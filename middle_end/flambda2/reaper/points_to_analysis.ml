@@ -563,22 +563,16 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     the calls.
 
     Function slots are considered as aliases for this analysis. *)
-let get_all_usages :
-    follow_known_arity_calls:bool ->
-    Datalog.database ->
-    unit Code_id_or_name.Map.t ->
-    usages =
+let add_usages_through_function_slots :
+    follow_known_arity_calls:bool -> Datalog.database -> usages -> usages =
   let open! Fixit in
   let stmt =
     let@ follow_known_arity_calls =
       paramc "follow_known_arity_calls" One.cols One.of_bool
     in
     let@ in_ = param "in_" Cols.[n] in
-    let@ out = fix1' (empty Cols.[n]) in
-    [ (let$ [x; y] = ["x"; "y"] in
-       [in_ % [x]; usages x y; has_usage y] ==> out % [y]);
-      (let$ [x; apply_witness; call_witness; code_id; my_closure_of_code_id; y]
-           =
+    let@ out = fix1' in_ in
+    [ (let$ [x; apply_witness; call_witness; code_id; my_closure_of_code_id; y] =
          [ "x";
            "apply_witness";
            "call_witness";
@@ -607,7 +601,7 @@ let get_all_usages :
          has_usage z ]
        ==> out % [z]) ]
   in
-  fun ~follow_known_arity_calls db s ->
+  fun ~follow_known_arity_calls db (Usages s) ->
     Usages (run stmt db follow_known_arity_calls s)
 
 let get_direct_usages :
@@ -620,11 +614,8 @@ let get_direct_usages :
      [ (let$ [x; y] = ["x"; "y"] in
         [in_ % [x]; usages x y; has_usage y] ==> out % [y]) ])
 
-type field_usage =
-  | Used_as_top
-  | Used_as_vars of unit Code_id_or_name.Map.t
-
-let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
+let get_one_field_usage :
+    Datalog.database -> Field.t -> usages -> _ Or_unknown_or_bottom.t =
   let open! Fixit in
   run
     (let@ in_field = param1s "in_field" Cols.f in
@@ -647,11 +638,18 @@ let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
             has_usage y ]
           ==> used_as_vars % [y]) ]
      in
-     if One.to_bool used_as_top then Used_as_top else Used_as_vars used_as_vars)
+     if One.to_bool used_as_top
+     then Or_unknown_or_bottom.Unknown
+     else if Code_id_or_name.Map.is_empty used_as_vars
+     then Or_unknown_or_bottom.Bottom
+     else Or_unknown_or_bottom.Ok used_as_vars)
 
 (** For an usage set, compute the way its fields are used. As function slots are
     transparent for [get_usages], functions slot usages are ignored here. *)
-let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
+let get_fields :
+    Datalog.database ->
+    usages ->
+    unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t =
   let open! Fixit in
   run
     (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
@@ -680,12 +678,15 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
              Field.print k
          | Some _, Some _ ->
            Misc.fatal_errorf "Got two results for field %a" Field.print k
-         | Some (), None -> Some Used_as_top
-         | None, Some m -> Some (Used_as_vars m))
+         | Some (), None -> Some Or_unknown.Unknown
+         | None, Some m -> Some (Or_unknown.Known m))
        out1 out2)
 
 let get_one_field_usage_of_constructors :
-    Datalog.database -> unit Code_id_or_name.Map.t -> Field.t -> field_usage =
+    Datalog.database ->
+    unit Code_id_or_name.Map.t ->
+    Field.t ->
+    _ Or_unknown_or_bottom.t =
   let open! Fixit in
   run
     (let@ in_ = param "in_" Cols.[n] in
@@ -702,10 +703,16 @@ let get_one_field_usage_of_constructors :
             ~~(One.flag out1) ]
           ==> out2 % [y]) ]
      in
-     if One.to_bool out1 then Used_as_top else Used_as_vars out2)
+     if One.to_bool out1
+     then Or_unknown_or_bottom.Unknown
+     else if Code_id_or_name.Map.is_empty out2
+     then Or_unknown_or_bottom.Bottom
+     else Or_unknown_or_bottom.Ok out2)
 
 let get_fields_usage_of_constructors :
-    Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t =
+    Datalog.database ->
+    unit Code_id_or_name.Map.t ->
+    unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t =
   let open! Fixit in
   run
     (let@ in_ = param "in_" Cols.[n] in
@@ -733,8 +740,8 @@ let get_fields_usage_of_constructors :
              Field.print k
          | Some _, Some _ ->
            Misc.fatal_errorf "Got two results for field %a" Field.print k
-         | Some (), None -> Some Used_as_top
-         | None, Some m -> Some (Used_as_vars m))
+         | Some (), None -> Some Or_unknown.Unknown
+         | None, Some m -> Some (Or_unknown.Known m))
        out1 out2)
 
 type set_of_closures_def =
@@ -1099,3 +1106,18 @@ let get_allocation_point =
 let any_usage db x = any_usage_query [x] db
 
 let any_source db x = any_source_query [x] db
+
+let get_usages db x : _ Or_unknown_or_bottom.t =
+  if not (has_usage_query [x] db)
+  then Bottom
+  else if any_usage_query [x] db
+  then Unknown
+  else Ok (get_direct_usages db (Code_id_or_name.Map.singleton x ()))
+
+let get_single_source db x : _ Or_unknown_or_bottom.t =
+  if not (has_source_query db x)
+  then Bottom
+  else
+    match get_allocation_point db x with
+    | None -> Unknown
+    | Some source -> Ok source
