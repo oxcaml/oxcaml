@@ -384,8 +384,8 @@ double_loop_no_definition_at_beginning:
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    .L158
-.L159:
+  jl    .L156
+.L157:
   addq  72(%r14), %rbx
   addq  $8, %rbx
   movq  $5111, -8(%rbx)
@@ -400,21 +400,12 @@ double_loop_no_definition_at_beginning:
   movq  %rbx, 56(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
-  je    .L128
-.L153:
-  movq  8(%rsp), %rbx
-  movq  %rbx, 64(%r14)
-  movq  (%rsp), %rdx
-  incq  %rdx
-  cmpq  %rsi, %rdx
-  jle   .L113
-  movq  16(%rsp), %rbx
-  jmp   .L149
+  jne   .L135
 .L128:
   movq  (%rdx), %rax
   movq  %rdx, 40(%rsp)
   call  camlTOP15__f_33_37_code@PLT
-.L160:
+.L158:
   movq  40(%rsp), %rdx
   movq  8(%rdx), %rdx
   movq  24(%rsp), %rax
@@ -423,7 +414,14 @@ double_loop_no_definition_at_beginning:
   movq  56(%rsp), %rbx
   testb $1, %dl
   je    .L128
-  jmp   .L153
+.L135:
+  movq  8(%rsp), %rbx
+  movq  %rbx, 64(%r14)
+  movq  (%rsp), %rdx
+  incq  %rdx
+  cmpq  %rsi, %rdx
+  jle   .L113
+  movq  16(%rsp), %rbx
 .L149:
   movq  %rbx, 64(%r14)
   movl  $1, %eax
@@ -436,12 +434,12 @@ double_loop_no_definition_at_beginning.f:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rax
-  jae   .L182
+  jae   .L177
   movq  16(%rbx), %rbx
   movq  %rbx, -4(%rsi,%rax,4)
   movl  $1, %eax
   ret
-.L182:
+.L177:
   movq  camlTOP15__block741@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

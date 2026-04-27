@@ -120,6 +120,8 @@ let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
 let use_ssa = ref true                       (* -use-ssa *)
 
+let ssa_simplify = ref false                 (* -ssa-simplify *)
+
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto

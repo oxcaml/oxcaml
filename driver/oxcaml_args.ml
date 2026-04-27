@@ -389,6 +389,14 @@ let mk_use_ssa f =
 let mk_no_use_ssa f =
   ("-no-use-ssa", Arg.Unit f, " Disable SSA intermediate representation")
 
+let mk_ssa_simplify f =
+  ( "-ssa-simplify",
+    Arg.Unit f,
+    " Run the SSA simplification pass (EXPERIMENTAL)" )
+
+let mk_no_ssa_simplify f =
+  ("-no-ssa-simplify", Arg.Unit f, " Disable the SSA simplification pass")
+
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
     Arg.Unit f,
@@ -1314,6 +1322,8 @@ module type Oxcaml_options = sig
   val caml_apply_inline_fast_path : unit -> unit
   val use_ssa : unit -> unit
   val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -1499,6 +1509,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_use_ssa F.use_ssa;
       mk_no_use_ssa F.no_use_ssa;
+      mk_ssa_simplify F.ssa_simplify;
+      mk_no_ssa_simplify F.no_ssa_simplify;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
@@ -1899,6 +1911,8 @@ module Oxcaml_options_impl = struct
 
   let use_ssa = set' Oxcaml_flags.use_ssa
   let no_use_ssa () = Oxcaml_flags.use_ssa := false
+  let ssa_simplify = set' Oxcaml_flags.ssa_simplify
+  let no_ssa_simplify () = Oxcaml_flags.ssa_simplify := false
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
@@ -2316,6 +2330,7 @@ module Extra_params = struct
     in
     match name with
     | "use-ssa" -> set' Oxcaml_flags.use_ssa
+    | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings

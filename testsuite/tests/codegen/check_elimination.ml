@@ -56,10 +56,6 @@ arr_sum:
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
-  jmp   .L114
-.L137:
-  movl  $1, %eax
-  ret
 .L114:
   leaq  1(%rdx,%rdx), %rcx
 <<<<<<< HEAD
@@ -72,19 +68,22 @@ arr_sum:
   movq  -4(%rbx,%rcx,4), %rcx
 =======
   cmpq  %rbx, %rcx
-  jae   .L140
+  jae   .L133
   movq  -4(%rdi,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L114
   ret
-.L140:
+.L133:
   movq  camlTOP2__block101@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L137:
+  movl  $1, %eax
+  ret
 |}]
 
 (* CR ttebbi: The generated control flow branches three (!) times on
@@ -112,11 +111,12 @@ search:
   movq  %rbx, %rax
   jmp   .L131
 .L116:
-  movq  (%rbx), %rdx
+  movq  (%rbx), %rax
   xorl  %esi, %esi
-  cmpq  %rdx, %rdi
+  cmpq  %rax, %rdi
   setl  %sil
-  jge   .L123
+  testq %rsi, %rsi
+  je    .L123
   movq  8(%rbx), %rax
   testq %rsi, %rsi
   jne   .L129

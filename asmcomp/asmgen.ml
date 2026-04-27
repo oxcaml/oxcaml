@@ -568,8 +568,10 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      (* Second conversion: produces the CFG that feeds the real pipeline. This
         is where SSA-level optimizations run. *)
-     let ssa = Ssa_simplify.run ssa in
-     if !Oxcaml_flags.dump_cfg
+     let ssa =
+       if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ssa else ssa
+     in
+     if !Oxcaml_flags.dump_cfg && !Oxcaml_flags.ssa_simplify
      then
        Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a"
          Ssa_print.print ssa;

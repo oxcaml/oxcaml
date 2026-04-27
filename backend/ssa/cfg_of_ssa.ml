@@ -265,8 +265,13 @@ let is_exception_predecessor (pred : Ssa.block) (target : Ssa.block) =
   | _ -> false
 
 let is_call_predecessor (pred : Ssa.block) (target : Ssa.block) =
+  (* [Probe] uses the [Call] constructor but has no return value to receive in
+     its continuation, so [cfg_of_ssa] doesn't register the continuation in
+     [env.call_result_locs]. We mirror that here so the predicate stays
+     consistent with [is_call_continuation]. *)
   match[@warning "-fragile-match"] pred.terminator with
-  | Call { continuation; _ } -> Ssa.block_equal continuation target
+  | Call { op = Func _ | Prim (External _); continuation; _ } ->
+    Ssa.block_equal continuation target
   | _ -> false
 
 let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
