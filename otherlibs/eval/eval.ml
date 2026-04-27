@@ -140,6 +140,10 @@ let eval (expr : 'a expr) =
       Misc.R (Clflags.shared, true);
       Misc.R (Clflags.dlcode, false) ]
   @@ fun () ->
+  (* Each [Eval.eval] call compiles a fresh, self-contained unit. Snapshot
+     the JIT's global symbol table so anonymous local labels (e.g. [.L277])
+     from this call do not collide with those of earlier calls. *)
+  Jit.protect_global_symbols @@ fun () ->
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
   (* We need this in case the quote contains unused module aliases that point to
