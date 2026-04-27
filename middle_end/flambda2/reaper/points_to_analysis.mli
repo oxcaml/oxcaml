@@ -82,28 +82,33 @@ end
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
-val get_all_usages :
-  follow_known_arity_calls:bool ->
-  Datalog.database ->
-  unit Code_id_or_name.Map.t ->
-  usages
+val add_usages_through_function_slots :
+  follow_known_arity_calls:bool -> Datalog.database -> usages -> usages
 
 val get_direct_usages :
   Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
 
-type field_usage =
-  | Used_as_top
-  | Used_as_vars of unit Code_id_or_name.Map.t
+val get_one_field_usage :
+  Datalog.database ->
+  Field.t ->
+  usages ->
+  unit Code_id_or_name.Map.t Or_unknown_or_bottom.t
 
-val get_one_field : Datalog.database -> Field.t -> usages -> field_usage
-
-val get_fields : Datalog.database -> usages -> field_usage Field.Map.t
+val get_fields :
+  Datalog.database ->
+  usages ->
+  unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t
 
 val get_one_field_usage_of_constructors :
-  Datalog.database -> unit Code_id_or_name.Map.t -> Field.t -> field_usage
+  Datalog.database ->
+  unit Code_id_or_name.Map.t ->
+  Field.t ->
+  unit Code_id_or_name.Map.t Or_unknown_or_bottom.t
 
 val get_fields_usage_of_constructors :
-  Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t
+  Datalog.database ->
+  unit Code_id_or_name.Map.t ->
+  unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t
 
 type set_of_closures_def =
   | Not_a_set_of_closures
@@ -150,3 +155,13 @@ val get_allocation_point :
 
 val perform_analysis :
   Datalog.database -> stats:Datalog.Schedule.stats -> Datalog.database
+
+val get_usages :
+  Datalog.database ->
+  Code_id_or_name.t ->
+  unit Code_id_or_name.Map.t Or_unknown_or_bottom.t
+
+val get_single_source :
+  Datalog.database ->
+  Code_id_or_name.t ->
+  Code_id_or_name.t Or_unknown_or_bottom.t

@@ -518,9 +518,9 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
           let[@local] default () =
             Some (Unboxed_fields.Not_unboxed (mk (Field.kind field) new_name))
           in
-          match (field_use : PTA.field_usage) with
-          | Used_as_top -> default ()
-          | Used_as_vars flow_to ->
+          match (field_use : _ Or_unknown.t) with
+          | Unknown -> default ()
+          | Known flow_to ->
             if Code_id_or_name.Map.is_empty flow_to
             then Misc.fatal_errorf "Empty set in [get_fields]";
             if
@@ -540,11 +540,12 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
                     "[mk_unboxed_fields]: unboxed fields, but [Many] sources"
                 | One v -> v
               in
+              let usages = PTA.get_direct_usages db flow_to in
               let unboxed_fields =
                 mk_unboxed_fields ~has_to_be_unboxed ~mk db new_unboxed_block
                   (PTA.get_fields db
-                     (PTA.get_all_usages ~follow_known_arity_calls:true db
-                        flow_to))
+                     (PTA.add_usages_through_function_slots
+                        ~follow_known_arity_calls:true db (Usages usages)))
                   new_name
               in
               Some (Unboxed_fields.Unboxed unboxed_fields)
@@ -633,13 +634,17 @@ let perform_analysis db ~stats =
                   (name_of_node code_or_name)
                   (name_of_node to_patch)
               in
+              let usages =
+                PTA.get_direct_usages db
+                  (Code_id_or_name.Map.singleton to_patch ())
+              in
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
                   ~mk:(fun kind name -> Variable.create name kind)
                   db code_or_name
                   (PTA.get_fields db
-                     (PTA.get_all_usages ~follow_known_arity_calls:true db
-                        (Code_id_or_name.Map.singleton to_patch ())))
+                     (PTA.add_usages_through_function_slots
+                        ~follow_known_arity_calls:true db (Usages usages)))
                   new_name
               in
               Code_id_or_name.Map.add to_patch fields unboxed)
@@ -680,9 +685,13 @@ let perform_analysis db ~stats =
                           field_kind = Block_access_field_kind.Any_value
                         }) )
                 in
-                let uses =
-                  PTA.get_all_usages ~follow_known_arity_calls:false db
+                let usages =
+                  PTA.get_direct_usages db
                     (Code_id_or_name.Map.singleton code_id_or_name ())
+                in
+                let uses =
+                  PTA.add_usages_through_function_slots
+                    ~follow_known_arity_calls:false db (Usages usages)
                 in
                 let repr =
                   mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name

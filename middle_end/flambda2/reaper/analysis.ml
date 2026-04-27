@@ -42,6 +42,8 @@ let has_use uses v = PTA.has_use uses.db v
 
 let any_usage uses v = PTA.any_usage uses.db v
 
+let get_usages uses v = PTA.get_usages uses.db v
+
 let field_used uses v f = PTA.field_used uses.db v f
 
 let not_local_field_has_source uses v f =

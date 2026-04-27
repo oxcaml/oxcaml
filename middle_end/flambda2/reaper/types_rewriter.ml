@@ -117,7 +117,7 @@ let[@inline] erase kind =
     Flambda_kind.With_subkind.Non_null_value_subkind.Anything
     (Flambda_kind.With_subkind.nullable kind)
 
-let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
+let rec rewrite_kind_with_subkind_not_top_not_bottom db usages kind =
   (* CR ncourant: rewrite changed representation, or at least replace with Top.
      Not needed while we don't change representation of blocks. *)
   match Flambda_kind.With_subkind.non_null_value_subkind kind with
@@ -138,12 +138,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
        is best to delete it. *)
     erase kind
   | Variant { consts; non_consts } ->
-    (* We don't need to follow indirect code pointers for usage, since functions
-       never appear in value_kinds *)
-    let usages =
-      PTA.get_all_usages ~follow_known_arity_calls:false db flow_to
-    in
-    let fields = PTA.get_fields db usages in
+    let fields = PTA.get_fields db (Usages usages) in
     let non_consts =
       Tag.Scannable.Map.map
         (fun (shape, kinds) ->
@@ -155,9 +150,10 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
                 in
                 match Field.Map.find_opt field fields with
                 | None -> (* maybe poison *) erase kind
-                | Some Used_as_top -> (* top *) kind
-                | Some (Used_as_vars flow_to) ->
-                  rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind)
+                | Some Unknown -> (* top *) kind
+                | Some (Known flow_to) ->
+                  let usages = PTA.get_direct_usages db flow_to in
+                  rewrite_kind_with_subkind_not_top_not_bottom db usages kind)
               kinds
           in
           shape, kinds)
@@ -171,14 +167,13 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
 let rewrite_kind_with_subkind uses var kind =
   let db = uses.UA.db in
   let var = Code_id_or_name.name var in
-  if PTA.any_usage db var
-  then kind
-  else if not (PTA.has_use db var)
-  then erase kind
-  else
-    rewrite_kind_with_subkind_not_top_not_bottom db
-      (Code_id_or_name.Map.singleton var ())
-      kind
+  match PTA.get_usages db var with
+  | Bottom -> erase kind
+  | Unknown -> kind
+  | Ok usages ->
+    (* We don't need to add usages through function slots, since functions never
+       appear in value_kinds. *)
+    rewrite_kind_with_subkind_not_top_not_bottom db usages kind
 
 let forget_all_types = lazy (Flambda_features.debug_reaper "forget-types")
 
@@ -616,12 +611,12 @@ module Rewriter = struct
         ( Unboxed_fields.Not_unboxed (Some v, x),
           Pattern.var v (var x field_source field_use) )
       | Unboxed unboxed_fields -> (
-        match (field_use : PTA.field_usage) with
-        | Used_as_top ->
+        match (field_use : _ Or_unknown.t) with
+        | Unknown ->
           Misc.fatal_errorf
             "In [patterns_for_unboxed_fields], field was unboxed but has \
              [Used_as_top] usage"
-        | Used_as_vars flow_to -> (
+        | Known flow_to -> (
           match field_source with
           | No_source ->
             Misc.fatal_errorf
@@ -632,9 +627,11 @@ module Rewriter = struct
               "In [patterns_for_unboxed_fields], field was unboxed but has \
                many sources"
           | One field_source ->
+            let usages = PTA.get_direct_usages db flow_to in
             let fields =
               PTA.get_fields db
-                (PTA.get_all_usages ~follow_known_arity_calls:true db flow_to)
+                (PTA.add_usages_through_function_slots
+                   ~follow_known_arity_calls:true db (Usages usages))
             in
             let vars, patterns =
               patterns_for_unboxed_fields ~machine_width
@@ -711,13 +708,10 @@ module Rewriter = struct
 
   let follow_field result t field =
     let[@local] for_usages usages =
-      match PTA.get_one_field result.UA.db field (Usages usages) with
-      | Used_as_top -> Many_sources_any_usage
-      | Used_as_vars vs ->
-        let usages = PTA.get_direct_usages result.UA.db vs in
-        if Code_id_or_name.Map.is_empty usages
-        then At_least_one_source_no_usages
-        else Many_sources_usages usages
+      match PTA.get_one_field_usage result.UA.db field (Usages usages) with
+      | Unknown -> Many_sources_any_usage
+      | Bottom -> At_least_one_source_no_usages
+      | Ok vars -> Many_sources_usages (PTA.get_direct_usages result.UA.db vars)
     in
     match t with
     | No_source ->
@@ -739,13 +733,11 @@ module Rewriter = struct
         match PTA.get_single_field_source result.UA.db source field with
         | No_source -> No_source
         | One field_source -> Single_source field_source
-        | Many ->
-          if PTA.any_usage result.UA.db source
-          then Many_sources_any_usage
-          else
-            for_usages
-              (PTA.get_direct_usages result.db
-                 (Code_id_or_name.Map.singleton source ())))
+        | Many -> (
+          match PTA.get_usages result.UA.db source with
+          | Unknown -> Many_sources_any_usage
+          | Bottom -> At_least_one_source_no_usages
+          | Ok usages -> for_usages usages))
 
   let follow_field_for_set_of_closures result set_of_closures value_slot =
     let field = Field.value_slot value_slot in
@@ -782,12 +774,9 @@ module Rewriter = struct
             set_of_closures Code_id_or_name.Map.empty
         in
         match PTA.get_one_field_usage_of_constructors result.db c field with
-        | Used_as_top -> Many_sources_any_usage
-        | Used_as_vars vs ->
-          let usages = PTA.get_direct_usages result.db vs in
-          if Code_id_or_name.Map.is_empty usages
-          then At_least_one_source_no_usages
-          else Many_sources_usages usages)
+        | Unknown -> Many_sources_any_usage
+        | Bottom -> At_least_one_source_no_usages
+        | Ok vars -> Many_sources_usages (PTA.get_direct_usages result.db vars))
 
   let rewrite (result, usages) typing_env flambda_type =
     let open Flambda2_types.Rewriter in
@@ -902,8 +891,8 @@ module Rewriter = struct
                   match field_source, field_use with
                   | No_source, _ -> No_source
                   | One source, _ -> Single_source source
-                  | Many, Used_as_top -> Many_sources_any_usage
-                  | Many, Used_as_vars flow_to ->
+                  | Many, Unknown -> Many_sources_any_usage
+                  | Many, Known flow_to ->
                     let usages = PTA.get_direct_usages result.UA.db flow_to in
                     Many_sources_usages usages
                 in
@@ -1118,13 +1107,14 @@ module Rewriter = struct
               Value_slot.Map.mapi
                 (fun value_slot _value_slot_type ->
                   match
-                    PTA.get_one_field db
+                    PTA.get_one_field_usage db
                       (Field.value_slot value_slot)
                       (Usages usages_for_value_slots)
                   with
-                  | Used_as_top -> Many_sources_any_usage
-                  | Used_as_vars vs ->
-                    Many_sources_usages (PTA.get_direct_usages db vs))
+                  | Unknown -> Many_sources_any_usage
+                  | Bottom -> At_least_one_source_no_usages
+                  | Ok vars ->
+                    Many_sources_usages (PTA.get_direct_usages db vars))
                 value_slot_types
             in
             no_representation_change current_function_slot usages_of_value_slots
@@ -1295,21 +1285,18 @@ let rewrite_typing_env result ~unit_symbol:_ typing_env =
     then result, Rewriter.Many_sources_any_usage
     else
       let sym = Code_id_or_name.symbol sym in
-      if not (PTA.has_source_query db sym)
-      then result, Rewriter.No_source
-      else if not (PTA.has_use db sym)
-      then result, Rewriter.At_least_one_source_no_usages
-      else
-        match PTA.get_allocation_point db sym with
-        | Some alloc_point -> result, Rewriter.Single_source alloc_point
-        | None ->
-          if PTA.any_usage db sym
-          then result, Rewriter.Many_sources_any_usage
-          else
-            ( result,
-              Rewriter.Many_sources_usages
-                (PTA.get_direct_usages db
-                   (Code_id_or_name.Map.singleton sym ())) )
+      match PTA.get_single_source db sym with
+      | Bottom -> result, Rewriter.No_source
+      | Ok source -> (
+        (* CR bclement: has_use? *)
+        match PTA.get_usages db sym with
+        | Bottom -> result, Rewriter.At_least_one_source_no_usages
+        | Unknown | Ok _ -> result, Rewriter.Single_source source)
+      | Unknown -> (
+        match PTA.get_usages db sym with
+        | Bottom -> result, Rewriter.At_least_one_source_no_usages
+        | Unknown -> result, Rewriter.Many_sources_any_usage
+        | Ok usages -> result, Rewriter.Many_sources_usages usages)
   in
   let r =
     Profile.record_call ~accumulate:true "types" (fun () ->
@@ -1333,76 +1320,78 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
     let var = Code_id_or_name.var var in
     let db = result.UA.db in
     if Code_id_or_name.Map.mem var result.UA.unboxed_fields
-    then (
+    then
       let unboxed_fields = Code_id_or_name.Map.find var result.unboxed_fields in
-      if PTA.any_usage db var
-      then
+      match PTA.get_usages db var with
+      | Unknown ->
         Misc.fatal_errorf "In [rewrite_result_types], var %a is unboxed but top"
-          Code_id_or_name.print var;
-      let allocation_point =
-        match PTA.get_allocation_point db var with
-        | None ->
-          Misc.fatal_errorf
-            "In [rewrite_result_types], var %a is unboxed but could not get \
-             its allocation point"
-            Code_id_or_name.print var
-        | Some allocation_point -> allocation_point
-      in
-      let fields =
-        PTA.get_fields db
-          (PTA.get_all_usages ~follow_known_arity_calls:true db
-             (Code_id_or_name.Map.singleton var ()))
-      in
-      let bound, pat =
-        Rewriter.patterns_for_unboxed_fields
-          ~machine_width:(Typing_env.machine_width old_typing_env)
-          ~patterns_for_function_slots:None db
-          ~var:(fun v field_source field_use ->
-            let metadata =
-              match field_source, field_use with
-              | No_source, _ -> Rewriter.No_source
-              | One source, _ -> Rewriter.Single_source source
-              | Many, Used_as_top -> Rewriter.Many_sources_any_usage
-              | Many, Used_as_vars flow_to ->
-                let usages = PTA.get_direct_usages db flow_to in
-                Rewriter.Many_sources_usages usages
-            in
-            Variable.name v, (result, metadata))
-          fields unboxed_fields allocation_point
-      in
-      let all_vars =
-        Unboxed_fields.fold_with_kind
-          (fun _kind (pattern_var, v) acc ->
-            match pattern_var with
-            | None ->
-              Misc.fatal_errorf
-                "In [rewrite_result_types], could not get a pattern variable \
-                 for unboxed var %a@."
-                Variable.print v
-            | Some pattern_var -> pattern_var :: acc)
-          bound []
-      in
-      (pat, kind), all_vars)
+          Code_id_or_name.print var
+      | Bottom ->
+        Misc.fatal_errorf
+          "In [rewrite_result_types], var %a is unboxed but has no usage"
+          Code_id_or_name.print var
+      | Ok usages ->
+        let allocation_point =
+          match PTA.get_single_source db var with
+          | Bottom | Unknown ->
+            Misc.fatal_errorf
+              "In [rewrite_result_types], var %a is unboxed but could not get \
+               its allocation point"
+              Code_id_or_name.print var
+          | Ok allocation_point -> allocation_point
+        in
+        let fields =
+          PTA.get_fields db
+            (PTA.add_usages_through_function_slots
+               ~follow_known_arity_calls:true db (Usages usages))
+        in
+        let bound, pat =
+          Rewriter.patterns_for_unboxed_fields
+            ~machine_width:(Typing_env.machine_width old_typing_env)
+            ~patterns_for_function_slots:None db
+            ~var:(fun v field_source field_use ->
+              let metadata =
+                match field_source, field_use with
+                | No_source, _ -> Rewriter.No_source
+                | One source, _ -> Rewriter.Single_source source
+                | Many, Unknown -> Rewriter.Many_sources_any_usage
+                | Many, Known flow_to ->
+                  let usages = PTA.get_direct_usages db flow_to in
+                  Rewriter.Many_sources_usages usages
+              in
+              Variable.name v, (result, metadata))
+            fields unboxed_fields allocation_point
+        in
+        let all_vars =
+          Unboxed_fields.fold_with_kind
+            (fun _kind (pattern_var, v) acc ->
+              match pattern_var with
+              | None ->
+                Misc.fatal_errorf
+                  "In [rewrite_result_types], could not get a pattern variable \
+                   for unboxed var %a@."
+                  Variable.print v
+              | Some pattern_var -> pattern_var :: acc)
+            bound []
+        in
+        (pat, kind), all_vars
     else
       match to_keep with
       | PTA.Delete -> (Flambda2_types.Rewriter.Pattern.any, kind), []
       | PTA.Keep ->
         let metadata =
-          if not (PTA.has_source_query db var)
-          then result, Rewriter.No_source
-          else if not (PTA.has_use db var)
-          then result, Rewriter.At_least_one_source_no_usages
-          else
-            match PTA.get_allocation_point db var with
-            | Some alloc_point -> result, Rewriter.Single_source alloc_point
-            | None ->
-              if PTA.any_usage db var
-              then result, Rewriter.Many_sources_any_usage
-              else
-                ( result,
-                  Rewriter.Many_sources_usages
-                    (PTA.get_direct_usages db
-                       (Code_id_or_name.Map.singleton var ())) )
+          match PTA.get_single_source db var with
+          | Bottom -> result, Rewriter.No_source
+          | Ok source -> (
+            (* CR bclement: has_use? *)
+            match PTA.get_usages db var with
+            | Bottom -> result, Rewriter.At_least_one_source_no_usages
+            | Unknown | Ok _ -> result, Rewriter.Single_source source)
+          | Unknown -> (
+            match PTA.get_usages db var with
+            | Bottom -> result, Rewriter.At_least_one_source_no_usages
+            | Unknown -> result, Rewriter.Many_sources_any_usage
+            | Ok usages -> result, Rewriter.Many_sources_usages usages)
         in
         let v = Flambda2_types.Rewriter.Var.create () in
         let pat = Flambda2_types.Rewriter.Pattern.var v (name, metadata) in

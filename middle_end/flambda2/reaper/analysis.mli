@@ -27,6 +27,11 @@ val has_use : result -> Code_id_or_name.t -> bool
 
 val any_usage : result -> Code_id_or_name.t -> bool
 
+val get_usages :
+  result ->
+  Code_id_or_name.t ->
+  unit Code_id_or_name.Map.t Or_unknown_or_bottom.t
+
 val has_source : result -> Code_id_or_name.t -> bool
 
 val any_source : result -> Code_id_or_name.t -> bool
