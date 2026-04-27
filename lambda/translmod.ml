@@ -143,6 +143,7 @@ let rec apply_coercion loc strict restr arg =
       let lam = transl_module_path loc env path in
       name_lambda strict arg Lambda.layout_module
         (fun _ -> apply_coercion loc Alias cc lam)
+  | Tcoerce_invalid -> Misc.fatal_error "Translmod: invalid coercion"
 
 and apply_coercion_field loc get_field (pos, cc) =
   apply_coercion loc Alias cc (get_field pos)
@@ -1074,7 +1075,8 @@ let module_block_size component_names coercion =
   | Tcoerce_structure { pos_cc_list; _ } -> List.length pos_cc_list
   | Tcoerce_functor _
   | Tcoerce_primitive _
-  | Tcoerce_alias _ -> assert false
+  | Tcoerce_alias _
+  | Tcoerce_invalid -> assert false
 
 let transl_implementation compilation_unit impl ~loc =
   reset_labels ();

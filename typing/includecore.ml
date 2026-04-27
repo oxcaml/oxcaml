@@ -149,46 +149,20 @@ let primitive_descriptions pd1 pd2 =
    there is a context E such that [E |- vd1 <: vd2] for the ordinary subtyping.
    For values, this is the case as soon as the kind of [vd1] is a subkind of the
    [vd2] kind. *)
-let value_descriptions_consistency env vd1 vd2 =
+let value_descriptions_consistency _env vd1 vd2 =
   match (vd1.val_kind, vd2.val_kind) with
   | (Val_prim p1, Val_prim p2) -> begin
-      let locality = [ Mode.Locality.global; Mode.Locality.local ] in
-      let forkable = [ Mode.Forkable.forkable; Mode.Forkable.unforkable ] in
-      let yielding = [ Mode.Yielding.unyielding; Mode.Yielding.yielding ] in
-      List.iter (fun loc ->
-       List.iter (fun fork ->
-        List.iter (fun yield ->
-          let ty1, _, _, _ = Ctype.instance_prim env p1 vd1.val_type in
-          let ty2, mode_l2, mode_fy2, _ =
-            Ctype.instance_prim env p2 vd2.val_type
-          in
-          let mode_f2 = Option.map fst mode_fy2 in
-          let mode_y2 = Option.map snd mode_fy2 in
-          Option.iter (Mode.Locality.equate_exn loc) mode_l2;
-          Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
-          Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-          try
-            Ctype.moregeneral env true ty1 ty2
-          with Ctype.Moregen err ->
-            raise (Dont_match (Type err))
-        ) yielding
-       ) forkable
-      ) locality;
       match primitive_descriptions p1 p2 with
       | None -> Tcoerce_none
       | Some err -> raise (Dont_match (Primitive_mismatch err))
     end
-  | (Val_prim p, _) ->
-      let _ty, mode_l, _mode_fy, sort =
-        Ctype.instance_prim env p vd1.val_type
-      in
-      let pc =
-        { pc_desc = p; pc_type = vd2.Types.val_type;
-          pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l;
-          pc_poly_sort = sort;
-          pc_env = env; pc_loc = vd1.Types.val_loc; }
-      in
-      Tcoerce_primitive pc
+  | (Val_prim _, _) ->
+      (* Here we can not compute a valid coercion, because it may depend on the
+         local environment of the module, which is not made available in the
+         consistency check. But the coercion computed by the [*_consistency]
+         functions is never used, so it's fine. We return [Tcoerce_invalid] so
+         that if someone ever started using this, they'd get a loud error. *)
+      Tcoerce_invalid
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 

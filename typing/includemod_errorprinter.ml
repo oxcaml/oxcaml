@@ -127,6 +127,9 @@ module Runtime_coercion = struct
           (first_change_under (InBody::path)) res
     | Tcoerce_none -> None
     | Tcoerce_alias _ | Tcoerce_primitive _ -> None
+    | Tcoerce_invalid ->
+      Misc.fatal_error
+        "Includemod_errorprinter.first_change_under: invalid coercion"
 
   (* we search the first point which is not invariant at the current level *)
   and first_item_transposition path pos = function

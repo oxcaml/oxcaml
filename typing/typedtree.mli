@@ -983,6 +983,9 @@ and module_coercion =
         struct module Sub = Some_alias end
       ]}
       Only occurs inside a [Tcoerce_structure] coercion. *)
+  | Tcoerce_invalid
+  (** This coercion is only constructed by the recursive module consistency
+      check, whose result is discarded. It's a bug if it shows up anywhere. *)
 
 and module_type =
   { mty_desc: module_type_desc;

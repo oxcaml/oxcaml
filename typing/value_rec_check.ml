@@ -360,6 +360,8 @@ let classify_expression : Typedtree.expression -> sd =
             Misc.fatal_error "letrec: primitive coercion on a module"
         | Tcoerce_alias _ ->
             Misc.fatal_error "letrec: alias coercion on a module"
+        | Tcoerce_invalid ->
+            Misc.fatal_error "letrec: invalid coercion on a module"
         end
     | Tmod_unpack (e, _) ->
         classify_expression env e
@@ -1221,6 +1223,8 @@ and modexp : Typedtree.module_expr -> term_judg =
           (* Alias coercions ignore their arguments, but they evaluate
              their alias module 'pth' under another coercion. *)
           coercion coe (fun m -> path pth << m)
+        | Tcoerce_invalid ->
+          Misc.fatal_error "Value_rec_check.modexp: invalid coercion"
       in
       coercion coe (fun m -> modexp mexp << m)
     | Tmod_unpack (e, _) ->

@@ -446,6 +446,8 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         Printtyp.path p
         print_coercion c
+  | Tcoerce_invalid ->
+      pr "invalid_coercion"
 and print_coercion2 ppf (n, c) =
   Format.fprintf ppf "@[%d,@ %a@]" n print_coercion c
 and print_coercion3 ppf (i, n, c) =

@@ -645,6 +645,7 @@ and module_coercion =
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
+  | Tcoerce_invalid
 
 and module_type =
   { mty_desc: module_type_desc;

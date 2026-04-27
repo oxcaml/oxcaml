@@ -23,28 +23,10 @@ end = struct
 end
 
 [%%expect{|
-Line 1:
-Error: Modules do not match:
-         sig
-           type 'a repr
-           type ('a, 'permission) t = 'a repr
-           external to_repr : 'a repr -> 'a repr = "%identity"
-         end
-       is not included in
-         sig
-           type 'a repr
-           type ('a, 'permission) t
-           external to_repr : ('a, 'b) t -> 'a repr = "%identity"
-         end
-       Values do not match:
-         external to_repr : 'a repr/1 -> 'a repr/1 = "%identity"
-       is not included in
-         external to_repr : ('a, 'b) t/2 -> 'a repr/2 = "%identity"
-       The type "'a repr/1 -> 'a repr/1" is not compatible with the type
-         "('b, 'c) t/2 -> 'b repr/2"
-       Type "'a repr/1" is not compatible with type "('b, 'c) t/2"
-       Line 7, characters 2-14:
-         Definition of type "repr/1"
-       Line 8, characters 2-36:
-         Definition of type "t/1"
+module rec Bvar :
+  sig
+    type 'a repr
+    type ('a, 'permission) t
+    external to_repr : ('a, 'b) t -> 'a repr = "%identity"
+  end
 |}]
