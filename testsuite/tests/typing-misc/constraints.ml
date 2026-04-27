@@ -28,9 +28,9 @@ Line 1, characters 0-26:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
-         type "'a t/2"
+         type "'a t"
        but it is used as
-         "'a t/2 t/2".
+         "'a t t".
        All uses need to match the definition for the recursive type to be regular.
 |}];;
 type 'a t = [`A of 'a t t] constraint 'a = 'a t;; (* fails since 4.04 *)
@@ -186,9 +186,9 @@ Line 1, characters 0-42:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
-         type "('b * 'b) t/2 t/2"
+         type "('b * 'b) t t"
        but it is used as
-         "('b * 'b) t/2".
+         "('b * 'b) t".
        All uses need to match the definition for the recursive type to be regular.
 |}]
 
@@ -217,9 +217,9 @@ Line 1, characters 0-49:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
-         type "'b t/2 t/2"
+         type "'b t t"
        but it is used as
-         "'b t/2".
+         "'b t".
        All uses need to match the definition for the recursive type to be regular.
 |}]
 
@@ -239,9 +239,9 @@ Line 1, characters 19-54:
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
-         type "'b t/3 t/3"
+         type "'b t t"
        but it is used as
-         "'b t/3".
+         "'b t".
        All uses need to match the definition for the recursive type to be regular.
 |}]
 module rec M : sig type 'a t = 'b constraint 'a = ('b * 'b) t end = M;;
@@ -251,9 +251,9 @@ Line 1, characters 19-61:
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
-         type "('b * 'b) t/4 t/4"
+         type "('b * 'b) t t"
        but it is used as
-         "('b * 'b) t/4".
+         "('b * 'b) t".
        All uses need to match the definition for the recursive type to be regular.
 |}]
 
