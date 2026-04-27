@@ -578,11 +578,8 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
     Format.fprintf ppf "*** CFG comparison MISMATCH for %s:@.%s@." fun_name msg;
     Format.fprintf ppf "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
     Format.fprintf ppf "*** SSA:@.%a@." Ssa_print.print ssa;
-    Format.fprintf ppf "*** Old CFG:@.%a@."
-      (Cfg_with_layout.dump ~msg:"")
-      old_cfg;
-    Format.fprintf ppf "*** New CFG (from SSA):@.%a@."
-      (Cfg_with_layout.dump ~msg:"")
+    Format.fprintf ppf "*** Old CFG:@.%a@." Printcfg.cfg_with_layout old_cfg;
+    Format.fprintf ppf "*** New CFG (from SSA):@.%a@." Printcfg.cfg_with_layout
       new_cfg;
     Format.pp_print_flush ppf ();
     Format.print_flush ();

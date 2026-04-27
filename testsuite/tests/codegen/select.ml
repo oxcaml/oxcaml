@@ -53,7 +53,6 @@ select_cmp_twice:
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
   setl  %al
-  movzbq %al, %rax
   leaq  1(%rax,%rax), %rsi
   movl  $41, %eax
   movl  $21, %edx
