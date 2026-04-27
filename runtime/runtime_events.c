@@ -422,14 +422,14 @@ static int perf_events_setup(struct perf_counters* counters,
 static void perf_events_sample(struct perf_counters* counters,
                                uint64_t* samples)
 {
+  int n = counters->ncounters;
   if (*counters->leader_seq_lock != counters->last_seq) {
     if (perf_events_setup_rdpmc(counters) != 0) {
-      memset(samples, 0, counters->ncounters * sizeof(uint64_t));
+      memset(samples, 0, n * sizeof(uint64_t));
       return;
     }
   }
 retry:
-  int n = counters->ncounters;
   for (int i = 0; i < n; i++) {
     struct perf_counter_rdpmc_info info = counters->rdpmc_info[i];
     uint64_t v = _rdpmc(info.index);
@@ -440,7 +440,7 @@ retry:
   seqlock_barrier();
   if (*counters->leader_seq_lock != counters->last_seq) {
     if (perf_events_setup_rdpmc(counters) != 0) {
-      memset(samples, 0, counters->ncounters * sizeof(uint64_t));
+      memset(samples, 0, n * sizeof(uint64_t));
       return;
     }
     goto retry;
