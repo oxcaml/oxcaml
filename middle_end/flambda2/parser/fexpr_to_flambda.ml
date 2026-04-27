@@ -136,11 +136,7 @@ let field_of_block env (v : Fexpr.field_of_block) =
   let simple =
     match v with
     | Symbol s -> Simple.symbol (get_symbol env s)
-    | Tagged_immediate i ->
-      let i = Targetint_32_64.of_string machine_width i in
-      Simple.const
-        (Reg_width_const.tagged_immediate
-           (Target_ocaml_int.of_targetint machine_width i))
+    | Const cst -> Simple.const (const cst)
     | Dynamically_computed var ->
       let var = find_var env var in
       Simple.var var
@@ -568,9 +564,49 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const
             (SC.immutable_float_array
                (List.map (or_variable float env) elements))
+        | Immutable_float32_array elements ->
+          static_const
+            (SC.immutable_float32_array
+               (List.map (or_variable float32 env) elements))
         | Immutable_value_array elements ->
           static_const
             (SC.immutable_value_array (List.map (field_of_block env) elements))
+        | Immutable_int_array elements ->
+          static_const
+            (SC.immutable_int_array
+               (List.map (or_variable targetint_31_63 env) elements))
+        | Immutable_int8_array elements ->
+          static_const
+            (SC.immutable_int8_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_int16_array elements ->
+          static_const
+            (SC.immutable_int16_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_int32_array elements ->
+          static_const
+            (SC.immutable_int32_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_int64_array elements ->
+          static_const
+            (SC.immutable_int64_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_nativeint_array elements ->
+          static_const
+            (SC.immutable_nativeint_array
+               (List.map (or_variable targetint env) elements))
+        | Immutable_vec128_array elements ->
+          static_const
+            (SC.immutable_vec128_array
+               (List.map (or_variable vec128 env) elements))
+        | Immutable_vec256_array elements ->
+          static_const
+            (SC.immutable_vec256_array
+               (List.map (or_variable vec256 env) elements))
+        | Immutable_vec512_array elements ->
+          static_const
+            (SC.immutable_vec512_array
+               (List.map (or_variable vec512 env) elements))
         | Empty_array array_kind -> static_const (SC.empty_array array_kind)
         | Mutable_string { initial_value = s } ->
           static_const (SC.mutable_string ~initial_value:s)

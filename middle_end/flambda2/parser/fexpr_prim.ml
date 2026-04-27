@@ -273,17 +273,27 @@ let array_kind =
     @@ constructor_flag
          ~no_match_handler:(fun (k : P.Array_kind.t) ->
            match k with
-           | Immediates | Values | Naked_floats | Gc_ignorable_values ->
-             assert false
+           | Immediates | Values | Naked_floats | Gc_ignorable_values
            | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
            | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-           | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
+           | Naked_vec256s | Naked_vec512s ->
+             assert false
+           | Unboxed_product _ ->
              Misc.fatal_error
-               "fexpr support for arrays of unboxed elements not yet \
-                implemented")
+               "fexpr support for structured kinds not yet implemented")
          P.Array_kind.
            [ "imm", Immediates;
              "float", Naked_floats;
+             "float32", Naked_float32s;
+             "int", Naked_ints;
+             "int8", Naked_int8s;
+             "int16", Naked_int16s;
+             "int32", Naked_int32s;
+             "int64", Naked_int64s;
+             "nativeint", Naked_nativeints;
+             "vec128", Naked_vec128s;
+             "vec256", Naked_vec256s;
+             "vec512", Naked_vec512s;
              "gc_ign", Gc_ignorable_values ])
 
 let array_kind_for_length =
