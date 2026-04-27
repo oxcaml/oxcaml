@@ -1261,12 +1261,15 @@ L(do_perform):
         (no-op unless this is a reperform) */
         SWITCH_OCAML_TO_C
     /* Save x0 (effect, needed later by caml_raise_unhandled_effect) and x30
-       across the C call */
+       across the C call. The continuation in x1 is saved in callee-saved
+       x19. */
         stp     x0, x30, [sp, -16]!
         CFI_ADJUST(16)
+        mov     x19, x1
         mov     x0, x1 /* pass continuation to caml_continuation_use_noexc */
         bl      G(caml_continuation_use_noexc) /* x0 := stack */
         mov     x10, x0
+        mov     x1, x19 /* restore continuation */
         ldp     x0, x30, [sp], 16
         CFI_ADJUST(-16)
         SWITCH_C_TO_OCAML
