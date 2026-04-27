@@ -306,15 +306,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         Data_types.lbl_res_type_path
 
     and tree_of_unboxed_product_label =
-      let lbl_res_type_path lbl =
-        match Types.get_desc lbl.Data_types.lbl_res with
-        | Tconstr (p, _, _) -> p
-        | _ -> assert false
-      in
       tree_of_qualified
         (Env.lookup_all_labels ~use:false ~record_form:Unboxed_product
            ~loc:Location.none Env.Construct)
-        lbl_res_type_path
+        Data_types.gen_lbl_res_type_path
 
     (* An abstract type *)
 
