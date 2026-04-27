@@ -132,15 +132,13 @@ let eval (expr : 'a expr) =
      [expectnat]'s phrase-by-phrase compile-and-link cycle, where a lingering
      [dlcode = false] causes the system linker to reject non-PIC text
      relocations when bundling the next phrase into a shared object). *)
-  Clflags.protect_optimization_state
-  @@ fun () ->
+  Clflags.protect_optimization_state @@ fun () ->
   Misc.protect_refs
     [ Misc.R (Clflags.no_cwd, true);
       Misc.R (Clflags.native_code, true);
       Misc.R (Clflags.dont_write_files, true);
       Misc.R (Clflags.shared, true);
-      Misc.R (Clflags.dlcode, false)
-    ]
+      Misc.R (Clflags.dlcode, false) ]
   @@ fun () ->
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
