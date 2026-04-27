@@ -4717,6 +4717,7 @@ let report_error ~loc = function
       let reaching_path = Reaching_path.simplify reaching_path in
       Out_type.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
+      Out_type.Ident_names.reset ();
       Location.errorf ~loc
         "This recursive type is not regular.@ \
          @[<v>The type constructor %a is defined as@;<1 2>type %a@ \
