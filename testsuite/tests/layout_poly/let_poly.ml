@@ -11,31 +11,29 @@ go through lambda and middle-end. *)
 
 let poly_ id x = x
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
 |}]
 
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <fun>
+val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
 |}]
 
 let poly_ id =
   let f x = x in
   f
 [%%expect{|
-Lines 5-6, characters 4-5:
-5 | ....let f x = x in
-6 |     f
+Lines 2-3, characters 2-3:
+2 | ..let f x = x in
+3 |   f
 Error: This expression is not allowed in a "let poly_" definition;
        it must be a function, constructor, tuple, record, or constant.
 |}]
 
 let poly_ id = fun x -> x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <fun>
+val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
 |}]
 
 
@@ -43,8 +41,9 @@ val id : layout_ l. ('a : l). 'a -> 'a = <fun>
 let poly_ const x y = x
 and poly_ apply f x = f x
 [%%expect{|
-val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <fun>
-val apply : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b = <fun>
+val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <layout poly>
+val apply : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b =
+  <layout poly>
 |}]
 
 (* Tuple pattern - both bindings have separate univars *)
@@ -164,9 +163,9 @@ Error: Signature mismatch:
 (* The RHS has to be a syntactic value *)
 let poly_ pair = let y = 42 in fun x -> #(x, y)
 [%%expect{|
-Line 4, characters 19-49:
-4 |   let poly_ pair = let y = 42 in fun x -> #(x, y)
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 17-47:
+1 | let poly_ pair = let y = 42 in fun x -> #(x, y)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
        it must be a function, constructor, tuple, record, or constant.
 |}]
@@ -174,9 +173,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* constructor: passing when all args are syntactic values *)
 let poly_ f = Some (fun x -> x)
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val f : layout_ l. ('a : l). ('a -> 'a) option = <layout poly>
 |}]
 
 (* constructor: failing when an arg is not a syntactic value *)
@@ -196,17 +193,14 @@ Line 1, characters 10-11:
 1 | let poly_ f = `A
               ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val f : [> `A ] = `A
 |}]
 
 (* variant: passing - payload is a syntactic value *)
 let poly_ f = `A (fun x -> x)
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val f : layout_ l. ('a : l). [> `A of 'a -> 'a ] = <layout poly>
 |}]
 
 (* variant: failing - payload is not a syntactic value *)
@@ -222,9 +216,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* tuple: passing when all components are syntactic values *)
 let poly_ f = (42, fun x -> x)
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val f : layout_ l. ('a : l). int * ('a -> 'a) = <layout poly>
 |}]
 
 (* tuple: failing when a component is not a syntactic value *)
@@ -240,9 +232,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* unboxed tuple: passing when all components are syntactic values *)
 let poly_ f = #(42, fun x -> x)
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val f : layout_ l. ('a : l). #(int * ('a -> 'a)) = <layout poly>
 |}]
 
 (* unboxed tuple: failing when a component is not a syntactic value *)
@@ -264,9 +254,8 @@ Line 2, characters 10-11:
 2 | let poly_ f = { a = 42; b = fun x -> x }
               ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val f : r = {a = 42; b = <fun>}
 |}]
 
 (* record: failing when a field is not a syntactic value *)
@@ -288,9 +277,8 @@ Line 2, characters 10-11:
 2 | let poly_ f = #{ a = 42; b = 0 }
               ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val f : ur = #{a = 42; b = 0}
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
@@ -304,19 +292,15 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
-module M : sig
-  val f : int
-end = struct
-  let poly_ f x y = #(x, (y, y))
-end
+let poly_ f x y = #(x, (y, y))
 [%%expect{|
-val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b)) = <fun>
+val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b)) = <layout poly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
 let poly_ f x = (x : (_ : any))
 [%%expect{|
-val f : layout_ l. ('a : l). 'a -> 'a = <fun>
+val f : layout_ l. ('a : l). 'a -> 'a = <layout poly>
 |}]
 
 (* [value] does constrain the layout *)
@@ -333,7 +317,7 @@ val f : 'a -> 'a = <fun>
 (* [assert false] is layout poly *)
 let poly_ f () = assert false
 [%%expect{|
-val f : layout_ l. ('a : l). unit -> 'a = <fun>
+val f : layout_ l. ('a : l). unit -> 'a = <layout poly>
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic
@@ -344,7 +328,7 @@ let poly_ foo x y =
   let _ = id y in
   ()
 [%%expect{|
-val foo : layout_ l. ('a : l) ('b : l). 'a -> 'b -> unit = <fun>
+val foo : layout_ l. ('a : l) ('b : l). 'a -> 'b -> unit = <layout poly>
 |}]
 
 (* We observe that foo is polymorphic on two types NOT sharing the same polymorphic
@@ -355,7 +339,7 @@ let poly_ foo x y =
   let _ = id y in
   ()
 [%%expect{|
-val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <fun>
+val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <layout poly>
 |}]
 
 (* [rec] prevents layout polymorphism, even for fake recursion (no
