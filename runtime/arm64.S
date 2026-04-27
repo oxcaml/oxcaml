@@ -602,6 +602,10 @@ END_FUNCTION(caml_call_gc)
 */
 FUNCTION(caml_preempt)
         CFI_STARTPROC
+    /* Inherit caml_call_gc's frame */
+        CFI_ADJUST(16)
+        CFI_OFFSET(29, -16)
+        CFI_OFFSET(30, -8)
     /* Restore the young_ptr that was saved at the beginning of SAVE_ALL_REGS,
        in caml_call_gc */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
