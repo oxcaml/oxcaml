@@ -557,6 +557,14 @@ module Int16_u = struct
   external clz : t -> t = "" "caml_bmi_tzcnt_int16"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
+  external shl : t -> t -> t = "" "caml_int16_shift_left_by_int16_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external sar : t -> t -> t = "" "caml_int16_shift_right_by_int16_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external shr : t -> t -> t
+    = "" "caml_int16_shift_right_logical_by_int16_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
   external select : bool -> t -> t -> t = "" "caml_csel_int16_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 end
@@ -639,6 +647,14 @@ module Int8_u = struct
   external ctz : t -> t = "" "caml_int8_ctz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
   external clz : t -> t = "" "caml_int8_clz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external shl : t -> t -> t = "" "caml_int8_shift_left_by_int8_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external sar : t -> t -> t = "" "caml_int8_shift_right_by_int8_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external shr : t -> t -> t
+    = "" "caml_int8_shift_right_logical_by_int8_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external select : bool -> t -> t -> t = "" "caml_csel_int8_untagged"
@@ -1121,6 +1137,54 @@ module Builtins = struct
     (nativeint[@unboxed]) -> (int[@untagged])
     = "" "caml_nativeint_popcnt_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* Shift left *)
+  external int64_shl :
+    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
+    = "" "caml_int64_shift_left_by_int64_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_shl :
+    (int32[@unboxed]) -> (int32[@unboxed]) -> (int32[@unboxed])
+    = "" "caml_int32_shift_left_by_int32_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_shl :
+    (nativeint[@unboxed]) -> (nativeint[@unboxed]) -> (nativeint[@unboxed])
+    = "" "caml_nativeint_shift_left_by_nativeint_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* Shift right arithmetic *)
+  external int64_sar :
+    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
+    = "" "caml_int64_shift_right_by_int64_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_sar :
+    (int32[@unboxed]) -> (int32[@unboxed]) -> (int32[@unboxed])
+    = "" "caml_int32_shift_right_by_int32_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_sar :
+    (nativeint[@unboxed]) -> (nativeint[@unboxed]) -> (nativeint[@unboxed])
+    = "" "caml_nativeint_shift_right_by_nativeint_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* Shift right logical *)
+  external int64_shr :
+    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
+    = "" "caml_int64_shift_right_logical_by_int64_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_shr :
+    (int32[@unboxed]) -> (int32[@unboxed]) -> (int32[@unboxed])
+    = "" "caml_int32_shift_right_logical_by_int32_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_shr :
+    (nativeint[@unboxed]) -> (nativeint[@unboxed]) -> (nativeint[@unboxed])
+    = "" "caml_nativeint_shift_right_logical_by_nativeint_unboxed"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (* High multiply *)
 

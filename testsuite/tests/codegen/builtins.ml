@@ -213,6 +213,123 @@ popcnt_native:
   ret
 |}]
 
+(* Shift left - int64 *)
+
+let int64_shl x y =
+  Builtins.int64_shl (Int64_u.to_int64 x) (Int64_u.to_int64 y)
+  |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+int64_shl:
+  movq  %rbx, %rcx
+  salq  %cl, %rax
+  ret
+|}]
+
+(* Shift left - int32 *)
+
+let int32_shl x y =
+  Builtins.int32_shl (Int32_u.to_int32 x) (Int32_u.to_int32 y)
+  |> Int32_u.of_int32
+[%%expect_asm X86_64{|
+int32_shl:
+  movq  %rbx, %rcx
+  andl  $31, %ecx
+  salq  %cl, %rax
+  movslq %eax, %rax
+  ret
+|}]
+
+(* Shift left - nativeint *)
+
+let nativeint_shl x y =
+  Builtins.nativeint_shl
+    (Nativeint_u.to_nativeint x) (Nativeint_u.to_nativeint y)
+  |> Nativeint_u.of_nativeint
+[%%expect_asm X86_64{|
+nativeint_shl:
+  movq  %rbx, %rcx
+  salq  %cl, %rax
+  ret
+|}]
+
+(* Shift right arithmetic - int64 *)
+
+let int64_sar x y =
+  Builtins.int64_sar (Int64_u.to_int64 x) (Int64_u.to_int64 y)
+  |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+int64_sar:
+  movq  %rbx, %rcx
+  sarq  %cl, %rax
+  ret
+|}]
+
+(* Shift right arithmetic - int32 *)
+
+let int32_sar x y =
+  Builtins.int32_sar (Int32_u.to_int32 x) (Int32_u.to_int32 y)
+  |> Int32_u.of_int32
+[%%expect_asm X86_64{|
+int32_sar:
+  movq  %rbx, %rcx
+  andl  $31, %ecx
+  sarq  %cl, %rax
+  ret
+|}]
+
+(* Shift right arithmetic - nativeint *)
+
+let nativeint_sar x y =
+  Builtins.nativeint_sar
+    (Nativeint_u.to_nativeint x) (Nativeint_u.to_nativeint y)
+  |> Nativeint_u.of_nativeint
+[%%expect_asm X86_64{|
+nativeint_sar:
+  movq  %rbx, %rcx
+  sarq  %cl, %rax
+  ret
+|}]
+
+(* Shift right logical - int64 *)
+
+let int64_shr x y =
+  Builtins.int64_shr (Int64_u.to_int64 x) (Int64_u.to_int64 y)
+  |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+int64_shr:
+  movq  %rbx, %rcx
+  shrq  %cl, %rax
+  ret
+|}]
+
+(* Shift right logical - int32 *)
+
+let int32_shr x y =
+  Builtins.int32_shr (Int32_u.to_int32 x) (Int32_u.to_int32 y)
+  |> Int32_u.of_int32
+[%%expect_asm X86_64{|
+int32_shr:
+  movq  %rbx, %rcx
+  andl  $31, %ecx
+  movl  %eax, %eax
+  shrq  %cl, %rax
+  movslq %eax, %rax
+  ret
+|}]
+
+(* Shift right logical - nativeint *)
+
+let nativeint_shr x y =
+  Builtins.nativeint_shr
+    (Nativeint_u.to_nativeint x) (Nativeint_u.to_nativeint y)
+  |> Nativeint_u.of_nativeint
+[%%expect_asm X86_64{|
+nativeint_shr:
+  movq  %rbx, %rcx
+  shrq  %cl, %rax
+  ret
+|}]
+
 (* High multiply *)
 
 let mulhi_signed x y =
