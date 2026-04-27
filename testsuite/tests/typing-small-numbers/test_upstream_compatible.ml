@@ -11,7 +11,7 @@ Line 1, characters 9-16:
 1 | type t = float32;;
              ^^^^^^^
 Error: Unbound type constructor "float32"
-Hint:              Did you mean "float", "float32x4" or "float32x8"?
+Hint:              Did you mean "float"?
 |}];;
 
 let _ = 1.0s;;
@@ -123,7 +123,7 @@ Line 1, characters 9-17:
 1 | type t = float32#;;
              ^^^^^^^^
 Error: Unbound type constructor "float32"
-Hint:              Did you mean "float", "float32x4" or "float32x8"?
+Hint:              Did you mean "float"?
 |}];;
 
 let () = ignore #1.0s;;
@@ -266,7 +266,7 @@ Line 1, characters 9-14:
 1 | type t = int16;;
              ^^^^^
 Error: Unbound type constructor "int16"
-Hint:              Did you mean "int", "int16x8", "int32", "int64" or "int8x16"?
+Hint:              Did you mean "int", "int32" or "int64"?
 |}];;
 
 type t = int16#;;
@@ -275,7 +275,7 @@ Line 1, characters 9-15:
 1 | type t = int16#;;
              ^^^^^^
 Error: Unbound type constructor "int16"
-Hint:              Did you mean "int", "int16x8", "int32", "int64" or "int8x16"?
+Hint:              Did you mean "int", "int32" or "int64"?
 |}];;
 
 let f () = #'a';;

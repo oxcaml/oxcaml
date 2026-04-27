@@ -95,7 +95,7 @@ type type_constr = [
   | data_type_constr
 ]
 
-let non_extension_type_constrs : type_constr list = [
+let base_type_constrs : type_constr list = [
   `Int;
   `Char;
   `String;
@@ -121,6 +121,9 @@ let non_extension_type_constrs : type_constr list = [
   `Code;
   `Idx_imm;
   `Idx_mut;
+]
+
+let or_null_extension_type_constrs : type_constr list = [
   `Or_null;
 ]
 
@@ -160,7 +163,9 @@ let small_number_extension_type_constrs : type_constr list = [
 ]
 
 let all_type_constrs = (
-  non_extension_type_constrs
+  base_type_constrs
+  @ or_null_extension_type_constrs
+  @ small_number_extension_type_constrs
   @ simd_stable_extension_type_constrs
   @ simd_beta_extension_type_constrs
   @ simd_alpha_extension_type_constrs
@@ -1021,7 +1026,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
   in
   List.fold_left (fun env tconstr ->
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
-  ) empty_env all_type_constrs
+  ) empty_env base_type_constrs
   (* Predefined exceptions - alphabetical order *)
   |> add_extension ident_assert_failure
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
@@ -1050,8 +1055,9 @@ let build_initial_env add_type add_extension add_jkind empty_env =
   |> add_predef_jkinds add_jkind
 
 let add_or_null add_type env =
-  let tconstr = `Or_null in
-  add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
+  List.fold_left (fun env tconstr ->
+    add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
+  ) env or_null_extension_type_constrs
 
 let add_simd_stable_extension_types add_type env =
   List.fold_left (fun env tconstr ->
@@ -1060,7 +1066,10 @@ let add_simd_stable_extension_types add_type env =
 
 let add_simd_beta_extension_types _add_type env = env
 
-let add_simd_alpha_extension_types _add_type env = env
+let add_simd_alpha_extension_types add_type env =
+  List.fold_left (fun env tconstr ->
+    add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
+  ) env simd_alpha_extension_type_constrs
 
 let add_small_number_extension_types add_type env =
   List.fold_left (fun env tconstr ->
