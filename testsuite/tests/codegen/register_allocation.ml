@@ -169,9 +169,7 @@ spill_unspill_loop_movement:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  $3, %rax
-  jl    .L119
   jl    .L135
-  movq  %rax, (%rsp)
   movq  %rdi, 24(%rsp)
   movq  %rax, %rbx
   movq  %rax, (%rsp)
@@ -380,7 +378,6 @@ double_loop_no_definition_at_beginning:
   movq  %rsi, 48(%rsp)
   xorl  %edx, %edx
 .L113:
-  movq  %rdx, (%rsp)
   movq  64(%r14), %rbx
   movq  %rbx, 8(%rsp)
   movq  64(%r14), %rbx
@@ -391,7 +388,6 @@ double_loop_no_definition_at_beginning:
 .L159:
   addq  72(%r14), %rbx
   addq  $8, %rbx
-  movq  %rbx, 56(%rsp)
   movq  $5111, -8(%rbx)
   movq  camlTOP15__f_33_37_code@GOTPCREL(%rip), %rcx
   movq  %rcx, (%rbx)
@@ -401,6 +397,7 @@ double_loop_no_definition_at_beginning:
   movq  %rdx, (%rsp)
   movq  %rcx, 16(%rbx)
   movq  %rax, 24(%rbx)
+  movq  %rbx, 56(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
   je    .L128
@@ -414,8 +411,8 @@ double_loop_no_definition_at_beginning:
   movq  16(%rsp), %rbx
   jmp   .L149
 .L128:
-  movq  %rdx, 40(%rsp)
   movq  (%rdx), %rax
+  movq  %rdx, 40(%rsp)
   call  camlTOP15__f_33_37_code@PLT
 .L160:
   movq  40(%rsp), %rdx
