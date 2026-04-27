@@ -201,7 +201,7 @@ let value_descriptions ~loc env name
   | Error e -> raise (Dont_match (Zero_alloc e))
   end;
   let crossing =
-    Ctype.crossing_of_ty env ~val_lpoly:vd2.val_lpoly vd2.val_type
+    Ctype.crossing_of_ty env ~lpoly:vd2.val_lpoly vd2.val_type
   in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =

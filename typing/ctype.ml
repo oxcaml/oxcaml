@@ -5929,7 +5929,7 @@ let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
   Ikind.crossing_of_jkind ~context env jkind
 
-let crossing_of_ty env ?modalities ?(val_lpoly = Lpoly.determined []) ty =
+let crossing_of_ty env ?modalities ?lpoly ty =
   let principal = is_principal ty in
   let crossing =
     if not principal
@@ -5960,11 +5960,11 @@ let crossing_of_ty env ?modalities ?(val_lpoly = Lpoly.determined []) ty =
         jkind_crossing ()
   in
   let crossing =
-    if List.is_empty (Types.Lpoly.get_exn val_lpoly)
-    then
+    match lpoly with
+    | Some lpoly when List.is_empty (Types.Lpoly.get_exn lpoly) ->
       let staticity_ax = Crossing.Axis.Monadic Staticity in
       Crossing.set staticity_ax (Crossing.Per_axis.min staticity_ax) crossing
-    else crossing
+    | _ -> crossing
   in
   match modalities with
   | None -> crossing

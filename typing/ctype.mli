@@ -795,12 +795,12 @@ val print_global_state : Format.formatter -> global_state -> unit
 (** Get the crossing of a jkind  *)
 val crossing_of_jkind : Env.t -> 'd Types.jkind -> Mode.Crossing.t
 
-(** Get the crossing of a type wrapped in modalities, quantified by layout
-polymorphism. Non-principal types get trivial crossing.*)
+(** Get the crossing of a type wrapped in [modalities] and quantified by [lpoly]
+allow more crossing.  Non-principal types get trivial crossing. *)
 val crossing_of_ty :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
-  ?val_lpoly:Types.Lpoly.t ->
+  ?lpoly:Types.Lpoly.t ->
   Types.type_expr ->
   Mode.Crossing.t
 
