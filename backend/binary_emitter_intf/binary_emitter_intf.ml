@@ -71,13 +71,17 @@ module type Relocation = sig
       - [place_address]: where the relocation site is in memory
       - [lookup_target]: resolve symbol/label -> address
       - [read_instruction]: read the 32-bit instruction at the relocation site
-        (used by ARM64 to read-modify-write instruction bit fields) Returns the
-        value to write at the relocation site, or an error. *)
+        (used by ARM64 to read-modify-write instruction bit fields)
+      - [read_int64]: read the 64-bit value currently stored at the relocation
+        site (used by ARM64 ABS64 relocations on Mach-O, where the addend for a
+        local-label target is encoded in the data slot) Returns the value to
+        write at the relocation site, or an error. *)
   val compute_value :
     t ->
     place_address:int64 ->
     lookup_target:(target -> int64 option) ->
     read_instruction:(unit -> int32) ->
+    read_int64:(unit -> int64) ->
     (int64, string) result
 end
 

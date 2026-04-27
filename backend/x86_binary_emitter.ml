@@ -1861,7 +1861,7 @@ module For_jit = struct
       | _ -> false
 
     let compute_value (r : Reloc.t) ~place_address ~lookup_target
-        ~read_instruction:_ =
+        ~read_instruction:_ ~read_int64:_ =
       let label, addend =
         match r.Reloc.kind with
         | Kind.REL32 (label, addend)
