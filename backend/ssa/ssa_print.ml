@@ -72,40 +72,43 @@ let print_terminator ppf (t : Ssa.terminator) =
   | Branch { cond; ifso; ifnot } ->
     Format.fprintf ppf "if %a then goto %a else goto %a" print_instr_ref cond
       print_block_id ifso print_block_id ifnot
-  | Switch (targets, arg) ->
-    Format.fprintf ppf "switch(%a) [%a]" print_instr_array arg
+  | Switch { index; targets } ->
+    Format.fprintf ppf "switch(%a) [%a]" print_instr_ref index
       (Format.pp_print_array
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
          print_block_id)
       targets
-  | Return args -> Format.fprintf ppf "return(%a)" print_instr_array args
-  | Raise (_, args, _) -> Format.fprintf ppf "raise(%a)" print_instr_array args
+  | Return { args } -> Format.fprintf ppf "return(%a)" print_instr_array args
+  | Raise { args; _ } -> Format.fprintf ppf "raise(%a)" print_instr_array args
   | Tailcall_self { destination; args } ->
     Format.fprintf ppf "tailcall_self %a(%a)" print_block_id destination
       print_instr_array args
-  | Tailcall_func (_, args) ->
+  | Tailcall_func { args; _ } ->
     Format.fprintf ppf "tailcall_func(%a)" print_instr_array args
-  | Call { op = Direct sym; args; continuation; exn_continuation } -> (
+  | Call { op = Func (Direct sym); args; continuation; exn_continuation } -> (
     Format.fprintf ppf "call %s(%a) -> %a" sym.sym_name print_instr_array args
       print_block_id continuation;
     match exn_continuation with
     | Some l -> Format.fprintf ppf " exn %a" print_block_id l
     | None -> ())
-  | Call { op = Indirect _; args; continuation; exn_continuation } -> (
+  | Call { op = Func (Indirect _); args; continuation; exn_continuation } -> (
     Format.fprintf ppf "call_indirect(%a) -> %a" print_instr_array args
       print_block_id continuation;
     match exn_continuation with
     | Some l -> Format.fprintf ppf " exn %a" print_block_id l
     | None -> ())
-  | Prim
-      { op = External { func_symbol; _ }; args; continuation; exn_continuation }
-    -> (
+  | Call
+      { op = Prim (External { func_symbol; _ });
+        args;
+        continuation;
+        exn_continuation
+      } -> (
     Format.fprintf ppf "prim %s(%a) -> %a" func_symbol print_instr_array args
       print_block_id continuation;
     match exn_continuation with
     | Some l -> Format.fprintf ppf " exn %a" print_block_id l
     | None -> ())
-  | Prim { op = Probe { name; _ }; args; continuation; _ } ->
+  | Call { op = Prim (Probe { name; _ }); args; continuation; _ } ->
     Format.fprintf ppf "probe %s(%a) -> %a" name print_instr_array args
       print_block_id continuation
   | Invalid { message = _; args; continuation } -> (
@@ -123,14 +126,7 @@ let print_typed_params ppf (blk : Ssa.block) =
     blk.params
 
 let print_block_header ppf (blk : Ssa.block) =
-  let name =
-    match blk.desc with
-    | Function_start -> "FUNCTION_START"
-    | Branch_target -> "BRANCH_TARGET"
-    | Call_continuation -> "CALL_CONT"
-    | Merge -> "MERGE"
-    | Trap_handler -> "TRAP_HANDLER"
-  in
+  let name = if blk.is_function_start then "FUNCTION_START" else "BLOCK" in
   Format.fprintf ppf "%a: %s(%a)" print_block_id blk name print_typed_params blk;
   (match blk.label_hint with
   | None -> ()

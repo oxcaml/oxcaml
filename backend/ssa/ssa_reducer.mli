@@ -17,8 +17,8 @@
     the output-side [rewrite] hook before moving on. *)
 
 (** Framework-provided context: the output builder, lookups from input- to
-    output-graph references, and default visit implementations the reducer can
-    delegate to. *)
+    output-graph references, and inlining helpers the reducer can use to splice
+    another input block's content into the current output position. *)
 module type Context = sig
   include Ssa.BuilderS
 
@@ -31,21 +31,19 @@ module type Context = sig
 
   (** Inline [blk]'s body and terminator into the current output builder [t],
       treating [Block_param { block = blk; index; _ }] as aliasing
-      [block_args.(index)] in all subsequent [map_arg] lookups. *)
-  val visit_block : Ssa.block -> block_args:Ssa.instruction array -> t -> unit
+      [block_args.(index)] in all subsequent [map_arg] lookups. The reducer's
+      hooks fire with [~is_inlining:true] for [blk]'s instructions and
+      terminator. *)
+  val inline_block : Ssa.block -> block_args:Ssa.instruction array -> t -> unit
 
-  (** Visit a single input instruction: first consult the reducer's
-      [visit_instruction] hook; if it returns [`Unchanged], fall back to the
-      default translation (rewrite args and emit through the reducer's
-      [rewrite_instruction] hook). Reducers compose cleanly by calling this on
-      the instructions they want to visit — e.g. an inlining reducer can replay
-      another block's instructions through the full combined reducer by invoking
-      [visit_instruction] for each. *)
-  val visit_instruction : Ssa.block -> instr_index:int -> t -> unit
+  (** Inline a single instruction: consults the reducer's [visit_instruction]
+      with [~is_inlining:true] and falls back to the default translation
+      (rewrite args, then [rewrite_instruction]). *)
+  val inline_instruction : Ssa.block -> instr_index:int -> t -> unit
 
-  (** Visit an input block's terminator: same layering as [visit_instruction].
+  (** Inline an input block's terminator: same layering as [inline_instruction].
   *)
-  val visit_terminator : Ssa.block -> t -> unit
+  val inline_terminator : Ssa.block -> t -> unit
 end
 
 (** The rules of a single reducer. *)
@@ -59,9 +57,7 @@ module type S = sig
 
   (** Called once per input block, before its body is visited. [`Unchanged]:
       defer to the framework (which visits body and terminator in turn).
-      [`Replaced]: the reducer has handled this block — e.g. because it has
-      been inlined into a predecessor elsewhere and should not appear in the
-      output. *)
+      [`Replaced]: the reducer has handled this block alrady. *)
   val visit_block : Ssa.block -> t -> [> `Unchanged | `Replaced]
 
   (** Called for each instruction in each input block. [`Unchanged]: defer to
@@ -96,9 +92,11 @@ module type Reducer = functor (C : Context) -> S with type t = C.t
 module Default : Reducer
 
 (** Combine several reducers into one. For each hook, children are tried in
-    order; the first one to return a non-[`Unchanged] result wins and its
-    result is propagated. If every child returns [`Unchanged], the combined
-    reducer also returns [`Unchanged]. *)
+    order; the first one to return a non-[`Unchanged] result wins and its result
+    is propagated. If every child returns [`Unchanged], the combined reducer
+    also returns [`Unchanged]. *)
 val combine : (module Reducer) list -> (module Reducer)
 
+(** Instantiate the given reducer functor. This will be a fresh instance per
+    run, so module level state is not shared between runs.*)
 val run : (module Reducer) -> Ssa.t -> Ssa.t

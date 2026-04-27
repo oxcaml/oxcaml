@@ -9,11 +9,11 @@ module type Context = sig
 
   val map_block : Ssa.block -> Ssa.block
 
-  val visit_block : Ssa.block -> block_args:Ssa.instruction array -> t -> unit
+  val inline_block : Ssa.block -> block_args:Ssa.instruction array -> t -> unit
 
-  val visit_instruction : Ssa.block -> instr_index:int -> t -> unit
+  val inline_instruction : Ssa.block -> instr_index:int -> t -> unit
 
-  val visit_terminator : Ssa.block -> t -> unit
+  val inline_terminator : Ssa.block -> t -> unit
 end
 
 module type S = sig
@@ -144,48 +144,68 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
     Ssa.Block.Tbl.create 16
   in
   (* For each old block, the array of old param indices kept in the new block
-     (in order). [Merge] blocks drop any param with zero usage count ("unused
-     phi node"); other block descriptors keep all params since their values come
-     from runtime mechanisms (call return, exn bucket, function ABI) or carry no
-     params at all. *)
+     (in order). See [compute_kept] for the dropping criterion. *)
   let kept_params : int array Ssa.Block.Tbl.t = Ssa.Block.Tbl.create 64 in
   let op_map : Ssa.instruction Ssa.InstructionId.Tbl.t =
     Ssa.InstructionId.Tbl.create 256
   in
+  (* A param can be dropped only if every incoming edge passes its arg through a
+     [Goto] (the only terminator that has positional per-param args). A non-Goto
+     predecessor supplies the param's value through a runtime-fixed mechanism,
+     so its position must be preserved — we model this as "every param is used"
+     for that target. The function entry is handled separately below: its params
+     come from the function ABI and are never droppable. *)
   let compute_kept (blk : Ssa.block) : int array =
     let n = Array.length blk.params in
-    match[@warning "-fragile-match"] blk.desc with
-    | Merge ->
+    let any_non_goto_pred =
+      List.exists
+        (fun (pred : Ssa.block) ->
+          match[@warning "-fragile-match"] pred.terminator with
+          | Goto _ -> false
+          | _ -> true)
+        (Ssa.predecessors blk)
+    in
+    if any_non_goto_pred
+    then Array.init n Fun.id
+    else
       let buf = ref [] in
       for i = n - 1 downto 0 do
         if blk.param_usage_counts.(i) > 0 then buf := i :: !buf
       done;
       Array.of_list !buf
-    | Function_start | Branch_target | Call_continuation | Trap_handler ->
-      Array.init n Fun.id
   in
-  (* Step 1: create a fresh builder for each block. *)
+  (* Step 1: create a fresh builder for each block. The entry's params come from
+     the function ABI and are kept verbatim; other blocks may drop unused params
+     per [compute_kept]. *)
   let entry_builder = B.make ssa.entry.params in
   Ssa.set_label_hint (B.current_block entry_builder) ssa.entry.label_hint;
   Ssa.Block.Tbl.replace block_map ssa.entry entry_builder;
-  Ssa.Block.Tbl.replace kept_params ssa.entry (compute_kept ssa.entry);
+  Ssa.Block.Tbl.replace kept_params ssa.entry
+    (Array.init (Array.length ssa.entry.params) Fun.id);
   List.iter
     (fun (blk : Ssa.block) ->
       if not (Ssa.block_equal blk ssa.entry)
-      then (
-        (match[@warning "-fragile-match"] blk.desc with
-        | Function_start ->
-          Misc.fatal_errorf "Ssa_reducer.run: multiple Function_start"
-        | Merge | Branch_target | Call_continuation | Trap_handler -> ());
+      then begin
         let kept = compute_kept blk in
         Ssa.Block.Tbl.replace kept_params blk kept;
         let params = Array.map (fun i -> blk.params.(i)) kept in
-        let new_builder = B.new_block entry_builder ~params blk.desc in
+        let new_builder = B.new_block entry_builder ~params in
         (* Carry the [label_hint] forward so the downstream [cfg_of_ssa] reuses
            the aligned labels. *)
         Ssa.set_label_hint (B.current_block new_builder) blk.label_hint;
-        Ssa.Block.Tbl.replace block_map blk new_builder))
+        Ssa.Block.Tbl.replace block_map blk new_builder
+      end)
     ssa.blocks;
+  (* Inverse of [block_map]: for each output block, the input block it was
+     created for. Used in the [finish_block] hook to translate a finalised
+     terminator's output successors back to input blocks for
+     [iter_reachable_topological]'s reachability tracking. *)
+  let block_inverse_map : Ssa.block Ssa.Block.Tbl.t = Ssa.Block.Tbl.create 64 in
+  Ssa.Block.Tbl.iter
+    (fun (input_blk : Ssa.block) (builder : B.t) ->
+      Ssa.Block.Tbl.replace block_inverse_map (B.current_block builder)
+        input_blk)
+    block_map;
   let map_block_impl (old : Ssa.block) : Ssa.block =
     B.current_block (Ssa.Block.Tbl.find block_map old)
   in
@@ -253,30 +273,26 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
           ifso = map_block_impl ifso;
           ifnot = map_block_impl ifnot
         }
-    | Switch (targets, args) ->
-      Switch (Array.map map_block_impl targets, map_args args)
-    | Return args -> Return (map_args args)
-    | Raise (k, args, h) ->
-      let h = Option.map map_block_impl h in
+    | Switch { index; targets } ->
+      Switch
+        { index = map_arg_impl index;
+          targets = Array.map map_block_impl targets
+        }
+    | Return { args } -> Return { args = map_args args }
+    | Raise { raise_kind; args; handler } ->
+      let handler = Option.map map_block_impl handler in
       Option.iter
         (fun (h : Ssa.block) ->
           assert (Array.length args = Array.length h.params))
-        h;
-      Raise (k, map_args args, h)
+        handler;
+      Raise { raise_kind; args = map_args args; handler }
     | Tailcall_self { destination; args } ->
       let destination = map_block_impl destination in
       assert (Array.length args = Array.length destination.params);
       Tailcall_self { destination; args = map_args args }
-    | Tailcall_func (op, args) -> Tailcall_func (op, map_args args)
+    | Tailcall_func { op; args } -> Tailcall_func { op; args = map_args args }
     | Call { op; args; continuation; exn_continuation } ->
       Call
-        { op;
-          args = map_args args;
-          continuation = map_block_impl continuation;
-          exn_continuation = Option.map map_block_impl exn_continuation
-        }
-    | Prim { op; args; continuation; exn_continuation } ->
-      Prim
         { op;
           args = map_args args;
           continuation = map_block_impl continuation;
@@ -289,11 +305,26 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
           continuation = Option.map map_block_impl continuation
         }
   in
+  (* Blocks that became reachable in the output graph during the current
+     [iter_reachable_topological] callback invocation. Populated by
+     [finish_block] (which inspects the just-finalised block's output
+     successors) and read by the main loop after each [visit] returns. *)
+  let newly_reachable : Ssa.block list ref = ref [] in
   (* [Ctx] and [Red] are mutually recursive: [Ctx]'s emissions route through
      [Red]'s rewrite hooks, and [Red]'s visit hooks default to [Ctx]'s
-     translation helpers. *)
+     translation helpers. [Ctx]'s [inline_*] family (exposed via [Context]) is
+     used by reducers to splice another block's content into the current
+     builder; the matching [visit_*] helpers are the same translation logic
+     exposed via [Ctx]'s richer signature so the main loop can drive them
+     directly. *)
   let module M = struct
-    module rec Ctx : (Context with type t = B.t) = struct
+    module rec Ctx : sig
+      include Context with type t = B.t
+
+      val visit_instruction : Ssa.block -> instr_index:int -> t -> unit
+
+      val visit_terminator : Ssa.block -> t -> unit
+    end = struct
       type t = B.t
 
       let emit_instruction b i =
@@ -305,9 +336,20 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
         emit_instruction b (Ssa.make_op ~op ~typ ~args ~dbg)
 
       let finish_block b ~dbg term =
-        match Red.rewrite_terminator b ~dbg term with
+        (match Red.rewrite_terminator b ~dbg term with
         | `Unchanged -> B.finish_block b ~dbg term
-        | `Replaced -> ()
+        | `Replaced -> ());
+        (* The block has now been sealed (in either branch). Translate its
+           output successors back to their input counterparts and add them to
+           [newly_reachable]; the iter callback below collects this set as the
+           "now reachable" return value. Output blocks without an input
+           counterpart (e.g., freshly created via [new_block]) are skipped. *)
+        List.iter
+          (fun (out_succ : Ssa.block) ->
+            match Ssa.Block.Tbl.find_opt block_inverse_map out_succ with
+            | None -> ()
+            | Some in_succ -> newly_reachable := in_succ :: !newly_reachable)
+          (Ssa.successors (B.current_block b))
 
       let current_block = B.current_block
 
@@ -359,15 +401,19 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
           let term = rewrite_terminator_impl blk.terminator in
           finish_block b ~dbg:blk.terminator_dbg term
 
-      let visit_block (blk : Ssa.block) ~block_args b =
+      let inline_instruction = visit_instruction
+
+      let inline_terminator = visit_terminator
+
+      let inline_block (blk : Ssa.block) ~block_args b =
         match Red.visit_block blk b with
         | `Replaced -> ()
         | `Unchanged ->
           Ssa.Block.Tbl.replace block_param_subst blk block_args;
           Array.iteri
-            (fun instr_index _ -> visit_instruction blk ~instr_index b)
+            (fun instr_index _ -> inline_instruction blk ~instr_index b)
             blk.body;
-          visit_terminator blk b
+          inline_terminator blk b
     end
 
     and Red : (S with type t = B.t) = Red_ctor (Ctx)
@@ -375,161 +421,38 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
   let module Red = M.Red in
   let module Ctx = M.Ctx in
   Red.analyze ssa;
-  (* Step 2: walk the input graph in a priority order over unvisited blocks
-     [(priority, input_position)] (smaller is better):
-       priority 0 — all predecessors already visited (canonical topological);
-       priority 1 — block is a transitive predecessor of an already-visited
-                   block (closes an existing "open" structure);
-       priority 2 — neither.
-     [input_position] breaks ties by input list order.
-
-     The two state pieces are maintained incrementally:
-     - [unvisited_pred_count] starts at the predecessor count and is decremented
-       when a predecessor is popped from the queue (whether or not it ends up
-       being emitted standalone). The entry's count starts at 0 even if it has
-       back-edge predecessors, so it's always priority 0 initially.
-     - [reaches_visited] is set when, after visiting a block [v] that itself
-       had unvisited predecessors, we walk backward from [v]'s preds, marking
-       each previously-unmarked-and-unvisited ancestor and stopping at visited
-       or already-marked ones. (When [v] is visited with all preds already
-       visited, no propagation is needed: every ancestor reaches some visited
-       pred of [v] through a path whose first visited node was already
-       processed with unvisited preds and thus already triggered the
-       propagation.)
-
-     Before emitting, we still consult [should_process]: a block whose output
-     has been spliced in by an inlining [visit_block] (e.g., [Inline_merge])
-     must not be emitted standalone, or we'd create a second copy of its body
-     that pollutes [op_map] and ends up filtered as unreachable. We always
-     decrement successor counts on pop, even when skipping, so blocks
-     downstream of an inlined block can still reach priority 0. *)
-  let position : int Ssa.Block.Tbl.t = Ssa.Block.Tbl.create 64 in
-  List.iteri
-    (fun pos blk -> Ssa.Block.Tbl.replace position blk pos)
-    ssa.blocks;
-  let unvisited_pred_count : int Ssa.Block.Tbl.t = Ssa.Block.Tbl.create 64 in
-  List.iter
-    (fun (blk : Ssa.block) ->
-      let n =
-        if Ssa.block_equal blk ssa.entry
-        then 0
-        else List.length (Ssa.predecessors blk)
-      in
-      Ssa.Block.Tbl.replace unvisited_pred_count blk n)
-    ssa.blocks;
-  let reaches_visited : unit Ssa.Block.Tbl.t = Ssa.Block.Tbl.create 64 in
-  let priority_of (blk : Ssa.block) =
-    if Ssa.Block.Tbl.find unvisited_pred_count blk = 0
-    then 0
-    else if Ssa.Block.Tbl.mem reaches_visited blk
-    then 1
-    else 2
-  in
-  let module Q = Set.Make (struct
-    type t = int * int * Ssa.block
-    let compare (p1, i1, b1) (p2, i2, b2) =
-      match Int.compare p1 p2 with
-      | 0 -> (
-        match Int.compare i1 i2 with 0 -> Ssa.Block.compare b1 b2 | n -> n)
-      | n -> n
-  end) in
-  let queue = ref Q.empty in
-  let entry_of (blk : Ssa.block) =
-    priority_of blk, Ssa.Block.Tbl.find position blk, blk
-  in
-  List.iter (fun blk -> queue := Q.add (entry_of blk) !queue) ssa.blocks;
-  let bump_priority (blk : Ssa.block) ~old_priority =
-    let pos = Ssa.Block.Tbl.find position blk in
-    let old_key = old_priority, pos, blk in
-    if Q.mem old_key !queue
-    then begin
-      let new_prio = priority_of blk in
-      if new_prio < old_priority
-      then begin
-        queue := Q.remove old_key !queue;
-        queue := Q.add (new_prio, pos, blk) !queue
-      end
-    end
-  in
-  let should_process (blk : Ssa.block) =
-    let out = B.current_block (Ssa.Block.Tbl.find block_map blk) in
-    (not (Ssa.block_finished out))
-    && (Ssa.block_equal blk ssa.entry || Ssa.predecessors out <> [])
-  in
-  while not (Q.is_empty !queue) do
-    let ((_, _, blk) as item) = Q.min_elt !queue in
-    queue := Q.remove item !queue;
-    let visited_with_unvisited_preds =
-      if should_process blk
-      then begin
-        let had_unvisited_preds =
-          Ssa.Block.Tbl.find unvisited_pred_count blk > 0
-        in
-        let b = Ssa.Block.Tbl.find block_map blk in
-        (try
-           match Red.visit_block blk b with
-           | `Replaced -> ()
-           | `Unchanged ->
-             Array.iteri
-               (fun instr_index _ ->
-                 Ctx.visit_instruction blk ~instr_index b)
-               blk.body;
-             Ctx.visit_terminator blk b
-         with exn ->
-           let bt = Printexc.get_raw_backtrace () in
-           Format.eprintf
-             "*** Ssa_reducer.run error for %s while processing block %a: %s@."
-             ssa.fun_name Ssa_print.print_block_id blk
-             (Printexc.to_string exn);
-           Format.eprintf "*** Old SSA:@.%a@." Ssa_print.print ssa;
-           let finished_so_far = B.finish entry_builder in
-           Format.eprintf "*** New SSA so far (%d finished block(s)):@.%a@."
-             (List.length finished_so_far)
-             (Format.pp_print_list
-                ~pp_sep:(fun _ () -> ())
-                Ssa_print.print_block)
-             finished_so_far;
-           Format.eprintf
-             "*** Under-construction block (body not yet flushed):\n%a"
-             Ssa_print.print_block (B.current_block b);
-           Format.pp_print_flush Format.err_formatter ();
-           Printexc.raise_with_backtrace exn bt);
-        had_unvisited_preds
-      end
-      else false
-    in
-    List.iter
-      (fun (succ : Ssa.block) ->
-        match Ssa.Block.Tbl.find_opt unvisited_pred_count succ with
-        | None -> ()
-        | Some cnt ->
-          let old_prio = priority_of succ in
-          Ssa.Block.Tbl.replace unvisited_pred_count succ (cnt - 1);
-          bump_priority succ ~old_priority:old_prio)
-      (Ssa.successors blk);
-    if visited_with_unvisited_preds
-    then begin
-      let rec walk (b : Ssa.block) =
-        List.iter
-          (fun (pred : Ssa.block) ->
-            if (not (Ssa.Block.Tbl.mem reaches_visited pred))
-               && Ssa.Block.Tbl.mem position pred
-               && Q.mem
-                    ( priority_of pred,
-                      Ssa.Block.Tbl.find position pred,
-                      pred )
-                    !queue
-            then begin
-              let old_prio = priority_of pred in
-              Ssa.Block.Tbl.add reaches_visited pred ();
-              bump_priority pred ~old_priority:old_prio;
-              walk pred
-            end)
-          (Ssa.predecessors b)
-      in
-      walk blk
-    end
-  done;
+  (* Step 2: walk the input graph in [Ssa.iter_reachable_topological]. The iter
+     only pops blocks that are reachable in the output graph; a block becomes
+     reachable when an earlier [finish_block] hook reports it via
+     [newly_reachable]. *)
+  Ssa.iter_reachable_topological ssa (fun blk ->
+      newly_reachable := [];
+      let b = Ssa.Block.Tbl.find block_map blk in
+      (try
+         match Red.visit_block blk b with
+         | `Replaced -> ()
+         | `Unchanged ->
+           Array.iteri
+             (fun instr_index _ -> Ctx.visit_instruction blk ~instr_index b)
+             blk.body;
+           Ctx.visit_terminator blk b
+       with exn ->
+         let bt = Printexc.get_raw_backtrace () in
+         Format.eprintf
+           "*** Ssa_reducer.run error for %s while processing block %a: %s@."
+           ssa.fun_name Ssa_print.print_block_id blk (Printexc.to_string exn);
+         Format.eprintf "*** Old SSA:@.%a@." Ssa_print.print ssa;
+         let finished_so_far = B.finish entry_builder in
+         Format.eprintf "*** New SSA so far (%d finished block(s)):@.%a@."
+           (List.length finished_so_far)
+           (Format.pp_print_list ~pp_sep:(fun _ () -> ()) Ssa_print.print_block)
+           finished_so_far;
+         Format.eprintf
+           "*** Under-construction block (body not yet flushed):\n%a"
+           Ssa_print.print_block (B.current_block b);
+         Format.pp_print_flush Format.err_formatter ();
+         Printexc.raise_with_backtrace exn bt);
+      !newly_reachable);
   let result =
     { Ssa.blocks = B.finish entry_builder;
       fun_name = ssa.fun_name;
@@ -546,7 +469,8 @@ let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
    with exn ->
      let bt = Printexc.get_raw_backtrace () in
      Format.eprintf
-       "*** Ssa_reducer.run: validation failed for %s: %s@.*** Old SSA:@.%a@.*** New SSA:@.%a@."
+       "*** Ssa_reducer.run: validation failed for %s: %s@.*** Old \
+        SSA:@.%a@.*** New SSA:@.%a@."
        ssa.fun_name (Printexc.to_string exn) Ssa_print.print ssa Ssa_print.print
        result;
      Format.pp_print_flush Format.err_formatter ();

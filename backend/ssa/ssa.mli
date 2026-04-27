@@ -4,13 +4,6 @@ module InstructionId : Oxcaml_utils.Id_counter.S
 
 module BlockId : Oxcaml_utils.Id_counter.S
 
-type block_desc =
-  | Merge
-  | Branch_target
-  | Function_start
-  | Call_continuation
-  | Trap_handler
-
 type op_data = private
   { id : InstructionId.t;
     op : Operation.t;
@@ -49,6 +42,10 @@ and instruction =
         regs : instruction array
       }
 
+and call_op =
+  | Func of Cfg_intf.S.func_call_operation
+  | Prim of Cfg_intf.S.prim_call_operation
+
 and terminator =
   | Pending_construction
   | Goto of
@@ -60,22 +57,26 @@ and terminator =
         ifso : block;
         ifnot : block
       }
-  | Switch of block array * instruction array
-  | Return of instruction array
-  | Raise of Lambda.raise_kind * instruction array * block option
+  | Switch of
+      { index : instruction;
+        targets : block array
+      }
+  | Return of { args : instruction array }
+  | Raise of
+      { raise_kind : Lambda.raise_kind;
+        args : instruction array;
+        handler : block option
+      }
   | Tailcall_self of
       { destination : block;
         args : instruction array
       }
-  | Tailcall_func of Cfg_intf.S.func_call_operation * instruction array
-  | Call of
+  | Tailcall_func of
       { op : Cfg_intf.S.func_call_operation;
-        args : instruction array;
-        continuation : block;
-        exn_continuation : block option
+        args : instruction array
       }
-  | Prim of
-      { op : Cfg_intf.S.prim_call_operation;
+  | Call of
+      { op : call_op;
         args : instruction array;
         continuation : block;
         exn_continuation : block option
@@ -97,7 +98,7 @@ and dominator_of_reachable = private
 
 and block = private
   { id : BlockId.t;
-    desc : block_desc;
+    is_function_start : bool;
     params : Cmm.machtype;
     mutable predecessors : block list;
     mutable body : instruction array;
@@ -129,8 +130,8 @@ val make_op :
   instruction
 
 (** Smart constructor for [Proj] that short-circuits projections out of a
-    [Tuple]: [make_proj ~index (Tuple elems)] returns [elems.(index)]
-    directly. This is the only supported way to consume a [Tuple]. *)
+    [Tuple]: [make_proj ~index (Tuple elems)] returns [elems.(index)] directly.
+    This is the only supported way to consume a [Tuple]. *)
 val make_proj : index:int -> instruction -> instruction
 
 val reachable : dominator_info -> bool
@@ -175,8 +176,22 @@ val dominates : block -> block -> bool
 
 val common_dominator : dominator_info -> dominator_info -> dominator_info
 
-(** The subset of the builder interface that reducers may use: operations
-    that act on an already-existing cursor. Lifecycle operations ([make] and
+(** Iterate over all reachable blocks of [ssa] in a priority order over the
+    unvisited set [(priority, input_position)] (smaller is better):
+    - priority 0: all predecessors are already visited (canonical topological);
+    - priority 1: block transitively reaches an already-visited block (closes an
+      existing "open" structure before starting a new one);
+    - priority 2: neither.
+
+    [input_position] (the index of the block in [ssa.blocks]) breaks ties.
+
+    Reachability is computed dynamically, initially only the start block is
+    considered reachable. The callback returns the blocks that should be
+    considered reachable after processing the given block. *)
+val iter_reachable_topological : t -> (block -> block list) -> unit
+
+(** The subset of the builder interface that reducers may use: operations that
+    act on an already-existing cursor. Lifecycle operations ([make] and
     [finish]) live on [Builder] itself. *)
 module type BuilderS = sig
   type t
@@ -184,8 +199,8 @@ module type BuilderS = sig
   (** Emit [i] and return the instruction that was actually added. For the
       canonical [Builder] this is just [i]; for chained builders used in
       [Ssa_reducer], the chain may rewrite the instruction and return the
-      rewritten version, so callers that intend to reference the emission
-      (e.g. via [emit_op]) must use the returned value. *)
+      rewritten version, so callers that intend to reference the emission (e.g.
+      via [emit_op]) must use the returned value. *)
   val emit_instruction : t -> instruction -> instruction
 
   val emit_op :
@@ -200,7 +215,7 @@ module type BuilderS = sig
 
   val current_block : t -> block
 
-  val new_block : t -> ?params:Cmm.machtype -> block_desc -> t
+  val new_block : t -> params:Cmm.machtype -> t
 
   val block_params : t -> instruction array
 end

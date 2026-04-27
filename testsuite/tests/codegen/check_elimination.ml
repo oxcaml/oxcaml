@@ -56,6 +56,10 @@ arr_sum:
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
+  jmp   .L114
+.L137:
+  movl  $1, %eax
+  ret
 .L114:
   leaq  1(%rdx,%rdx), %rcx
 <<<<<<< HEAD
@@ -81,9 +85,6 @@ arr_sum:
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L137:
-  movl  $1, %eax
-  ret
 |}]
 
 (* CR ttebbi: The generated control flow branches three (!) times on
