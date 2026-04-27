@@ -25,6 +25,10 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
 
+          - name: setup-ocaml probe (ubuntu-latest)
+            config: --enable-runtime5
+            os: ubuntu-latest
+
           - name: runtime5 dissector-assembler (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
@@ -268,6 +272,22 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo touch /.dockerenv
         # makes setup-ocaml skip apt-get, which is slow on first invocation
+
+      - name: Probe ocaml/opam releases API
+        run: |
+          echo "--- with GITHUB_TOKEN ---"
+          curl -sS -w "\nHTTP %{http_code}\n" \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "User-Agent: ci-probe" \
+            'https://api.github.com/repos/ocaml/opam/releases?per_page=30' \
+            -o /tmp/auth.json
+          jq 'length, [.[] | .tag_name][:5]' /tmp/auth.json || cat /tmp/auth.json
+          echo "--- unauthenticated ---"
+          curl -sS -w "\nHTTP %{http_code}\n" \
+            -H "User-Agent: ci-probe" \
+            'https://api.github.com/repos/ocaml/opam/releases?per_page=30' \
+            -o /tmp/anon.json
+          jq 'length' /tmp/anon.json || cat /tmp/anon.json
 
       - name: Set up Opam
         uses: ocaml/setup-ocaml@v3
