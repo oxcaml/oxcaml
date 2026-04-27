@@ -68,6 +68,8 @@ module Expanded_type : sig
 
   val to_type : t -> Type_grammar.t
 
+  val kind : t -> Flambda_kind.t
+
   type descr = private
     | Value of Type_grammar.head_of_kind_value
     | Naked_immediate of Type_grammar.head_of_kind_naked_immediate
