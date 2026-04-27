@@ -421,8 +421,6 @@ let index_occurrences binary_annots =
     in
     (* Shape reduction can be expensive, but the persistent memoization tables
        should make these successive reductions fast. *)
-    (* CR sspies: [index_components] was added during the 5.4 merge and is worth
-       keeping an eye on with respect to how it impacts Merlin. *)
     let rec index_components namespace lid path =
       let module_ = Shape.Sig_component_kind.Module in
       let scraped_path = Path.scrape_extra_ty path in

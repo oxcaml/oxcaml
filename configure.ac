@@ -1193,7 +1193,6 @@ AS_IF(
 ## AC_PROG_CC_C99
 
 ## Determine which flags to use for the C compiler
-dnl CR sspies: outputobj is set earlier, around line 519
 
 AS_CASE([$ocaml_cc_vendor],
   [xlc-*],
@@ -3060,8 +3059,6 @@ AC_ARG_WITH([objcopy],
   [objcopy=$with_objcopy])
 
 ## Frame pointers
-dnl CR sspies: Add aarch64-*-linux*|aarch64-*-darwin* when we support frame pointers on ARM.
-dnl Upstream already has support for these.
 
 AS_IF([test x"$enable_frame_pointers" = "xyes" -o x"$enable_address_sanitizer" = "xyes"],
   [AS_CASE([$target],

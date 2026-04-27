@@ -235,7 +235,7 @@
   ctype
   printtyp
   rawprinttyp
-  gprinttyp ;; CR sspies: Not added upstream, let's keep it for now.
+  gprinttyp
   includeclass
   mtype
   envaux

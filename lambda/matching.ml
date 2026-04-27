@@ -4583,8 +4583,6 @@ let for_trywith ~scopes ~return_layout loc param pat_act_list =
     None param pat_act_list Partial
 
 let for_handler ~scopes ~return_layout loc param cont cont_tail pat_act_list =
-  (* CR sspies: Hardcoding arg_sort and arg_layout like for_trywith.
-     Revisit whether this choice is actually correct. *)
   compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
     ~arg_layout:layout_block ~return_layout loc
     ~failer:(Reperform_noloc [param; cont; cont_tail])

@@ -162,8 +162,6 @@ val add_type_declaration_to_preparation :
 val prepared_type_declaration: Ident.t -> type_declaration printer
 
 val tree_of_value_description: Ident.t -> value_description -> out_sig_item
-(* CR sspies: oxcaml adds [?abbrev] to [tree_of_modtype_declaration].
-   Implementation is in printtyp.ml. *)
 val tree_of_modtype_declaration:
     ?abbrev:bool -> Ident.t -> modtype_declaration -> out_sig_item
 val tree_of_class_declaration:
@@ -179,8 +177,6 @@ val tree_of_jkind_declaration:
 val tree_of_module:
     Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status ->
     out_sig_item
-(* CR sspies: oxcaml adds [?abbrev] to [tree_of_modtype].
-   Implementation is in printtyp.ml. *)
 val tree_of_modtype: ?abbrev:bool -> module_type -> out_module_type
 val tree_of_signature: Types.signature -> out_sig_item list
 

@@ -2377,9 +2377,6 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
        ~mode:alloc_heap
        ~ret_mode:(to_locality p.prim_native_repr_res)
 
-(* CR sspies: I didn't attempt to reorder the constructors during the 5.4 merge
-   here. But maybe we should do something to decrease the diff and make the
-   order the same for the constructors that are shared. *)
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that MAY raise
      an exception or allocate (this is approximated conservatively). These are
