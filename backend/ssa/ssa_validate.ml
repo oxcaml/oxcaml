@@ -88,9 +88,12 @@ let validate (t : Ssa.t) =
     | Proj { src; _ } -> (
       match src with
       | Op _ -> check_arg bl src
-      | Block_param _ | Proj _ | Push_trap _ | Pop_trap _ | Stack_check _
-      | Name_for_debugger _ ->
+      | Tuple _ | Block_param _ | Proj _ | Push_trap _ | Pop_trap _
+      | Stack_check _ | Name_for_debugger _ ->
         error "block %a: Proj source must be an Op" pb bl)
+    | Tuple _ ->
+      error "block %a: Tuple must be short-circuited by Proj, not used as arg"
+        pb bl
     | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
       error "block %a: non-value instruction used as argument" pb bl
   in
@@ -163,7 +166,11 @@ let validate (t : Ssa.t) =
                 (Ssa.InstructionId.hash id);
             Ssa.InstructionId.Tbl.replace defined_ops id bl
           | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
-          | Block_param _ | Proj _ -> ())
+          | Block_param _ | Proj _ | Tuple _ ->
+            error
+              "block %a: virtual instruction (Block_param/Proj/Tuple) cannot \
+               appear in a block body"
+              pb bl)
         bl.body;
       (* Check terminator *)
       match bl.terminator with

@@ -64,7 +64,7 @@ div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L118
+  je    .L121
   cmpq  $-1, %rcx
   je    .L111
   movq  %rdi, %rax
@@ -75,7 +75,7 @@ div:
   xorl  %eax, %eax
   subq  %rdi, %rax
   ret
-.L118:
+.L121:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -102,7 +102,7 @@ unsigned_div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L115
+  jge   .L145
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
   movabsq $-9223372036854775808, %rax
@@ -114,9 +114,9 @@ unsigned_div:
 .L109:
   movl  $1, %eax
   ret
-.L115:
+.L145:
   testq %rcx, %rcx
-  je    .L141
+  je    .L146
   movq  %rdi, %rbx
   shrq  $1, %rbx
   cmpq  $-1, %rcx
@@ -144,7 +144,7 @@ unsigned_div:
 .L134:
   incq  %rax
   ret
-.L141:
+.L146:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -157,7 +157,7 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L117
+  je    .L120
   cmpq  $-1, %rcx
   je    .L111
   cqto
@@ -167,7 +167,7 @@ rem:
 .L111:
   xorl  %eax, %eax
   ret
-.L117:
+.L120:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -182,7 +182,7 @@ unsigned_rem:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L118
+  jge   .L153
   movabsq $-9223372036854775808, %rbx
   movq  %rcx, %rax
   subq  %rbx, %rax
@@ -196,9 +196,9 @@ unsigned_rem:
 .L112:
   movl  $1, %ebx
   jmp   .L148
-.L118:
+.L153:
   testq %rcx, %rcx
-  je    .L144
+  je    .L154
   movq  %rdi, %rax
   shrq  $1, %rax
   cmpq  $-1, %rcx
@@ -225,7 +225,7 @@ unsigned_rem:
   jl    .L148
   incq  %rbx
   jmp   .L148
-.L144:
+.L154:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

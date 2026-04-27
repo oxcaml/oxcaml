@@ -42,13 +42,13 @@ push:
   salq  $8, %rax
   shrq  $17, %rax
   cmpq  %rax, %r12
-  jae   .L117
+  jae   .L120
   leaq  -4(%rbx,%r12,4), %rdi
   call  caml_modify@PLT
   leaq  2(%r12), %rax
   addq  $8, %rsp
   ret
-.L117:
+.L120:
   movq  camlTOP3__block33@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -430,10 +430,10 @@ int_safe_get:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jae   .L115
+  jae   .L118
   movq  -4(%rax,%rbx,4), %rax
   ret
-.L115:
+.L118:
   movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -451,13 +451,13 @@ ref_safe_set:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jae   .L116
+  jae   .L119
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L116:
+.L119:
   movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -478,15 +478,15 @@ poly_safe_get:
   salq  $8, %rax
   shrq  $17, %rax
   cmpq  %rax, %rbx
-  jae   .L123
+  jae   .L126
   movzbq -8(%rdi), %rax
   cmpq  $254, %rax
   jne   .L116
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L126
-.L128:
+  jb    .L128
+.L130:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0
@@ -496,7 +496,7 @@ poly_safe_get:
 .L116:
   movq  -4(%rdi,%rbx,4), %rax
   ret
-.L123:
+.L126:
   subq  $8, %rsp
   movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
@@ -514,7 +514,7 @@ poly_safe_set:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jae   .L124
+  jae   .L127
   movzbq -8(%rax), %rdi
   cmpq  $254, %rdi
   jne   .L116
@@ -529,7 +529,7 @@ poly_safe_set:
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L124:
+.L127:
   subq  $8, %rsp
   movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
@@ -548,10 +548,10 @@ int64_safe_get:
   shrq  $18, %rdi
   salq  $1, %rdi
   cmpq  %rdi, %rbx
-  jae   .L116
+  jae   .L119
   movq  -4(%rax,%rbx,4), %rax
   ret
-.L116:
+.L119:
   movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -567,10 +567,10 @@ float_safe_get:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jae   .L115
+  jae   .L118
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
-.L115:
+.L118:
   movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -586,10 +586,10 @@ float_safe_get_plain:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jae   .L115
+  jae   .L118
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
-.L115:
+.L118:
   movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -610,10 +610,10 @@ int32_safe_get:
   subq  %rdi, %rsi
   salq  $1, %rsi
   cmpq  %rsi, %rbx
-  jae   .L120
+  jae   .L123
   movslq -2(%rax,%rbx,2), %rax
   ret
-.L120:
+.L123:
   movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

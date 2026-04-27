@@ -31,6 +31,12 @@ and instruction =
       { index : int;
         src : instruction
       }
+  | Tuple of instruction array
+      (** A multi-value bundle. Only appears transiently, e.g. as the
+          representative an [Ssa_reducer] reducer nominates for a multi-output
+          instruction. Projections out of a [Tuple] short-circuit via
+          {!make_proj}, so a well-formed graph never contains a [Tuple] in an
+          arg or block body. *)
   | Push_trap of { handler : block option }
       (** [handler = None] means "no handler block exists"; CFG lowering
           provides a shared dummy invalid block. *)
@@ -98,10 +104,15 @@ and block = private
     mutable terminator : terminator;
     mutable terminator_dbg : Debuginfo.t;
     mutable dominator_info : dominator_info;
-    mutable label_hint : Label.t option
+    mutable label_hint : Label.t option;
         (** Cached CFG label. Set by [Cfg_of_ssa.convert] so a second conversion
             pass can reuse it, and updated after [Cfg_compare] to align labels
             with the old pipeline. *)
+    param_usage_counts : int array
+        (** Per-parameter usage counts, symmetric with [Op]'s [usage_count]. A
+            param with count 0 is "dead": no arg passed via an unconditional
+            jump ([Goto]/[Raise]/[Tailcall_self]) to this param need be kept
+            alive. *)
   }
 
 val block_equal : block -> block -> bool
@@ -117,7 +128,16 @@ val make_op :
   dbg:Debuginfo.t ->
   instruction
 
+(** Smart constructor for [Proj] that short-circuits projections out of a
+    [Tuple]: [make_proj ~index (Tuple elems)] returns [elems.(index)]
+    directly. This is the only supported way to consume a [Tuple]. *)
+val make_proj : index:int -> instruction -> instruction
+
 val reachable : dominator_info -> bool
+
+(** A block is "finished" once its terminator has been set (i.e. is no longer
+    [Pending_construction]). *)
+val block_finished : block -> bool
 
 module Block : sig
   type t = block
@@ -155,12 +175,18 @@ val dominates : block -> block -> bool
 
 val common_dominator : dominator_info -> dominator_info -> dominator_info
 
-module Builder : sig
+(** The subset of the builder interface that reducers may use: operations
+    that act on an already-existing cursor. Lifecycle operations ([make] and
+    [finish]) live on [Builder] itself. *)
+module type BuilderS = sig
   type t
 
-  val make : Cmm.machtype -> t
-
-  val emit_instruction : t -> instruction -> unit
+  (** Emit [i] and return the instruction that was actually added. For the
+      canonical [Builder] this is just [i]; for chained builders used in
+      [Ssa_reducer], the chain may rewrite the instruction and return the
+      rewritten version, so callers that intend to reference the emission
+      (e.g. via [emit_op]) must use the returned value. *)
+  val emit_instruction : t -> instruction -> instruction
 
   val emit_op :
     t ->
@@ -177,6 +203,12 @@ module Builder : sig
   val new_block : t -> ?params:Cmm.machtype -> block_desc -> t
 
   val block_params : t -> instruction array
+end
+
+module Builder : sig
+  include BuilderS
+
+  val make : Cmm.machtype -> t
 
   val finish : t -> block list
 end

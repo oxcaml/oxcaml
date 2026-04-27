@@ -21,6 +21,7 @@ type instruction =
       { index : int;
         src : instruction
       }
+  | Tuple of instruction array
   | Push_trap of { handler : block option }
       (** [handler = None] is resolved to a shared dummy "invalid handler" block
           at CFG conversion time (used for trap handlers that are statically
@@ -99,10 +100,16 @@ and block =
     mutable terminator : terminator;
     mutable terminator_dbg : Debuginfo.t;
     mutable dominator_info : dominator_info;
-    mutable label_hint : Label.t option
+    mutable label_hint : Label.t option;
         (** Cached CFG label. Set by [cfg_of_ssa] during conversion so that a
             second conversion pass can reuse the same label. May be updated
             after a [cfg_compare] round to align with the old pipeline's labels.
+        *)
+    param_usage_counts : int array
+        (** Per-parameter usage counts, tracked symmetrically with [Op]'s
+            [usage_count]. A [Block_param] use propagates through this count to
+            each predecessor's terminator arg at the same index, so that
+            arguments passed to a dead parameter are themselves treated as dead.
         *)
   }
 
@@ -117,6 +124,17 @@ let set_label_hint (b : block) (hint : Label.t option) = b.label_hint <- hint
 let make_op ~op ~typ ~args ~dbg : instruction =
   Op { id = InstructionId.create (); op; typ; args; dbg; usage_count = 0 }
 
+(* Smart constructor for [Proj] that short-circuits projections out of a
+   [Tuple]. This is the only supported way to consume a [Tuple]. *)
+let make_proj ~index src : instruction =
+  match src with
+  | Tuple elems -> elems.(index)
+  | Op _ -> Proj { index; src }
+  | Block_param _ | Proj _ | Push_trap _ | Pop_trap _ | Stack_check _
+  | Name_for_debugger _ ->
+    Misc.fatal_error
+      "Ssa.make_proj: cannot project from a non-value-producing instruction"
+
 let create_block ~desc ~params =
   { id = BlockId.create ();
     desc;
@@ -126,7 +144,8 @@ let create_block ~desc ~params =
     terminator = Pending_construction;
     terminator_dbg = Debuginfo.none;
     dominator_info = Unreachable;
-    label_hint = None
+    label_hint = None;
+    param_usage_counts = Array.make (Array.length params) 0
   }
 
 module Block = struct
@@ -226,6 +245,70 @@ let dominator_info_equal (a : dominator_info) (b : dominator_info) =
     block_equal d1 d2 && dp1 = dp2
   | Unreachable, Reachable _ | Reachable _, Unreachable -> false
 
+(* For a predecessor's terminator, return the argument at [index] that is passed
+   through an unconditional jump to a successor whose params may be dropped.
+   Only [Goto] targets such successors ([Merge] blocks); [Tailcall_self] and
+   [Raise] target blocks whose params are never dropped (function re-entry /
+   trap handlers fed by the runtime), so their args are counted unconditionally
+   by [increment_uses_in_terminator] rather than gated here. *)
+let block_param_arg (term : terminator) (index : int) : instruction option =
+  match term with
+  | Goto { args; _ } -> Some args.(index)
+  | Pending_construction | Branch _ | Switch _ | Return _ | Raise _
+  | Tailcall_self _ | Tailcall_func _ | Call _ | Prim _ | Invalid _ ->
+    None
+
+(* Use counts behave like reference counting. An [Op] with [usage_count = 0]
+   does NOT contribute to its args' use counts; a [Block_param] whose
+   [param_usage_counts] slot is zero does NOT contribute to its predecessors'
+   terminator-arg use counts either. Transitions (0 → 1 on increment, 1 → 0 on
+   decrement) propagate outward through the respective edges. *)
+let rec increment_use (i : instruction) =
+  match i with
+  | Op r ->
+    r.usage_count <- r.usage_count + 1;
+    if r.usage_count = 1 then Array.iter increment_use r.args
+  | Proj { src; _ } -> increment_use src
+  | Block_param { block; index; _ } ->
+    let old = block.param_usage_counts.(index) in
+    block.param_usage_counts.(index) <- old + 1;
+    if old = 0
+    then
+      List.iter
+        (fun pred ->
+          match block_param_arg pred.terminator index with
+          | Some arg -> increment_use arg
+          | None -> ())
+        block.predecessors
+  | Tuple _ ->
+    Misc.fatal_error
+      "Ssa.increment_use: Tuple should have been short-circuited by make_proj"
+  | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
+
+let rec decrement_use (i : instruction) =
+  match i with
+  | Op r ->
+    assert (r.usage_count > 0);
+    r.usage_count <- r.usage_count - 1;
+    if r.usage_count = 0 then Array.iter decrement_use r.args
+  | Proj { src; _ } -> decrement_use src
+  | Block_param { block; index; _ } ->
+    let old = block.param_usage_counts.(index) in
+    assert (old > 0);
+    block.param_usage_counts.(index) <- old - 1;
+    if old = 1
+    then
+      List.iter
+        (fun pred ->
+          match block_param_arg pred.terminator index with
+          | Some arg -> decrement_use arg
+          | None -> ())
+        block.predecessors
+  | Tuple _ ->
+    Misc.fatal_error
+      "Ssa.decrement_use: Tuple should have been short-circuited by make_proj"
+  | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
+
 let rec update_dominator (blk : block) =
   if block_finished blk
   then (
@@ -261,68 +344,53 @@ and add_pred ~src ~(dst : block) =
   (* Skip unreachable predecessors: they will be added later if this block
      becomes reachable. *)
   if reachable src.dominator_info
-  then (
-    (match dst.desc with
-    | Branch_target | Call_continuation -> (
-      match dst.predecessors with
-      | [] -> dst.predecessors <- [src]
-      | [pred] -> assert (block_equal pred src)
-      | _ -> assert false)
-    | Function_start | Merge | Trap_handler ->
-      dst.predecessors <- src :: dst.predecessors);
-    update_dominator dst)
-
-(* Use counts behave like reference counting: an Op with usage_count = 0 does
-   NOT contribute to its args' use counts. Transitions (0 → 1 on increment, 1 →
-   0 on decrement) propagate to args. *)
-let rec increment_use (i : instruction) =
-  match i with
-  | Op r ->
-    r.usage_count <- r.usage_count + 1;
-    if r.usage_count = 1 then Array.iter increment_use r.args
-  | Proj { src; _ } -> increment_use src
-  | Block_param _ | Push_trap _ | Pop_trap _ | Stack_check _
-  | Name_for_debugger _ ->
-    ()
-
-let rec decrement_use (i : instruction) =
-  match i with
-  | Op r ->
-    assert (r.usage_count > 0);
-    r.usage_count <- r.usage_count - 1;
-    if r.usage_count = 0 then Array.iter decrement_use r.args
-  | Proj { src; _ } -> decrement_use src
-  | Block_param _ | Push_trap _ | Pop_trap _ | Stack_check _
-  | Name_for_debugger _ ->
-    ()
+  then begin
+    dst.predecessors <- src :: dst.predecessors;
+    (* Retroactively propagate already-live params of [dst] through the
+       newly-wired edge to the matching args in [src]'s terminator. *)
+    Array.iteri
+      (fun i count ->
+        if count > 0
+        then
+          match block_param_arg src.terminator i with
+          | Some arg -> increment_use arg
+          | None -> ())
+      dst.param_usage_counts;
+    if block_finished dst then update_dominator dst
+  end
 
 let increment_uses_in_terminator (term : terminator) =
   let incr_all = Array.iter increment_use in
   match term with
   | Pending_construction -> ()
-  | Goto { args; _ } -> incr_all args
+  (* Only [Goto] gates its args on target param usage; the target ([Merge]) has
+     params that may be dropped. All other terminators either don't pass args to
+     block params, or target blocks whose params are always kept ([Trap_handler]
+     for [Raise], the tail-rec entry for [Tailcall_self]). *)
+  | Goto _ -> ()
   | Branch { cond; _ } -> increment_use cond
-  | Switch (_, args) -> incr_all args
-  | Return args -> incr_all args
-  | Raise (_, args, _) -> incr_all args
-  | Tailcall_self { args; _ } -> incr_all args
-  | Tailcall_func (_, args) -> incr_all args
-  | Call { args; _ } -> incr_all args
-  | Prim { args; _ } -> incr_all args
-  | Invalid { args; _ } -> incr_all args
+  | Switch (_, args)
+  | Return args
+  | Raise (_, args, _)
+  | Tailcall_self { args; _ }
+  | Tailcall_func (_, args)
+  | Call { args; _ }
+  | Prim { args; _ }
+  | Invalid { args; _ } ->
+    incr_all args
 
 (* === Builder: assembler-like interface for constructing SSA graphs ===
    Maintains a current open block. [finish_block] seals the current block with a
    terminator. *)
 
-module Builder : sig
+module type BuilderS = sig
   type t
 
-  (** Create a builder that binds the start block. *)
-  val make : Cmm.machtype -> t
-
-  (** Add an instruction to the given incomplete block. *)
-  val emit_instruction : t -> instruction -> unit
+  (** Add an instruction to the given incomplete block and return the
+      instruction that was actually added. For [Builder] this is always the
+      input; chained builders in [Ssa_reducer] may substitute a rewritten
+      instruction. *)
+  val emit_instruction : t -> instruction -> instruction
 
   (** Create an Op instruction and add it to the current block. *)
   val emit_op :
@@ -344,10 +412,17 @@ module Builder : sig
       [finish_block]). *)
   val new_block : t -> ?params:Cmm.machtype -> block_desc -> t
 
-  (** Create block_param instructions for a given block. *)
+  (** Create block_param instructions for the current block. *)
   val block_params : t -> instruction array
+end
 
-  (** Finalize: collect all created blocks. Returns blocks in emission order. *)
+module Builder : sig
+  include BuilderS
+
+  (** Create a builder that binds the start block. *)
+  val make : Cmm.machtype -> t
+
+  (** Finalize: collect reachable blocks in emission order. *)
   val finish : t -> block list
 end = struct
   (* Each [t] represents an incomplete block being built. All [t] values created
@@ -373,20 +448,29 @@ end = struct
     assert (not (block_finished t.current_block));
     (match i with
     | Name_for_debugger { regs; _ } -> Array.iter increment_use regs
-    | Op _ | Block_param _ | Proj _ | Push_trap _ | Pop_trap _ | Stack_check _
-      ->
-      ());
-    t.body <- i :: t.body
+    | Block_param _ | Proj _ | Tuple _ ->
+      Misc.fatal_errorf
+        "Ssa.Builder.emit_instruction: %s is a virtual value and cannot be \
+         emitted into a block body"
+        (match[@warning "-fragile-match"] i with
+        | Block_param _ -> "Block_param"
+        | Proj _ -> "Proj"
+        | Tuple _ -> "Tuple"
+        | _ -> assert false)
+    | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ());
+    t.body <- i :: t.body;
+    i
 
   let emit_op t ~op ~dbg ~typ ~args =
     let i : instruction =
       Op { id = InstructionId.create (); op; typ; args; dbg; usage_count = 0 }
     in
-    (* Impure ops are "pre-incremented" because their side effect counts as a
-       use. [increment_use] handles the recursive propagation to args. *)
-    if not (Operation.is_pure op) then increment_use i;
-    emit_instruction t i;
-    i
+    (* Non-removable impure ops are "pre-incremented" because their side effect
+       counts as a use. Ops like [Opaque]/[Alloc] are impure in [is_pure] terms
+       but may still be dropped when their result is unused, so we skip the
+       pre-increment for them and let the normal reference counting decide. *)
+    if not (Operation.is_removable_when_unused op) then increment_use i;
+    emit_instruction t i
 
   let finish_block t ~dbg term =
     assert (not (block_finished t.current_block));
