@@ -667,7 +667,7 @@ let id' x = id x
 
 [%%expect{|
 external id : ('a : any separable). 'a t -> int = "%identity"
-val id' : ('a : value maybe_null). 'a t -> int = <fun>
+val id' : ('a : any separable). 'a t -> int = <fun>
 |}]
 
 
