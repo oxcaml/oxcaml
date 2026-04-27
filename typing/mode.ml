@@ -3284,7 +3284,7 @@ module Lattices_mono = struct
       Simple_proj (Simple_morph.left_adjoint mid m, ax, dst)
     | Const_max _ -> Const_min dst
 
-  let compose_simple_with_proj_core : type a c p d.
+  let compose_simple_proj_core : type a c p d.
       c obj ->
       (p, c, d) Simple_morph.t ->
       (a, p, d) Core_morph.compose_proj_result ->
@@ -3297,7 +3297,7 @@ module Lattices_mono = struct
     | Proj_const_max obj1 -> Const_max obj1
     | Proj_const_min obj1 -> Const_min obj1
 
-  let compose_simple_with_proj_meet_const_core : type a c p l.
+  let compose_simple_proj_meet_const_core : type a c p l.
       c obj ->
       (p, c, l * disallowed) Simple_morph.t ->
       p ->
@@ -3313,7 +3313,7 @@ module Lattices_mono = struct
     | Proj_const_max obj1 -> Const_max obj1
     | Proj_const_min obj1 -> Const_min obj1
 
-  let compose_simple_with_proj_core_imply_const : type a c p r.
+  let compose_simple_proj_core_imply_const : type a c p r.
       c obj ->
       (p, c, disallowed * r) Simple_morph.t ->
       a ->
@@ -3343,7 +3343,7 @@ module Lattices_mono = struct
     | Id -> Simple_proj (m0, ax0, obj0)
     | Core m1 ->
       let pm1 = Core_morph.compose_projection_core ax0 m1 in
-      compose_simple_with_proj_core dst m0 pm1
+      compose_simple_proj_core dst m0 pm1
     | Meet_const c1 ->
       let c1 = Axis.proj ax0 c1 in
       Simple_proj (Simple_morph.compose dst m0 (Meet_const c1), ax0, obj0)
@@ -3353,13 +3353,13 @@ module Lattices_mono = struct
     | Meet_const_core (c1, m1) ->
       let c1 = Axis.proj ax0 c1 in
       let pm1 = Core_morph.compose_projection_core ax0 m1 in
-      compose_simple_with_proj_meet_const_core dst m0 c1 pm1
+      compose_simple_proj_meet_const_core dst m0 c1 pm1
     | Core_imply_const (m1, c1) ->
       let pm1 = Core_morph.compose_projection_core ax0 m1 in
-      compose_simple_with_proj_core_imply_const dst m0 c1 pm1
+      compose_simple_proj_core_imply_const dst m0 c1 pm1
     | Compose _ -> Compose (Simple_proj (m0, ax0, obj0), Simple m1)
 
-  let compose_simple_with_and_max : type a b c q r.
+  let compose_simple_max_with_simple : type a b c q r.
       c obj ->
       (b, c, disallowed * r) Simple_morph.t ->
       (b, q) Axis.t ->
@@ -3398,7 +3398,7 @@ module Lattices_mono = struct
     | Meet_const _ -> Compose (Simple sm0, Max_with_simple (ax1, m1))
     | Compose _ -> Compose (Simple sm0, Max_with_simple (ax1, m1))
 
-  let compose_simple_with_and_min : type a b c q l.
+  let compose_simple_min_with_simple : type a b c q l.
       c obj ->
       (b, c, l * disallowed) Simple_morph.t ->
       (b, q) Axis.t ->
@@ -3470,12 +3470,12 @@ module Lattices_mono = struct
       let dst = proj_obj ax0 dst in
       Max_with_simple (ax0, Simple_morph.compose dst m0 m1)
     | Simple m0, Max_with_simple (ax1, m1) ->
-      compose_simple_with_and_max dst m0 ax1 m1
+      compose_simple_max_with_simple dst m0 ax1 m1
     | Min_with_simple (ax0, m0), Simple m1 ->
       let dst = proj_obj ax0 dst in
       Min_with_simple (ax0, Simple_morph.compose dst m0 m1)
     | Simple m0, Min_with_simple (ax1, m1) ->
-      compose_simple_with_and_min dst m0 ax1 m1
+      compose_simple_min_with_simple dst m0 ax1 m1
     | Simple_proj (m0, ax0, obj1), Max_with_simple (ax1, m1) ->
       begin match Axis.equal ax0 ax1 with
       | Misc.Is_eq -> Simple (Simple_morph.compose dst m0 m1)
