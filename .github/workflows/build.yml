@@ -34,10 +34,24 @@ jobs:
             dissector_assembler: true
             sysdeps: gdb
 
-          - name: runtime5 stack-checks (x86_64-linux)
+          - name: runtime5 function sections & binary emitter (x86_64-linux)
+            config: --enable-runtime5 --enable-function-sections
+            os: warp-ubuntu-latest-x64-8x
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            # build_ocamlparam: '_,verify-binary-emitter=1'
+            ocamlparam: '_,verify-binary-emitter=1'
+            llvm_mc_as: true
+
+          - name: runtime5 stack checks & binary emitter (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            # build_ocamlparam: '_,verify-binary-emitter=1'
+            ocamlparam: '_,verify-binary-emitter=1'
+            llvm_mc_as: true
 
           - name: runtime5 poll-insertion (x86_64-linux)
             config: --enable-runtime5 --enable-poll-insertion
@@ -365,6 +379,9 @@ jobs:
             # build. Pin CFLAGS to gnu11 so the later -std= wins at compile
             # time. Scoped to runtime4 since it will be deleted soon.
             export CFLAGS="-std=gnu11"
+          fi
+          if [[ "${{matrix.llvm_mc_as}}" == "true" ]]; then
+            export AS="$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc -filetype=obj"
           fi
           autoconf
           ./configure \
