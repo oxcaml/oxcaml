@@ -13,12 +13,10 @@ let _ = Eval.eval <[ List.append [1; 2] [3] ]>
 
 let _ = Eval.eval <[ List.append [1; 2] [3] ]>
 [%%expect{|
-Line 1:
-Error: Error during linking (exit code 1)
+- : int list = [1; 2; 3]
 |}]
 
 let _ = Eval.eval <[ List.append [1; 2] [3] ]>
 [%%expect{|
-Line 1:
-Error: Error during linking (exit code 1)
+- : int list = [1; 2; 3]
 |}]
