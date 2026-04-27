@@ -1,7 +1,6 @@
 (* TEST
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 class type ct = object end
 module type s = sig type a val one:int type b class two:ct type c type exn+=Three type d end
 module type c12 = sig type a class two:ct type b val one:int type c type exn+=Three type d end

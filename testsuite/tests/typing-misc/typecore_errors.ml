@@ -2,7 +2,6 @@
  expect;
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 
 (** Gives an example for every [raise(Error(_,_,_)] in typing/typecore.ml

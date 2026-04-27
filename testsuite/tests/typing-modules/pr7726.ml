@@ -1,7 +1,6 @@
 (* TEST
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 module type T = sig type t end
 module Fix(F:(T -> T)) = struct

@@ -1,7 +1,6 @@
 (* TEST
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 module C = Char;;
 C.chr 66;;

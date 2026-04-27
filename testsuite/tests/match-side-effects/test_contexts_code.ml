@@ -4,7 +4,6 @@
  stack-allocation;
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 #use "contexts_1.ml";;
 (* Notice that (field_mut 1 input) occurs twice, it

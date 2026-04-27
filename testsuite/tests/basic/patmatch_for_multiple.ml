@@ -2,7 +2,6 @@
  flags = "-drawlambda -dlambda -dcanonical-ids";
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* Note: the tests below contain *both* the -drawlambda and
    the -dlambda intermediate representations:

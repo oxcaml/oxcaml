@@ -1,7 +1,6 @@
 (* TEST
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* The goal of this test is exhaustively cover all spellcheck-style
    error messages in the compiler. *)

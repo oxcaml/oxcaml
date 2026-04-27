@@ -3,7 +3,6 @@
  stack-allocation;
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* We explicitly enable the warning (see the discussion in the
    "Warning reference" section of the reference manual), which makes

@@ -2,7 +2,6 @@
  flags = "-no-alias-deps -w +40";
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 module M = struct
   type t = A
   module M : sig

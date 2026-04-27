@@ -1,7 +1,6 @@
 (* TEST
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* Subtyping is "syntactic" *)
 fun (x : < x : int >) y z -> (y :> 'a), (x :> 'a), (z :> 'a);;

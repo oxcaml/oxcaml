@@ -2,7 +2,6 @@
  flags = "-nostdlib -nopervasives -dlambda -dcanonical-ids";
  expect;
 *)
-(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (******************************************************************************)
 
