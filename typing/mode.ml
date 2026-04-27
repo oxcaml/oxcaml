@@ -3821,106 +3821,6 @@ module Report = struct
       (Location.Doc.loc ~capitalize_first:false)
       loc
 
-  let print_containing maybe_modality { containing; container } =
-    let container = fst container in
-    match containing with
-    | Tuple ->
-      Fmt.dprintf "is an element of the tuple at %a"
-        (Location.Doc.loc ~capitalize_first:false)
-        container
-    | Record (s, moda) ->
-      Fmt.dprintf "is the field %a%a of the record at %a" Misc.Style.inline_code
-        s maybe_modality moda
-        (Location.Doc.loc ~capitalize_first:false)
-        container
-    | Array moda ->
-      Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
-        (Location.Doc.loc ~capitalize_first:false)
-        container
-    | Constructor (s, moda) ->
-      Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
-        Misc.Style.inline_code s maybe_modality moda
-        (Location.Doc.loc ~capitalize_first:false)
-        container
-    | Structure (x, moda) ->
-      Fmt.dprintf "is %t%a in the structure at %a"
-        (print_structure_item ~capitalize:false x)
-        maybe_modality moda
-        (Location.Doc.loc ~capitalize_first:false)
-        container
-
-  (** Given a pinpoint and a const, where the pinpoint has been expressed,
-      prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
-      (l * r) const -> unit = function
-    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
-    | Lazy_allocated_on_heap ->
-      (match pp_desc with
-      | Lazy ->
-        (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "lazy expressions always need"
-      | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
-      Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Legacy m ->
-      (match pp_desc, m with
-      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
-          Class ) ->
-        (* if we already said it's a class, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "classes are always"
-      | _ ->
-        Fmt.fprintf ppf "it is %t and thus always"
-          (print_legacy m ~definite:false ~capitalize:false));
-      Fmt.pp_print_string ppf " at the legacy modes"
-    | Toplevel_expression ->
-      Fmt.pp_print_string ppf "it is a top-level expression"
-    | Tailcall_function ->
-      Fmt.pp_print_string ppf "it is the function in a tail call"
-    | Tailcall_argument ->
-      Fmt.pp_print_string ppf "it is an argument in a tail call"
-    | Mutable_read m ->
-      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
-    | Mutable_write m ->
-      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
-    | Lazy_forced -> (
-      match pp_desc with
-      | Lazy ->
-        (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "it is being forced"
-      | _ -> Fmt.pp_print_string ppf "it is a lazy value being forced")
-    | Function_return ->
-      Fmt.fprintf ppf
-        "it is a function return value.@ Hint: Use exclave_ to return a local \
-         value"
-    | Stack_expression ->
-      Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
-    | Module_allocated_on_heap ->
-      (match pp_desc with
-      | Ident { category = Module; _ }
-      | Functor | Module | Structure
-      | Structure_item (Module, _) ->
-        (* if we already said it's a module, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "modules always need"
-      | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
-      Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Is_used_in pp ->
-      let print_pp = print_pinpoint pp |> Option.get in
-      Fmt.fprintf ppf "it is used in %t"
-        (print_pp ~definite:false ~capitalize:false)
-    | Always_dynamic x ->
-      Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
-    | Branching -> Fmt.fprintf ppf "it has branches"
-    | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
-    | Escape_region reg ->
-      Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
-    | Quoted_computation -> Fmt.fprintf ppf "it is the quote of a computation"
-    | Lpoly_inst ->
-      Fmt.pp_print_string ppf
-        "it is layout-polymorphic and being instantiated here"
-    | Spliced _ -> Fmt.fprintf ppf "it is spliced"
-    | Contained_by c ->
-      let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
-      Fmt.fprintf ppf "it %t" (print_containing print_mod c)
-
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
     match txt with
@@ -4008,6 +3908,34 @@ module Report = struct
         in
         pr, contained)
 
+  let print_containing maybe_modality { containing; container } =
+    let container = fst container in
+    match containing with
+    | Tuple ->
+      Fmt.dprintf "is an element of the tuple at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Record (s, moda) ->
+      Fmt.dprintf "is the field %a%a of the record at %a" Misc.Style.inline_code
+        s maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Array moda ->
+      Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Constructor (s, moda) ->
+      Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
+        Misc.Style.inline_code s maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Structure (x, moda) ->
+      Fmt.dprintf "is %t%a in the structure at %a"
+        (print_structure_item ~capitalize:false x)
+        maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+
   let print_is_contained_by :
       fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
    fun ~fixpoint { containing; container } ->
@@ -4015,35 +3943,80 @@ module Report = struct
     (* CR-someday zqian: Use the full [container] to improve the printing below.
        E.g., insted of printing "the tuple at XXX", we can print "the tuple
        pattern at XXX" or "the tuple expression at XXX". *)
-    let container = fst container in
-    let pr =
-      match containing with
-      | Tuple ->
-        Fmt.dprintf "is an element of the tuple at %a"
-          (Location.Doc.loc ~capitalize_first:false)
-          container
-      | Record (s, moda) ->
-        Fmt.dprintf "is the field %a%a of the record at %a"
-          Misc.Style.inline_code s maybe_modality moda
-          (Location.Doc.loc ~capitalize_first:false)
-          container
-      | Array moda ->
-        Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
-          (Location.Doc.loc ~capitalize_first:false)
-          container
-      | Constructor (s, moda) ->
-        Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
-          Misc.Style.inline_code s maybe_modality moda
-          (Location.Doc.loc ~capitalize_first:false)
-          container
-      | Structure (x, moda) ->
-        Fmt.dprintf "is %t%a in the structure at %a"
-          (print_structure_item ~capitalize:false x)
-          maybe_modality moda
-          (Location.Doc.loc ~capitalize_first:false)
-          container
-    in
+    let pr = print_containing maybe_modality { containing; container } in
     pr, pp
+
+  (** Given a pinpoint and a const, where the pinpoint has been expressed,
+      prints the const to explain the mode on the pinpoint. *)
+  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+      (l * r) const -> unit = function
+    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
+    | Lazy_allocated_on_heap ->
+      (match pp_desc with
+      | Lazy ->
+        (* if we already said it's a lazy, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "lazy expressions always need"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
+    | Legacy m ->
+      (match pp_desc, m with
+      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
+          Class ) ->
+        (* if we already said it's a class, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "classes are always"
+      | _ ->
+        Fmt.fprintf ppf "it is %t and thus always"
+          (print_legacy m ~definite:false ~capitalize:false));
+      Fmt.pp_print_string ppf " at the legacy modes"
+    | Toplevel_expression ->
+      Fmt.pp_print_string ppf "it is a top-level expression"
+    | Tailcall_function ->
+      Fmt.pp_print_string ppf "it is the function in a tail call"
+    | Tailcall_argument ->
+      Fmt.pp_print_string ppf "it is an argument in a tail call"
+    | Mutable_read m ->
+      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
+    | Mutable_write m ->
+      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
+    | Lazy_forced -> (
+      match pp_desc with
+      | Lazy ->
+        (* if we already said it's a lazy, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "it is being forced"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy value being forced")
+    | Function_return ->
+      Fmt.fprintf ppf
+        "it is a function return value.@ Hint: Use exclave_ to return a local \
+         value"
+    | Stack_expression ->
+      Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
+    | Module_allocated_on_heap ->
+      (match pp_desc with
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
+        (* if we already said it's a module, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "modules always need"
+      | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
+    | Is_used_in pp ->
+      let print_pp = print_pinpoint pp |> Option.get in
+      Fmt.fprintf ppf "it is used in %t"
+        (print_pp ~definite:false ~capitalize:false)
+    | Always_dynamic x ->
+      Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Branching -> Fmt.fprintf ppf "it has branches"
+    | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
+    | Escape_region reg ->
+      Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+    | Quoted_computation -> Fmt.fprintf ppf "it is the quote of a computation"
+    | Lpoly_inst ->
+      Fmt.pp_print_string ppf
+        "it is layout-polymorphic and being instantiated here"
+    | Spliced _ -> Fmt.fprintf ppf "it is spliced"
+    | Contained_by c ->
+      let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
+      Fmt.fprintf ppf "it %t" (print_containing print_mod c)
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
