@@ -57,10 +57,10 @@ end
 Variant_with_uneven_mutability.get:
   movzbq -8(%rax), %rbx
   cmpq  $1, %rbx
-  je    .L109
+  jne   .L113
   movq  (%rax), %rax
   ret
-.L109:
+.L113:
   movq  (%rax), %rax
   ret
 |}]

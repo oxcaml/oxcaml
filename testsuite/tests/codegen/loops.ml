@@ -66,10 +66,6 @@ for_loop_layout:
   sarq  $1, %rax
   movq  %rax, 16(%rsp)
   xorl  %eax, %eax
-  jmp   .L109
-.L120:
-  movl  $1, %eax
-  ret
 .L109:
   movq  %rax, 8(%rsp)
   movl  $1, %eax
@@ -84,6 +80,9 @@ for_loop_layout:
   jle   .L109
   movl  $1, %eax
   addq  $24, %rsp
+  ret
+.L120:
+  movl  $1, %eax
   ret
 |}]
 
@@ -168,15 +167,13 @@ noop_loop:
   jg    .L119
   sarq  $1, %rax
   sarq  $1, %rbx
-  jmp   .L110
-.L119:
-  movl  $1, %eax
-  ret
 .L110:
   incq  %rax
   cmpq  %rbx, %rax
-  jg    .L119
-  jmp   .L110
+  jle   .L110
+.L119:
+  movl  $1, %eax
+  ret
 |}]
 
 
@@ -199,10 +196,6 @@ f:
   sarq  $1, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
-  jmp   .L109
-.L121:
-  movl  $1, %eax
-  ret
 .L109:
   movq  %rdi, %rsi
   imulq $6, %rsi
@@ -210,6 +203,9 @@ f:
   incq  %rdi
   cmpq  %rbx, %rdi
   jle   .L109
+  ret
+.L121:
+  movl  $1, %eax
   ret
 |}]
 
@@ -259,10 +255,6 @@ M.f:
   movq  %rdi, %rsi
 =======
   xorl  %ebx, %ebx
-  jmp   .L116
-.L132:
-  vxorpd %xmm0, %xmm0, %xmm0
-  ret
 .L116:
   movq  %rbx, %rsi
 >>>>>>> 42782c097b (passes testsuite)
@@ -285,6 +277,9 @@ M.f:
   cmpq  %rax, %rbx
   jle   .L116
   ret
+.L132:
+  vxorpd %xmm0, %xmm0, %xmm0
+  ret
 |}]
 
 
@@ -302,7 +297,7 @@ loop_invariant_code:
   cmpq  $1, %rax
   je    .L118
   jmp   .L113
-.L128:
+.L109:
   cmpq  $1, %rax
   je    .L118
 .L113:
@@ -310,14 +305,14 @@ loop_invariant_code:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L132:
+.L130:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
 .L118:
   incq  %rdi
   cmpq  $9, %rdi
-  jle   .L128
+  jle   .L109
   movl  $1, %eax
   addq  $24, %rsp
   ret

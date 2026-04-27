@@ -57,14 +57,14 @@ let div x y = x / y
 div:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  je    .L118
+  je    .L115
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rax,%rax), %rax
   ret
-.L118:
+.L115:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -110,14 +110,14 @@ let rem x y = x mod y
 rem:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  je    .L118
+  je    .L115
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rdx,%rdx), %rax
   ret
-.L118:
+.L115:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -366,9 +366,8 @@ let collatz n =
 ;;
 [%%expect_asm X86_64{|
 collatz:
-  movl  $1, %edi
   movq  %rax, %rbx
-  movq  %rdi, %rax
+  movl  $1, %eax
   cmpq  $3, %rbx
   jg    .L110
 .L108:

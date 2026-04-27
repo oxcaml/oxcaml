@@ -64,7 +64,7 @@ div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L121
+  je    .L118
   cmpq  $-1, %rcx
   je    .L111
   movq  %rdi, %rax
@@ -75,7 +75,7 @@ div:
   xorl  %eax, %eax
   subq  %rdi, %rax
   ret
-.L121:
+.L118:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -102,7 +102,7 @@ unsigned_div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L145
+  jge   .L115
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
   movabsq $-9223372036854775808, %rax
@@ -114,9 +114,9 @@ unsigned_div:
 .L109:
   movl  $1, %eax
   ret
-.L145:
+.L115:
   testq %rcx, %rcx
-  je    .L146
+  je    .L141
   movq  %rdi, %rbx
   shrq  $1, %rbx
   cmpq  $-1, %rcx
@@ -144,7 +144,7 @@ unsigned_div:
 .L134:
   incq  %rax
   ret
-.L146:
+.L141:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -157,7 +157,7 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L120
+  je    .L117
   cmpq  $-1, %rcx
   je    .L111
   cqto
@@ -167,7 +167,7 @@ rem:
 .L111:
   xorl  %eax, %eax
   ret
-.L120:
+.L117:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -182,7 +182,7 @@ unsigned_rem:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L153
+  jge   .L118
   movabsq $-9223372036854775808, %rbx
   movq  %rcx, %rax
   subq  %rbx, %rax
@@ -196,9 +196,9 @@ unsigned_rem:
 .L112:
   movl  $1, %ebx
   jmp   .L148
-.L153:
+.L118:
   testq %rcx, %rcx
-  je    .L154
+  je    .L144
   movq  %rdi, %rax
   shrq  $1, %rax
   cmpq  $-1, %rcx
@@ -224,17 +224,18 @@ unsigned_rem:
   cmpq  %rax, %rdx
   jl    .L148
   incq  %rbx
-.L148:
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
-  subq  %rbx, %rax
-  ret
-.L154:
+  jmp   .L148
+.L144:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L148:
+  imulq %rcx, %rbx
+  movq  %rdi, %rax
+  subq  %rbx, %rax
+  ret
 |}]
 
 (* CR ttebbi: This could be just a bitwise and. *)
