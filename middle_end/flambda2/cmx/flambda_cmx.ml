@@ -202,7 +202,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
      function_slots/vars reachable from the code of the current compilation
      unit, but since we also re-export code metadata (including return types)
      from other compilation units, we need to take those into account. *)
-  let free_slots_of_all_code = EC.free_function_slots_and_value_slots all_code in
+  let free_slots_of_all_code =
+    EC.free_function_slots_and_value_slots all_code
+  in
   let slots_used_in_typing_env =
     TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
