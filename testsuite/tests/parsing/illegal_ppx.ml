@@ -81,12 +81,6 @@ let expr mapper e =
     mutable_let_ppat_any loc
   | _ -> super.M.expr mapper e
 
-let typ mapper t =
-  match t.ptyp_desc with
-  | Ptyp_extension ({txt="alias_with_too_many_nones";loc},_) ->
-      alias_with_too_many_nones loc
-  | _ -> super.M.typ mapper t
-
 let pat mapper p =
   match p.ppat_desc with
   | Ppat_extension ({txt="record_with_functor_fields";loc},_) ->
@@ -101,6 +95,8 @@ let pat mapper p =
 
 let typ mapper ty =
   match ty.ptyp_desc with
+  | Ptyp_extension ({txt="alias_with_too_many_nones";loc},_) ->
+      alias_with_too_many_nones loc
   | Ptyp_extension ({txt="empty_poly_binder";loc},_) ->
       empty_poly_binder loc
   | _ -> super.M.typ mapper ty
