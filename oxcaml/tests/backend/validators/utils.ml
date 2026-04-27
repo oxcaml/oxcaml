@@ -165,7 +165,7 @@ let return_label = label_add entry_label 5
 
 let new_label i = label_add entry_label (6 + i)
 
-let int = Array.init 8 (fun _ -> Reg.create Int)
+let int = Array.init 8 (fun _ -> Reg.create Int64)
 
 let check name f ~validate ~save ~exp_std ~exp_err =
   let cfg = f () in

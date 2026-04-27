@@ -68,7 +68,7 @@ let machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
   match Flambda_kind.With_subkind.kind kind with
   | Value -> (
     match Flambda_kind.With_subkind.non_null_value_subkind kind with
-    | Tagged_immediate -> Cmm.typ_int
+    | Tagged_immediate -> Cmm.typ_tagged_int
     | Anything | Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64
     | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
     | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
@@ -82,11 +82,12 @@ let machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
   | Naked_number Naked_vec128 -> Cmm.typ_vec128
   | Naked_number Naked_vec256 -> Cmm.typ_vec256
   | Naked_number Naked_vec512 -> Cmm.typ_vec512
-  | Naked_number
-      ( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
-      | Naked_nativeint ) ->
-    Cmm.typ_int
-  | Region -> Cmm.typ_int
+  | Naked_number (Naked_immediate | Naked_int64 | Naked_nativeint) ->
+    Cmm.typ_int64
+  | Naked_number Naked_int32 -> Cmm.typ_int32
+  | Naked_number Naked_int16 -> Cmm.typ_int16
+  | Naked_number Naked_int8 -> Cmm.typ_int8
+  | Region -> Cmm.typ_tagged_int
   | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
 
 let extended_machtype_of_kind (kind : Flambda_kind.With_subkind.t) =

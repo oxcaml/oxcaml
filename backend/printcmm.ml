@@ -35,7 +35,11 @@ let machtype_component ppf (ty : machtype_component) =
   match ty with
   | Val -> fprintf ppf "val"
   | Addr -> fprintf ppf "addr"
-  | Int -> fprintf ppf "int"
+  | Tagged_int -> fprintf ppf "tagged_int"
+  | Int64 -> fprintf ppf "int64"
+  | Int32 -> fprintf ppf "int32"
+  | Int16 -> fprintf ppf "int16"
+  | Int8 -> fprintf ppf "int8"
   | Float -> fprintf ppf "float"
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"

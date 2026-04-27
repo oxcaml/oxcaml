@@ -624,7 +624,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let reset_addressing () =
       (* Use a temporary to store the address [!base + !byte_offset]. *)
-      let tmp = Reg.createv Cmm.typ_int in
+      (* CR jrayman: should registers have a machtype of tagged int? *)
+      let tmp = Reg.createv Cmm.typ_tagged_int in
       (* CR-someday xclerc: Now that this code in the "generic" part, it is
          maybe a bit unexpected to assume there is no better sequence to emit x
          += k. That being said, it is a corner case. *)
@@ -679,7 +680,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec128 -> Onetwentyeight_unaligned
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
-              | Val | Addr | Int -> Word_val
+              | Val | Addr | Tagged_int | Int64 | Int32 | Int16 | Int8 ->
+                Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
             insert_debug env sub_cfg
@@ -712,10 +714,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Reg.t array Or_never_returns.t =
     match exp with
     | Cconst_int (n, _dbg) ->
-      let r = Reg.createv Cmm.typ_int in
+      let r = Reg.createv Cmm.typ_int64 in
       Ok (insert_op env sub_cfg (SU.make_const_int (Nativeint.of_int n)) [||] r)
     | Cconst_natint (n, _dbg) ->
-      let r = Reg.createv Cmm.typ_int in
+      let r = Reg.createv Cmm.typ_int64 in
       Ok (insert_op env sub_cfg (SU.make_const_int n) [||] r)
     | Cconst_float32 (n, _dbg) ->
       let r = Reg.createv Cmm.typ_float32 in
@@ -746,7 +748,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
          may point to heap values. However, any such blocks will be registered
          in the compilation unit's global roots structure, so adding this
          register to the frame table would be redundant *)
-      let r = Reg.createv Cmm.typ_int in
+      let r = Reg.createv Cmm.typ_int64 in
       Ok (insert_op env sub_cfg (SU.make_const_symbol n) [||] r)
     | Cvar v -> (
       try Ok (SU.env_find v env)
@@ -842,7 +844,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (* For zero alloc checking we need to treat [Invalid] as returning. *)
       let label = Cmm.new_label () in
       let label_after = Some label in
-      let ty = Cmm.typ_int in
+      let ty = Cmm.typ_tagged_int in
       let rd = Reg.createv ty in
       let term = Cfg.Invalid { message; stack_ofs; stack_align; label_after } in
       let loc_res =
@@ -1195,7 +1197,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             match reg.Reg.typ with
             | Addr -> assert false
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
+            | Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128
+            | Vec256 | Vec512 | Float32 ->
+              ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
         SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);
