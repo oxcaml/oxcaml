@@ -6,6 +6,11 @@ let backendWorker = null;
 let directBackendPromise = null;
 let workerFailed = false;
 
+const backendWorkerUrl = new URL(
+  "./backend_worker.js?v=20260427-worker-blob",
+  import.meta.url,
+).href;
+
 export function addBackendStatusListener(listener) {
   statusListeners.add(listener);
   return () => {
@@ -41,13 +46,70 @@ function workerSupported() {
   return !workerFailed && typeof Worker === "function" && typeof URL === "function";
 }
 
+function createBlobWorker(workerUrl) {
+  if (
+    typeof Blob !== "function" ||
+    typeof URL.createObjectURL !== "function" ||
+    typeof URL.revokeObjectURL !== "function"
+  ) {
+    return null;
+  }
+  const source = `
+const queuedMessages = [];
+function queueMessage(event) {
+  queuedMessages.push(event);
+}
+globalThis.onmessage = queueMessage;
+import(${JSON.stringify(workerUrl)}).then(() => {
+  const handler = globalThis.onmessage;
+  if (handler === queueMessage || typeof handler !== "function") {
+    throw new Error("OxCaml backend worker did not install a message handler");
+  }
+  for (const event of queuedMessages) {
+    handler.call(globalThis, event);
+  }
+}).catch((error) => {
+  globalThis.postMessage({
+    type: "worker_boot_error",
+    error: error?.stack || error?.message || String(error),
+  });
+});
+`;
+  const blobUrl = URL.createObjectURL(
+    new Blob([source], { type: "application/javascript" }),
+  );
+  try {
+    return new Worker(blobUrl);
+  } finally {
+    globalThis.setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 0);
+  }
+}
+
 function getBackendWorker() {
   if (backendWorker || !workerSupported()) {
     return backendWorker;
   }
-  backendWorker = new Worker(new URL("./backend_worker.js", import.meta.url));
+  try {
+    backendWorker = new Worker(backendWorkerUrl);
+  } catch (error) {
+    backendWorker = createBlobWorker(backendWorkerUrl);
+    if (!backendWorker) {
+      workerFailed = true;
+      backendWorker = null;
+      return null;
+    }
+  }
   backendWorker.onmessage = ({ data }) => {
     if (!data || typeof data !== "object") {
+      return;
+    }
+    if (data.type === "worker_boot_error") {
+      workerFailed = true;
+      backendWorker?.terminate();
+      backendWorker = null;
+      retryPendingRequestsDirect();
       return;
     }
     if (data.type === "status") {
@@ -85,7 +147,7 @@ function getBackendWorker() {
 
 async function directBackend() {
   if (!directBackendPromise) {
-    directBackendPromise = import("./backend_direct.js?v=20260424-multicore-shim");
+    directBackendPromise = import("./backend_direct.js?v=20260427-worker-blob");
   }
   return directBackendPromise;
 }
