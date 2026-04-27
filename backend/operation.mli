@@ -186,10 +186,10 @@ type t =
 val is_pure : t -> bool
 
 (** Operations that are not pure in the [is_pure] sense but whose observable
-    effect is subsumed by their result: when the result is unused, the op
-    itself can be deleted. Examples include [Opaque] (a no-op marker kept
-    only so optimizers don't look through it) and [Alloc _] (unused
-    allocations are just garbage). *)
+    effect is subsumed by their result: when the result is unused, the op itself
+    can be deleted. Examples include [Opaque] (a no-op marker kept only so
+    optimizers don't look through it) and [Alloc _] (unused allocations are just
+    garbage). *)
 val is_removable_when_unused : t -> bool
 
 val dump : Format.formatter -> t -> unit

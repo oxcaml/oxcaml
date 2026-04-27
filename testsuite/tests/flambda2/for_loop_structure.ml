@@ -14,6 +14,10 @@ f:
   jl    .L121
   sarq  $1, %rax
   xorl  %ebx, %ebx
+  jmp   .L109
+.L121:
+  movl  $1, %eax
+  ret
 .L109:
   movq  (%rdi), %rsi
   leaq  (%rsi,%rbx,2), %rsi
@@ -21,9 +25,6 @@ f:
   incq  %rbx
   cmpq  %rax, %rbx
   jle   .L109
-  movl  $1, %eax
-  ret
-.L121:
   movl  $1, %eax
   ret
 |}]

@@ -224,18 +224,17 @@ unsigned_rem:
   cmpq  %rax, %rdx
   jl    .L148
   incq  %rbx
-  jmp   .L148
+.L148:
+  imulq %rcx, %rbx
+  movq  %rdi, %rax
+  subq  %rbx, %rax
+  ret
 .L154:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L148:
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
-  subq  %rbx, %rax
-  ret
 |}]
 
 (* CR ttebbi: This could be just a bitwise and. *)

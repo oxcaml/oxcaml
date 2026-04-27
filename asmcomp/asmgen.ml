@@ -528,8 +528,6 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
           fd_cmm Ssa_print.print ssa;
         Printexc.raise_with_backtrace exn bt);
-     if !Oxcaml_flags.dump_cfg
-     then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      let cfg_from_ssa_for_compare =
        (* First conversion: used only for [Cfg_compare], so we emit a CFG that
           stays faithful to plain [cfg_selectgen]. No optimizations here. Labels
@@ -566,13 +564,15 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
            let new_hint = Label.Tbl.find_opt new_to_old l in
            Ssa.set_label_hint bl new_hint)
        ssa.blocks;
+     if !Oxcaml_flags.dump_cfg
+     then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      (* Second conversion: produces the CFG that feeds the real pipeline. This
         is where SSA-level optimizations run. *)
      let ssa = Ssa_simplify.run ssa in
      if !Oxcaml_flags.dump_cfg
      then
-       Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
-         ssa;
+       Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a"
+         Ssa_print.print ssa;
      let cfg_final =
        try
          Label.with_saved_counter @@ fun () ->

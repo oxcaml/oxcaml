@@ -333,7 +333,7 @@ and emit env b (exp : Cmm.expression) ~tail : result =
     | Cswitch (esel, index, ecases, _dbg) ->
       emit_switch env b ~tail esel index ecases
     | Ccatch (_, [], e1) -> emit env b e1 ~tail
-    | Ccatch (flag, handlers, body) -> emit_catch env b ~tail flag handlers body
+    | Ccatch (_flag, handlers, body) -> emit_catch env b ~tail handlers body
     (* Leaf expressions *)
     | Cconst_int (n, _dbg) ->
       Ok
@@ -401,7 +401,7 @@ and insert_return env (r : result) (traps : Cmm.trap_action list) : result =
   | Never_returns -> Never_returns
   | Ok (r, b) ->
     emit_trap_actions env b traps;
-    B.finish_block b ~dbg:Debuginfo.none (Return r);
+    B.finish_block b ~dbg:Debuginfo.none (Return { args = r });
     Never_returns
 
 and emit_invalid env b message symbol =
@@ -409,7 +409,7 @@ and emit_invalid env b message symbol =
   let* arg_instrs, b = emit_tuple env b [arg_expr] in
   if !SU.current_function_is_check_enabled
   then (
-    let cont_b = B.new_block b ~params:Cmm.typ_int Call_continuation in
+    let cont_b = B.new_block b ~params:Cmm.typ_int in
     let cont_block = B.current_block cont_b in
     B.finish_block b ~dbg:Debuginfo.none
       (Invalid { message; args = arg_instrs; continuation = Some cont_block });
@@ -424,7 +424,8 @@ and emit_invalid env b message symbol =
 and emit_expr_raise env b k args dbg =
   let* r, b = emit_tuple env b args in
   let handler_block = current_exn_continuation env in
-  B.finish_block b ~dbg (Raise (k, r, handler_block));
+  B.finish_block b ~dbg
+    (Raise { raise_kind = k; args = r; handler = handler_block });
   set_traps_for_raise env;
   Never_returns
 
@@ -437,12 +438,12 @@ and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
   in
   match new_op with
   | Terminator (Call { op = call_op; _ }) ->
-    let cont_b = B.new_block b ~params:ty Call_continuation in
+    let cont_b = B.new_block b ~params:ty in
     let cont_block = B.current_block cont_b in
     let exn_cont = current_exn_continuation env in
     B.finish_block b ~dbg
       (Call
-         { op = call_op;
+         { op = Func call_op;
            args = arg_instrs;
            continuation = cont_block;
            exn_continuation = exn_cont
@@ -450,12 +451,12 @@ and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
     set_traps_for_raise env;
     Ok (B.block_params cont_b, cont_b)
   | Terminator (Prim { op = External ({ ty_res; _ } as ext_call); _ }) ->
-    let cont_b = B.new_block b ~params:ty_res Call_continuation in
+    let cont_b = B.new_block b ~params:ty_res in
     let cont_block = B.current_block cont_b in
     let exn_cont = current_exn_continuation env in
     B.finish_block b ~dbg
-      (Prim
-         { op = External ext_call;
+      (Call
+         { op = Prim (External ext_call);
            args = arg_instrs;
            continuation = cont_block;
            exn_continuation = exn_cont
@@ -463,11 +464,11 @@ and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
     set_traps_for_raise env;
     Ok (B.block_params cont_b, cont_b)
   | Terminator (Prim { op = Probe _ as probe_op; _ }) ->
-    let cont_b = B.new_block b ~params:ty Call_continuation in
+    let cont_b = B.new_block b ~params:ty in
     let cont_block = B.current_block cont_b in
     B.finish_block b ~dbg
-      (Prim
-         { op = probe_op;
+      (Call
+         { op = Prim probe_op;
            args = arg_instrs;
            continuation = cont_block;
            exn_continuation = None
@@ -527,8 +528,8 @@ and emit_ifthenelse env b ~tail econd eif eelse : result =
   match emit env b earg ~tail:false with
   | Never_returns -> Never_returns
   | Ok (rarg, b) ->
-    let then_b = B.new_block b Branch_target in
-    let else_b = B.new_block b Branch_target in
+    let then_b = B.new_block b ~params:[||] in
+    let else_b = B.new_block b ~params:[||] in
     let then_block = B.current_block then_b in
     let else_block = B.current_block else_b in
     let term =
@@ -549,10 +550,14 @@ and emit_switch env b ~tail esel index ecases : result =
   | Never_returns -> Never_returns
   | Ok (rsel, b) ->
     let case_bs =
-      Array.map (fun (_case_expr, _dbg) -> B.new_block b Branch_target) ecases
+      Array.map (fun (_case_expr, _dbg) -> B.new_block b ~params:[||]) ecases
     in
     let targets = Array.map (fun idx -> B.current_block case_bs.(idx)) index in
-    B.finish_block b ~dbg:Debuginfo.none (Switch (targets, rsel));
+    let index =
+      assert (Array.length rsel = 1);
+      rsel.(0)
+    in
+    B.finish_block b ~dbg:Debuginfo.none (Switch { index; targets });
     let case_results =
       Array.mapi
         (fun i (case_expr, _dbg) -> emit env case_bs.(i) case_expr ~tail)
@@ -566,24 +571,18 @@ and emit_switch env b ~tail esel index ecases : result =
       Never_returns)
     else join_array case_results
 
-and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
-  let body_b = B.new_block b Merge in
+and emit_catch env b ~tail handlers body : result =
+  let body_b = B.new_block b ~params:[||] in
   let body_block = B.current_block body_b in
   (* Create one block per handler up front so they can refer to one another
      (mutually recursive [Recursive] handlers). All handlers are emitted
-     unconditionally, regardless of whether the body or peer handlers
-     reach them — later passes drop unreachable blocks. *)
+     unconditionally, regardless of whether the body or peer handlers reach them
+     — later passes drop unreachable blocks. *)
   let handler_infos =
     List.map
       (fun Cmm.{ label = nfail; params; body = h_body; _ } ->
-        let types =
-          List.map (fun (_id, ty) -> ty) params |> Array.concat
-        in
-        let handler_b =
-          match flag with
-          | Cmm.Exn_handler -> B.new_block b ~params:types Trap_handler
-          | Cmm.Recursive | Cmm.Normal -> B.new_block b ~params:types Merge
-        in
+        let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
+        let handler_b = B.new_block b ~params:types in
         let traps_ref = ref SU.Unreachable in
         nfail, params, h_body, handler_b, traps_ref)
       handlers
@@ -602,9 +601,9 @@ and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
   let r_body = emit env body_b body ~tail in
   let translate_handler params handler_b traps_ref handler_body =
     (* If no [Cexit]/raise populated [traps_ref], the handler is dead and its
-       trap stack defaults to the ambient one; later passes drop the
-       resulting unreachable block and rewrite [Push_trap]/[Pop_trap]
-       references to [None]. *)
+       trap stack defaults to the ambient one; later passes drop the resulting
+       unreachable block and rewrite [Push_trap]/[Pop_trap] references to
+       [None]. *)
     let trap_stack =
       match !traps_ref with
       | SU.Reachable trap_stack -> trap_stack
@@ -682,7 +681,8 @@ and emit_trap_actions env b traps =
       ignore
         (B.emit_instruction b
            (match trap with
-           | Push _ -> Push_trap { handler = Some (B.current_block h.handler_b) }
+           | Push _ ->
+             Push_trap { handler = Some (B.current_block h.handler_b) }
            | Pop _ -> Pop_trap { handler = Some (B.current_block h.handler_b) })
           : Ssa.instruction))
     traps
@@ -703,7 +703,7 @@ and emit_expr_exit env b (lbl : Cmm.exit_label) args traps : result =
     | Return_lbl ->
       let* src, b = emit_tuple ext_env b simple_list in
       emit_trap_actions env b traps;
-      B.finish_block b ~dbg:Debuginfo.none (Return src);
+      B.finish_block b ~dbg:Debuginfo.none (Return { args = src });
       Never_returns)
 
 and emit_tail_apply env b _ty op args dbg : result =
@@ -735,7 +735,8 @@ and emit_tail_apply env b _ty op args dbg : result =
       match new_op with
       | Terminator (Call { op = Indirect callees; _ })
         when can_tailcall (Indirect callees) ->
-        B.finish_block b ~dbg (Tailcall_func (Indirect callees, arg_instrs));
+        B.finish_block b ~dbg
+          (Tailcall_func { op = Indirect callees; args = arg_instrs });
         Never_returns
       | Terminator (Call { op = Direct func; _ })
         when String.equal func.sym_name !SU.current_function_name
@@ -745,7 +746,8 @@ and emit_tail_apply env b _ty op args dbg : result =
         Never_returns
       | Terminator (Call { op = Direct func; _ })
         when can_tailcall (Direct func) ->
-        B.finish_block b ~dbg (Tailcall_func (Direct func, arg_instrs));
+        B.finish_block b ~dbg
+          (Tailcall_func { op = Direct func; args = arg_instrs });
         Never_returns
       | _ ->
         let ty = SU.oper_result_type op in
@@ -764,7 +766,7 @@ and join_branches (r1 : result) (r2 : result) : result =
   | Ok (r1_instrs, b1), Ok (r2_instrs, b2) ->
     assert (Array.length r1_instrs = Array.length r2_instrs);
     let join_types = Array.map typ_of_instruction r1_instrs in
-    let join_b = B.new_block b1 ~params:join_types Merge in
+    let join_b = B.new_block b1 ~params:join_types in
     let join_block = B.current_block join_b in
     B.finish_block b1 ~dbg:Debuginfo.none
       (Goto { goto = join_block; args = r1_instrs });
@@ -786,19 +788,17 @@ and join_array (results : result array) : result =
         | None -> join_info := Some (types, any_b)
         | Some (prev, any_b) ->
           (* Different paths may produce values of compatible but distinct
-             machtype components (e.g. a [try val E with _ 456] mixes [val]
-             and [int]). Pick the least upper bound so the joined block's
-             param types accommodate every incoming arm. *)
+             machtype components (e.g. a [try val E with _ 456] mixes [val] and
+             [int]). Pick the least upper bound so the joined block's param
+             types accommodate every incoming arm. *)
           assert (Array.length prev = Array.length types);
-          let lub =
-            Array.map2 Cmm.lub_component prev types
-          in
+          let lub = Array.map2 Cmm.lub_component prev types in
           join_info := Some (lub, any_b)))
     results;
   match !join_info with
   | None -> Never_returns
   | Some (join_types, any_b) ->
-    let join_b = B.new_block any_b ~params:join_types Merge in
+    let join_b = B.new_block any_b ~params:join_types in
     let join_block = B.current_block join_b in
     Array.iter
       (fun r ->

@@ -3,13 +3,6 @@
 module InstructionId = Oxcaml_utils.Id_counter.Make ()
 module BlockId = Oxcaml_utils.Id_counter.Make ()
 
-type block_desc =
-  | Merge
-  | Branch_target
-  | Function_start
-  | Call_continuation
-  | Trap_handler
-
 type instruction =
   | Op of op_data
   | Block_param of
@@ -55,23 +48,26 @@ and terminator =
         ifso : block;
         ifnot : block
       }
-  | Switch of block array * instruction array
-  | Return of instruction array
+  | Switch of
+      { index : instruction;
+        targets : block array
+      }
+  | Return of { args : instruction array }
   | Raise of
-      Lambda.raise_kind * instruction array * block option (* exn handler *)
+      { raise_kind : Lambda.raise_kind;
+        args : instruction array;
+        handler : block option
+      }
   | Tailcall_self of
       { destination : block;
         args : instruction array
       }
-  | Tailcall_func of Cfg_intf.S.func_call_operation * instruction array
-  | Call of
+  | Tailcall_func of
       { op : Cfg_intf.S.func_call_operation;
-        args : instruction array;
-        continuation : block;
-        exn_continuation : block option
+        args : instruction array
       }
-  | Prim of
-      { op : Cfg_intf.S.prim_call_operation;
+  | Call of
+      { op : call_op;
         args : instruction array;
         continuation : block;
         exn_continuation : block option
@@ -81,6 +77,10 @@ and terminator =
         args : instruction array;
         continuation : block option
       }
+
+and call_op =
+  | Func of Cfg_intf.S.func_call_operation
+  | Prim of Cfg_intf.S.prim_call_operation
 
 and dominator_info =
   | Unreachable
@@ -93,7 +93,7 @@ and dominator_of_reachable =
 
 and block =
   { id : BlockId.t;
-    desc : block_desc;
+    is_function_start : bool;
     params : Cmm.machtype;
     mutable predecessors : block list;
     mutable body : instruction array;
@@ -135,9 +135,9 @@ let make_proj ~index src : instruction =
     Misc.fatal_error
       "Ssa.make_proj: cannot project from a non-value-producing instruction"
 
-let create_block ~desc ~params =
+let create_block ~is_function_start ~params =
   { id = BlockId.create ();
-    desc;
+    is_function_start;
     params;
     predecessors = [];
     body = [||];
@@ -189,13 +189,12 @@ let predecessors (blk : block) : block list = blk.predecessors
 let successors (blk : block) : block list =
   match blk.terminator with
   | Pending_construction | Return _ | Tailcall_func _ -> []
-  | Raise (_, _, handler) -> ( match handler with Some h -> [h] | None -> [])
+  | Raise { handler; _ } -> ( match handler with Some h -> [h] | None -> [])
   | Goto { goto; _ } -> [goto]
   | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
-  | Switch (targets, _) -> Array.to_list targets
+  | Switch { targets; _ } -> Array.to_list targets
   | Tailcall_self { destination; _ } -> [destination]
-  | Call { continuation; exn_continuation; _ }
-  | Prim { continuation; exn_continuation; _ } -> (
+  | Call { continuation; exn_continuation; _ } -> (
     match exn_continuation with
     | Some l -> [continuation; l]
     | None -> [continuation])
@@ -232,6 +231,112 @@ let rec dominates (a : block) (b : block) =
     ->
     block_equal a b || (depth_b > depth_a && dominates a dominator)
 
+let iter_reachable_topological (ssa : t) (visit : block -> block list) : unit =
+  let position : int Block.Tbl.t = Block.Tbl.create 64 in
+  List.iteri (fun pos blk -> Block.Tbl.replace position blk pos) ssa.blocks;
+  let unvisited_pred_count : int Block.Tbl.t = Block.Tbl.create 64 in
+  List.iter
+    (fun (blk : block) ->
+      let n =
+        if block_equal blk ssa.entry then 0 else List.length (predecessors blk)
+      in
+      Block.Tbl.replace unvisited_pred_count blk n)
+    ssa.blocks;
+  let reaches_visited : unit Block.Tbl.t = Block.Tbl.create 64 in
+  let priority_of (blk : block) =
+    if Block.Tbl.find unvisited_pred_count blk = 0
+    then 0
+    else if Block.Tbl.mem reaches_visited blk
+    then 1
+    else 2
+  in
+  let module Q = Set.Make (struct
+    type t = int * int * block
+
+    let compare (p1, i1, b1) (p2, i2, b2) =
+      match Int.compare p1 p2 with
+      | 0 -> ( match Int.compare i1 i2 with 0 -> Block.compare b1 b2 | n -> n)
+      | n -> n
+  end) in
+  let queue = ref Q.empty in
+  let in_queue : unit Block.Tbl.t = Block.Tbl.create 64 in
+  let popped : unit Block.Tbl.t = Block.Tbl.create 64 in
+  let push (blk : block) =
+    if
+      (not (Block.Tbl.mem popped blk))
+      && (not (Block.Tbl.mem in_queue blk))
+      && Block.Tbl.mem position blk
+    then begin
+      Block.Tbl.add in_queue blk ();
+      queue := Q.add (priority_of blk, Block.Tbl.find position blk, blk) !queue
+    end
+  in
+  let bump_priority (blk : block) ~old_priority =
+    let pos = Block.Tbl.find position blk in
+    let old_key = old_priority, pos, blk in
+    if Q.mem old_key !queue
+    then begin
+      let new_prio = priority_of blk in
+      if new_prio < old_priority
+      then begin
+        queue := Q.remove old_key !queue;
+        queue := Q.add (new_prio, pos, blk) !queue
+      end
+    end
+  in
+  push ssa.entry;
+  while not (Q.is_empty !queue) do
+    let ((_, _, blk) as item) = Q.min_elt !queue in
+    queue := Q.remove item !queue;
+    Block.Tbl.remove in_queue blk;
+    Block.Tbl.add popped blk ();
+    let had_unvisited_preds = Block.Tbl.find unvisited_pred_count blk > 0 in
+    let newly_reachable = visit blk in
+    (* Pred-count maintenance: every input successor of [blk] sees one fewer
+       unvisited predecessor now that [blk] has been popped, regardless of
+       whether the callback considered [blk]'s output edge to it reachable. *)
+    List.iter
+      (fun (succ : block) ->
+        match Block.Tbl.find_opt unvisited_pred_count succ with
+        | None -> ()
+        | Some cnt ->
+          let old_prio = priority_of succ in
+          Block.Tbl.replace unvisited_pred_count succ (cnt - 1);
+          bump_priority succ ~old_priority:old_prio)
+      (successors blk);
+    (* Push the blocks the callback declared newly reachable. *)
+    List.iter push newly_reachable;
+    if had_unvisited_preds
+    then begin
+      (* Propagate [reaches_visited] backward from [blk] through transitive
+         predecessors. We descend through both already-popped and unpopped
+         blocks so we can mark unpopped ancestors that are only reachable via a
+         popped-but-not-yet-marked path. The [walked] set guards against loops
+         in the predecessor graph. *)
+      let walked : unit Block.Tbl.t = Block.Tbl.create 16 in
+      let rec walk (b : block) =
+        if not (Block.Tbl.mem walked b)
+        then begin
+          Block.Tbl.add walked b ();
+          List.iter
+            (fun (pred : block) ->
+              if not (Block.Tbl.mem reaches_visited pred)
+              then begin
+                if Block.Tbl.mem in_queue pred
+                then begin
+                  let old_prio = priority_of pred in
+                  Block.Tbl.add reaches_visited pred ();
+                  bump_priority pred ~old_priority:old_prio
+                end;
+                walk pred
+              end)
+            (predecessors b)
+        end
+      in
+      walk blk
+    end
+  done
+
 let block_finished (b : block) =
   match[@warning "-fragile-match"] b.terminator with
   | Pending_construction -> false
@@ -255,7 +360,7 @@ let block_param_arg (term : terminator) (index : int) : instruction option =
   match term with
   | Goto { args; _ } -> Some args.(index)
   | Pending_construction | Branch _ | Switch _ | Return _ | Raise _
-  | Tailcall_self _ | Tailcall_func _ | Call _ | Prim _ | Invalid _ ->
+  | Tailcall_self _ | Tailcall_func _ | Call _ | Invalid _ ->
     None
 
 (* Use counts behave like reference counting. An [Op] with [usage_count = 0]
@@ -314,9 +419,9 @@ let rec update_dominator (blk : block) =
   then (
     let old_info = blk.dominator_info in
     let new_info =
-      match[@warning "-fragile-match"] blk.desc with
-      | Function_start -> Reachable { dominator = blk; depth = 0 }
-      | _ -> (
+      if blk.is_function_start
+      then Reachable { dominator = blk; depth = 0 }
+      else
         let info blk =
           match blk.dominator_info with
           | Unreachable -> Unreachable
@@ -328,7 +433,7 @@ let rec update_dominator (blk : block) =
         | first :: rest ->
           List.fold_left
             (fun a b -> common_dominator a (info b))
-            (info first) rest)
+            (info first) rest
     in
     blk.dominator_info <- new_info;
     if not (dominator_info_equal new_info old_info)
@@ -369,13 +474,12 @@ let increment_uses_in_terminator (term : terminator) =
      for [Raise], the tail-rec entry for [Tailcall_self]). *)
   | Goto _ -> ()
   | Branch { cond; _ } -> increment_use cond
-  | Switch (_, args)
-  | Return args
-  | Raise (_, args, _)
+  | Switch { index; _ } -> increment_use index
+  | Return { args }
+  | Raise { args; _ }
   | Tailcall_self { args; _ }
-  | Tailcall_func (_, args)
+  | Tailcall_func { args; _ }
   | Call { args; _ }
-  | Prim { args; _ }
   | Invalid { args; _ } ->
     incr_all args
 
@@ -410,7 +514,7 @@ module type BuilderS = sig
       [params] (defaulting to no parameters). Predecessor wiring happens when
       the current block's terminator references the new block (via
       [finish_block]). *)
-  val new_block : t -> ?params:Cmm.machtype -> block_desc -> t
+  val new_block : t -> params:Cmm.machtype -> t
 
   (** Create block_param instructions for the current block. *)
   val block_params : t -> instruction array
@@ -426,7 +530,7 @@ module Builder : sig
   val finish : t -> block list
 end = struct
   (* Each [t] represents an incomplete block being built. All [t] values created
-     from the same [make] call share the same [blocks] ref, which accumulatesf
+     from the same [make] call share the same [blocks] ref, which accumulates
      all created blocks in reverse order. *)
   type t =
     { blocks : block list ref;
@@ -434,12 +538,12 @@ end = struct
       mutable body : instruction list
     }
 
-  let new_block t ?(params = [||]) desc =
-    let blk = create_block ~desc ~params in
+  let new_block t ~params =
+    let blk = create_block ~is_function_start:false ~params in
     { blocks = t.blocks; current_block = blk; body = [] }
 
   let make params =
-    let start_block = create_block ~desc:Function_start ~params in
+    let start_block = create_block ~is_function_start:true ~params in
     { blocks = ref []; current_block = start_block; body = [] }
 
   let current_block t = t.current_block

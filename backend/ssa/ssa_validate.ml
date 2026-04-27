@@ -30,14 +30,13 @@ let validate (t : Ssa.t) =
     | Branch { ifso; ifnot; _ } ->
       add_pred ~src:bl ~dst:ifso;
       add_pred ~src:bl ~dst:ifnot
-    | Switch (targets, _) ->
+    | Switch { targets; _ } ->
       Array.iter (fun dst -> add_pred ~src:bl ~dst) targets
     | Return _ | Tailcall_func _ -> ()
-    | Raise (_, _, handler) ->
+    | Raise { handler; _ } ->
       Option.iter (fun dst -> add_pred ~src:bl ~dst) handler
     | Tailcall_self { destination; _ } -> add_pred ~src:bl ~dst:destination
-    | Call { continuation; exn_continuation; _ }
-    | Prim { continuation; exn_continuation; _ } -> (
+    | Call { continuation; exn_continuation; _ } -> (
       add_pred ~src:bl ~dst:continuation;
       match exn_continuation with
       | Some l -> add_pred ~src:bl ~dst:l
@@ -124,14 +123,11 @@ let validate (t : Ssa.t) =
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
            pb)
         reachable_actual;
-    (* Invariant 2: a block is marked as reachable iff it has predecessors
-       (Function_start is reachable with no predecessors). *)
+    (* Invariant 2: a block is marked as reachable iff it has predecessors (the
+       function-start block is reachable with no predecessors). *)
     let recorded_reachable = Ssa.reachable bl.dominator_info in
     let expected_reachable =
-      (match[@warning "-fragile-match"] bl.desc with
-        | Function_start -> true
-        | _ -> false)
-      || not (List.is_empty bl.predecessors)
+      bl.is_function_start || not (List.is_empty bl.predecessors)
     in
     if not (Bool.equal recorded_reachable expected_reachable)
     then
@@ -143,17 +139,11 @@ let validate (t : Ssa.t) =
        code, and their contents may be stale or meaningless. *)
     if recorded_reachable
     then begin
-      (* Check entry block is Function_start *)
-      (if Ssa.block_equal bl t.entry
-       then
-         match[@warning "-fragile-match"] bl.desc with
-         | Function_start -> ()
-         | _ -> error "entry block %a is not Function_start" pb bl);
-      (match bl.desc with
-      | Branch_target ->
-        if Array.length bl.params > 0
-        then error "block %a: Branch_target must not have parameters" pb bl
-      | Merge | Function_start | Call_continuation | Trap_handler -> ());
+      (* Check entry block is the function-start block. *)
+      if Ssa.block_equal bl t.entry && not bl.is_function_start
+      then error "entry block %a is not the function-start block" pb bl;
+      if (not (Ssa.block_equal bl t.entry)) && bl.is_function_start
+      then error "non-entry block %a is marked as function-start" pb bl;
       (* Check body: validate args then register Op *)
       Array.iter
         (fun (i : Ssa.instruction) ->
@@ -184,33 +174,34 @@ let validate (t : Ssa.t) =
           error "block %a: goto %a has %d args but target has %d params" pb bl
             pb goto (Array.length args) (Array.length goto.params)
       | Branch { cond; ifso; ifnot } ->
+        (* Branch passes no parameters to the successor blocks. *)
         let check_branch_target (target : Ssa.block) =
-          match[@warning "-fragile-match"] target.desc with
-          | Branch_target -> ()
-          | _ ->
-            error "block %a: Branch target %a is not a Branch_target block" pb
-              bl pb target
+          if Array.length target.params > 0
+          then
+            error "block %a: Branch target %a must have no parameters" pb bl pb
+              target
         in
         check_arg bl cond;
         check_branch_target ifso;
         check_branch_target ifnot
-      | Switch (targets, args) ->
-        check_args bl args;
+      | Switch { index; targets } ->
+        check_arg bl index;
+        (* Switch passes no parameters to the successor blocks. *)
         Array.iter
           (fun (target : Ssa.block) ->
-            match[@warning "-fragile-match"] target.desc with
-            | Branch_target -> ()
-            | _ ->
-              error "block %a: Switch target %a is not a Branch_target block" pb
-                bl pb target)
+            if Array.length target.params > 0
+            then
+              error "block %a: Switch target %a must have no parameters" pb bl
+                pb target)
           targets
-      | Return args -> check_args bl args
-      | Raise (_, args, _) -> check_args bl args
+      | Return { args } -> check_args bl args
+      | Raise { args; _ } -> check_args bl args
       | Tailcall_self { args; _ } -> check_args bl args
-      | Tailcall_func (_, args) -> check_args bl args
+      | Tailcall_func { args; _ } -> check_args bl args
       | Call { args; _ } -> check_args bl args
-      | Prim { args; _ } -> check_args bl args
       | Invalid { args; _ } -> check_args bl args
     end
   in
-  List.iter visit_block t.blocks
+  Ssa.iter_reachable_topological t (fun bl ->
+      visit_block bl;
+      Ssa.successors bl)
