@@ -502,23 +502,8 @@ Error: Signature mismatch:
                    module B :
                      sig
                        module C :
-                         (X : sig end) (Y : sig end)
-                         (Z : sig
-                                module D :
-                                  sig
-                                    module E :
-                                      sig
-                                        module F :
-                                          (X : sig end)
-                                          (Arg : sig
-                                                   val two : int
-                                                   val one : int
-                                                 end)
-                                            -> sig end
-                                      end
-                                  end
-                              end)
-                           -> sig end
+                         functor (X : sig end) (Y : sig end)
+                           (Z : sig ... end) -> sig end
                      end
                  end
              end
@@ -532,23 +517,8 @@ Error: Signature mismatch:
                    module B :
                      sig
                        module C :
-                         (X : sig end) (Y : sig end)
-                         (Z : sig
-                                module D :
-                                  sig
-                                    module E :
-                                      sig
-                                        module F :
-                                          (X : sig end)
-                                          (Arg : sig
-                                                   val one : int
-                                                   val two : int
-                                                 end)
-                                            -> sig end
-                                      end
-                                  end
-                              end)
-                           -> sig end
+                         functor (X : sig end) (Y : sig end)
+                           (Z : sig ... end) -> sig end
                      end
                  end
              end
@@ -561,23 +531,8 @@ Error: Signature mismatch:
                  module B :
                    sig
                      module C :
-                       (X : sig end) (Y : sig end)
-                       (Z : sig
-                              module D :
-                                sig
-                                  module E :
-                                    sig
-                                      module F :
-                                        (X : sig end)
-                                        (Arg : sig
-                                                 val two : int
-                                                 val one : int
-                                               end)
-                                          -> sig end
-                                    end
-                                end
-                            end)
-                         -> sig end
+                       functor (X : sig end) (Y : sig end)
+                         (Z : sig module D : sig ... end end) -> sig end
                    end
                end
            end
@@ -589,23 +544,8 @@ Error: Signature mismatch:
                  module B :
                    sig
                      module C :
-                       (X : sig end) (Y : sig end)
-                       (Z : sig
-                              module D :
-                                sig
-                                  module E :
-                                    sig
-                                      module F :
-                                        (X : sig end)
-                                        (Arg : sig
-                                                 val one : int
-                                                 val two : int
-                                               end)
-                                          -> sig end
-                                    end
-                                end
-                            end)
-                         -> sig end
+                       functor (X : sig end) (Y : sig end)
+                         (Z : sig module D : sig ... end end) -> sig end
                    end
                end
            end
