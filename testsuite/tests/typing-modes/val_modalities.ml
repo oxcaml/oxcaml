@@ -801,6 +801,9 @@ Line 1, characters 26-57:
 1 | let f (x : (module S')) = (x : (module S') :> (module S))
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module S')" is not a subtype of "(module S)"
+       Modules do not match: S' is not included in S
+       Modalities on foo do not match:
+       The second is global and the first is not.
 |}]
 
 (* module equality/substitution inclusion check doesn't look at modes of modules
