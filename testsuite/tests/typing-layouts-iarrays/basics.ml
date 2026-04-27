@@ -89,13 +89,12 @@ Line 1, characters 28-34:
 Error: Unbound value "(.:())"
 |}];;
 
+(****************************************************)
+(* Test 3.5: operations in the Iarray module work *)
+
 let f (x : float# iarray) = Iarray.length x
 [%%expect{|
-Line 1, characters 28-41:
-1 | let f (x : float# iarray) = Iarray.length x
-                                ^^^^^^^^^^^^^
-Error: Unbound module "Iarray"
-Hint: Did you mean "Array"?
+val f : float# iarray -> int = <fun>
 |}];;
 
 (*****************************************************************
