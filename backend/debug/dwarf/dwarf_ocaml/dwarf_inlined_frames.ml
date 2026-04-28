@@ -165,8 +165,8 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
          for now, until we sort out how to properly reference DIEs across units
          (in a way which will also work on macOS). In particular it should
          otherwise suffice for backtraces. *)
-      [ DAH.create_name (Asm_symbol.encode fun_symbol);
-        DAH.create_linkage_name ~linkage_name:demangled_name;
+      [ DAH.create_name demangled_name;
+        DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
         DAH.create_external ~is_visible_externally:true ]
   in
   let block : Debuginfo.item = List.hd (Debuginfo.to_items block) in

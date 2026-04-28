@@ -34,9 +34,6 @@ module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
 
-let attributes fun_name =
-  [DAH.create_name fun_name; DAH.create_external ~is_visible_externally:true]
-
 let abstract_instance_proto_die_symbol ~fun_symbol =
   Asm_symbol.create_global (Asm_symbol.to_raw_string fun_symbol ^ "_absinst")
 
@@ -45,8 +42,8 @@ let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
     (* DWARF-5 specification section 3.3.8.1, page 82. *)
     Proto_die.create ~parent:(Some compilation_unit_proto_die) ~tag:Subprogram
       ~attribute_values:
-        [ DAH.create_name (Asm_symbol.encode fun_symbol);
-          DAH.create_linkage_name ~linkage_name:demangled_name;
+        [ DAH.create_name demangled_name;
+          DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
           DAH.create_external ~is_visible_externally:true ]
       ()
   in
@@ -62,15 +59,13 @@ let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
   abstract_instance_proto_die, abstract_instance_proto_die_symbol
 
 let add_root state ~parent ~demangled_name fun_symbol ~location_attributes =
-  let linkage_name =
-    match demangled_name with
-    | Some linkage_name -> [DAH.create_linkage_name ~linkage_name]
-    | None -> []
+  let name =
+    match demangled_name with Some name -> [DAH.create_name name] | None -> []
   in
   let attributes =
-    [ DAH.create_name (Asm_symbol.encode fun_symbol);
+    [ DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
       DAH.create_external ~is_visible_externally:true ]
-    @ linkage_name @ location_attributes
+    @ name @ location_attributes
   in
   let attribute_values =
     attributes

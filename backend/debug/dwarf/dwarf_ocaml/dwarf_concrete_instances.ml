@@ -26,7 +26,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let parent = Dwarf_state.compilation_unit_proto_die state in
   let fun_name = fundecl.fun_name in
   let loc = Debuginfo.to_location fundecl.fun_dbg in
-  let linkage_name_from_debug () =
+  let demangled_name_from_debug () =
     match Debuginfo.Dbg.to_list (Debuginfo.get_dbg fundecl.fun_dbg) with
     | [item] ->
       Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
@@ -36,18 +36,19 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
        [Debuginfo.to_structured_mangling_path] *)
     | [] | _ :: _ -> fun_name
   in
-  let linkage_name =
+  let demangled_name =
     match Compilation_unit.name_mangling_scheme_for_current_unit () with
-    | Flat -> Some (linkage_name_from_debug ())
+    | Flat -> Some (demangled_name_from_debug ())
     | Structured -> None
-    (* When structured mangling is used, there is no need for additional linkage
-       names on non-inlined functions, because the module path can be
-       reconstructed from the assembly symbol name. *)
-    (* CR sspies: This removes the linkage name for some symbols that still use
+    (* When structured mangling is used, there is no need for a separate
+       [DW_AT_name] on non-inlined functions, because a human-readable name can
+       be reconstructed from the [DW_AT_linkage_name] (i.e. the assembly symbol
+       name). *)
+    (* CR sspies: This omits the demangled name for some symbols that still use
        the old mangling scheme (see the comment in [make_symbol] in
-       cmm_helpers.ml). I observed this for the linkage name of the module entry
-       point, but for that one the linkage name is currently just the symbol
-       name (e.g., "camlTest__entry"). *)
+       cmm_helpers.ml). I observed this for the module entry point, but for
+       that one the symbol name is currently just "camlTest__entry", which is
+       already reasonably readable. *)
   in
   let start_sym = Asm_symbol.create_global fun_name in
   let location_attributes =
@@ -69,8 +70,8 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let _abstract_instance_root_proto_die, _abstract_instance_root_symbol =
     (* Add the abstract instance root for this function *)
     DS.Debug.log "*** Adding absint root for %s\n%!" fundecl.fun_name;
-    Dwarf_abstract_instances.add_root state ~parent ~demangled_name:linkage_name
-      start_sym ~location_attributes
+    Dwarf_abstract_instances.add_root state ~parent ~demangled_name start_sym
+      ~location_attributes
   in
   let attribute_values =
     [ DAH.create_low_pc_from_symbol start_sym;
