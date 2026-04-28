@@ -1089,6 +1089,7 @@ let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   match memory_chunk with
   | Word_int -> basic T.i64
   | Word_val -> basic T.val_ptr
+  | Word_code_pointer -> basic T.i64
   | Byte_unsigned -> extend Zext ~from:T.i8 ~to_:T.i64
   | Byte_signed -> extend Sext ~from:T.i8 ~to_:T.i64
   | Sixteen_unsigned -> extend Zext ~from:T.i16 ~to_:T.i64
@@ -1117,6 +1118,7 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   match memory_chunk with
   | Word_int -> basic T.i64
   | Word_val -> basic T.val_ptr
+  | Word_code_pointer -> basic T.i64
   | Byte_unsigned | Byte_signed -> trunc Trunc T.i8
   | Sixteen_unsigned | Sixteen_signed -> trunc Trunc T.i16
   | Thirtytwo_signed | Thirtytwo_unsigned -> trunc Trunc T.i32
@@ -1471,7 +1473,8 @@ let fun_attrs ~has_try codegen_options =
         match (opt : Cfg.codegen_option) with
         | Cfg.Cold -> [Cold; Noinline]
         | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
-        | Use_regalloc_param _ | Assume_zero_alloc _ | Check_zero_alloc _ ->
+        | Use_regalloc_param _ | Unloadable | Assume_zero_alloc _
+        | Check_zero_alloc _ ->
           [] (* CR yusumez: Do these require any attributes? *))
       codegen_options
   in

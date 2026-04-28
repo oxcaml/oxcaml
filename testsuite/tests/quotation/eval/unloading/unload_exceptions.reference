@@ -1,0 +1,9 @@
+start: registered=0 unloaded=0 live=0
+caught: oops 7
+f 0 returned normally
+caught: oops 13
+after raise_from_eval + compact: registered=1 unloaded=1 live=0
+cb called with 0
+(cb returned)
+caught nested: 99
+after caller_in_eval_then_raise + compact: registered=2 unloaded=2 live=0

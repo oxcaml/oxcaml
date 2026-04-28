@@ -93,7 +93,8 @@ let reg_index reg =
 let assert_vec128 ~fname reg =
   match reg.typ with
   | Vec128 -> ()
-  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "%s: expected Vec128 register, got %a" fname Printreg.reg
       reg
 
@@ -120,7 +121,8 @@ let reg_v2s_of_float reg =
   let index = reg_index reg in
   match reg.typ with
   | Float -> Ast.DSL.reg_v2s index
-  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_v2s_of_float: expected Float register, got %a"
       Printreg.reg reg
 
@@ -180,7 +182,7 @@ let mem base = Ast.DSL.mem ~base
 let gp_reg_of_reg r : [`GP of [`X]] Ast.Reg.t =
   let index = reg_index r in
   match r.typ with
-  | Val | Int | Addr -> Ast.Reg.reg_x index
+  | Val | Int | Addr | Code_pointer -> Ast.Reg.reg_x index
   | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
     Misc.fatal_errorf "gp_reg_of_reg: expected integer register, got %a"
       Printreg.reg r
@@ -234,7 +236,7 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
   (* Scale is the access size in bytes, determined by the register type *)
   let scale =
     match r.typ with
-    | Val | Int | Addr | Float -> 8
+    | Val | Int | Addr | Float | Code_pointer -> 8
     | Float32 -> 4
     | Vec128 -> 16
     | Valx2 | Vec256 | Vec512 ->
@@ -264,7 +266,7 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
 let reg_x reg =
   let index = reg_index reg in
   match reg.typ with
-  | Val | Int | Addr ->
+  | Val | Int | Addr | Code_pointer ->
     if index = 31
     then Misc.fatal_error "reg_x: register SP not valid here"
     else Ast.DSL.reg_op (Ast.Reg.reg_x index)
@@ -275,7 +277,7 @@ let reg_x reg =
 let reg_w reg =
   let index = reg_index reg in
   match reg.typ with
-  | Val | Int | Addr ->
+  | Val | Int | Addr | Code_pointer ->
     if index = 31
     then Misc.fatal_error "reg_w: register SP not valid here"
     else Ast.DSL.reg_op (Ast.Reg.reg_w index)
@@ -287,14 +289,16 @@ let reg_d reg =
   let index = reg_index reg in
   match reg.typ with
   | Float -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
-  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_d: expected Float register, got %a" Printreg.reg reg
 
 let reg_s reg =
   let index = reg_index reg in
   match reg.typ with
   | Float32 -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
-  | Val | Int | Addr | Float | Vec128 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Vec128 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_s: expected Float32 register, got %a" Printreg.reg
       reg
 
@@ -304,7 +308,8 @@ let reg_s_of_float reg =
   let index = reg_index reg in
   match reg.typ with
   | Float -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
-  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_s_of_float: expected Float register, got %a"
       Printreg.reg reg
 
@@ -314,7 +319,8 @@ let reg_d_of_vec128 reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
-  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_d_of_vec128: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -324,7 +330,8 @@ let reg_s_of_vec128 reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
-  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_s_of_vec128: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -332,14 +339,16 @@ let reg_q reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_q index)
-  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_q: expected Vec128 register, got %a" Printreg.reg reg
 
 let reg_v2d_operand reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_v2d index)
-  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_v2d_operand: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -347,7 +356,8 @@ let reg_v16b_operand reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_v16b index)
-  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 | Code_pointer
+    ->
     Misc.fatal_errorf "reg_v16b_operand: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -374,7 +384,8 @@ let reg_fp_operand_3 r1 r2 r3 =
       ( Ast.DSL.reg_op (Ast.Reg.reg_d index1),
         Ast.DSL.reg_op (Ast.Reg.reg_d index2),
         Ast.DSL.reg_op (Ast.Reg.reg_d index3) )
-  | ( (Float32 | Float | Val | Int | Addr | Vec128 | Valx2 | Vec256 | Vec512),
+  | ( ( Float32 | Float | Val | Int | Addr | Vec128 | Valx2 | Vec256 | Vec512
+      | Code_pointer ),
       _,
       _ ) ->
     Misc.fatal_errorf
@@ -414,7 +425,8 @@ let reg_fp_operand_4 r1 r2 r3 r4 : scalar_fp_regs_4 =
         Ast.DSL.reg_op (Ast.Reg.reg_d index2),
         Ast.DSL.reg_op (Ast.Reg.reg_d index3),
         Ast.DSL.reg_op (Ast.Reg.reg_d index4) )
-  | ( (Float32 | Float | Val | Int | Addr | Vec128 | Valx2 | Vec256 | Vec512),
+  | ( ( Float32 | Float | Val | Int | Addr | Vec128 | Valx2 | Vec256 | Vec512
+      | Code_pointer ),
       _,
       _,
       _ ) ->

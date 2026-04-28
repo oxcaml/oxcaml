@@ -97,6 +97,7 @@ external with_tag : int -> t -> t = "caml_obj_with_tag"
 val first_non_constant_constructor_tag : int
 val last_non_constant_constructor_tag : int
 
+val code_block_tag : int
 val forcing_tag : int
 val cont_tag : int
 val lazy_tag : int

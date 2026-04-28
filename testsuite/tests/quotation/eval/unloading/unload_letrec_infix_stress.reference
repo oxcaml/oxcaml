@@ -1,0 +1,10 @@
+start: registered=0 unloaded=0 live=0
+f0(2)=884 f1(2)=887 f2(2)=886 f3(2)=885
+after populate: registered=1 unloaded=0 live=1
+stable across 10x Gc.compact: f0(2)=884 f1(2)=887 f2(2)=886 f3(2)=885
+after 10x compact (all held): registered=1 unloaded=0 live=1
+after release f0 (f1/f2/f3 still hold via infix): registered=1 unloaded=0 live=1
+after release f1: registered=1 unloaded=0 live=1
+f3 still: 888
+after release f2 (only f3 held via infix): registered=1 unloaded=0 live=1
+after release f3: registered=1 unloaded=1 live=0

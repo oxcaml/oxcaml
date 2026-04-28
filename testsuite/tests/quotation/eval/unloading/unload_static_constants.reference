@@ -1,0 +1,16 @@
+start: registered=0 unloaded=0 live=0
+some_const: Some 42
+list_const: 5 items, sum=15
+str_const: static-string-literal
+tuple_const: (7, tag, 99)
+nested_const: 4 items
+after populate: registered=5 unloaded=0 live=5
+after 2x Gc.compact (all held): registered=5 unloaded=0 live=5
+some_const: Some 42
+list_const: 5 items, sum=15
+str_const: static-string-literal
+tuple_const: (7, tag, 99)
+nested_const: 4 items
+after release some_const: registered=5 unloaded=1 live=4
+list_const still: 5 items
+after release all: registered=5 unloaded=5 live=0

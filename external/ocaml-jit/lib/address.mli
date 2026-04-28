@@ -33,6 +33,8 @@ val emit_string : t -> string
 
 val to_int64 : t -> int64
 
+val to_nativeint : t -> nativeint
+
 val pp : Format.formatter -> t -> unit
 
 val to_obj : t -> Obj.t

@@ -1,0 +1,14 @@
+start: registered=0 unloaded=0 live=0
+round 1: total=9
+round 2: total=12
+round 3: total=15
+round 4: total=18
+round 5: total=21
+round 6: total=24
+round 7: total=27
+round 8: total=30
+after 8 rounds + compacts: registered=8 unloaded=8 live=0
+after 5 idle Gc.compacts (no leaks): registered=8 unloaded=8 live=0
+kept !kept 7 = 22
+after 6 compacts holding kept: registered=9 unloaded=8 live=1
+after release kept + Gc.compact: registered=9 unloaded=9 live=0

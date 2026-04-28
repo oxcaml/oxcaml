@@ -135,12 +135,63 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let entry =
     let fun_codegen =
       let fun_codegen = [Cmm.Reduce_code_size; Cmm.Use_linscan_regalloc] in
-      if Flambda_features.backend_cse_at_toplevel ()
-      then fun_codegen
-      else Cmm.No_CSE :: fun_codegen
+      let fun_codegen =
+        if Flambda_features.backend_cse_at_toplevel ()
+        then fun_codegen
+        else Cmm.No_CSE :: fun_codegen
+      in
+      (* The entry (module initializer) is a function in this CU just like any
+         other; if the unit is unloadable, it needs the [Unloadable] codegen
+         option so the back-end emits frame-descriptor UNLOADABLE bits and the
+         back-pointer at [entry - 1]. The matching [Code_block] is emitted below
+         by [To_cmm_code_blocks.emit_entry_code_block]. *)
+      if !Clflags.unit_is_unloadable
+      then Cmm.Unloadable :: fun_codegen
+      else fun_codegen
     in
     C.cfunction
       (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
+  in
+  (* Per-function [Code_block]s are emitted alongside fundecls in
+     [To_cmm_static.add_functions]. Here we just emit the [Code_block] for the
+     entry (module initializer) function, which doesn't go through that path. *)
+  let res = To_cmm_code_blocks.emit_entry_code_block ~entry_sym res in
+  (* In unloadable mode, emit a static array enumerating every static data block
+     in the unit so the JIT loader can pass the list to
+     [caml_register_unloadable_unit]. The runtime needs this list to normalize
+     surviving units' headers (white -> MARKED) at end of major cycle. Format:
+     [count; addr_1; ..; addr_count]. The symbol is always emitted (with count =
+     0 if there are no data blocks) so the JIT loader can rely on its presence
+     whenever the CU is unloadable. *)
+  let res =
+    if !Clflags.unit_is_unloadable
+    then
+      let syms = C.flush_unloadable_data_block_symbols () in
+      (* Reverse-and-dedup: the helper accumulates in reverse order, and a
+         symbol may have been registered more than once if [emit_unit_block] was
+         called multiple times for the same definition (defensive). *)
+      let seen = Hashtbl.create 8 in
+      let syms =
+        List.rev syms
+        |> List.filter (fun (s : Cmm.symbol) ->
+            if Hashtbl.mem seen s.sym_name
+            then false
+            else (
+              Hashtbl.add seen s.sym_name ();
+              true))
+      in
+      let count = List.length syms in
+      let array_name =
+        Cmm_helpers.make_symbol C.unloadable_data_blocks_symbol_basename
+      in
+      let res, array_sym = R.raw_symbol res ~global:Global array_name in
+      let data_items =
+        Cmm.Cdefine_symbol array_sym
+        :: Cmm.Cint (Nativeint.of_int count)
+        :: List.map (fun s -> Cmm.Csymbol_address s) syms
+      in
+      R.add_archive_data_items res data_items
+    else res
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in

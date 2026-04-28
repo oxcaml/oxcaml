@@ -16,6 +16,8 @@
 
 external memalign : int -> (Address.t, string) result = "jit_memalign"
 
+external supports_unloading : unit -> bool = "jit_supports_unloading"
+
 external load_section : Address.t -> string -> int -> unit = "jit_load_section"
 
 external mprotect_ro : Address.t -> int -> (unit, int) result
@@ -30,3 +32,17 @@ external run_toplevel : Jit_unit.Entry_points.t -> Toplevel_res.t
 external get_page_size : unit -> int = "jit_get_page_size"
 
 external dlsym : string -> Address.t option = "jit_dlsym"
+
+external register_unloadable_unit :
+  nativeint array (* code-block addresses *) ->
+  nativeint
+  (* Address of the unit's data-blocks table:
+     a static array [count; addr_1; ...; addr_count]. 0n if absent. *) ->
+  nativeint array (* function entries, sorted by address *) ->
+  nativeint (* code_end *) ->
+  nativeint (* frametable, or 0n if absent *) ->
+  nativeint (* gc_roots, or 0n if absent *) ->
+  nativeint (* JIT buffer base address *) ->
+  int (* JIT buffer size in bytes *) ->
+  unit = "jit_register_unloadable_unit_bytecode"
+        "jit_register_unloadable_unit_native"

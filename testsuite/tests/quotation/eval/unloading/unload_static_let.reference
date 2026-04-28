@@ -1,0 +1,6 @@
+start: registered=0 unloaded=0 live=0
+f1(0)=864 f2(0)=15 f3(0)=302
+after populate: registered=3 unloaded=0 live=3
+stable across 3x Gc.compact: f1=864 f2=15 f3=302
+after 3x compact (held): registered=3 unloaded=0 live=3
+after release + Gc.compact: registered=3 unloaded=3 live=0

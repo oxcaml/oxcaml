@@ -53,6 +53,7 @@ type codegen_option =
   | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold
+  | Unloadable
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -83,7 +84,8 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
     | Use_regalloc regalloc -> Use_regalloc regalloc :: of_cmm_codegen_option tl
     | Use_regalloc_param params ->
       Use_regalloc_param params :: of_cmm_codegen_option tl
-    | Cold -> Cold :: of_cmm_codegen_option tl)
+    | Cold -> Cold :: of_cmm_codegen_option tl
+    | Unloadable -> Unloadable :: of_cmm_codegen_option tl)
 
 type t =
   { blocks : basic_block Label.Tbl.t;

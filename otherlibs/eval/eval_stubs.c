@@ -27,7 +27,12 @@
 
 // CR metaprogramming jrickard: This file has not been code reviewed
 
+#define CAML_INTERNALS
+
 #include "caml/mlvalues.h"
+#ifdef CAML_RUNTIME_5
+#include "caml/unloadable.h"
+#endif
 
 extern char caml_bundled_cmis[] __attribute__((weak));
 extern char caml_bundled_cmxs[] __attribute__((weak));
@@ -47,5 +52,25 @@ value caml_bundled_cmxs_this_exe()
 value caml_bundle_available(value bundle)
 {
   return (bundle == (value) 0) ? Val_false : Val_true;
+}
+
+value caml_eval_unloadable_units_registered_total(value unit)
+{
+  (void)unit;
+#ifdef CAML_RUNTIME_5
+  return Val_long(caml_unloadable_units_registered_total());
+#else
+  return Val_long(0);
+#endif
+}
+
+value caml_eval_unloadable_units_unloaded_total(value unit)
+{
+  (void)unit;
+#ifdef CAML_RUNTIME_5
+  return Val_long(caml_unloadable_units_unloaded_total());
+#else
+  return Val_long(0);
+#endif
 }
 

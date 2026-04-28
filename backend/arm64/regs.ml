@@ -37,7 +37,7 @@ module T = struct
 
     let of_machtype typ =
       match (typ : Cmm.machtype_component) with
-      | Val | Int | Addr -> Int64
+      | Val | Int | Addr | Code_pointer -> Int64
       | Float | Float32 -> Float128
       | Vec128 | Valx2 -> Float128
       | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -192,7 +192,7 @@ module T = struct
     let index_in_class = index_in_class phys_reg in
     let names =
       match (typ : Cmm.machtype_component) with
-      | Int | Addr | Val -> gpr_name
+      | Int | Addr | Val | Code_pointer -> gpr_name
       | Float -> float_reg_name
       | Float32 -> float32_reg_name
       | Vec128 | Valx2 -> vec128_reg_name

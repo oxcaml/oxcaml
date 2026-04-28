@@ -242,3 +242,9 @@ let eval code =
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
         Printexc.raise_with_backtrace exn backtrace)
+
+external unloadable_units_registered_total : unit -> int
+  = "caml_eval_unloadable_units_registered_total"
+
+external unloadable_units_unloaded_total : unit -> int
+  = "caml_eval_unloadable_units_unloaded_total"

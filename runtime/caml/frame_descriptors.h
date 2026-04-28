@@ -56,7 +56,14 @@
 
 #define FRAME_DESCRIPTOR_DEBUG 1
 #define FRAME_DESCRIPTOR_ALLOC 2
-#define FRAME_DESCRIPTOR_FLAGS 3
+#define FRAME_DESCRIPTOR_UNLOADABLE 4
+/* Set when the frame descriptor has a parallel [code_ptr_live_ofs] array
+   describing live Code_pointer-typed slots. Independent of
+   FRAME_DESCRIPTOR_UNLOADABLE: a non-unloadable frame can still spill an
+   unloadable code pointer across an indirect call, so we need this
+   everywhere. */
+#define FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS 8
+#define FRAME_DESCRIPTOR_FLAGS 0xF
 #define FRAME_RETURN_TO_C 0xFFFF
 #define FRAME_LONG_MARKER 0x7FFF
 
@@ -140,6 +147,14 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
   return (frame_data(d) & FRAME_DESCRIPTOR_DEBUG) != 0;
 }
 
+Caml_inline bool frame_is_unloadable(frame_descr *d) {
+  return (frame_data(d) & FRAME_DESCRIPTOR_UNLOADABLE) != 0;
+}
+
+Caml_inline bool frame_has_code_ptr_slots(frame_descr *d) {
+  return (frame_data(d) & FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS) != 0;
+}
+
 /* Allocation lengths are encoded reduced by one, so values 0-255 mean
  * sizes 1-256 words. */
 
@@ -159,6 +174,12 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
 
 void caml_init_frame_descriptors(void);
 void caml_register_frametables(void **tables, int ntables);
+
+/* Unregister a previously-registered frame table. Caller must hold the
+   STW barrier; the global frame-descriptor hashtable is mutated in place
+   and rebuilt from the remaining frametables. Used by the unloadable-unit
+   unload pass (G) to drop frametables of unreachable units. */
+void caml_unregister_frametable_from_stw_single(intnat *frametable);
 
 /* a linked list of frametables */
 typedef struct caml_frametable_list {

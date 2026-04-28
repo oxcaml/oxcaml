@@ -345,6 +345,8 @@ let get_code_metadata env code_id =
 
 let exported_offsets t = t.offsets
 
+let all_code t = t.functions_info
+
 (* Variables *)
 
 let gen_variable ~debug_uid v =

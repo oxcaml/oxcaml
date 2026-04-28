@@ -28,6 +28,11 @@ void caml_scan_global_young_roots(scanning_action f, void* fdata);
 
 #ifdef NATIVE_CODE
 void caml_register_dyn_globals(void **globals, int nglobals);
+
+/* Remove [global] from the dyn-global skiplist. Used by the unloadable-CU
+ * unload path to undo a [caml_register_dyn_globals] for a unit that is
+ * being reclaimed. Returns 1 if [global] was present, 0 otherwise. */
+int caml_unregister_dyn_global(void *global);
 #endif
 
 #endif /* CAML_INTERNALS */

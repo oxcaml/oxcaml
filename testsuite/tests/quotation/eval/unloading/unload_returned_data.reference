@@ -1,0 +1,9 @@
+start: registered=0 unloaded=0 live=0
+list: [10;11;12]
+after eval_list + compact: registered=1 unloaded=1 live=0
+array: [|5; 10; 15; 20|]
+after eval_array + compact: registered=2 unloaded=2 live=0
+tuple: (42, name-42, [|42; 84|])
+after eval_record + compact: registered=3 unloaded=3 live=0
+ref: 18
+after eval_ref + compact: registered=4 unloaded=4 live=0

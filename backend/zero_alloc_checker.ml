@@ -1541,7 +1541,7 @@ end = struct
                 custom_error_msg = None
               }
           | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
-          | Use_regalloc_param _ | Cold ->
+          | Use_regalloc_param _ | Cold | Unloadable ->
             None)
         codegen_options
     in
@@ -1577,7 +1577,7 @@ end = struct
                 custom_error_msg = None
               }
           | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
-          | Use_regalloc_param _ | Cold ->
+          | Use_regalloc_param _ | Cold | Unloadable ->
             None)
         codegen_options
     in

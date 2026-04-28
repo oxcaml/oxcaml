@@ -1,0 +1,8 @@
+start: registered=0 unloaded=0 live=0
+Kept call: 42
+after eval_and_keep: registered=1 unloaded=0 live=1
+after Gc.compact (kept still live): registered=1 unloaded=0 live=1
+Drop call: 101
+after eval_and_drop: registered=2 unloaded=0 live=2
+after Gc.compact (only dropped should unload): registered=2 unloaded=1 live=1
+after release kept + Gc.compact: registered=2 unloaded=2 live=0
