@@ -70,7 +70,8 @@ val define_variable : Variable.t -> t -> t
 (** Define a new set of bound mutually recursive continuations. *)
 val define_continuations : can_be_lifted:bool -> Continuation.t list -> t -> t
 
-val record_inlining_decision : apply:Apply_expr.t -> Call_site_inlining_decision_type.t -> t -> t
+val record_inlining_decision :
+  apply:Apply_expr.t -> Call_site_inlining_decision_type.t -> t -> t
 
 (** {2 Inspection API} *)
 
@@ -96,4 +97,3 @@ val replay_continuation_mapping :
 
 val replay_inlining_decision :
   t -> Call_site_inlining_decision_type.t replay_result
-

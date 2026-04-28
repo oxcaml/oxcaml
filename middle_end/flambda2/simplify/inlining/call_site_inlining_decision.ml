@@ -249,7 +249,8 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
       Misc.fatal_errorf
         "Deciding not to inline an [Apply], but the replay_history says we \
          should inline.@ Replay_history: %a"
-        Replay_history.print (DE.replay_history (DA.denv dacc))
+        Replay_history.print
+        (DE.replay_history (DA.denv dacc))
   in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in
@@ -341,12 +342,16 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               Recursion_depth_exceeded)
             else if must_inline
             then
-              match Replay_history.replay_inlining_decision (DE.replay_history (DA.denv dacc)) with
+              match
+                Replay_history.replay_inlining_decision
+                  (DE.replay_history (DA.denv dacc))
+              with
               | Still_recording ->
-                  Misc.fatal_errorf "Internal assumption broken: DE.says must_inline
-                  (presumably because of the replay history), but the replay history is still recoding."
-              | Replayed decision ->
-                  Replay_history_says_must_inline decision
+                Misc.fatal_errorf
+                  "Internal assumption broken: DE.says must_inline\n\
+                  \                  (presumably because of the replay \
+                   history), but the replay history is still recoding."
+              | Replayed decision -> Replay_history_says_must_inline decision
             else
               might_inline dacc ~apply ~code_or_metadata ~function_type
                 ~simplify_expr ~return_arity
