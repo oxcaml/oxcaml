@@ -91,7 +91,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
         Dwarf_inlined_frames.dwarf state fundecl inlined_frame_ranges
           ~value_type_proto_die ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die
-          ~available_ranges_vars)
+          ~available_ranges_all_vars)
       ~accumulate:true ()
   in
   (match value_type_proto_die with
