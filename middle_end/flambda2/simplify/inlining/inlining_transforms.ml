@@ -22,7 +22,8 @@ module VB = Bound_var
 
 let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
-    ~return_continuation ~apply_exn_continuation ~apply_return_continuation =
+    ~return_continuation ~apply_exn_continuation ~apply_return_continuation
+    ~inlined_debuginfo =
   let callee, rec_info =
     match callee with
     | None ->
@@ -64,8 +65,9 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
         let param_var, param_uid, param_dbg =
           BP.var_and_uid_and_debuginfo param
         in
+        let dbg = Inlined_debuginfo.rewrite inlined_debuginfo param_dbg in
         let var =
-          Bound_var.create param_var param_uid Name_mode.normal ~dbg:param_dbg
+          Bound_var.create param_var param_uid Name_mode.normal ~dbg
             ~is_parameter:(Bound_var.Is_parameter.parameter ~index)
         in
         Let.create
@@ -167,6 +169,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
             ~params:(Bound_parameters.to_list params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
             ~exn_continuation ~return_continuation
+            ~inlined_debuginfo:(DE.inlined_debuginfo denv)
         in
         let expr =
           match Exn_continuation.extra_args apply_exn_continuation with

@@ -75,12 +75,12 @@ let print_debug_uid ppf duid =
 
 let print_is_parameter ppf (dbg, (is_parameter : Is_parameter.t)) =
   let depth = List.length (Debuginfo.to_items dbg) in
-  if depth > 1
+  if depth >= 1
   then
     match is_parameter with
     | Parameter { index } ->
       Format.fprintf ppf "[param-inlined-fn:%d@%a]" index
-        Debuginfo.print_compact_extended dbg
+        Debuginfo.print_compact dbg
     | Local_var | Implicit_parameter -> ()
 
 let print ppf { var; debug_uid; name_mode = _; dbg; is_parameter } =
