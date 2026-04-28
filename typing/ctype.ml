@@ -2494,6 +2494,8 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
        a [Missing_cmi]. Internal ticket 5109. *)
     | Cannot_subst | Not_found -> Jkind.Builtin.any ~why:(Missing_cmi p)
     end
+  | Tobject (fi, nm) when get_desc fi = Tnil && !nm = None ->
+     Jkind.for_empty_object
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
