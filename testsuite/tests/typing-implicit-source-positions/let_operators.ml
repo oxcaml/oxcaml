@@ -52,7 +52,7 @@ let _ =
 val ( >>| ) :
   call_pos:[%call_pos] -> 'a -> (lexing_position * 'a -> 'b) -> 'b = <fun>
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 3; pos_bol = 1140; pos_cnum = 1144}
+{pos_fname = ""; pos_lnum = 3; pos_bol = 1331; pos_cnum = 1335}
 |}]
 
 (* TEST
