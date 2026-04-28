@@ -222,7 +222,8 @@ module Bytecode = struct
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
         seek_in ic toc_pos;
         let lib = (input_value ic : library) in
-        Dll.open_dlls Dll.For_execution lib.lib_dllibs;
+        Dll.open_dlls Dll.For_execution
+          (List.map Dll.extract_dll_name lib.lib_dllibs);
         handle, lib.lib_units
       end else begin
         raise (DT.Error (Not_a_bytecode_file file_name))
