@@ -49,6 +49,7 @@ type binding_to_place =
 
     The [name_occurrences] in the provided [uacc] must contain exactly the free
     names of the [body]. *)
+
 val make_new_let_bindings :
   Upwards_acc.t ->
   bindings_outermost_first:binding_to_place list ->
