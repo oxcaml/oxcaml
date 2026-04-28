@@ -116,9 +116,12 @@ let load_lambda ppf tlam =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg _; val_type}, _) ->
-          Some (outval_of_value env (getvalue (Translmod.toplevel_name id))
-                  val_type)
+      | Sig_value(id, {val_kind = Val_reg _; val_type; val_lpoly}, _) ->
+          (match Types.Lpoly.get_exn val_lpoly with
+           | [] ->
+             Some (outval_of_value env
+                     (getvalue (Translmod.toplevel_name id)) val_type)
+           | _ :: _ -> Some (Oval_stuff "<lpoly>"))
       | _ -> None
     )
 
