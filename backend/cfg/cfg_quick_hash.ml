@@ -49,7 +49,7 @@ let basic : Cfg.basic -> int = function
   | Poptrap { lbl_handler = _ } -> 3
   | Prologue -> 4
   | Epilogue -> 5
-  | Stack_check { max_frame_size_bytes = _ } -> 6
+  | Stack_check { max_frame_size_bytes } -> hash_combine 6 max_frame_size_bytes
 
 let terminator : Cfg.terminator -> int =
  fun term ->
