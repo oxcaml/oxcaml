@@ -2981,6 +2981,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   Stack_class.Tbl.copy_values ~from:p.num_stack_slots ~to_:num_stack_slots;
   (* Account for the return address that is now pushed on the stack. *)
   stack_offset := !stack_offset + 8;
+  pushed_stack_slots := [];
   (* Emit function entry code *)
   D.comment (Printf.sprintf "probe %s %s" probe_name handler_code_sym);
   emit_named_text_section (S.encode wrap_label);

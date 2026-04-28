@@ -429,22 +429,22 @@ let spilled_phi_merge cond callback f a b c d e =
 [%%expect_asm X86_64{|
 spilled_phi_merge:
   subq  $40, %rsp
-  movq  %rax, 8(%rsp)
+  movq  %rax, 16(%rsp)
   movq  %rbx, 24(%rsp)
   movq  %rdi, (%rsp)
   movq  %rsi, %rbp
   movq  %rdx, %rbx
-  movq  %rcx, 16(%rsp)
+  movq  %rcx, 8(%rsp)
   movq  %r8, %r12
   movq  %r9, %r13
   movl  $1, %edi
   call  caml_sys_time_unboxed@PLT
-  movq  8(%rsp), %rax
+  movq  16(%rsp), %rax
   cmpq  $1, %rax
   je    .L1
   pushq %r13
   pushq %r12
-  movq  32(%rsp), %rax
+  movq  24(%rsp), %rax
   pushq %rax
   pushq %rbx
   pushq %rbp
@@ -463,12 +463,12 @@ spilled_phi_merge:
   popq  %r8
   popq  %r9
   movq  %rax, (%rsp)
-  movq  %rdi, 16(%rsp)
+  movq  %rdi, 8(%rsp)
   movq  %r8, %r12
   movq  %r9, %r13
 .L1:
   movq  %rbp, %rax
-  movq  16(%rsp), %rdi
+  movq  8(%rsp), %rdi
   movq  %r12, %rsi
   movq  %r13, %rdx
   movq  (%rsp), %rcx

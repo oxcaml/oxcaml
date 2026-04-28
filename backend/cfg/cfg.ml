@@ -664,6 +664,12 @@ let is_end_region (b : basic) =
 
 let is_alloc_or_poll instr = is_alloc instr || is_poll instr
 
+let is_spill (instr : basic instruction) =
+  match[@ocaml.warning "-4"] instr.desc with Op Spill -> true | _ -> false
+
+let is_reload (instr : basic instruction) =
+  match[@ocaml.warning "-4"] instr.desc with Op Reload -> true | _ -> false
+
 let basic_block_contains_calls block =
   block.is_trap_handler
   || (match block.terminator.desc with

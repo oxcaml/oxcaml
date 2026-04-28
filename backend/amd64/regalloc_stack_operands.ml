@@ -279,14 +279,13 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
          | Istore_int (_, _, _)
          | Ioffset_loc (_, _)
          | Ifloatarithmem (_, _, _)
-         | Icldemote _ | Iprefetch _ | Ibswap _ | Ipush_to_stack
-         | Ipop_from_stack ))
+         | Icldemote _ | Iprefetch _ | Ibswap _ ))
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
   | Op (Intop_imm ((Ipopcnt | Iclz | Ictz), _))
   | Stack_check _
-  | Op (Specific (Illvm_intrinsic _)) ->
+  | Op (Specific (Illvm_intrinsic _ | Ipush_to_stack | Ipop_from_stack)) ->
     (* should not happen *)
     fatal "unexpected instruction"
 
