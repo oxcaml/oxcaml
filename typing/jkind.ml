@@ -1912,11 +1912,11 @@ module Const = struct
 
     let annot_of_nullability_annot :
         Nullability.t Location.loc option -> t Location.loc option =
-     fun x -> Option.map (fun x -> Location.map (fun x -> Nullability x) x) x
+      Option.map (Location.map (fun x -> Nullability x))
 
     let annot_of_separability_annot :
         Separability.t Location.loc option -> t Location.loc option =
-     fun x -> Option.map (fun x -> Location.map (fun x -> Separability x) x) x
+      Option.map (Location.map (fun x -> Separability x))
   end
 
   let apply_scannable_axis ?prior_annot env
@@ -2029,6 +2029,8 @@ module Const = struct
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      (* For scannable axes in mod bounds, we do not print redundancy warnings,
+         as scannable axes in mod bounds will be deprecated anyway *)
       |> apply_scannable_axis env
            (Scannable_axis.annot_of_nullability_annot nullability)
       |> apply_scannable_axis env

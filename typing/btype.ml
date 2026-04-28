@@ -1785,6 +1785,8 @@ module Jkind0 = struct
 
       let builtins =
         [ any;
+          (* Order matters: value_maybe_null comes before value_or_null because
+             we prefer to print the latter. *)
           value_maybe_null;
           value_maybe_separable;
           value_or_null;
