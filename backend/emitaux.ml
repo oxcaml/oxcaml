@@ -546,6 +546,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
       let s = fs + trap_size in
       loop i.next s (max s max_fs) nontail_flag
     | Lpoptrap _ -> loop i.next (fs - trap_size) max_fs nontail_flag
+    | Lop (Specific op) ->
+      let fs = fs + Arch.specific_operation_stack_offset_delta op in
+      loop i.next fs (max fs max_fs) nontail_flag
     | Lop (Stackoffset n) ->
       let s = fs + n in
       loop i.next s (max s max_fs) nontail_flag
@@ -562,7 +565,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _ | Alloc _ )
+        | Name_for_debugger _ | Alloc _ )
     | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->

@@ -63,6 +63,10 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
     Misc.fatal_errorf
       "Vectorize_specific: Unexpected llvm_intrinsic %s: not using LLVM backend"
       intr
+  | Ipush_to_stack | Ipop_from_stack ->
+    Misc.fatal_error
+      "Vectorize_specific: Unexpected push/pop operation, these are only \
+       emitted later."
 
 let is_seed_store :
     Arch.specific_operation -> Vectorize_utils.Width_in_bits.t option =
@@ -78,3 +82,7 @@ let is_seed_store :
       "Vectorize_specific.is_seed_store: Unexpected llvm_intrinsic %s: not \
        using LLVM backend"
       intr
+  | Ipush_to_stack | Ipop_from_stack ->
+    Misc.fatal_error
+      "Vectorize_specific: Unexpected push/pop operation, these are only \
+       emitted later."
