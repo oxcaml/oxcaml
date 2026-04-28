@@ -29,6 +29,14 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
 
+let which_parameter_of_provenance provenance =
+  match (provenance : V.Provenance.t option) with
+  | None -> None
+  | Some provenance -> (
+    match V.Provenance.is_parameter provenance with
+    | Local -> None
+    | Parameter { index } -> Some index)
+
 type error = Builtin_not_recognized of string
 
 exception Error of error * Debuginfo.t
@@ -188,7 +196,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     (if Option.is_some provenance
      then
        let naming_op =
-         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
+         SU.make_name_for_debugger ~ident:(VP.var v)
+           ~which_parameter:(which_parameter_of_provenance provenance)
            ~provenance ~regs:r1
        in
        SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
@@ -899,10 +908,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           let provenance = VP.provenance bound_name in
           if Option.is_some provenance
           then
+            let which_parameter = which_parameter_of_provenance provenance in
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name; provenance; which_parameter = None; regs }
+                { ident = bound_name; provenance; which_parameter; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in
@@ -1109,14 +1119,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 let provenance = VP.provenance var in
                 if Option.is_some provenance
                 then
+                  let which_parameter =
+                    which_parameter_of_provenance provenance
+                  in
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
@@ -1389,14 +1398,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 let provenance = VP.provenance var in
                 if Option.is_some provenance
                 then
+                  let which_parameter =
+                    which_parameter_of_provenance provenance
+                  in
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])

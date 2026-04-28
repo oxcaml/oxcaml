@@ -103,8 +103,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
           ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die
-          ~debuginfo_missing_outermost_frame:Debuginfo.none
-          available_ranges_vars)
+          ~frame_path:Debuginfo.none available_ranges_vars)
       ~accumulate:true ());
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we
      need to be careful about symbol table size. let name = Printf.sprintf

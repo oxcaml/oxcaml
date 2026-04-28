@@ -678,14 +678,20 @@ let maybe_emit_naming_op env sub_cfg ~bound_name regs =
   | None -> ()
   | Some bound_name ->
     let provenance = Backend_var.With_provenance.provenance bound_name in
-    if Option.is_some provenance
-    then
+    (match provenance with
+    | None -> ()
+    | Some provenance_inner ->
+      let which_parameter =
+        match Backend_var.Provenance.is_parameter provenance_inner with
+        | Local -> None
+        | Parameter { index } -> Some index
+      in
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
         Operation.Name_for_debugger
-          { ident = bound_name; provenance; which_parameter = None; regs }
+          { ident = bound_name; provenance; which_parameter; regs }
       in
-      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
+      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||])
 
 let join env (opt_r1 : _ Or_never_returns.t) sub_cfg1
     (opt_r2 : _ Or_never_returns.t) sub_cfg2 ~bound_name : _ Or_never_returns.t

@@ -266,8 +266,22 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
       ()
 
-let matches_debuginfo_missing_outermost_frame ~debuginfo_missing_outermost_frame
-    range =
+(* A variable belongs to a particular frame DIE iff its provenance location
+   (the inlining stack at the point of binding) is exactly the frame's path
+   (the call sites from the function down to, but not including, the frame
+   itself).
+
+   - For the function's main subprogram, [frame_path] is [Debuginfo.none].
+     Variables bound at the top level of the function (no inlining) have
+     [provenance.location = Debuginfo.none] and so match.
+
+   - For an inlined-subroutine DIE at depth [d], [frame_path] is the [d]
+     outermost call sites of the inlining stack at that frame. A variable
+     bound by [closure_conversion]/[expr_builder] inside that inlined region
+     gets its [bound_var.dbg] rewritten to the same [frame_path] (the
+     inlining context applied to its original [Debuginfo.none]), so its
+     [provenance.location] matches the frame_path exactly. *)
+let matches_frame_path ~frame_path range =
   let range_info = ARV.Range.info range in
   match ARV.Range_info.provenance range_info with
   | None ->
@@ -275,33 +289,26 @@ let matches_debuginfo_missing_outermost_frame ~debuginfo_missing_outermost_frame
     true
   | Some provenance ->
     let location = Backend_var.Provenance.location provenance in
-    let location_without_outermost =
-      Debuginfo.remove_outermost_frame location
-    in
-    Debuginfo.compare location_without_outermost
-      debuginfo_missing_outermost_frame
-    = 0
+    Debuginfo.compare location frame_path = 0
 
-let iterate_over_variable_like_things _state ~available_ranges_vars
-    ~debuginfo_missing_outermost_frame ~f =
+let iterate_over_variable_like_things _state ~available_ranges_vars ~frame_path
+    ~f =
   ARV.iter available_ranges_vars ~f:(fun var range ->
-      if matches_debuginfo_missing_outermost_frame
-           ~debuginfo_missing_outermost_frame range
+      if matches_frame_path ~frame_path range
       then
         let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
         f var ~ident_for_type ~range)
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
-    ~debuginfo_missing_outermost_frame available_ranges_vars =
+    ~frame_path available_ranges_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
-  iterate_over_variable_like_things state ~available_ranges_vars
-    ~debuginfo_missing_outermost_frame ~f:(fun var ~ident_for_type:_ ~range:_ ->
+  iterate_over_variable_like_things state ~available_ranges_vars ~frame_path
+    ~f:(fun var ~ident_for_type:_ ~range:_ ->
       let value_die_lvalue = Proto_die.create_reference () in
       let type_die = Proto_die.create_reference () in
       assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
-  iterate_over_variable_like_things state ~available_ranges_vars
-    ~debuginfo_missing_outermost_frame
+  iterate_over_variable_like_things state ~available_ranges_vars ~frame_path
     ~f:
       (dwarf_for_variable state ~value_type_proto_die ~function_symbol
          ~function_proto_die ~proto_dies_for_vars)
