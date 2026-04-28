@@ -637,6 +637,18 @@ let rec expr scope ppf = function
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
 
+(* CR keryan/bclement: Printing inlined goto only occurs when reprinting parsed
+   fexpr, conversion to and from flambda does not preserve this.
+
+   To do so without breaking scoping, it requires three properties to inline:
+   single use goto, last one declared yet to be inlined, no let expression
+   between declaration and use.
+
+   We could use a stack of declared single use gotos to preserve scoping order,
+   droping it when meeting lets or out of order use. But since a switch is
+   almost always preceded by a get_tag of is_int, we would never inline in
+   practice, except for converted inlining written by hand (which does add let
+   conts right above switches). We deem this not worth the effort for now. *)
 and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
   match ac with
   | Named_cont ac -> apply_cont ppf ac
