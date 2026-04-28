@@ -41,7 +41,7 @@ type t =
         is_a_functor : bool
       }
   | Attribute_always
-  | Replay_history_says_must_inline
+  | Replay_history_says_must_inline of t
   | Begin_unrolling of int
   | Continue_unrolling
   | Definition_says_inline of { was_inline_always : bool }
@@ -53,7 +53,7 @@ type t =
       }
   | Jsir_inlining_disabled
 
-let [@ocamlformat "disable"] print ppf t =
+let [@ocamlformat "disable"] rec print ppf t =
   match t with
   | Missing_code -> Format.fprintf ppf "Missing_code"
   | Definition_says_not_to_inline ->
@@ -73,8 +73,8 @@ let [@ocamlformat "disable"] print ppf t =
     Format.fprintf ppf "Never_inlined_attribute"
   | Attribute_always ->
     Format.fprintf ppf "Attribute_always"
-  | Replay_history_says_must_inline ->
-    Format.fprintf ppf "Replay_history_says_must_inline"
+  | Replay_history_says_must_inline t' ->
+    Format.fprintf ppf "Replay_history_says_must_inline(%a)" print t'
   | Definition_says_inline { was_inline_always } ->
     Format.fprintf ppf
       "@[<hov 1>(Definition_says_inline@ \
@@ -124,7 +124,7 @@ type can_inline =
         was_inline_always : bool
       }
 
-let can_inline (t : t) : can_inline =
+let rec can_inline (t : t) : can_inline =
   match t with
   | Missing_code | In_a_stub | Doing_speculative_inlining
   | Max_inlining_depth_exceeded | Recursion_depth_exceeded
@@ -155,13 +155,12 @@ let can_inline (t : t) : can_inline =
   | Speculatively_inline _ ->
     Inline { unroll_to = None; was_inline_always = false }
   | Attribute_always -> Inline { unroll_to = None; was_inline_always = true }
-  | Replay_history_says_must_inline ->
-    Inline { unroll_to = None; was_inline_always = false }
+  | Replay_history_says_must_inline t' -> can_inline t'
   | Jsir_inlining_disabled ->
     Do_not_inline { erase_attribute_if_ignored = false }
 
 (* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
-let report_reason fmt t =
+let rec report_reason fmt t =
   match (t : t) with
   | Missing_code ->
     Format.fprintf fmt
@@ -189,14 +188,15 @@ let report_reason fmt t =
     Format.fprintf fmt "the@ call@ has@ an@ attribute@ forbidding@ inlining"
   | Attribute_always ->
     Format.fprintf fmt "the@ call@ has@ an@ [@@inline always]@ attribute"
-  | Replay_history_says_must_inline ->
+  | Replay_history_says_must_inline t' ->
     (* CR gbury: We could decide not to include in the inlining report inlining
        decisions that were made during replays (e.g. continuation
        specialization), or alternatively to store the initial inlining decision
        so that we can report it each time. *)
     Format.fprintf fmt
       "the@ call@ was@ inlined@ during@ the@ first@ pass@ on@ the@ current@ \
-       continuation@ handler"
+       continuation@ handler@ with@ the@ following@ reason:@ @[<hov 2>%a@]"
+      report_reason t'
   | Begin_unrolling n ->
     Format.fprintf fmt "the@ call@ has@ an@ [@@unroll %d]@ attribute" n
   | Continue_unrolling ->
