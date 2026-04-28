@@ -279,7 +279,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
          | Istore_int (_, _, _)
          | Ioffset_loc (_, _)
          | Ifloatarithmem (_, _, _)
-         | Icldemote _ | Iprefetch _ | Ibswap _ ))
+         | Icldemote _ | Iprefetch _ | Ibswap _ | Ipush_to_stack
+         | Ipop_from_stack ))
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
