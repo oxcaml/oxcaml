@@ -61,10 +61,11 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     let params_with_index = List.mapi (fun i p -> i, p) params in
     ListLabels.fold_left2 (List.rev params_with_index)
       (List.rev args) ~init:body ~f:(fun expr (index, param) arg ->
-        let param_var, param_uid = BP.var_and_uid param in
+        let param_var, param_uid, param_dbg =
+          BP.var_and_uid_and_debuginfo param
+        in
         let var =
-          Bound_var.create param_var param_uid Name_mode.normal
-            ~dbg:Debuginfo.none
+          Bound_var.create param_var param_uid Name_mode.normal ~dbg:param_dbg
             ~is_parameter:(Bound_var.Is_parameter.parameter ~index)
         in
         Let.create

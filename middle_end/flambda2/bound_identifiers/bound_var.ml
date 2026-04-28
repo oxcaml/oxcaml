@@ -73,9 +73,19 @@ let print_debug_uid ppf duid =
   if !Clflags.dump_debug_uids
   then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
 
-let [@ocamlformat "disable"] print ppf { var; debug_uid; name_mode = _;
-                                         dbg = _; is_parameter = _ } =
-  Format.fprintf ppf "%a%a" Variable.print var print_debug_uid debug_uid
+let print_is_parameter ppf (dbg, (is_parameter : Is_parameter.t)) =
+  let depth = List.length (Debuginfo.to_items dbg) in
+  if depth > 1
+  then
+    match is_parameter with
+    | Parameter { index } ->
+      Format.fprintf ppf "[param-inlined-fn:%d@%a]" index
+        Debuginfo.print_compact_extended dbg
+    | Local_var | Implicit_parameter -> ()
+
+let print ppf { var; debug_uid; name_mode = _; dbg; is_parameter } =
+  Format.fprintf ppf "%a%a%a" Variable.print var print_is_parameter
+    (dbg, is_parameter) print_debug_uid debug_uid
 
 let create var debug_uid name_mode ~dbg ~is_parameter =
   (* Note that [name_mode] might be [In_types], e.g. when dealing with function
