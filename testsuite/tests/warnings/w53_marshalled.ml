@@ -4,7 +4,7 @@
  setup-ocamlc.byte-build-env;
  program = "${test_build_directory}/marshall_for_w53.exe";
  all_modules = "marshall_for_w53.ml";
- flags = "-w +A-22-27-32-60-67-70-71-72";
+ flags = "-w +A-22-27-32-34-60-67-70-71-72";
  ocamlc.byte;
  run;
  {
