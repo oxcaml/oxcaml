@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_alpha -w +183..185";
+ flags = "-extension layouts_alpha -w +183..184";
  expect;
 *)
 
