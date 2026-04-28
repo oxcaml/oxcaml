@@ -209,7 +209,7 @@ The abbreviations defined in the language are as follows:
     type `int ref` has this kind.
 
 
-* `mutable_data_or_null = value non_float mod many portable forkable unyielding
+* `mutable_data_or_null = value_or_null non_float mod many portable forkable unyielding
                           stateless`
 
     This is the kind of `(_ : mutable_data) or_null` and similar types.
@@ -481,8 +481,9 @@ lists containing one or more repetitions. Any nonterminal not defined here is
 defined in the OCaml [manual][].
 
 **Note on syntax for scannable axes:** Previously, scannable axes used to be
-non-modal axes, and were written like `value mod non_null`, which upper-bounds
-the nullability to `non_null`. Now, we can also write them as `value non_null`.
+non-modal axes, and were written like `value mod non_pointer`, which
+upper-bounds the separability to `non_pointer`. Now, we can also write them as
+`value non_pointer`.
 
 First we define the syntax for kinds:
 
