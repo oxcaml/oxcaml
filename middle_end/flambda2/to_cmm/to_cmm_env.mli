@@ -296,6 +296,8 @@ val add_phantom_let_binding :
   t ->
   Variable.t ->
   debug_uid:Flambda_debug_uid.t ->
+  dbg:Debuginfo.t ->
+  bv_is_parameter:Bound_var.Is_parameter.t ->
   t * Backend_var.With_provenance.t
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)

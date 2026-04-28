@@ -121,12 +121,12 @@ let rec phantom_var_location_description state
     then rvalue i
     else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue i)
   | Lphantom_const_symbol symbol ->
-    let symbol = SLDL.Rvalue.const_symbol (Asm_symbol.create symbol) in
+    let symbol = SLDL.Rvalue.const_symbol (Asm_symbol.create_global symbol) in
     if need_rvalue
     then rvalue symbol
     else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue symbol)
   | Lphantom_read_symbol_field { sym; field } ->
-    let symbol = Asm_symbol.create sym in
+    let symbol = Asm_symbol.create_global sym in
     let field = Targetint.of_int field in
     if need_rvalue
     then rvalue (SLDL.Rvalue.read_symbol_field symbol ~field)
@@ -240,16 +240,18 @@ let single_location_description state ~parent ~subrange ~proto_dies_for_vars
   let location_description =
     match ARAV.Subrange.info subrange with
     | Non_phantom { reg; offset } ->
-      reg_location_description reg ~offset ~need_rvalue
+      Some (reg_location_description reg ~offset ~need_rvalue)
     | Phantom defining_expr ->
       phantom_var_location_description state ~defining_expr ~need_rvalue
         ~proto_dies_for_vars ~parent
   in
   match location_description with
-  | Simple simple ->
-    Single_location_description.of_simple_location_description simple
-  | Composite composite ->
-    Single_location_description.of_composite_location_description composite
+  | None -> None
+  | Some (Simple simple) ->
+    Some (Single_location_description.of_simple_location_description simple)
+  | Some (Composite composite) ->
+    Some
+      (Single_location_description.of_composite_location_description composite)
 
 type location_list_entry =
   | Dwarf_4 of Dwarf_4_location_list_entry.t
@@ -361,25 +363,27 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       ARAV.Range.fold range
         ~init:([], Location_list.create ())
         ~f:(fun (dwarf_4_location_list_entries, location_list) subrange ->
-          let single_location_description =
+          match
             single_location_description state ~parent:(Some function_proto_die)
               ~subrange ~proto_dies_for_vars ~need_rvalue:false
-          in
-          let location_list_entry =
-            location_list_entry state ~start_of_code_symbol ~subrange
-              single_location_description
-          in
-          match location_list_entry with
-          | Dwarf_4 location_list_entry ->
-            let dwarf_4_location_list_entries =
-              location_list_entry :: dwarf_4_location_list_entries
+          with
+          | None -> dwarf_4_location_list_entries, location_list
+          | Some single_location_description -> (
+            let location_list_entry =
+              location_list_entry state ~start_of_code_symbol ~subrange
+                single_location_description
             in
-            dwarf_4_location_list_entries, location_list
-          | Dwarf_5 location_list_entry ->
-            let location_list =
-              Location_list.add location_list location_list_entry
-            in
-            dwarf_4_location_list_entries, location_list)
+            match location_list_entry with
+            | Dwarf_4 location_list_entry ->
+              let dwarf_4_location_list_entries =
+                location_list_entry :: dwarf_4_location_list_entries
+              in
+              dwarf_4_location_list_entries, location_list
+            | Dwarf_5 location_list_entry ->
+              let location_list =
+                Location_list.add location_list location_list_entry
+              in
+              dwarf_4_location_list_entries, location_list))
     in
     match !Dwarf_flags.gdwarf_version with
     | Four ->

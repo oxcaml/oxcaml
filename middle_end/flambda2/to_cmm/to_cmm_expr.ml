@@ -817,8 +817,11 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
   let make_phantom_let env res bound_var defining_expr ~body =
     let var = Bound_var.var bound_var in
     let debug_uid = Bound_var.debug_uid bound_var in
+    let dbg = Bound_var.dbg bound_var in
+    let bv_is_parameter = Bound_var.is_parameter bound_var in
     let env, backend_var_with_prov =
-      To_cmm_env.add_phantom_let_binding env var ~debug_uid
+      To_cmm_env.add_phantom_let_binding env var ~debug_uid ~dbg
+        ~bv_is_parameter
     in
     let wrap, env, res =
       Env.flush_delayed_lets ~mode:Flush_everything env res
@@ -832,17 +835,22 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
   in
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton bound_var, Simple simple ->
+    Format.eprintf "DBG let_expr_phantom Simple: bound=%a simple=%a@."
+      Bound_var.print bound_var Simple.print simple;
     Simple.pattern_match' simple
       ~var:(fun var ~coercion:_ ->
         let To_cmm_env.{ expr = { cmm; _ }; _ } =
           C.simple ~dbg:Debuginfo.none env res (Simple.var var)
         in
+        Format.eprintf "DBG   var lookup result cmm=%a@." Printcmm.expression cmm;
         match cmm with
         | Cvar backend_var ->
           make_phantom_let env res bound_var
             (Some (Cmm.Cphantom_var backend_var))
             ~body
-        | _ -> expr env res body)
+        | _ ->
+          Format.eprintf "DBG   DROPPING phantom let (not Cvar)@.";
+          expr env res body)
       ~symbol:(fun sym ~coercion:_ ->
         let sym_name = Symbol.linkage_name_as_string sym in
         make_phantom_let env res bound_var

@@ -408,8 +408,8 @@ let create_bound_parameters env vs =
   in
   env, List.rev vs'
 
-let add_phantom_let_binding env var ~debug_uid =
-  let v' = gen_variable var ~debug_uid in
+let add_phantom_let_binding env var ~debug_uid ~dbg ~bv_is_parameter =
+  let v' = gen_variable env var ~debug_uid ~dbg ~bv_is_parameter in
   let env = add_bound_param env var v' in
   env, v'
 
