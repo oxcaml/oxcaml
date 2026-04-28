@@ -85,8 +85,7 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 val add_usages_through_function_slots :
   follow_known_arity_calls:bool -> Datalog.database -> usages -> usages
 
-val get_direct_usages :
-  Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
+val get_direct_usages : Datalog.database -> unit Code_id_or_name.Map.t -> usages
 
 val get_one_field_usage :
   Datalog.database ->
@@ -157,9 +156,7 @@ val perform_analysis :
   Datalog.database -> stats:Datalog.Schedule.stats -> Datalog.database
 
 val get_usages :
-  Datalog.database ->
-  Code_id_or_name.t ->
-  unit Code_id_or_name.Map.t Or_unknown_or_bottom.t
+  Datalog.database -> Code_id_or_name.t -> usages Or_unknown_or_bottom.t
 
 val get_single_source :
   Datalog.database ->

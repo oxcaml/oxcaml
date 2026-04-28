@@ -545,7 +545,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
                 mk_unboxed_fields ~has_to_be_unboxed ~mk db new_unboxed_block
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
-                        ~follow_known_arity_calls:true db (Usages usages)))
+                        ~follow_known_arity_calls:true db usages))
                   new_name
               in
               Some (Unboxed_fields.Unboxed unboxed_fields)
@@ -644,7 +644,7 @@ let perform_analysis db ~stats =
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
-                        ~follow_known_arity_calls:true db (Usages usages)))
+                        ~follow_known_arity_calls:true db usages))
                   new_name
               in
               Code_id_or_name.Map.add to_patch fields unboxed)
@@ -691,7 +691,7 @@ let perform_analysis db ~stats =
                 in
                 let uses =
                   PTA.add_usages_through_function_slots
-                    ~follow_known_arity_calls:false db (Usages usages)
+                    ~follow_known_arity_calls:false db usages
                 in
                 let repr =
                   mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
