@@ -229,7 +229,13 @@ let emit_fundecl f =
   then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
-      try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
+      try
+        Profile.record_with_counters ~accumulate:true
+          ~counter_f:Emitaux.get_frame_counters "emit"
+          (fun fundecl ->
+            Emitaux.reset_frame_counters ();
+            Emit.fundecl fundecl)
+          fundecl
       with Emitaux.Error e ->
         raise (Error (Asm_generation (fundecl.Linear.fun_name, e))))
     f
@@ -430,8 +436,6 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
           (Cfg_with_infos.cfg_with_layout cfg_with_infos)
       in
       cfg_with_infos ++ register_allocator fd_cmm
-      ++ cfg_with_infos_profile ~accumulate:true "push_pop_around_calls"
-           Push_pop_around_calls.run
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
            (Regalloc_validate.run cfg_description))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run

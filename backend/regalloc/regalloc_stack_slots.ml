@@ -246,16 +246,21 @@ with type slots := t = struct
     in
     Stack_class.Tbl.iter intervals ~f:(fun stack_class intervals ->
         Array.iteri intervals ~f:(fun slot_index interval ->
-            let buckets = Stack_class.Tbl.find buckets stack_class in
-            let bucket_index = ref 0 in
-            while
-              !bucket_index < Array.length buckets
-              && does_not_fit buckets.(!bucket_index) interval
-            do
-              incr bucket_index
-            done;
-            assert (!bucket_index < Array.length buckets);
-            Int.Tbl.replace buckets.(!bucket_index) slot_index interval));
+            (* Skip slots whose interval is empty: they have no uses left and
+               will be dropped by the loop in [optimize] below. *)
+            if interval.Interval.start == Point.dummy
+            then ()
+            else
+              let buckets = Stack_class.Tbl.find buckets stack_class in
+              let bucket_index = ref 0 in
+              while
+                !bucket_index < Array.length buckets
+                && does_not_fit buckets.(!bucket_index) interval
+              do
+                incr bucket_index
+              done;
+              assert (!bucket_index < Array.length buckets);
+              Int.Tbl.replace buckets.(!bucket_index) slot_index interval));
     buckets
 
   let contains_empty t =
@@ -327,8 +332,9 @@ let optimize (t : t) (cfg_with_infos : Cfg_with_infos.t) : unit =
               let stack_class = Stack_class.of_machtype reg.typ in
               match Buckets.find_bucket buckets ~stack_class ~slot_index with
               | None ->
-                fatal "slot %d (stack_class=%a) is not in any of the buckets"
-                  slot_index Stack_class.print stack_class
+                (* The slot has no uses left, so the register is dead. *)
+                Reg.set_loc reg Unknown;
+                Reg.Tbl.remove t.stack_slots reg
               | Some bucket_index ->
                 if debug
                 then

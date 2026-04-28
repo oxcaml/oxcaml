@@ -163,7 +163,7 @@ end = struct
   let print typ ppf t =
     match t with
     | Push_stack { index } -> Format.fprintf ppf "push_stack[%d]" index
-    | _ ->
+    | Reg _ | Stack _ ->
       Printreg.loc ~unknown:(fun _ -> assert false) ppf (to_loc_lossy t) typ
 
   let compare (t1 : t) (t2 : t) : int =
@@ -390,7 +390,27 @@ end = struct
   let is_regalloc_specific_basic (desc : Cfg.basic) =
     match desc with
     | Op (Reload | Spill) -> true
-    | _ -> Proc.is_push_to_stack desc || Proc.is_pop_from_stack desc
+    | Op (Specific _) ->
+      Proc.is_push_to_stack desc || Proc.is_pop_from_stack desc
+    | Op
+        ( Operation.Move | Operation.Const_int _ | Operation.Const_float32 _
+        | Operation.Const_float _ | Operation.Const_symbol _
+        | Operation.Const_vec128 _ | Operation.Const_vec256 _
+        | Operation.Const_vec512 _ | Operation.Stackoffset _ | Operation.Load _
+        | Operation.Store (_, _, _)
+        | Operation.Intop _ | Operation.Int128op _
+        | Operation.Intop_imm (_, _)
+        | Operation.Intop_atomic _
+        | Operation.Floatop (_, _)
+        | Operation.Csel _ | Operation.Reinterpret_cast _
+        | Operation.Static_cast _ | Operation.Probe_is_enabled _
+        | Operation.Opaque | Operation.Begin_region | Operation.End_region
+        | Operation.Name_for_debugger _ | Operation.Dls_get | Operation.Tls_get
+        | Operation.Domain_index | Operation.Poll | Operation.Pause
+        | Operation.Alloc _ )
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
+      false
 
   let add_instr_id ~seen_ids ~context id =
     if Hashtbl.mem seen_ids id
@@ -1504,9 +1524,7 @@ let compute_push_pop_slots (cfg : Cfg.t) : int InstructionId.Tbl.t =
       Label.Set.iter
         (fun succ -> set_successor_slot succ !next_slot)
         (Cfg.successor_labels ~normal:true ~exn:false block);
-      Label.Set.iter
-        (fun succ -> set_successor_slot succ 0)
-        (Cfg.successor_labels ~normal:false ~exn:true block));
+      Option.iter (fun succ -> set_successor_slot succ 0) block.exn);
   slots
 
 let test (desc : Description.t) ~push_pop_slots (cfg : Cfg_with_layout.t) :
