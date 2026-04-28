@@ -129,8 +129,7 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
             | `Replaced -> `Replaced)
         in
         loop children
-    end
-  in
+    end in
   (module Combined : Reducer)
 
 let run (module Red_ctor : Reducer) (ssa : Ssa.t) : Ssa.t =
