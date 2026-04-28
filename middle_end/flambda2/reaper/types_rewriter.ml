@@ -138,7 +138,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db usages kind =
        is best to delete it. *)
     erase kind
   | Variant { consts; non_consts } ->
-    let fields = PTA.get_fields db (Usages usages) in
+    let fields = PTA.get_fields db usages in
     let non_consts =
       Tag.Scannable.Map.map
         (fun (shape, kinds) ->
@@ -184,7 +184,7 @@ module Rewriter = struct
     | No_source
     | Single_source of Code_id_or_name.t
     | Many_sources_any_usage
-    | Many_sources_usages of unit Code_id_or_name.Map.t
+    | Many_sources_usages of PTA.usages
     | At_least_one_source_no_usages
 
   type t = UA.result * t0
@@ -195,7 +195,8 @@ module Rewriter = struct
     | Single_source source1, Single_source source2 ->
       Code_id_or_name.compare source1 source2
     | Many_sources_any_usage, Many_sources_any_usage -> 0
-    | Many_sources_usages usages1, Many_sources_usages usages2 ->
+    | Many_sources_usages (Usages usages1), Many_sources_usages (Usages usages2)
+      ->
       Code_id_or_name.Map.compare Unit.compare usages1 usages2
     | At_least_one_source_no_usages, At_least_one_source_no_usages -> 0
     | ( No_source,
@@ -231,7 +232,7 @@ module Rewriter = struct
     | Single_source source ->
       Format.fprintf ff "(Single_source %a)" Code_id_or_name.print source
     | Many_sources_any_usage -> Format.fprintf ff "Many_sources_any_usage"
-    | Many_sources_usages usages ->
+    | Many_sources_usages (Usages usages) ->
       Format.fprintf ff "(Many_sources_usages %a)" Code_id_or_name.Set.print
         (Code_id_or_name.Map.keys usages)
     | At_least_one_source_no_usages ->
@@ -505,7 +506,7 @@ module Rewriter = struct
               in
               Function_slot.Map.add
                 (Field.must_be_function_slot fs)
-                (Many_sources_usages uses, calls)
+                (Many_sources_usages (PTA.Usages uses), calls)
                 m)
             out2 Function_slot.Map.empty )
     in
@@ -534,7 +535,7 @@ module Rewriter = struct
            [uses_for_set_of_closures] for function slot %a"
           Function_slot.print current_function_slot
       | Many_sources_any_usage -> any ()
-      | Many_sources_usages s ->
+      | Many_sources_usages (Usages s) ->
         Fixit.run stmt db s current_function_slot any code_ids_of_function_slots
       | Single_source source -> (
         match
@@ -631,7 +632,7 @@ module Rewriter = struct
             let fields =
               PTA.get_fields db
                 (PTA.add_usages_through_function_slots
-                   ~follow_known_arity_calls:true db (Usages usages))
+                   ~follow_known_arity_calls:true db usages)
             in
             let vars, patterns =
               patterns_for_unboxed_fields ~machine_width
@@ -708,7 +709,7 @@ module Rewriter = struct
 
   let follow_field result t field =
     let[@local] for_usages usages =
-      match PTA.get_one_field_usage result.UA.db field (Usages usages) with
+      match PTA.get_one_field_usage result.UA.db field usages with
       | Unknown -> Many_sources_any_usage
       | Bottom -> At_least_one_source_no_usages
       | Ok vars -> Many_sources_usages (PTA.get_direct_usages result.UA.db vars)
@@ -794,11 +795,12 @@ module Rewriter = struct
     match usages with
     | _ when Lazy.force forget_all_types -> forget_type ()
     | At_least_one_source_no_usages -> forget_type ()
-    | Many_sources_usages m when Code_id_or_name.Map.is_empty m ->
+    | Many_sources_usages (Usages m) when Code_id_or_name.Map.is_empty m ->
       forget_type ()
     | No_source ->
       Rule.rewrite Pattern.any (Expr.bottom (Flambda2_types.kind flambda_type))
-    | Single_source _ | Many_sources_any_usage | Many_sources_usages _ -> (
+    | Single_source _ | Many_sources_any_usage | Many_sources_usages (Usages _)
+      -> (
       match
         Flambda2_types.meet_single_closures_entry typing_env flambda_type
       with
@@ -1287,11 +1289,10 @@ let rewrite_typing_env result ~unit_symbol:_ typing_env =
       let sym = Code_id_or_name.symbol sym in
       match PTA.get_single_source db sym with
       | Bottom -> result, Rewriter.No_source
-      | Ok source -> (
-        (* CR bclement: has_use? *)
-        match PTA.get_usages db sym with
-        | Bottom -> result, Rewriter.At_least_one_source_no_usages
-        | Unknown | Ok _ -> result, Rewriter.Single_source source)
+      | Ok source ->
+        if PTA.has_use db sym
+        then result, Rewriter.Single_source source
+        else result, Rewriter.At_least_one_source_no_usages
       | Unknown -> (
         match PTA.get_usages db sym with
         | Bottom -> result, Rewriter.At_least_one_source_no_usages
@@ -1343,7 +1344,7 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
         let fields =
           PTA.get_fields db
             (PTA.add_usages_through_function_slots
-               ~follow_known_arity_calls:true db (Usages usages))
+               ~follow_known_arity_calls:true db usages)
         in
         let bound, pat =
           Rewriter.patterns_for_unboxed_fields
@@ -1382,11 +1383,10 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
         let metadata =
           match PTA.get_single_source db var with
           | Bottom -> result, Rewriter.No_source
-          | Ok source -> (
-            (* CR bclement: has_use? *)
-            match PTA.get_usages db var with
-            | Bottom -> result, Rewriter.At_least_one_source_no_usages
-            | Unknown | Ok _ -> result, Rewriter.Single_source source)
+          | Ok source ->
+            if PTA.has_use db var
+            then result, Rewriter.Single_source source
+            else result, Rewriter.At_least_one_source_no_usages
           | Unknown -> (
             match PTA.get_usages db var with
             | Bottom -> result, Rewriter.At_least_one_source_no_usages

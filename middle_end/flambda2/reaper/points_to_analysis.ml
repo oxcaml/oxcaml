@@ -604,15 +604,17 @@ let add_usages_through_function_slots :
   fun ~follow_known_arity_calls db (Usages s) ->
     Usages (run stmt db follow_known_arity_calls s)
 
-let get_direct_usages :
-    Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
+let get_direct_usages : Datalog.database -> unit Code_id_or_name.Map.t -> usages
     =
   let open! Fixit in
   run
-    (let@ in_ = param "in_" Cols.[n] in
-     let@ out = fix1' (empty Cols.[n]) in
-     [ (let$ [x; y] = ["x"; "y"] in
-        [in_ % [x]; usages x y; has_usage y] ==> out % [y]) ])
+    (let+ usages =
+       let@ in_ = param "in_" Cols.[n] in
+       let@ out = fix1' (empty Cols.[n]) in
+       [ (let$ [x; y] = ["x"; "y"] in
+          [in_ % [x]; usages x y; has_usage y] ==> out % [y]) ]
+     in
+     Usages usages)
 
 let get_one_field_usage :
     Datalog.database -> Field.t -> usages -> _ Or_unknown_or_bottom.t =
