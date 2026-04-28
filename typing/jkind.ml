@@ -1919,7 +1919,7 @@ module Const = struct
      fun x -> Option.map (fun x -> Location.map (fun x -> Separability x) x) x
   end
 
-  let apply_scannable_axis ?abbrev env
+  let apply_scannable_axis ?prior_annot env
       (axis : Scannable_axis.t Location.loc option) t =
     match axis with
     | None -> t
@@ -1932,11 +1932,13 @@ module Const = struct
         | None -> t
         | Some sa ->
           let sa' = Scannable_axis.lower_axes sa axis in
-          (match abbrev with
-          | Some abbrev when Scannable_axes.equal sa sa' ->
+          (match prior_annot with
+          | Some (abbrev, rev_axes) when Scannable_axes.equal sa sa' ->
             Location.prerr_warning loc
               (Warnings.Redundant_kind_modifier
-                 (Format.asprintf "%a" Pprintast.longident abbrev))
+                 (Format.asprintf "%a%s" Pprintast.longident abbrev
+                    (String.concat ""
+                       (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
           | _ -> ());
           { t with
             base = Layout (Layout.Const.set_root_scannable_axes layout sa')
@@ -1968,25 +1970,19 @@ module Const = struct
       with_bounds
     }
 
-  let transl_scannable_axes sa_annots =
-    List.map
-      (fun ({ txt; loc } : string Location.loc) ->
-        match txt with
-        | "non_pointer" ->
-          Location.mkloc (Scannable_axis.Separability Non_pointer) loc
-        | "non_pointer64" ->
-          Location.mkloc (Scannable_axis.Separability Non_pointer64) loc
-        | "non_float" ->
-          Location.mkloc (Scannable_axis.Separability Non_float) loc
-        | "separable" ->
-          Location.mkloc (Scannable_axis.Separability Separable) loc
-        | "maybe_separable" ->
-          Location.mkloc (Scannable_axis.Separability Maybe_separable) loc
-        | "non_null" -> Location.mkloc (Scannable_axis.Nullability Non_null) loc
-        | "maybe_null" ->
-          Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
-        | _ -> raise ~loc (Unknown_kind_modifier txt))
-      sa_annots
+  let transl_scannable_axis ({ txt; loc } : string Location.loc) =
+    match txt with
+    | "non_pointer" ->
+      Location.mkloc (Scannable_axis.Separability Non_pointer) loc
+    | "non_pointer64" ->
+      Location.mkloc (Scannable_axis.Separability Non_pointer64) loc
+    | "non_float" -> Location.mkloc (Scannable_axis.Separability Non_float) loc
+    | "separable" -> Location.mkloc (Scannable_axis.Separability Separable) loc
+    | "maybe_separable" ->
+      Location.mkloc (Scannable_axis.Separability Maybe_separable) loc
+    | "non_null" -> Location.mkloc (Scannable_axis.Nullability Non_null) loc
+    | "maybe_null" -> Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
+    | _ -> raise ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2000,7 +1996,6 @@ module Const = struct
     | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p in
-      let scannable_annots = transl_scannable_axes sa_annot in
       if
         sa_annot <> []
         &&
@@ -2012,11 +2007,16 @@ module Const = struct
           (Warnings.Ignored_kind_modifier
              ( Format.asprintf "%a" Pprintast.longident name.txt,
                List.map Location.get_txt sa_annot ));
-      List.fold_left
-        (fun jkind sa ->
-          apply_scannable_axis ~abbrev:name.txt env (Some sa) jkind)
-        jkind_without_sa scannable_annots
-      |> allow_left |> allow_right
+      let jkind, _abbrev =
+        List.fold_left
+          (fun (jkind, rev_axes) axis ->
+            ( apply_scannable_axis ~prior_annot:(name.txt, rev_axes) env
+                (Some (transl_scannable_axis axis))
+                jkind,
+              axis.Location.txt :: rev_axes ))
+          (jkind_without_sa, []) sa_annot
+      in
+      allow_left jkind |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
