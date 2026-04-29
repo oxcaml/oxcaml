@@ -305,6 +305,16 @@ val get_current_exn : unit -> t
 
 val is_current : t -> bool
 
+(** Set an override for the compile-time name mangling scheme. This is typically
+    called by the driver when the [-name-mangling-scheme] command-line option is
+    used. *)
+val set_name_mangling_scheme_override : Config.name_mangling_scheme -> unit
+
+(** Returns the name mangling scheme to use for the current compilation. If
+    [set_name_mangling_scheme_override] has been called, that value is returned;
+    otherwise [Config.name_mangling_scheme] is returned. *)
+val name_mangling_scheme : unit -> Config.name_mangling_scheme
+
 module Private : sig
   val fwd_get_current : (unit -> t option) ref
 end

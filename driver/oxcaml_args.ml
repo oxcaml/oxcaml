@@ -348,6 +348,11 @@ let mk_function_layout f =
     Printf.sprintf " Order of functions in the generated assembly (default: %s)"
       default )
 
+let mk_name_mangling_scheme f =
+  ( "-name-mangling-scheme",
+    Arg.Symbol ([ "flat"; "structured" ], f),
+    " Override the default name mangling scheme set at configure time" )
+
 let mk_disable_builtin_check f =
   ( "-disable-builtin-check",
     Arg.Unit f,
@@ -1269,6 +1274,7 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
+  val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
   val enable_poll_insertion : unit -> unit
@@ -1448,6 +1454,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_zero_alloc_checker_details_extra;
       mk_zero_alloc_checker_join F.zero_alloc_checker_join;
       mk_function_layout F.function_layout;
+      mk_name_mangling_scheme F.name_mangling_scheme;
       mk_disable_builtin_check F.disable_builtin_check;
       mk_disable_poll_insertion F.disable_poll_insertion;
       mk_enable_poll_insertion F.enable_poll_insertion;
@@ -1726,6 +1733,17 @@ module Oxcaml_options_impl = struct
     match Oxcaml_flags.Function_layout.of_string s with
     | None -> () (* this should not occur as we use Arg.Symbol *)
     | Some layout -> Oxcaml_flags.function_layout := layout
+
+  let name_mangling_scheme s =
+    let scheme : Config.name_mangling_scheme option =
+      match s with
+      | "flat" -> Some Flat
+      | "structured" -> Some Structured
+      | _ -> None (* this should not occur as we use Arg.Symbol *)
+    in
+    match scheme with
+    | Some scheme -> Compilation_unit.set_name_mangling_scheme_override scheme
+    | None -> ()
 
   let disable_builtin_check = set' Oxcaml_flags.disable_builtin_check
   let disable_poll_insertion = set' Oxcaml_flags.disable_poll_insertion
@@ -2252,6 +2270,20 @@ module Extra_params = struct
         match Oxcaml_flags.Function_layout.of_string v with
         | Some layout ->
             Oxcaml_flags.function_layout := layout;
+            true
+        | None ->
+            raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
+        )
+    | "name-mangling-scheme" -> (
+        let scheme : Config.name_mangling_scheme option =
+          match v with
+          | "flat" -> Some Flat
+          | "structured" -> Some Structured
+          | _ -> None
+        in
+        match scheme with
+        | Some scheme ->
+            Compilation_unit.set_name_mangling_scheme_override scheme;
             true
         | None ->
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))

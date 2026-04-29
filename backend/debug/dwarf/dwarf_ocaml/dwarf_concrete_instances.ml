@@ -37,7 +37,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
     | [] | _ :: _ -> fun_name
   in
   let linkage_name =
-    match Config.name_mangling_scheme with
+    match Compilation_unit.name_mangling_scheme () with
     | Flat -> Some (linkage_name_from_debug ())
     | Structured -> None
     (* When structured mangling is used, there is no need for additional linkage
