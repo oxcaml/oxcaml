@@ -10,14 +10,12 @@
  {
    module = "w53.marshalled.ml";
    compiler_reference = "${test_source_directory}/w53.compilers.reference";
-   flags = "-w +A-22-27-32-60-67-70-71-72";
    ocamlc.byte;
    check-ocamlc.byte-output;
  }{
    setup-ocamlc.byte-build-env;
    module = "w53_zero_alloc_all.marshalled.ml";
    compiler_reference = "${test_source_directory}/w53_zero_alloc_all.compilers.reference";
-   flags = "-w +A-22-27-32-60-67-70-71-72";
    ocamlc.byte;
    check-ocamlc.byte-output;
  }
