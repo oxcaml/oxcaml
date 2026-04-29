@@ -486,19 +486,40 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
+<<<<<<< HEAD
 (* CR layouts-scannable: improve this error message (internal ticket 6111) *)
+||||||| parent of ad041ac3ca (Malleable records squashed)
+(* CR layouts v7.2: improve this error message *)
+=======
+>>>>>>> ad041ac3ca (Malleable records squashed)
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
 Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Error: The layout of type "r#" is value non_pointer & value non_pointer
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Error:
+       The kind of r# is value_or_null & float64
+=======
+Error:
+       The layout of r# is value & value
+>>>>>>> ad041ac3ca (Malleable records squashed)
          because it is an unboxed record.
+<<<<<<< HEAD
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
        Note: The layout of immediate is value non_pointer.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+       But the kind of r# must be a subkind of value & float64
+         because of the definition of t at line 1, characters 0-29.
+=======
+       But the layout of r# must be a sublayout of value & float64
+         because of the definition of t at line 1, characters 0-29.
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 (* CR layouts-scannable: improve this error message (internal ticket 6111) *)
@@ -506,15 +527,37 @@ type s_bad = q t
 and r = {x:int; y:bool}
 and q = r#
 [%%expect{|
+<<<<<<< HEAD
 Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "r#" is value non_pointer & value non_pointer
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Line 3, characters 0-10:
+3 | and q = r#
+    ^^^^^^^^^^
+Error:
+       The kind of q is value_or_null & float64
+=======
+Line 3, characters 0-10:
+3 | and q = r#
+    ^^^^^^^^^^
+Error:
+       The layout of q is value & value
+>>>>>>> ad041ac3ca (Malleable records squashed)
          because it is an unboxed record.
+<<<<<<< HEAD
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
        Note: The layout of immediate is value non_pointer.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+       But the kind of q must be a subkind of value & float64
+         because of the definition of t at line 1, characters 0-29.
+=======
+       But the layout of q must be a sublayout of value & float64
+         because of the definition of t at line 1, characters 0-29.
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 module rec M : sig

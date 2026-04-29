@@ -36,14 +36,34 @@ Error: This pattern matches values of type "t_any_mod_separable"
 type t = { x : t_any_mod_separable }
 
 [%%expect{|
+<<<<<<< HEAD
 Line 1, characters 11-34:
 1 | type t = { x : t_any_mod_separable }
                ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Record element types must have a representable layout.
        The layout of t_any_mod_separable is any separable
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Line 1, characters 11-34:
+1 | type t = { x : t_any_mod_separable }
+               ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Record element types must have a representable layout.
+       The layout of t_any_mod_separable is any
+=======
+type t = { x : t_any_mod_separable; }
+|}]
+
+let f t = t.x
+
+[%%expect{|
+Line 1, characters 10-13:
+1 | let f t = t.x
+              ^^^
+Error: Fields being projected must be representable.
+       The layout of t_any_mod_separable is any
+>>>>>>> ad041ac3ca (Malleable records squashed)
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
-         because it is the type of record field x.
+         because it's the type of a field being projected.
 |}]
 
 module type S1 = sig

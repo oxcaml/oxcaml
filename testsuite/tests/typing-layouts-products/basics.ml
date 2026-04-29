@@ -243,6 +243,7 @@ type t6_wrong_inner_record = #{ i : int; i64 : int64 }
 and ('a : value & bits64) t6_wrong = 'a t7_wrong
 and 'a t7_wrong = { x : t6_wrong_inner_record t6_wrong }
 [%%expect{|
+<<<<<<< HEAD
 Line 2, characters 37-48:
 2 | and ('a : value & bits64) t6_wrong = 'a t7_wrong
                                          ^^^^^^^^^^^
@@ -259,6 +260,29 @@ Error: Layout mismatch in final type declaration consistency check.
                                         t6_wrong.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Line 1, characters 0-54:
+1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t6_wrong_inner_record is value_or_null & bits64
+         because it is an unboxed record.
+       But the kind of t6_wrong_inner_record must be a subkind of
+           value & bits64
+         because of the annotation on 'a in the declaration of the type
+                                      t6_wrong.
+=======
+Line 1, characters 0-54:
+1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of t6_wrong_inner_record is value & value
+         because it is an unboxed record.
+       But the layout of t6_wrong_inner_record must be a sublayout of
+           value & bits64
+         because of the annotation on 'a in the declaration of the type
+                                      t6_wrong.
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 (* Just like t6/t7, but with the annotation on the other (the order doesn't
@@ -932,24 +956,13 @@ module F :
     sig type r = X.t4 t_constraint end
 |}]
 
-(* This typechecks for unboxed tuples, but fail for [@@unboxed], unboxed, and
-   boxed records, in the same way as below.
-
-   CR layouts v7.2: These should typecheck for all record forms.
-*)
 module type S_coherence_deep = sig
   type t1 : any
   type t2 = #{ i : int; t1 : t1 }
 end
 [%%expect{|
-Line 3, characters 24-31:
-3 |   type t2 = #{ i : int; t1 : t1 }
-                            ^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = #{ i : int; t1 : t1; } end
 |}]
 
 module type S_coherence_deep = sig
@@ -957,14 +970,8 @@ module type S_coherence_deep = sig
   type t2 = { t1 : t1 } [@@unboxed]
 end
 [%%expect{|
-Line 3, characters 14-21:
-3 |   type t2 = { t1 : t1 } [@@unboxed]
-                  ^^^^^^^
-Error: [@@unboxed] record element types must have a representable layout.
-       The layout of t1/2 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1/2 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = { t1 : t1; } [@@unboxed] end
 |}]
 
 (*************************************************)
@@ -2133,6 +2140,7 @@ Error: This type "string t" should be an instance of type "('a : any mod global)
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
+<<<<<<< HEAD
 |}, Principal{|
 Line 1, characters 19-27:
 1 | type should_fail = string t needs_any_mod_global
@@ -2144,6 +2152,20 @@ Error: This type "string t" should be an instance of type "('a : any mod global)
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+|}, Principal{|
+Line 1, characters 19-27:
+1 | type should_fail = string t needs_any_mod_global
+                       ^^^^^^^^
+Error: This type "string t" should be an instance of type "('a : any mod global)"
+       The kind of string t is
+           immediate mod dynamic with string u
+           & immediate mod dynamic with string u
+         because of the definition of t at line 2, characters 0-47.
+       But the kind of string t must be a subkind of any mod global
+         because of the definition of needs_any_mod_global at line 4, characters 0-47.
+=======
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 type ('a : any mod external_) t

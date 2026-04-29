@@ -45,13 +45,13 @@ Error: The definition of "bad" is recursive without boxing:
 (* The below is adapted from
    [testsuite/tests/typing-layouts-products/basics_alpha.ml]. *)
 
-(* [t3] is allowed for unboxed tuples, and disallowed for (un)boxed records *)
 type t1 : any mod non_null separable
 type t2 : value
 type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any separable non_null
 type t2
+<<<<<<< HEAD
 Line 3, characters 42-51:
 3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
                                               ^^^^^^^^^
@@ -60,10 +60,19 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-36.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Line 3, characters 42-51:
+3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
+                                              ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-36.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
-
-(* CR layouts v7.2: once [any] is allowed in unboxed record declarations, check
-   that [non_null] behaves correctly in the following tests. *)
 
 type t1 : any mod non_null separable
 type t2 : value
@@ -71,6 +80,7 @@ type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any separable non_null
 type t2
+<<<<<<< HEAD
 Line 3, characters 50-59:
 3 | type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
                                                       ^^^^^^^^^
@@ -79,6 +89,18 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-36.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Line 3, characters 50-59:
+3 | type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
+                                                      ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-36.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 type t1 : any mod non_null separable
@@ -87,6 +109,7 @@ type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 
 [%%expect{|
 type t1 : any separable non_null
 type t2
+<<<<<<< HEAD
 Line 3, characters 77-86:
 3 | type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 : t1 ; t2 : t2};;
                                                                                  ^^^^^^^^^
@@ -95,6 +118,18 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-36.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+Line 3, characters 77-86:
+3 | type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 : t1 ; t2 : t2};;
+                                                                                 ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-36.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 type t1 : any
@@ -102,6 +137,7 @@ type t2 : any mod non_null separable
 type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
+<<<<<<< HEAD
 type t2 : any separable non_null
 Line 3, characters 50-59:
 3 | type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
@@ -111,14 +147,28 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-13.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+type t2 : any mod non_null separable
+Line 3, characters 50-59:
+3 | type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
+                                                      ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-13.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t2 : any mod non_null separable
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
-(* Should not be allowed for either unboxed tuples or (un)boxed records. *)
 type t1 : any
 type t2 : any mod non_null separable
 type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
+<<<<<<< HEAD
 type t2 : any separable non_null
 Line 3, characters 42-51:
 3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
@@ -128,6 +178,20 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-13.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+type t2 : any mod non_null separable
+Line 3, characters 42-51:
+3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
+                                              ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-13.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t2 : any mod non_null separable
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 type t1 : any
@@ -135,6 +199,7 @@ type t2 : any mod non_null separable
 type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
+<<<<<<< HEAD
 type t2 : any separable non_null
 Line 3, characters 48-57:
 3 | type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
@@ -144,6 +209,20 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-13.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+type t2 : any mod non_null separable
+Line 3, characters 48-57:
+3 | type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
+                                                    ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-13.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t2 : any mod non_null separable
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 type t1 : any
@@ -151,6 +230,7 @@ type t2 : any mod non_null separable
 type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
+<<<<<<< HEAD
 type t2 : any separable non_null
 Line 3, characters 75-84:
 3 | type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
@@ -160,6 +240,20 @@ Error: Unboxed record element types must have a representable layout.
          because of the definition of t1 at line 1, characters 0-13.
        But the layout of t1 must be representable
          because it is the type of record field t1.
+||||||| parent of ad041ac3ca (Malleable records squashed)
+type t2 : any mod non_null separable
+Line 3, characters 75-84:
+3 | type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
+                                                                               ^^^^^^^^^
+Error: Unboxed record element types must have a representable layout.
+       The layout of t1 is any
+         because of the definition of t1 at line 1, characters 0-13.
+       But the layout of t1 must be representable
+         because it is the type of record field t1.
+=======
+type t2 : any mod non_null separable
+type t3 = #{ t1 : t1; t2 : t2; }
+>>>>>>> ad041ac3ca (Malleable records squashed)
 |}]
 
 type ur1 = #{ a : int64#; b : float# }
