@@ -4899,7 +4899,7 @@ module Reaching_path = struct
         (match Jkind.Scannable_axes.to_string_list sa with
          | [] -> Printtyp.path ppf p
          | _ :: _ as sa_strs ->
-           Fmt.fprintf ppf "%a mod %s" Printtyp.path p
+           Fmt.fprintf ppf "%a %s" Printtyp.path p
              (String.concat " " sa_strs))
     in
     let mod_strings =

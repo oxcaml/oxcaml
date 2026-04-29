@@ -265,3 +265,37 @@ Error: The universal type variable 'a was declared to have kind k separable.
        But it was inferred to have kind k separable non_null
          because of the definition of a at line 3, characters 2-30.
 |}]
+
+(* Recursive jkind cycle reporting *)
+module rec M : sig
+  kind_ k = M.k separable
+end = struct
+  kind_ k = M.k separable
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec M : sig
+2 |   kind_ k = M.k separable
+3 | end = struct
+4 |   kind_ k = M.k separable
+5 | end
+Error: The kind "M.k" is cyclic:
+         "M.k" = "M.k separable"
+|}]
+
+module rec M : sig
+  kind_ k = M.k separable mod global
+end = struct
+  kind_ k = M.k separable mod global
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec M : sig
+2 |   kind_ k = M.k separable mod global
+3 | end = struct
+4 |   kind_ k = M.k separable mod global
+5 | end
+Error: The kind "M.k" is cyclic:
+         "M.k" = "M.k separable mod global",
+         "M.k separable mod global" contains "M.k"
+|}]
