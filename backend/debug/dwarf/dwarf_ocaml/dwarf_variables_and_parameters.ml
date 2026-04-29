@@ -421,12 +421,20 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       (* Ensure that parameters appear in the correct order in the debugger. *)
       Some index
   in
-  if not hidden
-  then
-    Proto_die.create_ignore ?reference ?sort_priority
-      ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
-      ~attribute_values:(type_and_name_attributes @ location_attribute_value)
-      ()
+  (* Even when [hidden] is set (the variable has no provenance and so should
+     not be visible to the user in the debugger) we still emit a DIE for the
+     variable, because phantom variables may reference it via their
+     [Lphantom_var] location description. Without a target DIE, those
+     references would resolve to an empty location list. We mark such DIEs
+     as [DW_AT_artificial] and omit the name. *)
+  let attribute_values =
+    if hidden
+    then DAH.create_artificial () :: location_attribute_value
+    else type_and_name_attributes @ location_attribute_value
+  in
+  Proto_die.create_ignore ?reference ?sort_priority
+    ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
+    ~attribute_values ()
 
 (* A variable belongs to a particular frame DIE iff its provenance location
    identifies the same inlining context as the frame's [scope_key] (the full
