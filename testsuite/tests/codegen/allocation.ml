@@ -75,7 +75,8 @@ spill_slot_lifetime:
   jb    .L116
 .L118:
   leaq  8(%r15), %rax
-  movq  $4350, -8(%rax)
+  movabsq $72057594037932032, %rbx
+  movq  %rbx, -8(%rax)
   vmovsd (%rsp), %xmm1
   vmovsd %xmm1, (%rax)
   vmovsd 8(%rsp), %xmm1

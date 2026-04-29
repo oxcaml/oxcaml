@@ -225,6 +225,7 @@ type error =
   | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
+  | Bad_represent_as_float_array_attribute
 
 exception Error of Location.t * error
 
