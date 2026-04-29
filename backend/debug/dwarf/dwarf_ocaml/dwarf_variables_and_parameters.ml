@@ -33,6 +33,12 @@ type proto_dies_for_var =
 
 let arch_size_addr = Targetint.of_int_exn Arch.size_addr
 
+(* When set, phantom-variable location descriptions for [Lphantom_var] are
+   wrapped in a single-piece composite ([DW_OP_piece]). This is a GDB-specific
+   workaround for stack-underflow on unavailable referenced variables; LLVM
+   debuggers do not currently support [DW_OP_piece] in this position. *)
+let use_dw_op_piece = false
+
 let proto_dies_for_variable var ~proto_dies_for_vars =
   match Backend_var.Tbl.find proto_dies_for_vars var with
   | exception Not_found -> None
@@ -131,33 +137,48 @@ let rec phantom_var_location_description state
     if need_rvalue
     then rvalue (SLDL.Rvalue.read_symbol_field symbol ~field)
     else lvalue (SLDL.Lvalue.in_symbol_field symbol ~field)
-  | Lphantom_var var -> (
-    if (* Variables referenced by phantom lets may themselves become unavailable
-          at certain program points. We wrap the location description in a
-          composite location description (with only one piece) so GDB correctly
-          detects unavailability rather than producing a stack underflow
-          error. *)
-       need_rvalue
+  | Lphantom_var var ->
+    (* The original encoding wraps the [location_from_another_die] reference
+       in a single-piece composite location description ([DW_OP_piece]). This
+       prevents GDB from producing a stack-underflow error when the referenced
+       variable becomes unavailable at certain program points. LLVM-based
+       debuggers do not currently support [DW_OP_piece] in this position, so
+       the simple (non-composite) form is used by default; flip
+       [use_dw_op_piece] below to restore the original encoding. *)
+    if use_dw_op_piece
     then
+      if need_rvalue
+      then (
+        match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
+        | None -> None
+        | Some rvalue ->
+          let location = SLDL.compile (SLDL.of_rvalue rvalue) in
+          let composite =
+            Composite_location_description
+            .pieces_of_simple_location_descriptions
+              [location, arch_size_addr]
+          in
+          Some (Composite composite))
+      else (
+        match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+        | None -> None
+        | Some lvalue ->
+          let location = SLDL.compile (SLDL.of_lvalue lvalue) in
+          let composite =
+            Composite_location_description
+            .pieces_of_simple_location_descriptions
+              [location, arch_size_addr]
+          in
+          Some (Composite composite))
+    else if need_rvalue
+    then (
       match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
       | None -> None
-      | Some rvalue ->
-        let location = SLDL.compile (SLDL.of_rvalue rvalue) in
-        let composite =
-          Composite_location_description.pieces_of_simple_location_descriptions
-            [location, arch_size_addr]
-        in
-        Some (Composite composite)
-    else
+      | Some r -> rvalue r)
+    else (
       match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
       | None -> None
-      | Some lvalue ->
-        let location = SLDL.compile (SLDL.of_lvalue lvalue) in
-        let composite =
-          Composite_location_description.pieces_of_simple_location_descriptions
-            [location, arch_size_addr]
-        in
-        Some (Composite composite))
+      | Some l -> lvalue l)
   | Lphantom_read_field { var; field } ->
     (* For now, show field access as unavailable since we cannot dereference
        values built with implicit pointers. *)
@@ -440,23 +461,26 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
    identifies the same inlining context as the frame's [scope_key] (the full
    inlining path from the function down to and including the frame itself).
 
-   - For the function's main subprogram, [scope_key] is [Debuginfo.none].
-     Variables bound at the top level of the function have an empty location
-     and so match.
+   For an inlined-subroutine DIE, [scope_key] is the inlining stack of the
+   frame. A variable bound inside that inlined region has its [bound_var.dbg]
+   passed through [Inlined_debuginfo.rewrite] when the enclosing function is
+   inlined; this prepends each enclosing apply's debuginfo and stamps the
+   variable's own [dbg] with the inlined function's [function_symbol] and the
+   inlining [uid]. Two locations identify the same inlining context iff each
+   pair of corresponding items agrees on those tags. We deliberately ignore
+   the line/column of items, because a variable's [dbg] (set in
+   [closure_conversion] to the function's declaration loc) and an
+   instruction's [dbg] (some op location inside the inlined body) will share
+   [uid] and [function_symbol] but not their line numbers.
 
-   - For an inlined-subroutine DIE, [scope_key] is the inlining stack of the
-     frame. A variable bound inside that inlined region has its
-     [bound_var.dbg] passed through [Inlined_debuginfo.rewrite] when the
-     enclosing function is inlined; this prepends each enclosing apply's
-     debuginfo and stamps the variable's own [dbg] with the inlined
-     function's [function_symbol] and the inlining [uid]. Two locations
-     identify the same inlining context iff each pair of corresponding items
-     agrees on those tags, which is what we check below. We deliberately
-     ignore the line/column of items for this comparison, because a
-     variable's [dbg] (set in [closure_conversion] to the function's
-     declaration loc) and an instruction's [dbg] (some op location inside
-     the inlined body) will share [uid] and [function_symbol] but not their
-     line numbers. *)
+   For the function's main subprogram, [scope_key] is [Debuginfo.none]. A
+   variable belongs at the function level iff its location has no inlining
+   tags, i.e. none of its items name an inlined function. This admits both
+   the legacy convention ([bound_var.dbg = none] gives an empty location) and
+   the convention introduced by [closure_conversion] for parameters
+   ([bound_var.dbg = function loc] gives a single item with no inlining
+   tags, since [Inlined_debuginfo.rewrite] only stamps items that came from
+   inside an inlined body). *)
 let inlining_contexts_match (loc1 : Debuginfo.t) (loc2 : Debuginfo.t) =
   let items1 = Debuginfo.to_items loc1 in
   let items2 = Debuginfo.to_items loc2 in
@@ -472,6 +496,13 @@ let inlining_contexts_match (loc1 : Debuginfo.t) (loc2 : Debuginfo.t) =
   in
   loop items1 items2
 
+let location_has_no_inlining_tags (loc : Debuginfo.t) =
+  List.for_all
+    (fun (item : Debuginfo.item) ->
+      Option.is_none item.dinfo_function_symbol
+      && Option.is_none item.dinfo_uid)
+    (Debuginfo.to_items loc)
+
 let matches_frame_path ~frame_path range =
   let range_info = ARAV.Range.info range in
   match ARAV.Range_info.provenance range_info with
@@ -480,7 +511,9 @@ let matches_frame_path ~frame_path range =
     true
   | Some provenance ->
     let location = Backend_var.Provenance.location provenance in
-    inlining_contexts_match location frame_path
+    if Debuginfo.is_none frame_path
+    then location_has_no_inlining_tags location
+    else inlining_contexts_match location frame_path
 
 let iterate_over_variable_like_things _state ~available_ranges_all_vars
     ~frame_path ~f =
