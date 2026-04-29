@@ -1409,7 +1409,7 @@ G(caml_system__code_end):
 /* Uses the same naming convention as ocamlopt generated modules. */
 OBJECT(CAMLSEP(system,frametable))
         .quad   2                   /* two descriptors */
-        .quad  L(caml_retaddr) - .  /* return address into callback */
+        .4byte  L(caml_retaddr) - . /* return address into callback */
         .short  -1                  /* negative frame size => use callback link */
         .short  0                   /* no roots */
         .align  3
