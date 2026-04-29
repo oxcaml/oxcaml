@@ -276,5 +276,6 @@ let run (cfg_with_infos : Cfg_with_infos.t) =
   then begin
     let cfg = Cfg_with_infos.cfg cfg_with_infos in
     Cfg.iter_blocks cfg ~f:(fun _label block ->
-        process_call cfg_with_infos block)
+        process_call cfg_with_infos block);
+    Cfg_with_infos.invalidate_liveness cfg_with_infos
   end
