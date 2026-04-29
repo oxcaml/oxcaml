@@ -308,8 +308,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
       let inlined_subroutine_die =
         die_for_inlined_frame state ~compilation_unit_proto_die
           ~parent:parent_die ~value_type_proto_die ~function_symbol
-          ~frame_path:(Debuginfo.of_items prefix)
-          range_list_attributes block ~available_ranges_all_vars
+          ~frame_path:scope_key range_list_attributes block
+          ~available_ranges_all_vars
       in
       DS.Debug.log "Our DIE ref (DW_TAG_inlined_subroutine) for %a is %a\n%!"
         Debuginfo.print_compact_extended block Asm_label.print

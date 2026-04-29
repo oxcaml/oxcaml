@@ -2727,7 +2727,14 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     List.map
       (fun (p : Function_decl.param) ->
         let var = fst (Env.find_var closure_env p.name) in
-        BP.create var p.kind p.debug_uid ~dbg:Debuginfo.none)
+        (* Use the function's location as the parameter's [dbg]. When this
+           function is later inlined, [Inlined_debuginfo.rewrite] prepends the
+           call site to this [dbg], producing a multi-item Debuginfo whose
+           outermost item is the call site and whose innermost item is the
+           function's body. This is required for [Inlined_frame_ranges] to
+           detect inlined frames via parameter phantom lets even when no
+           residual instructions are tagged with the inlining stack. *)
+        BP.create var p.kind p.debug_uid ~dbg)
       unarized_params
     |> Bound_parameters.create
   in

@@ -429,20 +429,41 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       ()
 
 (* A variable belongs to a particular frame DIE iff its provenance location
-   (the inlining stack at the point of binding) is exactly the frame's path
-   (the call sites from the function down to, but not including, the frame
-   itself).
+   identifies the same inlining context as the frame's [scope_key] (the full
+   inlining path from the function down to and including the frame itself).
 
-   - For the function's main subprogram, [frame_path] is [Debuginfo.none].
-     Variables bound at the top level of the function (no inlining) have
-     [provenance.location = Debuginfo.none] and so match.
+   - For the function's main subprogram, [scope_key] is [Debuginfo.none].
+     Variables bound at the top level of the function have an empty location
+     and so match.
 
-   - For an inlined-subroutine DIE at depth [d], [frame_path] is the [d]
-     outermost call sites of the inlining stack at that frame. A variable
-     bound by [closure_conversion]/[expr_builder] inside that inlined region
-     gets its [bound_var.dbg] rewritten to the same [frame_path] (the
-     inlining context applied to its original [Debuginfo.none]), so its
-     [provenance.location] matches the frame_path exactly. *)
+   - For an inlined-subroutine DIE, [scope_key] is the inlining stack of the
+     frame. A variable bound inside that inlined region has its
+     [bound_var.dbg] passed through [Inlined_debuginfo.rewrite] when the
+     enclosing function is inlined; this prepends each enclosing apply's
+     debuginfo and stamps the variable's own [dbg] with the inlined
+     function's [function_symbol] and the inlining [uid]. Two locations
+     identify the same inlining context iff each pair of corresponding items
+     agrees on those tags, which is what we check below. We deliberately
+     ignore the line/column of items for this comparison, because a
+     variable's [dbg] (set in [closure_conversion] to the function's
+     declaration loc) and an instruction's [dbg] (some op location inside
+     the inlined body) will share [uid] and [function_symbol] but not their
+     line numbers. *)
+let inlining_contexts_match (loc1 : Debuginfo.t) (loc2 : Debuginfo.t) =
+  let items1 = Debuginfo.to_items loc1 in
+  let items2 = Debuginfo.to_items loc2 in
+  let rec loop (items1 : Debuginfo.item list) (items2 : Debuginfo.item list) =
+    match items1, items2 with
+    | [], [] -> true
+    | [], _ :: _ | _ :: _, [] -> false
+    | i1 :: items1, i2 :: items2 ->
+      Option.equal String.equal i1.dinfo_uid i2.dinfo_uid
+      && Option.equal String.equal i1.dinfo_function_symbol
+           i2.dinfo_function_symbol
+      && loop items1 items2
+  in
+  loop items1 items2
+
 let matches_frame_path ~frame_path range =
   let range_info = ARAV.Range.info range in
   match ARAV.Range_info.provenance range_info with
@@ -451,7 +472,7 @@ let matches_frame_path ~frame_path range =
     true
   | Some provenance ->
     let location = Backend_var.Provenance.location provenance in
-    Debuginfo.compare location frame_path = 0
+    inlining_contexts_match location frame_path
 
 let iterate_over_variable_like_things _state ~available_ranges_all_vars
     ~frame_path ~f =
