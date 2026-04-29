@@ -169,8 +169,12 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         match classify_variant_with_null_constructor cstr with
         | Variant_with_null_nullary ->
           Some (Constructor_uniform_value, [| |])
-        | Variant_with_null_payload { payload_arg = { ca_sort = sort; _ }; _ }
-          -> Some (Constructor_uniform_value, [| sort |])
+        | Variant_with_null_payload
+            { payload_arg = { ca_sort = Some sort; _ }; _ } ->
+          Some (Constructor_uniform_value, [| sort |])
+        | Variant_with_null_payload
+            { payload_arg = { ca_sort = None; _ }; _ } ->
+          Misc.fatal_error "Custom or_null payload with non-fixed layout"
       in
       Array.of_list (List.map shape cstrs), false
   in

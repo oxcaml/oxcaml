@@ -5039,8 +5039,8 @@ let rec check_captures_comonadic env (exp : expression) =
   match exp.exp_desc with
   | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _
   | Texp_function _ -> ()
-  | Texp_construct (_, _, args, _) ->
-    List.iter check args
+  | Texp_construct (_, _, _, args, _) ->
+    List.iter (fun (_, e) -> check e) args
   | Texp_variant (_, None) -> ()
   | Texp_variant (_, Some (e, _)) -> check e
   | Texp_tuple (args, _) ->
@@ -5048,12 +5048,12 @@ let rec check_captures_comonadic env (exp : expression) =
   | Texp_unboxed_tuple args ->
     List.iter (fun (_, e, _) -> check e) args
   | Texp_record { fields; extended_expression = None; _ } ->
-    Array.iter (fun (_, def) ->
+    Array.iter (fun (_, _, def) ->
       match def with
       | Kept _ -> assert false
       | Overridden (_, e) -> check e) fields
   | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
-    Array.iter (fun (_, def) ->
+    Array.iter (fun (_, _, def) ->
       match def with
       | Kept _ -> assert false
       | Overridden (_, e) -> check e) fields
@@ -9334,7 +9334,7 @@ and type_option_some env expected_mode sarg ty ty0 =
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
-  let sort = Jkind.Sort.value in
+  let sort = Jkind.Sort.scannable in
   let repres = Types.Constructor_uniform_value in
   mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
                         Some alloc_mode))

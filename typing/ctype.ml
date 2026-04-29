@@ -2860,7 +2860,9 @@ let rec compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
   in
   match apply_layout_wrapping_l ~env ~unwrapped_ty jkind with
   | Ok layout -> (unwrapped_ty.ty, unwrapped_ty.modality), layout
-  | Error prev_unwrapped_ty -> compute_ty_modality_layout prev_unwrapped_ty
+  | Error prev_unwrapped_ty ->
+    compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
+      prev_unwrapped_ty
 and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
@@ -2953,8 +2955,10 @@ and estimate_unboxed_product_jkind
       ~expand_components ~ignore_mod_bounds ~why env tys =
   let tys_modalities, layouts =
     List.map
-      (fun (_lbl, ty) -> compute_ty_modality_layout (expand_components env ty))
-      ltys
+      (fun ty ->
+         compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
+           (maybe_expand_component env ty ~expand_components))
+      tys
     |> List.split
   in
   Jkind.Builtin.product ~why tys_modalities layouts
@@ -3192,29 +3196,28 @@ let constrain_type_jkind ~fixed env ty jkind =
                    (fun unwrapped_ty jkind ->
                       let jkind = apply_jkind_wrapping_r jkind ~unwrapped_ty in
                       estimate_jkind_and_loop ~fuel ~expanded:false env
-                        unwrapped_ty.ty ty's_jkind jkind)
+                        unwrapped_ty.ty jkind)
                    unwrapped_tys jkinds
                in
                if List.for_all Result.is_ok results
                then Ok ()
                else
+                 (* CR rtjoa: tried to adapt this to 5178, not sure *)
                  (* [ty's_jkind] may be an approximation that we tried to refine
                     when we recursed. We're in an error case anyway so just do
                     the easy, slow thing of recomputing the jkind now. *)
                  let ty's_best_jkind =
                    let tys_and_modalities =
-                     List.map (fun { ty; modality } -> ty, modality) tys
-                   in
-                   let tys =
-                     List.map (fun { ty; modality = _ } -> ty) tys
+                     List.map (fun { ty; modality } -> ty, modality) unwrapped_tys
                    in
                    let layouts =
                      Misc.Stdlib.List.map_option
-                       (fun ty ->
-                          type_jkind_purely env ty
-                          |> Jkind.extract_layout env
+                       (fun ({ ty; _ } as unwrapped_ty) ->
+                          type_jkind_purely env ty (* Here we recompute the
+                                                      jkind more accurately *)
+                          |> apply_layout_wrapping_l ~env ~unwrapped_ty
                           |> Result.to_option)
-                       tys
+                       unwrapped_tys
                    in
                    match layouts with
                    | Some layouts ->
@@ -3318,7 +3321,7 @@ let constrain_type_jkind ~fixed env ty jkind =
           | _ ->
             Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-  and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
+  and estimate_jkind_and_loop ~fuel ~expanded env ty (jkind : jkind_r) : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
        constrain layouts. So we still continue, but we avoid performing any

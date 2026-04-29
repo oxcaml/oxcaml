@@ -467,7 +467,7 @@ module Type_decl_shape = struct
               (fun { Shape.field_name = _; field_value = _, ly } ->
                 if
                   not
-                    (Layout.equal ly (Layout.Base Value)
+                    (Layout.equal ly (Layout.Base Scannable)
                     || Layout.equal ly (Layout.Base Void))
                 then
                   if !Clflags.dwarf_pedantic
@@ -476,7 +476,7 @@ module Type_decl_shape = struct
                       "Type_shape: variant constructor with mismatched layout, \
                        has %a but expected value or void."
                       Layout.format ly
-                  else Layout.Base Value
+                  else Layout.Base Scannable
                 else ly)
               args
           in

@@ -1355,7 +1355,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
              let rec transl (element : mixed_block_element) =
                let open Jkind.Sort.Const in
                match element with
-               | Value -> value
+               | Scannable _ -> scannable
                | Float_boxed ->
                  Misc.fatal_error "doesn't get unboxed version"
                | Float64 -> float64
@@ -2084,26 +2084,6 @@ let update_record_kind (type rep) env loc (form : rep record_form)
          mutable first_any : Ident.t option;
       }
   end in
-
-  let represent_as_float_array =
-    Builtin_attributes.has_represent_as_float_array decl.type_attributes
-  in
-  if represent_as_float_array then begin
-    match decl.type_kind with
-    | Type_record _ -> ()
-    | _ -> raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute))
-  end;
-  let mixed_record () =
-    let shape =
-      Element_repr.mixed_product_shape loc reprs Record
-    in
-    let shape =
-      match shape with
-      | Ok (`Mixed x) -> x
-      | Ok `Not_mixed | Error _ -> Misc.fatal_error "expected mixed block"
-    in
-    Ok (Record_mixed shape)
-  in
   match form, lbls, rep with
   | Legacy, [(lbl, ld_type)], Some Record_unboxed ->
     let jkind =
@@ -2111,7 +2091,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       Jkind.apply_modality_l lbl.Types.ld_modalities
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
-    let ld_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
+    let ld_sort = Option.map Jkind.Sort.default_to_scannable_and_get sort in
     let rep =
       (* Weirdly, we CAN give the record a representation even if its kind is
          [any]. This works because the representation doesn't include a sort,
@@ -2182,7 +2162,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
                               | Vec128 | Vec256 | Vec512 | Word
                               | Untagged_immediate | Product _ ) ->
                 repr_summary.non_float64_unboxed_fields <- true
-            | Value_element -> repr_summary.values <- true
+            | Value_element _ -> repr_summary.values <- true
             | Void ->
                 repr_summary.voids <- true
             end)
@@ -2194,6 +2174,17 @@ let update_record_kind (type rep) env loc (form : rep record_form)
              first_any } = repr_summary
       in
       let refining_block_with_any = Option.is_none rep in
+      let mixed_record () =
+        let shape =
+          Element_repr.mixed_product_shape loc reprs Record
+        in
+        let shape =
+          match shape with
+          | Ok (`Mixed x) -> x
+          | Ok `Not_mixed | Error _ -> Misc.fatal_error "expected mixed block"
+        in
+        Ok (Record_mixed shape)
+      in
       (* Important: If [refining_block_with_any] is true, we must use a plain
          value block or mixed block. *)
       match
@@ -2221,7 +2212,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
                                         | Bits8 | Bits16 | Bits32 | Bits64
                                         | Vec128 | Vec256 | Vec512 | Word
                                         | Untagged_immediate | Product _))
-                | Some Value_element | None ->
+                | Some Value_element _ | None ->
                     Misc.fatal_error "Expected only floats and float64s")
               reprs
             |> Array.of_list
@@ -2243,7 +2234,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
               List.find_map
                 (fun ((repr : Element_repr.t option), lbl) ->
                    match repr with
-                   | Some (Value_element | Float_element) | None -> None
+                   | Some (Value_element _ | Float_element) | None -> None
                    | Some _ ->
                      if Types.is_atomic lbl.Types.ld_mutable
                      then Some lbl
@@ -2311,10 +2302,12 @@ let update_record_kind (type rep) env loc (form : rep record_form)
         ( ~values:false, ~floats:false, ~atomic_floats:false,
           ~float64s:true, ~non_float64_unboxed_fields:false,
           ~voids:false, ~first_any:None, .. ) ->
-        if represent_as_float_array then
-          Ok Record_ufloat
-        else
-          mixed_record ()
+        (match rep with
+         | Some Record_ufloat ->
+           (* This is only the case if it got the [@@represent_as_float_array]
+              attribute *)
+           Ok Record_ufloat
+          | _ -> mixed_record ())
       (* Records with atomic float fields cannot use flat representation *)
       | Legacy,
         ( ~atomic_floats:true, ~first_any:None, .. ) ->
@@ -2425,7 +2418,8 @@ let rec update_decl_jkind env dpath decl =
                    { cstr with
                      cd_args =
                        Cstr_tuple
-                         [{ ca_type; ca_sort; ca_modalities; ca_loc }] }
+                         [{ ca_type; ca_sort = Some ca_sort; ca_modalities;
+                            ca_loc }] }
                  | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
                    Misc.fatal_error "Invalid constructor for Variant_with_null"
                else cstr)
@@ -2449,7 +2443,7 @@ let rec update_decl_jkind env dpath decl =
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_option_of_jkind env jkind in
-            let ca_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
+            let ca_sort = Option.map Jkind.Sort.default_to_scannable_and_get sort in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -2457,7 +2451,7 @@ let rec update_decl_jkind env dpath decl =
         | Cstr_record [{ld_type} as lbl] -> begin
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_option_of_jkind env jkind in
-            let ld_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
+            let ld_sort = Option.map Jkind.Sort.default_to_scannable_and_get sort in
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -2526,11 +2520,17 @@ let rec update_decl_jkind env dpath decl =
         type_ikind = Types.ikinds_todo reason
       }
     | Type_record (lbls, rep, umc) ->
+      let represent_as_float_array =
+        Builtin_attributes.has_represent_as_float_array decl.type_attributes
+      in
       let sorts, rep, type_jkind =
+        let rep =
+          if represent_as_float_array then Some Record_ufloat else rep
+        in
         let lbls = List.map (fun lbl -> lbl, lbl.Types.ld_type) lbls in
         update_record_kind env decl.type_loc Legacy lbls rep ~warn:true
       in
-      if represent_as_float_array && rep <> Record_ufloat then
+      if represent_as_float_array && rep <> Ok Record_ufloat then
         raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute));
       let lbls =
         List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
@@ -2643,7 +2643,7 @@ let update_decls_jkind env decls =
          in
          let is_mixed_float_float64 =
            match new_decl.type_kind with
-           | Type_record (_, rep, _) -> record_has_float_boxed rep
+           | Type_record (_, Some rep, _) -> record_has_float_boxed rep
            | _ -> false
          in
          begin match has_flatten_floats, is_mixed_float_float64 with
