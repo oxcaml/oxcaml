@@ -217,11 +217,11 @@ let print_out_phrase = Oprint.out_phrase
 
 let print_untyped_exception ppf obj =
   !print_out_value ppf (Printer.outval_of_untyped_exception obj)
-let outval_of_value env obj ty =
+let outval_of_value env obj lpoly ty =
   Printer.outval_of_value !max_printer_steps !max_printer_depth
-    (fun _ _ _ -> None) env obj ty
-let print_value env obj ppf ty =
-  !print_out_value ppf (outval_of_value env obj ty)
+    (fun _ _ _ -> None) env obj lpoly ty
+let print_value env obj ppf (lpoly, ty) =
+  !print_out_value ppf (outval_of_value env obj lpoly ty)
 
 type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
   | Zero of 'b
@@ -354,10 +354,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
 let outval_of_id env id val_lpoly val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
   match mod_field (global_symbol glob) repr pos with
-  | Some obj_to_print ->
-    (match Types.Lpoly.get_exn val_lpoly with
-     | [] -> outval_of_value env obj_to_print val_type
-     | _ :: _ -> Oval_stuff "<lpoly>")
+  | Some obj_to_print -> outval_of_value env obj_to_print val_lpoly val_type
   | None -> Oval_stuff "<abstr>"
 
 (* Print the outcome of an evaluation *)
@@ -382,7 +379,10 @@ let print_out_exception ppf exn outv =
 
 let print_exception_outcome ppf exn =
   if exn = Out_of_memory then Gc.full_major ();
-  let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
+  let outv =
+    outval_of_value !toplevel_env (Obj.repr exn) (Lpoly.determined [])
+      Predef.type_exn
+  in
   print_out_exception ppf exn outv
 
 (* The table of toplevel directives.
@@ -538,7 +538,8 @@ let execute_phrase print_outcome ppf phr =
               toplevel_sig := oldsig;
               if exn = Out_of_memory then Gc.full_major();
               let outv =
-                outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
+                outval_of_value !toplevel_env (Obj.repr exn)
+                  (Lpoly.determined []) Predef.type_exn
               in
               Ophr_exception (exn, outv)
         in

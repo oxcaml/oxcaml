@@ -99,7 +99,8 @@ module MakeEvalPrinter (_ : EVAL_BASE) : sig
 
   module Printer: Genprintval.S with type t = Obj.t
 
-  val print_value: Env.t -> Printer.t -> formatter -> Types.type_expr -> unit
+  val print_value:
+    Env.t -> Printer.t -> formatter -> (Types.Lpoly.t * Types.type_expr) -> unit
 
   val print_untyped_exception: formatter -> Printer.t -> unit
 
@@ -107,7 +108,8 @@ module MakeEvalPrinter (_ : EVAL_BASE) : sig
     (* Print an exception resulting from the evaluation of user code. *)
 
   val outval_of_value:
-    Env.t -> Printer.t -> Types.type_expr -> Outcometree.out_value
+    Env.t -> Printer.t -> Types.Lpoly.t -> Types.type_expr ->
+    Outcometree.out_value
 
   type ('a, 'b) gen_printer =
     | Zero of 'b

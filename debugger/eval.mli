@@ -36,6 +36,7 @@ type error =
   | Wrong_label of type_expr * string
   | Not_a_record of type_expr
   | No_result
+  | Layout_polymorphic_value
 
 exception Error of error
 
