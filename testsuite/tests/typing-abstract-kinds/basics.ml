@@ -788,21 +788,21 @@ Error: This type "t1" should be an instance of type "('a : any separable)"
 type t2 : k mod separable
 type s2 = t2 array
 [%%expect{|
-type t2 : k mod separable
+type t2 : k separable
 type s2 = t2 array
 |}]
 
 type ('a : k mod separable) s3 = 'a array
 [%%expect{|
-type ('a : k mod separable) s3 = 'a array
+type ('a : k separable) s3 = 'a array
 |}]
 
 kind_ k' = k mod separable
 type t4 : k'
 type s4 = t4 array
 [%%expect{|
-kind_ k' = k mod separable
-type t4 : k mod separable
+kind_ k' = k separable
+type t4 : k separable
 type s4 = t4 array
 |}]
 

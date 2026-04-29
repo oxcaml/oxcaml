@@ -641,7 +641,7 @@ module Base = struct
       match Scannable_axes.to_string_list sa with
       | [] -> Path.name p
       | _ :: _ as sa_strs ->
-        Printf.sprintf "%s mod %s" (Path.name p) (String.concat " " sa_strs))
+        Printf.sprintf "%s %s" (Path.name p) (String.concat " " sa_strs))
 
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
@@ -682,8 +682,7 @@ module Base = struct
       match sa_strs with
       | [] -> Format.fprintf ppf "%s" (Path.name p)
       | _ :: _ ->
-        Format.fprintf ppf "%s mod %s" (Path.name p) (String.concat " " sa_strs)
-      )
+        Format.fprintf ppf "%s %s" (Path.name p) (String.concat " " sa_strs))
 
   let expand_once (type a) env (t : a jkind_base) :
       Layout.Const.t jkind_base option =
@@ -1364,6 +1363,13 @@ module Jkind_desc = struct
     | No_intersection
     | Unknown
 
+  (* Precondition: [jk] is fully expanded, if we are to take the stored [sa]
+     from a [Kconstr] . *)
+  let get_scannable_axes_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.get_root_scannable_axes l
+    | Kconstr (_, sa) -> Some sa
+
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
     { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
@@ -1593,6 +1599,15 @@ end
 module Const = struct
   include Jkind0.Const
 
+  (* Precondition: [jk] is fully expanded (e.g. via
+     [Base_and_axes.fully_expand_aliases_const]), otherwise the stored [sa] on
+     a [Kconstr] is just the user-written upper bound and may not reflect a
+     tighter manifest. *)
+  let get_scannable_axes_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.Const.get_root_scannable_axes l
+    | Kconstr (_, sa) -> Some sa
+
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
     | Expanded t -> Some t
@@ -1699,12 +1714,10 @@ module Const = struct
         bounds_to_print
 
     let get_scannable_axes_diff ~base actual =
-      let base_sa = Layout.Const.get_root_scannable_axes base in
-      let actual_sa = Layout.Const.get_root_scannable_axes actual in
-      match base_sa, actual_sa with
+      match base, actual with
       | None, _ | _, None -> []
-      | Some base_sa, Some actual_sa ->
-        Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
+      | Some base, Some actual ->
+        Scannable_axes.to_string_list_diff ~base actual
 
     let modalities_of_ignored_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
@@ -1741,27 +1754,14 @@ module Const = struct
         | Layout l1, Layout l2 -> Layout.Const.equal_up_to_scannable_axes l1 l2
         | (Kconstr _ | Layout _), _ -> false
       in
-      (* Scannable axes are printed two ways. For [Layout] bases they decorate
-         the abbreviation (e.g. [value non_pointer]). For [Kconstr] bases they
-         go into the [mod] list alongside modal bounds (e.g. [k mod
-         separable]), because the overwrite-style abbreviation is an error on
-         abstract kinds. *)
       let scannable_axes =
-        match base_jkind.base, actual.base with
-        | Layout base_l, Layout l when Layout.Const.is_scannable_or_any l ->
-          get_scannable_axes_diff ~base:base_l l
-        | (Kconstr _ | Layout _), _ -> []
-      in
-      let kconstr_sa_mods =
-        match base_jkind.base, actual.base with
-        | Kconstr (_, base_sa), Kconstr (_, actual_sa) ->
-          Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
-        | _ -> []
+        get_scannable_axes_diff
+          ~base:(get_scannable_axes_of_fully_expanded base_jkind)
+          (get_scannable_axes_of_fully_expanded actual)
       in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
           actual.mod_bounds
-        |> Option.map (fun bounds -> bounds @ kconstr_sa_mods)
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function
@@ -2573,24 +2573,9 @@ let set_externality_upper_bound jk externality_upper_bound =
       }
   }
 
-(* Only used by [apply_or_null_l]/[apply_or_null_r], which in turn need
-   [set_root_nullability]/[set_root_separability] to be meaningful. Those
-   setters are no-ops on [Kconstr], so there's nothing useful [apply_or_null]
-   can do with an abstract kind, and [None] is the right answer. *)
-let get_root_scannable_axes jk =
-  match jk.jkind.base with
-  | Layout l -> Layout.get_root_scannable_axes l
-  | Kconstr _ -> None
-
 let get_nullability env jk =
-  (* Expand first so that concrete manifests refine the stored sa of any
-     intermediate [Kconstr]s; then read the resulting scannable axes. *)
   let expanded = Base_and_axes.fully_expand_aliases env jk.jkind in
-  let sa =
-    match expanded.base with
-    | Layout l -> Layout.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
-  in
+  let sa = Jkind_desc.get_scannable_axes_of_fully_expanded expanded in
   Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability) sa
 
 let set_root_nullability jk nullability =
@@ -2641,8 +2626,9 @@ let apply_modality_r modality jk =
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
-let apply_or_null_l jkind =
-  match get_root_scannable_axes jkind with
+let apply_or_null_l env jkind =
+  let expanded = Base_and_axes.fully_expand_aliases env jkind.jkind in
+  match Jkind_desc.get_scannable_axes_of_fully_expanded expanded with
   | Some { nullability = Non_null; separability } ->
     let jkind = set_root_nullability jkind Maybe_null in
     let jkind =
@@ -2654,8 +2640,9 @@ let apply_or_null_l jkind =
     Ok jkind
   | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
 
-let apply_or_null_r jkind =
-  match get_root_scannable_axes jkind with
+let apply_or_null_r env jkind =
+  let expanded = Base_and_axes.fully_expand_aliases env jkind.jkind in
+  match Jkind_desc.get_scannable_axes_of_fully_expanded expanded with
   | Some { nullability = Maybe_null; separability } ->
     let jkind = set_root_nullability jkind Non_null in
     let jkind =

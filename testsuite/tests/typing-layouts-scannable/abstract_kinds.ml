@@ -18,27 +18,23 @@ type t : value non_pointer
 type check = t require_non_pointer
 |}]
 
-(* The "overwrite" abbreviation form errors on abstract kinds *)
+(* As well as abstract *)
 kind_ k
 type t : k non_pointer
 type check = t require_non_pointer
 [%%expect{|
 kind_ k
-Line 2, characters 11-22:
-2 | type t : k non_pointer
-               ^^^^^^^^^^^
-Error: Abstract kinds with kind abbreviation modifiers are not supported.
-       Hint: Use "mod" to upper-bound an abstract kind.
+type t : k non_pointer
+type check = t require_non_pointer
 |}]
 
-(* [mod non_pointer] (meet form) is supported: the axis hangs around on the
-   abstract kind and reduces on substitution. *)
+(* [mod non_pointer] works the same *)
 kind_ k2
 type t2 : k2 mod non_pointer
 type check2 = t2 require_non_pointer
 [%%expect{|
 kind_ k2
-type t2 : k2 mod non_pointer
+type t2 : k2 non_pointer
 type check2 = t2 require_non_pointer
 |}]
 
@@ -56,8 +52,8 @@ module type S =
     kind_ k
     type (_ : any separable) a
     type (_ : k) b
-    type ('a : k mod separable) ab = 'a a * 'a b
-    val f : ('a : k mod separable). 'a a -> 'a b
+    type ('a : k separable) ab = 'a a * 'a b
+    val f : ('a : k separable). 'a a -> 'a b
   end
 |}]
 
@@ -74,8 +70,8 @@ end
 Line 5, characters 10-46:
 5 |   val f : ('a : k mod separable). 'a a -> 'a b
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind k mod separable.
-       But it was inferred to have kind k mod non_float
+Error: The universal type variable 'a was declared to have kind k separable.
+       But it was inferred to have kind k non_float
          because of the definition of a at line 3, characters 2-28.
 |}]
 
@@ -125,8 +121,8 @@ module type S_k2 =
     kind_ k = k2
     type (_ : any separable) a
     type (_ : k) b
-    type ('a : k mod separable) ab = 'a a * 'a b
-    val f : ('a : k mod separable). 'a a -> 'a b
+    type ('a : k separable) ab = 'a a * 'a b
+    val f : ('a : k separable). 'a a -> 'a b
   end
 |}]
 
@@ -186,8 +182,8 @@ module type S_k2 =
   sig
     type (_ : any separable) a
     type (_ : k2) b
-    type ('a : k2 mod separable) ab = 'a a * 'a b
-    val f : ('a : k2 mod separable). 'a a -> 'a b
+    type ('a : k2 separable) ab = 'a a * 'a b
+    val f : ('a : k2 separable). 'a a -> 'a b
   end
 |}]
 
@@ -217,9 +213,9 @@ module type S =
   sig
     kind_ k
     type (_ : any separable) a
-    type (_ : k mod non_float non_null) b
-    type ('a : k mod non_float non_null) ab = 'a a * 'a b
-    val f : ('a : k mod non_float non_null). 'a a -> 'a b
+    type (_ : k non_float non_null) b
+    type ('a : k non_float non_null) ab = 'a a * 'a b
+    val f : ('a : k non_float non_null). 'a a -> 'a b
   end
 |}]
 
@@ -236,9 +232,9 @@ module type S =
   sig
     kind_ k
     type (_ : any non_float non_null) a
-    type (_ : k mod separable) b
-    type ('a : k mod non_float non_null) ab = 'a a * 'a b
-    val f : ('a : k mod non_float non_null). 'a a -> 'a b
+    type (_ : k separable) b
+    type ('a : k non_float non_null) ab = 'a a * 'a b
+    val f : ('a : k non_float non_null). 'a a -> 'a b
   end
 |}]
 
@@ -248,8 +244,8 @@ kind_ k2 = k mod separable
 kind_ k3 = k2 mod non_null
 [%%expect{|
 kind_ k
-kind_ k2 = k mod separable
-kind_ k3 = k mod separable non_null
+kind_ k2 = k separable
+kind_ k3 = k separable non_null
 |}]
 
 (* Two Kconstrs with the same path but different sa are incomparable on an
@@ -265,7 +261,7 @@ kind_ k
 Line 4, characters 10-46:
 4 |   val f : ('a : k mod separable). 'a a -> 'a a
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind k mod separable.
-       But it was inferred to have kind k mod separable non_null
+Error: The universal type variable 'a was declared to have kind k separable.
+       But it was inferred to have kind k separable non_null
          because of the definition of a at line 3, characters 2-30.
 |}]

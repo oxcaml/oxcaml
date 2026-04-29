@@ -2258,7 +2258,7 @@ let rec update_decl_jkind env dpath decl =
         in
         begin match
           Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l
+          |> Jkind.apply_or_null_l env
         with
         | Ok type_jkind -> cstrs, rep, type_jkind
         | Error () ->
