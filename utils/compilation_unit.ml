@@ -720,7 +720,7 @@ let name_mangling_scheme_override : Config.name_mangling_scheme option ref =
 let set_name_mangling_scheme_override scheme =
   name_mangling_scheme_override := Some scheme
 
-let name_mangling_scheme () =
+let name_mangling_scheme_for_current_unit () =
   match !name_mangling_scheme_override with
   | Some scheme -> scheme
   | None -> Config.name_mangling_scheme
