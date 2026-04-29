@@ -7,7 +7,7 @@
 let f ~x = x + 1;;
 f ?x:0;;
 [%%expect{|
-val f : x:int -> int = <fun>
+val f : x:int @ 'm -> int @ [< global] = <fun>
 Line 2, characters 5-6:
 2 | f ?x:0;;
          ^
@@ -21,8 +21,10 @@ let foo (f : unit -> unit) = ();;
 let g ?x () = ();;
 foo ((); g);;
 [%%expect{|
-val foo : (unit -> unit) -> unit = <fun>
-val g : ?x:'a -> unit -> unit = <fun>
+val foo : (unit -> unit) @ 'm -> unit @ [< global] = <fun>
+val g :
+  ?x:'a @ [< 'm @@ past & global] ->
+  (unit @ 'n -> unit @ [< global]) @ [< global > 'm] = <fun>
 - : unit = ()
 |}];;
 
@@ -90,38 +92,62 @@ Error: This function is applied to arguments
 (* principality warning *)
 let f g = ignore (g : ?x:int -> unit -> int); g ~x:3 () ;;
 [%%expect{|
-val f : (?x:int -> unit -> int) -> int = <fun>
+val f :
+  (?x:int @ [< 'q @@ past & global many > 'o | aliased nonportable] ->
+   (unit @ [< 'o @@ past & 'p @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & global many uncontended > nonportable]) @ [< global many > 'p | 'n | 'q] ->
+  int @ [< global] = <fun>
 |}, Principal{|
 Line 1, characters 51-52:
 1 | let f g = ignore (g : ?x:int -> unit -> int); g ~x:3 () ;;
                                                        ^
 Warning 18 [not-principal]: using an optional argument here is not principal.
 
-val f : (?x:int -> unit -> int) -> int = <fun>
+val f :
+  (?x:int @ [< 'mm0 @@ past & global many > 'p | aliased nonportable] ->
+   (unit @ [< 'p @@ past & 'q @@ past > aliased nonportable] ->
+    int @ [< 'o & global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & global many uncontended > nonportable]) @ [< global many > 'q | 'n | 'mm0] ->
+  int @ [< global > 'o] = <fun>
 |}];;
 
 let f g = ignore (g : ?x:int -> unit -> int); g ();;
 [%%expect{|
-val f : (?x:int -> unit -> int) -> int = <fun>
+val f :
+  (?x:int @ [< 'q @@ past & global many > 'o | aliased nonportable] ->
+   (unit @ [< 'o @@ past & 'p @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & global many uncontended > nonportable]) @ [< global many > 'p | 'n | 'q] ->
+  int @ [< global] = <fun>
 |}, Principal{|
 Line 1, characters 46-47:
 1 | let f g = ignore (g : ?x:int -> unit -> int); g ();;
                                                   ^
 Warning 19 [non-principal-labels]: eliminated omittable argument without principality.
 
-val f : (?x:int -> unit -> int) -> int = <fun>
+val f :
+  (?x:int @ [< 'mm0 @@ past & global many > 'p | aliased nonportable] ->
+   (unit @ [< 'p @@ past & 'q @@ past > aliased nonportable] ->
+    int @ [< 'o & global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & global many uncontended > nonportable]) @ [< global many > 'q | 'n | 'mm0] ->
+  int @ [< global > 'o] = <fun>
 |}];;
 
 let f g = ignore (g : x:int -> unit -> int); g ();;
 [%%expect{|
-val f : (x:int -> unit -> int) -> x:int -> int = <fun>
+val f :
+  (x:int @ [< 'mm0 @@ past & global many > 'p | aliased nonportable]as 'mm1 ->
+   (unit @ [< 'p @@ past & 'q @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]as 'o) @ [< 'm @@ past & 'n @@ past & global many uncontended > nonportable]) @ [< 'mm2 @@ past & global many > 'q | 'n | 'mm0] ->
+  (x:int @ 'mm1 -> int @ 'o) @ [< global > 'mm2] = <fun>
 |}, Principal{|
 Line 1, characters 45-46:
 1 | let f g = ignore (g : x:int -> unit -> int); g ();;
                                                  ^
 Warning 19 [non-principal-labels]: commuted an argument without principality.
 
-val f : (x:int -> unit -> int) -> x:int -> int = <fun>
+val f :
+  (x:int @ [< 'mm0 @@ past & global many > 'p | aliased nonportable]as 'mm1 ->
+   (unit @ [< 'p @@ past & 'q @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]as 'o) @ [< 'm @@ past & 'n @@ past & global many uncontended > nonportable]) @ [< 'mm2 @@ past & global many > 'q | 'n | 'mm0] ->
+  (x:int @ 'mm1 -> int @ 'o) @ [< global > 'mm2] = <fun>
 |}];;
 
 (* 9859: inferred function types may appear in the right hand side of :> *)
@@ -132,11 +158,18 @@ class virtual fail = object (self)
   method trigger = (self :> setup )
 end
 [%%expect {|
-class setup : object method with_ : (int -> unit) -> unit end
+class setup :
+  object
+    method with_ :
+      (int @ 'n -> unit @ [< 'm @@ past & global]) @ 'o ->
+      unit @ [< global > 'm @@ many portable]
+  end
 class virtual fail :
   object
     method trigger : setup
-    method virtual with_ : (int -> unit) -> unit
+    method virtual with_ :
+      (int @ 'n -> unit @ [< 'm @@ past & global]) @ 'o ->
+      unit @ [< global > 'm @@ many portable]
   end
 |}]
 
@@ -147,8 +180,10 @@ module E = (val type_of f)
 let g = ( (fun _ -> f) :> 'a -> E.t)
 [%%expect {|
 module type T = sig type t end
-val type_of : 'x -> (module T with type t = 'x) = <fun>
-val f : (x:int -> y:int -> int) -> int = <fun>
+val type_of : 'x @ 'm -> (module T with type t = 'x) @ [< global] = <fun>
+val f :
+  (x:int @ [< 'm @@ past] -> (y:int @ 'p -> int @ 'o) @ [> 'm | 'n]) @ [< 'n @@ past] ->
+  int @ [< global] = <fun>
 Line 4, characters 11-26:
 4 | module E = (val type_of f)
                ^^^^^^^^^^^^^^^

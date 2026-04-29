@@ -2333,6 +2333,12 @@ module Lattices_mono = struct
      fun dst m1 m2 ->
       match m1, m2 with
       | Id, Id -> Equal
+      | Id, Meet_const c -> if equal dst (max dst) c then Equal else Less_than
+      | Meet_const c, Id ->
+        if equal dst (max dst) c then Equal else Greater_than
+      | Id, Imply_const c -> if equal dst (max dst) c then Equal else Less_than
+      | Imply_const c, Id ->
+        if equal dst (max dst) c then Equal else Greater_than
       | Id, _ -> Less_than
       | _, Id -> Greater_than
       | Core m1, Core m2 -> Core_morph.compare m1 m2
@@ -3024,6 +3030,22 @@ module Lattices_mono = struct
   [@@warning "-4"]
 
   let id = Simple Id
+
+  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =
+   fun a b ->
+    match compare_obj a b with
+    | Equal -> Some Refl
+    | Less_than | Greater_than -> None
+
+  let equal_morph : type a0 b l0 r0 a1 l1 r1.
+      b obj ->
+      (a0, b, l0 * r0) morph ->
+      (a1, b, l1 * r1) morph ->
+      (a0, a1) Misc.eq option =
+   fun dst m1 m2 ->
+    match compare_morph dst m1 m2 with
+    | Equal -> Some Refl
+    | Less_than | Greater_than -> None
 
   let rec apply : type a b d. b obj -> (a, b, d) morph -> a -> b =
    fun dst f a ->
@@ -4486,9 +4508,15 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let iter_contravariant a iter = S.iter_contravariant obj a iter
 
-  let zap_to_ceil_force m = with_log (S.zap_to_ceil obj m)
+  let zap_to_ceil_force ?(commit = true) m =
+    if commit
+    then with_log (S.zap_to_ceil obj m)
+    else S.zap_to_ceil ~log:None obj m
 
-  let zap_to_floor_force m = with_log (S.zap_to_floor obj m)
+  let zap_to_floor_force ?(commit = true) m =
+    if commit
+    then with_log (S.zap_to_floor obj m)
+    else S.zap_to_floor ~log:None obj m
 
   let zap_to_ceil_exn m =
     if check_level_var m generic_level then raise Cannot_zap_generic;
@@ -4530,6 +4558,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
 
+  let desc a = S.desc obj a
+
   module Guts = struct
     let get_floor m = S.get_floor obj m
 
@@ -4543,6 +4573,11 @@ module Comonadic_gen (Obj : Obj) = struct
       let floor = get_floor m in
       let ceil = get_ceil m in
       if C.le obj ceil floor then Some ceil else None
+
+    let in_bounds c m =
+      let floor = get_floor m in
+      let ceil = get_ceil m in
+      C.le obj floor c && C.le obj c ceil
   end
 end
 [@@inline]
@@ -4657,9 +4692,15 @@ module Monadic_gen (Obj : Obj) = struct
 
   let iter_contravariant a iter = S.iter_covariant obj a iter
 
-  let zap_to_ceil_force m = with_log (S.zap_to_floor obj m)
+  let zap_to_ceil_force ?(commit = true) m =
+    if commit
+    then with_log (S.zap_to_floor obj m)
+    else S.zap_to_floor ~log:None obj m
 
-  let zap_to_floor_force m = with_log (S.zap_to_ceil obj m)
+  let zap_to_floor_force ?(commit = true) m =
+    if commit
+    then with_log (S.zap_to_ceil obj m)
+    else S.zap_to_ceil ~log:None obj m
 
   let zap_to_ceil_exn m =
     if check_level_var m generic_level then raise Cannot_zap_generic;
@@ -4701,6 +4742,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
 
+  let desc a = S.desc obj a
+
   module Guts = struct
     let get_floor m = S.get_ceil obj m
 
@@ -4710,6 +4753,11 @@ module Monadic_gen (Obj : Obj) = struct
       let floor = get_floor m in
       let ceil = get_ceil m in
       if C.le obj ceil floor then Some ceil else None
+
+    let in_bounds c m =
+      let floor = get_floor m in
+      let ceil = get_ceil m in
+      C.le obj floor c && C.le obj c ceil
   end
 end
 [@@inline]
@@ -4971,7 +5019,8 @@ module type Areality = sig
 
   module Obj : Obj with type const = Const.t
 
-  val zap_to_legacy_force : (Const.t, allowed * 'r) S.mode -> Const.t
+  val zap_to_legacy_force :
+    ?commit:bool -> (Const.t, allowed * 'r) S.mode -> Const.t
 end
 
 module Lattice_Product (L : Lattice) = struct
@@ -5082,18 +5131,23 @@ module Comonadic_with (Areality : Areality) = struct
 
   let meet_const_with ax c m = meet_const (C.max_with Obj.obj ax c) m
 
-  let zap_to_legacy_force m : Const.t =
-    let areality = proj Areality m |> Areality.zap_to_legacy_force in
-    let linearity = proj Linearity m |> Linearity.zap_to_legacy_force in
+  let zap_to_legacy_force ?commit m : Const.t =
+    let areality = proj Areality m |> Areality.zap_to_legacy_force ?commit in
+    let linearity = proj Linearity m |> Linearity.zap_to_legacy_force ?commit in
     let statefulness =
-      proj Statefulness m |> Statefulness.zap_to_legacy_force
+      proj Statefulness m |> Statefulness.zap_to_legacy_force ?commit
     in
     let portability =
-      proj Portability m |> Portability.zap_to_legacy_force ~statefulness
+      proj Portability m
+      |> Portability.zap_to_legacy_force ?commit ~statefulness
     in
     let global = Areality.Const.equal areality Areality.Const.legacy in
-    let forkable = proj Forkable m |> Forkable.zap_to_legacy_force ~global in
-    let yielding = proj Yielding m |> Yielding.zap_to_legacy_force ~global in
+    let forkable =
+      proj Forkable m |> Forkable.zap_to_legacy_force ?commit ~global
+    in
+    let yielding =
+      proj Yielding m |> Yielding.zap_to_legacy_force ?commit ~global
+    in
     { areality; linearity; portability; forkable; yielding; statefulness }
 
   let legacy = of_const Const.legacy
@@ -5225,13 +5279,17 @@ module Monadic = struct
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (S.disallow_left m)
 
-  let zap_to_legacy_force m : Const.t =
-    let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy_force in
-    let visibility = proj Visibility m |> Visibility.zap_to_legacy_force in
-    let contention =
-      proj Contention m |> Contention.zap_to_legacy_force ~visibility
+  let zap_to_legacy_force ?commit m : Const.t =
+    let uniqueness =
+      proj Uniqueness m |> Uniqueness.zap_to_legacy_force ?commit
     in
-    let staticity = proj Staticity m |> Staticity.zap_to_legacy_force in
+    let visibility =
+      proj Visibility m |> Visibility.zap_to_legacy_force ?commit
+    in
+    let contention =
+      proj Contention m |> Contention.zap_to_legacy_force ?commit ~visibility
+    in
+    let staticity = proj Staticity m |> Staticity.zap_to_legacy_force ?commit in
     { uniqueness; contention; visibility; staticity }
 
   let legacy = of_const Const.legacy
@@ -5749,6 +5807,108 @@ module Value_with (Areality : Areality) = struct
     let merge = merge
   end
 
+  module C = C
+  module Desc = S.Desc
+
+  let obj_monadic = Monadic.Obj.obj
+
+  let obj_comonadic = Comonadic.Obj.obj
+
+  let get_monadic_desc m = Monadic.desc m
+
+  let get_comonadic_desc m = Comonadic.desc m
+
+  let meet_const_morph a = C.Simple (C.Simple_morph.Meet_const a)
+
+  let pretty_print_monadic_simple_morph : type a d f.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      (d, Monadic.Const.t, f) C.Simple_morph.t ->
+      unit =
+   fun printm m ppf f ->
+    match f with
+    | C.Simple_morph.Id -> Fmt.fprintf ppf "%a" printm m
+    | C.Simple_morph.Meet_const c ->
+      (* only print the interesting parts of the monadic meet; omit max (min due to
+          flipping of Monadic axis) modes *)
+      let c = merge { monadic = c; comonadic = Comonadic.Const.min } in
+      let diff = Const.diff c Const.min in
+      if diff = Const.Option.none
+      then Fmt.fprintf ppf "%a" printm m
+      else Fmt.fprintf ppf "%a . %a" printm m Const.Option.partial_print diff
+    | _ ->
+      Fmt.fprintf ppf "%a(%a)" (C.Simple_morph.print obj_monadic) f printm m
+  [@@warning "-4"]
+
+  let pretty_print_monadic_morph : type a d f.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      (d, Monadic.Const.t, f) C.morph ->
+      unit =
+   fun printm m ppf f ->
+    match f with
+    | C.Simple f -> pretty_print_monadic_simple_morph printm m ppf f
+    | _ -> Fmt.fprintf ppf "%a(%a)" (C.print_morph obj_monadic) f printm m
+  [@@warning "-4"]
+
+  let pretty_print_comonadic_meet : type a.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      Comonadic.Const.t ->
+      unit =
+   fun printm m ppf c ->
+    (* only print the interesting parts of the meet; omit max modes *)
+    let c = merge { monadic = Monadic.Const.max; comonadic = c } in
+    let diff = Const.diff c Const.max in
+    if diff = Const.Option.none
+    then Fmt.fprintf ppf "%a" printm m
+    else Fmt.fprintf ppf "%a @@@@ %a" printm m Const.Option.partial_print diff
+
+  let pretty_print_comonadic_simple_morph : type a d f.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      (d, Comonadic.Const.t, f) C.Simple_morph.t ->
+      unit =
+   fun printm m ppf f ->
+    match f with
+    | C.Simple_morph.Id -> Fmt.fprintf ppf "%a" printm m
+    | C.Simple_morph.Meet_const c -> pretty_print_comonadic_meet printm m ppf c
+    | C.Simple_morph.Core C.Core_morph.Monadic_to_comonadic_min ->
+      Fmt.fprintf ppf "close(%a)" printm m
+    | C.Simple_morph.Meet_const_core (c, C.Core_morph.Monadic_to_comonadic_min)
+      ->
+      (* since the meet is applied to a monadic_to_comonadic_min, we filter out the
+      comonadic only axes *)
+      let c : Comonadic.Const.t =
+        { c with
+          areality = Areality.Const.max;
+          forkable = Forkable.Const.max;
+          yielding = Yielding.Const.max
+        }
+      in
+      pretty_print_comonadic_meet
+        (fun ppf m -> Fmt.fprintf ppf "close(%a)" printm m)
+        m ppf c
+    | _ ->
+      Fmt.fprintf ppf "%a(%a)" (C.Simple_morph.print obj_comonadic) f printm m
+  [@@warning "-4"]
+
+  let pretty_print_comonadic_morph : type a d f.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      (d, Comonadic.Const.t, f) C.morph ->
+      unit =
+   fun printm m ppf f ->
+    match f with
+    | C.Simple f -> pretty_print_comonadic_simple_morph printm m ppf f
+    | _ -> Fmt.fprintf ppf "%a(%a)" (C.print_morph obj_comonadic) f printm m
+  [@@warning "-4"]
+
   let min = { comonadic = Comonadic.min; monadic = Monadic.min }
 
   let max = { comonadic = Comonadic.max; monadic = Monadic.max }
@@ -5990,9 +6150,9 @@ module Value_with (Areality : Areality) = struct
   let zap_to_ceil m =
     if check_level_var m generic_level then None else Some (zap_to_ceil_force m)
 
-  let zap_to_legacy_force { comonadic; monadic } =
-    let monadic = Monadic.zap_to_legacy_force monadic in
-    let comonadic = Comonadic.zap_to_legacy_force comonadic in
+  let zap_to_legacy_force ?commit { comonadic; monadic } =
+    let monadic = Monadic.zap_to_legacy_force ?commit monadic in
+    let comonadic = Comonadic.zap_to_legacy_force ?commit comonadic in
     merge { monadic; comonadic }
 
   let zap_to_legacy_exn m =
@@ -6163,6 +6323,22 @@ module Value_with (Areality : Areality) = struct
       let* monadic = Monadic.Guts.check_const monadic in
       let* comonadic = Comonadic.Guts.check_const comonadic in
       Some (merge { comonadic; monadic })
+
+    let get_legacy { monadic; comonadic } =
+      let monadic = Monadic.zap_to_legacy_force ~commit:false monadic in
+      let comonadic = Comonadic.zap_to_legacy_force ~commit:false comonadic in
+      merge { monadic; comonadic }
+
+    let get_ceil { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_ceil monadic in
+      let comonadic = Comonadic.Guts.get_ceil comonadic in
+      merge { monadic; comonadic }
+
+    let in_bounds c { monadic; comonadic } =
+      let c = split c in
+      let monadic = Monadic.Guts.in_bounds c.monadic monadic in
+      let comonadic = Comonadic.Guts.in_bounds c.comonadic comonadic in
+      monadic && comonadic
   end
 end
 [@@inline]

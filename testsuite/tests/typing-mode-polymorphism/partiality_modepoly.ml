@@ -36,7 +36,7 @@ type t = { a : bool; mutable b : int option; }
              1))
          0)))
   (apply (field_imm 1 (global Toploop!)) "f" f/290))
-val f : t -> int = <fun>
+val f : t @ [< uncontended] -> int @ [< global] = <fun>
 |}]
 
 
@@ -63,7 +63,7 @@ type t = { a : bool; mutable b : int option; }
            (if *match*/308 (field_imm 0 *match*/308) 1))
          0)))
   (apply (field_imm 1 (global Toploop!)) "f" f/303))
-val f : t -> int = <fun>
+val f : t @ [< shared] -> int @ [< global] = <fun>
 |}]
 
 
@@ -104,7 +104,9 @@ let f r =
                    (field_imm 0 *match*/317))
                  3)))))))
   (apply (field_imm 1 (global Toploop!)) "f" f/310))
-val f : int option ref -> int = <fun>
+val f :
+  int option ref @ [< 'm @@ past & many uncontended] ->
+  int @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 
 
@@ -128,7 +130,7 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
        param/324[L][value<(consts (0)) (non_consts ([0: ?]))>] : int
        (if param/324 (field_imm 0 (field_imm 0 param/324)) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/321))
-val test : int t option -> int = <fun>
+val test : int t option @ 'n -> int @ 'm = <fun>
 |}]
 
 
@@ -150,7 +152,7 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
        (let (*match*/332 =o? (field_mut 0 param/331))
          (if *match*/332 (field_imm 0 (field_imm 0 *match*/332)) 0))))
   (apply (field_imm 1 (global Toploop!)) "test" test/329))
-val test : int t option ref -> int = <fun>
+val test : int t option ref @ [< shared] -> int @ 'm = <fun>
 |}]
 
 
@@ -196,5 +198,5 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
                  (%int_neg (field_imm 0 (field_imm 1 *match*/342)))))
              3)))))
   (apply (field_imm 1 (global Toploop!)) "test" test/337))
-val test : 'a -> int = <fun>
+val test : 'a @ 'm -> int @ [< global] = <fun>
 |}]

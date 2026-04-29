@@ -25,13 +25,15 @@ let noleak n =
   let r = local_ ref n in
   idint (r.contents)
 [%%expect{|
-val noleak : int -> int = <fun>
+val noleak : int @ [< global many uncontended] -> int @ [< global] = <fun>
 |}]
 
 
 let (!) = fun (local_ r) -> r.contents
 [%%expect{|
-val ( ! ) : 'a ref @ local -> 'a = <fun>
+val ( ! ) :
+  'a ref @ [< 'm & shared > local] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 
 (* Local lets *)
@@ -183,7 +185,7 @@ let foo () =
     ((fun y z -> z) : int -> local_ (int -> int)) in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -203,7 +205,7 @@ let foo () =
     ((fun y z -> z) : _ -> local_ (_ -> _)) in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -223,7 +225,7 @@ let foo () =
     ((fun y z -> z) : int -> local_ (int -> int)) in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -242,7 +244,7 @@ let foo (local_ bar : int -> int -> int) =
   let _ = (bar : int -> local_ (int -> int)) in
   ()
 [%%expect{|
-val foo : (int -> int -> int) @ local -> unit = <fun>
+val foo : (int -> int -> int) @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 let foo (bar : int -> local_ (int -> int)) =
@@ -272,7 +274,9 @@ val f4 : int -> 'a @ local -> int -> int -> int = <fun>
 
 let apply1 x = f4 x
 [%%expect{|
-val apply1 : int -> 'a @ local -> int -> int -> int = <fun>
+val apply1 :
+  int @ 'm -> ('a @ local -> int -> int -> int) @ [< global > nonportable] =
+  <fun>
 |}]
 let apply2 x = f4 x x
 [%%expect{|
@@ -301,7 +305,7 @@ Error: This value is "local"
 let apply4 x =
   f4 x x x x
 [%%expect{|
-val apply4 : int -> int = <fun>
+val apply4 : int @ [< many uncontended] -> int @ [< global] = <fun>
 |}]
 
 (* Partial applications of two or three arguments are OK if bound locally *)
@@ -314,8 +318,8 @@ let apply3_stack x =
   let res = g x in
   res
 [%%expect{|
-val apply2_stack : int -> int = <fun>
-val apply3_stack : int -> int = <fun>
+val apply2_stack : int @ [< many uncontended] -> int @ [< global] = <fun>
+val apply3_stack : int @ [< many uncontended] -> int @ [< global] = <fun>
 |}]
 
 (*
@@ -325,7 +329,9 @@ let appopt1 (f : ?a:local_ int ref -> unit -> unit) =
   let res = f ~a:(let x = local_ ref 42 in x) () in
   res
 [%%expect{|
-val appopt1 : (?a:int ref @ local -> unit -> unit) -> unit = <fun>
+val appopt1 :
+  (?a:int ref @ local -> unit -> unit) @ [< many] -> unit @ [< global] =
+  <fun>
 |}]
 let appopt2 (f : ?a:local_ int ref -> unit -> unit) =
   let res = f ~a:(let x = local_ ref 42 in x) in
@@ -371,7 +377,9 @@ Error: This value is "local"
 (* Optional argument elimination eta-expands and therefore allocates *)
 let no_eta (local_ f : unit -> int) = (f : unit -> int)
 [%%expect{|
-val no_eta : (unit -> int) @ local -> unit -> int = <fun>
+val no_eta :
+  (unit -> int) @ [< 'm . aliased contended > local] ->
+  (unit -> int) @ [> 'm | local] = <fun>
 |}]
 
 let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
@@ -391,7 +399,10 @@ let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
   if p then (f : unit -> int) else g
 [%%expect{|
 val etajoin :
-  bool -> (?b:bool -> unit -> int) -> (unit -> int) @ local -> unit -> int =
+  bool @ [< 'm @@ past & global] ->
+  ((?b:bool -> unit -> int) @ [< 'p @@ past & 'n @@ past & global] ->
+   ((unit -> int) @ [< 'o @@ past > local] ->
+    (unit -> int) @ [> 'o | 'p | local]) @ [< global > 'n]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -399,12 +410,16 @@ val etajoin :
 
 let foo ?(local_ x) () = x;;
 [%%expect{|
-val foo : ?x:'a @ local -> unit -> 'a option @ local = <fun>
+val foo :
+  ?x:'a @ [< 'm > local] ->
+  (unit @ 'n -> 'a option @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo ?(local_ x = "hello") () = x;;
 [%%expect{|
-val foo : ?x:string @ local -> unit -> string @ local = <fun>
+val foo :
+  ?x:string @ [< 'm > local] ->
+  (unit @ 'n -> string @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo ?(local_ x = local_ "hello") () = x;;
@@ -464,7 +479,7 @@ let local_closure () =
   res
 
 [%%expect{|
-val local_closure : unit -> unit = <fun>
+val local_closure : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (*
@@ -550,8 +565,14 @@ let use_locally' (local_ f : local_ 'a -> 'a) (x : 'a) =
   let res = f x in
   res
 [%%expect{|
-val use_locally : ('a @ local -> 'a) -> 'a -> 'a = <fun>
-val use_locally' : ('a @ local -> 'a) @ local -> 'a -> 'a = <fun>
+val use_locally :
+  ('a @ local -> 'a) @ [< 'm @@ past & global] ->
+  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [< global > 'm] =
+  <fun>
+val use_locally' :
+  ('a @ local -> 'a) @ [< 'm @@ past > local] ->
+  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [> 'm | local] =
+  <fun>
 |}]
 
 let no_leak = use_locally (fun x -> 1) 42
@@ -643,7 +664,9 @@ let catch (f : unit -> local_ string) =
   in
   (a, b)
 [%%expect{|
-val catch : (unit -> string @ local) -> string * string = <fun>
+val catch :
+  (unit -> string @ local) @ [< many] ->
+  string * string @ [< global > aliased] = <fun>
 |}]
 
 
@@ -651,7 +674,10 @@ val catch : (unit -> string @ local) -> string * string = <fun>
 let use_locally (f : local_ 'a -> local_ 'a) : local_ 'a -> local_ 'a = f
 [%%expect{|
 val use_locally :
-  ('a : any). ('a @ local -> 'a @ local) -> 'a @ local -> 'a @ local = <fun>
+  ('a : any).
+    ('a @ local -> 'a @ local) @ [< 'm . aliased contended & global] ->
+    ('a @ local -> 'a @ local) @ [< global > 'm] =
+  <fun>
 |}]
 
 let loc = ((fun x -> local_ x) : local_ int -> local_ int)
@@ -676,7 +702,7 @@ let bar (local_ (m : (module S))) =
   ()
 [%%expect{|
 module type S = sig val s : string end
-val bar : (module S) @ local -> unit = <fun>
+val bar : (module S) @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 (* While it's sound to let modules cross locality (since they are always heap
@@ -685,14 +711,18 @@ let bar (local_ (m : (module S))) =
   let (module M) = m in
   M.s
 [%%expect{|
-val bar : (module S) @ local -> string @ local = <fun>
+val bar :
+  (module S) @ [< many uncontended > local] -> string @ [> local aliased] =
+  <fun>
 |}]
 
 let bar (local_ m) =
   let module M = (val m : S) in
   M.s
 [%%expect{|
-val bar : (module S) @ local -> string @ local = <fun>
+val bar :
+  (module S) @ [< many uncontended > local] -> string @ [> local aliased] =
+  <fun>
 |}]
 
 (* packing is allocation, and we can't construct a global module using local values *)
@@ -908,7 +938,8 @@ let foo (local_ x) =
       object end
   end in new M.c
 [%%expect{|
-val foo : 'a @ local -> <  > = <fun>
+val foo : 'a @ [< many > local] -> <  > @ [< global > aliased nonportable] =
+  <fun>
 |}]
 
 let foo (local_ x : string ref) =
@@ -919,7 +950,9 @@ let foo (local_ x : string ref) =
     end
   end in new M.c
 [%%expect{|
-val foo : string ref @ local -> < m : string > = <fun>
+val foo :
+  string ref @ [< uncontended > local] ->
+  < m : string > @ [< global > aliased nonportable] = <fun>
 |}]
 
 (* Don't escape under a class parameter variable *)
@@ -948,7 +981,9 @@ let foo (local_ x : string ref) =
       object method m = y end
   end in new M.c
 [%%expect{|
-val foo : string ref @ local -> (unit -> < m : string >) = <fun>
+val foo :
+  string ref @ [< uncontended > local] ->
+  (unit -> < m : string >) @ [< global > aliased nonportable] = <fun>
 |}]
 
 (* Don't escape in inherit expressions *)
@@ -995,7 +1030,7 @@ let foo (local_ x) =
   let rec g () = let _ = x in h (); () and h () = g (); () in
   g (); ()
 [%%expect {|
-val foo : 'a @ local -> unit = <fun>
+val foo : 'a @ [< many > local] -> unit @ [< global] = <fun>
 |}]
 
 let foo (local_ x) =
@@ -1003,7 +1038,7 @@ let foo (local_ x) =
   let _ = (x, 1) in
   1
 [%%expect {|
-val foo : 'a @ local -> int = <fun>
+val foo : 'a @ [> local] -> int @ [< global] = <fun>
 |}]
 
 let foo (local_ x) =
@@ -1028,7 +1063,7 @@ let foo x =
   let r = local_ { contents = x } in
   print r
 [%%expect{|
-val print : string ref @ local -> unit = <fun>
+val print : string ref @ [< shared > local] -> unit @ [< global] = <fun>
 Line 5, characters 8-9:
 5 |   print r
             ^
@@ -1040,7 +1075,9 @@ Error: This value is "local"
 let local_cb (local_ f) = f ()
 let foo (local_ x) = local_cb (fun () -> x := 17; 42)
 [%%expect{|
-val local_cb : (unit -> 'a) @ local -> 'a = <fun>
+val local_cb :
+  (unit @ 'n -> 'a @ [< 'm & global]) @ [> local] -> 'a @ [< global > 'm] =
+  <fun>
 Line 2, characters 41-42:
 2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
                                              ^
@@ -1057,14 +1094,14 @@ let foo x =
   print r;
   ()
 [%%expect{|
-val foo : string -> unit = <fun>
+val foo : string @ [< global many shared] -> unit @ [< global] = <fun>
 |}]
 
 let foo x = exclave_
   let r = local_ { contents = x } in
   print r
 [%%expect{|
-val foo : string -> unit @ local = <fun>
+val foo : string @ [< global many shared] -> unit @ [> local] = <fun>
 |}]
 
 (* Can pass local values to calls explicitly marked as nontail *)
@@ -1072,14 +1109,14 @@ let foo x =
   let local_ r = ref x in
   print r [@nontail]
 [%%expect{|
-val foo : string -> unit = <fun>
+val foo : string @ [< global many uncontended] -> unit @ [< global] = <fun>
 |}]
 
 let foo x =
   let local_ f () = 42 in
   f () [@nontail]
 [%%expect{|
-val foo : 'a -> int = <fun>
+val foo : 'a @ 'm -> int @ [< global] = <fun>
 |}]
 
 (* Cannot call local values in tail calls *)
@@ -1105,7 +1142,9 @@ let foo x =
   let res = foo () in
   res
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past & global > aliased nonportable] = <fun>
 |}]
 
 let foo x = exclave_
@@ -1113,7 +1152,9 @@ let foo x = exclave_
   let local_ foo () = r.contents in
   foo ()
 [%%expect{|
-val foo : 'a -> 'a @ local = <fun>
+val foo :
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past > local aliased nonportable] = <fun>
 |}]
 
 (* Cannot return local values without annotations on all exits *)
@@ -1135,7 +1176,9 @@ let foo x = exclave_
   let r = local_ { contents = x } in
   r
 [%%expect{|
-val foo : 'a -> 'a ref @ local = <fun>
+val foo :
+  'a @ [< global many > 'm] -> 'a ref @ [< 'm @@ past > local nonportable] =
+  <fun>
 |}]
 
 let foo p x = exclave_
@@ -1143,7 +1186,10 @@ let foo p x = exclave_
   if p then r
   else r
 [%%expect{|
-val foo : bool -> 'a -> 'a ref @ local = <fun>
+val foo :
+  bool @ [< 'm @@ past & global] ->
+  ('a @ [< global many > 'n] -> 'a ref @ [< 'n @@ past > local nonportable]) @ [< global > 'm] =
+  <fun>
 |}]
 
 (* Non-local regional values can be passed to tail calls *)
@@ -1152,7 +1198,10 @@ let rec length acc (local_ xl) =
   | [] -> 0
   | x :: xs -> length (acc + 1) xs
 [%%expect{|
-val length : int -> 'a list @ local -> int = <fun>
+val length :
+  int @ [< 'm @@ past & global] ->
+  ('a list @ [> local] -> int @ [< global]) @ [< global > 'm | nonportable] =
+  <fun>
 |}]
 
 let foo () =
@@ -1164,7 +1213,7 @@ let foo () =
   let x = baz () in
   x
 [%%expect{|
-val foo : unit -> int = <fun>
+val foo : unit @ 'm -> int @ [< global] = <fun>
 |}]
 
 (* tail-calling local-returning functions make the current function
@@ -1175,14 +1224,14 @@ let foo () = exclave_
   let _ = local_ (52, 24) in
   42
 [%%expect{|
-val foo : unit -> int @ local = <fun>
+val foo : unit @ 'm -> int @ [> local] = <fun>
 |}]
 
 let bar () =
   let _x = 52 in
   foo ()
 [%%expect{|
-val bar : unit -> int @ local = <fun>
+val bar : unit @ 'm -> int @ [> local] = <fun>
 |}]
 
 (* if not at tail, then not affected *)
@@ -1190,14 +1239,14 @@ let bar' () =
   let _x = foo () in
   52
 [%%expect{|
-val bar' : unit -> int = <fun>
+val bar' : unit @ 'm -> int @ [< global] = <fun>
 |}]
 
 (* nontail attribute works as well *)
 let bar' () =
   foo () [@nontail]
 [%%expect{|
-val bar' : unit -> int = <fun>
+val bar' : unit @ 'm -> int @ [< global] = <fun>
 |}]
 
 (* Parameter modes must be matched by the type *)
@@ -1246,7 +1295,7 @@ let f (local_ x) = B { bar = { foo = A x } }
 type 'a unb1 = A of 'a [@@unboxed]
 type 'a unb2 = { foo : 'a; } [@@unboxed]
 type 'a unb3 = B of { bar : 'a; } [@@unboxed]
-val f : 'a @ local -> 'a unb1 unb2 unb3 @ local = <fun>
+val f : 'a @ [< 'm > local] -> 'a unb1 unb2 unb3 @ [> 'm | local] = <fun>
 |}]
 
 
@@ -1263,7 +1312,7 @@ type 'a gbl = { gbl : 'a @@ global; }
 
 let foo (local_ x) = x.imm
 [%%expect{|
-val foo : 'a imm @ local -> 'a @ local = <fun>
+val foo : 'a imm @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 |}]
 let foo y =
   let x = local_ { imm = y } in
@@ -1281,28 +1330,35 @@ Error: This value is "local"
 |}]
 let foo (local_ x) = x.mut
 [%%expect{|
-val foo : 'a mut @ local -> 'a = <fun>
+val foo :
+  'a mut @ [< 'm & shared > local] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo y =
   let x = local_ { mut = y } in
   x.mut
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past & global > aliased nonportable] = <fun>
 |}]
 let foo (local_ x) = x.gbl
 [%%expect{|
-val foo : 'a gbl @ local -> 'a = <fun>
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo y =
   let x = local_ { gbl = y } in
   x.gbl
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ { imm }) = imm
 [%%expect{|
-val foo : 'a imm @ local -> 'a @ local = <fun>
+val foo : 'a imm @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 |}]
 let foo y =
   let { imm } = local_ { imm = y } in
@@ -1320,37 +1376,44 @@ Error: This value is "local"
 |}]
 let foo (local_ { mut }) = mut
 [%%expect{|
-val foo : 'a mut @ local -> 'a = <fun>
+val foo :
+  'a mut @ [< 'm & shared > local] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo y =
   let { mut } = local_ { mut = y } in
   mut
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past & global > aliased nonportable] = <fun>
 |}]
 let foo (local_ { gbl }) = gbl
 [%%expect{|
-val foo : 'a gbl @ local -> 'a = <fun>
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo y =
   let { gbl } = local_ { gbl = y } in
   gbl
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ imm) =
   let _ = { imm } in
   ()
 [%%expect{|
-val foo : 'a @ local -> unit = <fun>
+val foo : 'a @ [> local] -> unit @ [< global] = <fun>
 |}]
 let foo () =
   let imm = local_ ref 5 in
   let _ = { imm } in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 let foo (local_ mut) =
   let _ = { mut } in
@@ -1403,7 +1466,7 @@ Error: This value is "local"
 
 let foo (local_ x) = x.#imm
 [%%expect{|
-val foo : 'a imm# @ local -> 'a @ local = <fun>
+val foo : 'a imm# @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 |}]
 let foo y =
   let x = local_ #{ imm = y } in
@@ -1421,28 +1484,36 @@ Error: This value is "local"
 |}]
 let foo (local_ x) = x.#mut
 [%%expect{|
-val foo : 'a mut# @ local -> 'a = <fun>
+val foo :
+  'a mut# @ [< 'm > local] -> 'a @ [< global > 'm @@ global many | aliased] =
+  <fun>
 |}]
 let foo y =
   let x = local_ #{ mut = y } in
   x.#mut
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global many] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo (local_ x) = x.#gbl
 [%%expect{|
-val foo : 'a gbl# @ local -> 'a = <fun>
+val foo :
+  'a gbl# @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo y =
   let x = local_ #{ gbl = y } in
   x.#gbl
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ #{ imm }) = imm
 [%%expect{|
-val foo : 'a imm# @ local -> 'a @ local = <fun>
+val foo : 'a imm# @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 |}]
 let foo y =
   let #{ imm } = local_ #{ imm = y } in
@@ -1460,37 +1531,45 @@ Error: This value is "local"
 |}]
 let foo (local_ #{ mut }) = mut
 [%%expect{|
-val foo : 'a mut# @ local -> 'a = <fun>
+val foo :
+  'a mut# @ [< 'm > local] -> 'a @ [< global > 'm @@ global many | aliased] =
+  <fun>
 |}]
 let foo y =
   let #{ mut } = local_ #{ mut = y } in
   mut
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global many] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
-val foo : 'a gbl# @ local -> 'a = <fun>
+val foo :
+  'a gbl# @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo y =
   let #{ gbl } = local_ #{ gbl = y } in
   gbl
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ imm) =
   let _ = #{ imm } in
   ()
 [%%expect{|
-val foo : 'a @ local -> unit = <fun>
+val foo : 'a @ [> local] -> unit @ [< global] = <fun>
 |}]
 let foo () =
   let imm = local_ ref 5 in
   let _ = #{ imm } in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 let foo (local_ mut) =
   let _ = #{ mut } in
@@ -1548,23 +1627,29 @@ type 'a gbl = #{ gbl : 'a @@ global; }
 
 let foo (local_ x) = x.#gbl
 [%%expect{|
-val foo : 'a gbl @ local -> 'a = <fun>
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo y =
   let x = local_ #{ gbl = y } in
   x.#gbl
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
-val foo : 'a gbl @ local -> 'a = <fun>
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo y =
   let #{ gbl } = local_ #{ gbl = y } in
   gbl
 [%%expect{|
-val foo : 'a -> 'a = <fun>
+val foo :
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1707,7 +1792,10 @@ let foo (local_ x) y =
   | pr  -> let _, _ = pr in ();;
 [%%expect{|
 val escape : 'a -> unit = <fun>
-val foo : 'a option @ local -> 'b option -> unit = <fun>
+val foo :
+  'a option @ [< 'm @@ past & many > local] ->
+  ('b option @ [< global many uncontended] -> unit @ [< global]) @ [> 'm | local] =
+  <fun>
 |}]
 
 let foo (local_ x) y =
@@ -1759,7 +1847,12 @@ let foo p (local_ x) y z =
   let _, _ = pr in
   escape b;;
 [%%expect{|
-val foo : bool -> 'a @ local -> 'b -> 'a * 'b -> unit = <fun>
+val foo :
+  bool @ [< 'm @@ past & global] ->
+  ('a @ [< 'n @@ past > local] ->
+   ('b @ [< global many uncontended > 'p] ->
+    ('a * 'b @ [< global many uncontended > 'o] -> unit @ [< global]) @ [< 'o @@ past & 'p @@ past > local nonportable]) @ [> 'n | local]) @ [< global > 'm] =
+  <fun>
 |}]
 
 let foo p (local_ x) y (local_ z) =
@@ -1816,7 +1909,7 @@ let foo (local_ x) =
   | None as y -> escape y
   | Some _ -> ()
 [%%expect{|
-val foo : 'a option @ local -> unit = <fun>
+val foo : 'a option @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 let foo (local_ x) =
@@ -1835,7 +1928,7 @@ let foo (local_ x) =
   | 0 as y -> escape y
   | _ -> ()
 [%%expect{|
-val foo : int @ local -> unit = <fun>
+val foo : int @ [> local] -> unit @ [< global] = <fun>
 |}, Principal{|
 Line 3, characters 21-22:
 3 |   | 0 as y -> escape y
@@ -1848,7 +1941,7 @@ let foo (local_ x) =
   | 'a'..'e' as y -> escape y
   | _ -> ()
 [%%expect{|
-val foo : char @ local -> unit = <fun>
+val foo : char @ [> local] -> unit @ [< global] = <fun>
 |}, Principal{|
 Line 3, characters 28-29:
 3 |   | 'a'..'e' as y -> escape y
@@ -1872,7 +1965,7 @@ let foo (local_ x) =
   | `Foo as y -> escape y
   | _ -> ()
 [%%expect{|
-val foo : [> `Foo ] @ local -> unit = <fun>
+val foo : [> `Foo ] @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 let foo (local_ x) =
@@ -1913,7 +2006,7 @@ let foo (local_ x) =
   | #foo as y -> escape y
 [%%expect{|
 type foo = [ `Bar | `Foo ]
-val foo : [< foo ] @ local -> unit = <fun>
+val foo : [< foo ] @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 type foo = [`Foo | `Bar of int]
@@ -1956,14 +2049,22 @@ Line 2, characters 2-32:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         sig val add : int32 @ local -> int32 @ local -> int32 @ local end
+         sig
+           val add :
+             int32 @ local ->
+             (int32 @ local -> int32 @ local) @ [> local aliased nonportable]
+         end
        is not included in
          sig val add : int32 @ local -> int32 @ local -> int32 end
        Values do not match:
-         val add : int32 @ local -> int32 @ local -> int32 @ local
+         val add :
+           int32 @ local ->
+           (int32 @ local -> int32 @ local) @ [> local aliased nonportable]
        is not included in
          val add : int32 @ local -> int32 @ local -> int32
-       The type "int32 @ local -> int32 @ local -> int32 @ local"
+       The type
+         "int32 @ local ->
+         (int32 @ local -> int32 @ local) @ [> local aliased nonportable]"
        is not compatible with the type
          "int32 @ local -> int32 @ local -> int32"
        Type "int32 @ local -> int32 @ local" is not compatible with type
@@ -2038,16 +2139,28 @@ let nativeint (local_ x) (local_ y) = exclave_
 let float (local_ x) (local_ y) = exclave_
   (x +. y *. x -. 42.)
 [%%expect{|
-val int32 : int32 @ local -> int32 @ local -> int32 @ local = <fun>
-val int64 : int64 @ local -> int64 @ local -> int64 @ local = <fun>
-val nativeint : nativeint @ local -> nativeint @ local -> nativeint @ local =
+val int32 :
+  int32 @ [< 'm @@ past & many > local] ->
+  (int32 @ [< many > local] -> int32 @ [> local aliased]) @ [> 'm | local] =
   <fun>
-val float : float @ local -> float @ local -> float @ local = <fun>
+val int64 :
+  int64 @ [< 'm @@ past & many > local] ->
+  (int64 @ [< many > local] -> int64 @ [> local aliased]) @ [> 'm | local] =
+  <fun>
+val nativeint :
+  nativeint @ [< 'm @@ past & many > local] ->
+  (nativeint @ [< many > local] -> nativeint @ [> local aliased]) @ [> 'm | local] =
+  <fun>
+val float :
+  float @ [< 'm @@ past & many > local] ->
+  (float @ [> local] -> float @ [> local aliased]) @ [> 'm | local] = <fun>
 |}]
 
 let etapair (local_ x) = exclave_ (fst x, snd x)
 [%%expect{|
-val etapair : 'a * 'b @ local -> 'a * 'b @ local = <fun>
+val etapair :
+  'a * 'b @ [< many uncontended > local] ->
+  'a * 'b @ [> local aliased nonportable] = <fun>
 |}]
 
 (* Arity checking on primitives *)
@@ -2066,19 +2179,22 @@ Error: Wrong arity for builtin primitive "%int32_add"
 let compare (local_ x) (local_ y) =
   [x = y; x <> y; x < y; x > y; x <= y; x >= y; compare x y = 0; x == y; x != y]
 [%%expect{|
-val compare : 'a @ local -> 'a @ local -> bool list = <fun>
+val compare :
+  'a @ [< many uncontended > 'n | local] ->
+  ('a @ [< many uncontended > 'm | local] -> bool list @ [< global]) @ [< 'm @@ past & 'n @@ past > local nonportable] =
+  <fun>
 |}]
 
 (* integer primitives accept local args *)
 let intf (local_ x) = x |> Int.succ |> Int.add 42 |> pred |> (/) 100 |> (+) 1
 [%%expect{|
-val intf : int @ local -> int = <fun>
+val intf : int @ [> local] -> int @ [< global] = <fun>
 |}]
 
 (* primitives don't count as tail calls, so you can pass them locals *)
 let primloc x = let local_ y = Int32.add x 1l in Int32.to_int y
 [%%expect{|
-val primloc : int32 -> int = <fun>
+val primloc : int32 @ 'm -> int @ [< global] = <fun>
 |}]
 
 (* (&&) and (||) tail call on the right *)
@@ -2086,7 +2202,9 @@ let testbool1 f = let local_ r = ref 42 in (f r || false) && true
 
 let testbool2 f = let local_ r = ref 42 in true && (false || f r)
 [%%expect{|
-val testbool1 : (int ref @ local -> bool) -> bool = <fun>
+val testbool1 :
+  (int ref @ [> local aliased] -> bool @ 'm) @ 'n -> bool @ [< global] =
+  <fun>
 Line 3, characters 63-64:
 3 | let testbool2 f = let local_ r = ref 42 in true && (false || f r)
                                                                    ^
@@ -2100,8 +2218,8 @@ Error: This value is "local"
 let foo () = exclave_ let local_ _x = "hello" in true
 let testboo3 () =  true && (foo ())
 [%%expect{|
-val foo : unit -> bool @ local = <fun>
-val testboo3 : unit -> bool @ local = <fun>
+val foo : unit @ 'm -> bool @ [> local] = <fun>
+val testboo3 : unit @ 'm -> bool @ [> local] = <fun>
 |}]
 
 (* Test from Nathanaëlle Courant.
@@ -2124,7 +2242,7 @@ Error: This value is "local" but is expected to be "global".
 (* mode-crossing using unary + *)
 let promote (local_ x) = +x
 [%%expect{|
-val promote : int @ local -> int = <fun>
+val promote : int @ [> local] -> int @ [< global] = <fun>
 |}]
 
 (* Or-patterns *)
@@ -2133,7 +2251,10 @@ let foo (local_ x) y =
   | Some z, None | None, Some z -> z
   | None, None | Some _, Some _ -> assert false
 [%%expect{|
-val foo : 'a option @ local -> 'a option -> 'a @ local = <fun>
+val foo :
+  'a option @ [< 'm > local] ->
+  ('a option @ [< 'n] -> 'a @ [> 'n | 'm | local]) @ [> close('m) | local] =
+  <fun>
 |}]
 
 let foo (local_ x) y =
@@ -2141,7 +2262,10 @@ let foo (local_ x) y =
   | Some z, None | None, Some z -> z
   | None, None | Some _, Some _ -> assert false
 [%%expect{|
-val foo : 'a option @ local -> 'a option -> 'a @ local = <fun>
+val foo :
+  'a option @ [< 'm > local] ->
+  ('a option @ [< 'n] -> 'a @ [> 'n | 'm | local]) @ [> close('m) | local] =
+  <fun>
 |}]
 
 module M = struct
@@ -2185,7 +2309,9 @@ let f g n =
   ()
 let z : (int list -> unit) -> int -> unit = f
 [%%expect{|
-val f : (int list @ local -> unit) -> int -> unit = <fun>
+val f :
+  (int list @ [> local] -> unit @ 'm) @ [< 'n @@ past & global] ->
+  (int @ 'o -> unit @ [< global]) @ [< global > 'n] = <fun>
 Line 5, characters 44-45:
 5 | let z : (int list -> unit) -> int -> unit = f
                                                 ^
@@ -2218,12 +2344,17 @@ Error: This expression has type "(int list @ local -> unit) -> int -> unit"
 
 let foo f = (f : local_ string -> float :> string -> float)
 [%%expect{|
-val foo : (string @ local -> float) -> string -> float = <fun>
+val foo :
+  (string @ [> local aliased nonportable] ->
+   float @ [< global many uncontended]) @ [< 'm . aliased contended & global] ->
+  (string -> float) @ [< global > 'm] = <fun>
 |}]
 
 let foo f = (f : string -> float :> string -> local_ float)
 [%%expect{|
-val foo : (string -> float) -> string -> float @ local = <fun>
+val foo :
+  (string @ [> aliased nonportable] -> float @ [< global many uncontended]) @ [< 'm . aliased contended & global] ->
+  (string -> float @ local) @ [< global > 'm] = <fun>
 |}]
 
 let foo f = (f : string -> local_ float :> string -> float)
@@ -2245,7 +2376,9 @@ Error: Type "string -> float" is not a subtype of
 
 let foo f = ignore (f :> string -> float); ()
 [%%expect{|
-val foo : (string -> float) -> unit = <fun>
+val foo :
+  (string -> float) @ [< global many uncontended] -> unit @ [< global] =
+  <fun>
 |}]
 
 let global_to_global_to_global (f : float -> string) = f 42.0
@@ -2254,8 +2387,11 @@ let foo f =
   ignore (f :> (local_ float -> string) -> string);
   [f; global_to_global_to_global]
 [%%expect{|
-val global_to_global_to_global : (float -> string) -> string = <fun>
-val foo : ((float -> string) -> string) -> ((float -> string) -> string) list =
+val global_to_global_to_global :
+  (float -> string) @ 'm -> string @ [< global > aliased] = <fun>
+val foo :
+  ((float -> string) -> string) @ [< global many uncontended] ->
+  ((float -> string) -> string) list @ [< global > aliased nonportable] =
   <fun>
 |}]
 
@@ -2265,7 +2401,8 @@ let foo f =
   ignore (f :> (float -> string) -> string);
   [f; local_to_global_to_global]
 [%%expect{|
-val local_to_global_to_global : (float @ local -> string) -> string = <fun>
+val local_to_global_to_global :
+  (float @ local -> string) @ 'm -> string @ [< global > aliased] = <fun>
 Line 5, characters 6-31:
 5 |   [f; local_to_global_to_global]
           ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2615,7 +2752,8 @@ let f (s : string) =
   | GFoo (s', _) -> ref s'
 
 [%%expect{|
-val f : string -> string ref = <fun>
+val f : string @ [< global] -> string ref @ [< global > aliased nonportable] =
+  <fun>
 |}]
 
 let f (local_ x : gfoo) =
@@ -2623,7 +2761,8 @@ let f (local_ x : gfoo) =
   | GFoo (s', _) -> ref s'
 
 [%%expect{|
-val f : gfoo @ local -> string ref = <fun>
+val f : gfoo @ [> local] -> string ref @ [< global > aliased nonportable] =
+  <fun>
 |}]
 
 (* the argument not marked global remains contingent on construction  *)
@@ -2681,13 +2820,15 @@ Error: This value is "local" to the parent region
 (* constructing local iarray from local elements is fine *)
 let f (local_ x : string) = exclave_ [:x; "foo":]
 [%%expect{|
-val f : string @ local -> string iarray @ local = <fun>
+val f : string @ [> local] -> string iarray @ [> local] = <fun>
 |}]
 
 (* constructing global iarray from global elements is fine *)
 let f (x : string) = ref [:x; "foo":]
 [%%expect{|
-val f : string -> string iarray ref = <fun>
+val f :
+  string @ [< global] -> string iarray ref @ [< global > aliased nonportable] =
+  <fun>
 |}]
 
 (* projecting out of local array gives local elements *)
@@ -2727,7 +2868,7 @@ let f (local_ a : string iarray) =
   | [: x; _ :] -> x
   | _ -> "foo"
 [%%expect{|
-val f : string iarray @ local -> string @ local = <fun>
+val f : string iarray @ [> local] -> string @ [> local aliased] = <fun>
 |}]
 
 (* projecting out of global iarray gives global elements *)
@@ -2736,7 +2877,9 @@ let f (a : string iarray) =
   | [: x :] -> ref x
   | _ -> ref "foo"
 [%%expect{|
-val f : string iarray -> string ref = <fun>
+val f :
+  string iarray @ [< global] -> string ref @ [< global > aliased nonportable] =
+  <fun>
 |}]
 
 (* Mutable array, like references, is dangerous. They must contain global
@@ -2756,7 +2899,7 @@ Error: This value is "local"
 (* constructing local array from global elements is allowed *)
 let f (x : string) = exclave_ [| x |]
 [%%expect{|
-val f : string -> string array @ local = <fun>
+val f : string @ [< global] -> string array @ [> local nonportable] = <fun>
 |}]
 
 (* projecting out of local array gives global elements *)
@@ -2765,7 +2908,9 @@ let f (local_ a : string array) =
   | [| x |] -> ref x
   | _ -> ref "foo"
 [%%expect{|
-val f : string array @ local -> string ref = <fun>
+val f :
+  string array @ [< shared > local] ->
+  string ref @ [< global > aliased nonportable] = <fun>
 |}]
 
 (* reported internal to Jane Street as TANDC-1742 *)
@@ -2812,16 +2957,23 @@ Lines 3-6, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val g : 'a -> 'b -> string @ local
-           val f : 'a -> ('b -> string @ local) @ local
+           val g :
+             'a @ [< 'm @@ past] -> ('b @ 'n -> string @ [> local]) @ [> 'm]
+           val f :
+             'a @ [< 'm @@ past] ->
+             ('b @ 'n -> string @ [> local]) @ [> 'm | local]
          end
        is not included in
          sig val f : string -> string -> string @ local end
        Values do not match:
-         val f : 'a -> ('b -> string @ local) @ local
+         val f :
+           'a @ [< 'm @@ past] ->
+           ('b @ 'n -> string @ [> local]) @ [> 'm | local]
        is not included in
          val f : string -> string -> string @ local
-       The type "string -> (string -> string @ local) @ local"
+       The type
+         "string @ [< 'm @@ past & 'm @@ past > aliased] ->
+         (string @ [> aliased] -> string @ [> local]) @ [> 'm | 'm | local]"
        is not compatible with the type "string -> string -> string @ local"
 |}]
 
@@ -2830,7 +2982,8 @@ Error: Signature mismatch:
 (* Valid; [local_ string -> string -> string] is [local_ string -> local_ (string -> string)] *)
 let f () = ((fun x y -> "") : (local_ string -> string -> string));;
 [%%expect{|
-val f : unit -> string @ local -> string -> string = <fun>
+val f : unit @ 'm -> (string @ local -> string -> string) @ [< global] =
+  <fun>
 |}];;
 
 (* Illegal: the return mode on (string -> string) is global. *)
@@ -2856,14 +3009,15 @@ Error: This function or one of its parameters escape their region
 let f () = ((fun x -> (fun y -> "") [@extension.curry])
             : (local_ string -> (string -> string)));;
 [%%expect{|
-val f : unit -> string @ local -> (string -> string) = <fun>
+val f : unit @ 'm -> (string @ local -> (string -> string)) @ [< global] =
+  <fun>
 |}];;
 
 (* mode crossing - the inner closure is [global] despite closing over [local_
 int] *)
 let f () = ((fun x y -> x + y) : (local_ int -> (int -> int)));;
 [%%expect{|
-val f : unit -> int @ local -> (int -> int) = <fun>
+val f : unit @ 'm -> (int @ local -> (int -> int)) @ [< global] = <fun>
 |}];;
 
 (* Illegal: the expected mode is global *)
@@ -2888,18 +3042,21 @@ Error: This function or one of its parameters escape their region
 (* For nested functions, inner functions are not constrained *)
 let f () = ((fun x -> fun y -> "") : (local_ string -> (string -> string)));;
 [%%expect{|
-val f : unit -> string @ local -> (string -> string) = <fun>
+val f : unit @ 'm -> (string @ local -> (string -> string)) @ [< global] =
+  <fun>
 |}];;
 
 let f () = exclave_ ((fun x -> fun y -> x + y) : (_ -> _));;
 [%%expect{|
-val f : unit -> (int -> (int -> int)) @ local = <fun>
+val f : unit @ 'n -> (int -> (int @ 'm -> int @ [< global])) @ [> local] =
+  <fun>
 |}];;
 
 (* ok if curried *)
 let f () = exclave_ ((fun x -> (fun y -> x + y) [@extension.curry]) : (_ -> _));;
 [%%expect{|
-val f : unit -> (int -> (int -> int)) @ local = <fun>
+val f : unit @ 'n -> (int -> (int @ 'm -> int @ [< global])) @ [> local] =
+  <fun>
 |}];;
 
 (* Type annotations on a [local_] binding are interpreted in a local context,
@@ -2911,7 +3068,7 @@ let foo () =
   let local_ _bar2 z : int -> int -> int = exclave_ (fun x y -> x + y + z) in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}];;
 
 let foo () =
@@ -2962,8 +3119,8 @@ let foo (local_ _ : M.t) = ();;
 let foo_f (local_ _ : M.t -> unit) = ();;
 [%%expect{|
 module M : sig type t = M_constructor end
-val foo : M.t @ local -> unit = <fun>
-val foo_f : (M.t -> unit) @ local -> unit = <fun>
+val foo : M.t @ [> local] -> unit @ [< global] = <fun>
+val foo_f : (M.t -> unit) @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 let () = foo M_constructor
@@ -2984,17 +3141,17 @@ let () = foo_f (local_ (fun M_constructor -> ()))
 
 let _ret () : M.t -> unit = (fun M_constructor -> ())
 [%%expect{|
-val _ret : unit -> M.t -> unit = <fun>
+val _ret : unit @ 'm -> (M.t -> unit) @ [< global] = <fun>
 |}]
 
 let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
 [%%expect{|
-val _ret : unit -> (M.t -> unit) @ local = <fun>
+val _ret : unit @ 'm -> (M.t -> unit) @ [> local] = <fun>
 |}]
 
 let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
 [%%expect{|
-val _ret : unit -> (M.t -> unit) @ local = <fun>
+val _ret : unit @ 'm -> (M.t -> unit) @ [> local] = <fun>
 |}]
 
 type r = {global_ x : string; y : string}
@@ -3006,5 +3163,5 @@ let foo () =
   {r with y = "foo!" }
 [%%expect{|
 type r = { x : string @@ global; y : string; }
-val foo : unit -> r = <fun>
+val foo : unit @ 'm -> r @ [< global] = <fun>
 |}]

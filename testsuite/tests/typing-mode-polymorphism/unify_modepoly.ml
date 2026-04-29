@@ -140,8 +140,10 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
 [%%expect {|
 - : <[
-     (<[Inst0.t]>, int NonInst1.t) Type.eq ->
-     (<[Inst0.t]> expr -> int NonInst1.t expr) @ local]>
+     (<[Inst0.t]>, int NonInst1.t) Type.eq @ [< 'm @@ past] ->
+     (<[Inst0.t]> expr @ [< 'n . aliased contended] ->
+      int NonInst1.t expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -155,8 +157,10 @@ let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
 [%%expect {|
 - : <[
-     (int NonInst1.t, <[Inst0.t]>) Type.eq ->
-     (<[Inst0.t]> expr -> int NonInst1.t expr) @ local]>
+     (int NonInst1.t, <[Inst0.t]>) Type.eq @ [< 'm @@ past] ->
+     (<[Inst0.t]> expr @ [< 'n . aliased contended] ->
+      int NonInst1.t expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -173,8 +177,8 @@ let _ = <[ fun (Equal : (Inst0.t, $(int NonInst1.t)) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
 [%%expect {|
 - : <[
-     (Inst0.t, $(int NonInst1.t)) Type.eq ->
-     (Inst0.t -> $(int NonInst1.t)) @ local]>
+     (Inst0.t, $(int NonInst1.t)) Type.eq @ [< 'm @@ past] ->
+     (Inst0.t @ [< 'n] -> $(int NonInst1.t) @ [> 'n]) @ [> 'm | local]]>
     expr
 =
 <[
@@ -187,8 +191,8 @@ let _ = <[ fun (Equal : ($(int NonInst1.t), Inst0.t) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
 [%%expect {|
 - : <[
-     ($(int NonInst1.t), Inst0.t) Type.eq ->
-     (Inst0.t -> $(int NonInst1.t)) @ local]>
+     ($(int NonInst1.t), Inst0.t) Type.eq @ [< 'm @@ past] ->
+     (Inst0.t @ [< 'n] -> $(int NonInst1.t) @ [> 'n]) @ [> 'm | local]]>
     expr
 =
 <[
@@ -201,8 +205,10 @@ let _ = <[ fun (Equal : (Inst1.t, <[int NonInst0.t]>) Type.eq)
                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
 [%%expect {|
 - : <[
-     (Inst1.t, <[int NonInst0.t]>) Type.eq ->
-     (Inst1.t expr -> <[int NonInst0.t]> expr) @ local]>
+     (Inst1.t, <[int NonInst0.t]>) Type.eq @ [< 'm @@ past] ->
+     (Inst1.t expr @ [< 'n . aliased contended] ->
+      <[int NonInst0.t]> expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -216,8 +222,10 @@ let _ = <[ fun (Equal : (<[int NonInst0.t]>, Inst1.t) Type.eq)
                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
 [%%expect {|
 - : <[
-     (<[int NonInst0.t]>, Inst1.t) Type.eq ->
-     (Inst1.t expr -> <[int NonInst0.t]> expr) @ local]>
+     (<[int NonInst0.t]>, Inst1.t) Type.eq @ [< 'm @@ past] ->
+     (Inst1.t expr @ [< 'n . aliased contended] ->
+      <[int NonInst0.t]> expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -246,8 +254,10 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, <[Inst0.t']>) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : <[Inst0.t']> expr) ]>
 [%%expect {|
 - : <[
-     (<[Inst0.t]>, <[Inst0.t']>) Type.eq ->
-     (<[Inst0.t]> expr -> <[Inst0.t']> expr) @ local]>
+     (<[Inst0.t]>, <[Inst0.t']>) Type.eq @ [< 'm @@ past] ->
+     (<[Inst0.t]> expr @ [< 'n . aliased contended] ->
+      <[Inst0.t']> expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -261,8 +271,10 @@ let _ = <[ fun (Equal : ($Inst2.t, <[Inst0.t']>) Type.eq)
                (x : <[Inst0.t']> expr) -> (x : $Inst2.t expr) ]>
 [%%expect {|
 - : <[
-     ($(Inst2.t), <[Inst0.t']>) Type.eq ->
-     (<[Inst0.t']> expr -> $(Inst2.t) expr) @ local]>
+     ($(Inst2.t), <[Inst0.t']>) Type.eq @ [< 'm @@ past] ->
+     (<[Inst0.t']> expr @ [< 'n . aliased contended] ->
+      $(Inst2.t) expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -275,8 +287,10 @@ let _ = <[ fun (Equal : (<[Inst0.t']>, $Inst2.t) Type.eq)
                (x : <[Inst0.t']> expr) -> (x : $Inst2.t expr) ]>
 [%%expect {|
 - : <[
-     (<[Inst0.t']>, $(Inst2.t)) Type.eq ->
-     (<[Inst0.t']> expr -> $(Inst2.t) expr) @ local]>
+     (<[Inst0.t']>, $(Inst2.t)) Type.eq @ [< 'm @@ past] ->
+     (<[Inst0.t']> expr @ [< 'n . aliased contended] ->
+      $(Inst2.t) expr @ [> 'n]) @ [> 'm | local]
+     ]>
     expr
 =
 <[
@@ -294,8 +308,8 @@ let _ = <[ fun (Equal : ($(<[Inst0.t]> NonInst1.t),
                (x : Inst0.t) -> (x : Inst0.t') ]>
 [%%expect {|
 - : <[
-     ($(<[Inst0.t]> NonInst1.t), $(<[Inst0.t']> NonInst1.t)) Type.eq ->
-     (Inst0.t -> Inst0.t') @ local]>
+     ($(<[Inst0.t]> NonInst1.t), $(<[Inst0.t']> NonInst1.t)) Type.eq @ [< 'm @@ past] ->
+     (Inst0.t @ [< 'n] -> Inst0.t' @ [> 'n]) @ [> 'm | local]]>
     expr
 =
 <[
@@ -310,13 +324,15 @@ let _ = <[ fun (Equal : ($(<[Inst0.t]> NonInst1.t),
    so that we can see if it gets equated. *)
 let force_variables_equal_intro_left (x : 'a expr) (y : ('a, _) Type.eq) = ()
 [%%expect {|
-val force_variables_equal_intro_left : 'a expr -> ('a, 'b) Type.eq -> unit =
-  <fun>
+val force_variables_equal_intro_left :
+  'a expr @ [< 'm @@ past & global] ->
+  (('a, 'b) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm] = <fun>
 |}]
 let force_variables_equal_intro_right (x : 'a expr) (y : (_, 'a) Type.eq) = ()
 [%%expect {|
-val force_variables_equal_intro_right : 'a expr -> ('b, 'a) Type.eq -> unit =
-  <fun>
+val force_variables_equal_intro_right :
+  'a expr @ [< 'm @@ past & global] ->
+  (('b, 'a) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm] = <fun>
 |}]
 
 (* Quotes *)
@@ -326,7 +342,10 @@ let f (type a) (x : <[_]> expr) (eq : (<[_]>, a) Type.eq) =
   force_variables_equal_intro_left x eq;
   match eq with Equal -> x
 [%%expect {|
-val f : 'a expr -> ('a, 'a) Type.eq -> 'a expr = <fun>
+val f :
+  'a expr @ [< 'm . aliased contended & global many] ->
+  (('a, 'a) Type.eq @ 'n -> 'a expr @ [< global > 'm | aliased]) @ [< global > close('m) @@ many portable] =
+  <fun>
 |}]
 (* <[t]> ~ s  equates s to t when s instantiable -- $0 escapes! *)
 let f (type a) (x : <[_]> expr) (eq : (<[_ NonInst0.t]>, a) Type.eq) =
@@ -347,7 +366,10 @@ let f (type a) (x : <[_]> expr) (eq : (a, <[_]>) Type.eq) =
   force_variables_equal_intro_right x eq;
   match eq with Equal -> x
 [%%expect {|
-val f : 'a expr -> ('a, 'a) Type.eq -> 'a expr = <fun>
+val f :
+  'a expr @ [< 'm . aliased contended & global many] ->
+  (('a, 'a) Type.eq @ 'n -> 'a expr @ [< global > 'm | aliased]) @ [< global > close('m) @@ many portable] =
+  <fun>
 |}]
 (* s ~ <[t]>  equates s to t when s instantiable -- $0 escapes! *)
 let f (type a) (x : <[_]> expr) (eq : (a, <[_ NonInst0.t]>) Type.eq) =
@@ -371,15 +393,19 @@ let force_variables_equal_intro_left' =
   <[ fun (x : 'a expr) (y : ('a, _) Type.eq) -> () ]>
 [%%expect {|
 val force_variables_equal_intro_left' :
-  <[$('a) expr -> ($('a), $('b)) Type.eq -> unit]> expr =
-  <[fun (x : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()]>
+  <[
+   $('a) expr @ [< 'm @@ past & global] ->
+   (($('a), $('b)) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm]]>
+  expr = <[fun (x : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()]>
 |}]
 let force_variables_equal_intro_right' =
   <[ fun (x : 'a expr) (y : (_, 'a) Type.eq) -> () ]>
 [%%expect {|
 val force_variables_equal_intro_right' :
-  <[$('a) expr -> ($('b), $('a)) Type.eq -> unit]> expr =
-  <[fun (x : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()]>
+  <[
+   $('a) expr @ [< 'm @@ past & global] ->
+   (($('b), $('a)) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm]]>
+  expr = <[fun (x : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()]>
 |}]
 
 (* $t ~ s  links t to s when t flexible and s instantiable *)
@@ -389,7 +415,12 @@ let f = <[
       match eq with Equal -> x
   ]>
 [%%expect {|
-val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
+val f :
+  <[
+   $('a) expr @ [< 'm . aliased contended & global many] ->
+   (($('a), $('a)) Type.eq @ 'n -> $('a) expr @ [< global > 'm | aliased]) @ [< global > close('m) @@ many portable]
+   ]>
+  expr =
   <[
     fun (type a) (x : _ expr) (eq : (_, a) Stdlib.Type.eq) ->
       (fun (x__1 : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()) x eq;
@@ -419,7 +450,12 @@ let f = <[
       match eq with Equal -> x
   ]>
 [%%expect {|
-val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
+val f :
+  <[
+   $('a) expr @ [< 'm . aliased contended & global many] ->
+   (($('a), $('a)) Type.eq @ 'n -> $('a) expr @ [< global > 'm | aliased]) @ [< global > close('m) @@ many portable]
+   ]>
+  expr =
   <[
     fun (type a) (x : _ expr) (eq : (a, _) Stdlib.Type.eq) ->
       (fun (x__1 : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()) x eq;
