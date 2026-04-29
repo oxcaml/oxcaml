@@ -1,4 +1,5 @@
 (* TEST
+ multicore;
  include unix;
  hasunix;
  not-target-windows;
