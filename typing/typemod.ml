@@ -1399,35 +1399,6 @@ let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
     Typemode.transl_modalities_with_default
       ~default:default_modalities ~maturity:Stable modalities
 
-let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
-  let modalities = transl_modalities ~default_modalities pmd_modalities in
-  (*
-  Workaround for pmd_modalities
-
-  Let [f] be the mapping representing [pmd_modalities].
-
-  In the future with proper modal modules, let [m] be the mode of the enclosing
-  structure. This module will be of mode [f m], and a value inside the module
-  will of mode [g (f m)] where [g] is the modalities on the value. Note that [m]
-  itself is of the form [f0 (f1 .. (fn legacy))] where [legacy] is the mode of
-  the file-level structure, and [fi] is the sequence of [pmd_modalities] that
-  corresponds to the enclosing structure nested inside layers of structures.
-  Therefore, the aforementioned value will be of mode
-  [g (f (f0 (f1 .. (fn legacy))))].
-
-  Currently, all modules are legacy. To simulate the above effect, we apply each
-  [pmd_modalities] of a structure deeply to all [val_modalities] in that
-  structure.
-
-  We still don't support [pmd_modalities] on functors.
-  *)
-  let mty =
-    match Mode.Modality.Const.is_id modalities.moda_modalities with
-    | true -> mty
-    | false ->
-        apply_modalities_module_type env modalities.moda_modalities mty
-  in
-  mty, { modalities with moda_modalities = Mode.Modality.Const.id }
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -2325,13 +2296,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env pmd.pmd_type)
         in
-        let mty_type, md_modalities =
-          apply_pmd_modalities
-            env
+        let md_modalities =
+          transl_modalities
             ~default_modalities:sig_modalities.moda_modalities
-            pmd.pmd_modalities tmty.mty_type
+            pmd.pmd_modalities
         in
-        let tmty = {tmty with mty_type} in
         let pres =
           match tmty.mty_type with
           | Mty_alias _ -> Mp_absent
@@ -2615,11 +2584,10 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env_c pmd.pmd_type)
         in
-        let mty_type, md_modalities =
-          apply_pmd_modalities env ~default_modalities:sig_modalities
-            pmd.pmd_modalities tmty.mty_type
+        let md_modalities =
+          transl_modalities ~default_modalities:sig_modalities
+            pmd.pmd_modalities
         in
-        let tmty = {tmty with mty_type} in
         let md =
           { md with
             Types.md_type = tmty.mty_type;
@@ -2655,10 +2623,12 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
-         let md_type, md_modalities =
+         let md_type =
           approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
-          |> apply_pmd_modalities env ~default_modalities:sig_modalities
-              pmd.pmd_modalities
+         in
+         let md_modalities =
+          transl_modalities ~default_modalities:sig_modalities
+            pmd.pmd_modalities
          in
          let md_modalities = Modality.of_const md_modalities.moda_modalities in
          let md =

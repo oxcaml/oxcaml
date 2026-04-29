@@ -16,10 +16,8 @@ end
 module type S =
   sig
     module M :
-      sig
-        val foo : 'a -> 'a @@ portable
-        module N : sig val bar : 'a -> 'a @@ portable end
-      end
+      sig val foo : 'a -> 'a module N : sig val bar : 'a -> 'a end end @@
+      portable
   end
 |}]
 
@@ -35,10 +33,8 @@ end
 module type S =
   sig
     module M :
-      sig
-        val foo : 'a -> 'a @@ portable
-        module N : sig val bar : 'a -> 'a @@ portable end
-      end
+      sig val foo : 'a -> 'a module N : sig val bar : 'a -> 'a end end @@
+      portable
   end
 |}]
 
@@ -74,7 +70,7 @@ end
 module type S =
   sig
     module rec M : sig val foo : 'a -> 'a end
-    and N : sig val bar : 'a -> 'a @@ portable end
+    and N : sig val bar : 'a -> 'a end @@ portable
   end
 |}]
 
@@ -88,7 +84,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module type T = sig val foo : 'a -> 'a end
-module type S = sig module M : sig val foo : 'a -> 'a @@ portable end end
+module type S = sig module M : T @@ portable end
 |}]
 
 (* works for Mty_functor *)
@@ -97,7 +93,10 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module type S =
-  sig module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end end
+  sig
+    module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end @@
+      portable
+  end
 |}]
 
 module M : T = struct
@@ -111,7 +110,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module M : T @@ stateless nonportable
-module type S = sig module M' = M end
+module type S = sig module M' = M @@ portable end
 |}]
 
 (* works for Mty_strenthen, and type check keeps working *)
@@ -119,7 +118,7 @@ module type S = sig @@ portable
   module M' : T with M
 end
 [%%expect{|
-module type S = sig module M' : sig val foo : 'a -> 'a @@ portable end end
+module type S = sig module M' : sig val foo : 'a -> 'a end @@ portable end
 |}]
 
 module M : S = struct
@@ -139,12 +138,12 @@ Error: Signature mismatch:
        Modules do not match:
          sig val foo : 'a -> 'a end @ nonportable
        is not included in
-         sig val foo : 'a -> 'a @@ portable end @ nonportable
+         sig val foo : 'a -> 'a end @ portable
        In module "M'":
        Values do not match:
          val foo : 'a -> 'a (* in a structure at nonportable *)
        is not included in
-         val foo : 'a -> 'a @@ portable (* in a structure at nonportable *)
+         val foo : 'a -> 'a (* in a structure at portable *)
        The first is "nonportable"
        but the second is "portable".
 |}]
@@ -160,7 +159,7 @@ end
 module type S =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a @@ portable contended end
+    module M : sig val foo : 'a -> 'a @@ contended end @@ portable
   end
 |}]
 
@@ -175,7 +174,7 @@ end
 module type S =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a @@ portable end
+    module M : sig val foo : 'a -> 'a end @@ portable
   end
 |}]
 
@@ -194,9 +193,9 @@ module type S =
     val outer : 'a -> 'a @@ portable
     module M :
       sig
-        val inner : 'a -> 'a @@ portable contended
-        val inner_override : 'a -> 'a @@ portable contended
-      end
+        val inner : 'a -> 'a @@ contended
+        val inner_override : 'a -> 'a @@ contended
+      end @@ portable
   end
 |}]
 
@@ -213,10 +212,8 @@ module type S =
   sig
     val outer : 'a -> 'a @@ portable
     module M :
-      sig
-        val inner : 'a -> 'a @@ portable contended
-        val inner_override : 'a -> 'a @@ portable
-      end
+      sig val inner : 'a -> 'a @@ contended val inner_override : 'a -> 'a end
+      @@ portable
   end
 |}]
 
