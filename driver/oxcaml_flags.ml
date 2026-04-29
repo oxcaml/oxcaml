@@ -400,7 +400,9 @@ module Flambda2 = struct
         small_function_size = 10;
         large_function_size = 10;
         small_functor_size = 10;
-        large_functor_size = 20;
+        (* CR mshinwell: lower to: large_functor_size = 20, once we're happy
+           inlining behaviour is ok *)
+        large_functor_size = 2000000;
         threshold = 10.;
       }
 
