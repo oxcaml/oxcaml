@@ -4,7 +4,8 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 (* A set of (old_reg, new_reg) pairs asserting that these registers hold equal
    values at a given program point. Represented as two [Reg.Set.t Reg.Map.t]
-   maps for bidirectional lookup. Not necessarily injective. *)
+   maps for bidirectional lookup. Not necessarily injective. Since we are doing
+   a backwards analysis, these are proof obligations rather than assumptions. *)
 module Equations : sig
   type t
 
@@ -108,6 +109,10 @@ end
 
 let is_move (i : Cfg.basic Cfg.instruction) =
   match i.desc with
+  (* Opaque should not be treated as a move, really. However, there is a bug in
+     the current Cfg_selectgen, where let a = opaque x in let b = opaque x in
+     ... is translated as let a = opaque x in let b = opaque a in ... *)
+  (* CR ttebbi: Fix Cfg_selectgen and remove Opaque here. *)
   | Op (Move | Opaque) ->
     Array.length i.arg = 1
     && Array.length i.res = 1
@@ -223,9 +228,19 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
   | Prim op, Prim np ->
     map_label op.label_after np.label_after;
     Cfg.equal_prim_call_operation op.op np.op
-  | Invalid _, Invalid _ ->
-    (* Invalid blocks are unreachable; don't compare args or messages *)
-    true
+  | Invalid oi, Invalid ni ->
+    let labels_match =
+      match oi.label_after, ni.label_after with
+      | None, None -> true
+      | Some ol, Some nl ->
+        map_label ol nl;
+        true
+      | Some _, None | None, Some _ -> false
+    in
+    labels_match
+    && String.equal oi.message ni.message
+    && Int.equal oi.stack_ofs ni.stack_ofs
+    && Cmm.equal_stack_align oi.stack_align ni.stack_align
   | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Int_test _
       | Float_test _ | Switch _ | Return | Raise _ | Tailcall_self _
       | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
@@ -354,133 +369,129 @@ let effective_arg (i : Cfg.basic Cfg.instruction) =
 
 let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     ~(new_block : Cfg.basic_block) =
-  match old_block.terminator.desc, new_block.terminator.desc with
-  | Invalid _, Invalid _ -> eqs
-  | _ ->
-    let ol = old_block.start in
-    let nl = new_block.start in
-    let add_reg_pairs eqs old_regs new_regs =
-      fold_left2_arr
-        (fun eqs old_r new_r ->
+  let ol = old_block.start in
+  let nl = new_block.start in
+  let add_reg_pairs eqs old_regs new_regs =
+    fold_left2_arr
+      (fun eqs old_r new_r ->
+        if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
+        then (
+          if not (Reg.same_loc old_r new_r)
+          then
+            Format.fprintf ppf_m "Physical reg mismatch at old=%a new=%a@."
+              Label.format ol Label.format nl;
+          eqs)
+        else Equations.add_pair eqs ~old_r ~new_r)
+      eqs old_regs new_regs
+  in
+  (* Process a matched instruction pair: remove output equations, then add input
+     equations. *)
+  let process_instruction eqs ~(old_i : _ Cfg.instruction)
+      ~(new_i : _ Cfg.instruction) ~old_arg ~new_arg =
+    (* Check physical result registers match, then remove matched output
+       pairs *)
+    let eqs =
+      let n = Array.length old_i.res in
+      if n <> Array.length new_i.res
+      then (
+        Format.fprintf ppf_m
+          "Result register count mismatch at old=%a(id:%a) new=%a(id:%a): old \
+           has %d res, new has %d res@."
+          Label.format ol InstructionId.print old_i.id Label.format nl
+          InstructionId.print new_i.id n (Array.length new_i.res);
+        eqs)
+      else
+        let eqs = ref eqs in
+        for i = 0 to n - 1 do
+          let old_r = old_i.res.(i) in
+          let new_r = new_i.res.(i) in
           if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
           then (
             if not (Reg.same_loc old_r new_r)
             then
-              Format.fprintf ppf_m "Physical reg mismatch at old=%a new=%a@."
-                Label.format ol Label.format nl;
-            eqs)
-          else Equations.add_pair eqs ~old_r ~new_r)
-        eqs old_regs new_regs
+              Format.fprintf ppf_m
+                "Physical result reg mismatch at old=%a(id:%a) new=%a(id:%a): \
+                 %a vs %a@."
+                Label.format ol InstructionId.print old_i.id Label.format nl
+                InstructionId.print new_i.id Printreg.reg old_r Printreg.reg
+                new_r)
+          else eqs := Equations.remove_pair !eqs ~old_r ~new_r
+        done;
+        !eqs
     in
-    (* Process a matched instruction pair: remove output equations, then add
-       input equations. *)
-    let process_instruction eqs ~(old_i : _ Cfg.instruction)
-        ~(new_i : _ Cfg.instruction) ~old_arg ~new_arg =
-      (* Check physical result registers match, then remove matched output
-         pairs *)
-      let eqs =
-        let n = Array.length old_i.res in
-        if n <> Array.length new_i.res
-        then (
-          Format.fprintf ppf_m
-            "Result register count mismatch at old=%a(id:%a) new=%a(id:%a): \
-             old has %d res, new has %d res@."
-            Label.format ol InstructionId.print old_i.id Label.format nl
-            InstructionId.print new_i.id n (Array.length new_i.res);
-          eqs)
-        else
-          let eqs = ref eqs in
-          for i = 0 to n - 1 do
-            let old_r = old_i.res.(i) in
-            let new_r = new_i.res.(i) in
-            if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
-            then (
-              if not (Reg.same_loc old_r new_r)
-              then
+    (* Check for residual output equations *)
+    let check_side res ~find =
+      Array.iter
+        (fun r ->
+          match find eqs r with
+          | None -> ()
+          | Some partners ->
+            Reg.Set.iter
+              (fun r' ->
                 Format.fprintf ppf_m
-                  "Physical result reg mismatch at old=%a(id:%a) \
-                   new=%a(id:%a): %a vs %a@."
+                  "Residual output equation at old=%a(id:%a) new=%a(id:%a): %a \
+                   still paired with %a@."
                   Label.format ol InstructionId.print old_i.id Label.format nl
-                  InstructionId.print new_i.id Printreg.reg old_r Printreg.reg
-                  new_r)
-            else eqs := Equations.remove_pair !eqs ~old_r ~new_r
-          done;
-          !eqs
+                  InstructionId.print new_i.id Printreg.reg r Printreg.reg r')
+              partners)
+        res
+    in
+    check_side old_i.res ~find:Equations.find_partners_of_old;
+    check_side new_i.res ~find:Equations.find_partners_of_new;
+    (* Remove all remaining output equations *)
+    let eqs = Array.fold_left Equations.remove_old eqs old_i.res in
+    let eqs = Array.fold_left Equations.remove_new eqs new_i.res in
+    (* Add input equations *)
+    if Array.length old_arg <> Array.length new_arg
+    then (
+      Format.fprintf ppf_m
+        "Arg length mismatch at old=%a(id:%a) new=%a(id:%a): %d vs %d@."
+        Label.format ol InstructionId.print old_i.id Label.format nl
+        InstructionId.print new_i.id (Array.length old_arg)
+        (Array.length new_arg);
+      eqs)
+    else add_reg_pairs eqs old_arg new_arg
+  in
+  (* Process terminator *)
+  let old_t = old_block.terminator in
+  let new_t = new_block.terminator in
+  let eqs =
+    process_instruction eqs ~old_i:old_t ~new_i:new_t ~old_arg:old_t.arg
+      ~new_arg:new_t.arg
+  in
+  (* Process body backwards, skipping moves *)
+  let old_rev = List.rev (DLL.to_list old_block.body) in
+  let new_rev = List.rev (DLL.to_list new_block.body) in
+  let rec loop eqs old_is new_is =
+    match old_is, new_is with
+    | [], [] -> eqs
+    | oi :: rest, _ when is_move oi ->
+      let (oi : Cfg.basic Cfg.instruction) = oi in
+      loop
+        (Equations.subst_old_move eqs ~src:oi.arg.(0) ~dst:oi.res.(0))
+        rest new_is
+    | _, ni :: rest when is_move ni ->
+      let (ni : Cfg.basic Cfg.instruction) = ni in
+      loop
+        (Equations.subst_new_move eqs ~src:ni.arg.(0) ~dst:ni.res.(0))
+        old_is rest
+    | oi :: old_rest, ni :: new_rest ->
+      let (oi : Cfg.basic Cfg.instruction) = oi in
+      let (ni : Cfg.basic Cfg.instruction) = ni in
+      let eqs =
+        process_instruction eqs ~old_i:oi ~new_i:ni ~old_arg:(effective_arg oi)
+          ~new_arg:(effective_arg ni)
       in
-      (* Check for residual output equations *)
-      let check_side res ~find =
-        Array.iter
-          (fun r ->
-            match find eqs r with
-            | None -> ()
-            | Some partners ->
-              Reg.Set.iter
-                (fun r' ->
-                  Format.fprintf ppf_m
-                    "Residual output equation at old=%a(id:%a) new=%a(id:%a): \
-                     %a still paired with %a@."
-                    Label.format ol InstructionId.print old_i.id Label.format nl
-                    InstructionId.print new_i.id Printreg.reg r Printreg.reg r')
-                partners)
-          res
-      in
-      check_side old_i.res ~find:Equations.find_partners_of_old;
-      check_side new_i.res ~find:Equations.find_partners_of_new;
-      (* Remove all remaining output equations *)
-      let eqs = Array.fold_left Equations.remove_old eqs old_i.res in
-      let eqs = Array.fold_left Equations.remove_new eqs new_i.res in
-      (* Add input equations *)
-      if Array.length old_arg <> Array.length new_arg
-      then (
-        Format.fprintf ppf_m
-          "Arg length mismatch at old=%a(id:%a) new=%a(id:%a): %d vs %d@."
-          Label.format ol InstructionId.print old_i.id Label.format nl
-          InstructionId.print new_i.id (Array.length old_arg)
-          (Array.length new_arg);
-        eqs)
-      else add_reg_pairs eqs old_arg new_arg
-    in
-    (* Process terminator *)
-    let old_t = old_block.terminator in
-    let new_t = new_block.terminator in
-    let old_arg = match old_t.desc with Invalid _ -> [||] | _ -> old_t.arg in
-    let new_arg = match new_t.desc with Invalid _ -> [||] | _ -> new_t.arg in
-    let eqs =
-      process_instruction eqs ~old_i:old_t ~new_i:new_t ~old_arg ~new_arg
-    in
-    (* Process body backwards, skipping moves *)
-    let old_rev = List.rev (DLL.to_list old_block.body) in
-    let new_rev = List.rev (DLL.to_list new_block.body) in
-    let rec loop eqs old_is new_is =
-      match old_is, new_is with
-      | [], [] -> eqs
-      | oi :: rest, _ when is_move oi ->
-        let (oi : Cfg.basic Cfg.instruction) = oi in
-        loop
-          (Equations.subst_old_move eqs ~src:oi.arg.(0) ~dst:oi.res.(0))
-          rest new_is
-      | _, ni :: rest when is_move ni ->
-        let (ni : Cfg.basic Cfg.instruction) = ni in
-        loop
-          (Equations.subst_new_move eqs ~src:ni.arg.(0) ~dst:ni.res.(0))
-          old_is rest
-      | oi :: old_rest, ni :: new_rest ->
-        let (oi : Cfg.basic Cfg.instruction) = oi in
-        let (ni : Cfg.basic Cfg.instruction) = ni in
-        let eqs =
-          process_instruction eqs ~old_i:oi ~new_i:ni
-            ~old_arg:(effective_arg oi) ~new_arg:(effective_arg ni)
-        in
-        loop eqs old_rest new_rest
-      | _ :: _, [] | [], _ :: _ ->
-        Format.fprintf ppf_m
-          "Body length mismatch (after skipping moves) at old=%a new=%a: \
-           old_remaining=%d new_remaining=%d@."
-          Label.format ol Label.format nl (List.length old_is)
-          (List.length new_is);
-        eqs
-    in
-    loop eqs old_rev new_rev
+      loop eqs old_rest new_rest
+    | _ :: _, [] | [], _ :: _ ->
+      Format.fprintf ppf_m
+        "Body length mismatch (after skipping moves) at old=%a new=%a: \
+         old_remaining=%d new_remaining=%d@."
+        Label.format ol Label.format nl (List.length old_is)
+        (List.length new_is);
+      eqs
+  in
+  loop eqs old_rev new_rev
 
 let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
   (* block_eqs and worklist are keyed by new labels. new_to_old is used to find
