@@ -8,7 +8,7 @@
   multidomain ? false,
   ocamltest ? true,
   pollInsertion ? false,
-  runtime5 ? false,
+  runtime5 ? true,
   stackChecks ? false,
   warnError ? true,
   oxcamlClang ? false,
