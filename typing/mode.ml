@@ -1522,98 +1522,128 @@ module Lattices_mono = struct
       let src0 = src dst0 f in
       comonadic_with_obj src0
 
-  let rec compare_morph : type a1 l1 r1 a2 b l2 r2.
+  let rec equal_morph : type a1 l1 r1 a2 b l2 r2.
       b obj ->
       (a1, b, l1 * r1) morph ->
       (a2, b, l2 * r2) morph ->
-      (a1, a2) Misc.comparison =
+      (a1, a2) Misc.eq option =
    fun dst f1 f2 ->
     match f1, f2 with
-    | Id, Id -> Equal
-    | Id, _ -> Less_than
-    | _, Id -> Greater_than
+    | Id, Id -> Some Refl
     | Proj (src1, ax1), Proj (src2, ax2) -> (
       match compare_obj src1 src2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
       | Equal -> (
         match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Greater_than -> Greater_than
-        | Equal -> Equal))
-    | Proj _, _ -> Less_than
-    | _, Proj _ -> Greater_than
+        | Equal -> Some Refl
+        | Less_than | Greater_than -> None)
+      | Less_than | Greater_than -> None)
+    | Proj _, _ | _, Proj _ -> None
     | Max_with ax1, Max_with ax2 -> (
       match Axis.compare ax1 ax2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Max_with _, _ -> Less_than
-    | _, Max_with _ -> Greater_than
+      | Equal -> Some Refl
+      | Less_than | Greater_than -> None)
+    | Max_with _, _ | _, Max_with _ -> None
     | Min_with ax1, Min_with ax2 -> (
       match Axis.compare ax1 ax2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Min_with _, _ -> Less_than
-    | _, Min_with _ -> Greater_than
-    | Meet_const c1, Meet_const c2 -> compare dst c1 c2
-    | Meet_const _, _ -> Less_than
-    | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 -> compare dst c1 c2
-    | Imply_const _, _ -> Less_than
-    | _, Imply_const _ -> Greater_than
-    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
-    | Monadic_to_comonadic_min, _ -> Less_than
-    | _, Monadic_to_comonadic_min -> Greater_than
+      | Equal -> Some Refl
+      | Less_than | Greater_than -> None)
+    | Min_with _, _ | _, Min_with _ -> None
+    | Meet_const c1, Meet_const c2 -> (
+      match compare dst c1 c2 with
+      | Equal -> Some Refl
+      | Less_than | Greater_than -> None)
+    | Meet_const _, _ | _, Meet_const _ -> None
+    | Imply_const c1, Imply_const c2 -> (
+      match compare dst c1 c2 with
+      | Equal -> Some Refl
+      | Less_than | Greater_than -> None)
+    | Imply_const _, _ | _, Imply_const _ -> None
+    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Some Refl
+    | Monadic_to_comonadic_min, _ | _, Monadic_to_comonadic_min -> None
     | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> (
       match compare_obj a1 a2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Comonadic_to_monadic_min _, _ -> Less_than
-    | _, Comonadic_to_monadic_min _ -> Greater_than
-    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
-    | Monadic_to_comonadic_max, _ -> Less_than
-    | _, Monadic_to_comonadic_max -> Greater_than
+      | Equal -> Some Refl
+      | Less_than | Greater_than -> None)
+    | Comonadic_to_monadic_min _, _ | _, Comonadic_to_monadic_min _ -> None
+    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Some Refl
+    | Monadic_to_comonadic_max, _ | _, Monadic_to_comonadic_max -> None
     | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> (
       match compare_obj a1 a2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Comonadic_to_monadic_max _, _ -> Less_than
-    | _, Comonadic_to_monadic_max _ -> Greater_than
-    | Local_to_regional, Local_to_regional -> Equal
-    | Local_to_regional, _ -> Less_than
-    | _, Local_to_regional -> Greater_than
-    | Locality_as_regionality, Locality_as_regionality -> Equal
-    | Locality_as_regionality, _ -> Less_than
-    | _, Locality_as_regionality -> Greater_than
-    | Global_to_regional, Global_to_regional -> Equal
-    | Global_to_regional, _ -> Less_than
-    | _, Global_to_regional -> Greater_than
-    | Regional_to_local, Regional_to_local -> Equal
-    | Regional_to_local, _ -> Less_than
-    | _, Regional_to_local -> Greater_than
-    | Regional_to_global, Regional_to_global -> Equal
-    | Regional_to_global, _ -> Less_than
-    | _, Regional_to_global -> Greater_than
+      | Equal -> Some Refl
+      | Less_than | Greater_than -> None)
+    | Comonadic_to_monadic_max _, _ | _, Comonadic_to_monadic_max _ -> None
+    | Local_to_regional, Local_to_regional -> Some Refl
+    | Local_to_regional, _ | _, Local_to_regional -> None
+    | Locality_as_regionality, Locality_as_regionality -> Some Refl
+    | Locality_as_regionality, _ | _, Locality_as_regionality -> None
+    | Global_to_regional, Global_to_regional -> Some Refl
+    | Global_to_regional, _ | _, Global_to_regional -> None
+    | Regional_to_local, Regional_to_local -> Some Refl
+    | Regional_to_local, _ | _, Regional_to_local -> None
+    | Regional_to_global, Regional_to_global -> Some Refl
+    | Regional_to_global, _ | _, Regional_to_global -> None
     | Compose (f1, g1), Compose (f2, g2) -> (
-      match compare_morph dst f1 f2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> (
-        match compare_morph (src dst f1) g1 g2 with
-        | Less_than -> Less_than
-        | Greater_than -> Greater_than
-        | Equal -> Equal))
-    | Compose _, _ -> Less_than
-    | _, Compose _ -> Greater_than
+      match equal_morph dst f1 f2 with
+      | Some Refl -> (
+        match equal_morph (src dst f1) g1 g2 with
+        | Some Refl -> Some Refl
+        | None -> None)
+      | None -> None)
+    | Compose _, _ | _, Compose _ -> None
     | Map_comonadic f, Map_comonadic g -> (
-      match compare_morph (proj_obj Areality dst) f g with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
+      match equal_morph (proj_obj Areality dst) f g with
+      | Some Refl -> Some Refl
+      | None -> None)
+    | Map_comonadic _, _ | _, Map_comonadic _ -> None
+
+  let hash_obj : type a. a obj -> int = function
+    | Locality -> 0
+    | Regionality -> 1
+    | Uniqueness_op -> 2
+    | Linearity -> 3
+    | Portability -> 4
+    | Forkable -> 5
+    | Yielding -> 6
+    | Statefulness -> 7
+    | Contention_op -> 8
+    | Visibility_op -> 9
+    | Staticity_op -> 10
+    | Monadic_op -> 11
+    | Comonadic_with_regionality -> 12
+    | Comonadic_with_locality -> 13
+
+  let hash_axis : type p r. (p, r) Axis.t -> int = function
+    | Areality -> 0
+    | Linearity -> 1
+    | Portability -> 2
+    | Uniqueness -> 3
+    | Contention -> 4
+    | Forkable -> 5
+    | Yielding -> 6
+    | Statefulness -> 7
+    | Visibility -> 8
+    | Staticity -> 9
+
+  let rec hash_morph : type a b l r. (a, b, l * r) morph -> int =
+   fun f ->
+    match f with
+    | Id -> Hashtbl.hash 0
+    | Meet_const c -> Hashtbl.hash (1, c)
+    | Imply_const c -> Hashtbl.hash (2, c)
+    | Proj (src, ax) -> Hashtbl.hash (3, hash_obj src, hash_axis ax)
+    | Max_with ax -> Hashtbl.hash (4, hash_axis ax)
+    | Min_with ax -> Hashtbl.hash (5, hash_axis ax)
+    | Map_comonadic f -> Hashtbl.hash (6, hash_morph f)
+    | Monadic_to_comonadic_min -> Hashtbl.hash 7
+    | Comonadic_to_monadic_min a -> Hashtbl.hash (8, hash_obj a)
+    | Monadic_to_comonadic_max -> Hashtbl.hash 9
+    | Comonadic_to_monadic_max a -> Hashtbl.hash (10, hash_obj a)
+    | Local_to_regional -> Hashtbl.hash 11
+    | Regional_to_local -> Hashtbl.hash 12
+    | Locality_as_regionality -> Hashtbl.hash 13
+    | Regional_to_global -> Hashtbl.hash 14
+    | Global_to_regional -> Hashtbl.hash 15
+    | Compose (f1, f2) -> Hashtbl.hash (16, hash_morph f1, hash_morph f2)
 
   let rec print_morph : type a b l r.
       b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =
