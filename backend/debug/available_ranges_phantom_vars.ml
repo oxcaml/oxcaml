@@ -129,7 +129,11 @@ module Phantom_vars = struct
            [Available_ranges_all_vars]) since they are always available. *)
         (* TODO: implement is_static check when Backend_var.Provenance supports
            it *)
-        let is_parameter = Is_parameter.local in
+        let is_parameter =
+          match provenance with
+          | None -> Is_parameter.local
+          | Some prov -> V.Provenance.is_parameter prov
+        in
         let t = { provenance; is_parameter; defining_expr } in
         Some (var, t)
 
@@ -144,15 +148,15 @@ module Phantom_vars = struct
         t.is_parameter
   end
 
-  let available_before (insn : L.instruction) =
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
     match insn.phantom_available_before with
     | None -> None
     | Some set -> Some (Key.Set.of_list (V.Set.elements set))
 
-  let available_across insn =
+  let available_across fundecl insn =
     (* Phantom variable availability never changes during the execution of a
        [Linear] instruction. *)
-    available_before insn
+    available_before fundecl insn
 end
 
 module Impl = Compute_ranges.Make (Phantom_vars)

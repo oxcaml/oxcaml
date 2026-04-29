@@ -835,22 +835,17 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
   in
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton bound_var, Simple simple ->
-    Format.eprintf "DBG let_expr_phantom Simple: bound=%a simple=%a@."
-      Bound_var.print bound_var Simple.print simple;
     Simple.pattern_match' simple
       ~var:(fun var ~coercion:_ ->
         let To_cmm_env.{ expr = { cmm; _ }; _ } =
           C.simple ~dbg:Debuginfo.none env res (Simple.var var)
         in
-        Format.eprintf "DBG   var lookup result cmm=%a@." Printcmm.expression cmm;
         match cmm with
         | Cvar backend_var ->
           make_phantom_let env res bound_var
             (Some (Cmm.Cphantom_var backend_var))
             ~body
-        | _ ->
-          Format.eprintf "DBG   DROPPING phantom let (not Cvar)@.";
-          expr env res body)
+        | _ -> expr env res body)
       ~symbol:(fun sym ~coercion:_ ->
         let sym_name = Symbol.linkage_name_as_string sym in
         make_phantom_let env res bound_var
