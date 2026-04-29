@@ -119,6 +119,12 @@ let rec find_reload_block (cfg : Cfg.t) label =
     | _ -> Some blk
   else Some blk
 
+let instr_id_set (instrs : Cfg.basic Cfg.instruction list) =
+  List.fold_left
+    (fun acc (instr : Cfg.basic Cfg.instruction) ->
+      InstructionId.Set.add instr.id acc)
+    InstructionId.Set.empty instrs
+
 (* From the candidate spills and the per-slot reload map, keep only spills with
    a matching reload, trim to a multiple of the call stack alignment, and pair
    each remaining spill with its reload. Returned lists have the same length and
@@ -156,12 +162,7 @@ let replace_spills_with_pushes (cfg : Cfg.t)
         Reg.Set.add spill.res.(0) acc)
       Reg.Set.empty spills
   in
-  let selected_spill_ids =
-    List.fold_left
-      (fun acc (spill : Cfg.basic Cfg.instruction) ->
-        InstructionId.Set.add spill.id acc)
-      InstructionId.Set.empty spills
-  in
+  let selected_spill_ids = instr_id_set spills in
   let unprocessed_stack_regs = ref now_unused_spill_slots in
   let stack_offset =
     ref (base_stack_offset + (List.length spills * Arch.size_addr))
@@ -212,12 +213,7 @@ let replace_spills_with_pushes (cfg : Cfg.t)
 let replace_reloads_with_pops (cfg : Cfg.t)
     ~(reloads : Cfg.basic Cfg.instruction list) ~base_stack_offset
     (after_block : Cfg.basic_block) =
-  let selected_reload_ids =
-    List.fold_left
-      (fun acc (reload : Cfg.basic Cfg.instruction) ->
-        InstructionId.Set.add reload.id acc)
-      InstructionId.Set.empty reloads
-  in
+  let selected_reload_ids = instr_id_set reloads in
   let n_to_remove = List.length reloads in
   let rec remove_reloads remaining cell =
     let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
