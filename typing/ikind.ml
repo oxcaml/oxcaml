@@ -772,7 +772,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
           let immutable_base =
             Ldd.const
               (match rep with
-              | Types.Record_unboxed -> Axis_lattice.immediate
+              | Some Types.Record_unboxed -> Axis_lattice.immediate
+              (* CR rtjoa: do we need to consider [None] *)
               | _ -> Axis_lattice.immutable_data)
           in
           let kind : Solver.ckind =
@@ -814,12 +815,18 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
                 | Types.Cstr_tuple args ->
                   List.for_all
                     (fun (arg : Types.constructor_argument) ->
-                      Jkind_types.Sort.Const.all_void arg.ca_sort)
+                      match arg.ca_sort with
+                      | Some sort -> Jkind_types.Sort.Const.all_void sort
+                      (* CR rtjoa: too approx? *)
+                      | None -> false)
                     args
                 | Types.Cstr_record lbls ->
                   List.for_all
                     (fun (lbl : Types.label_declaration) ->
-                      Jkind_types.Sort.Const.all_void lbl.ld_sort)
+                      match lbl.ld_sort with
+                      | Some sort -> Jkind_types.Sort.Const.all_void sort
+                      (* CR rtjoa: too approx? *)
+                      | None -> false)
                     lbls)
               cstrs
           in
