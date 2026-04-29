@@ -494,7 +494,7 @@ let instr_help ppf lexbuf =
 let print_expr depth ev env ppf expr =
   try
     let (v, ty) = Eval.expression ev env expr in
-    print_named_value depth expr env v ppf ty
+    print_named_value depth expr env v ppf ((Lpoly.determined []), ty)
   with
   | Eval.Error msg ->
     Eval.report_error ppf msg;
