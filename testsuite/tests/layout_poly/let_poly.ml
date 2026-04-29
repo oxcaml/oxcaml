@@ -438,3 +438,35 @@ Warning 26 [unused-var]: unused variable f.
 
 val f : 'a @ local -> unit = <fun>
 |}]
+
+(* let poly_ instantiation *)
+let #(a, b) =
+  let poly_ id x = x in
+  #(id 42, id #43.0)
+[%%expect{|
+val a : int = 42
+val b : float# = <abstr>
+|}]
+
+(* closure conversion - uniform block *)
+let #(a, b) =
+  let x = Sys.opaque_identity true in
+  let y = Sys.opaque_identity "true" in
+  let poly_ f z = if x then #(y, z) else #("false", z) in
+  #(f 1, f #2L)
+[%%expect{|
+val a : #(string * int) = #("true", 1)
+val b : #(string * int64#) = #("true", <abstr>)
+|}]
+
+(* closure conversion - mixed block *)
+let #(a, b) =
+  let x = Sys.opaque_identity true in
+  let y = Sys.opaque_identity #1s in
+  let poly_ f z = if x then #(y, z) else #(#2s, z) in
+  #(f 1, f #2L)
+
+[%%expect{|
+val a : #(int8# * int) = #(<abstr>, 1)
+val b : #(int8# * int64#) = #(<abstr>, <abstr>)
+|}]
