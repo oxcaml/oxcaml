@@ -490,6 +490,44 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let phantom_available_before = SU.phantom_vars_from_env env in
     Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
+  (* When a [Cphantom_let] aliases other backend variables (e.g.
+     [Cphantom_var v]), the alias is rendered in DWARF as a reference to [v]'s
+     own DIE. That DIE is only created if [v] appears in the variable
+     availability ranges, which in turn requires a [Name_for_debugger]
+     instruction tagging [v]'s register(s). For ordinary user-visible vars
+     this happens automatically (via the wrap in [To_cmm_env.bind_variable]),
+     but compiler-generated bindings such as [apply_result] do not get such a
+     wrap. Emit a synthetic naming op here so the alias resolves to a
+     non-empty location. *)
+  let ensure_var_named env sub_cfg (referenced_var : Backend_var.t) =
+    match V.Map.find referenced_var env.SU.vars with
+    | exception Not_found -> ()
+    | regs, provenance, _mut ->
+      let naming_op =
+        Operation.Name_for_debugger
+          { ident = referenced_var;
+            provenance;
+            which_parameter = None;
+            regs
+          }
+      in
+      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
+
+  let ensure_referenced_vars_named env sub_cfg
+      (defining_expr : Cmm.phantom_defining_expr option) =
+    match defining_expr with
+    | None
+    | Some
+        ( Cmm.Cphantom_const_int _ | Cmm.Cphantom_const_symbol _
+        | Cmm.Cphantom_read_symbol_field _ ) ->
+      ()
+    | Some (Cmm.Cphantom_var var)
+    | Some (Cmm.Cphantom_offset_var { var; offset_in_words = _ })
+    | Some (Cmm.Cphantom_read_field { var; field = _ }) ->
+      ensure_var_named env sub_cfg var
+    | Some (Cmm.Cphantom_block { tag = _; fields }) ->
+      List.iter (ensure_var_named env sub_cfg) fields
+
   let insert_op_debug_returning_id env sub_cfg op dbg arg res =
     let phantom_available_before = SU.phantom_vars_from_env env in
     let instr =
@@ -798,6 +836,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (var, defining_expr, body) ->
       (* Add to global accumulator for this function *)
       accumulate_phantom_let var defining_expr;
+      ensure_referenced_vars_named env sub_cfg defining_expr;
       let env = SU.env_add_phantom_let var env in
       emit_expr env sub_cfg body ~bound_name
     | Cname_for_debugger (var, body) -> (
@@ -865,6 +904,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (var, defining_expr, body) ->
       accumulate_phantom_let var defining_expr;
+      ensure_referenced_vars_named env sub_cfg defining_expr;
       let env = SU.env_add_phantom_let var env in
       emit_tail env sub_cfg body
     | Cname_for_debugger (_, body) ->
