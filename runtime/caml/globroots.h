@@ -17,6 +17,7 @@
 
 #ifndef CAML_GLOBROOTS_H
 #define CAML_GLOBROOTS_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

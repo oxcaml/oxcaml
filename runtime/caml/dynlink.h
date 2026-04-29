@@ -17,6 +17,7 @@
 
 #ifndef CAML_DYNLINK_H
 #define CAML_DYNLINK_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

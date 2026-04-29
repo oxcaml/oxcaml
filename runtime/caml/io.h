@@ -17,6 +17,7 @@
 
 #ifndef CAML_IO_H
 #define CAML_IO_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

@@ -14,10 +14,10 @@
 /**************************************************************************/
 
 #define _GNU_SOURCE  /* helps to find execvpe() */
+#define CAML_INTERNALS
 #include <string.h>
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
-#define CAML_INTERNALS
 #include <caml/osdeps.h>
 #include "caml/unixsupport.h"
 #include "errno.h"

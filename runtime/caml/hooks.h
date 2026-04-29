@@ -15,6 +15,7 @@
 
 #ifndef CAML_HOOKS_H
 #define CAML_HOOKS_H
+#include "guard.h"
 
 #include "misc.h"
 #include "memory.h"

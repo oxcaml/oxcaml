@@ -17,6 +17,7 @@
 
 #ifndef CAML_INTERP_H
 #define CAML_INTERP_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

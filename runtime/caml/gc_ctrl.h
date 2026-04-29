@@ -15,6 +15,7 @@
 
 #ifndef CAML_GC_CTRL_H
 #define CAML_GC_CTRL_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

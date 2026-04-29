@@ -15,6 +15,7 @@
 
 #ifndef CAML_BACKTRACE_H
 #define CAML_BACKTRACE_H
+#include "guard.h"
 
 #include "mlvalues.h"
 

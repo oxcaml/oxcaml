@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#define CAML_INTERNALS
 #include "caml/alloc.h"
 #include "caml/memory.h"
-#define CAML_INTERNALS
 #include "caml/gc_ctrl.h"
 
 

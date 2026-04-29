@@ -15,6 +15,7 @@
 
 #ifndef CAML_MLVALUES_H
 #define CAML_MLVALUES_H
+#include "guard.h"
 
 #include "config.h"
 #include "misc.h"

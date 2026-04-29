@@ -16,6 +16,7 @@
 
 #ifndef CAML_WINSUPPORT_H
 #define CAML_WINSUPPORT_H
+#include "guard.h"
 
 #if defined(_WIN32) && defined(CAML_INTERNALS)
 

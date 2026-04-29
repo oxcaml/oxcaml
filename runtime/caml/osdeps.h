@@ -17,6 +17,7 @@
 
 #ifndef CAML_OSDEPS_H
 #define CAML_OSDEPS_H
+#include "guard.h"
 
 #ifdef _WIN32
 #include <time.h>

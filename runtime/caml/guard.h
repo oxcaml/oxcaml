@@ -2,10 +2,9 @@
 /*                                                                        */
 /*                                 OCaml                                  */
 /*                                                                        */
-/*           Damien Doligez, Projet Moscova, INRIA Rocquencourt           */
+/*                   David Allsopp, Jane Street Europe                    */
 /*                                                                        */
-/*   Copyright 2003 Institut National de Recherche en Informatique et     */
-/*     en Automatique.                                                    */
+/*   Copyright 2026 Jane Street Group LLC                                 */
 /*                                                                        */
 /*   All rights reserved.  This file is distributed under the terms of    */
 /*   the GNU Lesser General Public License version 2.1, with the          */
@@ -13,16 +12,11 @@
 /*                                                                        */
 /**************************************************************************/
 
-#ifndef CAML_COMPARE_H
-#define CAML_COMPARE_H
-#include "guard.h"
-
-#ifdef CAML_INTERNALS
-
-#include "misc.h"
-
-CAMLextern int caml_compare_unordered;
-
-#endif /* CAML_INTERNALS */
-
-#endif /* CAML_COMPARE_H */
+#if defined(CAML_INTERNALS) && defined(CAML_NO_INTERNALS) || \
+    !defined(CAML_INTERNALS) && defined(CAML_WITH_INTERNALS)
+#error "Inconsistent use of CAML_INTERNALS"
+#elif defined(CAML_INTERNALS) && !defined(CAML_WITH_INTERNALS)
+#define CAML_WITH_INTERNALS
+#elif !defined(CAML_INTERNALS) && !defined(CAML_NO_INTERNALS)
+#define CAML_NO_INTERNALS
+#endif

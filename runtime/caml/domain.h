@@ -16,6 +16,7 @@
 
 #ifndef CAML_DOMAIN_H
 #define CAML_DOMAIN_H
+#include "guard.h"
 
 #ifdef __cplusplus
 extern "C" {

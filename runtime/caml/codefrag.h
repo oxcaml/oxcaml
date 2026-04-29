@@ -17,6 +17,7 @@
 
 #ifndef CAML_CODEFRAG_H
 #define CAML_CODEFRAG_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

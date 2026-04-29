@@ -17,6 +17,7 @@
 
 #ifndef CAML_DEBUGGER_H
 #define CAML_DEBUGGER_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

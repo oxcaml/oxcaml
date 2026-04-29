@@ -15,6 +15,7 @@
 
 #ifndef CAML_ROOTS_H
 #define CAML_ROOTS_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

@@ -15,6 +15,7 @@
 
 #ifndef CAML_BIGARRAY_H
 #define CAML_BIGARRAY_H
+#include "guard.h"
 
 #include "config.h"
 #include "mlvalues.h"

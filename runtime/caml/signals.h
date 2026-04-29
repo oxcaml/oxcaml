@@ -15,6 +15,7 @@
 
 #ifndef CAML_SIGNALS_H
 #define CAML_SIGNALS_H
+#include "guard.h"
 
 #if defined(CAML_INTERNALS)
 #include <signal.h>

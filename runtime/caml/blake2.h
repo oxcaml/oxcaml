@@ -17,6 +17,7 @@
 
 #ifndef CAML_BLAKE2_H
 #define CAML_BLAKE2_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

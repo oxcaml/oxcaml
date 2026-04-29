@@ -18,6 +18,7 @@
 
 #ifndef CAML_FRAME_DESCRIPTORS_H
 #define CAML_FRAME_DESCRIPTORS_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

@@ -20,6 +20,7 @@
 
 #ifndef CAML_SKIPLIST_H
 #define CAML_SKIPLIST_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

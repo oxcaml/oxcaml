@@ -15,6 +15,7 @@
 
 #ifndef CAML_GC_STATS_H
 #define CAML_GC_STATS_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

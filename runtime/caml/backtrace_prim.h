@@ -15,6 +15,7 @@
 
 #ifndef CAML_BACKTRACE_PRIM_H
 #define CAML_BACKTRACE_PRIM_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

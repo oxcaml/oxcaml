@@ -15,6 +15,7 @@
 
 #ifndef CAML_FINALISE_H
 #define CAML_FINALISE_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 
