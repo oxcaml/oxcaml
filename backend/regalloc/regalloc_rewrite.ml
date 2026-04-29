@@ -470,11 +470,9 @@ let postlude : type s.
  fun (module State : State with type t = s) (module Utils) state ~f
      cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   Profile.record ~accumulate:true "push_pop_around_calls"
     (fun () -> Push_pop_around_calls.run cfg_with_infos)
     ();
-  Cfg_with_infos.invalidate_liveness cfg_with_infos;
   (* note: slots need to be updated before prologue removal *)
   Profile.record ~accumulate:true "stack_slots_optimize"
     (fun () ->
