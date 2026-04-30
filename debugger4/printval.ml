@@ -93,13 +93,13 @@ let print_exception ppf obj =
   let t = Printer.outval_of_untyped_exception obj in
   !Oprint.out_value ppf t
 
-let print_value max_depth env obj (ppf : Format.formatter) (lpoly, ty) =
+let print_value max_depth env obj (ppf : Format.formatter) ty =
   let t =
     Printer.outval_of_value !max_printer_steps max_depth
-      check_depth env obj lpoly ty in
+      check_depth env obj (Lpoly.determined []) ty in
   !Oprint.out_value ppf t
 
-let print_named_value max_depth exp env obj ppf (lpoly, ty) =
+let print_named_value max_depth exp env obj ppf ty =
   let print_value_name ppf = function
   | E_ident lid ->
       Printtyp.longident ppf lid
@@ -111,4 +111,4 @@ let print_named_value max_depth exp env obj ppf (lpoly, ty) =
   fprintf ppf "@[<2>%a:@ %a@ =@ %a@]@."
   print_value_name exp
   Printtyp.type_expr ty
-  (print_value max_depth env obj) (lpoly, ty)
+  (print_value max_depth env obj) ty

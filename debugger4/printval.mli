@@ -20,10 +20,10 @@ val max_printer_depth : int ref
 val max_printer_steps : int ref
 
 val print_exception: formatter -> Debugcom.Remote_value.t -> unit
+(** The type_expr must not be layout-polymorphic. *)
 val print_named_value :
   int -> Parser_aux.expression -> Env.t ->
-    Debugcom.Remote_value.t -> formatter -> Types.Lpoly.t * Types.type_expr ->
-    unit
+    Debugcom.Remote_value.t -> formatter -> Types.type_expr -> unit
 
 val reset_named_values : unit -> unit
 val find_named_value : int -> Debugcom.Remote_value.t * Types.type_expr
