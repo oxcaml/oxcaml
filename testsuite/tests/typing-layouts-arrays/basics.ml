@@ -247,7 +247,7 @@ Line 11, characters 79-82:
 <<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
          "('a : bits32 mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "int64#" but an expression was expected of type
          "('a : bits32 mod separable)"
 =======
@@ -298,7 +298,7 @@ Line 2, characters 39-44:
 <<<<<<< HEAD
 Error: This constant has type "float#" but an expression was expected of type
          "('a : value_or_null mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "float#" but an expression was expected of type
          "('a : value_or_null mod separable)"
 =======
@@ -322,7 +322,7 @@ Line 2, characters 39-43:
 <<<<<<< HEAD
 Error: This constant has type "int32#" but an expression was expected of type
          "('a : value_or_null mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "int32#" but an expression was expected of type
          "('a : value_or_null mod separable)"
 =======
@@ -346,7 +346,7 @@ Line 2, characters 39-43:
 <<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
          "('a : value_or_null mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "int64#" but an expression was expected of type
          "('a : value_or_null mod separable)"
 =======
@@ -371,7 +371,7 @@ Line 2, characters 39-43:
 Error: This constant has type "nativeint#"
        but an expression was expected of type
          "('a : value_or_null mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "nativeint#"
        but an expression was expected of type
          "('a : value_or_null mod separable)"
@@ -396,7 +396,7 @@ Line 2, characters 39-45:
 <<<<<<< HEAD
 Error: This constant has type "float32#" but an expression was expected of type
          "('a : value_or_null mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "float32#"
        but an expression was expected of type
          "('a : value_or_null mod separable)"

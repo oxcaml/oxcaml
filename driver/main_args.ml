@@ -1137,7 +1137,7 @@ module type Common_options = sig
   val _alert : string -> unit
 <<<<<<< HEAD
   val _i_variance : unit -> unit
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
   val _ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
@@ -2373,7 +2373,7 @@ module Default = struct
     let _alert = Warnings.parse_alert_option
 <<<<<<< HEAD
     let _alias_deps = clear no_alias_deps
-||||||| 9790921724
+||||||| 5.2.0minus-31
     let _alias_deps = clear transparent_modules
 =======
     let _ikinds = set Clflags.ikinds

@@ -62,7 +62,7 @@ let scrape_ty env ty =
   | Tconstr _ ->
       let ty = Ctype.expand_head_opt env ty in
       begin match get_desc ty with
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Tconstr _ ->
       let ty = Ctype.correct_levels ty in
       let ty' = Ctype.expand_head_opt env ty in
@@ -80,7 +80,7 @@ let scrape_ty env ty =
           | Some _ -> Some (Ctype.get_unboxed_type_approximation env ty).ty
           | None -> Some ty
           | exception Not_found -> None
-||||||| 9790921724
+||||||| 5.2.0minus-31
           | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
           | None -> ty'
           | exception Not_found -> ty (* missing cmi file *)
@@ -178,7 +178,7 @@ let classify ~classify_product env ty sort : _ classification =
   match scrape_ty env ty with
   | None -> Any
   | Some ty ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Base Value -> begin
 =======
   | Base Scannable -> begin
@@ -1282,7 +1282,7 @@ let report_error ppf = function
 <<<<<<< HEAD
            ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) env) err
-||||||| 9790921724
+||||||| 5.2.0minus-31
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) env) err
 =======
@@ -1348,7 +1348,7 @@ let report_error ppf = function
 <<<<<<< HEAD
            ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) env) err
-||||||| 9790921724
+||||||| 5.2.0minus-31
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) env) err
 =======
@@ -1392,7 +1392,7 @@ let report_error ppf = function
 <<<<<<< HEAD
              ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
              ~level:(Ctype.get_current_level ()) env) err
-||||||| 9790921724
+||||||| 5.2.0minus-31
              ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
              ~level:(Ctype.get_current_level ()) env) err
 =======

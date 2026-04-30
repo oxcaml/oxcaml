@@ -25,7 +25,7 @@ Line 2, characters 2-52:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f_immediate
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-52:
 2 |   val f_immediate : ('a : immediate). 'a -> 'a -> 'a
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,7 +48,7 @@ Line 2, characters 2-48:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f_immediate
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-48:
 2 |   val f_immediate : ('a : immediate) -> 'a -> 'a
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -71,7 +71,7 @@ Line 2, characters 2-25:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in t
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-25:
 2 |   type ('a : immediate) t
       ^^^^^^^^^^^^^^^^^^^^^^^
@@ -94,7 +94,7 @@ Line 2, characters 2-43:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in g
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-43:
 2 |   type _ g = | MkG : ('a : immediate). 'a g
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -115,7 +115,7 @@ Line 1, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 1, characters 4-5:
 1 | let f (type a : immediate): a -> a = fun x -> x
         ^
@@ -136,7 +136,7 @@ Line 1, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 1, characters 4-5:
 1 | let f x = (x : (_ : immediate))
         ^
@@ -157,7 +157,7 @@ Line 1, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 1, characters 4-5:
 1 | let f v: ((_ : immediate)[@error_message "Custom message"]) = v
         ^
@@ -181,7 +181,7 @@ Line 2, characters 2-56:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f_immediate64
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-56:
 2 |   val f_immediate64 : ('a : immediate64). 'a -> 'a -> 'a
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -205,7 +205,7 @@ Line 2, characters 2-52:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f_immediate64
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-52:
 2 |   val f_immediate64 : ('a : immediate64) -> 'a -> 'a
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -229,7 +229,7 @@ Line 2, characters 2-27:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in t
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-27:
 2 |   type ('a : immediate64) t
       ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -252,7 +252,7 @@ Line 2, characters 2-45:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in g
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 2, characters 2-45:
 2 |   type _ g = | MkG : ('a : immediate64). 'a g
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -273,7 +273,7 @@ Line 1, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 1, characters 4-5:
 1 | let f (type a : immediate64): a -> a = fun x -> x
         ^
@@ -294,7 +294,7 @@ Line 1, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 1, characters 4-5:
 1 | let f x = (x : (_ : immediate64))
         ^
@@ -315,7 +315,7 @@ Line 1, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 1, characters 4-5:
 1 | let f v: ((_ : immediate64)[@error_message "Custom message"]) = v
         ^
@@ -344,7 +344,7 @@ Line 6, characters 2-49:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 6, characters 2-49:
 6 |   val f : 'a -> (module S with type t = 'a) -> 'a
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -381,7 +381,7 @@ Line 3, characters 2-42:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 3, characters 2-42:
 3 |   val f : ('a id as (_ : immediate)) -> 'a
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -410,7 +410,7 @@ Line 5, characters 4-5:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in f
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 5, characters 4-5:
 5 | let f (module _ : S with type t = 'a) (x : 'a) = x
         ^
@@ -827,7 +827,7 @@ module M6 : sig type ('a : immediate) t = 'a * 'a end
 |}]
 
 (* More disabled warnings. *)
-||||||| 9790921724
+||||||| 5.2.0minus-31
 (* Disabling warnings *)
 
 module M4 : sig

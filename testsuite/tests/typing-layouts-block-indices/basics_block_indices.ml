@@ -397,7 +397,7 @@ Error: This constant has type "string" but an expression was expected of type
          "int"
 |}]
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let bad_index_type = (.("test"))
 [%%expect{|
 Line 1, characters 24-30:
@@ -786,7 +786,7 @@ Line 3, characters 23-24:
 3 |   Idx_mut.unsafe_get x y
                            ^
 Error: The value "y" has type "('a array, 'a) idx_mut"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 3, characters 23-24:
 3 |   Idx_mut.unsafe_get x y
                            ^
@@ -947,7 +947,7 @@ Line 5, characters 11-12:
                ^
 Warning 18 [not-principal]: this type-based unboxed record field disambiguation
   is not principal.
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 5, characters 11-12:
 5 |     (.(1).#x)
                ^
@@ -979,7 +979,7 @@ Line 5, characters 14-15:
                   ^
 Warning 18 [not-principal]: this type-based unboxed record field disambiguation
   is not principal.
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 5, characters 14-15:
 5 |     (.(1).#a.#x)
                   ^

@@ -16,7 +16,7 @@
 open Out_type
 module Fmt = Format_doc
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 open Format_doc
 
 let longident = Pprintast.Doc.longident
@@ -835,7 +835,7 @@ let signature = Fmt.compat signature
 let class_declaration = Fmt.compat1 class_declaration
 let class_type = Fmt.compat class_type
 let cltype_declaration = Fmt.compat1 cltype_declaration
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let () = Env.print_path := path
 let () = Jkind.set_printtyp_path path
 
@@ -5617,7 +5617,7 @@ let () =
     List.map (tree_of_typexp Type) tys);
   Jkind.set_outcometree_of_modalities tree_of_modalities;
   Jkind.set_print_type_expr Doc.type_expr
-||||||| 9790921724
+||||||| 5.2.0minus-31
 (* A configuration type that controls which trace we print.  This could be
    exposed, but we instead expose three separate
    [report_{unification,equality,moregen}_error] functions.  This also lets us

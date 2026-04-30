@@ -236,7 +236,7 @@ Line 2, characters 31-32:
 Error: The value "x" has type "int -> int" but an expression was expected of type
          "'a t" = "('a : void)"
        The layout of int -> int is value
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "int -> int"
        but an expression was expected of type "'a t" = "('a : void)"
        The layout of int -> int is value

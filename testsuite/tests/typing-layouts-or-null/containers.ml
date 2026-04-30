@@ -95,7 +95,7 @@ Error: The constant "3.4" has type "float" but an expression was expected of typ
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
@@ -203,7 +203,7 @@ Error: The constant "3.4" has type "float" but an expression was expected of typ
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is

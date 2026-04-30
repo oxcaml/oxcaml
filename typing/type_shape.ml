@@ -321,7 +321,7 @@ module Type_shape = struct
                 | Trepr (_, _)
 <<<<<<< HEAD
                 | Tpackage _ | Tquote _ | Tsplice _ | Tof_kind _ ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
                 | Tpackage (_, _)
                 | Tquote _ | Tsplice _ | Tof_kind _ ->
 =======

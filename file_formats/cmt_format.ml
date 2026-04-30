@@ -306,8 +306,8 @@ let iter_on_occurrences
 <<<<<<< HEAD
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _
-||||||| 9790921724
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
+||||||| 5.2.0minus-31
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
 =======
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _

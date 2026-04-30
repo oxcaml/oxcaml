@@ -44,7 +44,7 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
        (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
           reference to the Standard Library when -nostdlib was specified. *)
        (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
-||||||| 9790921724
+||||||| 5.2.0minus-31
        Config.flexdll_dirs;
 =======
        List.map

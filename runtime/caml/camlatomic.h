@@ -28,7 +28,7 @@
 #ifdef __cplusplus
 extern "C++" {
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 #include <atomic>
 #define ATOMIC_UINTNAT_INIT(x) (x)
 typedef std::atomic<uintnat> atomic_uintnat;
@@ -47,7 +47,7 @@ using std::memory_order_acq_rel;
 using std::memory_order_seq_cst;
 }
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 
 #elif defined(HAS_STDATOMIC_H)
 

@@ -2979,7 +2979,7 @@ let rec package_constraints_sig env loc sg constrs =
 <<<<<<< HEAD
           let td = {td with type_manifest = Some ty} in
           Sig_type (id, td, rs, priv)
-||||||| 9790921724
+||||||| 5.2.0minus-31
           Sig_type (id, {td with type_manifest = Some ty}, rs, priv)
 =======
           let reason =

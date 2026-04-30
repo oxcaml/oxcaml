@@ -206,7 +206,7 @@ module Pattern_env : sig
     }
 <<<<<<< HEAD
   val make: Env.t -> equations_scope:int -> in_counterexample:bool -> t
-||||||| 9790921724
+||||||| 5.2.0minus-31
   val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
 =======
   val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
@@ -375,7 +375,7 @@ val deep_occur_list: type_expr -> type_expr list -> bool
 <<<<<<< HEAD
 val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
         (* Check if the first type scheme is more general than the second. *)
-||||||| 9790921724
+||||||| 5.2.0minus-31
 val deep_occur: type_expr -> type_expr -> bool
         (* Check whether a type occurs structurally within another. *)
 val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit

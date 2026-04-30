@@ -174,7 +174,7 @@ Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type
          "('b : value_or_null mod non_null)"
        The kind of 'a Or_null.t is value_or_null mod everything with 'a
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type
          "('b : value_or_null mod non_null)"

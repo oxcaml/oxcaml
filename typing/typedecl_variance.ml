@@ -119,7 +119,7 @@ let compute_variance env visited vari ty =
         let v = Variance.(compose vari full) in
 <<<<<<< HEAD
         List.iter (fun (_, ty) -> compute_variance_rec v ty) pack.pack_cstrs
-||||||| 9790921724
+||||||| 5.2.0minus-31
         List.iter (fun (_, ty) -> compute_variance_rec v ty) fl
 =======
         List.iter (fun (_, ty) -> compute_variance_rec env v ty) fl

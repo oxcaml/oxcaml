@@ -5053,7 +5053,7 @@ let report_lookup_error_doc loc env = function
                 line
              ]
         )
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let quoted_longident = Style.as_inline_code pp_longident
 
 let report_lookup_error_doc ~level _loc env ppf = function
@@ -5315,7 +5315,7 @@ let report_lookup_error_doc _loc env ppf = function
            ~offender:(fun ppf -> !print_type_expr ppf typ)
 <<<<<<< HEAD
            ~level:Btype.generic_level env ppf v)
-||||||| 9790921724
+||||||| 5.2.0minus-31
            ~level env v)
 =======
            env v)
@@ -5377,7 +5377,7 @@ let report_lookup_error_doc _loc env ppf = function
 let report_error_doc = function
   | Missing_module(loc, path1, path2) ->
      let pp_path path1 path2 ppf =
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let report_error_doc ~level ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
@@ -5408,7 +5408,7 @@ let report_error_doc ppf = function
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Lookup_error(loc, t, err) -> report_lookup_error_doc ~level loc t ppf err
 =======
   | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t ppf err
@@ -5437,7 +5437,7 @@ let () =
       | Error err ->
 <<<<<<< HEAD
           Some (report_error_doc err)
-||||||| 9790921724
+||||||| 5.2.0minus-31
           let loc =
             match err with
             | Missing_module (loc, _, _)
@@ -5486,7 +5486,7 @@ let () =
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 
 let report_lookup_error ~level loc t =
   Format_doc.compat (report_lookup_error_doc ~level loc t)

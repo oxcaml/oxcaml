@@ -30,7 +30,7 @@ Line 4, characters 2-27:
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in g
   can't be erased for compatibility with upstream OCaml.
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Line 4, characters 2-27:
 4 |   val g : 'elt array -> int
       ^^^^^^^^^^^^^^^^^^^^^^^^^

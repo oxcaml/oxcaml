@@ -147,7 +147,7 @@ and out_type =
   | Otyp_repr of string list * out_type
 <<<<<<< HEAD
   | Otyp_module of out_package
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Otyp_module of out_ident * (string * out_type) list
 =======
   | Otyp_newlayout of out_sort_genvar list * out_type

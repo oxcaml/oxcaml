@@ -390,7 +390,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   match exp_desc with
 <<<<<<< HEAD
   | Texp_ident (_, lid, _, _, _, _)  -> iter_loc_lid sub lid
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Texp_ident (_, lid, _, _, _, _)  -> iter_loc sub lid
 =======
   | Texp_ident { lid; _ } -> iter_loc sub lid

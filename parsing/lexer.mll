@@ -96,7 +96,7 @@ let all_keywords =
     "open", OPEN, always;
     "or", OR, always;
     "overwrite_", OVERWRITE, oxcaml;
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let keyword_table =
   create_hashtable 149 [
     "and", AND;

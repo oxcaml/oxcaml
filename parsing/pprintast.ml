@@ -503,7 +503,7 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
 <<<<<<< HEAD
   | Pjk_abbreviation s -> value_longident_loc f s
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Pjk_abbreviation s -> longident_loc f s
 =======
   | Pjk_abbreviation (s, sa) ->
@@ -1597,7 +1597,7 @@ and with_constraint ctxt f = function
       pp f "module type %a =@ %a"
         (with_loc type_longident) li
         (module_type ctxt) mty;
-||||||| 9790921724
+||||||| 5.2.0minus-31
       pp f "module type %a =@ %a" longident_loc li (module_type ctxt) mty;
 =======
       pp f "module type %a =@ %a" longident_loc li (module_type ctxt) mty;
@@ -1616,7 +1616,7 @@ and with_constraint ctxt f = function
       pp f "module type %a :=@ %a"
         (with_loc type_longident) li
         (module_type ctxt) mty;
-||||||| 9790921724
+||||||| 5.2.0minus-31
       pp f "module type %a :=@ %a" longident_loc li (module_type ctxt) mty;
 =======
       pp f "module type %a :=@ %a" longident_loc li (module_type ctxt) mty;
@@ -2354,7 +2354,7 @@ and block_access ctxt f = function
       | Index_unboxed_nativeint -> "n"
     in
     pp f "%s%s(%a)" dotop suffix (expression ctxt) index
-||||||| 9790921724
+||||||| 5.2.0minus-31
     pp f ".%a" longident_loc li
   | Baccess_array (mut, index_kind, index) ->
     let dotop =

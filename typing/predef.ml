@@ -370,7 +370,7 @@ and path_unboxed_float64x8 = Path.unboxed_version path_float64x8
 <<<<<<< HEAD
 let path_of_type_constr typ =
   Pident (ident_of_type_constr typ)
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let type_int = newgenty (Tconstr(path_int, [], ref Mnil))
 and type_int8 = newgenty (Tconstr(path_int8, [], ref Mnil))
 and type_int16 = newgenty (Tconstr(path_int16, [], ref Mnil))
@@ -648,7 +648,7 @@ let decl_of_type_constr tconstr =
       ?(unboxed_jkind : Jkind.Const.Builtin.t option)
       ()
     =
-||||||| 9790921724
+||||||| 5.2.0minus-31
 
 let mk_add_type add_type =
   let add_type_with_jkind
@@ -716,7 +716,7 @@ let mk_add_type add_type =
      type_uid;
      type_unboxed_version;
     }
-||||||| 9790921724
+||||||| 5.2.0minus-31
     let decl =
       {type_params = [];
       type_arity = 0;
@@ -765,7 +765,7 @@ let mk_add_type add_type =
   let decl1
       ~variance
       ~(param_jkind : jkind_lr)
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let add_type ?manifest type_ident ?kind ~jkind ?unboxed_jkind env =
     let jkind = Jkind.of_builtin ~why:(Primitive type_ident) jkind in
     add_type_with_jkind ?manifest type_ident ?kind ~jkind ?unboxed_jkind env
@@ -794,7 +794,7 @@ let mk_add_type1 add_type type_ident
     let param = newgenvar param_jkind in
     { (decl0 ~jkind:(jkind param) ~kind:(kind param) ()) with
       type_params = [param];
-||||||| 9790921724
+||||||| 5.2.0minus-31
       ?(param_jkind=Jkind.Builtin.value ~why:(
         Type_argument {
           parent_path = Path.Pident type_ident;
@@ -821,7 +821,7 @@ let mk_add_type1 add_type type_ident
 >>>>>>> 5.2.0minus-37
       type_arity = 1;
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
       type_kind = kind param;
       type_jkind = Jkind.mark_best (jkind param);
       type_loc = Location.none;
@@ -851,7 +851,7 @@ let mk_add_type1 add_type type_ident
     let param1, param2 = newgenvar param_jkind1, newgenvar param_jkind2 in
     { (decl0 ~kind:(kind param1 param2) ~jkind:(jkind param1 param2) ()) with
       type_params = [param1; param2];
-||||||| 9790921724
+||||||| 5.2.0minus-31
   add_type type_ident decl env
 
 let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
@@ -876,7 +876,7 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
 <<<<<<< HEAD
       type_variance = [var1; var2];
       type_separability = [sep1; sep2];
-||||||| 9790921724
+||||||| 5.2.0minus-31
       type_kind = Type_abstract Definition;
       type_jkind = Jkind.mark_best jkind;
       type_loc = Location.none;
@@ -918,7 +918,7 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
           Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
       in
       Constructor_uniform_value, sorts
-||||||| 9790921724
+||||||| 5.2.0minus-31
   add_type type_ident decl env
 
 let mk_add_extension add_extension id args =
@@ -1157,7 +1157,7 @@ let mk_add_jkind add_jkind =
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(
          Jkind.Builtin.value ~why:(Type_argument {
-||||||| 9790921724
+||||||| 5.2.0minus-31
   |> add_type2 ident_idx_imm
        ~param1_jkind:(
          Jkind.Builtin.value ~why:(Type_argument {
@@ -1182,7 +1182,7 @@ let mk_add_jkind add_jkind =
     decl2 ~variance:(Variance.full, Variance.full)
        ~param_jkinds:(
          Jkind.Builtin.value ~why:(Type_argument {
-||||||| 9790921724
+||||||| 5.2.0minus-31
        ~jkind:(
          Jkind.of_builtin ~why:(Primitive ident_idx_imm)
            Jkind.Const.Builtin.kind_of_idx)
@@ -1404,7 +1404,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
   List.fold_left (fun env tconstr ->
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
   ) empty_env base_type_constrs
-||||||| 9790921724
+||||||| 5.2.0minus-31
            ~why:(Primitive ident_lexing_position) |>
          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
@@ -1479,7 +1479,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
 <<<<<<< HEAD
        Jkind_types.Sort.Const.value]
   |> add_extension ident_continuation_already_taken []
-||||||| 9790921724
+||||||| 5.2.0minus-31
        Jkind_types.Sort.Const.value]
 =======
        Jkind_types.Sort.Const.scannable]
@@ -1511,7 +1511,7 @@ let add_small_number_extension_types add_type env =
 
 <<<<<<< HEAD
 let add_small_number_beta_extension_types _add_type env = env
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let add_small_number_beta_extension_types _add_type env =
   env
 

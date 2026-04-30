@@ -4477,7 +4477,7 @@ and compile_no_test ~scopes value_kind divide up_ctx repr partial ctx to_match =
 (* The entry points *)
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 (*
    If there is a guard in a matching or a lazy pattern,
    then set exhaustiveness info to Partial.

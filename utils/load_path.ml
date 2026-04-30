@@ -360,7 +360,7 @@ end = struct
           STbl.replace !visible_files_uncap ubase fn
         end)
       (Misc.normalized_unit_filename base)
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let prepend_add_single ~hidden base fn =
     if hidden then begin
       STbl.replace !hidden_files base fn;
@@ -413,7 +413,7 @@ end = struct
 <<<<<<< HEAD
   let find_in fn visible_files hidden_files =
     try (STbl.find !visible_files fn, Visible) with
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let find fn visible_files hidden_files =
     try (STbl.find !visible_files fn, Visible) with
 =======
@@ -614,7 +614,7 @@ let find_normalized_with_visibility fn =
   with Not_found ->
 <<<<<<< HEAD
     (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
-||||||| 9790921724
+||||||| 5.2.0minus-31
     let fn_uncap = String.uncapitalize_ascii fn in
     (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
 =======

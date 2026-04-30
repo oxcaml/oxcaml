@@ -338,7 +338,7 @@
  * all post-allocation callbacks, are run during
 <<<<<<< HEAD
  * `caml_memprof_run_callbacks_res()`, which is called by the
-||||||| 9790921724
+||||||| 5.2.0minus-31
  * `caml_memprof_run_callbacks_exn()`, which is called by the
 =======
  * `caml_memprof_do_pending_exn()`, which is called by the
@@ -349,7 +349,7 @@
  * pending callbacks. Caml drops into the runtime at a poll point, and
 <<<<<<< HEAD
  * calls `caml_memprof_run_callbacks_res()`, whenever the
-||||||| 9790921724
+||||||| 5.2.0minus-31
  * calls `caml_memprof_run_callbacks_exn()`, whenever the
 =======
  * calls `caml_memprof_do_pending_exn()`, whenever the
@@ -1196,7 +1196,7 @@ static void rand_batch(memprof_domain_t domain, value config)
 {
 <<<<<<< HEAD
   float one_log1m_lambda = One_log1m_lambda(domain->entries.config);
-||||||| 9790921724
+||||||| 5.2.0minus-31
   int i;
   float one_log1m_lambda = One_log1m_lambda(domain->entries.config);
 =======
@@ -1945,7 +1945,7 @@ static caml_result run_alloc_callback_res(memprof_thread_t thread,
   return run_callback_res(thread, es, i, callback, sample_info, CB_ALLOC);
 }
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 /* Run the allocation callback for a given entry of an entries array.
  * Returns Val_unit or an exception result. */
 
@@ -2010,7 +2010,7 @@ static caml_result entries_run_callbacks_res(memprof_thread_t thread,
 <<<<<<< HEAD
         res = run_alloc_callback_res(thread, es, i);
         if (caml_result_is_exception(res)) break;
-||||||| 9790921724
+||||||| 5.2.0minus-31
         res = run_alloc_callback_exn(thread, es, i);
         if (Is_exception_result(res)) break;
 =======
@@ -2053,7 +2053,7 @@ static caml_result entries_run_callbacks_res(memprof_thread_t thread,
 
 <<<<<<< HEAD
 caml_result caml_memprof_run_callbacks_res(void)
-||||||| 9790921724
+||||||| 5.2.0minus-31
 value caml_memprof_run_callbacks_exn(void)
 =======
 static value domain_run_callbacks_exn(memprof_domain_t domain)
@@ -2492,7 +2492,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 
   /* reset PRNG, generate first batch of random numbers. */
   rand_init(domain);
-||||||| 9790921724
+||||||| 5.2.0minus-31
 
   set_config(domain, config);
 

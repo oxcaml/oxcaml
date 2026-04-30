@@ -1202,7 +1202,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           pack_path = path;
           pack_cstrs = List.map (fun (s, cty) ->
                          (Longident.flatten s.txt, cty.ctyp_type)) ptys})
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Ptyp_package (p, l) ->
     (* CR layouts: right now we're doing a real gross hack where we demand
        everything in a package type with constraint be value.
@@ -1988,7 +1988,7 @@ let report_error_doc loc env = function
 <<<<<<< HEAD
            ~offender:(fun ppf -> pp_type ppf typ)
            ~level:(get_current_level ()) env) err
-||||||| 9790921724
+||||||| 5.2.0minus-31
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
            ~level:(get_current_level ()) env) err
@@ -2008,7 +2008,7 @@ let report_error_doc loc env = function
 <<<<<<< HEAD
            ~offender:(fun ppf -> pp_type ppf typ)
            ~level:(get_current_level ()) env) err
-||||||| 9790921724
+||||||| 5.2.0minus-31
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
            ~level:(get_current_level ()) env) err
@@ -2023,7 +2023,7 @@ let report_error_doc loc env = function
 <<<<<<< HEAD
          ~offender:(fun ppf -> pp_type ppf ty)
          ~level:(get_current_level ()) env) violation
-||||||| 9790921724
+||||||| 5.2.0minus-31
          ~offender:(fun ppf ->
              Style.as_inline_code Printtyp.type_expr ppf ty)
          ~level:(get_current_level ()) env) violation

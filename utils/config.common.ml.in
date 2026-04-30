@@ -120,7 +120,7 @@ let configuration_variables () =
   p_bool "with_cpp_mangling" with_cpp_mangling;
 <<<<<<< HEAD
   p_bool "with_nonexecstack_note" with_nonexecstack_note;
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
   p "name_mangling_scheme" name_mangling_scheme_string;
 >>>>>>> 5.2.0minus-37

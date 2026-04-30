@@ -2856,7 +2856,7 @@ let type_for_annotation ~env ~loc typ =
             Location.print_loc_in_lowercase loc
 <<<<<<< HEAD
         | Tpackage { pack_path; pack_cstrs } ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
         | Tpackage (pack_path, pack_fields) ->
 =======
         | Tquote_eval _ ->

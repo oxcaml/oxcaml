@@ -2197,7 +2197,7 @@ Line 3, characters 30-31:
 <<<<<<< HEAD
 Error: The value "x" has type "a" but an expression was expected of type
          "('a : '_representable_layout_21 & value_or_null mod separable)"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "a" but an expression was expected of type
          "('a : '_representable_layout_21 & value_or_null mod separable)"
 =======

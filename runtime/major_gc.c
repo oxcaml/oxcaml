@@ -43,7 +43,7 @@
 #include "caml/minor_gc.h"
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 /* NB the MARK_STACK_INIT_SIZE must be larger than the number of objects
    that can be in a pool, see POOL_WSIZE */
 #define MARK_STACK_INIT_SIZE (1 << 12)
@@ -203,7 +203,7 @@ static atomic_uintnat num_domains_to_final_update_last;
 static atomic_uintnat num_domains_orphaning_finalisers = 0;
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 /* The GC uses separate units to count marking work and sweeping work, which are
    converted with these functions (following the Dest_source convention).
    In general, sweep units are the default, with conversions to/from mark units
@@ -1145,7 +1145,7 @@ static uintnat gc_slice_work(uintnat allocated_words,
       }
 
       return max2 (alloc_work, offheap_work);
-||||||| 9790921724
+||||||| 5.2.0minus-31
       /*
          Free memory at the start of the GC cycle (garbage + free list) (assumed):
                      FM = heap_words * caml_percent_free
@@ -1256,7 +1256,7 @@ static uintnat gc_slice_work(uintnat allocated_words,
   default:
     caml_fatal_error("Unknown GC pacing policy %"ARCH_INTNAT_PRINTF_FORMAT"u.",
                      caml_gc_pacing_policy);
-||||||| 9790921724
+||||||| 5.2.0minus-31
   case GC_PACING_2025: {
     /* Shiny new 2025 Doligez/Dolan pacing policy */
     double sweep_per_mark = (double)caml_percent_sweep_per_mark / 100.0;
@@ -1350,7 +1350,7 @@ update_major_slice_work(intnat howmuch,
 <<<<<<< HEAD
     gc_slice_work(heap_words,
                   my_alloc_count - my_suspended_count + my_resumed_count,
-||||||| 9790921724
+||||||| 5.2.0minus-31
     gc_slice_work(heap_words,
                   my_alloc_count,
 =======
@@ -1381,7 +1381,7 @@ update_major_slice_work(intnat howmuch,
                   F_U" minor. Heap: "F_U" words. "
                   "Work: "F_D" work, "F_D" new_work, "
                   F_D" slice_budget\n",
-||||||| 9790921724
+||||||| 5.2.0minus-31
   CAML_GC_MESSAGE(POLICY, "Major slice [%c] work. Policy="
                   "%"ARCH_INTNAT_PRINTF_FORMAT "u. Allocation: "
                   "%"ARCH_INTNAT_PRINTF_FORMAT "u words, "
@@ -2060,7 +2060,7 @@ void caml_darken(void* state, value v, volatile value* ignored) {
 /*******************************************************************************
  * Root Marking
  ******************************************************************************/
-||||||| 9790921724
+||||||| 5.2.0minus-31
 static intnat ephe_mark (intnat budget, uintnat for_cycle,
                          /* Forces ephemerons and their data to be alive */
                          int force_alive)

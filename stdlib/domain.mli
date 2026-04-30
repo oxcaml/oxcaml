@@ -56,7 +56,7 @@ val self : unit -> id @@ portable
 (** [self ()] is the identifier of the currently running domain *)
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)

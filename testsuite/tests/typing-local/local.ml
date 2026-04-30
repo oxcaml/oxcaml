@@ -1467,7 +1467,7 @@ val foo : 'a -> 'a = <fun>
 <<<<<<< HEAD
 |}, Principal{|
 val foo : 'a -> 'a = <fun>
-||||||| 9790921724
+||||||| 5.2.0minus-31
 |}, Principal{|
 val foo : '_weak1 -> '_weak1 = <fun>
 =======
@@ -1485,7 +1485,7 @@ val foo : 'a -> 'a = <fun>
 <<<<<<< HEAD
 |}, Principal{|
 val foo : 'a -> 'a = <fun>
-||||||| 9790921724
+||||||| 5.2.0minus-31
 |}, Principal{|
 val foo : '_weak2 -> '_weak2 = <fun>
 =======
@@ -1581,7 +1581,7 @@ val foo : 'a -> 'a = <fun>
 <<<<<<< HEAD
 |}, Principal{|
 val foo : 'a -> 'a = <fun>
-||||||| 9790921724
+||||||| 5.2.0minus-31
 |}, Principal{|
 val foo : '_weak3 -> '_weak3 = <fun>
 =======

@@ -180,7 +180,7 @@ G(name):
 #define DW_REG_rsp                7
 #define DW_REG_r13                13
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 #define DW_OP_breg                0x70
 #define DW_OP_deref               0x06
 #define DW_OP_plus_uconst         0x23

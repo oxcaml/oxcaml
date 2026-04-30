@@ -1070,7 +1070,7 @@ let compile_letrec input_bindings body =
     List.fold_left (fun body (id, duid, size, _lam) ->
 <<<<<<< HEAD
         let alloc = compile_alloc size in
-||||||| 9790921724
+||||||| 5.2.0minus-31
         let alloc_prim, const_args =
           match size with
           | Regular_block size -> alloc_prim, [size]

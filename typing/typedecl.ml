@@ -3013,7 +3013,7 @@ let name_recursion sdecl id decl =
       link_type ty (Btype.newty2 ~level:(get_level ty) td);
       {decl with type_manifest = Some ty'}
     else decl
-||||||| 9790921724
+||||||| 5.2.0minus-31
       link_type ty (newty2 ~level:(get_level ty) td);
       {decl with type_manifest = Some ty'}
     else decl
@@ -4870,7 +4870,7 @@ module Reaching_path = struct
           Fmt.fprintf ppf "%a contains %a"
             (Style.as_inline_code Out_type.prepared_type_expr) outer
             (Style.as_inline_code Out_type.prepared_type_expr) inner
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let pp ppf reaching_path =
     let pp_step ppf = function
       | Expands_to (ty, body) ->
@@ -4910,7 +4910,7 @@ module Reaching_path = struct
 <<<<<<< HEAD
   let pp_colon ppf path =
     Fmt.fprintf ppf ":@\n  @[<v>%a@]" pp path
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let pp_colon ppf path =
     Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
 =======
@@ -5099,7 +5099,7 @@ let report_error ~loc = function
         "@[This variant or record definition@ \
          does not match that of type@;<1 2>%a@]%t"
         quoted_type ty
-||||||| 9790921724
+||||||| 5.2.0minus-31
         Reaching_path.pp_colon reaching_path
   | Definition_mismatch (ty, _env, None) ->
       fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]@]"
@@ -5173,7 +5173,7 @@ let report_error ~loc = function
              fprintf pp "@ after the following expansion(s)%a"
              Reaching_path.pp_colon reaching_path
            else fprintf pp ".")
-||||||| 9790921724
+||||||| 5.2.0minus-31
              fprintf pp "@ after the following expansion(s)%a@ "
              Reaching_path.pp_colon reaching_path
            else fprintf pp ".@ ")
@@ -5278,7 +5278,7 @@ let report_error ~loc = function
   | Multiple_native_repr_attributes ->
 <<<<<<< HEAD
       Location.errorf ~loc "Too many %a/%a attributes"
-||||||| 9790921724
+||||||| 5.2.0minus-31
       fprintf ppf "Too many %a/%a attributes"
 =======
       fprintf ppf "Too many %a/%a/%a attributes"
@@ -5330,7 +5330,7 @@ let report_error ~loc = function
     Location.errorf ~loc "%t" (fun ppf ->
       Jkind.Violation.report_with_offender ~offender
         ~level:(Ctype.get_current_level ()) env ppf v)
-||||||| 9790921724
+||||||| 5.2.0minus-31
     Jkind.Violation.report_with_offender ~offender
       ~level:(Ctype.get_current_level ()) env ppf v
 =======
@@ -5344,7 +5344,7 @@ let report_error ~loc = function
     Location.errorf ~loc "%t" (fun ppf ->
       Jkind.Violation.report_with_offender ~offender
         ~level:(Ctype.get_current_level ()) env ppf v)
-||||||| 9790921724
+||||||| 5.2.0minus-31
     Jkind.Violation.report_with_offender ~offender
       ~level:(Ctype.get_current_level ()) env ppf v
 =======
@@ -5562,7 +5562,7 @@ let report_error ~loc = function
 <<<<<<< HEAD
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-||||||| 9790921724
+||||||| 5.2.0minus-31
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
 

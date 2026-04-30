@@ -1097,7 +1097,7 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     dom->backup_thread_msg = BT_INIT;
 <<<<<<< HEAD
     dom->domain_canceled = false;
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
 
     /* Start out with the tick interval at 0, because we start out not ticking.

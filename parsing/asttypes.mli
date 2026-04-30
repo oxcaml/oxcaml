@@ -82,7 +82,7 @@ type index_kind =
   | Index_unboxed_nativeint
 
 val string_of_label: arg_label -> string
-||||||| 9790921724
+||||||| 5.2.0minus-31
 type index_kind =
   | Index_int
   | Index_unboxed_int64

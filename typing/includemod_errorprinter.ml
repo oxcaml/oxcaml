@@ -1236,7 +1236,7 @@ let all env = function
   | In_Type_declaration (id,reason) ->
 <<<<<<< HEAD
       [Location.msg "%t" (core env.i_env id reason)]
-||||||| 9790921724
+||||||| 5.2.0minus-31
       [Location.msg "%t" (core env id reason)]
 =======
       [Location.msg "%t" (core env id reason)]

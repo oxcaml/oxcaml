@@ -1466,7 +1466,7 @@ type pattern_variable =
     pv_sort: Jkind_types.Sort.t;
 <<<<<<< HEAD
     pv_uid : Uid.t;
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
     pv_lpoly: Lpoly.t;
 >>>>>>> 5.2.0minus-37
@@ -1579,7 +1579,7 @@ let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
 <<<<<<< HEAD
   List.iter (fun {pv_type; pv_value_kind; _ } ->
     match pv_value_kind with
-||||||| 9790921724
+||||||| 5.2.0minus-31
   List.iter (fun {pv_type; pv_kind; _ } ->
     match pv_kind with
 =======
@@ -1595,7 +1595,7 @@ let add_pattern_variables ?check ?check_as env pv =
     (fun {pv_id; pv_mode; pv_value_kind; pv_type; pv_loc; pv_kind;
           pv_attributes; pv_uid} env ->
        let check = if pv_kind=As_var then check_as else check in
-||||||| 9790921724
+||||||| 5.2.0minus-31
     (fun {pv_id; pv_mode; pv_kind; pv_type; pv_loc; pv_as_var;
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
@@ -1607,7 +1607,7 @@ let add_pattern_variables ?check ?check_as env pv =
        Env.add_value ?check ~mode:pv_mode pv_id
 <<<<<<< HEAD
          {val_type = pv_type; val_kind = pv_value_kind; Types.val_loc = pv_loc;
-||||||| 9790921724
+||||||| 5.2.0minus-31
          {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
 =======
          {val_type = pv_type; val_kind = pv_kind; val_lpoly = pv_lpoly;
@@ -3798,7 +3798,7 @@ let type_pattern_list
   let new_penv = Pattern_env.make env
 <<<<<<< HEAD
       ~equations_scope ~in_counterexample:false in
-||||||| 9790921724
+||||||| 5.2.0minus-31
       ~equations_scope ~allow_recursive_equations:false in
 =======
       ~is_lpoly ~equations_scope ~allow_recursive_equations:false in
@@ -6093,7 +6093,7 @@ and type_function_ret_info =
   }
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 (* Generalize expressions *)
 let generalize_structure_exp exp = generalize_structure exp.exp_type
 let may_lower_contravariant_then_generalize env exp =
@@ -6671,7 +6671,7 @@ and type_expect_
         exp_type = instance Predef.type_string;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-||||||| 9790921724
+||||||| 5.2.0minus-31
       exp
   | Pexp_constant(Pconst_string (str, _, _) as cst) -> (
       let cst = constant_or_raise env loc cst in
@@ -9774,7 +9774,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         {pat_desc =
            Tpat_var (id, mknoloc name, desc.val_uid, sort,
                      Value.disallow_right mode);
-||||||| 9790921724
+||||||| 5.2.0minus-31
         {pat_desc = Tpat_var (id, mknoloc name, desc.val_uid, sort,
           Value.disallow_right mode);
 =======
@@ -10416,7 +10416,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
           raise(Error(exp.exp_loc, env,
             Expr_type_clash(err, None, Some sexp))));
     end
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let subexp = final_subexpression exp in
   let ty = expand_head env exp.exp_type in
   if is_Tvar ty
@@ -10963,7 +10963,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 nvs sorts allow_modules
             ) ~before_generalize:(fun (_, _, _, pvs, _) ->
                                     iter_pattern_variables_type generalize pvs)
-||||||| 9790921724
+||||||| 5.2.0minus-31
                 nvs sorts allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
                        iter_pattern_variables_type generalize pvs)
@@ -11112,7 +11112,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
         pvs;
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
       (* update pattern variable jkind reasons *)
       List.iter
         (fun pv ->
@@ -11147,7 +11147,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
               List.iter generalize (exp.exp_type :: expected_ty :: vars))
         mode_pat_typ_list exp_list;
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
       let update_exp_jkind (_, p, _) (exp, _) =
         let pat_name =
           match p.pat_desc with
@@ -12544,7 +12544,7 @@ let report_error ~loc env =
       in
       Location.errorf ~loc "%t" (fun ppf ->
         Errortrace_report.unification ppf env err
-||||||| 9790921724
+||||||| 5.2.0minus-31
       Location.error_of_printer ~loc (fun ppf () ->
           (* Use deprecated_printer to defer prepare_expansion until after
              reset() is called inside report_unification_error. This ensures

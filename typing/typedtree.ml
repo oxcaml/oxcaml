@@ -402,7 +402,7 @@ and block_access =
       elt_ty: Types.type_expr;
       elt_sort: Jkind.Sort.t
     }
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Baccess_field of Longident.t loc * Types.label_description
   | Baccess_array of {
       mut: mutable_flag;
@@ -1458,7 +1458,7 @@ let split_pattern pat =
 let map_apply_arg f = function
   | Arg arg -> Arg (f arg)
   | Omitted _ as arg -> arg
-||||||| 9790921724
+||||||| 5.2.0minus-31
 (* Expressions are considered nominal if they can be used as the subject of a
    sentence or action. In practice, we consider that an expression is nominal
    if they satisfy one of:

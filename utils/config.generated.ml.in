@@ -34,7 +34,7 @@ let native_cflags = {@QS@|@native_cflags@|@QS@}
 let native_cppflags = {@QS@|@native_cppflags@|@QS@}
 
 let bytecomp_c_libraries = {@QS@|@zstd_libs@ @cclibs@|@QS@}
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let as_has_debug_prefix_map = @as_has_debug_prefix_map@
 let ocamlc_cflags = {@QS@|@ocamlc_cflags@|@QS@}
 let ocamlc_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}

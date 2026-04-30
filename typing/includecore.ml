@@ -173,7 +173,7 @@ let value_descriptions_consistency _env vd1 vd2 =
       Tcoerce_invalid
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
 let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
   let pat_refs =
@@ -276,7 +276,7 @@ let value_descriptions ~loc env name
           Ctype.instance_prim env p1 vd1.val_type
         in
         (try Ctype.moregeneral env true ty1 vd2.val_type
-||||||| 9790921724
+||||||| 5.2.0minus-31
         let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
         (try Ctype.moregeneral env true ty1 vd2.val_type
 =======

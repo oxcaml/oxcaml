@@ -428,7 +428,7 @@ let check_type
     | (Tsplice(_)         , Sep    )
 <<<<<<< HEAD
     | (Tpackage _         , Sep    )
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | (Tpackage(_,_)      , Sep    )
 =======
     | (Tquote_eval(_)     , Sep    )
@@ -446,7 +446,7 @@ let check_type
     | (Tsplice(_)         , Deepsep)
 <<<<<<< HEAD
     | (Tpackage _         , Deepsep) ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | (Tpackage(_,_)      , Deepsep) ->
 =======
     | (Tquote_eval(_)     , Deepsep)

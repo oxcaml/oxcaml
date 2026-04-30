@@ -162,7 +162,7 @@ let fmt_presence f x =
   | Types.Mp_present -> fprintf f "(Present)"
   | Types.Mp_absent -> fprintf f "(Absent)"
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let fmt_index_kind f = function
   | Index_int -> fprintf f "Index_int"
   | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"

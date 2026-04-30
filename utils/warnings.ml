@@ -136,7 +136,7 @@ type t =
 <<<<<<< HEAD
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
   (* Oxcaml specific warnings: numbers should go down from 199 *)
   | Redundant_kind_modifier of string       (* 183 *)
@@ -620,7 +620,7 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
   { number = 183;
     names = ["redundant-kind-modifier"];
@@ -1031,7 +1031,7 @@ let parse_options errflag s =
 (* If you change these, don't forget to change them in man/ocamlc.m *)
 <<<<<<< HEAD
 let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70"
 =======
 let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..185"
@@ -1420,7 +1420,7 @@ let message = function
          typically@ occurs@ due@ to@ complex@ matches@ on@ mutable@ fields.@ %a"
         Style.inline_code "Match_failure"
         Misc.print_see_manual ref_manual
-||||||| 9790921724
+||||||| 5.2.0minus-31
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
@@ -1555,7 +1555,7 @@ let message = function
   | Use_during_borrowing ->
 <<<<<<< HEAD
       msg "This value is used while being borrowed."
-||||||| 9790921724
+||||||| 5.2.0minus-31
       "This value is used while being borrowed."
 =======
       "This value is used while being borrowed."

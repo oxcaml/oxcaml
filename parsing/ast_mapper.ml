@@ -395,7 +395,7 @@ module MT = struct
     | Pwith_modtype (lid, mty) ->
 <<<<<<< HEAD
         Pwith_modtype (map_loc_lid sub lid, sub.module_type sub mty)
-||||||| 9790921724
+||||||| 5.2.0minus-31
         Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
 =======
         Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
@@ -409,7 +409,7 @@ module MT = struct
     | Pwith_modtypesubst (lid, mty) ->
 <<<<<<< HEAD
         Pwith_modtypesubst (map_loc_lid sub lid, sub.module_type sub mty)
-||||||| 9790921724
+||||||| 5.2.0minus-31
         Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
 =======
         Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
@@ -543,7 +543,7 @@ module E = struct
 <<<<<<< HEAD
     | Baccess_field lid -> Baccess_field (map_loc_lid sub lid)
     | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | Baccess_field lid -> Baccess_field (map_loc sub lid)
     | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
 =======

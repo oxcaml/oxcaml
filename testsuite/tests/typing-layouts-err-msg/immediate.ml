@@ -30,7 +30,7 @@ Line 3, characters 21-22:
 Error: The value "x" has type "v" = "unit" but an expression was expected of type
          "'a t" = "('a : void)"
        The layout of unit is value
-||||||| 9790921724
+||||||| 5.2.0minus-31
 Error: This expression has type "v" = "unit"
        but an expression was expected of type "'a t" = "('a : void)"
        The layout of unit is value
@@ -78,4 +78,3 @@ Error: The value "x" has type "[ `A | `B ]"
          because of the definition of t at line 1, characters 0-22.
        Note: The layout of immediate is value non_pointer.
 |}]
-

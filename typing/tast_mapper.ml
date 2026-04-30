@@ -382,7 +382,7 @@ let pat
         Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias (p, id, s, uid, sort, m, ty) ->
         Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
-||||||| 9790921724
+||||||| 5.2.0minus-31
           (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias (p, id, s, uid, sort, m, ty) ->
@@ -541,7 +541,7 @@ let expr sub x =
     | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
       let index = sub.expr sub index in
       Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
-||||||| 9790921724
+||||||| 5.2.0minus-31
       Baccess_field (map_loc sub lid, ld)
     | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
       let index = sub.expr sub index in
@@ -561,7 +561,7 @@ let expr sub x =
 <<<<<<< HEAD
     | Texp_ident (path, lid, vd, idk, uu, mode) ->
         Texp_ident (path, map_loc_lid sub lid, vd, idk, uu, mode)
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | Texp_ident (path, lid, vd, idk, uu, mode) ->
         Texp_ident (path, map_loc sub lid, vd, idk, uu, mode)
 =======
@@ -874,7 +874,7 @@ let with_constraint sub = function
 <<<<<<< HEAD
   | Twith_module (path, lid) -> Twith_module (path, map_loc_lid sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc_lid sub lid)
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | Twith_module (path, lid) -> Twith_module (path, map_loc sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc sub lid)
 =======

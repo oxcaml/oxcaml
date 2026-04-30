@@ -162,7 +162,7 @@ camlPervasives__loop_1128:
 <<<<<<< HEAD
     [as_has_debug_prefix_map=false
     AC_MSG_RESULT([no])])
-||||||| 9790921724
+||||||| 5.2.0minus-31
     [ashas_debug_prefix_map=false
     AC_MSG_RESULT([no])])
 =======
@@ -733,16 +733,16 @@ int main() { return 0; }
 
 AC_DEFUN([OCAML_OBJCOPY_COMPRESSION_SUPPORT], [
   AC_MSG_CHECKING([whether objcopy supports --compress-debug-sections=zlib])
-  
+
   # Create a test object file
   echo ".text" > conftest.s
   echo ".globl test" >> conftest.s
   echo "test:" >> conftest.s
   echo "  .byte 0" >> conftest.s
-  
+
   # Assemble it
   $AS -o conftest.o conftest.s 2>/dev/null
-  
+
   if test -f conftest.o; then
     # Try --compress-debug-sections=zlib
     if objcopy --compress-debug-sections=zlib conftest.o conftest2.o 2>/dev/null; then

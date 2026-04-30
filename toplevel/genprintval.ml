@@ -442,7 +442,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_record(lbl_list, rep,_); type_params} ->
                     tree_of_record depth path type_params ty_list obj
                       lbl_list rep
-||||||| 9790921724
+||||||| 5.2.0minus-31
                       (instantiate_type env decl.type_params ty_list body)
                 | {type_kind = Type_variant (constr_list, rep, _)} ->
                   (* Here we work backwards from the actual runtime value to

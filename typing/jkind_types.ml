@@ -306,7 +306,7 @@ module Sort = struct
     let for_effect = value
 
     let for_continuation = value
-||||||| 9790921724
+||||||| 5.2.0minus-31
     let for_class = value
 =======
     let for_class = scannable

@@ -266,7 +266,7 @@ let with_local_level_generalize_structure_if_principal f =
 let with_local_level_generalize_for_class ~before_generalize f =
   with_local_level_gen
     ~begin_def:begin_class_def ~structure:false ~before_generalize f
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
 let mark_toplevel_in_quotations env =
   let scope = !current_level in
@@ -368,7 +368,7 @@ module Pattern_env : sig
 <<<<<<< HEAD
       in_counterexample : bool; }
   val make: Env.t -> equations_scope:int -> in_counterexample:bool -> t
-||||||| 9790921724
+||||||| 5.2.0minus-31
       allow_recursive_equations : bool; }
   val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
 =======
@@ -386,7 +386,7 @@ end = struct
 <<<<<<< HEAD
       in_counterexample : bool; }
   let make env ~equations_scope ~in_counterexample =
-||||||| 9790921724
+||||||| 5.2.0minus-31
       allow_recursive_equations : bool; }
   let make env ~equations_scope ~allow_recursive_equations =
 =======
@@ -398,7 +398,7 @@ end = struct
       equations_scope;
 <<<<<<< HEAD
       in_counterexample; }
-||||||| 9790921724
+||||||| 5.2.0minus-31
       allow_recursive_equations; }
 =======
       allow_recursive_equations;
@@ -414,7 +414,7 @@ end
 (**** unification mode ****)
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 type equations_generation =
   | Forbidden
   | Allowed of { equated_types : TypePairs.t }
@@ -480,7 +480,7 @@ let in_subst_mode = function
   | Pattern _ -> false
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
   | Pattern { equations_generation = Allowed _ } -> true
@@ -521,7 +521,7 @@ let without_assume_injective uenv f =
   | Pattern r -> f (Pattern { r with assume_injective = false })
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let without_generating_equations uenv f =
   match uenv with
   | Expression _ as uenv -> f uenv
@@ -4191,7 +4191,7 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env u1 u2;
         | (Ttuple tl1, Ttuple tl2, _, _) ->
             mcomp_labeled_list type_pairs env tl1 tl2
-||||||| 9790921724
+||||||| 5.2.0minus-31
         | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _), _, _)
           when equivalent_with_nolabels l1 l2 ->
             mcomp type_pairs env t1 t2;
@@ -4277,7 +4277,7 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env t1 t2'
         | (_, Tquote t2, _, _) ->
             mcomp type_pairs env t1' t2
-||||||| 9790921724
+||||||| 5.2.0minus-31
             (try unify_univar env t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
         | (Tquote t1, Tquote t2, _, _) ->
@@ -5440,7 +5440,7 @@ let unify_gadt (penv : Pattern_env.t) ~pat:ty1 ~expected:ty2 =
     in
     unify uenv ty1 ty2;
     equated_types
-||||||| 9790921724
+||||||| 5.2.0minus-31
   let equations_generation = Allowed { equated_types } in
   let uenv = Pattern
       { penv;
@@ -6533,7 +6533,7 @@ let moregeneral env inst_nongen pat_sch subj_sch =
     | Ok () -> ()
     | Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
-||||||| 9790921724
+||||||| 5.2.0minus-31
 let moregeneral env inst_nongen pat_sch subj_sch =
   let old_level = !current_level in
   current_level := generic_level - 1;

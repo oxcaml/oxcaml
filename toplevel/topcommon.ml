@@ -328,7 +328,7 @@ let set_paths ?(auto_include=Compmisc.auto_include) ?(dir="") () =
       List.map expand (List.rev !Compenv.first_include_dirs);
       List.map expand (List.rev !Clflags.include_dirs);
       List.map expand (List.rev !Compenv.last_include_dirs);
-||||||| 9790921724
+||||||| 5.2.0minus-31
       [ "" ];
       List.map expand (List.rev !Compenv.first_include_dirs);
       List.map expand (List.rev !Clflags.include_dirs);

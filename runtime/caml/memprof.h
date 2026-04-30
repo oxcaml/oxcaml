@@ -99,7 +99,7 @@ extern void caml_memprof_set_trigger(caml_domain_state *state);
 
 <<<<<<< HEAD
 extern caml_result caml_memprof_run_callbacks_res(void);
-||||||| 9790921724
+||||||| 5.2.0minus-31
 extern value caml_memprof_run_callbacks_exn(void);
 =======
 extern value caml_memprof_do_pending_exn(void);

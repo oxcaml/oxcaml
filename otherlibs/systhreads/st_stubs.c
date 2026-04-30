@@ -59,7 +59,7 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #endif
 
 <<<<<<< HEAD
-||||||| 9790921724
+||||||| 5.2.0minus-31
 #include "caml/misc.h"
 
 #if defined(_WIN32) && !defined(NATIVE_CODE)
@@ -125,7 +125,7 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #define ST_INTERRUPT_FLAG   ((uintnat)1)
 
 typedef int st_retcode;
-||||||| 9790921724
+||||||| 5.2.0minus-31
 /* Max computation time before rescheduling, in milliseconds */
 #define Thread_timeout 50
 =======
@@ -678,7 +678,7 @@ static void caml_thread_domain_initialize_hook(void)
 
 <<<<<<< HEAD
   atomic_store_release(&Tick_thread_stop, 0);
-||||||| 9790921724
+||||||| 5.2.0minus-31
   atomic_store_release(&Tick_thread_stop, 0);
   /* OS-specific initialization */
   st_initialize();
@@ -952,7 +952,7 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
   return Val_unit;
 }
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
 static st_retcode start_tick_thread(void)
 {
   if (Tick_thread_running || Tick_thread_disabled) return 0;
@@ -1020,7 +1020,7 @@ CAMLprim value caml_thread_new(value clos)
   st_retcode err = create_tick_thread();
   caml_check_error(err, "Thread.create");
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
   /* Create the tick thread if not already done.
      Because of PR#4666, we start the tick thread late, only when we create
      the first additional thread in the current process */
@@ -1077,7 +1077,7 @@ CAMLexport int caml_c_thread_register(void)
   st_retcode err = create_tick_thread();
   if (err != 0) goto out_err;
 
-||||||| 9790921724
+||||||| 5.2.0minus-31
   /* Create tick thread if not already done */
   st_retcode err = start_tick_thread();
   if (err != 0) goto out_err;

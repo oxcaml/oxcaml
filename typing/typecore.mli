@@ -77,7 +77,7 @@ type pattern_variable =
     pv_sort: Jkind.Sort.t;
 <<<<<<< HEAD
     pv_uid: Uid.t;
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
     pv_lpoly: Types.Lpoly.t;
     (** Not yet determined; gets determined during generalization in
@@ -216,7 +216,7 @@ type existential_binding =
   | Bind_already_bound
   | Bind_not_in_scope
   | Bind_non_locally_abstract
-||||||| 9790921724
+||||||| 5.2.0minus-31
 =======
 type mode_mismatch_kind = Parameter | Return
 >>>>>>> 5.2.0minus-37

@@ -356,7 +356,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       Tpat_any -> Ppat_any
 <<<<<<< HEAD
     | Tpat_var (id, name, _, _, _) ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | Tpat_var (id, name,_,_,_) ->
 =======
     | Tpat_var { id; name; _ } ->
@@ -375,7 +375,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
      *)
 <<<<<<< HEAD
     | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _, _, _ty)
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | Tpat_alias
       ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
 =======
@@ -388,7 +388,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
 
 <<<<<<< HEAD
     | Tpat_alias (pat, _id, name, _, _, _, _ty) ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
 =======
     | Tpat_alias { pattern = pat; name; _ } ->
@@ -1167,7 +1167,7 @@ let class_structure sub cs =
 <<<<<<< HEAD
     | { pat_desc = Tpat_alias (p, id, _s, _, _, _, _ty) }
       when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
-||||||| 9790921724
+||||||| 5.2.0minus-31
     | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
       when string_is_prefix "selfpat-" (Ident.name id) ->
 =======
@@ -1205,7 +1205,7 @@ and is_self_pat = function
 <<<<<<< HEAD
   | { pat_desc = Tpat_alias(_pat, id, _, _, _, _, _ty) } ->
       String.starts_with ~prefix:"self-" (Ident.name id)
-||||||| 9790921724
+||||||| 5.2.0minus-31
   | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
       string_is_prefix "self-" (Ident.name id)
 =======
