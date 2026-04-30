@@ -1696,7 +1696,7 @@ val id : 'a -> 'a = <fun>
 
 let poly_ id = fun x -> x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
+val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x

@@ -16,7 +16,7 @@ let poly_ id x = x
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (id = $id) (apply (field_imm 1 (global Toploop!)) "id" id))⟫ })
-val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
+val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 (* Test closure conversion *)
@@ -52,10 +52,8 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
                  ; r =
                    ⟪(function {nlocal = 0} closure
                       (let
-                        (foo =a[value<int>]
-                           (mixedfield 1  (value<int>,value<int>) closure)
-                         bool =a[value<int>]
-                           (mixedfield 0  (value<int>,value<int>) closure))
+                        (foo =a[value<int>] (field_imm 1 closure)
+                         bool =a[value<int>] (field_imm 0 closure))
                         (function {nlocal = 0} x[$layout!15] y[$layout!15]
                           : #($layout!15, ?)
                           (if bool
@@ -70,7 +68,7 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
                  (apply (field_imm 1 (global Toploop!)) "captures" captures))⟫ }))
        { c = #body.c; r = ⟪(let (bool =? $bool) $#body)⟫ }))
   { c = #body.c; r = ⟪(let (foo =? $foo) $#body)⟫ })
-val captures : layout_ l. ('a : l). 'a -> 'a -> #('a * int) = <layout poly>
+val captures : layout_ l. ('a : l). 'a -> 'a -> #('a * int) = <lpoly>
 |}]
 
 (* Multiple static arguments *)
@@ -88,6 +86,5 @@ let poly_ f x y = #(x, y)
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (f = $f) (apply (field_imm 1 (global Toploop!)) "f" f))⟫ })
-val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) =
-  <layout poly>
+val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) = <lpoly>
 |}]

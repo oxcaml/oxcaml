@@ -11,13 +11,13 @@ go through lambda and middle-end. *)
 
 let poly_ id x = x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
+val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
+val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 let poly_ id =
@@ -33,7 +33,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 
 let poly_ id = fun x -> x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
+val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 
@@ -41,9 +41,9 @@ val id : layout_ l. ('a : l). 'a -> 'a = <layout poly>
 let poly_ const x y = x
 and poly_ apply f x = f x
 [%%expect{|
-val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <layout poly>
+val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <lpoly>
 val apply : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b =
-  <layout poly>
+  <lpoly>
 |}]
 
 (* Tuple pattern - both bindings have separate univars *)
@@ -173,7 +173,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* constructor: passing when all args are syntactic values *)
 let poly_ f = Some (fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). ('a -> 'a) option = <layout poly>
+val f : layout_ l. ('a : l). ('a -> 'a) option = <lpoly>
 |}]
 
 (* constructor: failing when an arg is not a syntactic value *)
@@ -200,7 +200,7 @@ val f : [> `A ] = `A
 (* variant: passing - payload is a syntactic value *)
 let poly_ f = `A (fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). [> `A of 'a -> 'a ] = <layout poly>
+val f : layout_ l. ('a : l). [> `A of 'a -> 'a ] = <lpoly>
 |}]
 
 (* variant: failing - payload is not a syntactic value *)
@@ -216,7 +216,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* tuple: passing when all components are syntactic values *)
 let poly_ f = (42, fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). int * ('a -> 'a) = <layout poly>
+val f : layout_ l. ('a : l). int * ('a -> 'a) = <lpoly>
 |}]
 
 (* tuple: failing when a component is not a syntactic value *)
@@ -232,7 +232,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* unboxed tuple: passing when all components are syntactic values *)
 let poly_ f = #(42, fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). #(int * ('a -> 'a)) = <layout poly>
+val f : layout_ l. ('a : l). #(int * ('a -> 'a)) = <lpoly>
 |}]
 
 (* unboxed tuple: failing when a component is not a syntactic value *)
@@ -294,13 +294,13 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* RHS might constrain a layout and makes it not polymorphic *)
 let poly_ f x y = #(x, (y, y))
 [%%expect{|
-val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b)) = <layout poly>
+val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
 let poly_ f x = (x : (_ : any))
 [%%expect{|
-val f : layout_ l. ('a : l). 'a -> 'a = <layout poly>
+val f : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 (* [value] does constrain the layout *)
@@ -317,7 +317,7 @@ val f : 'a -> 'a = <fun>
 (* [assert false] is layout poly *)
 let poly_ f () = assert false
 [%%expect{|
-val f : layout_ l. ('a : l). unit -> 'a = <layout poly>
+val f : layout_ l. ('a : l). unit -> 'a = <lpoly>
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic
@@ -328,7 +328,7 @@ let poly_ foo x y =
   let _ = id y in
   ()
 [%%expect{|
-val foo : layout_ l. ('a : l) ('b : l). 'a -> 'b -> unit = <layout poly>
+val foo : layout_ l. ('a : l) ('b : l). 'a -> 'b -> unit = <lpoly>
 |}]
 
 (* We observe that foo is polymorphic on two types NOT sharing the same polymorphic
@@ -339,7 +339,7 @@ let poly_ foo x y =
   let _ = id y in
   ()
 [%%expect{|
-val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <layout poly>
+val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <lpoly>
 |}]
 
 (* [rec] prevents layout polymorphism, even for fake recursion (no
