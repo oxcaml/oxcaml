@@ -98,8 +98,7 @@ let rec instrument_result env name ppf clos_typ =
               may_trace := false;
               fprintf ppf "@[<2>%a raises@ %a@]@."
                 Printtyp.longident starred_name
-                (print_value !toplevel_env (Obj.repr exn))
-                  Predef.type_exn;
+                (print_value !toplevel_env (Obj.repr exn)) Predef.type_exn;
               may_trace := true;
               raise exn
           end))
@@ -138,8 +137,7 @@ let instrument_closure env name ppf clos_typ =
             may_trace := false;
             fprintf ppf "@[<2>%a raises@ %a@]@."
               Printtyp.longident name
-              (print_value !toplevel_env (Obj.repr exn))
-                Predef.type_exn;
+              (print_value !toplevel_env (Obj.repr exn)) Predef.type_exn;
             may_trace := true;
             raise exn
         end)
