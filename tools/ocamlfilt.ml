@@ -221,6 +221,7 @@ module Structured = struct
         Buffer.add_string result "<inlining>"
       | _ -> err ()
     done;
+    if !pos = start_pos then err ();
     if !pos < String.length sym
     then Buffer.add_substring result sym !pos (String.length sym - !pos);
     Buffer.contents result
@@ -234,7 +235,12 @@ module FlatCommon = struct
 
   let caml_prefix_len = 4
 
-  let starts_with_prefix str = String.starts_with ~prefix:caml_prefix str
+  let is_upper = function 'A' .. 'Z' -> true | _ -> false
+
+  let starts_with_prefix str =
+    String.starts_with ~prefix:caml_prefix str
+    && String.length str > caml_prefix_len
+    && is_upper str.[caml_prefix_len]
 
   let is_xdigit (c : char) =
     if is_digit c
@@ -256,7 +262,7 @@ module Flat1 = struct
   open FlatCommon
 
   let unmangle str =
-    if not (String.starts_with ~prefix:caml_prefix str)
+    if not (starts_with_prefix str)
     then None
     else
       let j = ref 0 in
@@ -329,7 +335,7 @@ module Flat0 = struct
   open FlatCommon
 
   let unmangle str =
-    if not (String.starts_with ~prefix:caml_prefix str)
+    if not (starts_with_prefix str)
     then None
     else
       let j = ref 0 in

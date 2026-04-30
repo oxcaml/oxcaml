@@ -1,0 +1,17 @@
+Foo.Bar.baz
+Stdlib.map
+Foo.MyObj
+Foo.<inlining>.Bar.qux
+Foo.>>=
+Foo.let*
+Foo.func'sub'
+Stdlib.fn(stdlib.ml:334:0)
+Foo.mod(:42:7)
+Foo.partial(:10:5)
+Foo.Bar.Baz.my_fun
+Foo.0foo
+Main.say_hello_0_5_code
+Main.Test.foo_1_6_code
+Stdlib__List.map_15_113_code
+Main.mod(test.ml:5:15)_300
+Main.main.fn(main.ml:7:32).fn_4_9_code
