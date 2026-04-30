@@ -71,7 +71,7 @@ module type Outer = sig
 end
 ```
 
-Trying to re-declare an implicit kind will fail too:
+You can re-declare implicit kinds:
 
 ```ocaml
 module type Outer = sig
@@ -85,15 +85,7 @@ module type Outer = sig
     val inner : 't -> 't
   end
 end
-
-[%%expect{|
-Line 7, characters 29-38:
-7 |     [@@@implicit_kind: ('t : immediate)]
-                                 ^^^^^^^^^
-Error: The implicit kind for "t" is already defined at Line 2, characters 27-33.
-|}]
 ```
-
 
 Implicit kinds can't be declared in structures, though we plan to support that.
 
