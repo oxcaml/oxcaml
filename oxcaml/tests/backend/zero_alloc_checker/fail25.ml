@@ -52,8 +52,8 @@ let[@zero_alloc] rec f1 x = if x > Sys.opaque_identity 10 then x else f2 (x + 1)
 and[@zero_alloc] f2 x = f1 (x + 1)
 
 (* Previously, this failed the check when -disable-precise-zero-alloc-checker
-   was passed and -function-layout source.
-   Adding zero_alloc information on pattern variables fixed this. *)
+   was passed and -function-layout source. Adding zero_alloc information on
+   pattern variables changed this behaviour. *)
 let[@zero_alloc] outer x =
   let[@zero_alloc] [@inline never] [@local never] inner x =
     if x > Sys.opaque_identity 10 then x else x + 1

@@ -14,8 +14,8 @@ let[@zero_alloc strict] foo1 x =
   then List.nth (div (x + 2)) x
   else nor x
 
-(* zero_alloc properties are used when type-checking within a module;
-   this previously failed, the test is kept here to prevent regressions *)
+(* zero_alloc properties are used when type-checking within a module; this
+   previously failed, the test is kept here to prevent regressions *)
 let[@zero_alloc] [@inline never] [@local never] foo x =
   let[@opaque] bar x y = Sys.opaque_identity (x + y), x in
   fst (bar x (x * x))
