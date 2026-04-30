@@ -1283,7 +1283,7 @@ void caml_continuation_replace(value cont, struct stack_info* stk)
 }
 
 CAMLprim value caml_continuation_update_handler_noexc
-  (value cont, value hval, value hexn, value heff)
+  (value cont, value hval, value hexn, value heff, value htick)
 {
   CAMLnoalloc;
   value stack;
@@ -1299,6 +1299,7 @@ CAMLprim value caml_continuation_update_handler_noexc
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
+  Stack_handle_tick(stk) = htick;
   caml_continuation_replace(cont, Ptr_val(stack));
 
   return cont;
