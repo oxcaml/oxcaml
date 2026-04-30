@@ -115,6 +115,19 @@ val domainstate_ptr_dwarf_register_number : int
 (* Calling the assembler *)
 val assemble_file : string -> string -> int
 
+(** Stash a thunk to be invoked the next time [assemble_file] is called, in
+    place of shelling out to the system assembler. Used by the ARM64 binary
+    emitter to defer JIT hook invocation until after
+    [Zero_alloc_checker.record_unit_info] has run. Fails if a thunk is already
+    pending. No-op on architectures without an in-process binary emitter
+    (currently amd64). *)
+val set_pending_jit_run : (unit -> unit) -> unit
+
+(** Drop any pending thunk previously stashed by [set_pending_jit_run] without
+    running it. Used to recover from compilations that aborted between stashing
+    and the corresponding [assemble_file] call. *)
+val clear_pending_jit_run : unit -> unit
+
 (** [operation_supported op] returns true when [op] can be implemented directly
     with a hardware instruction. Used in Cmmgen when converting [@@builtin]
     external calls to primitive operations. *)

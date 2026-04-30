@@ -445,17 +445,50 @@ let slot_offset (loc : Reg.stack_location) ~stack_class ~stack_offset
 
 (* Calling the assembler *)
 
+(* Deferred JIT hook invocation. The hook (registered by [Jit_backend] via
+   [Arm64_binary_emitter.Binary_emitter.For_jit.Internal_assembler]) loads the
+   in-memory assembled sections and runs the entry function, which may
+   recursively re-enter the compiler (e.g. via [Eval.eval] in Opttoploop).
+   Running it inline from [end_emission] would do this in the middle of
+   [Asmgen.gen ()], before [Zero_alloc_checker.record_unit_info] has copied
+   function summaries from the local table into the current [Compilenv]
+   unit's [ui_zero_alloc_info]. A nested compile would replace [current_unit]
+   and refill the table, so the outer [record_unit_info] would write the
+   nested unit's symbols a second time and trip the "is already set" check
+   in [Zero_alloc_info.set_value]. To match the x86 path (where the hook is
+   captured during emit but invoked from [X86_proc.assemble_file], after
+   [record_unit_info]), [end_emission] stashes a thunk here and
+   [assemble_file] flushes it. *)
+let pending_jit_run : (unit -> unit) option ref = ref None
+
+let set_pending_jit_run run =
+  if Option.is_some !pending_jit_run
+  then Misc.fatal_error "Arm64 Proc.set_pending_jit_run: already set";
+  pending_jit_run := Some run
+
+let clear_pending_jit_run () = pending_jit_run := None
+
 let assemble_file infile outfile =
-  let dwarf_flag =
-    if !Clflags.native_code && !Clflags.debug then
-      Dwarf_flags.get_dwarf_as_toolchain_flag ()
-    else
-      ""
-  in
-  Ccomp.command (Config.asm ^ " " ^
-                 (String.concat " " (Misc.debug_prefix_map_flags ())) ^
-                 dwarf_flag ^
-                 " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
+  match !pending_jit_run with
+  | Some run ->
+    (* JIT mode: the binary emitter has already produced sections in memory.
+       Run the deferred JIT hook (which loads them and executes the entry
+       function) and skip the system assembler. *)
+    pending_jit_run := None;
+    run ();
+    0
+  | None ->
+    let dwarf_flag =
+      if !Clflags.native_code && !Clflags.debug then
+        Dwarf_flags.get_dwarf_as_toolchain_flag ()
+      else
+        ""
+    in
+    Ccomp.command (Config.asm ^ " " ^
+                   (String.concat " " (Misc.debug_prefix_map_flags ())) ^
+                   dwarf_flag ^
+                   " -o " ^ Filename.quote outfile ^
+                   " " ^ Filename.quote infile)
 
 let has_three_operand_float_ops () = false
 

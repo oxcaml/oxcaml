@@ -681,6 +681,14 @@ let slot_offset loc ~stack_class ~stack_offset ~fun_contains_calls
 let assemble_file infile outfile =
   X86_proc.assemble_file infile outfile
 
+(* On amd64 the deferred-JIT-hook mechanism is implemented inside [X86_proc]
+   via the [binary_content] ref written by the registered internal assembler.
+   These entry points exist only so that the cross-architecture interface in
+   [proc.mli] is uniform. *)
+let set_pending_jit_run _ = ()
+
+let clear_pending_jit_run () = ()
+
 (* Precolored_regs is not always the same as [all_phys_regs], as some physical registers
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
