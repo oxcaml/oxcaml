@@ -68,7 +68,12 @@ let _ =
   | n -> n
   | effect Need_unit, k -> continue k ()
 [%%expect {|
-- : int = 0
+Line 3, characters 9-10:
+3 |   match !r with
+             ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used in an expression (at lines 3-5, characters 2-40).
 |}]
 
 (* A value clause of [match] cannot capture a local from outside the generated
@@ -79,7 +84,12 @@ let _ =
   | () -> !r
   | effect Need_unit, k -> continue k ()
 [%%expect {|
-- : int = 0
+Line 4, characters 11-12:
+4 |   | () -> !r
+               ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used in an expression (at lines 3-5, characters 2-40).
 |}]
 
 (* An effect clause of [match] cannot capture a local from outside the generated
@@ -92,7 +102,12 @@ let _ =
       ignore !r;
       continue k ()
 [%%expect {|
-- : unit = ()
+Line 6, characters 14-15:
+6 |       ignore !r;
+                  ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used in an expression (at lines 3-7, characters 2-19).
 |}]
 
 (* A [try] continuation result cannot be a local reference escaping globally. *)
@@ -113,7 +128,12 @@ let _ =
   try !r with
   | effect Need_unit, k -> continue k ()
 [%%expect {|
-- : int = 0
+Line 3, characters 7-8:
+3 |   try !r with
+           ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used in an expression (at lines 3-4, characters 2-40).
 |}]
 
 (* An exception clause of [try] cannot capture a local from outside the
@@ -124,7 +144,12 @@ let _ =
   | Exit -> !r
   | effect Need_unit, k -> continue k ()
 [%%expect {|
-- : int = 0
+Line 4, characters 13-14:
+4 |   | Exit -> !r
+                 ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used in an expression (at lines 3-5, characters 2-40).
 |}]
 
 (* An effect clause of [try] cannot capture a local from outside the generated
@@ -140,7 +165,12 @@ let _ =
       ignore !r;
       continue k ()
 [%%expect {|
-- : int = 0
+Line 9, characters 14-15:
+9 |       ignore !r;
+                  ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used in an expression (at lines 3-10, characters 2-19).
 |}]
 
 (* Can allocate local values inside a [match] body. *)
