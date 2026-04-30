@@ -243,16 +243,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     type t = key
 
     let equal (Key (obj1, id1, m1)) (Key (obj2, id2, m2)) =
-      let c = Int.compare id1 id2 in
-      if c <> 0
-      then false
-      else
-        match C.compare_obj obj1 obj2 with
-        | Less_than | Greater_than -> false
-        | Equal -> (
-          match C.equal_morph obj1 m1 m2 with
-          | None -> false
-          | Some Refl -> true)
+      Int.equal id1 id2
+      &&
+      match C.compare_obj obj1 obj2 with
+      | Less_than | Greater_than -> false
+      | Equal -> (
+        match C.equal_morph obj1 m1 m2 with None -> false | Some Refl -> true)
 
     let hash (Key (obj, id, m)) =
       Hashtbl.hash (C.hash_obj obj, id, C.hash_morph m)
