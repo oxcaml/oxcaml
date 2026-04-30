@@ -1433,6 +1433,46 @@ static void dynamic_flush_cache(dynamic_thread_t thread)
   }
 }
 
+/* Call the tick handler for each running fiber *in reverse order*, stopping as
+   soon as one preempts
+
+   Returns Val_true if a preemption occurred, Val_false if one did not, or an
+   encoded exception result if any of the callbacks raised an exception.
+*/
+value caml_tick_fiber_exn(struct stack_info *stack) {
+  CAMLparam0();
+  CAMLlocal1(res);
+
+  if (Stack_parent(stack)) {
+    res = caml_tick_fiber_exn(Stack_parent(stack));
+    if (Is_exception_result(res) || res == Val_true) {
+      CAMLreturn(res);
+    }
+  }
+
+  if (Stack_is_preemptible(stack)) {
+    res = caml_callback_exn(Stack_handle_tick(stack), Val_unit);
+    if (Is_exception_result(res)) {
+      CAMLreturn(res);
+    }
+
+    switch (Long_val(res)) {
+    case TICK_RESULT_PREEMPT:
+      CAMLreturn(Val_true);
+    case TICK_RESULT_CONTINUE:
+      break;
+    default: {
+      value exn =
+        caml_failure_exn(caml_alloc_sprintf(
+          "caml_tick_fiber: tick_handler returned invalid result"));
+      CAMLreturn(Make_exception_result(exn));
+    }
+    }
+  }
+
+  CAMLreturn(Val_false);
+}
+
 /* parent is NULL for the first thread when systhreads initializes */
 
 CAMLexport dynamic_thread_t caml_dynamic_new_thread(dynamic_thread_t parent)

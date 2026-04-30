@@ -2254,11 +2254,24 @@ static void tick_thread_wake(void) {}
 
 #endif
 
-void caml_process_tick(void)
+value caml_process_tick_exn(void)
 {
-  if (atomic_exchange(&Caml_state->requested_tick, false)) {
+  CAMLparam0();
+  CAMLlocal1(res);
+  if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
+                               memory_order_acquire)) {
     caml_domain_tick_hook();
+
+    res = caml_tick_fiber_exn(Caml_state->current_stack);
+    if (Is_exception_result(res)) {
+      CAMLreturn(res);
+    }
+
+    if (res == Val_true) {
+      Caml_state->preemption = Val_long(1);
+    }
   }
+  CAMLreturn(Val_unit);
 }
 
 CAMLextern void caml_stop_tick_thread(void)

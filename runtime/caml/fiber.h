@@ -94,6 +94,7 @@ struct stack_info {
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
 #define Stack_handle_tick(stk) (stk)->handler->handle_tick
 #define Stack_parent(stk) (stk)->handler->parent
+#define Stack_is_preemptible(stk) (Stack_handle_tick(stk) != Val_null)
 
 /* Stack layout for native code. Stack grows downwards.
  *
@@ -292,6 +293,12 @@ extern value caml_global_data;
 #define Trap_pc(tp) (((code_t *)(tp))[0])
 #define Trap_link(tp) ((tp)[1])
 
+/* type tick_outcome in stdlib/effect.ml */
+enum tick_outcome {
+  TICK_RESULT_PREEMPT = 0,
+  TICK_RESULT_CONTINUE = 1
+};
+
 struct stack_cache {
   _Atomic(struct stack_info*) head;
   _Atomic(uintnat) len;
@@ -374,6 +381,8 @@ bool caml_continuation_is_preemption(value cont);
 /* If the given continuation is a preeempted continuation, returns a pointer to
    its [gc_regs] struct, or NULL otherwise */
 value* caml_continuation_gc_regs(value cont);
+
+value caml_tick_fiber_exn(struct stack_info* stack);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 
