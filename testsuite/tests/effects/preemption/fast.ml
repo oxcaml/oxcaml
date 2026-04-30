@@ -15,7 +15,7 @@ let () =
   let allocations = ref [] in
 
   let result = run_with_tick_handler
-    ~interval:0.001
+    ~interval_usec:1_000
     ~repeating:true
     ~on_preemption:(fun _resume ->
       incr count;
