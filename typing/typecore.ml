@@ -1074,10 +1074,10 @@ let has_poly_constraint spat =
   match spat.ppat_desc with
   | Ppat_constraint(_, Some styp, _) -> begin
       match styp.ptyp_desc with
-      | Ptyp_poly _ -> true
-      | _ -> false
+      | Ptyp_poly _ -> Poly None
+      | _ -> Mono
     end
-  | _ -> false
+  | _ -> Mono
 
 (** Mode cross a mode whose monadic fragment is a right mode, and whose comonadic
     fragment is a left mode. *)
@@ -4430,7 +4430,7 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
           match get_desc ty_fun with
           | Tvar { jkind; _ } ->
               let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
-              let ty_arg = newmono ~zero_alloc:None ty_arg_mono in
+              let ty_arg = newmono ty_arg_mono in
               let ty_res =
                 newvar (Jkind.of_new_sort ~why:Function_result
                           ~level:(Ctype.get_current_level ()))
@@ -4472,7 +4472,7 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
               | Error err -> raise(Error(funct.exp_loc, env,
                                          Function_type_not_rep (ty_arg,err)))
             in
-            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
+            (sort_arg, mode_arg, tpoly_get_inner ty_arg, mode_ret, ty_res)
         | td ->
             let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
             let ty_res = remaining_function_type ty_fun mode_fun rev_args in
@@ -5080,7 +5080,7 @@ let rec approx_type env sty =
       let marg = Alloc.of_const arg_mode.mode_modes in
       let mret = Alloc.newvar () in
       newty
-        (Tarrow ((p,marg,mret), newmono ~zero_alloc:None arg, ret, commu_ok))
+        (Tarrow ((p,marg,mret), newmono arg, ret, commu_ok))
   | Ptyp_tuple args ->
       newty (Ttuple (List.map (fun (label, t) -> label, approx_type env t) args))
   | Ptyp_constr (lid, ctl) ->
@@ -5138,11 +5138,11 @@ let type_approx_fun_one_param
   =
   let mode_annots, has_poly =
     match spato with
-    | None -> None, false
+    | None -> None, Mono
     | Some spat ->
         let mode_annots = mode_annots_from_pat spat in
         let has_poly = has_poly_constraint spat in
-        if has_poly && is_optional label then
+        if is_explicitly_poly has_poly && is_optional label then
           raise(Error(spat.ppat_loc, env, Optional_poly_param));
         Some mode_annots, has_poly
   in
@@ -5150,7 +5150,7 @@ let type_approx_fun_one_param
   let { ty_arg; arg_mode; ty_ret; _ } =
     try
       filter_arrow env ty_expected label
-        ~force_tpoly:(not has_poly) ~zero_alloc:None
+        ~has_poly:(match has_poly with Mono -> Poly None | Poly _ -> Mono)
     with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
@@ -5161,7 +5161,7 @@ let type_approx_fun_one_param
     (fun mode_annots ->
       apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
     mode_annots;
-  if has_poly then begin
+  if is_explicitly_poly has_poly then begin
     match spato with
     | None -> ()
     | Some spat -> type_pattern_approx env spat ty_arg
@@ -5723,11 +5723,14 @@ let unique_use ~loc ~env mode_l mode_r  =
     in
     (uniqueness, linearity)
 
-let is_really_poly ~env ~zero_alloc ty =
+let is_really_poly ~env ty =
   let snap = Btype.snapshot () in
   let any = Jkind.Builtin.any ~why:Dummy_jkind in
   let really_poly =
-    try unify env (newmono ~zero_alloc (newvar any)) ty; false
+    let zero_alloc =
+      match get_desc ty with Tpoly(_, _, za) -> za | _ -> None
+    in
+    try unify env (newty (Tpoly(newvar any, [], zero_alloc))) ty; false
     with Unify _ -> true
   in
   Btype.backtrack snap;
@@ -5800,8 +5803,8 @@ type split_function_ty =
 *)
 let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
-    ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
-    ~zero_alloc
+    ~zero_alloc ~mode_annots ~ret_mode_annots ~in_function
+    ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, mode =
       (* Unlike most allocations which can be the highest mode allowed by
@@ -5820,15 +5823,11 @@ let split_function_ty
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
     with_local_level_if separate begin fun () ->
-      let force_tpoly =
-        (* If [has_poly] is true then we rely on the later call to
-           type_pat to enforce the invariant that the parameter type
-           be a [Tpoly] node *)
-        not has_poly
-      in
       try
-        filter_arrow env (instance ty_expected) arg_label
-          ~force_tpoly ~zero_alloc
+        let has_poly =
+          match has_poly with Mono -> Poly zero_alloc | Poly _ -> Mono
+        in
+        filter_arrow env (instance ty_expected) arg_label ~has_poly
       with Filter_arrow_failed err ->
         let err =
           error_of_filter_arrow_failure ~explanation ~first:is_first_val_param
@@ -5843,8 +5842,11 @@ let split_function_ty
   apply_mode_annots ~loc:loc_fun ~env Parameter mode_annots arg_mode;
   apply_mode_annots ~loc:loc_fun ~env Return ret_mode_annots ret_mode;
   let really_poly =
-    not has_poly && not (tpoly_is_mono ty_arg)
-      && is_really_poly ~env ~zero_alloc ty_arg
+    not (is_explicitly_poly has_poly)
+    && (match get_desc ty_arg with
+        | Tpoly _ -> not (tpoly_is_mono ty_arg)
+        | _ -> false)
+    && is_really_poly ~env ty_arg
   in
   if really_poly &&
      !Clflags.principal && get_level ty_arg < Btype.generic_level then
@@ -5874,7 +5876,7 @@ let split_function_ty
       ret_value_mode
   in
   let ty_arg_mono =
-    if has_poly then ty_arg
+    if is_explicitly_poly has_poly then ty_arg
     else begin
       let ty, vars, _za = tpoly_get_poly ty_arg in
       if vars = [] then ty
@@ -6057,7 +6059,7 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, zero_alloc, spat) =
   in
   attrs, zero_alloc, pat_mode, env_alloc_mode, exp_mode, spat
 
-let add_typed_zero_alloc_attribute expr zero_alloc_attribute =
+let add_zero_alloc_attribute expr zero_alloc_attribute =
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
     | Check { strict; loc = _} ->
@@ -6073,17 +6075,17 @@ let add_typed_zero_alloc_attribute expr zero_alloc_attribute =
   match expr.exp_desc with
   | Texp_function fn ->
     begin match zero_alloc_attribute with
-    | Default_zero_alloc -> expr
-    | Ignore_assert_all | Check _ | Assume _ ->
+    | None | Some Default_zero_alloc -> expr
+    | Some za ->
       begin match Zero_alloc.get fn.zero_alloc with
       | Default_zero_alloc -> ()
       | Ignore_assert_all | Assume _ | Check _ ->
         Location.prerr_warning expr.exp_loc
-          (Warnings.Duplicated_attribute (to_string zero_alloc_attribute));
+          (Warnings.Duplicated_attribute (to_string za));
       end;
       (* Here, we may be throwing away a zero_alloc variable. There's no need
          to set it, because it can't have gotten anywhere else yet. *)
-      let zero_alloc = Zero_alloc.create_const zero_alloc_attribute in
+      let zero_alloc = Zero_alloc.create_const za in
       let exp_desc = Texp_function { fn with zero_alloc } in
       { expr with exp_desc }
     end
@@ -6842,32 +6844,13 @@ and type_expect_
             exp_extra = (Texp_inspected_type ti, loc, []) :: funct.exp_extra }
         | false -> funct
       in
-      let extract_zero_alloc_attr () =
-        Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
+      let zero_alloc =
+        Builtin_attributes.get_zero_alloc_attribute
+          ~in_signature:false
           ~on_application:true
           ~on_function_argument:false
           ~default_arity:(List.length args)
           sfunct.pexp_attributes
-      in
-      let zero_alloc =
-        begin
-          match funct.exp_desc with
-          | Texp_ident { desc; _ } ->
-            begin
-              let use_opt =
-                match !Clflags.zero_alloc_check with
-                | Check_default | No_check -> false
-                | Check_all | Check_opt_only -> true
-              in
-              match Zero_alloc.get desc.val_zero_alloc with
-              | Check {strict; arity; loc; opt} when use_opt || not opt ->
-                Assume {strict; arity; loc;
-                        never_returns_normally = false;
-                        never_raises = false}
-              | _ -> extract_zero_alloc_attr ()
-            end
-          | _ -> extract_zero_alloc_attr ()
-        end
         |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
@@ -7787,7 +7770,7 @@ and type_expect_
         | Tvar _ ->
             let exp = type_exp env expected_mode sbody in
             let exp =
-              {exp with exp_type = newmono ~zero_alloc:None exp.exp_type}
+              {exp with exp_type = newmono exp.exp_type}
             in
             unify_exp env exp ty;
             exp
@@ -7878,14 +7861,14 @@ and type_expect_
           let ty_func_result, body_sort = new_rep_var ~why:Function_result () in
           let arrow_desc = Nolabel, Alloc.legacy, Alloc.legacy in
           let ty_func =
-            newty (Tarrow(arrow_desc, newmono ~zero_alloc:None ty_params,
+            newty (Tarrow(arrow_desc, newmono ty_params,
                           ty_func_result, commu_ok))
           in
           let ty_result, op_result_sort = new_rep_var ~why:Function_result () in
           let ty_andops, sort_andops = new_rep_var ~why:Function_argument () in
           let ty_op =
-            newty (Tarrow(arrow_desc, newmono ~zero_alloc:None ty_andops,
-              newty (Tarrow(arrow_desc, newmono ~zero_alloc:None ty_func,
+            newty (Tarrow(arrow_desc, newmono ty_andops,
+              newty (Tarrow(arrow_desc, newmono ty_func,
                             ty_result, commu_ok)),
               commu_ok))
           in
@@ -8668,9 +8651,10 @@ and type_function
       in
       let mode_annots = mode_annots_from_pat pat in
       let has_poly = has_poly_constraint pat in
-      if has_poly && is_optional_parsetree arg_label then
+      let has_explicit_poly = is_explicitly_poly has_poly in
+      if has_explicit_poly && is_optional_parsetree arg_label then
         raise(Error(pat.ppat_loc, env, Optional_poly_param));
-      if has_poly
+      if has_explicit_poly
       && not (Language_extension.is_enabled Polymorphic_parameters) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Polymorphic_parameters));
@@ -8755,7 +8739,7 @@ and type_function
             let check2 =
               Zero_alloc.create_const (Zero_alloc.Check check_poly)
             in
-            match Zero_alloc.sub ~context:Fun_param check1 check2 with
+            match Zero_alloc.sub ~context:Type_constraint check1 check2 with
             | Ok () -> ()
             | Error e ->
               raise (Error (pparam_loc, env, Incompatible_param_zero_alloc e))
@@ -8930,7 +8914,7 @@ and type_function
             param_uid
       in
       let param =
-        { has_poly;
+        { has_poly = is_explicitly_poly has_poly;
           param =
             { fp_kind;
               fp_arg_label = typed_arg_label;
@@ -9539,7 +9523,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         match get_desc (expand_head env ty_fun) with
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
             let ty =
-              type_option_none env (instance (tpoly_get_mono ty_arg))
+              type_option_none env (instance (tpoly_get_inner ty_arg))
                 sarg.pexp_loc
             in
             (* CR layouts v5: change value assumption below when we allow
@@ -9720,7 +9704,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       let ty_arg', vars, zero_alloc = tpoly_get_poly ty_arg in
       let arg, sch, zero_alloc =
         if vars = [] then begin
-          let ty_arg0' = tpoly_get_mono ty_arg0 in
+          let ty_arg0' = tpoly_get_inner ty_arg0 in
           if wrapped_in_some then begin
             type_option_some
               env expected_mode sarg ty_arg' ty_arg0', None, zero_alloc
@@ -9730,7 +9714,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
           end
         end else begin
           let sch =
-            let really_poly = is_really_poly ~env ~zero_alloc ty_arg in
+            let really_poly = is_really_poly ~env ty_arg in
             if really_poly &&
                !Clflags.principal && get_level ty_arg < Btype.generic_level
             then
@@ -10640,10 +10624,10 @@ and type_function_cases_expect
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
-        ~in_function ~has_poly:false ~mode_annots:Mode.Alloc.Const.Option.none
+        ~in_function ~has_poly:Mono ~zero_alloc:None
+        ~mode_annots:Mode.Alloc.Const.Option.none
         ~ret_mode_annots:Mode.Alloc.Const.Option.none
         ~is_first_val_param:first ~is_final_val_param:true
-        ~zero_alloc:None
     in
     let cases, partial =
       type_cases Value env
@@ -10833,6 +10817,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
          we type-checked expressions before patterns, then we could call
          [add_module_variables] here.
       *)
+      let env_before_pvs = new_env in
       let new_env = add_pattern_variables new_env pvs in
       let mode_pat_typ_list =
         List.map
@@ -10851,7 +10836,14 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
            fail, even if the type of [m] is known.
         *)
         let exp_env =
-          if is_recursive then add_module_variables new_env mvs else env
+          if is_recursive then
+            let pvs_no_za =
+              List.map (fun pv -> { pv with pv_zero_alloc = None }) pvs
+            in
+            add_module_variables
+              (add_pattern_variables env_before_pvs pvs_no_za)
+              mvs
+          else env
         in
         type_let_def_wrap_warnings ?check ?check_strict ~is_recursive
           ~entirely_functions
@@ -10962,11 +10954,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       (fun (s, ((_,p,_), (e, _))) (pvb, zero_alloc) ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
-         let e =
-           add_typed_zero_alloc_attribute e
-             (Option.value ~default:Builtin_attributes.Default_zero_alloc
-                zero_alloc)
-        in
+        let e = add_zero_alloc_attribute e zero_alloc in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
@@ -11155,10 +11143,10 @@ and type_andops env sarg sands expected_sort expected_ty =
             in
             let arrow_desc = (Nolabel, Alloc.legacy, Alloc.legacy) in
             let ty_rest_fun =
-              newty (Tarrow(arrow_desc, newmono ~zero_alloc:None ty_arg,
+              newty (Tarrow(arrow_desc, newmono ty_arg,
                             ty_result, commu_ok)) in
             let ty_op =
-              newty (Tarrow(arrow_desc, newmono ~zero_alloc:None ty_rest,
+              newty (Tarrow(arrow_desc, newmono ty_rest,
                             ty_rest_fun, commu_ok))
             in
             begin try
@@ -11316,7 +11304,12 @@ and type_n_ary_function
             | Check c -> Some c
             | _ -> None
           in
-          match filter_arrow env ty arg_label ~force_tpoly ~zero_alloc with
+          let has_poly =
+            match force_tpoly, zero_alloc with
+            | false, None -> Mono
+            | _ -> Poly zero_alloc
+          in
+          match filter_arrow env ty arg_label ~has_poly with
           | { ty_ret; _ } -> ty_ret
           | exception (Filter_arrow_failed error) ->
               let trace =
@@ -12918,7 +12911,8 @@ let report_error ~loc env =
          for %s." ctx_str
   | Wrong_arg_zero_alloc err ->
       Location.errorf ~loc
-        "@[Function argument zero alloc assumption violated.@]@ %a"
+        "@[Mismatch between the \"zero_alloc\" requirement of the function@ \
+         being applied and this argument.@]@ %a"
         Zero_alloc.print_error err
   | Unsupported_arg_zero_alloc ->
       Location.errorf ~loc

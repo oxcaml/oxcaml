@@ -822,7 +822,8 @@ let instance_variable_type label sign =
 
 let tpoly_is_mono ty =
   match get_desc ty with
-  | Tpoly(_, [], _) -> true
+  | Tpoly(_, [], None) -> true
+  | Tpoly(_, [], Some _) -> false
   | Tpoly(_, _ :: _, _) -> false
   | _ -> assert false
 
@@ -832,6 +833,12 @@ let tpoly_get_poly ty =
   | _ -> assert false
 
 let tpoly_get_mono ty =
+  match get_desc ty with
+  | Tpoly(ty, [], None) -> ty
+  | _ -> assert false
+
+(* Like [tpoly_get_mono] but also works for [Tpoly(ty, [], Some _)] types. *)
+let tpoly_get_inner ty =
   match get_desc ty with
   | Tpoly(ty, [], _) -> ty
   | _ -> assert false
@@ -846,6 +853,18 @@ let cstr_type_path cstr =
   match get_desc cstr.cstr_res with
   | Tconstr (p, _, _) -> p
   | _ -> assert false
+
+                  (****************)
+                  (*  zero_alloc  *)
+                  (****************)
+
+type explicit_poly =
+  | Mono
+  | Poly of Zero_alloc.check option
+
+let is_explicitly_poly = function
+  | Mono -> false
+  | Poly _ -> true
 
                   (************)
                   (*  Jkinds  *)

@@ -40,9 +40,10 @@ let _ = f_requires_opt non_za_fn;;
 Line 1, characters 23-32:
 1 | let _ = f_requires_opt non_za_fn;;
                            ^^^^^^^^^
-Error: Function argument zero alloc assumption violated.
+Error: Mismatch between the "zero_alloc" requirement of the function
+       being applied and this argument.
        The former provides a weaker "zero_alloc" guarantee than the latter.
-       Hint: Add a "zero_alloc" attribute to the implementation.
+       Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
 
 (* Under opt mode, [@zero_alloc opt] on a function definition is checked. *)

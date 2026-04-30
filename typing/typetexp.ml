@@ -885,34 +885,32 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
+          let default_arity = Ctype.arity arg_cty.ctyp_type in
+          let za =
+            Builtin_attributes.get_zero_alloc_attribute
+              ~in_signature:false
+              ~on_application:false
+              ~on_function_argument:true
+              ~default_arity
+              arg_cty.ctyp_attributes
+          in
           let zero_alloc =
-            match Types.get_desc arg_cty.ctyp_type with
-            | Tpoly (_, _, zero_alloc) -> zero_alloc
-            | _ ->
-              let default_arity = Ctype.arity arg_cty.ctyp_type in
-              let za =
-                Builtin_attributes.get_zero_alloc_attribute
-                  ~in_signature:false
-                  ~on_application:false
-                  ~on_function_argument:true
-                  ~default_arity
-                  arg_cty.ctyp_attributes
-              in
-              match za with
-              | Check {arity; _} when arity = 0 || default_arity = 0 ->
-                raise (Error (loc, env, Zero_alloc_attr_non_function))
-              | Check {arity; _} when arity <> default_arity ->
-                raise (Error (loc, env,
-                  Zero_alloc_arity_mismatch (arity, default_arity)))
-              | Check za -> Some za
-              | Assume _ ->
-                raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
-              | Ignore_assert_all | Default_zero_alloc -> None
+            match za with
+            | Check {arity; _} when arity = 0 || default_arity = 0 ->
+              raise (Error (loc, env, Zero_alloc_attr_non_function))
+            | Check {arity; _} when arity <> default_arity ->
+              raise (Error (loc, env,
+                            Zero_alloc_arity_mismatch (arity, default_arity)))
+            | Check za -> Some za
+            | Assume _ ->
+              raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+            | Ignore_assert_all | Default_zero_alloc -> None
           in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
-            if Btype.is_Tpoly arg_ty then arg_ty else newmono ~zero_alloc arg_ty
+            if Btype.is_Tpoly arg_ty then arg_ty
+            else newty (Tpoly(arg_ty, [], zero_alloc))
           in
           let arg_ty =
             if not (Btype.is_optional l) then arg_ty
@@ -921,7 +919,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                 raise (Error (arg.ptyp_loc, env, Zero_alloc_on_optional_param));
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono ~zero_alloc:None
+              newmono
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in

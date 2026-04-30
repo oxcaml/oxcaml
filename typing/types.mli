@@ -262,8 +262,9 @@ and type_desc =
       the same sort univars in different orders represent incompatible types.
 
       Example: [(repr_ 'a) (repr_ 'b). 'a -> 'b] translates to
-      [Trepr (Tpoly ('a -> 'b, ['a; 'b]), [s1; s2])] where [s1] and [s2] are
-      sort univars that appear in the jkinds of ['a] and ['b] respectively. *)
+      [Trepr (Tpoly ('a -> 'b, ['a; 'b], None), [s1; s2])] where [s1] and [s2]
+      are sort univars that appear in the jkinds of ['a] and ['b] respectively.
+  *)
 
 
   | Tpackage of Path.t * (Longident.t * type_expr) list
