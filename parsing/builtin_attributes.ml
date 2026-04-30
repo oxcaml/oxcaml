@@ -1189,20 +1189,3 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
-
-<<<<<<< HEAD
-let get_eval_payload payload =
-  match payload with
-  | PTyp typ -> Ok typ
-  | _ -> Error ()
-
-||||||| 5.2.0minus-31
-let get_eval_payload payload =
-  match payload with
-  | PTyp typ -> Ok typ
-  | _ -> Error ()
-
-let has_atomic attrs = has_attribute "atomic" attrs
-=======
-let has_atomic attrs = has_attribute "atomic" attrs
->>>>>>> 5.2.0minus-37

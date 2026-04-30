@@ -323,22 +323,10 @@ let set_paths ?(auto_include=Compmisc.auto_include) ?(dir="") () =
   let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
   let visible = List.concat [
-<<<<<<< HEAD
-      [ dir ];
-      List.map expand (List.rev !Compenv.first_include_dirs);
-      List.map expand (List.rev !Clflags.include_dirs);
-      List.map expand (List.rev !Compenv.last_include_dirs);
-||||||| 5.2.0minus-31
-      [ "" ];
-      List.map expand (List.rev !Compenv.first_include_dirs);
-      List.map expand (List.rev !Clflags.include_dirs);
-      List.map expand (List.rev !Compenv.last_include_dirs);
-=======
-      [ include_no_cmx "" ];
+      [ include_no_cmx dir ];
       List.map expand_entry (List.rev !Compenv.first_include_dirs);
       List.map expand_entry (List.rev !Clflags.include_dirs);
       List.map expand_entry (List.rev !Compenv.last_include_dirs);
->>>>>>> 5.2.0minus-37
       visible;
       [ include_no_cmx (expand "+camlp4") ];
     ]

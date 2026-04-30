@@ -1135,13 +1135,9 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
-<<<<<<< HEAD
   val _i_variance : unit -> unit
-||||||| 5.2.0minus-31
-=======
   val _ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
->>>>>>> 5.2.0minus-37
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
@@ -2371,15 +2367,9 @@ module Default = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
     let _alert = Warnings.parse_alert_option
-<<<<<<< HEAD
-    let _alias_deps = clear no_alias_deps
-||||||| 5.2.0minus-31
-    let _alias_deps = clear transparent_modules
-=======
     let _ikinds = set Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
-    let _alias_deps = clear transparent_modules
->>>>>>> 5.2.0minus-37
+    let _alias_deps = clear no_alias_deps
     let _app_funct = set applicative_functors
     let _i_variance = set print_variance
     let _labels = clear classic

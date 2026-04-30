@@ -349,37 +349,18 @@ end = struct
     STbl.clear !visible_files;
     STbl.clear !visible_files_uncap
 
-<<<<<<< HEAD
-  let prepend_add_single ~hidden base fn =
+  let prepend_add_single ~hidden ~cmx_guaranteed base fn =
     Result.iter (fun ubase ->
         if hidden then begin
           STbl.replace !hidden_files base fn;
           STbl.replace !hidden_files_uncap ubase fn
         end else begin
-          STbl.replace !visible_files base fn;
-          STbl.replace !visible_files_uncap ubase fn
+          STbl.replace !visible_files base
+            { Clflags.path = fn; cmx_guaranteed };
+          STbl.replace !visible_files_uncap ubase
+            { Clflags.path = fn; cmx_guaranteed }
         end)
       (Misc.normalized_unit_filename base)
-||||||| 5.2.0minus-31
-  let prepend_add_single ~hidden base fn =
-    if hidden then begin
-      STbl.replace !hidden_files base fn;
-      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
-    end else begin
-      STbl.replace !visible_files base fn;
-      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base) fn
-    end
-=======
-  let prepend_add_single ~hidden ~cmx_guaranteed base fn =
-    if hidden then begin
-      STbl.replace !hidden_files base fn;
-      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
-    end else begin
-      STbl.replace !visible_files base { Clflags.path = fn; cmx_guaranteed };
-      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base)
-        { Clflags.path = fn; cmx_guaranteed }
-    end
->>>>>>> 5.2.0minus-37
 
   let prepend_add dir =
     let hidden, cmx_guaranteed =
@@ -410,19 +391,11 @@ end = struct
            (Misc.normalized_unit_filename base))
       (Dir.files dir)
 
-<<<<<<< HEAD
   let find_in fn visible_files hidden_files =
-    try (STbl.find !visible_files fn, Visible) with
-||||||| 5.2.0minus-31
-  let find fn visible_files hidden_files =
-    try (STbl.find !visible_files fn, Visible) with
-=======
-  let find fn visible_files hidden_files =
     try
       let { Clflags.path; cmx_guaranteed } = STbl.find !visible_files fn in
       (path, Visible { cmx_guaranteed })
     with
->>>>>>> 5.2.0minus-37
     | Not_found -> (STbl.find !hidden_files fn, Hidden)
 
   let find fn =
@@ -612,15 +585,7 @@ let find_normalized_with_visibility fn =
         | Some result -> result
         | None -> raise Not_found
   with Not_found ->
-<<<<<<< HEAD
-    (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
-||||||| 5.2.0minus-31
-    let fn_uncap = String.uncapitalize_ascii fn in
-    (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
-=======
-    let fn_uncap = String.uncapitalize_ascii fn in
     (!auto_include_callback Dir.find_normalized fn_uncap,
      Visible { cmx_guaranteed = false })
->>>>>>> 5.2.0minus-37
 
 let find_normalized fn = fst (find_normalized_with_visibility fn)

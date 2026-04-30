@@ -2854,17 +2854,11 @@ let type_for_annotation ~env ~loc typ =
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
              cannot be spliced@ within quoted higher-rank function types"
             Location.print_loc_in_lowercase loc
-<<<<<<< HEAD
-        | Tpackage { pack_path; pack_cstrs } ->
-||||||| 5.2.0minus-31
-        | Tpackage (pack_path, pack_fields) ->
-=======
         | Tquote_eval _ ->
           let lident = Untypeast.lident_of_path Predef.path_eval in
           Ttyp_constr
             (Predef.path_eval, mkloc lident loc, [go (Btype.new_quote_ty ty)])
-        | Tpackage (pack_path, pack_fields) ->
->>>>>>> 5.2.0minus-37
+        | Tpackage { pack_path; pack_cstrs } ->
           Ttyp_package
             { tpt_path = pack_path;
               tpt_cstrs =
