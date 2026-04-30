@@ -49,7 +49,7 @@ let dir_trace ppf lid =
               Format.fprintf ppf "%a is already traced (under the name %a).@."
               Printtyp.path path
               Printtyp.path opath
-          | None when Lpoly.is_empty_exn desc.val_lpoly ->
+          | None when Types.Lpoly.is_empty_exn desc.val_lpoly ->
               (* Instrument the old closure *)
               traced_functions :=
                 { path = path;
