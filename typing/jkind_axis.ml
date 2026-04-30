@@ -183,8 +183,10 @@ module Per_axis = struct
     let print : type a. a t -> Fmt.formatter -> a -> unit = function
       | Externality -> Externality.print
 
-    let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
-     fun a b -> match a, b with Externality, Externality -> Equal
+    let hash_obj : type a. a t -> int = function Externality -> 0
+
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+     fun a b -> match a, b with Externality, Externality -> Some Misc.Refl
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -223,13 +225,17 @@ module Per_axis = struct
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
 
-  let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
+  let hash_obj : type a. a t -> int = function
+    | Modal ax -> Mode.Crossing.Per_axis.hash_obj ax
+    | Nonmodal ax -> Nonmodal.hash_obj ax
+
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
    fun a b ->
     match a, b with
-    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.compare_obj ax0 ax1
-    | Modal _, _ -> Less_than
-    | _, Modal _ -> Greater_than
-    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.compare_obj ax0 ax1
+    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
+    | Modal _, _ -> None
+    | _, Modal _ -> None
+    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
 
   let print_obj : type a. Fmt.formatter -> a t -> unit =
    fun ppf ax -> Fmt.pp_print_string ppf (name ax)

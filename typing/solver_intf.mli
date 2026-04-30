@@ -47,9 +47,15 @@ module type Lattices = sig
 
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
-  (** Compares two objects. Used for deduplication only; it is sound (but not
-      recommended) to return a nonzero value for equal objects. *)
-  val compare_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.comparison
+  (** Tests two objects for equality. Used for deduplication only; it is fine
+      (but not recommended) to return [None] for equal objects.
+
+      Invariant: If equal_obj o1 o2 = Some Refl then hash_obj o1 = hash_obj o2
+  *)
+  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
+
+  (** Hashes an object. If two objects are equal, their hashes are equal. *)
+  val hash_obj : 'a obj -> int
 
   val print_obj : Fmt.formatter -> 'a obj -> unit
 end
@@ -164,9 +170,6 @@ module type Lattices_mono = sig
       Invariant: If equal_morph obj m1 m2 = Some Refl then hash_morph m1 =
       hash_morph m2 *)
   val hash_morph : ('a, 'b, 'd) morph -> int
-
-  (** Hashes an object. If two objects are equal, their hashes are equal. *)
-  val hash_obj : 'a obj -> int
 
   (** Print morphism *)
   val print_morph : 'b obj -> Fmt.formatter -> ('a, 'b, 'd) morph -> unit

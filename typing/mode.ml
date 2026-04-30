@@ -1201,6 +1201,28 @@ module Lattices = struct
     | Comonadic_with_regionality, _ -> Less_than
     | _, Comonadic_with_regionality -> Greater_than
     | Comonadic_with_locality, Comonadic_with_locality -> Equal
+
+  let hash_obj : type a. a obj -> int = function
+    | Locality -> 0
+    | Regionality -> 1
+    | Uniqueness_op -> 2
+    | Linearity -> 3
+    | Portability -> 4
+    | Forkable -> 5
+    | Yielding -> 6
+    | Statefulness -> 7
+    | Contention_op -> 8
+    | Visibility_op -> 9
+    | Staticity_op -> 10
+    | Monadic_op -> 11
+    | Comonadic_with_regionality -> 12
+    | Comonadic_with_locality -> 13
+
+  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =
+   fun a b ->
+    match compare_obj a b with
+    | Equal -> Some Refl
+    | Less_than | Greater_than -> None
 end
 
 module Lattices_mono = struct
@@ -1595,22 +1617,6 @@ module Lattices_mono = struct
       | Some Refl -> Some Refl
       | None -> None)
     | Map_comonadic _, _ | _, Map_comonadic _ -> None
-
-  let hash_obj : type a. a obj -> int = function
-    | Locality -> 0
-    | Regionality -> 1
-    | Uniqueness_op -> 2
-    | Linearity -> 3
-    | Portability -> 4
-    | Forkable -> 5
-    | Yielding -> 6
-    | Statefulness -> 7
-    | Contention_op -> 8
-    | Visibility_op -> 9
-    | Staticity_op -> 10
-    | Monadic_op -> 11
-    | Comonadic_with_regionality -> 12
-    | Comonadic_with_locality -> 13
 
   let hash_axis : type p r. (p, r) Axis.t -> int = function
     | Areality -> 0
@@ -2734,9 +2740,9 @@ module Report = struct
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
-    match C.compare_obj a_obj b_obj with
-    | Equal -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Less_than | Greater_than -> false
+    match C.equal_obj a_obj b_obj with
+    | None -> false
+    | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -3509,10 +3515,9 @@ module Comonadic_with (Areality : Areality) = struct
         let obj = (proj_obj [@inlined hint]) ax in
         (C.min [@inlined hint]) obj
 
-      let compare_obj ax1 ax2 =
-        let obj1 = proj_obj ax1 in
-        let obj2 = proj_obj ax2 in
-        C.compare_obj obj1 obj2
+      let hash_obj ax = C.hash_axis ax
+
+      let equal_obj ax1 ax2 = C.Axis.equal ax1 ax2
 
       let print_obj ppf ax =
         let obj = proj_obj ax in
@@ -3650,10 +3655,9 @@ module Monadic = struct
         let obj = (proj_obj [@inlined hint]) ax in
         (C.max [@inlined hint]) obj
 
-      let compare_obj ax1 ax2 =
-        let obj1 = proj_obj ax1 in
-        let obj2 = proj_obj ax2 in
-        C.compare_obj obj1 obj2
+      let hash_obj ax = C.hash_axis ax
+
+      let equal_obj ax1 ax2 = C.Axis.equal ax1 ax2
 
       let print_obj ppf ax =
         let obj = proj_obj ax in
@@ -5303,7 +5307,15 @@ module Crossing = struct
 
     let print_obj = Axis.print
 
-    let compare_obj = Axis.compare
+    let hash_obj : type a. a t -> int = function
+      | Monadic ax -> Hashtbl.hash (0, C.hash_axis ax)
+      | Comonadic ax -> Hashtbl.hash (1, C.hash_axis ax)
+
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+     fun ax1 ax2 ->
+      match Axis.compare ax1 ax2 with
+      | Equal -> Some Misc.Refl
+      | Less_than | Greater_than -> None
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
