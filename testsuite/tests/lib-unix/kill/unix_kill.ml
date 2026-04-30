@@ -1,6 +1,5 @@
 (* TEST
  include unix;
-<<<<<<< HEAD
  hasunix;
  not-target-windows;
  (*
@@ -9,12 +8,6 @@
    see https://github.com/llvm/llvm-project/issues/63824
  *)
  not_macos_amd64_tsan;
-||||||| 5.2.0minus-31
- flags = "-alert -unsafe_multidomain";
- libunix;
-=======
- libunix;
->>>>>>> 5.2.0minus-37
  {
    bytecode;
  }{

@@ -1,10 +1,5 @@
 (* TEST
-<<<<<<< HEAD
  multicore;
-||||||| 5.2.0minus-31
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
-=======
->>>>>>> 5.2.0minus-37
  no-tsan; (* TSan detects the intentional data race *)
  { bytecode; }
  { native; }
