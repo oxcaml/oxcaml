@@ -291,9 +291,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Genvar _ -> Print_as "<genvar>"
 
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
-      match Types.Lpoly.get_exn lpoly with
-      | _ :: _ -> Oval_stuff "<lpoly>"
-      | [] ->
+      if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"
+      else
 
       let printer_steps = ref max_steps in
 

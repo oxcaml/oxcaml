@@ -220,8 +220,8 @@ let print_untyped_exception ppf obj =
 let outval_of_value env obj lpoly ty =
   Printer.outval_of_value !max_printer_steps !max_printer_depth
     (fun _ _ _ -> None) env obj lpoly ty
-let print_value env obj ppf (lpoly, ty) =
-  !print_out_value ppf (outval_of_value env obj lpoly ty)
+let print_value env obj ppf ty =
+  !print_out_value ppf (outval_of_value env obj (Lpoly.determined []) ty)
 
 type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
   | Zero of 'b
@@ -527,6 +527,8 @@ let execute_phrase print_outcome ppf phr =
                           let outv =
                             outval_of_id newenv id vd.val_lpoly vd.val_type
                           in
+                          (* CR-someday zqian: should pass val_lpoly to
+                             printer *)
                           let ty = Printtyp.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false

@@ -1121,6 +1121,10 @@ module Lpoly : sig
   (** Assert that layout poly is determined and return the generalized vars. *)
   val get_exn : t -> Jkind_types.Sort.var list
 
+  (** Returns [true] for [determined []], [false] otherwise.
+      Raise exception if [pending]. *)
+  val is_empty_exn : t -> bool
+
   (** Dispatch on the state of [t]:
       - If pending ([pending loc]), call [on_to_generalize loc],
         transition to finalized with the returned vars.

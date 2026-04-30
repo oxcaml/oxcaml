@@ -109,9 +109,8 @@ let rec expression event env = function
             | _ ->
                 value_path event env p
           in
-          (match Lpoly.get_exn valdesc.val_lpoly with
-          | _ :: _ -> raise (Error Layout_polymorphic_value)
-          | [] -> ());
+          if not @@ Lpoly.is_empty_exn valdesc.val_lpoly then
+            raise (Error Layout_polymorphic_value);
           let typ = Ctype.correct_levels valdesc.val_type in
           v, typ
       | exception Not_found ->

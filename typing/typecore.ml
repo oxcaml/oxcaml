@@ -8295,7 +8295,7 @@ and type_ident env ?(recarg=Rejected) lid =
   let layout_args, val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
-       if not (List.is_empty (Lpoly.get_exn desc.val_lpoly)) then
+       if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in

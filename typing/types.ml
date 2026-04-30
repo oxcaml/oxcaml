@@ -651,6 +651,8 @@ module Lpoly = struct
     | Pending _ -> Misc.fatal_error "layout is pending generalization"
     | Determined l -> l
 
+  let is_empty_exn t = List.is_empty @@ get_exn t
+
   let determined l = ref (Determined l)
   let pending ~loc = ref (Pending loc)
 

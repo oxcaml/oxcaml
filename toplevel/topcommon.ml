@@ -172,8 +172,9 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
   let outval_of_value env obj lpoly ty =
     Printer.outval_of_value !max_printer_steps !max_printer_depth
       (fun _ _ _ -> None) env obj lpoly ty
-  let print_value env obj ppf (lpoly, ty) =
-    !print_out_value ppf (outval_of_value env obj lpoly ty)
+  let print_value env obj ppf ty =
+    !print_out_value ppf
+      (outval_of_value env obj (Types.Lpoly.determined []) ty)
 
   (* Print an exception produced by an evaluation *)
 

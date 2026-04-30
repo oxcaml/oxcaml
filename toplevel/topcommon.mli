@@ -99,8 +99,9 @@ module MakeEvalPrinter (_ : EVAL_BASE) : sig
 
   module Printer: Genprintval.S with type t = Obj.t
 
+  (** The type_expr must not be layout-polymorphic. *)
   val print_value:
-    Env.t -> Printer.t -> formatter -> (Types.Lpoly.t * Types.type_expr) -> unit
+    Env.t -> Printer.t -> formatter -> Types.type_expr -> unit
 
   val print_untyped_exception: formatter -> Printer.t -> unit
 
