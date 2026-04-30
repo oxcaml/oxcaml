@@ -6,8 +6,8 @@ Error: allocation of 32 bytes on a path to exceptional return
 inlined from
 fail20.ml:12,7--18[Fail20.foo1]
 
-File "fail20.ml", line 17, characters 5-15:
+File "fail20.ml", line 19, characters 5-15:
 Error: Annotation check for zero_alloc failed on function Fail20.foo (camlFail20.foo_HIDE_STAMP).
 
-File "fail20.ml", line 19, characters 6-21:
+File "fail20.ml", line 21, characters 6-21:
 Error: called function may allocate (direct call camlFail20.bar_HIDE_STAMP)
