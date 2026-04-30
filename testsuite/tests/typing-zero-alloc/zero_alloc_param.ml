@@ -881,6 +881,16 @@ val use_annotated_ignore_alias :
   (('a -> 'b) [@zero_alloc arity 1]) -> 'a -> 'b [@@zero_alloc] = <fun>
 |}];;
 
+(* Do aliases have the same zero_alloc properties? *)
+let _ =
+  let[@zero_alloc] (f as g) = fun x -> x + 123 in
+  let _ = require_za_arity_1 f in
+  let _ = require_za_arity_1 g in
+  ()
+[%%expect {|
+- : unit = ()
+|}];;
+
 (** `external` declarations and zero_alloc parameters.
     Zero_alloc attributes on parameters of `external` declarations behave
     the same as on `val` declarations in signatures. *)
@@ -929,7 +939,7 @@ let _ =
 Line 7, characters 6-67:
 7 |       (fun x -> if x < 0 then raise (Err (string_of_int x)) else x) a;;
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP98._$.(fun) (camlTOP98__fn[:7,6--67]_83_87_code).
+Error: Annotation check for zero_alloc strict failed on function TOP99._$.(fun) (camlTOP99__fn[:7,6--67]_85_89_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:7,41--58)
 Line 7, characters 36-59:
