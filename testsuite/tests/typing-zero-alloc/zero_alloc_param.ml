@@ -680,7 +680,6 @@ let _ =
   let[@zero_alloc] f x = x + 123 in
   let _ = g1 f in
   let _ = g2 f in
-  let _ = g3 f in
   f;;
 [%%expect {|
 Line 4, characters 13-14:
@@ -696,20 +695,15 @@ let _ =
   let[@zero_alloc strict] f_strict x = x + 123 in
   let _ = g1 f_strict in
   let _ = g2 f_strict in
-  let _ = g3 f_strict in
-  f;;
+  f_strict;;
 [%%expect {|
-Line 5, characters 10-12:
-5 |   let _ = g3 f_strict in
-              ^^
-Error: Unbound value "g3"
+- : int -> int = <fun>
 |}];;
 
 let _ =
   let f_unannotated x = x + 123 in
   let _ = g1 f_unannotated in
   let _ = g2 f_unannotated in
-  let _ = g3 f_unannotated in
   f_unannotated
 [%%expect {|
 Line 3, characters 13-26:
@@ -735,7 +729,7 @@ module type S = sig val f : ((int -> int) [@zero_alloc arity 1]) -> int end
 Line 6, characters 17-50:
 6 |   let g () = X.f (fun x -> Format.printf "foo"; x)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP74.F.g.(fun) (camlTOP74__fn[:6,17--50]_58_61_code).
+Error: Annotation check for zero_alloc failed on function TOP74.F.g.(fun) (camlTOP74__fn[:6,17--50]_60_63_code).
 my specific error
 
 File "format.ml", lines 1498-1500, characters 2-18:
@@ -935,7 +929,7 @@ let _ =
 Line 7, characters 6-67:
 7 |       (fun x -> if x < 0 then raise (Err (string_of_int x)) else x) a;;
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP98._$.(fun) (camlTOP98__fn[:7,6--67]_81_85_code).
+Error: Annotation check for zero_alloc strict failed on function TOP98._$.(fun) (camlTOP98__fn[:7,6--67]_83_87_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:7,41--58)
 Line 7, characters 36-59:
