@@ -26,19 +26,9 @@ type v = unit
 Line 3, characters 21-22:
 3 | let f (x: v): 'a t = x
                          ^
-<<<<<<< HEAD
 Error: The value "x" has type "v" = "unit" but an expression was expected of type
          "'a t" = "('a : void)"
-       The layout of unit is value
-||||||| 5.2.0minus-31
-Error: This expression has type "v" = "unit"
-       but an expression was expected of type "'a t" = "('a : void)"
-       The layout of unit is value
-=======
-Error: This expression has type "v" = "unit"
-       but an expression was expected of type "'a t" = "('a : void)"
        The layout of unit is value non_pointer
->>>>>>> 5.2.0minus-37
          because it is the primitive type unit.
        But the layout of unit must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.

@@ -433,30 +433,6 @@ let g () = exclave_ local_
   local_ (() : @ unique once);;
 
 [%%expect{|
-<<<<<<< HEAD
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable "f".
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable "f".
-
-||||||| 5.2.0minus-31
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-=======
->>>>>>> 5.2.0minus-37
 val g : unit -> unit @ local once = <fun>
 |}]
 
@@ -1591,14 +1567,8 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-<<<<<<< HEAD
-Uncaught exception: File "parsing/location.ml", line 1168, characters 2-8: Assertion failed
-||||||| 5.2.0minus-31
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
-=======
 >> Fatal error: Location.todo_overwrite_not_implemented
 Uncaught exception: Misc.Fatal_error
->>>>>>> 5.2.0minus-37
 
 |}]
 

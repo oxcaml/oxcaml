@@ -23,21 +23,5 @@ module type S2 = sig
   val g : 'elt array -> int
 end
 [%%expect{|
-<<<<<<< HEAD
-Line 4, characters 2-27:
-4 |   val g : 'elt array -> int
-      ^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in g
-  can't be erased for compatibility with upstream OCaml.
-
-||||||| 5.2.0minus-31
-Line 4, characters 2-27:
-4 |   val g : 'elt array -> int
-      ^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in g
-can't be erased for compatibility with upstream OCaml.
-
-=======
->>>>>>> 5.2.0minus-37
 module type S2 = sig val g : ('elt : immediate). 'elt array -> int end
 |}]
