@@ -4,11 +4,9 @@ set -eu
 
 case ${1:-} in
   "--check")
-    OUTPUT="test_native.corrected.ml"
     CHECKING="true"
   ;;
   "")
-    OUTPUT="test_native.ml"
     CHECKING=""
   ;;
   *)
@@ -17,18 +15,25 @@ case ${1:-} in
   ;;
 esac
 
-sed '
+gen_native() {
+  INPUT="$1"
+  OUTPUT="$2"
+  CORRECTED="${OUTPUT%.ml}.corrected.ml"
+  TARGET=$([ -n "$CHECKING" ] && echo "$CORRECTED" || echo "$OUTPUT")
+  sed '
 s/_byte/_native/g
 s/ocamlc/ocamlopt/g
 # Oops, we changed ocamlc_byte to ocamlopt_native, so fix that
 s/ocamlopt_native/ocamlopt_byte/g
 s/\.cmo/.cmx/g
 s/\.bc/.exe/g
-# Do this last to avoid replacing the _byte:
-s/TEST/TEST (* DO NOT EDIT. Instead edit test_byte.ml and run gen-native.sh. *)/
-' test_byte.ml > "$OUTPUT"
+' "$INPUT" | sed "s/TEST/TEST (* DO NOT EDIT. Instead edit $INPUT and run gen-native.sh. *)/" \
+  > "$TARGET"
+  if [ -n "$CHECKING" ]; then
+    ( diff -q "$OUTPUT" "$TARGET" && rm "$TARGET" ) \
+    || exit 1
+  fi
+}
 
-if [ -n "$CHECKING" ]; then
-  ( diff -q test_native.ml "$OUTPUT" && rm "$OUTPUT" ) \
-  || exit 1
-fi
+gen_native test_byte.ml test_native.ml
+gen_native test_functorize_byte.ml test_functorize_native.ml

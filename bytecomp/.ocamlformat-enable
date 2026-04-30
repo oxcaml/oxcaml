@@ -1,5 +1,7 @@
 blambda.ml
 blambda.mli
+bytefunctorizer.ml
+bytefunctorizer.mli
 blambda_of_lambda.ml
 blambda_of_lambda.mli
 bytegen.ml

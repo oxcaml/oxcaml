@@ -103,6 +103,12 @@ type starting_point =
       main_module_block_repr : Lambda.module_representation;
       arg_descr : Lambda.arg_descr option;
     }
+  | Functorization of {
+      initial_env : Env.t;
+      all_params : Global_module.t list;
+      modules_cu : Compilation_unit.t list;
+      modules : (Compilation_unit.t * Lambda.main_module_block_format) list;
+    }
 
 let starting_point_of_compiler_pass start_from =
   match (start_from:Clflags.Compiler_pass.t) with
@@ -130,6 +136,20 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       ~hook_parse_tree:(fun _ -> ())
       ~hook_typed_tree:(fun _ -> ())
       info ~backend
+  | Functorization { initial_env; all_params; modules_cu; modules } ->
+    let coercion =
+      Typemod.functorize_implementation initial_env ~all_params
+        ~modules:modules_cu info.target info.module_name
+    in
+    if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
+      let program =
+        Translmod.transl_functorize info.module_name ~all_params ~modules
+          ~coercion
+      in
+      let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+      if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda) then
+        emit_bytecode info bytecode
+    end
   | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
     begin
       match !Clflags.as_argument_for with
@@ -162,4 +182,13 @@ let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
     Instantiation { runtime_args; main_module_block_repr; arg_descr }
   in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
+    ~compilation_unit:(Exactly compilation_unit)
+
+let functorize ~source_file ~output_prefix ~compilation_unit ~initial_env
+    ~all_params ~modules_cu ~modules =
+  implementation_aux
+    ~start_from:
+      (Functorization { initial_env; all_params; modules_cu; modules })
+    ~source_file ~output_prefix
+    ~keep_symbol_tables:false
     ~compilation_unit:(Exactly compilation_unit)

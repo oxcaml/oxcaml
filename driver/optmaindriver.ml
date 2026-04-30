@@ -103,6 +103,7 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
+                      functorize;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -110,7 +111,7 @@ let main unix argv ppf ~flambda2 =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
+                         -output-obj, -instantiate, -functorize";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -152,6 +153,19 @@ let main unix argv ppf ~flambda2 =
           src, args
       in
       Compiler.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let files = Compenv.get_objfiles ~with_ocamlparam:false in
+      if files = [] then
+        Compenv.fatal
+          (Printf.sprintf
+             "Must specify at least one %s file with -functorize"
+             Compiler.ext_flambda_obj);
+      Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
+        Compiler.functorize ~ppf_dump (Compmisc.initial_env ()) files target);
       Warnings.check_fatal ();
     end
     else if !shared then begin

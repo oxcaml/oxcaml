@@ -37,6 +37,9 @@ type binary_annots =
   | Interface of signature
   | Partial_implementation of binary_part array
   | Partial_interface of binary_part array
+  | Functorize
+  (* CR-someday: add data (e.g. the bundle signature and list of input modules)
+     to [Functorize] once tooling needs it. *)
 
 and binary_part =
   | Partial_structure of structure

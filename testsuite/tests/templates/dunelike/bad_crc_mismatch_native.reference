@@ -1,0 +1,3 @@
+File "_none_", line 1:
+Error: Files bundle_crc/bundle_crc.cmx and main_crc_mismatch.cmx
+       make inconsistent assumptions over interface "Bundle_crc"
