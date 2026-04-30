@@ -296,13 +296,17 @@ let cfg_block_counters (block : Cfg.basic_block) =
   |> Profile.Counters.set "block" 1
   |> Profile.Counters.set "move" moves
 
+let rematerialize_loads = ref 0
+
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
 let whole_cfg_counters (cfg : Cfg.t) =
   let stack_slots =
     Stack_class.Tbl.fold cfg.fun_num_stack_slots ~init:0
       ~f:(fun _stack_class num acc -> num + acc)
   in
-  Profile.Counters.create () |> Profile.Counters.set "stack_slot" stack_slots
+  Profile.Counters.create ()
+  |> Profile.Counters.set "stack_slot" stack_slots
+  |> Profile.Counters.set "rematerialize_loads" !rematerialize_loads
 
 let cfg_profile to_cfg =
   let total_counters = ref (Profile.Counters.create ()) in
@@ -402,6 +406,193 @@ let available_regs ~stack_slots ~f x =
   then x
   else f x
 
+module Remat : sig
+  val run : Cfg_with_infos.t -> Cfg_with_infos.t
+end = struct
+  module Array = ArrayLabels
+
+  (* XXX quasi-duplicates with `Regalloc_split_utils` *)
+
+  type src =
+    | Load of Cfg.basic Cfg.instruction
+    | Move of Reg.t
+    | Other
+
+  let format_src : Format.formatter -> src -> unit =
+   fun fmt src ->
+    match src with
+    | Load instr -> Format.fprintf fmt "Load %a" Printreg.regs instr.arg
+    | Move arg -> Format.fprintf fmt "Move %a" Printreg.reg arg
+    | Other -> Format.fprintf fmt "Other"
+
+  type set =
+    | At_most_once of { src : src }
+    | Maybe_more_than_once
+
+  let compute_uses : Cfg_with_infos.t -> set Reg.Tbl.t =
+   fun cfg_with_infos ->
+    let loops = Cfg_with_infos.loop_infos cfg_with_infos in
+    let incr_set (tbl : set Reg.Tbl.t) (arr : Reg.t array) ~(in_loop : bool)
+        ~(src : src) : unit =
+      Array.iter arr ~f:(fun (reg : Reg.t) ->
+          if Reg.is_unknown reg
+          then
+            begin match Reg.Tbl.find_opt tbl reg with
+            | None ->
+              Reg.Tbl.replace tbl reg
+                (if in_loop then Maybe_more_than_once else At_most_once { src })
+            | Some (At_most_once _) ->
+              Reg.Tbl.replace tbl reg Maybe_more_than_once
+            | Some Maybe_more_than_once -> ()
+            end)
+    in
+    Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)
+      ~f:(fun label block acc ->
+        let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
+        incr_set acc block.terminator.res ~in_loop ~src:Other;
+        DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+            let src =
+              match instr.desc with
+              | Op
+                  (Load
+                     { memory_chunk = _;
+                       addressing_mode = _;
+                       mutability = Immutable;
+                       is_atomic = false
+                     })
+                when Array.length instr.res = 1 ->
+                (* XXX is `is_atomic` meaningful? *)
+                Load instr
+              | Op Move
+                when Cmm.equal_machtype_component instr.arg.(0).typ
+                       instr.res.(0).typ ->
+                Move instr.arg.(0)
+              | _ -> Other
+            in
+            incr_set acc instr.res ~in_loop ~src);
+        acc)
+
+  let format_set : Format.formatter -> set -> unit =
+   fun fmt set ->
+    match set with
+    | At_most_once { src } ->
+      Format.fprintf fmt "At_most_once %a" format_src src
+    | Maybe_more_than_once -> Format.fprintf fmt "Maybe_more_than_once"
+
+  let all_set_once : set Reg.Tbl.t -> Reg.t array -> bool =
+   fun uses regs ->
+    Array.for_all regs ~f:(fun reg ->
+        match Reg.Tbl.find_opt uses reg with
+        | None -> false
+        | Some Maybe_more_than_once -> false
+        | Some (At_most_once _) -> true)
+
+  let as_load :
+      set Reg.Tbl.t -> Reg.Set.t -> Reg.t -> Cfg.basic Cfg.instruction option =
+   fun uses destroyed reg ->
+    match Reg.Tbl.find_opt uses reg with
+    | None -> None
+    | Some Maybe_more_than_once -> None
+    | Some (At_most_once { src = Other }) -> None
+    | Some (At_most_once { src = Load instr }) ->
+      if
+        all_set_once uses instr.arg
+        && Array.for_all ~f:(fun r -> Reg.Set.mem r destroyed) instr.arg
+      then Some instr
+      else None
+    | Some (At_most_once { src = Move arg }) -> (
+      match Reg.Tbl.find_opt uses arg with
+      | None
+      | Some Maybe_more_than_once
+      | Some (At_most_once { src = Other })
+      | Some (At_most_once { src = Move _ }) ->
+        None
+      | Some (At_most_once { src = Load instr }) ->
+        if
+          all_set_once uses instr.arg
+          && Array.for_all ~f:(fun r -> Reg.Set.mem r destroyed) instr.arg
+        then Some instr
+        else None)
+
+  let debugXXX = false
+
+  let applyXXX = true
+
+  let run : Cfg_with_infos.t -> Cfg_with_infos.t =
+   fun cfg_with_infos ->
+    let uses : set Reg.Tbl.t = compute_uses cfg_with_infos in
+    if false
+    then begin
+      Format.eprintf
+        "XXX \
+         ======================================================================== \
+         XXX\n\
+         %!";
+      Reg.Tbl.iter
+        (fun reg set ->
+          Format.eprintf "XXX %a ~> %a\n%!" Printreg.reg reg format_set set)
+        uses
+    end;
+    let cfg = Cfg_with_infos.cfg cfg_with_infos in
+    rematerialize_loads := 0;
+    let invalidate = ref false in
+    Cfg.iter_blocks cfg ~f:(fun label block ->
+        if
+          Proc.is_destruction_point ~more_destruction_points:false
+            block.terminator.desc
+        then begin
+          if debugXXX
+          then
+            Format.eprintf "XXX destruction at end of %a\n%!" Label.format label;
+          match
+            Cfg_with_infos.liveness_find_opt cfg_with_infos block.terminator.id
+          with
+          | None -> assert false (* XXX *)
+          | Some { Cfg_liveness.across; before = _ } ->
+            Reg.Set.iter
+              (fun reg ->
+                match as_load uses across reg with
+                | None -> ()
+                | Some load_instr -> begin
+                  incr rematerialize_loads;
+                  if applyXXX
+                  then begin
+                    let successor_labels =
+                      Cfg.successor_labels block ~normal:true ~exn:true
+                    in
+                    Label.Set.iter
+                      (fun successor_label ->
+                        (*= XXX if
+                          Reg.Set.mem reg
+                            (Regalloc_split_utils.live_at_block_beginning
+                               cfg_with_infos successor_label)
+                        then*)
+                        begin
+                          invalidate := true;
+                          let successor_block =
+                            Cfg.get_block_exn cfg successor_label
+                          in
+                          let load_copy =
+                            { load_instr with
+                              id =
+                                InstructionId.get_and_incr
+                                  cfg.next_instruction_id;
+                              res = [| reg |] (* XXX dedup arg/res *)
+                            }
+                          in
+                          DLL.add_begin successor_block.body load_copy
+                        end)
+                      successor_labels
+                  end;
+                  if debugXXX
+                  then Format.eprintf "XXX REMAT %a\n%!" Printreg.reg reg
+                  end)
+              across
+        end);
+    if !invalidate then Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    cfg_with_infos
+end
+
 let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   let module CSE = Cfg_cse.Cse_generic (CSE) in
   cfg_with_layout
@@ -422,6 +613,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "cfg_cse" CSE.cfg_with_layout
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
   ++ Cfg_with_infos.make
+  ++ cfg_with_infos_profile ~accumulate:true "remat_imm_load" Remat.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
   ++ save_cfg_before_regalloc
   ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
