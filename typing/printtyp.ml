@@ -1528,7 +1528,7 @@ type modal =
     treated as NOT an arrow type, to align with the currying logic in
     [typetexp.ml].
 
-    If [r] is [Tpoly (Tarrow_, [])], it will be treated as NOT an arrow type.
+    If [r] is [Tpoly (Tarrow_, [], _)], it will be treated as NOT an arrow type.
     This gives tedious (but still correct) printing. *)
 
   | Other of Mode.Alloc.Const.t

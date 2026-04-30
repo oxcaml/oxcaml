@@ -276,7 +276,7 @@ let newobj fields      = newty (Tobject (fields, ref None))
 
 let newconstr path tyl = newty (Tconstr (path, tyl, ref Mnil))
 
-let newmono ~zero_alloc ty = newty (Tpoly(ty, [], zero_alloc))
+let newmono ty = newty (Tpoly(ty, [], None))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
@@ -4110,14 +4110,9 @@ let equivalent_with_nolabels l1 l2 =
   | _ -> false)
 
 let verify_zero_alloc_equal context_za context_tr za1 za2 =
-  match za1, za2 with
-  | None, None -> ()
-  | Some _, None | None, Some _ ->
-    raise_for context_tr (Incompatible_zero_alloc Zero_alloc.one_missing)
-  | Some check1, Some check2 ->
-    match Zero_alloc.assert_equal_checks ~context:context_za check1 check2 with
-    | Ok () -> ()
-    | Error e -> raise_for context_tr (Incompatible_zero_alloc e)
+  match Zero_alloc.check_option_equal ~context:context_za za1 za2 with
+  | Ok () -> ()
+  | Error e -> raise_for context_tr (Incompatible_zero_alloc e)
 
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
@@ -5498,15 +5493,16 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-let filter_arrow env t l ~force_tpoly ~zero_alloc =
+let filter_arrow env t l ~has_poly =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let ty_arg =
-      if not force_tpoly then begin
+      begin match has_poly with
+      | Mono ->
         assert (not (is_optional l));
         newvar2 level k_arg
-      end else begin
+      | Poly zero_alloc ->
         let t1 =
           if is_optional l then
             newty2 ~level
@@ -5570,14 +5566,14 @@ exception Filter_mono_failed
 
 let filter_mono ty =
   match get_desc ty with
-  | Tpoly(ty, [], _) -> ty
+  | Tpoly(ty, [], None) -> ty
   | Tpoly _ -> raise Filter_mono_failed
   | _ -> assert false
 
 exception Filter_arrow_mono_failed
 
 let filter_arrow_mono env t l =
-  match filter_arrow env t l ~force_tpoly:true ~zero_alloc:None with
+  match filter_arrow env t l ~has_poly:(Poly None) with
   | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
   | {ty_arg; _} as farr ->
       match filter_mono ty_arg with

@@ -93,7 +93,7 @@ val new_global_var: ?name:string -> jkind_lr -> type_expr
            (as type variables ['a] in type constraints). *)
 val newobj: type_expr -> type_expr
 val newconstr: Path.t -> type_expr list -> type_expr
-val newmono : zero_alloc:Zero_alloc.check option -> type_expr -> type_expr
+val newmono : type_expr -> type_expr
 val none: type_expr
         (* A dummy type expression *)
 
@@ -348,14 +348,13 @@ type filtered_arrow =
   }
 
 val filter_arrow: Env.t -> type_expr -> arg_label ->
-                  force_tpoly:bool -> zero_alloc:Zero_alloc.check option ->
-                  filtered_arrow
+                  has_poly:Btype.explicit_poly -> filtered_arrow
         (* A special case of unification (with l:'a -> 'b). If
-           [force_poly] is false then the usual invariant that the
+           [has_poly] is [Mono] then the usual invariant that the
            argument type be a [Tpoly] node is not enforced. Raises
            [Filter_arrow_failed] instead of [Unify].  *)
 val filter_mono: type_expr -> type_expr
-        (* A special case of unification (with Tpoly('a, [])). Can
+        (* A special case of unification (with Tpoly('a, [], None)). Can
            only be called on [Tpoly] nodes. Raises [Filter_mono_failed]
            instead of [Unify] *)
 val filter_arrow_mono: Env.t -> type_expr -> arg_label -> filtered_arrow

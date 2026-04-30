@@ -197,7 +197,7 @@ let rec constructor_type constr cty =
       constr
   | Cty_arrow (l, ty, cty) ->
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
-      let ty = Ctype.newmono ~zero_alloc:None ty in
+      let ty = Ctype.newmono ty in
       Ctype.newty
         (Tarrow (arrow_desc, ty, constructor_type constr cty, commu_ok))
 
@@ -830,7 +830,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                    let ty' =
                      Ctype.newvar (Jkind.Builtin.value ~why:Object_field)
                    in
-                   Ctype.unify val_env (Ctype.newmono ~zero_alloc:None ty') ty;
+                   Ctype.unify val_env (Ctype.newmono ty') ty;
                    Typecore.type_approx val_env sbody ty'
                | Tpoly (ty1, tl, _) ->
                    let ty1' = Ctype.instance_poly tl ty1 in
@@ -984,7 +984,7 @@ and class_field_second_pass cl_num sign met_env field =
         (fun () ->
            let unit_type = Ctype.instance Predef.type_unit in
            let self_param_type =
-             Ctype.newmono ~zero_alloc:None sign.Types.csig_self
+             Ctype.newmono sign.Types.csig_self
            in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
            let meth_type =
@@ -1202,7 +1202,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           cl_attributes = scl.pcl_attributes;
          }
   | Pcl_fun (l, Some default, spat, sbody) ->
-      if Typecore.has_poly_constraint spat then
+      if Btype.is_explicitly_poly (Typecore.has_poly_constraint spat) then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let loc = default.pexp_loc in
       let open Ast_helper in
@@ -1242,7 +1242,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       class_expr cl_num val_env met_env virt self_scope sfun
   | Pcl_fun (l, None, spat, scl') ->
       let l, spat = Typetexp.transl_label_from_pat l spat in
-      if Typecore.has_poly_constraint spat then
+      if Btype.is_explicitly_poly (Typecore.has_poly_constraint spat) then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let (pat, pv, val_env', met_env) =
         Ctype.with_local_level_if_principal
@@ -1591,7 +1591,7 @@ let rec approx_declaration cl =
           (* CR layouts: use of value here may be relaxed when we update
            classes to work with jkinds *)
       in
-      let arg = Ctype.newmono ~zero_alloc:None arg in
+      let arg = Ctype.newmono arg in
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_declaration cl, commu_ok))
@@ -1611,7 +1611,7 @@ let rec approx_description ct =
         (* CR layouts: use of value here may be relaxed when we
            relax jkinds in classes *)
       in
-      let arg = Ctype.newmono ~zero_alloc:None arg in
+      let arg = Ctype.newmono arg in
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_description ct, commu_ok))

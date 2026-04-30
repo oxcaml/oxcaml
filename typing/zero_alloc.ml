@@ -86,19 +86,23 @@ let get (t : t) =
 type check_context =
   | Signature
   | Fun_param
+  | Type_constraint
   | Default
 
 type incompatible_check =
   | Strict
   | Opt
 
+type less_general =
+  | Missing_entirely of check_context
+  | Parameter_requirement of incompatible_check
+  | Other
+
 type error =
-  | Less_general of { missing_entirely : bool }
+  | Less_general of less_general
   | Arity_mismatch of int * int * check_context
   | Incompatible of incompatible_check
   | One_missing
-
-let one_missing = One_missing
 
 let error_is_arity_mismatch = function
   | Less_general _ | Incompatible _ | One_missing -> false
@@ -109,10 +113,22 @@ exception Error of error
 let print_error ppf error =
   let pr fmt = Format_doc.fprintf ppf fmt in
   match error with
-  | Less_general { missing_entirely } ->
+  | Less_general Other ->
+    pr "The former provides a weaker \"zero_alloc\" guarantee than the latter."
+  | Less_general (Missing_entirely context) ->
     pr "The former provides a weaker \"zero_alloc\" guarantee than the latter.";
-    if missing_entirely then
-      pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
+    (match context with
+     | Signature ->
+       pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
+     | Fun_param ->
+       pr "@ Hint: Add a \"zero_alloc\" attribute to the argument's definition."
+     | Type_constraint | Default -> ())
+  | Less_general (Parameter_requirement check_type) ->
+    pr "The argument's \"zero_alloc\" property is required to be \"%s\",@ \
+        but this function is not."
+      (match check_type with
+       | Strict -> "strict"
+       | Opt -> "opt")
   | Incompatible check_type ->
     pr "There is a mismatch between the two \"zero_alloc\" assumptions:@ \
         the \"%s\" payloads need to match exactly."
@@ -126,19 +142,20 @@ let print_error ppf error =
         the interface.@ \
         Here the former is %d and the latter is %d."
       n1 n2
-  | Arity_mismatch (n1, n2, Fun_param) ->
+  | Arity_mismatch (n1, n2, Type_constraint) ->
     pr "When using \"zero_alloc\" on function parameters, the arities in the@ \
-        type of the function and the parameter term mus match exactly.@ \
+        type of the function and the parameter term must match exactly.@ \
         Here the arity in the actual parameter term is %d and the arity in@ \
         the type of the function is %d."
       n1 n2
+  | Arity_mismatch (n1, n2, Fun_param)
   | Arity_mismatch (n1, n2, Default) ->
     pr "Inconsistent \"zero_alloc\" arity properties: seen both %d and %d.@ \
         This error should never be reported in this context.@ \
         Contact the OxCaml development team and report a bug."
       n1 n2
   | One_missing ->
-    pr "The two types must agree on \"zero_alloc\": \
+    pr "The two types must agree on \"zero_alloc\":@ \
         either both carry the annotation or neither does."
 
 let sub_const_const_exn ~context za1 za2 =
@@ -154,9 +171,9 @@ let sub_const_const_exn ~context za1 za2 =
        be fully separate.
      - [arity] is also not captured by the abstract domain - it exists only for
        use here, in typechecking.  If the arities do not match, we issue an
-       error. It's essential for the soundness of the way we (will, in the next
-       PR) use zero_alloc in signatures that the apparent arity of the type in
-       the signature matches the syntactic arity of the function.
+       error. It's essential for the soundness of how zero_alloc is used in
+       signatures that the apparent arity of the type in the signature matches
+       the syntactic arity of the function.
      - [ignore] is erased from structure items when computing their signature.
        On signatures, [ignore] is interpreted as "top" for the inclusion check.
        This interpretation is the same as erasing [ignore]. *)
@@ -180,13 +197,21 @@ let sub_const_const_exn ~context za1 za2 =
         | Default_zero_alloc -> true
         | Ignore_assert_all | Check _ | Assume _ -> false
       in
-      raise (Error (Less_general {missing_entirely}))
+      if missing_entirely then
+        raise (Error (Less_general (Missing_entirely context)))
+      else if context = Fun_param then
+        raise (Error (Less_general (Parameter_requirement Strict)))
+      else
+        raise (Error (Less_general Other))
     end;
   (* opt check *)
   begin match za1, za2 with
   | Check { opt = opt1; _ }, Check { opt = opt2; _ } ->
     if opt1 && not opt2 then
-      raise (Error (Less_general {missing_entirely = false}))
+      if context = Fun_param then
+        raise (Error (Less_general (Parameter_requirement Opt)))
+      else
+        raise (Error (Less_general Other))
   | (Check _ | Default_zero_alloc | Assume _ | Ignore_assert_all), _ -> ()
   end;
   (* arity check *)
@@ -276,7 +301,7 @@ let check_payload_to_string ?(apparent_arity = -1)
       if arity = apparent_arity then "" else Printf.sprintf " arity %d" arity;
     ]
 
-let assert_equal_checks
+let check_equal
       ~context
       {arity = arity1; opt = opt1; strict = strict1; _}
       {arity = arity2; opt = opt2; strict = strict2; _} =
@@ -290,3 +315,9 @@ let assert_equal_checks
     Ok ()
   with
   | Error e -> Result.Error e
+
+let check_option_equal ~context za1 za2 =
+  match za1, za2 with
+  | None, None -> Ok ()
+  | Some _, None | None, Some _ -> Result.Error One_missing
+  | Some c1, Some c2 -> check_equal ~context c1 c2

@@ -22,8 +22,15 @@ type const = Builtin_attributes.zero_alloc_attribute =
 
 type check_context =
   | Signature
+  (* zero_alloc requirements come from a module signature *)
   | Fun_param
+  (* mainly used when type-checking applications;
+     zero_alloc requirements come from a higher-order function being applied to
+     another function *)
+  | Type_constraint
+  (* zero_alloc requirements compared against a type constraint *)
   | Default
+  (* all other contexts *)
 
 (* This type represents whether or not a function will be checked for
    zero-alloc-ness, and with what configuration (strict, opt, etc). It can be a
@@ -57,7 +64,6 @@ val undo_change : change -> unit
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
-val one_missing : error
 val error_is_arity_mismatch : error -> bool
 val print_error : Format_doc.formatter -> error -> unit
 
@@ -72,9 +78,11 @@ val sub : context:check_context -> t -> t -> (unit, error) Result.t
    [~apparent_arity] equals the check's arity, the arity suffix is omitted. *)
 val check_payload_to_string : ?apparent_arity:int -> check -> string
 
-(* [assert_equal_checks ~context t1 t2] checks whether two [check] values are
-   identical. If they are not, an error is reported. *)
-val assert_equal_checks :
-  context:check_context -> check -> check -> (unit, error) Result.t
+(* [check_option_equal ~context c1 c2] checks whether two optional [check]
+   values are identical. Returns an error if one is present and the other is
+   absent, or if both are present but differ. *)
+val check_option_equal :
+  context:check_context -> check option -> check option ->
+  (unit, error) Result.t
 
 val debug_printer : Format.formatter -> t -> unit

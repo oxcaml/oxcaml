@@ -177,7 +177,7 @@ val force_delayed_checks: unit -> unit
 val reset_allocations: unit -> unit
 val optimise_allocations: unit -> unit
 
-val has_poly_constraint : Parsetree.pattern -> bool
+val has_poly_constraint : Parsetree.pattern -> Btype.explicit_poly
 
 
 val name_pattern : string -> Typedtree.pattern list -> Ident.t * Uid.t
