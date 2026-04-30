@@ -1,0 +1,17 @@
+File "_none_", line 1:
+Error: The implementation "(obtained by functorizing)"
+       does not match the interface "bundle_bad/bundle_bad.cmi": 
+       In module "Func":
+       Modules do not match:
+         functor (P : $S1) () -> ...
+       is not included in
+         functor  -> ...
+       1. An extra argument is provided of module type
+              $S1 =
+              sig
+                type t
+                val create : unit -> t
+                val frob : t -> t
+                val to_string : t -> string
+              end
+       2. An extra argument is provided of module type ()

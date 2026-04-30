@@ -171,6 +171,7 @@ val as_parameter : bool ref
 val as_argument_for : string option ref
 val nondep_globals : string list ref
 val instantiate : bool ref
+val functorize : bool ref
 val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref

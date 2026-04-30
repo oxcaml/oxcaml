@@ -1,0 +1,5 @@
+File "bad_mix_bundles.ml", line 6, characters 21-39:
+6 | let _ : R1.Basic.t = R2.Basic.create 42
+                         ^^^^^^^^^^^^^^^^^^
+Error: This expression has type "R2.Basic.t"
+       but an expression was expected of type "R1.Basic.t"
