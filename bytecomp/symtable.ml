@@ -252,10 +252,8 @@ let rec transl_const = function
            "The boot bytecode compiler should not produce null constants."
     else int_as_pointer 0
   | Const_layout _ ->
-    if is_boot_compiler ()
-    then Misc.fatal_error
-           "The boot bytecode compiler should not produce layout constants."
-    else Obj.repr 0
+    Misc.fatal_error
+      "Layout constants should be erased during slambda evaluation."
 
 (* Initialization for batch linking *)
 
