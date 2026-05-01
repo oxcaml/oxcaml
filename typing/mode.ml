@@ -1301,6 +1301,18 @@ module Lattices_mono = struct
       | Contention -> { t with contention = r }
       | Visibility -> { t with visibility = r }
       | Staticity -> { t with staticity = r }
+
+    let hash : type p r. (p, r) t -> int = function
+      | Areality -> 0
+      | Linearity -> 1
+      | Portability -> 2
+      | Uniqueness -> 3
+      | Contention -> 4
+      | Forkable -> 5
+      | Yielding -> 6
+      | Statefulness -> 7
+      | Visibility -> 8
+      | Staticity -> 9
   end
 
   type ('a, 'b, 'd) morph =
@@ -1568,27 +1580,15 @@ module Lattices_mono = struct
       | None -> None)
     | Map_comonadic _, _ | _, Map_comonadic _ -> None
 
-  let hash_axis : type p r. (p, r) Axis.t -> int = function
-    | Areality -> 0
-    | Linearity -> 1
-    | Portability -> 2
-    | Uniqueness -> 3
-    | Contention -> 4
-    | Forkable -> 5
-    | Yielding -> 6
-    | Statefulness -> 7
-    | Visibility -> 8
-    | Staticity -> 9
-
   let rec hash_morph : type a b l r. (a, b, l * r) morph -> int =
    fun f ->
     match f with
     | Id -> Hashtbl.hash 0
     | Meet_const c -> Hashtbl.hash (1, c)
     | Imply_const c -> Hashtbl.hash (2, c)
-    | Proj (src, ax) -> Hashtbl.hash (3, hash_obj src, hash_axis ax)
-    | Max_with ax -> Hashtbl.hash (4, hash_axis ax)
-    | Min_with ax -> Hashtbl.hash (5, hash_axis ax)
+    | Proj (src, ax) -> Hashtbl.hash (3, hash_obj src, Axis.hash ax)
+    | Max_with ax -> Hashtbl.hash (4, Axis.hash ax)
+    | Min_with ax -> Hashtbl.hash (5, Axis.hash ax)
     | Map_comonadic f -> Hashtbl.hash (6, hash_morph f)
     | Monadic_to_comonadic_min -> Hashtbl.hash 7
     | Comonadic_to_monadic_min a -> Hashtbl.hash (8, hash_obj a)
@@ -3465,7 +3465,7 @@ module Comonadic_with (Areality : Areality) = struct
         let obj = (proj_obj [@inlined hint]) ax in
         (C.min [@inlined hint]) obj
 
-      let hash_obj ax = C.hash_axis ax
+      let hash_obj ax = C.Axis.hash ax
 
       let equal_obj ax1 ax2 = C.Axis.equal ax1 ax2
 
@@ -3605,7 +3605,7 @@ module Monadic = struct
         let obj = (proj_obj [@inlined hint]) ax in
         (C.max [@inlined hint]) obj
 
-      let hash_obj ax = C.hash_axis ax
+      let hash_obj ax = C.Axis.hash ax
 
       let equal_obj ax1 ax2 = C.Axis.equal ax1 ax2
 
@@ -5258,8 +5258,8 @@ module Crossing = struct
     let print_obj = Axis.print
 
     let hash_obj : type a. a t -> int = function
-      | Monadic ax -> Hashtbl.hash (0, C.hash_axis ax)
-      | Comonadic ax -> Hashtbl.hash (1, C.hash_axis ax)
+      | Monadic ax -> Hashtbl.hash (0, C.Axis.hash ax)
+      | Comonadic ax -> Hashtbl.hash (1, C.Axis.hash ax)
 
     let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun ax1 ax2 ->
