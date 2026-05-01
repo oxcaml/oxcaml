@@ -185,8 +185,8 @@ module Per_axis = struct
 
     let hash_obj : type a. a t -> int = function Externality -> 0
 
-    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
-     fun a b -> match a, b with Externality, Externality -> Some Misc.Refl
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
+     fun a b -> match a, b with Externality, Externality -> Equal
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -229,12 +229,12 @@ module Per_axis = struct
     | Modal ax -> Hashtbl.hash (0, Mode.Crossing.Per_axis.hash_obj ax)
     | Nonmodal ax -> Hashtbl.hash (1, Nonmodal.hash_obj ax)
 
-  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
    fun a b ->
     match a, b with
     | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
-    | Modal _, _ -> None
-    | _, Modal _ -> None
+    | Modal _, _ -> Not_equal
+    | _, Modal _ -> Not_equal
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
 
   let print_obj : type a. Fmt.formatter -> a t -> unit =

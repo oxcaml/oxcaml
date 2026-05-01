@@ -211,31 +211,32 @@ let of_string extn_name : exist option =
 (************************************)
 (* equality *)
 
-let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
+let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.is_eq =
   match a, b with
-  | Comprehensions, Comprehensions -> Some Refl
-  | Mode, Mode -> Some Refl
-  | Unique, Unique -> Some Refl
-  | Overwriting, Overwriting -> Some Refl
-  | Include_functor, Include_functor -> Some Refl
-  | Polymorphic_parameters, Polymorphic_parameters -> Some Refl
-  | Immutable_arrays, Immutable_arrays -> Some Refl
-  | Module_strengthening, Module_strengthening -> Some Refl
-  | Layouts, Layouts -> Some Refl
-  | SIMD, SIMD -> Some Refl
-  | Small_numbers, Small_numbers -> Some Refl
-  | Instances, Instances -> Some Refl
-  | Let_mutable, Let_mutable -> Some Refl
-  | Layout_poly, Layout_poly -> Some Refl
-  | Runtime_metaprogramming, Runtime_metaprogramming -> Some Refl
+  | Comprehensions, Comprehensions -> Equal
+  | Mode, Mode -> Equal
+  | Unique, Unique -> Equal
+  | Overwriting, Overwriting -> Equal
+  | Include_functor, Include_functor -> Equal
+  | Polymorphic_parameters, Polymorphic_parameters -> Equal
+  | Immutable_arrays, Immutable_arrays -> Equal
+  | Module_strengthening, Module_strengthening -> Equal
+  | Layouts, Layouts -> Equal
+  | SIMD, SIMD -> Equal
+  | Small_numbers, Small_numbers -> Equal
+  | Instances, Instances -> Equal
+  | Let_mutable, Let_mutable -> Equal
+  | Layout_poly, Layout_poly -> Equal
+  | Runtime_metaprogramming, Runtime_metaprogramming -> Equal
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Small_numbers | Instances | Let_mutable | Layout_poly
       | Runtime_metaprogramming ),
       _ ) ->
-    None
+    Not_equal
 
-let equal a b = Option.is_some (equal_t a b)
+let equal (type a b) (a : a t) (b : b t) : bool =
+  match equal_t a b with Equal -> true | Not_equal -> false
 
 (*****************************)
 (* extension universes *)
@@ -387,8 +388,8 @@ let set_worker (type a) (extn : a t) = function
       | [] -> Pair (extn, value) :: already_seen
       | (Pair (extn', v) as e) :: es -> (
         match equal_t extn extn' with
-        | None -> update_extensions (e :: already_seen) es
-        | Some Refl ->
+        | Not_equal -> update_extensions (e :: already_seen) es
+        | Equal ->
           Pair (extn, Ops.max v value) :: List.rev_append already_seen es)
     in
     extensions := update_extensions [] !extensions
@@ -463,8 +464,8 @@ let is_at_least (type a) (extn : a t) (value : a) =
     | Pair (e, v) :: es -> (
       let (module Ops) = get_level_ops e in
       match equal_t e extn with
-      | Some Refl -> Ops.compare v value >= 0
-      | None -> check es)
+      | Equal -> Ops.compare v value >= 0
+      | Not_equal -> check es)
   in
   check !extensions
 

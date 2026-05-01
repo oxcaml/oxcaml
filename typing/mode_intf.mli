@@ -572,7 +572,7 @@ module type S = sig
 
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
-    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
+    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.is_eq
   end
 
   module type Mode := sig
@@ -808,9 +808,11 @@ module type S = sig
     module Axis : sig
       val alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed
 
-      val is_areality :
-        'a Alloc.Axis.t ->
-        (('a, Locality.Const.t) Misc.eq, 'a Value.Axis.t) Either.t
+      type 'a is_areality =
+        | Is_areality : Locality.Const.t is_areality
+        | Not_areality : 'a Value.Axis.t -> 'a is_areality
+
+      val is_areality : 'a Alloc.Axis.t -> 'a is_areality
     end
 
     val locality_as_regionality : Locality.Const.t -> Regionality.Const.t

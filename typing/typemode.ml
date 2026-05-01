@@ -58,8 +58,8 @@ module Mode_axis_pair = struct
 
   let to_value (Atom (ax, a) : t) : t_value =
     match Const.Axis.is_areality ax with
-    | Left Refl -> Atom (Comonadic Areality, Const.locality_as_regionality a)
-    | Right ax -> Atom (ax, a)
+    | Is_areality -> Atom (Comonadic Areality, Const.locality_as_regionality a)
+    | Not_areality ax -> Atom (ax, a)
 
   let of_string s : t =
     let comonadic (type a) (ax : a Alloc.Comonadic.Axis.t) (a : a) : t =

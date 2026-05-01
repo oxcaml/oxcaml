@@ -1115,9 +1115,12 @@ module Le_result : sig
   val equal : le:('a -> 'a -> bool) -> 'a -> 'a -> bool
 end
 
-(** Propositional equality *)
-type (_, _) eq = Refl : ('a, 'a) eq
-
+(** Propositional equality check: [Equal] witnesses [a = b], [Not_equal]
+    witnesses [a <> b]. Prefer this over [('a, 'b) eq option] to avoid
+    allocating [Some]. *)
+type ('a, 'b) is_eq =
+  | Equal : ('a, 'a) is_eq
+  | Not_equal : ('a, 'b) is_eq
 
 (** Utilities for module-level programming *)
 module type T = sig

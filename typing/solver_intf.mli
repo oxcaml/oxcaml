@@ -20,9 +20,7 @@ module type Equal = sig
   type ('a, 'b, 'd) t constraint 'd = 'l * 'r
 
   val equal :
-    ('a0, 'b, 'l0 * 'r0) t ->
-    ('a1, 'b, 'l1 * 'r1) t ->
-    ('a0, 'a1) Misc.eq option
+    ('a0, 'b, 'l0 * 'r0) t -> ('a1, 'b, 'l1 * 'r1) t -> ('a0, 'a1) Misc.is_eq
 end
 
 (** A collection of lattices, indexed by [obj]; *)
@@ -50,11 +48,10 @@ module type Lattices = sig
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
   (** Tests two objects for equality. Used for deduplication only; it is fine
-      (but not recommended) to return [None] for equal objects.
+      (but not recommended) to return [Not_equal] for equal objects.
 
-      Invariant: If equal_obj o1 o2 = Some Refl then hash_obj o1 = hash_obj o2
-  *)
-  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
+      Invariant: If equal_obj o1 o2 = Equal then hash_obj o1 = hash_obj o2 *)
+  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.is_eq
 
   (** Hashes an object. If two objects are equal, their hashes are equal. *)
   val hash_obj : 'a obj -> int
@@ -165,11 +162,11 @@ module type Lattices_mono = sig
     'b obj ->
     ('a0, 'b, 'd0) morph ->
     ('a1, 'b, 'd1) morph ->
-    ('a0, 'a1) Misc.eq option
+    ('a0, 'a1) Misc.is_eq
 
   (** Hashes a morphism.
 
-      Invariant: If equal_morph obj m1 m2 = Some Refl then hash_morph m1 =
+      Invariant: If equal_morph obj m1 m2 = Equal then hash_morph m1 =
       hash_morph m2 *)
   val hash_morph : ('a, 'b, 'd) morph -> int
 
