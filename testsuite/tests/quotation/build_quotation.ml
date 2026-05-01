@@ -1579,3 +1579,15 @@ let open Op in
 - : <[int]> expr =
 <[let ( + ) = (fun x y -> x) in let f = (fun g -> g 1 2) in f ( + )]>
 |}];;
+
+(* Infix operators are correctly named when used in comprehensions. *)
+<[ [2 + 3 for ( + ) in [( + ); ( * )]] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ 2 + 3 for ( + ) in [Stdlib.( + ); Stdlib.( * )] ]
+]>
+|}];;
+
+<[ [( + ) for ( + ) = 1 to 3] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ ( + ) for ( + ) = 1 to 3 ]]>
+|}];;

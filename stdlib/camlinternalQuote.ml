@@ -1864,7 +1864,7 @@ module Ast = struct
   and print_for_iterator env fmt = function
     | Range (var, exp_start, exp_stop, dir) ->
       pp fmt "@[%a = %a@]@ %a@ %a"
-        (Var.Value.print env) var (print_exp env) exp_start
+        (print_value_var env) var (print_exp env) exp_start
         (print_dir) dir (print_exp env) exp_stop
     | In (pat, exp) ->
       pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
