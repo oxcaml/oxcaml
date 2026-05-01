@@ -2559,40 +2559,49 @@ let quote_constructor env loc constr =
   let exception Non_builtin of string in
   (try
      Identifier.Constructor.wrap
-       (match type_path env constr.cstr_res with
-       | None ->
-         fatal_errorf "Translquote [at %a]: no global path for constructor"
+       (match constr.cstr_tag with
+       | Extension (Path.Pdot (p, name)) ->
+         Identifier.Constructor.dot loc (module_for_path loc p) name
+       | Extension (Path.Pident name) -> raise (Non_builtin (Ident.name name))
+       | Extension _ ->
+         fatal_errorf "Translquote [at %a]: Papply in extension constructor."
            Location.print_loc (to_location loc)
-       | Some (Path.Pident _) -> (
-         match constr.cstr_name with
-         | "false" -> Identifier.Constructor.false_
-         | "true" -> Identifier.Constructor.true_
-         | "()" -> Identifier.Constructor.void
-         | "[]" -> Identifier.Constructor.nil
-         | "::" -> Identifier.Constructor.cons
-         | "None" -> Identifier.Constructor.none
-         | "Some" -> Identifier.Constructor.some
-         | "Match_failure" -> Identifier.Constructor.match_failure
-         | "Out_of_memory" -> Identifier.Constructor.out_of_memory
-         | "Out_of_fibers" -> Identifier.Constructor.out_of_fibers
-         | "Invalid_argument" -> Identifier.Constructor.invalid_argument
-         | "Failure" -> Identifier.Constructor.failure
-         | "Not_found" -> Identifier.Constructor.not_found
-         | "Sys_error" -> Identifier.Constructor.sys_error
-         | "End_of_file" -> Identifier.Constructor.end_of_file
-         | "Division_by_zero" -> Identifier.Constructor.division_by_zero
-         | "Stack_overflow" -> Identifier.Constructor.stack_overflow
-         | "Sys_blocked_io" -> Identifier.Constructor.sys_blocked_io
-         | "Assert_failure" -> Identifier.Constructor.assert_failure
-         | "Undefined_recursive_module" ->
-           Identifier.Constructor.undefined_recursive_module
-         | name -> raise (Non_builtin name))
-       | Some (Path.Pdot (p, _)) ->
-         Identifier.Constructor.dot loc (module_for_path loc p) constr.cstr_name
-       | _ ->
-         fatal_errorf
-           "Translquote [at %a]: unsupported constructor type detected."
-           Location.print_loc (to_location loc))
+       | Ordinary _ | Null -> (
+         match type_path env constr.cstr_res with
+         | None ->
+           fatal_errorf "Translquote [at %a]: no global path for constructor"
+             Location.print_loc (to_location loc)
+         | Some (Path.Pident _) -> (
+           match constr.cstr_name with
+           | "false" -> Identifier.Constructor.false_
+           | "true" -> Identifier.Constructor.true_
+           | "()" -> Identifier.Constructor.void
+           | "[]" -> Identifier.Constructor.nil
+           | "::" -> Identifier.Constructor.cons
+           | "None" -> Identifier.Constructor.none
+           | "Some" -> Identifier.Constructor.some
+           | "Match_failure" -> Identifier.Constructor.match_failure
+           | "Out_of_memory" -> Identifier.Constructor.out_of_memory
+           | "Out_of_fibers" -> Identifier.Constructor.out_of_fibers
+           | "Invalid_argument" -> Identifier.Constructor.invalid_argument
+           | "Failure" -> Identifier.Constructor.failure
+           | "Not_found" -> Identifier.Constructor.not_found
+           | "Sys_error" -> Identifier.Constructor.sys_error
+           | "End_of_file" -> Identifier.Constructor.end_of_file
+           | "Division_by_zero" -> Identifier.Constructor.division_by_zero
+           | "Stack_overflow" -> Identifier.Constructor.stack_overflow
+           | "Sys_blocked_io" -> Identifier.Constructor.sys_blocked_io
+           | "Assert_failure" -> Identifier.Constructor.assert_failure
+           | "Undefined_recursive_module" ->
+             Identifier.Constructor.undefined_recursive_module
+           | name -> raise (Non_builtin name))
+         | Some (Path.Pdot (p, _)) ->
+           Identifier.Constructor.dot loc (module_for_path loc p)
+             constr.cstr_name
+         | _ ->
+           fatal_errorf
+             "Translquote [at %a]: unsupported constructor type detected."
+             Location.print_loc (to_location loc)))
      |> Constructor.ident loc
    with Non_builtin name -> Constructor.of_string loc name)
   |> Constructor.wrap
