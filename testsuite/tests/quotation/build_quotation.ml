@@ -24,6 +24,13 @@ class cls = object method meth () = 42 end;;
 class cls : object method meth : unit -> int end
 |}];;
 
+module Op = struct
+  let (+) x y = x ^ y
+end
+[%%expect {|
+module Op : sig val ( + ) : string -> string -> string end
+|}];;
+
 #mark_toplevel_in_quotations;;
 
 (* Tests *)
@@ -1552,4 +1559,11 @@ Line 1, characters 31-40:
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
        as seen at line 1, characters 31-40.
+|}];;
+
+(* Correct disambiguation of infix operators. *)
+let open Op in
+<[ "abc" + "def" ]>;;
+[%%expect {|
+- : <[string]> expr = <[Op.( + ) "abc" "def"]>
 |}];;
