@@ -1268,14 +1268,14 @@ module Lattices_mono = struct
 
     let ord : type p r. (p, r) t -> int = function
       | Areality -> 0
-      | Linearity -> 1
-      | Portability -> 2
-      | Uniqueness -> 3
-      | Contention -> 4
-      | Forkable -> 5
-      | Yielding -> 6
-      | Statefulness -> 7
-      | Visibility -> 8
+      | Forkable -> 1
+      | Yielding -> 2
+      | Linearity -> 3
+      | Statefulness -> 4
+      | Portability -> 5
+      | Uniqueness -> 6
+      | Visibility -> 7
+      | Contention -> 8
       | Staticity -> 9
 
     let hash ax = ord ax
