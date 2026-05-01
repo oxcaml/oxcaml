@@ -278,7 +278,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     { mutable vlower : 'a lmorphvar VarHashtbl.t;
           (** A list of variables directly under the current variable. Each is a
               pair [f] [v], and we have [f v <= u] where [u] is the current
-              variable. *)
+              variable.
+
+              [vlower] is mutable (rather than the contents being mutated
+              in-place) to support [reset_vlower], which replaces the table with
+              a fresh empty one. Swapping the reference lets [Creset_vlower]
+              undo the reset cheaply by restoring the old table pointer, without
+              having to copy or clear it. New entries are added via
+              [Cvlower_added], which undoes by key removal. *)
       mutable upper : 'a;  (** The precise upper bound of the variable *)
       mutable upper_hint : ('a, right_only) Comp_hint.t;
           (** Hints for [upper] *)
