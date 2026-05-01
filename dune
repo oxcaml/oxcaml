@@ -701,6 +701,7 @@
   linear_format
   cfg_format
   ;; backend/ssa/
+  ssa_intf
   ssa
   ssa_print
   ssa_validate

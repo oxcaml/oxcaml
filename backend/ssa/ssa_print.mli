@@ -1,5 +1,9 @@
-val print : Format.formatter -> Ssa.t -> unit
+module Make (S : Ssa.Finished_graph) : sig
+  val print_block_id : Format.formatter -> S.Block.t -> unit
 
-val print_block : Format.formatter -> Ssa.block -> unit
+  val print_block : Format.formatter -> S.Block.t -> unit
 
-val print_block_id : Format.formatter -> Ssa.block -> unit
+  val print : Format.formatter -> unit
+end
+
+val print : Format.formatter -> (module Ssa.Finished_graph) -> unit

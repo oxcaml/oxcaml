@@ -1,1 +1,1 @@
-val validate : Ssa.t -> unit
+val validate : (module Ssa.Finished_graph) -> unit
