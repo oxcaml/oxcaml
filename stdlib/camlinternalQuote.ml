@@ -1425,7 +1425,8 @@ module Ast = struct
 
   let view_fixity_of_exp = function
     | { desc = Ident (VVar _ as l); attributes = [] }
-    | { desc = Ident (VDot (Global_module "Stdlib", _) as l); attributes = [] } ->
+    | { desc = Ident (VDot (Global_module "Stdlib", _) as l);
+        attributes = [] } ->
       fixity_of_string (suffix_string_of_ident_value l)
     | _ -> `Normal
 
