@@ -1239,41 +1239,6 @@ module Lattices_mono = struct
           _ ) ->
         None
 
-    let compare : type p r1 r2.
-        (p, r1) t -> (p, r2) t -> (r1, r2) Misc.comparison =
-     fun ax1 ax2 ->
-      match ax1, ax2 with
-      | Areality, Areality -> Equal
-      | Areality, _ -> Less_than
-      | _, Areality -> Greater_than
-      | Forkable, Forkable -> Equal
-      | Forkable, _ -> Less_than
-      | _, Forkable -> Greater_than
-      | Yielding, Yielding -> Equal
-      | Yielding, _ -> Less_than
-      | _, Yielding -> Greater_than
-      | Linearity, Linearity -> Equal
-      | Linearity, _ -> Less_than
-      | _, Linearity -> Greater_than
-      | Statefulness, Statefulness -> Equal
-      | Statefulness, _ -> Less_than
-      | _, Statefulness -> Greater_than
-      | Portability, Portability -> Equal
-      | Portability, _ -> .
-      | _, Portability -> .
-      | Uniqueness, Uniqueness -> Equal
-      | Uniqueness, _ -> Less_than
-      | _, Uniqueness -> Greater_than
-      | Visibility, Visibility -> Equal
-      | Visibility, _ -> Less_than
-      | _, Visibility -> Greater_than
-      | Contention, Contention -> Equal
-      | Contention, _ -> Less_than
-      | _, Contention -> Greater_than
-      | Staticity, Staticity -> Equal
-      | Staticity, _ -> .
-      | _, Staticity -> .
-
     let proj : type p r. (p, r) t -> p -> r =
      fun ax t ->
       match ax with
@@ -1302,7 +1267,7 @@ module Lattices_mono = struct
       | Visibility -> { t with visibility = r }
       | Staticity -> { t with staticity = r }
 
-    let hash : type p r. (p, r) t -> int = function
+    let ord : type p r. (p, r) t -> int = function
       | Areality -> 0
       | Linearity -> 1
       | Portability -> 2
@@ -1313,6 +1278,11 @@ module Lattices_mono = struct
       | Statefulness -> 7
       | Visibility -> 8
       | Staticity -> 9
+
+    let hash ax = ord ax
+
+    let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
+     fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
   end
 
   type ('a, 'b, 'd) morph =
@@ -3424,8 +3394,7 @@ module Comonadic_with (Areality : Areality) = struct
         P Forkable;
         P Yielding;
         P Statefulness ]
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3562,8 +3531,7 @@ module Monadic = struct
 
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3697,12 +3665,12 @@ module Value_with (Areality : Areality) = struct
       | Comonadic : 'a Comonadic.Axis.t -> 'a t
       | Monadic : 'a Monadic.Axis.t -> 'a t
 
-    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
+    let compare : type a b. a t -> b t -> int =
      fun t1 t2 ->
       match t1, t2 with
       | Comonadic t1, Comonadic t2 -> Axis.compare t1 t2
-      | Comonadic _, _ -> Less_than
-      | _, Comonadic _ -> Greater_than
+      | Comonadic _, _ -> -1
+      | _, Comonadic _ -> 1
       | Monadic t1, Monadic t2 -> Axis.compare t1 t2
 
     type packed = P : 'a t -> packed
@@ -3717,8 +3685,7 @@ module Value_with (Areality : Areality) = struct
       @ List.map
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function
@@ -5192,24 +5159,6 @@ module Crossing = struct
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
 
-    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
-     fun ax1 ax2 ->
-      match ax1, ax2 with
-      | Monadic ax1, Monadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Equal -> Equal
-        | Greater_than -> Greater_than
-        end
-      | Monadic _, _ -> Less_than
-      | _, Monadic _ -> Greater_than
-      | Comonadic ax1, Comonadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Equal -> Equal
-        | Greater_than -> Greater_than
-        end
-
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
       | Monadic ax -> Axis.print ppf ax
@@ -5263,9 +5212,16 @@ module Crossing = struct
 
     let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun ax1 ax2 ->
-      match Axis.compare ax1 ax2 with
-      | Equal -> Some Misc.Refl
-      | Less_than | Greater_than -> None
+      match ax1, ax2 with
+      | Monadic ax1, Monadic ax2 -> (
+        match C.Axis.equal ax1 ax2 with
+        | None -> None
+        | Some Refl -> Some Misc.Refl)
+      | Comonadic ax1, Comonadic ax2 -> (
+        match C.Axis.equal ax1 ax2 with
+        | None -> None
+        | Some Refl -> Some Misc.Refl)
+      | Monadic _, _ | _, Monadic _ -> None
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
