@@ -70,7 +70,7 @@ let bar (x : q) =
 Line 2, characters 23-24:
 2 |   takes_only_immutable x
                            ^
-Error: This expression has type "q" but an expression was expected of type
+Error: The value "x" has type "q" but an expression was expected of type
          "('a : immutable_data)"
        The kind of q is immutable_data with M.t
          because of the definition of q at line 1, characters 0-32.

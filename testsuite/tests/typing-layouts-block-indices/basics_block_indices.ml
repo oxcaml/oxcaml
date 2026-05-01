@@ -759,9 +759,9 @@ let bad (x : float array) =
   let y = Idx_mut.unsafe_create_into_array 42 in
   Idx_mut.get x y
 [%%expect{|
-Line 3, characters 23-24:
+Line 3, characters 16-17:
 3 |   Idx_mut.get x y
-                           ^
+                    ^
 Error: The value "y" has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value

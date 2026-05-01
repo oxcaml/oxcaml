@@ -444,7 +444,7 @@ let n, strs =
 in
 n, Iarray.map_local_input ~f:globalize_string strs;;
 [%%expect{|
-- : int * string iarray = (5, [:"1"; "2"; "3"; "4"; "5":])
+- : int * string iarray = (15, [:"1"; "2"; "3"; "4"; "5":])
 |}];;
 
 Iarray.fold_left_map_local_input ~f:(fun acc x -> acc + x, string_of_int x) ~init:0 iarray;;
@@ -458,7 +458,7 @@ let n, strs =
 in
 n, Iarray.map_local_input ~f:globalize_string strs;;
 [%%expect{|
-- : int * string iarray = (5, [:"1"; "2"; "3"; "4"; "5":])
+- : int * string iarray = (15, [:"1"; "2"; "3"; "4"; "5":])
 |}];;
 
 (* Confirm the function isn't called on the empty immutable array *)

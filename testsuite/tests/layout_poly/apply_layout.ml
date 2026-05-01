@@ -172,7 +172,7 @@ end
 Line 6, characters 12-13:
 6 |   let poly_ g = M.f 42
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Lines 5-7, characters 6-3:
 5 | ......struct
@@ -205,7 +205,7 @@ end
 Line 7, characters 9-11:
 7 |     (x', y')
              ^^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "y'" has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.

@@ -170,8 +170,7 @@ Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
 Error: This constructor has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type
-         "('b : value maybe_separable)"
+       but an expression was expected of type "('b : value maybe_separable)"
        The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of

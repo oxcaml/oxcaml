@@ -27,11 +27,12 @@ apply ccall noalloc
             where k1 =
               let Popaque = %opaque ($camlLazy_invalid__immstring10) in
               apply direct(force_lazy_block_4) inlined(never)
-                $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_9
+                $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11
                   (Popaque)
                   -> k * error))
   where k (region_return : val) =
-    (apply ccall ($`*extern*`.caml_alloc_dummy : val -> val) (1) -> k * error
+    (apply ccall
+       ($`*extern*`.caml_alloc_dummy_lazy : val -> val) (0) -> k * error
        where k (t) =
          let code loopify(never) size(1) newer_version_of(foo_0)
                foo_0_1 (x : imm tagged)
@@ -69,7 +70,7 @@ apply ccall noalloc
                        where k2 =
                          let Popaque = %opaque ($camlLazy_invalid__foo_2) in
                          apply direct(force_lazy_block_4) inlined(never)
-                           $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_9
+                           $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11
                              (Popaque)
                              -> k * k1))
          in
@@ -81,7 +82,7 @@ apply ccall noalloc
            %lazy ($`camlLazy_invalid__fn[lazy_invalid.ml:13,13--29]_3`)
          in
          (apply ccall
-            ($`*extern*`.caml_update_dummy : val * val -> val)
+            ($`*extern*`.caml_update_dummy_lazy : val * val -> val)
               (t, Pmakelazyblock)
               -> k1 * error
             where k1 (param) =

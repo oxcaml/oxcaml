@@ -208,7 +208,7 @@ end
 Line 2, characters 12-13:
 2 |   let poly_ f = 42
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -321,7 +321,7 @@ end
 Line 4, characters 12-13:
 4 |   let poly_ f x = (x : (_ : value))
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Lines 3-5, characters 6-3:
 3 | ......struct
@@ -435,7 +435,7 @@ end
 Line 4, characters 16-17:
 4 |   let rec poly_ f x = x
                     ^
-Warning 218: "poly_" has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular "let rec" instead.
+Warning 218: poly_ has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular let rec instead.
 >> Fatal error: Translcore.transl_let
 Uncaught exception: Misc.Fatal_error
 
