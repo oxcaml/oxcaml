@@ -15,7 +15,7 @@ on:
 
 jobs:
   nix-matrix:
-    runs-on: warp-ubuntu-latest-arm64-8x
+    runs-on: ${{ github.repository == 'oxcaml/oxcaml' && 'warp-ubuntu-latest-arm64-8x' || 'ubuntu-24.04-arm' }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -29,8 +29,18 @@ jobs:
         name: Generate Nix Matrix
         run: |
           set -Eeuo pipefail
+          if [ "${{ github.repository }}" = 'oxcaml/oxcaml' ]; then
+            filter='.'
+          else
+            filter='walk(if type == "string" then ({
+              "warp-ubuntu-latest-x64-8x":   "ubuntu-latest",
+              "warp-ubuntu-latest-x64-32x":  "ubuntu-latest",
+              "warp-ubuntu-latest-arm64-8x": "ubuntu-24.04-arm",
+              "warp-macos-15-arm64-6x":      "macos-15"
+            }[.] // .) else . end)'
+          fi
           echo -n 'matrix=' >> "$GITHUB_OUTPUT"
-          nix eval --json '.#githubActions.matrix' | tee -a "$GITHUB_OUTPUT"
+          nix eval --json '.#githubActions.matrix' | jq -c "$filter" | tee -a "$GITHUB_OUTPUT"
 
   nix-build:
     name: ${{ matrix.name }} (${{ matrix.system }})
