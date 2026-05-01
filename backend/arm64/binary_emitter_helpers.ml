@@ -196,5 +196,5 @@ let end_emission () =
     | Some hook ->
       Proc.set_pending_jit_run (fun () ->
           (* The hook returns a file writer we don't use for JIT. *)
-          let _file_writer = hook sections_for_jit in
+          let _file_writer : string -> unit = hook sections_for_jit in
           ()))
