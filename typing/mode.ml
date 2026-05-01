@@ -1061,7 +1061,23 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
 
-  let equal obj a b = Misc.Le_result.equal ~le:(le obj) a b
+  let equal : type a. a obj -> a -> a -> bool =
+   fun obj a b ->
+    match obj with
+    | Locality -> Locality.equal a b
+    | Regionality -> Regionality.equal a b
+    | Uniqueness_op -> Uniqueness_op.equal a b
+    | Contention_op -> Contention_op.equal a b
+    | Visibility_op -> Visibility_op.equal a b
+    | Linearity -> Linearity.equal a b
+    | Portability -> Portability.equal a b
+    | Forkable -> Forkable.equal a b
+    | Yielding -> Yielding.equal a b
+    | Statefulness -> Statefulness.equal a b
+    | Staticity_op -> Staticity_op.equal a b
+    | Monadic_op -> Monadic_op.equal a b
+    | Comonadic_with_locality -> Comonadic_with_locality.equal a b
+    | Comonadic_with_regionality -> Comonadic_with_regionality.equal a b
 
   let join : type a. a obj -> a -> a -> a =
    fun obj a b ->

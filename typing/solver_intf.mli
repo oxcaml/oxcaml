@@ -39,6 +39,8 @@ module type Lattices = sig
 
   val le : 'a obj -> 'a elt -> 'a elt -> bool
 
+  (** Tests two elements for equality. While [equal obj a b] could be derived as
+      [le obj a b && le obj b a], a direct implementation is often faster. *)
   val equal : 'a obj -> 'a elt -> 'a elt -> bool
 
   val join : 'a obj -> 'a elt -> 'a elt -> 'a elt
