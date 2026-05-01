@@ -4,4 +4,4 @@
     This removes the [!= 0] wrap that [ssa_of_cmm] inserts around truth tests.
 *)
 
-val run : Ssa.t -> Ssa.t
+val run : (module Ssa.Finished_graph) -> (module Ssa.Finished_graph)

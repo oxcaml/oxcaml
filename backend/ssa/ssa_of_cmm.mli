@@ -1,1 +1,1 @@
-val convert : Cmm.fundecl -> Ssa.t
+val convert : Cmm.fundecl -> (module Ssa.Finished_graph)
