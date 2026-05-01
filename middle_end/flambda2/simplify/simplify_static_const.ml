@@ -115,6 +115,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_float32
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_float or_var ->
@@ -126,6 +127,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_float
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_int32 or_var ->
@@ -137,6 +139,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_int32
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_int64 or_var ->
@@ -148,6 +151,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_int64
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_nativeint or_var ->
@@ -159,6 +163,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_nativeint
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_vec128 or_var ->
@@ -170,6 +175,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_vec128
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_vec256 or_var ->
@@ -181,6 +187,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_vec256
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Boxed_vec512 or_var ->
@@ -192,6 +199,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_boxed_vec512
         (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
   | Immutable_float_block fields ->
