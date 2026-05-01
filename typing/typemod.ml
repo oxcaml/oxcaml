@@ -1358,8 +1358,7 @@ let map_ext fn exts =
   | [] -> []
   | d1 :: dl -> fn Text_first d1 :: List.map (fn Text_next) dl
 
-let rec apply_modalities_signature ~recursive env modalities sg =
-  let env = Env.add_signature sg env in
+let apply_modalities_signature ~recursive modalities sg =
   List.map (function
   | Sig_value (id, vd, vis) ->
       let val_modalities =
@@ -1371,25 +1370,16 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let vd = {vd with val_modalities} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
-      let md_type = apply_modalities_module_type env modalities md.md_type in
-      let md = {md with md_type} in
+      let md_modalities =
+        md.md_modalities
+        |> Mode.Modality.to_const_exn
+        |> (fun then_ -> Mode.Modality.Const.concat ~then_ modalities)
+        |> Mode.Modality.of_const
+      in
+      let md = {md with md_modalities} in
       Sig_module (id, pres, md, rec_, vis)
   | item -> item
   ) sg
-
-and apply_modalities_module_type env modalities = function
-  | Mty_ident p ->
-      let mtd = Env.find_modtype p env in
-      begin match mtd.mtd_type with
-      | None -> Mty_ident p
-      | Some mty -> apply_modalities_module_type env modalities mty
-      end
-  | Mty_strengthen (mty, p, alias) ->
-      Mty_strengthen (apply_modalities_module_type env modalities mty, p, alias)
-  | Mty_signature sg ->
-      let sg = apply_modalities_signature ~recursive:true env modalities sg in
-      Mty_signature sg
-  | (Mty_functor _ | Mty_alias _) as mty -> mty
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
@@ -1597,7 +1587,7 @@ and approx_sig_items env ssg=
                   let recursive =
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
                   in
-                  apply_modalities_signature ~recursive env modalities sg
+                  apply_modalities_signature ~recursive modalities sg
               in
               let sg, newenv = Env.enter_signature ~scope sg env in
               sg @ approx_sig_items newenv srem
@@ -2195,7 +2185,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       match Mode.Modality.Const.is_id modalities.moda_modalities with
       | true -> sg
       | false ->
-        apply_modalities_signature ~recursive env modalities.moda_modalities sg
+        apply_modalities_signature ~recursive modalities.moda_modalities sg
     in
     let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
     Signature_group.iter

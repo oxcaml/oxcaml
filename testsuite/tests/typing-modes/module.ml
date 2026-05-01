@@ -520,7 +520,27 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
->> Fatal error: Env.module_declaration_address
-Uncaught exception: Misc.Fatal_error
-
+module type S =
+  sig
+    module type S = sig end
+    module type Key = sig module M0 : S end
+    module L :
+      sig
+        module M : Key
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end @@ portable
+          end
+      end
+    module L' :
+      sig
+        module M : sig module M0 : sig end end
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end @@ portable
+          end
+      end @@ portable
+  end
 |}]

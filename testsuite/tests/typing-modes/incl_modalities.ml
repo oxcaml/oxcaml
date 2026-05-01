@@ -107,7 +107,7 @@ end
 module type S' =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a @@ portable end
+    module M : sig val foo : 'a -> 'a end @@ portable
   end
 |}]
 
@@ -135,14 +135,7 @@ module type T' = sig
 end
 [%%expect{|
 module type T' =
-  sig
-    val baz : 'a -> 'a @@ portable
-    module M :
-      sig
-        val bar : 'a -> 'a @@ portable
-        module M : sig val foo : 'a -> 'a @@ portable end
-      end
-  end
+  sig val baz : 'a -> 'a @@ portable module M : S @@ portable end
 |}]
 
 module type T' = sig
@@ -169,7 +162,7 @@ module type S =
 module type S' =
   sig
     module type MT = sig val foo : 'a -> 'a end
-    module M : sig val foo : 'a -> 'a @@ portable end
+    module M : MT @@ portable
   end
 |}]
 
@@ -194,7 +187,7 @@ module type S =
 module type S' =
   sig
     module type MT = sig val foo : 'a -> 'a end
-    module M : sig module N : sig val foo : 'a -> 'a @@ portable end end
+    module M : sig module N : MT end @@ portable
   end
 |}]
 
@@ -218,7 +211,7 @@ module M :
     module type Foo' = Foo
     module type S = sig module N : Foo' end
   end @@ stateless
-module type S' = sig module N : sig val foo : 'a -> 'a @@ portable end end
+module type S' = sig module N : M.Foo' @@ portable end
 |}]
 
 (* include abstract module type is still not allowed *)
@@ -244,7 +237,7 @@ end
 [%%expect{|
 module type MT
 module type S = sig module M : MT end
-module type S' = sig module M : MT end
+module type S' = sig module M : MT @@ portable end
 |}]
 
 (* strenghtened module type *)
@@ -270,14 +263,8 @@ module type S =
 module type S' =
   sig
     module type T = sig type a val baz : a val foo : a -> a end
-    module MT :
-      sig type a val baz : a @@ portable val foo : a -> a @@ portable end
-    module M :
-      sig
-        type a = MT.a
-        val baz : a @@ portable
-        val foo : a -> a @@ portable
-      end
+    module MT : T @@ portable
+    module M : sig type a = MT.a val baz : a val foo : a -> a end @@ portable
   end
 |}]
 
@@ -295,7 +282,7 @@ module type T = sig @@ portable
   include T
 end
 [%%expect{|
-module type T = sig module M : sig val foo : 'a -> 'a @@ portable end end
+module type T = sig module M : sig val foo : 'a -> 'a end @@ portable end
 |}]
 
 (* signature with default modality, include with a different axis *)
