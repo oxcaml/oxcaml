@@ -901,6 +901,17 @@ let print_op fmt s =
   then Format.fprintf fmt "( %s )" s
   else Format.fprintf fmt "%s" s
 
+let needs_value_parens s =
+  s <> ""
+  && (List.mem s special_infix_strings
+      || List.mem s.[0] special_symbols
+      || s.[0] = '.')
+
+let print_value_var env fmt v =
+  if needs_value_parens (Var.Value.name v)
+  then Format.fprintf fmt "( %a )" (Var.Value.print env) v
+  else Var.Value.print env fmt v
+
 let rec print_raw_ident_module env fmt = function
   | Global_module s -> Format.fprintf fmt "%s" s
   | MDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
@@ -909,7 +920,7 @@ let rec print_raw_ident_module env fmt = function
 let print_raw_ident_value env fmt = function
   | VDot (m, s) ->
     Format.fprintf fmt "%a.%a" (print_raw_ident_module env) m print_op s
-  | VVar (v, _) -> Var.Value.print env fmt v
+  | VVar (v, _) -> print_value_var env fmt v
 
 let print_raw_ident_type env fmt = function
   | TDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
@@ -1527,9 +1538,9 @@ module Ast = struct
   and print_pat ?(with_parens = true) env fmt pat =
     match pat with
     | PatAny -> pp fmt "_"
-    | PatVar v -> Var.Value.print env fmt v
+    | PatVar v -> print_value_var env fmt v
     | PatAlias (pat, v) ->
-      pp fmt "%a@ as@ %a" (print_pat env) pat (Var.Value.print env) v
+      pp fmt "%a@ as@ %a" (print_pat env) pat (print_value_var env) v
     | PatConstant c -> print_const fmt c
     | PatUnboxedUnit -> pp fmt "#()"
     | PatUnboxedBool b -> pp fmt "#%a" print_bool b

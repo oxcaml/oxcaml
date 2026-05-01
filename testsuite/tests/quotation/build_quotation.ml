@@ -1567,3 +1567,15 @@ let open Op in
 [%%expect {|
 - : <[string]> expr = <[Op.( + ) "abc" "def"]>
 |}];;
+
+(* Infix operators are correctly parenthesised when defined in quotations. *)
+<[ let (+) x y = x ^ y in "foo" + "bar" ]>;;
+[%%expect {|
+- : <[string]> expr = <[let ( + ) = (fun x y -> x ^ y) in "foo" + "bar"]>
+|}];;
+
+<[ let (+) x y = x in let f g = g 1 2 in f (+) ]>;;
+[%%expect {|
+- : <[int]> expr =
+<[let ( + ) = (fun x y -> x) in let f = (fun g -> g 1 2) in f ( + )]>
+|}];;
