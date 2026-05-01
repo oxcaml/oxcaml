@@ -1153,7 +1153,14 @@ let move (src : Reg.t) (dst : Reg.t) =
     (* Vec128 stack slots are aligned, domainstate slots are not. *)
     let unaligned = Reg.is_domainstate src || Reg.is_domainstate dst in
     if distinct then movpd ~unaligned (reg src) (reg dst)
-  | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
+  | Vec256, Reg _, Vec256, Reg _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if prefer_load_form (reg src) (reg dst)
+      then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |]
+      else I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
+  | Vec256, Reg _, Vec256, Stack _ ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
   | Vec256, Stack _, Vec256, Reg _ ->
@@ -1642,6 +1649,9 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
     if distinct
     then
       if Reg.is_stack i.arg.(0)
+      then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
+      else if (not (Reg.is_stack i.res.(0)))
+              && prefer_load_form (arg i 0) (res i 0)
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
   | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
