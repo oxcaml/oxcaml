@@ -1,6 +1,7 @@
 #!/bin/bash
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
+subtree_prefix="$(git rev-parse --show-prefix)"
 
 # Script arguments with their default values
 repository=https://github.com/oxcaml/oxcaml
@@ -107,7 +108,7 @@ new_marker="$short_ocaml_repo:$commitish"
 
 # Then patch src/ocaml using the changes you just imported
 for file in $(git diff --no-ext-diff --name-only HEAD^ HEAD); do
-  file=${file#external/merlin/}
+  file=${file#${subtree_prefix}}
   base=${file#upstream/ocaml_flambda/}
   case $base in
     # If you add new files here, you need to apply the full diff manually once,
