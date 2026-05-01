@@ -1150,50 +1150,6 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.print
     | Comonadic_with_regionality -> Comonadic_with_regionality.print
 
-  let compare_obj : type a b. a obj -> b obj -> (a, b) Misc.comparison =
-   fun a b ->
-    match a, b with
-    | Locality, Locality -> Equal
-    | Locality, _ -> Less_than
-    | _, Locality -> Greater_than
-    | Regionality, Regionality -> Equal
-    | Regionality, _ -> Less_than
-    | _, Regionality -> Greater_than
-    | Uniqueness_op, Uniqueness_op -> Equal
-    | Uniqueness_op, _ -> Less_than
-    | _, Uniqueness_op -> Greater_than
-    | Linearity, Linearity -> Equal
-    | Linearity, _ -> Less_than
-    | _, Linearity -> Greater_than
-    | Portability, Portability -> Equal
-    | Portability, _ -> Less_than
-    | _, Portability -> Greater_than
-    | Forkable, Forkable -> Equal
-    | Forkable, _ -> Less_than
-    | _, Forkable -> Greater_than
-    | Yielding, Yielding -> Equal
-    | Yielding, _ -> Less_than
-    | _, Yielding -> Greater_than
-    | Statefulness, Statefulness -> Equal
-    | Statefulness, _ -> Less_than
-    | _, Statefulness -> Greater_than
-    | Contention_op, Contention_op -> Equal
-    | Contention_op, _ -> Less_than
-    | _, Contention_op -> Greater_than
-    | Visibility_op, Visibility_op -> Equal
-    | Visibility_op, _ -> Less_than
-    | _, Visibility_op -> Greater_than
-    | Staticity_op, Staticity_op -> Equal
-    | Staticity_op, _ -> Less_than
-    | _, Staticity_op -> Greater_than
-    | Monadic_op, Monadic_op -> Equal
-    | Monadic_op, _ -> Less_than
-    | _, Monadic_op -> Greater_than
-    | Comonadic_with_regionality, Comonadic_with_regionality -> Equal
-    | Comonadic_with_regionality, _ -> Less_than
-    | _, Comonadic_with_regionality -> Greater_than
-    | Comonadic_with_locality, Comonadic_with_locality -> Equal
-
   let hash_obj : type a. a obj -> int = function
     | Locality -> 0
     | Regionality -> 1
@@ -1212,9 +1168,27 @@ module Lattices = struct
 
   let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =
    fun a b ->
-    match compare_obj a b with
-    | Equal -> Some Refl
-    | Less_than | Greater_than -> None
+    match a, b with
+    | Locality, Locality -> Some Refl
+    | Regionality, Regionality -> Some Refl
+    | Uniqueness_op, Uniqueness_op -> Some Refl
+    | Linearity, Linearity -> Some Refl
+    | Portability, Portability -> Some Refl
+    | Forkable, Forkable -> Some Refl
+    | Yielding, Yielding -> Some Refl
+    | Statefulness, Statefulness -> Some Refl
+    | Contention_op, Contention_op -> Some Refl
+    | Visibility_op, Visibility_op -> Some Refl
+    | Staticity_op, Staticity_op -> Some Refl
+    | Monadic_op, Monadic_op -> Some Refl
+    | Comonadic_with_regionality, Comonadic_with_regionality -> Some Refl
+    | Comonadic_with_locality, Comonadic_with_locality -> Some Refl
+    | ( ( Locality | Regionality | Uniqueness_op | Linearity | Portability
+        | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
+        | Staticity_op | Monadic_op | Comonadic_with_regionality
+        | Comonadic_with_locality ),
+        _ ) ->
+      None
 end
 
 module Lattices_mono = struct
