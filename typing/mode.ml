@@ -2692,7 +2692,7 @@ module Report = struct
    fun a_obj b_obj a b ->
     match C.equal_obj a_obj b_obj with
     | None -> false
-    | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+    | Some Refl -> C.equal a_obj a b
 
   let rec print_ahint : type a l r.
       ?sub:bool ->

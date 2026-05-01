@@ -226,8 +226,8 @@ module Per_axis = struct
     | Nonmodal ax -> Nonmodal.print ax
 
   let hash_obj : type a. a t -> int = function
-    | Modal ax -> Mode.Crossing.Per_axis.hash_obj ax
-    | Nonmodal ax -> Nonmodal.hash_obj ax
+    | Modal ax -> Hashtbl.hash (0, Mode.Crossing.Per_axis.hash_obj ax)
+    | Nonmodal ax -> Hashtbl.hash (1, Nonmodal.hash_obj ax)
 
   let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
    fun a b ->
