@@ -1,0 +1,37 @@
+diff --git a/middle_end/closure/closure.ml b/middle_end/closure/closure.ml
+index 880773fbac09..b78feab118c9 100644
+--- a/middle_end/closure/closure.ml
++++ b/middle_end/closure/closure.ml
+@@ -1058,9 +1058,9 @@ let rec close ({ backend; fenv; cenv ; mutable_vars } as env) lam =
+         | Word_size -> make_const_int (8*B.size_int)
+         | Int_size -> make_const_int (8*B.size_int - 1)
+         | Max_wosize -> make_const_int ((1 lsl ((8*B.size_int) - 10)) - 1 )
+-        | Ostype_unix -> make_const_bool (Sys.os_type = "Unix")
+-        | Ostype_win32 -> make_const_bool (Sys.os_type = "Win32")
+-        | Ostype_cygwin -> make_const_bool (Sys.os_type = "Cygwin")
++        | Ostype_unix -> make_const_bool (Config.target_os_type = "Unix")
++        | Ostype_win32 -> make_const_bool (Config.target_os_type = "Win32")
++        | Ostype_cygwin -> make_const_bool (Config.target_os_type = "Cygwin")
+         | Backend_type ->
+             make_const_int 0 (* tag 0 is the same as Native here *)
+       in
+diff --git a/middle_end/flambda/closure_conversion.ml b/middle_end/flambda/closure_conversion.ml
+index 6b9e8d967019..3e8d88bf52b9 100644
+--- a/middle_end/flambda/closure_conversion.ml
++++ b/middle_end/flambda/closure_conversion.ml
+@@ -397,9 +397,12 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
+         | Int_size -> lambda_const_int (8*Backend.size_int - 1)
+         | Max_wosize ->
+             lambda_const_int ((1 lsl ((8*Backend.size_int) - 10)) - 1)
+-        | Ostype_unix -> lambda_const_bool (String.equal Sys.os_type "Unix")
+-        | Ostype_win32 -> lambda_const_bool (String.equal Sys.os_type "Win32")
+-        | Ostype_cygwin -> lambda_const_bool (String.equal Sys.os_type "Cygwin")
++        | Ostype_unix ->
++            lambda_const_bool (String.equal Config.target_os_type "Unix")
++        | Ostype_win32 ->
++            lambda_const_bool (String.equal Config.target_os_type "Win32")
++        | Ostype_cygwin ->
++            lambda_const_bool (String.equal Config.target_os_type "Cygwin")
+         | Backend_type ->
+             Lambda.const_int 0 (* tag 0 is the same as Native *)
+         end

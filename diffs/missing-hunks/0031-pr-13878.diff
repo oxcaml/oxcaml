@@ -1,0 +1,507 @@
+diff --git a/asmcomp/afl_instrument.ml b/asmcomp/afl_instrument.ml
+index 6d23311c3119..a2ed4191eeb7 100644
+--- a/asmcomp/afl_instrument.ml
++++ b/asmcomp/afl_instrument.ml
+@@ -98,7 +98,7 @@ and instrument = function
+   (* these are base cases and have no logging *)
+   | Cconst_int _ | Cconst_natint _ | Cconst_float _
+   | Cconst_symbol _ | Creturn_addr
+-  | Cvar _ as c -> c
++  | Cvar _ | Cvar_mut _ as c -> c
+ 
+ let instrument_function c dbg =
+   with_afl_logging c dbg
+diff --git a/asmcomp/cmm.ml b/asmcomp/cmm.ml
+index d1abd096aa37..3f4b170a945f 100644
+--- a/asmcomp/cmm.ml
++++ b/asmcomp/cmm.ml
+@@ -177,6 +177,7 @@ type expression =
+   | Cconst_float of float * Debuginfo.t
+   | Cconst_symbol of string * Debuginfo.t
+   | Cvar of Backend_var.t
++  | Cvar_mut of Backend_var.t
+   | Clet of Backend_var.With_provenance.t * expression * expression
+   | Clet_mut of Backend_var.With_provenance.t * machtype
+                 * expression * expression
+@@ -266,6 +267,7 @@ let iter_shallow_tail f = function
+   | Cconst_float _
+   | Cconst_symbol _
+   | Cvar _
++  | Cvar_mut _
+   | Cassign _
+   | Ctuple _
+   | Cop _
+@@ -303,6 +305,7 @@ let rec map_tail f = function
+   | Cconst_float _
+   | Cconst_symbol _
+   | Cvar _
++  | Cvar_mut _
+   | Cassign _
+   | Ctuple _
+   | Creturn_addr
+@@ -340,6 +343,7 @@ let map_shallow f = function
+   | Cconst_float _
+   | Cconst_symbol _
+   | Cvar _
++  | Cvar_mut _
+   | Creturn_addr
+     as c ->
+       c
+diff --git a/asmcomp/cmm.mli b/asmcomp/cmm.mli
+index c64f2c9f26ac..6844a353c103 100644
+--- a/asmcomp/cmm.mli
++++ b/asmcomp/cmm.mli
+@@ -178,6 +178,7 @@ and expression =
+   | Cconst_float of float * Debuginfo.t
+   | Cconst_symbol of string * Debuginfo.t
+   | Cvar of Backend_var.t
++  | Cvar_mut of Backend_var.t
+   | Clet of Backend_var.With_provenance.t * expression * expression
+   | Clet_mut of Backend_var.With_provenance.t * machtype
+                 * expression * expression
+diff --git a/asmcomp/cmm_helpers.ml b/asmcomp/cmm_helpers.ml
+index 7a3f9bc78246..953371fa9650 100644
+--- a/asmcomp/cmm_helpers.ml
++++ b/asmcomp/cmm_helpers.ml
+@@ -32,11 +32,6 @@ let bind_load name arg fn =
+   | Cop(Cload _, [Cvar _], _) -> fn arg
+   | _ -> bind name arg fn
+ 
+-let bind_nonvar name arg fn =
+-  match arg with
+-    Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> fn arg
+-  | _ -> let id = V.create_local name in Clet(VP.create id, arg, fn (Cvar id))
+-
+ let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
+     (* cf. runtime/caml/gc.h *)
+ 
+@@ -1800,7 +1795,8 @@ let cache_public_method meths tag cache dbg =
+        (Clet(
+         VP.create mi,
+         Cop(Cor,
+-            [Cop(Clsr, [Cop(Caddi, [Cvar li; Cvar hi], dbg); cconst_int 1],
++            [Cop(Clsr, [Cop(Caddi, [Cvar_mut li; Cvar_mut hi], dbg);
++                        cconst_int 1],
+                dbg);
+              cconst_int 1],
+             dbg),
+@@ -1817,7 +1813,7 @@ let cache_public_method meths tag cache dbg =
+            dbg, Cassign(li, Cvar mi),
+            dbg),
+         Cifthenelse
+-          (Cop(Ccmpi Cge, [Cvar li; Cvar hi], dbg),
++          (Cop(Ccmpi Cge, [Cvar_mut li; Cvar_mut hi], dbg),
+            dbg, Cexit (raise_num, []),
+            dbg, Ctuple [],
+            dbg))))
+@@ -1826,7 +1822,7 @@ let cache_public_method meths tag cache dbg =
+      dbg),
+   Clet (
+     VP.create tagged,
+-      Cop(Caddi, [lsl_const (Cvar li) log2_size_addr dbg;
++      Cop(Caddi, [lsl_const (Cvar_mut li) log2_size_addr dbg;
+         cconst_int(1 - 3 * size_addr)], dbg),
+     Csequence(Cop (Cstore (Word_int, Assignment), [cache; Cvar tagged], dbg),
+               Cvar tagged)))))
+diff --git a/asmcomp/cmm_helpers.mli b/asmcomp/cmm_helpers.mli
+index 934159acfef1..d71c541636f7 100644
+--- a/asmcomp/cmm_helpers.mli
++++ b/asmcomp/cmm_helpers.mli
+@@ -24,10 +24,6 @@ val bind :
+ val bind_load :
+   string -> expression -> (expression -> expression) -> expression
+ 
+-(** Same as [bind], but does not treat variables as simple *)
+-val bind_nonvar :
+-  string -> expression -> (expression -> expression) -> expression
+-
+ (** Headers *)
+ 
+ (** A null header with GC bits set to black *)
+diff --git a/asmcomp/cmm_invariants.ml b/asmcomp/cmm_invariants.ml
+index 92b605fecb2f..a9ba7a7879de 100644
+--- a/asmcomp/cmm_invariants.ml
++++ b/asmcomp/cmm_invariants.ml
+@@ -14,9 +14,23 @@
+ 
+ [@@@ocaml.warning "-40"]
+ 
++module V = Backend_var
++module VP = Backend_var.With_provenance
+ module Int = Numbers.Int
+ 
+-(* Check a number of continuation-related invariants *)
++(* Check a number of invariants around continuation and variable uses *)
++
++type mutability = Mutable | Immutable
++
++let equal_mutability m1 m2 =
++  match m1, m2 with
++  | Mutable, Mutable | Immutable, Immutable -> true
++  | Mutable, Immutable | Immutable, Mutable -> false
++
++let mutability_to_string m =
++  match m with
++  | Mutable -> "mutable"
++  | Immutable -> "immutable"
+ 
+ module Env : sig
+   type t
+@@ -27,10 +41,17 @@ module Env : sig
+ 
+   val jump : t -> cont:int -> arg_num:int -> unit
+ 
++  val bind_var : t -> V.t -> mutability -> t
++
++  val bind_params : t -> (VP.t * _) list -> t
++
++  val use_var : t -> V.t -> mutability -> unit
++
+   val report : Format.formatter -> bool
+ end = struct
+   type t = {
+     bound_handlers : int Int.Map.t;
++    bound_variables : mutability V.Map.t;
+   }
+ 
+   type error =
+@@ -38,6 +59,9 @@ end = struct
+     | Multiple_handlers of { cont: int; }
+     | Wrong_arguments_number of
+         { cont: int; handler_args: int; jump_args: int; }
++    | Unbound_variable of { var : V.t; mut : mutability }
++    | Wrong_mutability of
++        { var : V.t; binding_mut : mutability; use_mut : mutability }
+ 
+   module Error = struct
+     type t = error
+@@ -74,13 +98,14 @@ end = struct
+     state.errors <- ErrorSet.empty;
+     {
+       bound_handlers = Int.Map.empty;
++      bound_variables = V.Map.empty;
+     }
+ 
+   let handler t ~cont ~arg_num =
+     if Int.Set.mem cont state.all_handlers then multiple_handler cont;
+     state.all_handlers <- Int.Set.add cont state.all_handlers;
+     let bound_handlers = Int.Map.add cont arg_num t.bound_handlers in
+-    { bound_handlers; }
++    { t with bound_handlers; }
+ 
+   let jump t ~cont ~arg_num =
+     match Int.Map.find cont t.bound_handlers with
+@@ -89,6 +114,27 @@ end = struct
+         wrong_arguments cont handler_args arg_num
+     | exception Not_found -> unbound_handler cont
+ 
++  let bind_var t var mut =
++    let bound_variables = V.Map.add var mut t.bound_variables in
++    { t with bound_variables }
++
++  let bind_params t params =
++    let bound_variables =
++        List.fold_left (fun bound_vars (var, _) ->
++            V.Map.add (VP.var var) Immutable bound_vars)
++        t.bound_variables params
++    in
++    { t with bound_variables }
++
++  let use_var t var use_mut =
++    match V.Map.find_opt var t.bound_variables with
++    | Some binding_mut ->
++      if equal_mutability use_mut binding_mut
++      then ()
++      else record_error (Wrong_mutability { var; binding_mut; use_mut })
++    | None ->
++      record_error (Unbound_variable { var; mut = use_mut })
++
+   let print_error ppf error =
+     match error with
+     | Unbound_handler { cont } ->
+@@ -110,6 +156,16 @@ end = struct
+         cont
+         handler_args
+         jump_args
++    | Unbound_variable { var; mut } ->
++      Format.fprintf ppf
++        "Variable %a (%s) was unbound or used outside the scope of its binder"
++        V.print var (mutability_to_string mut)
++    | Wrong_mutability { var; binding_mut; use_mut } ->
++      Format.fprintf ppf
++        "Variable %a was bound as %s but used as %s"
++        V.print var
++        (mutability_to_string binding_mut)
++        (mutability_to_string use_mut)
+ 
+   let print_error_newline ppf error =
+     Format.fprintf ppf "%a@." print_error error
+@@ -125,15 +181,22 @@ end
+ let rec check env (expr : Cmm.expression) =
+   match expr with
+   | Cconst_int _ | Cconst_natint _ | Cconst_float _ | Cconst_symbol _
+-  | Cvar _ | Creturn_addr ->
++  | Creturn_addr ->
+     ()
+-  | Clet (_, expr, body)
+-  | Clet_mut (_, _, expr, body) ->
++  | Cvar id ->
++    Env.use_var env id Immutable
++  | Cvar_mut id ->
++    Env.use_var env id Mutable
++  | Clet (id, expr, body) ->
++    check env expr;
++    check (Env.bind_var env (VP.var id) Immutable) body
++  | Clet_mut (id, _, expr, body) ->
+     check env expr;
+-    check env body
++    check (Env.bind_var env (VP.var id) Mutable) body
+   | Cphantom_let (_, _, expr) ->
+     check env expr
+-  | Cassign (_, expr) ->
++  | Cassign (id, expr) ->
++    Env.use_var env id Mutable;
+     check env expr
+   | Ctuple exprs ->
+     List.iter (check env) exprs
+@@ -163,18 +226,21 @@ let rec check env (expr : Cmm.expression) =
+       | Recursive -> env_extended
+       | Nonrecursive -> env
+     in
+-    List.iter (fun (_, _, handler, _) -> check env_handler handler) handlers
++    List.iter (fun (_, args, handler, _) ->
++        let env_handler = Env.bind_params env_handler args in
++        check env_handler handler)
++      handlers
+   | Cexit (cont, args) ->
+     Env.jump env ~cont ~arg_num:(List.length args)
+-  | Ctrywith (body, _, handler, _) ->
++  | Ctrywith (body, id, handler, _) ->
+     (* Jumping from inside a trywith body to outside isn't very nice,
+        but it's handled correctly by Linearize, as it happens
+        when compiling match ... with exception ..., for instance, so it is
+        not reported as an error. *)
+     check env body;
+-    check env handler
++    check (Env.bind_var env (VP.var id) Immutable) handler
+ 
+ let run ppf (fundecl : Cmm.fundecl) =
+-  let env = Env.init () in
++  let env = Env.bind_params (Env.init ()) fundecl.fun_args in
+   check env fundecl.fun_body;
+   Env.report ppf
+diff --git a/asmcomp/cmmgen.ml b/asmcomp/cmmgen.ml
+index ed6f0c6bf3bc..e7aefe7b162b 100644
+--- a/asmcomp/cmmgen.ml
++++ b/asmcomp/cmmgen.ml
+@@ -39,6 +39,7 @@ type boxed_number =
+ 
+ type env = {
+   unboxed_ids : (V.t * boxed_number) V.tbl;
++  mutable_ids : V.Set.t;
+   notify_catch : (Cmm.expression list -> unit) IntMap.t;
+   environment_param : V.t option;
+ }
+@@ -61,6 +62,7 @@ type env = {
+ let empty_env =
+   {
+     unboxed_ids = V.empty;
++    mutable_ids = V.Set.empty;
+     notify_catch = IntMap.empty;
+     environment_param = None;
+   }
+@@ -79,6 +81,14 @@ let add_unboxed_id id unboxed_id bn env =
+     unboxed_ids = V.add id (unboxed_id, bn) env.unboxed_ids;
+   }
+ 
++let is_mutable_id id env =
++  V.Set.mem id env.mutable_ids
++
++let add_mutable_id id env =
++  { env with
++    mutable_ids = V.Set.add id env.mutable_ids;
++  }
++
+ let add_notify_catch n f env =
+   { env with
+     notify_catch = IntMap.add n f env.notify_catch
+@@ -354,8 +364,17 @@ let rec transl env e =
+   match e with
+     Uvar id ->
+       begin match is_unboxed_id id env with
+-      | None -> Cvar id
+-      | Some (unboxed_id, bn) -> box_number bn (Cvar unboxed_id)
++      | None ->
++          if is_mutable_id id env
++          then Cvar_mut id
++          else Cvar id
++      | Some (unboxed_id, bn) ->
++          let var =
++            if is_mutable_id unboxed_id env
++            then Cvar_mut unboxed_id
++            else Cvar unboxed_id
++          in
++          box_number bn var
+       end
+   | Uconst sc ->
+       transl_constant Debuginfo.none sc
+@@ -654,24 +673,26 @@ let rec transl env e =
+       let inc = match dir with Upto -> Caddi | Downto -> Csubi in
+       let raise_num = next_raise_count () in
+       let id_prev = VP.create (V.create_local "*id_prev*") in
++      let env = add_mutable_id (VP.var id) env in
+       return_unit dbg
+         (Clet_mut
+            (id, typ_int, transl env low,
+-            bind_nonvar "bound" (transl env high) (fun high ->
++            bind "bound" (transl env high) (fun high ->
+               ccatch
+                 (raise_num, [],
+                  Cifthenelse
+-                   (Cop(Ccmpi tst, [Cvar (VP.var id); high], dbg),
++                   (Cop(Ccmpi tst, [Cvar_mut (VP.var id); high], dbg),
+                     dbg,
+                     Cexit (raise_num, []),
+                     dbg,
+                     create_loop
+                       (Csequence
+                          (remove_unit(transl env body),
+-                         Clet(id_prev, Cvar (VP.var id),
++                         Clet(id_prev, Cvar_mut (VP.var id),
+                           Csequence
+                             (Cassign(VP.var id,
+-                               Cop(inc, [Cvar (VP.var id); Cconst_int (2, dbg)],
++                               Cop(inc, [Cvar_mut (VP.var id);
++                                         Cconst_int (2, dbg)],
+                                  dbg)),
+                              Cifthenelse
+                                (Cop(Ccmpi Ceq, [Cvar (VP.var id_prev); high],
+@@ -1238,19 +1259,27 @@ and transl_let env str kind id exp transl_body =
+       (* N.B. [body] must still be traversed even if [exp] will never return:
+          there may be constant closures inside that need lifting out. *)
+       begin match str, kind with
+-      | Immutable, _ -> Clet(id, cexp, transl_body env)
+-      | Mutable, Pintval -> Clet_mut(id, typ_int, cexp, transl_body env)
+-      | Mutable, _ -> Clet_mut(id, typ_val, cexp, transl_body env)
++      | Immutable, _ ->
++        Clet(id, cexp, transl_body env)
++      | Mutable, Pintval ->
++        Clet_mut(id, typ_int, cexp,
++                 transl_body (add_mutable_id (VP.var id) env))
++      | Mutable, _ ->
++        Clet_mut(id, typ_val, cexp,
++                 transl_body (add_mutable_id (VP.var id) env))
+       end
+   | Boxed (boxed_number, false) ->
+       let unboxed_id = V.create_local (VP.name id) in
+       let v = VP.create unboxed_id in
+       let cexp = unbox_number dbg boxed_number cexp in
+-      let body =
++      let body env =
+         transl_body (add_unboxed_id (VP.var id) unboxed_id boxed_number env) in
+       begin match str, boxed_number with
+-      | Immutable, _ -> Clet (v, cexp, body)
+-      | Mutable, bn -> Clet_mut (v, typ_of_boxed_number bn, cexp, body)
++      | Immutable, _ ->
++        Clet (v, cexp, body env)
++      | Mutable, bn ->
++        Clet_mut (v, typ_of_boxed_number bn, cexp,
++                  body (add_mutable_id unboxed_id env))
+       end
+ 
+ and make_catch ncatch body handler dbg = match body with
+diff --git a/asmcomp/printcmm.ml b/asmcomp/printcmm.ml
+index 7f98cc217149..5e46ff955445 100644
+--- a/asmcomp/printcmm.ml
++++ b/asmcomp/printcmm.ml
+@@ -168,6 +168,7 @@ let rec expr ppf = function
+   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
+   | Cconst_symbol (s, _dbg) -> fprintf ppf "\"%s\"" s
+   | Cvar id -> V.print ppf id
++  | Cvar_mut id -> fprintf ppf "!%a" V.print id
+   | Creturn_addr -> fprintf ppf "return_addr"
+   | Clet(id, def, (Clet(_, _, _) as body)) ->
+       let print_binding id ppf def =
+diff --git a/asmcomp/selectgen.ml b/asmcomp/selectgen.ml
+index 8226a39c9daa..fcf3aee942a4 100644
+--- a/asmcomp/selectgen.ml
++++ b/asmcomp/selectgen.ml
+@@ -110,7 +110,7 @@ let size_expr (env:environment) exp =
+     | Cconst_symbol _ ->
+         Arch.size_addr
+     | Cconst_float _ -> Arch.size_float
+-    | Cvar id ->
++    | Cvar id | Cvar_mut id ->
+         begin try
+           V.Map.find id localenv
+         with Not_found ->
+@@ -336,7 +336,7 @@ method is_simple_expr = function
+           List.for_all self#is_simple_expr args
+       end
+   | Cassign _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _
+-  | Ctrywith _ -> false
++  | Ctrywith _ | Cvar_mut _ -> false
+ 
+ (* Analyses the effects and coeffects of an expression.  This is used across
+    a whole list of expressions with a view to determining which expressions
+@@ -355,6 +355,7 @@ method effects_of exp =
+   match exp with
+   | Cconst_int _ | Cconst_natint _ | Cconst_float _ | Cconst_symbol _
+   | Cvar _ | Creturn_addr -> EC.none
++  | Cvar_mut _ -> EC.coeffect_only Coeffect.Read_mutable
+   | Ctuple el -> EC.join_list_map el self#effects_of
+   | Clet (_id, arg, body) | Clet_mut (_id, _, arg, body) ->
+     EC.join (self#effects_of arg) (self#effects_of body)
+@@ -605,7 +606,7 @@ method emit_expr (env:environment) exp =
+   | Creturn_addr ->
+       let r = self#regs_for typ_int in
+       Some(self#insert_op env Ireturn_addr [||] r)
+-  | Cvar v ->
++  | Cvar v | Cvar_mut v ->
+       begin try
+         Some(env_find v env)
+       with Not_found ->
+@@ -1122,7 +1123,7 @@ method emit_tail (env:environment) exp =
+       end
+   | Cop _
+   | Cconst_int _ | Cconst_natint _ | Cconst_float _ | Cconst_symbol _
+-  | Cvar _
++  | Cvar _ | Cvar_mut _
+   | Creturn_addr
+   | Cassign _
+   | Ctuple _
+diff --git a/asmcomp/thread_sanitizer.ml b/asmcomp/thread_sanitizer.ml
+index 362a89536acd..6f661cad8852 100644
+--- a/asmcomp/thread_sanitizer.ml
++++ b/asmcomp/thread_sanitizer.ml
+@@ -154,7 +154,7 @@ let wrap_entry_exit expr =
+       | Cconst_natint (_, _)
+       | Cconst_float (_, _)
+       | Cconst_symbol (_, _)
+-      | Cvar _ | Ctuple _ | Creturn_addr ) as expr ->
++      | Cvar _ | Cvar_mut _ | Ctuple _ | Creturn_addr ) as expr ->
+       let id = VP.create (V.create_local "res") in
+       Clet (id, expr, Csequence (call_exit, Cvar (VP.var id)))
+   in
+@@ -285,7 +285,7 @@ let instrument body =
+       Cswitch (aux e, cases, handlers, dbg_none)
+     (* no instrumentation *)
+     | ( Cconst_int _ | Cconst_natint _ | Cconst_float _ | Cconst_symbol _
+-      | Cvar _ | Creturn_addr ) as c ->
++      | Cvar _ | Cvar_mut _ | Creturn_addr ) as c ->
+       c
+   in
+   body |> aux |> wrap_entry_exit
+--- /dev/null
++++ b/testsuite/tests/asmcomp/issue13875.ml
+@@ -0,0 +1,10 @@
++(* TEST *)
++
++let () =
++  let o1 = object val x = 123 method get () = x end in
++  let o2 = object method get () = 456 end in
++  let r = ref o1 in
++  let n = (!r)#get (r := o2) in
++  (* Order of evaluation here is not really specified or consistent,
++     but we want to get either 123 or 456 *)
++  assert (n = 123 || n = 456)

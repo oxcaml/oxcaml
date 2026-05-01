@@ -1,0 +1,18 @@
+diff --git a/asmcomp/emitaux.ml b/asmcomp/emitaux.ml
+index 582b9bb1b8d7..69131632b63d 100644
+--- a/asmcomp/emitaux.ml
++++ b/asmcomp/emitaux.ml
+@@ -461,6 +461,13 @@ let report_error ppf = function
+   | Stack_frame_too_large n ->
+       Format_doc.fprintf ppf "stack frame too large (%d bytes)" n
+ 
++let () =
++  Location.register_error_of_exn
++    (function
++      | Error err -> Some (Location.error_of_printer_file report_error err)
++      | _ -> None
++    )
++
+ let mk_env f : Emitenv.per_function_env =
+   {
+     f;

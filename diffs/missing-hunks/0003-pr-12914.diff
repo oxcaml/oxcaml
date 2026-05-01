@@ -1,0 +1,13 @@
+diff --git a/asmcomp/s390x/emit.mlp b/asmcomp/s390x/emit.mlp
+index a9df052774f3..c98a0d77623f 100644
+--- a/asmcomp/s390x/emit.mlp
++++ b/asmcomp/s390x/emit.mlp
+@@ -121,7 +121,7 @@ let emit_stack env r =
+ 
+ let emit_load_symbol_addr reg s =
+   if !pic_code then
+-  `	lgrl	{emit_reg reg}, {emit_symbol s}@GOTENT\n`
++  `	lgrl	{emit_reg reg}, {emit_symbol s}@GOT\n`
+   else
+   `	larl	{emit_reg reg}, {emit_symbol s}\n`
+ 
