@@ -1061,31 +1061,7 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
 
-  let compare : type a. a obj -> a -> a -> (a, a) Misc.comparison =
-   fun obj c1 c2 ->
-    if le obj c1 c2
-    then
-      begin if le obj c2 c1 then Equal else Less_than
-      end
-    else Greater_than
-
-  let equal : type a. a obj -> a -> a -> bool =
-   fun obj a b ->
-    match obj with
-    | Locality -> Locality.equal a b
-    | Regionality -> Regionality.equal a b
-    | Uniqueness_op -> Uniqueness_op.equal a b
-    | Contention_op -> Contention_op.equal a b
-    | Visibility_op -> Visibility_op.equal a b
-    | Linearity -> Linearity.equal a b
-    | Portability -> Portability.equal a b
-    | Forkable -> Forkable.equal a b
-    | Yielding -> Yielding.equal a b
-    | Statefulness -> Statefulness.equal a b
-    | Staticity_op -> Staticity_op.equal a b
-    | Monadic_op -> Monadic_op.equal a b
-    | Comonadic_with_locality -> Comonadic_with_locality.equal a b
-    | Comonadic_with_regionality -> Comonadic_with_regionality.equal a b
+  let equal obj a b = Misc.Le_result.equal ~le:(le obj) a b
 
   let join : type a. a obj -> a -> a -> a =
    fun obj a b ->
@@ -1553,46 +1529,30 @@ module Lattices_mono = struct
     match f1, f2 with
     | Id, Id -> Some Refl
     | Proj (src1, ax1), Proj (src2, ax2) -> (
-      match compare_obj src1 src2 with
-      | Equal -> (
-        match Axis.compare ax1 ax2 with
-        | Equal -> Some Refl
-        | Less_than | Greater_than -> None)
-      | Less_than | Greater_than -> None)
+      match equal_obj src1 src2 with
+      | None -> None
+      | Some Refl ->
+        if Option.is_some (Axis.equal ax1 ax2) then Some Refl else None)
     | Proj _, _ | _, Proj _ -> None
-    | Max_with ax1, Max_with ax2 -> (
-      match Axis.compare ax1 ax2 with
-      | Equal -> Some Refl
-      | Less_than | Greater_than -> None)
+    | Max_with ax1, Max_with ax2 -> Axis.equal ax1 ax2
     | Max_with _, _ | _, Max_with _ -> None
-    | Min_with ax1, Min_with ax2 -> (
-      match Axis.compare ax1 ax2 with
-      | Equal -> Some Refl
-      | Less_than | Greater_than -> None)
+    | Min_with ax1, Min_with ax2 -> Axis.equal ax1 ax2
     | Min_with _, _ | _, Min_with _ -> None
-    | Meet_const c1, Meet_const c2 -> (
-      match compare dst c1 c2 with
-      | Equal -> Some Refl
-      | Less_than | Greater_than -> None)
+    | Meet_const c1, Meet_const c2 ->
+      if equal dst c1 c2 then Some Refl else None
     | Meet_const _, _ | _, Meet_const _ -> None
-    | Imply_const c1, Imply_const c2 -> (
-      match compare dst c1 c2 with
-      | Equal -> Some Refl
-      | Less_than | Greater_than -> None)
+    | Imply_const c1, Imply_const c2 ->
+      if equal dst c1 c2 then Some Refl else None
     | Imply_const _, _ | _, Imply_const _ -> None
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Some Refl
     | Monadic_to_comonadic_min, _ | _, Monadic_to_comonadic_min -> None
-    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> (
-      match compare_obj a1 a2 with
-      | Equal -> Some Refl
-      | Less_than | Greater_than -> None)
+    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 ->
+      equal_obj a1 a2
     | Comonadic_to_monadic_min _, _ | _, Comonadic_to_monadic_min _ -> None
     | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Some Refl
     | Monadic_to_comonadic_max, _ | _, Monadic_to_comonadic_max -> None
-    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> (
-      match compare_obj a1 a2 with
-      | Equal -> Some Refl
-      | Less_than | Greater_than -> None)
+    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 ->
+      equal_obj a1 a2
     | Comonadic_to_monadic_max _, _ | _, Comonadic_to_monadic_max _ -> None
     | Local_to_regional, Local_to_regional -> Some Refl
     | Local_to_regional, _ | _, Local_to_regional -> None
