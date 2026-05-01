@@ -23,6 +23,10 @@ type int_width = Cmx_format.int_width =
   | Int16
   | Int8
 
+val print_int_width : Format.formatter -> int_width -> unit
+
+val num_bits_of_int_width : int_width -> int
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
@@ -66,6 +70,8 @@ CR jrayman
 type machtype = machtype_component array
 
 val equal_machtype : machtype -> machtype -> bool
+
+val typ_of_int_width : int_width -> machtype
 
 val typ_void : machtype
 
@@ -462,19 +468,21 @@ type operation =
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
-  | Caddi
-  | Csubi
-  | Cmuli
+  | Caddi of int_width (* See note [Modeling Garbage] in [cmm_helpers.ml] *)
+  | Csubi of int_width
+  | Cmuli of int_width
   | Cmulhi of { signed : bool }
   | Cdivi
+    (* For now, only some integer operations have an [int_width] parameter.
+       Those without always have an implicit [int_width] of [Int64]. *)
   | Cmodi
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }
-  | Cand
-  | Cor
-  | Cxor
-  | Clsl
+  | Cand of int_width
+  | Cor of int_width
+  | Cxor of int_width
+  | Clsl of int_width
   | Clsr
   | Casr
   | Cbswap of { bitwidth : bswap_bitwidth }

@@ -257,6 +257,12 @@ let static_cast : Cmm.static_cast -> string = function
   | Scalar_of_v512 ty -> Printf.sprintf "%s->scalar" (vec512_name ty)
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
+let int_width = function
+  | Int64 -> ""
+  | Int32 -> "32"
+  | Int16 -> "16"
+  | Int8 -> "8"
+
 let operation d = function
   | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
   | Cextcall { func = lbl; _ } ->
@@ -275,19 +281,19 @@ let operation d = function
       match init with Initialization -> "(init)" | Assignment -> ""
     in
     Printf.sprintf "store %s%s" (chunk c) init
-  | Caddi -> "+"
-  | Csubi -> "-"
-  | Cmuli -> "*"
+  | Caddi w -> "+" ^ int_width w
+  | Csubi w -> "-" ^ int_width w
+  | Cmuli w -> "*" ^ int_width w
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
   | Cdivi -> "/"
   | Cmodi -> "mod"
   | Caddi128 -> "+128"
   | Csubi128 -> "-128"
   | Cmuli64 { signed } -> "*128" ^ if signed then "" else "u"
-  | Cand -> "and"
-  | Cor -> "or"
-  | Cxor -> "xor"
-  | Clsl -> "<<"
+  | Cand w -> "and" ^ int_width w
+  | Cor w -> "or" ^ int_width w
+  | Cxor w -> "xor" ^ int_width w
+  | Clsl w -> "<<" ^ int_width w
   | Clsr -> ">>u"
   | Casr -> ">>s"
   | Cbswap { bitwidth = Sixteen } -> "bswap_16"

@@ -23,6 +23,20 @@ type int_width = Cmx_format.int_width =
   | Int16
   | Int8
 
+let print_int_width ppf w =
+  Format.fprintf ppf "%s"
+    (match w with
+     | Int64 -> "Int64"
+     | Int32 -> "Int32"
+     | Int16 -> "Int16"
+     | Int8 -> "Int8")
+
+let num_bits_of_int_width = function
+  | Int64 -> 64
+  | Int32 -> 32
+  | Int16 -> 16
+  | Int8 -> 8
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
@@ -36,6 +50,8 @@ type machtype_component = Cmx_format.machtype_component =
   | Valx2
 
 type machtype = machtype_component array
+
+let typ_of_int_width width = [| Naked_int width |]
 
 (* Note: To_cmm_expr.translate_apply0 relies on non-void [machtype_component]s
    being singleton arrays. *)
@@ -574,19 +590,19 @@ type operation =
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
-  | Caddi
-  | Csubi
-  | Cmuli
+  | Caddi of int_width
+  | Csubi of int_width
+  | Cmuli of int_width
   | Cmulhi of { signed : bool }
   | Cdivi
   | Cmodi
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }
-  | Cand
-  | Cor
-  | Cxor
-  | Clsl
+  | Cand of int_width
+  | Cor of int_width
+  | Cxor of int_width
+  | Clsl of int_width
   | Clsr
   | Casr
   | Cbswap of { bitwidth : bswap_bitwidth }
@@ -794,8 +810,9 @@ let iter_shallow_tail f = function
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _
   | Cop
-      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
-        | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
+      ( ( Calloc _ | Caddi _ | Csubi _ | Cmuli _ | Cdivi | Cmodi | Caddi128
+        | Csubi128 | Cmuli64 _ | Cand _ | Cor _ | Cxor _ | Clsl _ | Clsr | Casr
+        | Cpopcnt | Caddv
         | Cadda | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get
         | Ctls_get | Cdomain_index | Cpoll | Cpause | Capply _ | Cextcall _
         | Cload _
@@ -828,8 +845,9 @@ let map_shallow_tail f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
     | Cvar _ | Ctuple _
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
-          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+        ( ( Calloc _ | Caddi _ | Csubi _ | Cmuli _ | Cdivi | Cmodi | Caddi128
+          | Csubi128 | Cmuli64 _ | Cand _ | Cor _ | Cxor _ | Clsl _ | Clsr
+          | Casr
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
           | Capply _ | Cextcall _ | Cload _

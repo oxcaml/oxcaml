@@ -35,14 +35,14 @@ let rec select_addr exp =
   let default = Alinear exp, 0 in
   match exp with
   | Cmm.Cconst_symbol (s, _) when not !Clflags.dlcode -> Asymbol s, 0
-  | Cmm.Cop ((Caddi | Caddv | Cadda), [arg; Cconst_int (m, _)], _)
-  | Cmm.Cop ((Caddi | Caddv | Cadda), [Cconst_int (m, _); arg], _) ->
+  | Cmm.Cop ((Caddi _ | Caddv | Cadda), [arg; Cconst_int (m, _)], _)
+  | Cmm.Cop ((Caddi _ | Caddv | Cadda), [Cconst_int (m, _); arg], _) ->
     let a, n = select_addr arg in
     if Misc.no_overflow_add n m then a, n + m else default
-  | Cmm.Cop (Csubi, [arg; Cconst_int (m, _)], _) ->
+  | Cmm.Cop (Csubi _, [arg; Cconst_int (m, _)], _) ->
     let a, n = select_addr arg in
     if Misc.no_overflow_sub n m then a, n - m else default
-  | Cmm.Cop (Clsl, [arg; Cconst_int (((1 | 2 | 3) as shift), _)], _) -> (
+  | Cmm.Cop (Clsl _, [arg; Cconst_int (((1 | 2 | 3) as shift), _)], _) -> (
     let default = Ascale (arg, 1 lsl shift), 0 in
     match select_addr arg with
     | Alinear e, n ->
@@ -51,12 +51,12 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
-  | Cmm.Cop (Cmuli, [(Cvar _ as arg); Cconst_int (((3 | 5 | 9) as mult), _)], _)
-  | Cmm.Cop (Cmuli, [Cconst_int (((3 | 5 | 9) as mult), _); (Cvar _ as arg)], _)
+  | Cmm.Cop (Cmuli _, [(Cvar _ as arg); Cconst_int (((3 | 5 | 9) as mult), _)], _)
+  | Cmm.Cop (Cmuli _, [Cconst_int (((3 | 5 | 9) as mult), _); (Cvar _ as arg)], _)
     ->
     Ascaledadd (arg, arg, mult - 1), 0
-  | Cmm.Cop (Cmuli, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
-  | Cmm.Cop (Cmuli, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
+  | Cmm.Cop (Cmuli _, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
+  | Cmm.Cop (Cmuli _, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
     let default = Ascale (arg, mult), 0 in
     match select_addr arg with
     | Alinear e, n ->
@@ -65,7 +65,7 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
-  | Cmm.Cop ((Caddi | Caddv | Cadda), [arg1; arg2], _) -> (
+  | Cmm.Cop ((Caddi _ | Caddv | Cadda), [arg1; arg2], _) -> (
     match select_addr arg1, select_addr arg2 with
     | (Alinear e1, n1), (Alinear e2, n2) when Misc.no_overflow_add n1 n2 ->
       Aadd (e1, e2), n1 + n2
@@ -80,8 +80,8 @@ let rec select_addr exp =
     | ( ((Asymbol _ | Aadd (_, _) | Ascaledadd (_, _, _)), _),
         ((Asymbol _ | Alinear _ | Aadd (_, _) | Ascaledadd (_, _, _)), _) ) ->
       Aadd (arg1, arg2), 0)
-  | Cmm.Cop (Cor, [arg; Cconst_int (1, _)], _)
-  | Cmm.Cop (Cor, [Cconst_int (1, _); arg], _) -> (
+  | Cmm.Cop (Cor _, [arg; Cconst_int (1, _)], _)
+  | Cmm.Cop (Cor _, [Cconst_int (1, _); arg], _) -> (
     (* optimize tagging integers *)
     match select_addr arg with
     | Ascale (e, scale), off when scale mod 2 = 0 ->
@@ -363,7 +363,7 @@ let select_operation'
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
   (* Recognize the LEA instruction *)
-  | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
+  | Caddi _ | Caddv | Cadda | Csubi _ | Cor _ | Cmuli _ -> (
     match select_addressing Word_int (Cop (op, args, dbg)) with
     | Iindexed _, _ | Iindexed2 0, _ -> Use_default
     | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
@@ -399,7 +399,8 @@ let select_operation'
   (* Recognize store instructions *)
   | Cstore (((Word_int | Word_val) as chunk), _init) -> (
     match args with
-    | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
+    | [loc;
+        Cop (Caddi Int64, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
       when Stdlib.( = ) loc loc' && int_is_immediate n ->
       let addr, arg = select_addressing chunk loc in
       Rewritten (specific (Ioffset_loc (n, addr)), [arg])
@@ -410,16 +411,16 @@ let select_operation'
   | Casr -> (
     (* Recognize sign extension *)
     match args with
-    | [Cop (Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
+    | [Cop (Clsl Int64, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
       Rewritten (specific Isextend32, [k])
     | _ -> Use_default)
   (* Recognize zero extension *)
   | Clsr -> (
     match args with
-    | [Cop (Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
+    | [Cop (Clsl Int64, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
       Rewritten (specific Izextend32, [k])
     | _ -> Use_default)
-  | Cand -> (
+  | Cand Int64 -> (
     match args with
     | [arg; Cconst_int (0xffff_ffff, _)]
     | [arg; Cconst_natint (0xffff_ffffn, _)]

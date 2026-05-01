@@ -719,9 +719,9 @@ let operation_supported = function
     Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi _ | Csubi _ | Cmuli _ | Cmulhi _ | Cdivi | Cmodi
   | Caddi128 | Csubi128 | Cmuli64 _
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand _ | Cor _ | Cxor _ | Clsl _ | Clsr | Casr
   | Ccsel _
   | Cbswap _
   | Cclz _ | Cctz _

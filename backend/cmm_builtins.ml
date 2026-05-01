@@ -93,7 +93,7 @@ let shift32 make_op arg count dbg =
     | Ccatch (_, _, _)
     | Cexit (_, _, _)
     | Cinvalid _ ->
-      Cop (Cand, [count; Cconst_int (mask, dbg)], dbg)
+      Cop (Cand Int64, [count; Cconst_int (mask, dbg)], dbg)
   in
   Some (make_op arg count dbg)
 
@@ -103,7 +103,7 @@ let shift32 make_op arg count dbg =
    argument is negative. *)
 let clear_sign_bit arg dbg =
   let mask = Nativeint.lognot (Nativeint.shift_left 1n ((size_int * 8) - 1)) in
-  Cop (Cand, [arg; Cconst_natint (mask, dbg)], dbg)
+  Cop (Cand Int64, [arg; Cconst_natint (mask, dbg)], dbg)
 
 let clz ~arg_is_non_zero bi arg dbg =
   let op = Cclz { arg_is_non_zero } in
@@ -111,7 +111,7 @@ let clz ~arg_is_non_zero bi arg dbg =
       let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
       let extra_bits = (size_int * 8) - bit_count bi in
       if extra_bits <> 0
-      then Cop (Caddi, [res; Cconst_int (-extra_bits, dbg)], dbg)
+      then Cop (Caddi Int64, [res; Cconst_int (-extra_bits, dbg)], dbg)
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
@@ -128,7 +128,7 @@ let ctz ~arg_is_non_zero bi arg dbg =
     if_operation_supported_bi bi op ~f:(fun () ->
         (* Set bit 32/16/8 *)
         let mask = Nativeint.shift_left 1n bit_count in
-        Cop (op, [Cop (Cor, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
+        Cop (op, [Cop (Cor Int64, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
 
 let popcnt bi arg dbg =
   if_operation_supported_bi bi Cpopcnt ~f:(fun () ->
@@ -160,7 +160,7 @@ let bigstring_prefetch ~is_write locality args dbg =
                   (* pointer to element "idx" of "ba" of type (char,
                      int8_unsigned_elt, c_layout) Bigarray.Array1.t is simply
                      offset "idx" from "ba_data" *)
-                  return_unit dbg (Cop (op, [add_int ba_data idx dbg], dbg))))))
+                  return_unit dbg (Cop (op, [add_int64 ba_data idx dbg], dbg))))))
 
 let prefetch ~is_write locality arg dbg =
   let op = Cprefetch { is_write; locality } in
@@ -171,7 +171,7 @@ let prefetch_offset ~is_write locality (arg1, arg2) dbg =
   (* [arg2], the index, is already untagged. *)
   let op = Cprefetch { is_write; locality } in
   if_operation_supported op ~f:(fun () ->
-      return_unit dbg (Cop (op, [add_int arg1 arg2 dbg], dbg)))
+      return_unit dbg (Cop (op, [add_int64 arg1 arg2 dbg], dbg)))
 
 let ext_pointer_prefetch ~is_write locality arg dbg =
   prefetch ~is_write locality (int_as_pointer arg dbg) dbg
@@ -198,7 +198,7 @@ let bigstring_cas size (arg1, arg2, arg3, arg4) dbg =
                         (Cop
                            (mk_load_mut Word_int, [field_address bs 1 dbg], dbg))
                         (fun bs_data ->
-                          bind "dst" (add_int bs_data idx dbg) (fun dst ->
+                          bind "dst" (add_int64 bs_data idx dbg) (fun dst ->
                               tag_int
                                 (Cop (op, [compare_with; set_to; dst], dbg))
                                 dbg)))))))
@@ -210,13 +210,14 @@ let native_pointer_atomic_add size (arg1, arg2) dbg =
           bind "dst" arg1 (fun dst -> Cop (op, [src; dst], dbg))))
 
 let native_pointer_atomic_sub size (arg1, arg2) dbg =
-  native_pointer_atomic_add size (arg1, neg_int arg2 dbg) dbg
+  native_pointer_atomic_add size (arg1, neg_int ~int_width:Int64 arg2 dbg) dbg
 
 let ext_pointer_atomic_add size (arg1, arg2) dbg =
   native_pointer_atomic_add size (int_as_pointer arg1 dbg, arg2) dbg
 
 let ext_pointer_atomic_sub size (arg1, arg2) dbg =
-  native_pointer_atomic_add size (int_as_pointer arg1 dbg, neg_int arg2 dbg) dbg
+  native_pointer_atomic_add size
+    (int_as_pointer arg1 dbg, neg_int ~int_width:Int64 arg2 dbg) dbg
 
 let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
   let op = Catomic { op = Fetch_and_add; size } in
@@ -227,11 +228,11 @@ let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
                   bind "bs_data"
                     (Cop (mk_load_mut Word_int, [field_address bs 1 dbg], dbg))
                     (fun bs_data ->
-                      bind "dst" (add_int bs_data idx dbg) (fun dst ->
+                      bind "dst" (add_int64 bs_data idx dbg) (fun dst ->
                           Cop (op, [src; dst], dbg)))))))
 
 let bigstring_atomic_sub size (arg1, arg2, arg3) dbg =
-  bigstring_atomic_add size (arg1, arg2, neg_int arg3 dbg) dbg
+  bigstring_atomic_add size (arg1, arg2, neg_int ~int_width:Int64 arg3 dbg) dbg
 
 let rec const_args_gen ~extract ~type_name n args name =
   match n, args with
@@ -877,7 +878,7 @@ let transl_builtin name args dbg typ_res =
     let op = Cclz { arg_is_non_zero = false } in
     if_operation_supported op ~f:(fun () ->
         let arg = clear_sign_bit (one_arg name args) dbg in
-        Cop (Caddi, [Cop (op, [arg], dbg); Cconst_int (-1, dbg)], dbg))
+        Cop (Caddi Int64, [Cop (op, [arg], dbg); Cconst_int (-1, dbg)], dbg))
   | "caml_int64_clz_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:false Unboxed_int64 (one_arg name args) dbg
   | "caml_int32_clz_unboxed_to_untagged" ->
@@ -902,7 +903,8 @@ let transl_builtin name args dbg typ_res =
     if_operation_supported Cpopcnt ~f:(fun () ->
         (* Having the argument tagged saves a shift, but there is one extra
            "set" bit, which is accounted for by the (-1) below. *)
-        Cop (Caddi, [Cop (Cpopcnt, args, dbg); Cconst_int (-1, dbg)], dbg))
+        Cop
+          (Caddi Int64, [Cop (Cpopcnt, args, dbg); Cconst_int (-1, dbg)], dbg))
   | "caml_int_popcnt_untagged_to_untagged" ->
     (* This code is expected to be faster than [popcnt(tagged_x) - 1] when the
        untagged argument is already available from a previous computation. *)
@@ -942,11 +944,11 @@ let transl_builtin name args dbg typ_res =
     if_operation_supported op ~f:(fun () ->
         let c =
           Cop
-            ( Clsl,
+            ( Clsl Int64,
               [Cconst_int (1, dbg); Cconst_int ((size_int * 8) - 1, dbg)],
               dbg )
         in
-        Cop (op, [Cop (Cor, [one_arg name args; c], dbg)], dbg))
+        Cop (op, [Cop (Cor Int64, [one_arg name args; c], dbg)], dbg))
   | "caml_int8_ctz_untagged_to_untagged" ->
     ctz ~arg_is_non_zero:false Untagged_int8 (one_arg name args) dbg
   | "caml_int16_ctz_untagged_to_untagged" ->
@@ -1010,7 +1012,7 @@ let transl_builtin name args dbg typ_res =
           Cop (op, [cond; ifso; ifnot], dbg))
   | "caml_int32_shift_left_by_int32_unboxed" ->
     let arg, count = two_args name args in
-    shift32 lsl_int arg count dbg
+    shift32 (lsl_int ~int_width:Int32) arg count dbg
   | "caml_int32_shift_right_by_int32_unboxed" ->
     let arg, count = two_args name args in
     shift32 asr_int arg count dbg
@@ -1021,7 +1023,7 @@ let transl_builtin name args dbg typ_res =
   | "caml_nativeint_shift_left_by_nativeint_unboxed"
   | "caml_int64_shift_left_by_int64_unboxed" ->
     let arg, count = two_args name args in
-    Some (lsl_int arg count dbg)
+    Some (lsl_int ~int_width:Int32 arg count dbg)
   | "caml_nativeint_shift_right_by_nativeint_unboxed"
   | "caml_int64_shift_right_by_int64_unboxed" ->
     let arg, count = two_args name args in

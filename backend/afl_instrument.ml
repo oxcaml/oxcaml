@@ -46,7 +46,8 @@ let rec with_afl_logging b dbg =
          op (Cload ({memory_chunk=Word_int;
                      mutability=Asttypes.Mutable;
                      is_atomic=false})) [afl_area_ptr dbg],
-         Clet(VP.create cur_pos, op Cxor [op (Cload {memory_chunk=Word_int;
+         Clet(VP.create cur_pos, op (Cxor Int64)
+                                         [op (Cload {memory_chunk=Word_int;
                                                      mutability=Asttypes.Mutable;
                                                      is_atomic=false})
         [afl_prev_loc dbg]; Cconst_int (cur_location, dbg)],

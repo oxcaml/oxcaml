@@ -132,25 +132,36 @@ val alloc_infix_header : int -> Debuginfo.t -> expression
 val int_const : Debuginfo.t -> int -> expression
 
 (** Arithmetical operations on integers *)
-val add_int : expression -> expression -> Debuginfo.t -> expression
+val add_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
-val sub_int : expression -> expression -> Debuginfo.t -> expression
+(* Shorthand for [add_int ~int_width:I64] *)
+val add_int64 : expression -> expression -> Debuginfo.t -> expression
 
-val neg_int : expression -> Debuginfo.t -> expression
+val sub_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
-val lsl_int : expression -> expression -> Debuginfo.t -> expression
+val neg_int :
+  int_width:int_width -> expression -> Debuginfo.t -> expression
 
-val mul_int : expression -> expression -> Debuginfo.t -> expression
+val lsl_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+
+val mul_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val lsr_int : expression -> expression -> Debuginfo.t -> expression
 
 val asr_int : expression -> expression -> Debuginfo.t -> expression
 
-val and_int : expression -> expression -> Debuginfo.t -> expression
+val and_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
-val or_int : expression -> expression -> Debuginfo.t -> expression
+val or_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
-val xor_int : expression -> expression -> Debuginfo.t -> expression
+val xor_int :
+  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
     [ptr_out_of_heap] is [false]. *)
