@@ -327,7 +327,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type change =
     | Cupper : 'a var * 'a * ('a, right_only) Comp_hint.t -> change
     | Clower : 'a var * 'a * ('a, left_only) Comp_hint.t -> change
-    | Cvlower : 'a var * 'a lmorphvar VarHashtbl.t -> change
+    | Creset_vlower : 'a var * 'a lmorphvar VarHashtbl.t -> change
     | Cvlower_added : 'a var * key -> change
 
   type changes = change list
@@ -339,7 +339,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Clower (v, lower, lower_hint) ->
       v.lower <- lower;
       v.lower_hint <- lower_hint
-    | Cvlower (v, vlower) -> v.vlower <- vlower
+    | Creset_vlower (v, vlower) -> v.vlower <- vlower
     | Cvlower_added (v, key) -> VarHashtbl.remove v.vlower key
 
   let empty_changes = []
@@ -637,11 +637,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
-  let set_vlower ~log v vlower =
+  let reset_vlower ~log v =
     (match log with
     | None -> ()
-    | Some log -> log := Cvlower (v, v.vlower) :: !log);
-    v.vlower <- vlower
+    | Some log -> log := Creset_vlower (v, v.vlower) :: !log);
+    v.vlower <- VarHashtbl.create 0
 
   let add_vlower ~log v key x =
     (match log with
@@ -664,7 +664,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then Error (v.upper, v.upper_hint)
     else (
       update_lower ~log obj v a' a'_hint;
-      if C.le obj v.upper v.lower then set_vlower ~log v (VarHashtbl.create 0);
+      if C.le obj v.upper v.lower then reset_vlower ~log v;
       Ok ())
 
   let submode_cmv : type a l.
@@ -727,7 +727,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                then update_lower ~log obj v mu_lower mu_lower_hint);
             r)
       in
-      if C.le obj v.upper v.lower then set_vlower ~log v (VarHashtbl.create 0);
+      if C.le obj v.upper v.lower then reset_vlower ~log v;
       r)
 
   and submode_mvc :
