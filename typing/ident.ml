@@ -30,7 +30,8 @@ type t =
   | Global_with_args of global
       (* must have non-empty [args] *)
   | Sort_var of int
-      (* Massive hack but useful for now *)
+      (* conceptually a [Jkind_intf.Sort.Var.id] but that would cause a circular
+         dependency. *)
 and global = Global_module.Name.t = private
   { head: string; args: Global_module.Name.argument list }
 

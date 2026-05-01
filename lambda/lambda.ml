@@ -1491,10 +1491,14 @@ let make_key e =
         (* Mutable constants are not shared *)
         raise Not_simple
     | Lconst _ -> e
-    | Lapply ap | Linstantiate ap ->
+    | Lapply ap ->
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
+    | Linstantiate ap ->
+        Linstantiate { ap with ap_func = tr_rec env ap.ap_func;
+                               ap_args = tr_recs env ap.ap_args;
+                               ap_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -2830,7 +2834,9 @@ let structured_constant_layout = function
   | Const_float_array _ | Const_float_block _ ->
     non_null_value (Parrayval Pfloatarray)
   | Const_null -> nullable_value Pgenval
-  | Const_layout _ -> layout_unboxed_unit
+  | Const_layout _ ->
+    Misc.fatal_error
+      "layout constants have no layout as they don't exist at runtime"
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with

@@ -304,7 +304,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     in
     register_const acc dbg const "const_mixed_block"
   | Const_null -> acc, reg_width RWC.const_null, "null"
-  | Const_layout _ -> Misc.fatal_error "I'm just hoping this can't happen"
+  | Const_layout _ ->
+    Misc.fatal_error "layout constants should not exist after slambda eval"
 
 let close_const acc const =
   (* For this code path, the debuginfo is discarded (see just below). *)

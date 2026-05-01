@@ -38,8 +38,6 @@ open Lambda
 let create_dynamic sval_runtime =
   SLhalves { sval_comptime = SLmissing; sval_runtime }
 
-(** Fracture a lambda constant, currently no constants have a compile time part
-    so does nothing. *)
 let fracture_const lambda = function
   | Const_layout layout ->
     SLhalves
@@ -48,7 +46,12 @@ let fracture_const lambda = function
           Lprim
             (Punbox_unit, [lambda_unit], Debuginfo.Scoped_location.Loc_unknown)
       }
-  | _ -> SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
+  | Const_block _ | Const_mixed_block _
+  (* There's currently no way to get layouts into a block so we don't need to
+     fracture these. *)
+  | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
+  | Const_null ->
+    SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
 
 let rec fracture_lam lambda : slambda =
   match lambda with
@@ -340,24 +343,20 @@ let rec fracture_lam lambda : slambda =
     ->
     let free_vars = Ident.Map.to_list free_vars in
     let free_vars_shape_locality_mode =
-      List.map
+      Misc.Stdlib.Array.of_list_map
         (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
         free_vars
-      |> Array.of_list
     in
     let free_vars_shape_unit =
-      List.map
+      Misc.Stdlib.Array.of_list_map
         (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
         free_vars
-      |> Array.of_list
     in
-    let free_vars_is_uniform =
-      Lambda.is_uniform_block_shape (Shape free_vars_shape_unit)
-    in
-    let get_free_var_prim i =
-      match free_vars_is_uniform with
-      | true -> Pfield (i, Pointer, Reads_agree)
-      | false -> Pmixedfield ([i], free_vars_shape_locality_mode, Reads_agree)
+    let get_free_var_prim =
+      match Lambda.is_uniform_block_shape (Shape free_vars_shape_unit) with
+      | true -> fun i -> Pfield (i, Pointer, Reads_agree)
+      | false ->
+        fun i -> Pmixedfield ([i], free_vars_shape_locality_mode, Reads_agree)
     in
     let templated_function_body =
       slet_local "body" body (fun body_c body_r ->
@@ -383,6 +382,9 @@ let rec fracture_lam lambda : slambda =
                       lam ) ))
               (0, body_r) free_vars
           in
+          (* This relies on all templates currently being generated from
+             [let poly_] which means all arguments are erased, this will need to
+             be improved for functors where the arguments aren't erased. *)
           SLhalves
             { sval_comptime = body_c;
               sval_runtime =

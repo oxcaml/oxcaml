@@ -1248,7 +1248,7 @@ let rec struct_const ppf = function
         List.iter (fun f -> fprintf ppf "@ %s" f) fl in
       fprintf ppf "@[<1>[|@[%s%a@]|]@]" f1 floats fl
   | Const_null -> fprintf ppf "<null>"
-  | Const_layout l -> layout ppf l
+  | Const_layout l -> fprintf ppf "@[<2><layout@ %a>]" layout l
 
 and struct_consts ppf (hd, tl) =
   let sconsts ppf scl =
@@ -1444,7 +1444,7 @@ let rec lam ppf = function
       fprintf ppf "$%a" slam slambda
 
 and slam ppf = function
-  | SLlayout l -> fprintf ppf "⟪%a⟫" layout l
+  | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
   | SLglobal cu ->
     fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
   | SLvar id -> Slambdaident.print ppf id

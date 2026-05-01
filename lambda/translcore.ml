@@ -397,7 +397,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             let layout = Typeopt.layout_of_sort e.exp_loc layout in
             Lconst (Const_layout layout))
           args;
-        ap_result_layout = Lambda.layout_function;
+        ap_result_layout = layout_exp sort e;
         ap_region_close = Rc_normal;
         ap_mode = alloc_local;
         ap_loc = (of_location ~scopes e.exp_loc);

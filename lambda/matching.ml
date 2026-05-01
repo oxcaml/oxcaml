@@ -4394,12 +4394,15 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
   | Tpat_fun_layout { id; uid = duid; lpoly; env_alloc_mode; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
-    let k = Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type in
+    let layout = Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type in
     let params =
       List.map
         (fun var ->
           let id = (Jkind_types.Sort.Var.get_id var :> int) in
           let name = Ident.create_sort_var id in
+          (* Most of this isn't particularly applicable for kinds as they get
+             erased, if we support more complex functions with static or erased
+              arguments this will be more sensible. *)
           { name;
             debug_uid = debug_uid_none;
             layout = layout_unboxed_unit;
@@ -4418,7 +4421,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
         }
     in
     let f =
-      lfunction' ~kind ~params ~return:k ~body:param
+      lfunction' ~kind ~params ~return:layout ~body:param
         ~attr:default_function_attribute
         ~loc:(Scoped_location.of_location ~scopes loc)
         ~mode:env_alloc_mode ~ret_mode:env_alloc_mode
@@ -4452,7 +4455,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
               Some (ident, layout_any_value))
       |> Ident.Map.of_list
     in
-    Llet (Strict, k, id, duid, Ltemplate (f, free_vars), body)
+    Llet (Strict, layout, id, duid, Ltemplate (f, free_vars), body)
   | Tpat_var { id; uid = duid; _ }
   | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }
   | Tpat_fun_layout { id; uid = duid; _ } ->
