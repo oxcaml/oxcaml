@@ -280,12 +280,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               pair [f] [v], and we have [f v <= u] where [u] is the current
               variable.
 
-              [vlower] is mutable (rather than the contents being mutated
-              in-place) to support [reset_vlower], which replaces the table with
-              a fresh empty one. Swapping the reference lets [Creset_vlower]
-              undo the reset cheaply by restoring the old table pointer, without
-              having to copy or clear it. New entries are added via
-              [Cvlower_added], which undoes by key removal. *)
+              The field itself is mutable to support [reset_vlower], which
+              replaces the table with a fresh empty one. Storing the old table
+              pointer in [Creset_vlower] lets the reset be undone cheaply,
+              without copying or clearing. New entries are added in-place via
+              [add_vlower] and undone by key removal via [Cvlower_added]. *)
       mutable upper : 'a;  (** The precise upper bound of the variable *)
       mutable upper_hint : ('a, right_only) Comp_hint.t;
           (** Hints for [upper] *)
