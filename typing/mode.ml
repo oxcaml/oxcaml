@@ -1504,47 +1504,39 @@ module Lattices_mono = struct
       | Not_equal -> Not_equal
       | Equal -> (
         match Axis.equal ax1 ax2 with Equal -> Equal | Not_equal -> Not_equal))
-    | Proj _, _ | _, Proj _ -> Not_equal
     | Max_with ax1, Max_with ax2 -> Axis.equal ax1 ax2
-    | Max_with _, _ | _, Max_with _ -> Not_equal
     | Min_with ax1, Min_with ax2 -> Axis.equal ax1 ax2
-    | Min_with _, _ | _, Min_with _ -> Not_equal
     | Meet_const c1, Meet_const c2 ->
       if equal dst c1 c2 then Equal else Not_equal
-    | Meet_const _, _ | _, Meet_const _ -> Not_equal
     | Imply_const c1, Imply_const c2 ->
       if equal dst c1 c2 then Equal else Not_equal
-    | Imply_const _, _ | _, Imply_const _ -> Not_equal
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
-    | Monadic_to_comonadic_min, _ | _, Monadic_to_comonadic_min -> Not_equal
     | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> (
       match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal)
-    | Comonadic_to_monadic_min _, _ | _, Comonadic_to_monadic_min _ -> Not_equal
     | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
-    | Monadic_to_comonadic_max, _ | _, Monadic_to_comonadic_max -> Not_equal
     | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> (
       match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal)
-    | Comonadic_to_monadic_max _, _ | _, Comonadic_to_monadic_max _ -> Not_equal
     | Local_to_regional, Local_to_regional -> Equal
-    | Local_to_regional, _ | _, Local_to_regional -> Not_equal
     | Locality_as_regionality, Locality_as_regionality -> Equal
-    | Locality_as_regionality, _ | _, Locality_as_regionality -> Not_equal
     | Global_to_regional, Global_to_regional -> Equal
-    | Global_to_regional, _ | _, Global_to_regional -> Not_equal
     | Regional_to_local, Regional_to_local -> Equal
-    | Regional_to_local, _ | _, Regional_to_local -> Not_equal
     | Regional_to_global, Regional_to_global -> Equal
-    | Regional_to_global, _ | _, Regional_to_global -> Not_equal
     | Compose (f1, g1), Compose (f2, g2) -> (
       match equal_morph dst f1 f2 with
       | Not_equal -> Not_equal
       | Equal -> equal_morph (src dst f1) g1 g2)
-    | Compose _, _ | _, Compose _ -> Not_equal
     | Map_comonadic f, Map_comonadic g -> (
       match equal_morph (proj_obj Areality dst) f g with
       | Not_equal -> Not_equal
       | Equal -> Equal)
-    | Map_comonadic _, _ | _, Map_comonadic _ -> Not_equal
+    | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _ | Imply_const _
+        | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
+        | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
+        | Local_to_regional | Locality_as_regionality | Global_to_regional
+        | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
+          ),
+        _ ) ->
+      Not_equal
 
   let rec hash_morph : type a b l r. (a, b, l * r) morph -> int =
    fun f ->
