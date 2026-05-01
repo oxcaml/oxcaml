@@ -263,6 +263,8 @@ module Dbg = struct
        if c <> 0 then c else
        let c = Option.compare String.compare d1.dinfo_dir d2.dinfo_dir in
        if c <> 0 then c else
+       let c = Option.compare String.compare d1.dinfo_uid d2.dinfo_uid in
+       if c <> 0 then c else
        loop ds1 ds2
     in
     loop dbg1 dbg2
@@ -489,3 +491,8 @@ let to_structured_mangling_path ~name dbg : Structured_mangling.path =
   Structured_mangling.Function name
   :: drop_partials_and_last_function (List.rev path_from_debug)
   |> List.rev
+
+let remove_outermost_frame t =
+  match t.dbg with
+  | [] -> t
+  | _ :: rest -> { t with dbg = rest }

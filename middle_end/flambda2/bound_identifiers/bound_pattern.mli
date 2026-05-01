@@ -45,6 +45,8 @@ val name_mode : t -> Name_mode.t
 
 val with_name_mode : t -> Name_mode.t -> t
 
+val add_inlined_debuginfo : t -> Inlined_debuginfo.t -> t
+
 val exists_all_bound_vars : t -> f:(Bound_var.t -> bool) -> bool
 
 val fold_all_bound_vars : t -> init:'a -> f:('a -> Bound_var.t -> 'a) -> 'a

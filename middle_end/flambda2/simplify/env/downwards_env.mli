@@ -142,6 +142,8 @@ val set_inlined_debuginfo : t -> from:t -> t
 
 val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
 
+val inlined_debuginfo : t -> Inlined_debuginfo.t
+
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
 val round : t -> int

@@ -186,10 +186,10 @@ module Vars = struct
   let availability_set_to_key_set (avail : Reg_availability_set.t) =
     Reg_availability_set.canonicalise avail
 
-  let available_before (insn : L.instruction) =
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
     Some (availability_set_to_key_set insn.available_before)
 
-  let available_across (insn : L.instruction) =
+  let available_across (_fundecl : L.fundecl) (insn : L.instruction) =
     Some (availability_set_to_key_set insn.available_across)
 end
 

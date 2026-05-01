@@ -491,7 +491,7 @@ module Fold_prims = struct
                 in
                 let var_duid = Flambda_debug_uid.none in
                 (* CR sspies: Improve the debug UID here in the future. *)
-                Bound_parameter.create var kind var_duid)
+                Bound_parameter.create var kind var_duid ~dbg:Debuginfo.none)
               fields_kinds
           in
           let env =

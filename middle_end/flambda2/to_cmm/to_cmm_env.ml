@@ -347,21 +347,30 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable ~debug_uid v =
+let gen_variable t ~debug_uid ~dbg ~bv_is_parameter v =
   let user_visible = Variable.user_visible v in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
-    if not (!Clflags.debug && not !Dwarf_flags.restrict_to_upstream_dwarf)
-    then None
-    else if not user_visible
-    then None
-    else
-      (* CR mshinwell: this is a temporary hack, the provenance information will
-         be reworked soon *)
-      Some
-        (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v ~debug_uid)
+    match (bv_is_parameter : Bound_var.Is_parameter.t) with
+    | Implicit_parameter -> None
+    | Local_var | Parameter _ ->
+      if not (!Clflags.debug && not !Dwarf_flags.restrict_to_upstream_dwarf)
+      then None
+      else if not user_visible
+      then None
+      else
+        (* CR mshinwell: it's not clear [module_path] is necessary, since we can
+           use the [Debuginfo.t] to extract it *)
+        let dbg = add_inlined_debuginfo t dbg in
+        let is_parameter =
+          match (bv_is_parameter : Bound_var.Is_parameter.t) with
+          | Implicit_parameter | Local_var -> Is_parameter.local
+          | Parameter { index } -> Is_parameter.parameter ~index
+        in
+        Some
+          (Backend_var.Provenance.create ~module_path:(Path.Pident v)
+             ~location:dbg ~original_ident:v ~debug_uid ~is_parameter)
   in
   Backend_var.With_provenance.create ?provenance v
 
@@ -371,17 +380,38 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env (v, debug_uid) =
+let create_bound_parameter_aux env ~bv_is_parameter (v, debug_uid, dbg) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
-  let v' = gen_variable v ~debug_uid in
+  let v' = gen_variable env v ~debug_uid ~dbg ~bv_is_parameter in
   let env = add_bound_param env v v' in
   env, v'
 
+let create_bound_parameter env (v, debug_uid, dbg) =
+  create_bound_parameter_aux env
+    ~bv_is_parameter:Bound_var.Is_parameter.implicit_parameter
+    (v, debug_uid, dbg)
+
 let create_bound_parameters env vs =
-  List.fold_left_map create_bound_parameter env vs
+  let _, env, vs' =
+    List.fold_left
+      (fun (index, env, acc) param ->
+        let env, v' =
+          create_bound_parameter_aux env
+            ~bv_is_parameter:(Bound_var.Is_parameter.parameter ~index)
+            param
+        in
+        index + 1, env, v' :: acc)
+      (0, env, []) vs
+  in
+  env, List.rev vs'
+
+let add_phantom_let_binding env var ~debug_uid ~dbg ~bv_is_parameter =
+  let v' = gen_variable env var ~debug_uid ~dbg ~bv_is_parameter in
+  let env = add_bound_param env var v' in
+  env, v'
 
 let extra_info env simple =
   match Simple.must_be_var simple with
@@ -471,14 +501,14 @@ let is_cmm_simple cmm =
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ ->
     true
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Cop _
+  | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     false
 
 (* Helper function to create bindings *)
 
-let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
-    (bound_expr : a bound_expr) =
+let create_binding_aux (type a) env effs (var : Bound_var.t)
+    ~(inline : a inline) (bound_expr : a bound_expr) =
   let order =
     let incr =
       match bound_expr with
@@ -489,12 +519,15 @@ let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     !next_order
   in
   let cmm_var =
-    gen_variable ~debug_uid:(Bound_var.debug_uid var) (Bound_var.var var)
+    gen_variable env ~debug_uid:(Bound_var.debug_uid var)
+      ~dbg:(Bound_var.dbg var)
+      ~bv_is_parameter:(Bound_var.is_parameter var)
+      (Bound_var.var var)
   in
   let binding = Binding { order; inline; effs; cmm_var; bound_expr } in
   binding
 
-let create_binding (type a) effs var ~(inline : a inline)
+let create_binding (type a) env effs var ~(inline : a inline)
     (bound_expr : a bound_expr) =
   (* In order to avoid generating binding of the form: "let x = y in ...", when
      'y' is trivial i.e. is a value that fits in a register, we mark 'x' as a
@@ -506,10 +539,10 @@ let create_binding (type a) effs var ~(inline : a inline)
     (* trivial/simple cmm expression (as decided by [is_cmm_simple]) do not have
        effects and coeffects *)
     let effs = Ece.pure_can_be_duplicated in
-    create_binding_aux effs var ~inline:Must_inline_and_duplicate
+    create_binding_aux env effs var ~inline:Must_inline_and_duplicate
       (Split { cmm_expr; free_vars })
   | Simple _ | Split _ | Splittable_prim _ ->
-    create_binding_aux effs var ~inline bound_expr
+    create_binding_aux env effs var ~inline bound_expr
 
 (* Binding splitting *)
 
@@ -783,7 +816,7 @@ and split_in_env env res var binding =
 let bind_variable_with_decision (type a) ?extra env res var ~inline
     ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr:effs
     =
-  let binding = create_binding ~inline effs var defining_expr in
+  let binding = create_binding env ~inline effs var defining_expr in
   add_binding_to_env ?extra env res (Bound_var.var var) binding
 
 let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
@@ -826,22 +859,36 @@ let bind_variable_to_primitive = bind_variable_with_decision
 (* Variable lookup (for potential inlining) *)
 
 let will_inline_simple env res
-    { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var = _; _ } =
-  { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
+    { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var; _ } =
+  let cmm =
+    (* Wrap with Cname_for_debugger if the variable is user-visible.
+       We can test user-visibleness by checking whether the provenance is [Some]. *)
+    match Backend_var.With_provenance.provenance cmm_var with
+    | None -> cmm_expr
+    | Some _ -> Cmm.Cname_for_debugger (cmm_var, cmm_expr)
+  in
+  { env; res; expr = { cmm; free_vars; effs } }
 
-let will_inline_complex env res { effs; bound_expr; _ } =
-  match bound_expr with
-  | Split { cmm_expr; free_vars } ->
-    { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
-  | Splittable_prim { dbg; prim; args } ->
-    let free_vars, cmm_args =
-      List.fold_left_map
-        (fun free_vars { cmm = cmm_arg; effs = _; free_vars = arg_free_vars } ->
-          Backend_var.Set.union free_vars arg_free_vars, cmm_arg)
-        Backend_var.Set.empty args
-    in
-    let cmm_expr, res = rebuild_prim ~dbg ~env ~res prim cmm_args in
-    { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
+let will_inline_complex env res { effs; bound_expr; cmm_var; _ } =
+  let cmm_expr, free_vars, res =
+    match bound_expr with
+    | Split { cmm_expr; free_vars } -> cmm_expr, free_vars, res
+    | Splittable_prim { dbg; prim; args } ->
+      let free_vars, cmm_args =
+        List.fold_left_map
+          (fun free_vars { cmm = cmm_arg; effs = _; free_vars = arg_free_vars } ->
+            Backend_var.Set.union free_vars arg_free_vars, cmm_arg)
+          Backend_var.Set.empty args
+      in
+      let cmm_expr, res = rebuild_prim ~dbg ~env ~res prim cmm_args in
+      cmm_expr, free_vars, res
+  in
+  let cmm =
+    match Backend_var.With_provenance.provenance cmm_var with
+    | None -> cmm_expr
+    | Some _ -> Cmm.Cname_for_debugger (cmm_var, cmm_expr)
+  in
+  { env; res; expr = { cmm; free_vars; effs } }
 
 let will_not_inline_simple env res v
     ({ cmm_var; bound_expr = Simple _; _ } as b) =
@@ -967,6 +1014,8 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
        flushed *)
     match Variable.Map.find var env.vars with
     | exception Not_found ->
+      Format.eprintf "%s\n%%!"
+        (Printexc.raw_backtrace_to_string (Printexc.get_callstack 20));
       Misc.fatal_errorf "Variable %a not found in env" Variable.print var
     | cmm, free_vars ->
       (* the env.vars map only contain bindings to expressions of the form

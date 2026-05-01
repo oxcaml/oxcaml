@@ -22,7 +22,8 @@ module VB = Bound_var
 
 let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
-    ~return_continuation ~apply_exn_continuation ~apply_return_continuation =
+    ~return_continuation ~apply_exn_continuation ~apply_return_continuation
+    ~inlined_debuginfo =
   let callee, rec_info =
     match callee with
     | None ->
@@ -49,7 +50,7 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
      [Flambda_debug_uid.none] for now. Improve this in the future. *)
   let my_closure =
     Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
-      my_closure_duid
+      my_closure_duid ~dbg:Debuginfo.none
   in
   let bind_params ~params ~args ~body =
     if List.compare_lengths params args <> 0
@@ -58,10 +59,17 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
         Bound_parameters.print
         (Bound_parameters.create params)
         Simple.List.print args;
-    ListLabels.fold_left2 (List.rev params) (List.rev args) ~init:body
-      ~f:(fun expr param arg ->
-        let param_var, param_uid = BP.var_and_uid param in
-        let var = Bound_var.create param_var param_uid Name_mode.normal in
+    let params_with_index = List.mapi (fun i p -> i, p) params in
+    ListLabels.fold_left2 (List.rev params_with_index)
+      (List.rev args) ~init:body ~f:(fun expr (index, param) arg ->
+        let param_var, param_uid, param_dbg =
+          BP.var_and_uid_and_debuginfo param
+        in
+        let dbg = Inlined_debuginfo.rewrite inlined_debuginfo param_dbg in
+        let var =
+          Bound_var.create param_var param_uid Name_mode.normal ~dbg
+            ~is_parameter:(Bound_var.Is_parameter.parameter ~index)
+        in
         Let.create
           (Bound_pattern.singleton var)
           (Named.create_simple arg) ~body:expr ~free_names_of_body:Unknown
@@ -71,7 +79,8 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     let my_depth_duid = Flambda_debug_uid.none in
     let bound =
       Bound_pattern.singleton
-        (VB.create my_depth my_depth_duid Name_mode.normal)
+        (VB.create my_depth my_depth_duid Name_mode.normal ~dbg:Debuginfo.none
+           ~is_parameter:VB.Is_parameter.implicit_parameter)
     in
     Let.create bound
       (Named.create_rec_info rec_info)
@@ -160,6 +169,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
             ~params:(Bound_parameters.to_list params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
             ~exn_continuation ~return_continuation
+            ~inlined_debuginfo:(DE.inlined_debuginfo denv)
         in
         let expr =
           match Exn_continuation.extra_args apply_exn_continuation with

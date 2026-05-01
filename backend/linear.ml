@@ -21,6 +21,43 @@ open! Int_replace_polymorphic_compare [@@warning "-66"]
 
 type label = Cmm.label
 
+type phantom_defining_expr =
+  | Lphantom_const_int of Targetint.t
+  | Lphantom_const_symbol of string
+  | Lphantom_var of Backend_var.t
+  | Lphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Lphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Lphantom_read_symbol_field of
+      { sym : string;
+        field : int
+      }
+  | Lphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+
+let lphantom_const_int i = Lphantom_const_int i
+
+let lphantom_const_symbol s = Lphantom_const_symbol s
+
+let lphantom_var v = Lphantom_var v
+
+let lphantom_offset_var ~var ~offset_in_words =
+  Lphantom_offset_var { var; offset_in_words }
+
+let lphantom_read_field ~var ~field = Lphantom_read_field { var; field }
+
+let lphantom_read_symbol_field ~sym ~field =
+  Lphantom_read_symbol_field { sym; field }
+
+let lphantom_block ~tag ~fields = Lphantom_block { tag; fields }
+
 (* N.B. [Branch_relaxation] relies on physical equality being precise on values
    of this type. *)
 type instruction =
@@ -32,7 +69,8 @@ type instruction =
     fdo : Fdo_info.t;
     live : Reg.Set.t;
     available_before : Reg_availability_set.t;
-    available_across : Reg_availability_set.t
+    available_across : Reg_availability_set.t;
+    phantom_available_before : Backend_var.Set.t option
   }
 
 and instruction_desc =
@@ -104,7 +142,10 @@ type fundecl =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_frame_required : bool;
     fun_prologue_required : bool;
-    fun_section_name : string option
+    fun_section_name : string option;
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t
   }
 
 (* Invert a test *)
@@ -120,12 +161,14 @@ let rec end_instr =
     fdo = Fdo_info.none;
     live = Reg.Set.empty;
     available_before = Unreachable;
-    available_across = Unreachable
+    available_across = Unreachable;
+    phantom_available_before = None
   }
 
 (* Cons an instruction (live, debug empty) *)
 
-let instr_cons d a r n ~available_before ~available_across =
+let instr_cons d a r n ~available_before ~available_across
+    ~phantom_available_before =
   { desc = d;
     next = n;
     arg = a;
@@ -134,7 +177,8 @@ let instr_cons d a r n ~available_before ~available_across =
     fdo = Fdo_info.none;
     live = Reg.Set.empty;
     available_before;
-    available_across
+    available_across;
+    phantom_available_before
   }
 
 let traps_to_bytes traps = Proc.trap_size_in_bytes () * traps
