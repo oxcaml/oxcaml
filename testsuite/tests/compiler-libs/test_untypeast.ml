@@ -152,8 +152,9 @@ run_structure {|
   end |};;
 
 [%%expect{|
-module State = struct type t = int
-                      external next : t -> t = "%identity" end
+module State =
+  struct type t = int
+         external next : t -> t @@ portable = "%identity" end
 - : unit = ()
 |}];;
 
@@ -163,6 +164,6 @@ run_structure {|
   end |};;
 
 [%%expect{|
-module type S  = sig val x : int -> int end
+module type S  = sig val x : int -> int @@ portable end
 - : unit = ()
 |}]
