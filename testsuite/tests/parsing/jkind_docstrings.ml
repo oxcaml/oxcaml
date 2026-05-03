@@ -14,7 +14,7 @@ end;;
 
 [%%expect {|
 
-module type S1  = sig kind_ k end;;
+module type S1  = sig kind_ k[@@ocaml.doc " Doc for k "] end;;
 module type S1 = sig kind_ k end
 |}]
 
@@ -26,7 +26,7 @@ end;;
 
 [%%expect {|
 
-module type S2  = sig kind_ k = value end;;
+module type S2  = sig kind_ k = value[@@ocaml.doc " Doc for k "] end;;
 module type S2 = sig kind_ k = value end
 |}]
 
@@ -38,7 +38,7 @@ end;;
 
 [%%expect {|
 
-module type S3  = sig kind_ k end;;
+module type S3  = sig kind_ k[@@ocaml.doc " Doc for k "] end;;
 module type S3 = sig kind_ k end
 |}]
 
@@ -50,7 +50,7 @@ end;;
 
 [%%expect {|
 
-module type S4  = sig kind_ k = value end;;
+module type S4  = sig kind_ k = value[@@ocaml.doc " Doc for k "] end;;
 module type S4 = sig kind_ k = value end
 |}]
 
@@ -63,7 +63,8 @@ end;;
 
 [%%expect {|
 
-module type S5  = sig kind_ k[@@deprecated "use k' instead"] end;;
+module type S5  =
+  sig kind_ k[@@ocaml.doc " Doc for k "][@@deprecated "use k' instead"] end;;
 module type S5 = sig kind_ k end
 |}]
 
@@ -75,6 +76,9 @@ end;;
 
 [%%expect {|
 
-module type S6  = sig kind_ k = value[@@deprecated "use k' instead"] end;;
+module type S6  =
+  sig
+    kind_ k = value[@@ocaml.doc " Doc for k "][@@deprecated "use k' instead"]
+  end;;
 module type S6 = sig kind_ k = value end
 |}]
