@@ -4277,6 +4277,20 @@ let emit_block symb white_header cont =
    this list to normalize surviving units' block headers at end of major cycle.
    [Code_block]s are NOT included — they're tracked separately via the
    [_code_block] suffix and registered in the unit's [code_blocks] list. *)
+(* REVIEW(claude): two pieces of file-global mutable state for what is
+   conceptually per-CU compilation context:
+     - [unloadable_data_block_symbols]: per-CU accumulator of tracked
+       static blocks
+     - [suppress_unloadable_data_block_tracking]: a stack of one,
+       implemented via save/restore at each Code_block emission site
+   This means concurrent compilation of multiple CUs in one process
+   would corrupt each other's tracking lists, and there's no enforcement
+   that the accumulator is reset between CUs (relying on
+   [flush_unloadable_data_block_symbols] being called from to_cmm.ml
+   exactly once per unit). [Clflags.unit_is_unloadable] is similarly
+   global. None of this is broken today (compilations are serialised),
+   but the contract should be either (a) made explicit (a CU-id
+   assertion) or (b) threaded as an explicit context value. *)
 let unloadable_data_block_symbols : Cmm.symbol list ref = ref []
 
 let suppress_unloadable_data_block_tracking = ref false

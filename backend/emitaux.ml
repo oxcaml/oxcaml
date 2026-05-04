@@ -248,6 +248,16 @@ let emit_frames a =
             && Config.max_young_wosize <= 256);
           emit_u8 (alloc_words - 2))
         dbg;
+      (* REVIEW(claude): bug: should be [flags land 3 = 3], not [flags = 3].
+         When [Dbg_alloc] has debug info AND any of bits 2 (UNLOADABLE) or
+         bit 3 (HAS_CODE_PTR_SLOTS) is set, [flags] is in {7,11,15} and this
+         check fails — so the per-alloc debuginfo labels are NOT emitted.
+         But the runtime parser ([next_frame_descr] in
+         frame_descriptors.c) still tries to read 4*num_allocs bytes here
+         because both [frame_has_allocs] and [frame_has_debug] are true. The
+         result is a frame-descriptor parse drift that misreads either the
+         code_ptr_live_ofs section or the next descriptor. Triggered for any
+         unloadable function with [Dbg_alloc] under [-g]. *)
       if flags = 3
       then (
         a.efa_align 4;

@@ -206,6 +206,14 @@ let entry_points ~phrase_name symbols =
 
     Returns [None] if the unit has no [_code_block] symbols (nothing to
     register). *)
+(* REVIEW(claude): suffix-based detection is fragile. Any user function
+   whose name happens to end in [_code_block] would be misclassified as a
+   Code_block descriptor (and worse: the entry-name lookup [Symbols.find]
+   would happen to return [Some] when the prefix exists). Consider having
+   to_cmm emit a sentinel symbol listing the unit's [Code_block]s
+   explicitly (mirroring the [unloadable_data_blocks] table) so that the
+   loader does no name-pattern matching. The same comment applies to the
+   [__unloadable_data_blocks] suffix walk later in [jit_load]. *)
 let unloadable_metadata local_symbols =
   let suffix = "_code_block" in
   let suffix_len = String.length suffix in
@@ -229,6 +237,12 @@ let unloadable_metadata local_symbols =
   | _ ->
       let code_blocks = Array.of_list (List.rev code_blocks_rev) in
       let entries = Array.of_list (List.rev entries_rev) in
+      (* REVIEW(claude): after this sort, [entries] is no longer
+         index-aligned with [code_blocks]. The C side does not rely on
+         the alignment (code_blocks is an opaque list of mark targets;
+         entries is only used to derive sorted text ranges), but the
+         asymmetry is non-obvious. Rename to [entries_sorted] / document
+         that the index correspondence is intentionally dropped. *)
       Array.sort Nativeint.compare entries;
       Some (code_blocks, entries)
 
@@ -328,6 +342,13 @@ let jit_load (type a r)
            populate the unit's [data_blocks] field. We pass [0n] only when
            no such symbol exists (which only happens for non-unloadable
            units; see the [unloadable_metadata] gate above). *)
+        (* REVIEW(claude): the comment above [unloadable_metadata]
+           applies here too — suffix matching is fragile. More
+           importantly, this fold runs on every unloadable JIT load and
+           costs O(N) in the symbol map; combined with the
+           [unloadable_metadata] fold that's three full passes over the
+           symbol table per load. If load latency matters, consider a
+           single fold producing both pieces. *)
         let data_blocks_table_addr =
           (* Match symbols whose name ends in
              [_<unloadable_data_blocks_symbol_basename>]. The exact prefix
@@ -361,6 +382,18 @@ let jit_load (type a r)
                 "More than one distinct unloadable_data_blocks symbol address \
                  found in JIT unit (expected at most one)"
         in
+        (* REVIEW(claude): there is a window between
+           [Externals.register_unloadable_unit] (which inserts our text
+           range into the code-fragment table and frametable list) and
+           [jit_run] (which calls [caml_callback] on the entry, the
+           first time mutator code in this unit runs). If a major GC on
+           another domain begins marking in this window, [F.2] could
+           visit a stale return address (from before our registration)
+           that lies in our newly-registered text range, and we'd treat
+           it as an entry into our unit. Mitigated in practice because
+           callbacks are synchronous and OCaml domains poll, but worth
+           explicitly arguing why this is safe (perhaps via the
+           born-marked normalisation, but I can't see the chain). *)
         Externals.register_unloadable_unit code_blocks data_blocks_table_addr
           function_entries code_end_addr frametable_addr gc_roots_addr
           (Address.to_nativeint buffer_base)

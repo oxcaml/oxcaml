@@ -482,6 +482,12 @@ Caml_inline void* Ptr_val(value val)
 #define Start_env_closinfo(info) (((uintnat)(info) << 10) >> 11)
 #define Is_last_closinfo(info) (((uintnat)(info) << 8) >> 63)
 #define Unloadable_closinfo(info) (((uintnat)(info) << 9) >> 63)
+/* REVIEW(claude): [Make_closinfo] is now subtly wrong: it does not zero
+   bit 54 explicitly, so a [delta] whose top bit (bit 53) is set would
+   alias into the new [is_unloadable] bit. In practice deltas are tiny
+   (closure prefix word counts) so this is fine, but the macro encodes
+   "non-unloadable" only by accident. Either delete this variant in
+   favour of always passing [is_unloadable], or explicitly mask. */
 #define Make_closinfo(arity,delta,is_last) \
   (((uintnat)(arity) << 56) + ((uintnat)(is_last) << 55) \
     + ((uintnat)(delta) << 1) + 1)

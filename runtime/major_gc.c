@@ -1151,6 +1151,15 @@ again:
         me.start += env_offset;
         /* F.1: see [mark_stack_push_block] for the same injection. */
 #ifdef NATIVE_CODE
+        /* REVIEW(claude): this fires for EVERY closure, not just
+           closures that contain unloadable function slots. Most closures
+           are non-unloadable, so the inner loop reads a closinfo, checks
+           the bit, and bails — but the call still happens on the hot
+           mark path. Consider gating this on a cheap predicate like
+           "any registered unloadable units exist" (via a boolean read
+           against a global non-zero counter), or on the closure's own
+           closinfo bit when set, since within a single closure all slots
+           share the same unit. */
         caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
 #endif
       }

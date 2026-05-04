@@ -52,6 +52,16 @@ static int units_mutex_initialized = 0;
 static uintnat units_registered_total = 0;
 static uintnat units_unloaded_total = 0;
 
+/* REVIEW(claude): not thread-safe. Two domains calling this concurrently
+   can both observe [!units_mutex_initialized] and both run
+   [caml_plat_mutex_init], leaking the first init and producing a
+   double-initialised mutex with undefined behaviour on its first user. The
+   mutex itself is supposed to serialise access here but it can't because
+   it's the thing being initialised. Use a one-shot init at runtime startup
+   (e.g. add to [caml_runtime_startup] / call from a DOMAIN_HOOK), or use
+   pthread_once / ATOMIC_INIT_ONCE. The current callers happen to be
+   single-threaded in [Eval.eval] but the public [caml_register_unloadable_
+   unit] makes no such restriction. */
 static void ensure_mutex_initialized(void) {
   /* Lazy initialization: the runtime may register a unit before any
    * explicit [caml_init_unloadable] hook runs. The first registration
@@ -111,13 +121,47 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
     caml_register_frametables(&tbl, 1);
   }
 
-  /* Register the unit's gc_roots so the major GC's global-root scan walks
+  /* REVIEW(claude): the comment here is misleading — and the entire
+     interaction between the unloadable design and gc_roots deserves a
+     dedicated section in the design doc. [scan_native_globals] iterates
+     each glob_block and applies [f] to its FIELDS only (not to the
+     glob_block itself). So gc_roots is NOT what marks the unit's static
+     data blocks; heap-side Symbol references via [caml_darken] are. The
+     gc_roots scan only preserves heap values STORED IN those static
+     blocks (e.g. a ref cell with a heap pointer).
+
+     If a unit ever has a non-empty gc_roots whose entries are themselves
+     reachable via non-fully-static computation (see
+     [to_cmm_static.ml:static_consts]'s [Bound_static.gc_roots] usage),
+     each element of [u->gc_roots] is a value pointer to a static block.
+     The current scan walks the BLOCK's fields, so the static block
+     itself is not darkened — good, we want unloadability. But this is
+     extremely subtle and depends on the structure of [scan_native_
+     globals]; a future cleanup that "fixes" the scan to darken
+     glob_block itself would silently make every unloadable unit
+     immortal. Worth an explicit invariant in the design doc and ideally
+     a runtime assertion. */
+   /* Register the unit's gc_roots so the major GC's global-root scan walks
    * the unit's static blocks. The runtime would otherwise leave them
    * unmarked (they are emitted with white headers per B.1). */
   if (u->gc_roots != NULL) {
     caml_register_dyn_globals(&u->gc_roots, 1);
   }
 
+  /* REVIEW(claude): registration order is:
+       1. patch headers (born-marked normalisation)
+       2. register code fragments
+       3. register frametable
+       4. register dyn_globals
+       5. link into units_head (here)
+     Steps 2-4 add the unit to *globally visible* tables before step 5 puts
+     it on our own list. Between those steps, a major-GC cycle starting on
+     another domain would scan via gc_roots and via the frametable, but
+     would not see the unit on the list. That's actually what we want
+     during born-marked, but it does mean an unloaded check-and-unload
+     pass that interleaved between steps 2 and 5 would not find this
+     unit. Worth a comment block explaining the invariant; today it's
+     implicit. */
   caml_plat_lock_blocking(&units_mutex);
   u->next = units_head;
   units_head = u;
@@ -278,6 +322,10 @@ uintnat caml_unloadable_units_unloaded_total(void) {
   return r;
 }
 
+/* REVIEW(claude): this function is exposed and dead. The header documents
+   it for F.2 / F.3 but those paths use [caml_find_code_fragment_by_pc]
+   instead — and grep finds no callers. Drop it, or wire it up where it was
+   meant to be used. */
 struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc) {
   ensure_mutex_initialized();
   caml_plat_lock_blocking(&units_mutex);
