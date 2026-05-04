@@ -182,9 +182,11 @@ module type Graph_builder = sig
       | Return of { args : Instruction.t array }
       | Raise of
           { raise_kind : Lambda.raise_kind;
-            args : Instruction.t array;
-            handler : Block.t option
+            args : Instruction.t array
           }
+          (** Raise to the topmost handler in the enclosing block's
+              [block_end_trap_stack]; if that stack is empty, the exception
+              escapes the function. *)
       | Tailcall_self of
           { destination : Block.t;
             args : Instruction.t array
@@ -197,16 +199,20 @@ module type Graph_builder = sig
           { op : call_op;
             args : Instruction.t array;
             continuation : Block.t;
-            exn_continuation : Block.t option
+            may_raise : bool;
+                (** If [true], an exception escaping the call branches to the
+                    topmost handler in the enclosing block's
+                    [block_end_trap_stack]. *)
+            nontail : bool
+                (** If [true], this call must not be tail-call optimized even if
+                    its continuation is a trivial [Return]. Set for [Cmm]
+                    [Capply]s with [Rc_nontail] (e.g. [[@nontail]]). *)
           }
       | Invalid of
           { message : string;
             args : Instruction.t array;
             continuation : Block.t option
           }
-
-    (** The successor blocks reachable from this terminator's outgoing edges. *)
-    val successors : t -> Block.t list
   end
 
   type unfinished_block
@@ -280,11 +286,19 @@ module type Finished_graph = sig
             (** Cached CFG label. Set by [Cfg_of_ssa.convert] so a second
                 conversion pass can reuse it, and updated after [Cfg_compare] to
                 align labels with the old pipeline. *)
-        mutable param_usage_counts : usage_count array
+        mutable param_usage_counts : usage_count array;
             (** Per-parameter usage counts, symmetric with [Op]'s [usage_count].
                 A param with count 0 is "dead": no arg passed via an
                 unconditional jump ([Goto]/[Raise]/[Tailcall_self]) to this
                 param need be kept alive. *)
+        mutable block_end_trap_stack : t list
+            (** Trap stack at the end of the block (after applying the body's
+                [Push_trap]/[Pop_trap] effects to the stack inherited from
+                predecessors), innermost handler first. Computed by
+                {!Ssa.finish} and used to resolve exception successors of the
+                terminator: a [Call] with [may_raise = true] (or any [Raise])
+                branches to [List.hd block_end_trap_stack] when the stack is
+                non-empty. *)
       }
 
     val equal : t -> t -> bool
@@ -373,8 +387,7 @@ module type Finished_graph = sig
       | Return of { args : Instruction.t array }
       | Raise of
           { raise_kind : Lambda.raise_kind;
-            args : Instruction.t array;
-            handler : Block.t option
+            args : Instruction.t array
           }
       | Tailcall_self of
           { destination : Block.t;
@@ -388,16 +401,14 @@ module type Finished_graph = sig
           { op : call_op;
             args : Instruction.t array;
             continuation : Block.t;
-            exn_continuation : Block.t option
+            may_raise : bool;
+            nontail : bool
           }
       | Invalid of
           { message : string;
             args : Instruction.t array;
             continuation : Block.t option
           }
-
-    (** The successor blocks reachable from this terminator's outgoing edges. *)
-    val successors : t -> Block.t list
   end
 
   val function_info : function_info

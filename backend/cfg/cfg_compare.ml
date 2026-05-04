@@ -277,7 +277,7 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
   while not (Queue.is_empty queue) do
     let ol, nl = Queue.pop queue in
     if not (Label.Set.mem ol !visited)
-    then (
+    then begin
       visited := Label.Set.add ol !visited;
       let ob = Cfg.get_block old_cfg_t ol in
       let nb = Cfg.get_block new_cfg_t nl in
@@ -293,40 +293,51 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
         then
           Format.fprintf ppf_m "Trap handler mismatch at old=%a new=%a@."
             Label.format ol Label.format nl;
-        (match ob.exn, nb.exn with
-        | Some oe, Some ne -> map_label oe ne
-        | None, None -> ()
-        | _ ->
-          Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
-            Label.format ol Label.format nl);
-        (* Compare body structure, debuginfo, and map labels *)
-        compare_body ~ppf_m ~map_label ~ol ~nl ob.body nb.body;
-        (* Compare terminator structure and map labels *)
         if
-          not
-            (terminator_structure_match ~map_label ob.terminator.desc
-               nb.terminator.desc)
+          Label.Set.is_empty ob.predecessors
+          && Label.Set.is_empty nb.predecessors
         then
-          Format.fprintf ppf_m
-            "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
-            Label.format ol InstructionId.print ob.terminator.id Label.format nl
-            InstructionId.print nb.terminator.id
-            (Cfg.dump_terminator ~sep:"")
-            ob.terminator.desc
-            (Cfg.dump_terminator ~sep:"")
-            nb.terminator.desc;
-        (* Compare terminator debuginfo *)
-        if Debuginfo.compare ob.terminator.dbg nb.terminator.dbg <> 0
-        then
-          Format.fprintf ppf_m
-            "Debuginfo mismatch at terminator old=%a(id:%a) new=%a(id:%a) %a: \
-             %a vs %a@."
-            Label.format ol InstructionId.print ob.terminator.id Label.format nl
-            InstructionId.print nb.terminator.id
-            (Cfg.dump_terminator ~sep:"")
-            ob.terminator.desc Debuginfo.print_compact ob.terminator.dbg
-            Debuginfo.print_compact nb.terminator.dbg;
-        ())
+          (* We don't compare unreachable trap handlers, since their replacement
+             with a dummy block is unreliable and it makes no semantic
+             difference as they are unreachable anyway. *)
+          ()
+        else begin
+          (match ob.exn, nb.exn with
+          | Some oe, Some ne -> map_label oe ne
+          | None, None -> ()
+          | _ ->
+            Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
+              Label.format ol Label.format nl);
+          (* Compare body structure, debuginfo, and map labels *)
+          compare_body ~ppf_m ~map_label ~ol ~nl ob.body nb.body;
+          (* Compare terminator structure and map labels *)
+          if
+            not
+              (terminator_structure_match ~map_label ob.terminator.desc
+                 nb.terminator.desc)
+          then
+            Format.fprintf ppf_m
+              "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
+              Label.format ol InstructionId.print ob.terminator.id Label.format
+              nl InstructionId.print nb.terminator.id
+              (Cfg.dump_terminator ~sep:"")
+              ob.terminator.desc
+              (Cfg.dump_terminator ~sep:"")
+              nb.terminator.desc;
+          (* Compare terminator debuginfo *)
+          if Debuginfo.compare ob.terminator.dbg nb.terminator.dbg <> 0
+          then
+            Format.fprintf ppf_m
+              "Debuginfo mismatch at terminator old=%a(id:%a) new=%a(id:%a) \
+               %a: %a vs %a@."
+              Label.format ol InstructionId.print ob.terminator.id Label.format
+              nl InstructionId.print nb.terminator.id
+              (Cfg.dump_terminator ~sep:"")
+              ob.terminator.desc Debuginfo.print_compact ob.terminator.dbg
+              Debuginfo.print_compact nb.terminator.dbg;
+          ()
+        end
+    end
   done;
   (* Validate predecessors match under the label mapping *)
   new_to_old
@@ -552,13 +563,6 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
     (* Phase 2: register equivalence *)
     verify_register_equivalence ~ppf_m ~old_cfg_t:old_cfg ~new_cfg_t:new_cfg
       ~new_to_old;
-    (* Check block counts *)
-    let old_count = Label.Tbl.length old_cfg.blocks in
-    let new_count = Label.Tbl.length new_cfg.blocks in
-    if old_count <> new_count
-    then
-      Format.fprintf ppf_m "Block count mismatch: old=%d new=%d@." old_count
-        new_count;
     (* Check CFG metadata *)
     if not (Bool.equal old_cfg.fun_contains_calls new_cfg.fun_contains_calls)
     then

@@ -220,10 +220,17 @@ module Make (S : Ssa.Finished_graph) = struct
       main
 
   let is_exception_predecessor (pred : S.Block.t) (target : S.Block.t) =
-    match[@warning "-fragile-match"] pred.terminator with
-    | Raise { handler = Some h; _ } -> S.Block.equal h target
-    | Call { exn_continuation = Some h; _ } -> S.Block.equal h target
-    | _ -> false
+    let may_raise =
+      match[@warning "-fragile-match"] pred.terminator with
+      | Raise _ -> true
+      | Call { may_raise; _ } -> may_raise
+      | _ -> false
+    in
+    may_raise
+    &&
+    match pred.block_end_trap_stack with
+    | h :: _ -> S.Block.equal h target
+    | [] -> false
 
   let is_call_predecessor (pred : S.Block.t) (target : S.Block.t) =
     (* [Probe] uses the [Call] constructor but has no return value to receive in
@@ -392,17 +399,17 @@ module Make (S : Ssa.Finished_graph) = struct
         let loc_res = Proc.loc_results_return (Reg.typv arg) in
         emit_moves body ~src:arg ~dst:loc_res;
         make_cfg_instr Cfg.Return loc_res [||] dbg, false
-      | Raise { raise_kind; args; handler } ->
+      | Raise { raise_kind; args } ->
         let exn_val = Array.map (get_reg env) args in
         let exn_bucket = [| Proc.loc_exn_bucket |] in
         let extra_dst =
-          match handler with
-          | Some hb ->
+          match block.block_end_trap_stack with
+          | hb :: _ ->
             let handler_regs = get_block_params_regs env hb in
             if Array.length handler_regs > 1
             then Array.sub handler_regs 1 (Array.length handler_regs - 1)
             else [||]
-          | None -> [||]
+          | [] -> [||]
         in
         let dst = Array.append exn_bucket extra_dst in
         let src =
@@ -439,7 +446,7 @@ module Make (S : Ssa.Finished_graph) = struct
           | Direct _ -> loc_arg
         in
         make_cfg_instr (Cfg.Tailcall_func call_op) call_arg [||] dbg, false
-      | Call { op; args; continuation; exn_continuation = _ } -> (
+      | Call { op; args; continuation; may_raise = _ } -> (
         let virt_args = Array.map (get_reg env) args in
         let virt_res = get_block_params_regs env continuation in
         match op with
@@ -558,7 +565,22 @@ module Make (S : Ssa.Finished_graph) = struct
           true )
     in
     let is_trap_handler = S.Block.Tbl.mem env.trap_handlers block in
-    let exn = None in
+    let raises =
+      can_raise
+      &&
+      match[@warning "-fragile-match"] block.terminator with
+      | Raise _ -> true
+      | Call { may_raise; _ } -> may_raise
+      | _ -> false
+    in
+    let exn =
+      if raises
+      then
+        match block.block_end_trap_stack with
+        | h :: _ -> Some (label_of env h)
+        | [] -> None
+      else None
+    in
     { Cfg.start = label_of env block;
       body;
       terminator;

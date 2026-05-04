@@ -702,6 +702,7 @@
   ssa_validate
   ssa_reducer
   ssa_simplify
+  ssa_tail_call
   ssa_of_cmm
   cfg_of_ssa
   ;; backend/debug/

@@ -143,6 +143,14 @@ val combine : (module Reducer) list -> (module Reducer)
 
 (** Run the given reducer over the input graph, producing a new
     [Finished_graph]. Each call instantiates a fresh reducer, so module level
-    state is not shared between runs. *)
+    state is not shared between runs.
+
+    [keep_unused_ops] (default [false]) disables structural pruning: dead [Op]s
+    and dropped block params are preserved in the output. Use it when the output
+    must remain faithful to the input shape (e.g. before [Cfg_compare], which
+    expects the baseline's instructions and params verbatim). *)
 val run :
-  (module Reducer) -> (module Ssa.Finished_graph) -> (module Ssa.Finished_graph)
+  ?keep_unused_ops:bool ->
+  (module Reducer) ->
+  (module Ssa.Finished_graph) ->
+  (module Ssa.Finished_graph)

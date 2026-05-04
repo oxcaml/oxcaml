@@ -80,29 +80,26 @@ module Make (S : Ssa.Finished_graph) = struct
         print_args args
     | Tailcall_func { args; _ } ->
       Format.fprintf ppf "tailcall_func(%a)" print_args args
-    | Call { op = Func (Direct sym); args; continuation; exn_continuation } -> (
+    | Call { op = Func (Direct sym); args; continuation; may_raise; nontail } ->
       Format.fprintf ppf "call %s(%a) -> %a" sym.sym_name print_args args
         print_block_id continuation;
-      match exn_continuation with
-      | Some l -> Format.fprintf ppf " exn %a" print_block_id l
-      | None -> ())
-    | Call { op = Func (Indirect _); args; continuation; exn_continuation } -> (
+      if may_raise then Format.fprintf ppf " may_raise";
+      if nontail then Format.fprintf ppf " nontail"
+    | Call { op = Func (Indirect _); args; continuation; may_raise; nontail } ->
       Format.fprintf ppf "call_indirect(%a) -> %a" print_args args
         print_block_id continuation;
-      match exn_continuation with
-      | Some l -> Format.fprintf ppf " exn %a" print_block_id l
-      | None -> ())
+      if may_raise then Format.fprintf ppf " may_raise";
+      if nontail then Format.fprintf ppf " nontail"
     | Call
         { op = Prim (External { func_symbol; _ });
           args;
           continuation;
-          exn_continuation
-        } -> (
+          may_raise;
+          nontail = _
+        } ->
       Format.fprintf ppf "prim %s(%a) -> %a" func_symbol print_args args
         print_block_id continuation;
-      match exn_continuation with
-      | Some l -> Format.fprintf ppf " exn %a" print_block_id l
-      | None -> ())
+      if may_raise then Format.fprintf ppf " may_raise"
     | Call { op = Prim (Probe { name; _ }); args; continuation; _ } ->
       Format.fprintf ppf "probe %s(%a) -> %a" name print_args args
         print_block_id continuation
