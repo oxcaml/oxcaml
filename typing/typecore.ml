@@ -311,7 +311,6 @@ type error =
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Wrong_arg_zero_alloc of Zero_alloc.error
   | Unsupported_arg_zero_alloc
-  | Must_provide_zero_alloc_arity
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
   | Zero_alloc_arity_mismatch of int * int
@@ -6043,9 +6042,9 @@ let split_function_ty
   begin match get_desc ty_arg with
   | Tpoly (_, _, Some check_poly) ->
     begin
-      match has_poly with
-      | Mono | Poly None -> ()
-      | Poly (Some check_attr) ->
+      match zero_alloc with
+      | None -> ()
+      | Some check_attr ->
         let check1 =
           Zero_alloc.create_const (Zero_alloc.Check check_attr)
         in
@@ -7072,7 +7071,7 @@ and type_expect_
           ~in_signature:false
           ~on_application:true
           ~on_function_argument:false
-          ~default_arity:(List.length args)
+          ~default_arity:(Some (List.length args))
           sfunct.pexp_attributes
         |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
@@ -8869,20 +8868,21 @@ and type_function
             get_pat_attrs inner
           | _ -> p.ppat_attributes
         in
-        Builtin_attributes.get_zero_alloc_attribute
-          ~in_signature:false
-          ~on_application:false
-          ~on_function_argument:true
-          ~default_arity:0
-          (get_pat_attrs pat)
+        (try
+          Builtin_attributes.get_zero_alloc_attribute
+            ~in_signature:false
+            ~on_application:false
+            ~on_function_argument:true
+            ~default_arity:None
+            (get_pat_attrs pat)
+        with Builtin_attributes.Error_builtin (_, err) ->
+          raise (Builtin_attributes.Error_builtin (pparam_loc, err)))
       in
       let zero_alloc =
         match zero_alloc with
         | Default_zero_alloc | Ignore_assert_all -> None
         | Assume _ ->
           raise (Error (pparam_loc, env, Invalid_payload_arg_zero_alloc))
-        | Check { arity; _ } when arity = 0 ->
-          raise (Error (pparam_loc, env, Must_provide_zero_alloc_arity))
         | Check check -> Some check
       in
       let env,
@@ -10918,7 +10918,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     List.map
       (fun vb ->
          if vb_is_fun vb then
-           let default_arity = vb_fun_arity vb in
+           let default_arity = Some (vb_fun_arity vb) in
            add_parsed_zero_alloc_attribute ~default_arity vb
          else (vb, None))
       spat_sexp_list
@@ -11544,7 +11544,7 @@ and type_n_ary_function
         ~in_signature:false
         ~on_application:false
         ~on_function_argument:false
-        ~default_arity:syntactic_arity
+        ~default_arity:(Some syntactic_arity)
         attributes
     in
     let zero_alloc =
@@ -13129,9 +13129,6 @@ let report_error ~loc env =
          Only identifiers and anonymous functions may be passed as arguments@ \
          to functions with %a parameters.@]"
         Style.inline_code "zero_alloc"
-  | Must_provide_zero_alloc_arity ->
-      Location.errorf ~loc
-        "Zero-alloc annotations on function arguments must specify arity."
   | Invalid_payload_arg_zero_alloc ->
       Location.errorf ~loc
         "Invalid zero-alloc payload for a higher-order function argument."

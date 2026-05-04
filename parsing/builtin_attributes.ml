@@ -17,6 +17,11 @@ open Asttypes
 open Parsetree
 open Ast_helper
 
+type error =
+  | Must_provide_zero_alloc_arity
+  | Zero_alloc_attr_non_function
+
+exception Error_builtin of Location.t * error
 
 module Attribute_table = Hashtbl.Make (struct
   type t = string with_loc
@@ -1033,7 +1038,17 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
     in
     match get_optional_payload get_ids_and_constants_from_exp payload with
     | Error () -> warn (); Default_zero_alloc
-    | Ok None -> empty default_arity None
+    | Ok None ->
+      let default_arity = begin
+        match default_arity with
+        | None ->
+          if on_function_argument then
+            raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
+          else
+            raise (Error_builtin (loc, Zero_alloc_attr_non_function))
+        | Some arity -> arity
+      end in
+      empty default_arity None
     | Ok (Some payload) ->
       let custom_error_message, payload =
         match filter_custom_error_message payload with
@@ -1050,9 +1065,22 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
           else
             Some custom_error_message, payload
       in
+      if List.filter_map
+           (function (Ident, s) -> Some s | _ -> None) payload
+         = ["ignore"] then Ignore_assert_all
+      else
+      let default_arity () = begin
+        match default_arity with
+        | None ->
+          if on_function_argument then
+            raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
+          else
+            raise (Error_builtin (loc, Zero_alloc_attr_non_function))
+        | Some arity -> arity
+      end in
       let arity, payload =
         match filter_arity payload with
-        | None -> default_arity, payload
+        | None -> default_arity (), payload
         | Some (user_arity, payload) ->
           if in_signature || on_function_argument then
             user_arity, payload
@@ -1060,7 +1088,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
             (warn_payload loc txt
                "The \"arity\" field is only supported on \"zero_alloc\" in \
                 signatures or on function arguments";
-             default_arity, payload)
+             default_arity (), payload)
       in
       let _, payload = List.split payload in
       let parse p =
@@ -1189,3 +1217,23 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
   Ok { name; name_loc; enabled_at_init; arg }
 
 let has_atomic attrs = has_attribute "atomic" attrs
+
+let report_error ~loc =
+  function
+  | Must_provide_zero_alloc_arity ->
+      Location.errorf ~loc
+        "Zero-alloc annotations on function arguments must specify arity."
+  | Zero_alloc_attr_non_function ->
+      Location.errorf ~loc
+        "%a attributes on function arguments require the argument@ \
+         to be a function type."
+        Style.inline_code "zero_alloc"
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error_builtin (loc, err) ->
+        Some (report_error ~loc err)
+      | _ ->
+        None
+    )
