@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val type_declaration_ikind_gated :
+val type_declaration_type_ikind :
   env:Env.t option ->
   path:Path.t ->
   Types.type_ikind

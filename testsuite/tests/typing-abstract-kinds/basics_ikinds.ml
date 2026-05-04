@@ -1,5 +1,4 @@
 (* TEST
-   flags = "-ikinds";
    expect;
 *)
 
@@ -1386,8 +1385,8 @@ type t2 : k2
 type ('a : k1) require_k1
 |}]
 
-(* In the [-ikinds] variant this is accepted: [t1]'s kind is [k1], so the
-   with bound does not change the required kind. *)
+(* This is accepted because [t1]'s kind is [k1], so the with bound does not
+   change the required kind. *)
 type a : k1 with t1
 type b = a require_k1
 [%%expect{|

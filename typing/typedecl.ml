@@ -1637,10 +1637,10 @@ let narrow_to_manifest_jkind env loc path decl =
           Format.eprintf
             "[ikind-narrow] path=%a branch=ikind_sub_jkind_l@."
             (Format_doc.compat Path.print) path;
-        (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
-           [try_allow_r] returns [None] and we route through Ikind. We also
-           fall back here when [decl.type_jkind] cannot allow-right
-           (e.g. due to with-bounds/Best). *)
+        (* Ikinds keep [decl.type_jkind] in left/Best form, so [try_allow_r]
+           returns [None] and we route through Ikind. We also fall back here
+           when [decl.type_jkind] cannot allow-right (e.g. due to
+           with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
@@ -1666,8 +1666,8 @@ let narrow_to_manifest_jkind env loc path decl =
           Format.eprintf
             "[ikind-narrow] path=%a branch=constrain_type_jkind@."
             (Format_doc.compat Path.print) path;
-        (* Legacy path: refine via [constrain_type_jkind] when ikinds disabled
-           and we can allow-right. *)
+        (* Legacy path: refine via [constrain_type_jkind] when we can
+           allow-right. *)
         (match Ctype.constrain_type_jkind env ty type_jkind with
          | Ok () -> ()
          | Error v ->
@@ -1678,7 +1678,7 @@ let narrow_to_manifest_jkind env loc path decl =
              raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     end;
     let type_ikind =
-      Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
+      Ikind.type_declaration_type_ikind ~env:(Some env) ~path
     in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
@@ -3129,7 +3129,7 @@ let normalize_decl_jkinds env decls =
       { decl with
         type_jkind = normalized_jkind;
         type_ikind =
-          Ikind.type_declaration_ikind_gated ~env:(Some env) ~path;
+          Ikind.type_declaration_type_ikind ~env:(Some env) ~path;
         type_unboxed_version
       }
     in

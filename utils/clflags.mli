@@ -260,8 +260,6 @@ val supports_optimized_probes : bool
 
 val llvm_backend : bool ref
 
-(* Dedicated flag to enable the ikinds kind checker. *)
-val ikinds : bool ref
 val ikinds_debug : bool ref
 
 val all_passes : string list ref

@@ -16,8 +16,6 @@
    These are intended to be easy to flip while iterating on
    performance or correctness. *)
 (* CR jujacobs: remove toggles in the final version. *)
-let () = Clflags.ikinds := true
-
 let enable_crossing = true
 
 let enable_sub_jkind_l = true
@@ -529,12 +527,6 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
 let pp_coeffs (coeffs : Ldd.node array) : string =
   coeffs |> Array.map Ldd.pp |> Array.to_list |> String.concat "; "
 
-let with_ikinds_enabled (f : unit -> Types.constructor_ikind) :
-    Types.type_ikind =
-  if not !Clflags.ikinds
-  then Types.ikinds_todo "ikinds disabled"
-  else Types.Constructor_ikind (f ())
-
 let origin_suffix_of = function None -> "" | Some o -> " origin=" ^ o
 
 let pp_axes (axes : Jkind_axis.Axis.packed list) : string =
@@ -878,15 +870,13 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
         *)
         )
     in
-    (* Prefer a stored constructor ikind if one is present and enabled. *)
+    (* Prefer a stored constructor ikind if one is present. *)
     let ikind =
       match type_decl.type_ikind with
-      | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
+      | Types.Constructor_ikind { base; coeffs } ->
         Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
-        fallback ()
-      | Types.Constructor_ikind _ ->
         fallback ()
     in
     (if !Clflags.ikinds_debug
@@ -922,7 +912,7 @@ let type_declaration_ikind ~(env : Env.t option)
   let base, coeffs = Solver.constr_kind_poly ctx path in
   constructor_ikind ~base ~coeffs
 
-let type_declaration_ikind_gated ~(env : Env.t option)
+let type_declaration_type_ikind ~(env : Env.t option)
     ~(path : Path.t) : Types.type_ikind =
   (* This function gets called separately for each
     type definition of a mutually recursive group. This is
@@ -931,43 +921,41 @@ let type_declaration_ikind_gated ~(env : Env.t option)
     ikind for all of them at once. Alternatively, keep the cache
     between calls to this function from the same mutually recursive
     group. *)
-  with_ikinds_enabled (fun () ->
-    let ikind = type_declaration_ikind ~env ~path in
-    (if !Clflags.ikinds_debug
-    then
-      let stored_jkind =
-        match env with
-        | None -> "?"
-        | Some env -> (
-          match Env.find_type path env with
-          | exception Not_found -> "?"
-          | _decl -> "<stored-jkind>")
-      in
-      Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
-        (Format_doc.compat Path.print) path stored_jkind
-        (Ldd.pp ikind.base)
-        (pp_coeffs ikind.coeffs));
-    ikind)
+  let ikind = type_declaration_ikind ~env ~path in
+  (if !Clflags.ikinds_debug
+  then
+    let stored_jkind =
+      match env with
+      | None -> "?"
+      | Some env -> (
+        match Env.find_type path env with
+        | exception Not_found -> "?"
+        | _decl -> "<stored-jkind>")
+    in
+    Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
+      (Format_doc.compat Path.print) path stored_jkind
+      (Ldd.pp ikind.base)
+      (pp_coeffs ikind.coeffs));
+  Types.Constructor_ikind ikind
 
 let type_declaration_ikind_of_jkind ~(env : Env.t option)
     ~(params : Types.type_expr list) (type_jkind : Types.jkind_l) :
     Types.type_ikind =
-  with_ikinds_enabled (fun () ->
-    let poly = normalize ~env type_jkind in
-    let rigid_vars =
-      List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
-    in
-    let base, coeffs =
-      Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
-    in
-    let coeffs = Array.of_list coeffs in
-    let payload = constructor_ikind ~base ~coeffs in
-    if !Clflags.ikinds_debug
-    then
-      Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
-        (Ldd.pp payload.base)
-        (pp_coeffs payload.coeffs);
-    payload)
+  let poly = normalize ~env type_jkind in
+  let rigid_vars =
+    List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+  in
+  let base, coeffs =
+    Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
+  in
+  let coeffs = Array.of_list coeffs in
+  let payload = constructor_ikind ~base ~coeffs in
+  if !Clflags.ikinds_debug
+  then
+    Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
+      (Ldd.pp payload.base)
+      (pp_coeffs payload.coeffs);
+  Types.Constructor_ikind payload
 
 let predef_ikind_of_jkind ~params type_jkind =
   type_declaration_ikind_of_jkind ~env:None ~params type_jkind
@@ -1045,7 +1033,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  if not (enable_sub_jkind_l && !Clflags.ikinds)
+  if not enable_sub_jkind_l
   then
     Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env
       sub super
@@ -1114,7 +1102,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
 
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     env (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (enable_crossing && !Clflags.ikinds)
+  if not enable_crossing
   then Jkind.get_mode_crossing ~context env jkind
   else
     let with_bounds_is_empty :
@@ -1298,7 +1286,7 @@ let sub_or_intersect ?origin
         in
         Jkind.May_have_intersection reasons
   in
-  if not (enable_sub_or_intersect && !Clflags.ikinds)
+  if not enable_sub_or_intersect
   then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
   else if fast_sub ~context env t1 t2
   then (
@@ -1317,7 +1305,7 @@ let sub_or_error ?origin:_origin
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
-  if not (enable_sub_or_error && !Clflags.ikinds)
+  if not enable_sub_or_error
   then Jkind.sub_or_error ~type_equal ~context env t1 t2
   else
     let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =

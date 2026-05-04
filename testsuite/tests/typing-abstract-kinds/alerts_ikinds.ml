@@ -1,5 +1,4 @@
 (* TEST
-   flags = "-ikinds";
 *)
 
 module Kind_with_alert = struct

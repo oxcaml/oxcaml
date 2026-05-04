@@ -1,5 +1,4 @@
 (* TEST
-   flags = "-ikinds";
    expect;
 *)
 
@@ -327,7 +326,7 @@ Error: The layout of type "t2" is value non_float
 |}]
 type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted, but still fails in principal mode.
-   ikinds regression vs non-ikinds.
+   ikinds regression.
    Internal ticket 6481. *)
 [%%expect{|
 Line 1, characters 0-78:
@@ -356,7 +355,7 @@ Error: The layout of type "t2" is value non_float
 |}]
 type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted, but still fails in principal mode.
-   ikinds regression vs non-ikinds.
+   ikinds regression.
    Internal ticket 6481. *)
 [%%expect{|
 Line 1, characters 0-96:
