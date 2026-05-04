@@ -840,12 +840,6 @@ end = struct
     let wrap = inject_force
 
     let global_module loc a1 =
-      (* CR metaprogramming jrickard: I'm pretty confident this is bugged:
-         it ignores parameterized libraries, and references the wrong file for
-         impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
-         this references Stdlib). *)
-      Env.require_global_for_quote
-        (Compilation_unit.Name.of_head_of_global_name a1);
       let a1 = Global_module.Name.to_string a1 in
       apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
 
@@ -2415,34 +2409,42 @@ let quote_arg_label loc = function
        Labelled, Nolabel and Optional"
       Location.print_loc (to_location loc)
 
-let rec module_for_path loc = function
-  | Path.Pident id ->
+let rec module_for_path env loc = function
+  | Path.Pident id as path ->
     (match Hashtbl.find_opt vars_env.env_mod id with
       | Some m -> Identifier.Module.var loc m (quote_loc loc)
       | None -> (
         match Ident.to_global id with
-        | Some global -> Identifier.Module.global_module loc global
+        | Some global ->
+          (* CR metaprogramming jrickard: I'm pretty confident this is bugged:
+            it ignores parameterized libraries, and references the wrong file for
+            impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
+            this references Stdlib).
+
+            jbachurski: Updated to use existing logic. *)
+          Env.add_required_global ~for_quote:true path env;
+          Identifier.Module.global_module loc global
         | None ->
           (* We must be in a [Toplevel_lock_for_directive] if we are quoting
              a non-global module. *)
           Ident.name id |> Identifier.Module.toplevel_module loc))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
-    Identifier.Module.dot loc (module_for_path loc p) s
+    Identifier.Module.dot loc (module_for_path env loc p) s
     |> Identifier.Module.wrap
   | _ -> raise Exit
 
-let module_type_for_path loc = function
+let module_type_for_path env loc = function
   | Path.Pident id ->
     Module_type.of_string loc (Ident.name id) |> Module_type.wrap
   | Path.Pdot (p, s) ->
     Module_type.ident loc
-      (Identifier.Module_type.dot loc (module_for_path loc p) s
+      (Identifier.Module_type.dot loc (module_for_path env loc p) s
       |> Identifier.Module_type.wrap)
     |> Module_type.wrap
   | _ -> raise Exit
 
-let type_for_path loc = function
+let type_for_path env loc = function
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_tys id with
       | Some t -> Identifier.Type.var loc t (quote_loc loc)
@@ -2483,32 +2485,31 @@ let type_for_path loc = function
         | _ -> raise Exit))
     |> Identifier.Type.wrap
   | Path.Pdot (p, s) ->
-    Identifier.Type.dot loc (module_for_path loc p) s |> Identifier.Type.wrap
+    Identifier.Type.dot loc (module_for_path env loc p) s |> Identifier.Type.wrap
   | _ -> raise Exit
 
-let type_constr_for_path loc path arity =
-  Type.constr loc (type_for_path loc path)
+let type_constr_for_path env loc path arity =
+  Type.constr loc (type_for_path env loc path)
     (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
   |> Type.wrap
 
-let value_for_path loc = function
+let value_for_path env loc = function
   | Path.Pdot (p, s) ->
-    Identifier.Value.dot loc (module_for_path loc p) s |> Identifier.Value.wrap
+    Identifier.Value.dot loc (module_for_path env loc p) s |> Identifier.Value.wrap
   | _ -> raise Exit
 
-let value_for_path_opt loc p =
-  match value_for_path loc p with res -> Some res | exception Exit -> None
+let value_for_path_opt env loc p =
+  match value_for_path env loc p with res -> Some res | exception Exit -> None
 
 let quote_value_ident_path loc env path ident_kind =
   (* CR metaprogramming jrickard: This probably doesn't work with parameterised
-     libraries etc. *)
+     libraries etc.
+
+     jbachurski: Updated to use existing logic. *)
   (match ident_kind with
   | Id_prim _ -> ()
-  | Id_value -> (
-    match Env.address_head (Env.find_value_address path env) with
-    | Env.AHunit cu -> Env.require_global_for_quote (Compilation_unit.name cu)
-    | _ | (exception Not_found) -> ()));
-  match value_for_path_opt loc path with
+  | Id_value -> Env.add_required_global ~for_quote:true path env);
+  match value_for_path_opt env loc path with
   | Some ident_val -> ident_val
   | None -> (
     match path with
@@ -2543,7 +2544,7 @@ let quote_record_field env loc lbl_desc =
   | Some (Path.Pident _) -> Field.of_string loc lbl_desc.lbl_name |> Field.wrap
   | Some (Path.Pdot (p, _)) ->
     Field.ident loc
-      (Identifier.Field.dot loc (module_for_path loc p) lbl_desc.lbl_name
+      (Identifier.Field.dot loc (module_for_path env loc p) lbl_desc.lbl_name
       |> Identifier.Field.wrap)
     |> Field.wrap
   | _ ->
@@ -2583,7 +2584,7 @@ let quote_constructor env loc constr =
            Identifier.Constructor.undefined_recursive_module
          | name -> raise (Non_builtin name))
        | Some (Path.Pdot (p, _)) ->
-         Identifier.Constructor.dot loc (module_for_path loc p) constr.cstr_name
+         Identifier.Constructor.dot loc (module_for_path env loc p) constr.cstr_name
        | _ ->
          fatal_errorf
            "Translquote [at %a]: unsupported constructor type detected."
@@ -2702,10 +2703,10 @@ let quote_modes loc modes =
   |> List.map (function { loc = _; txt = Parsetree.Mode m } -> m)
   |> Modes.of_string_list loc |> Modes.wrap
 
-let type_constraint_of_ambiguity loc ambiguity =
+let type_constraint_of_ambiguity env loc ambiguity =
   match ambiguity with
   | Unambiguous -> None
-  | Ambiguous { path; arity } -> Some (type_constr_for_path loc path arity)
+  | Ambiguous { path; arity } -> Some (type_constr_for_path env loc path arity)
 
 let constrain_exp_with_type loc typ exp_desc =
   Type_constraint.constraint_ loc typ (Modes.wrap Modes.legacy)
@@ -2914,7 +2915,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_inspected_type (Label_disambiguation ambiguity) ->
     pat_lam
     |> maybe_constrain_pat_with_type loc
-         (type_constraint_of_ambiguity loc ambiguity)
+         (type_constraint_of_ambiguity env loc ambiguity)
   | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
     Pat.constraint_ loc pat_lam
       (type_for_annotation ~env ~loc:(to_location loc) ty
@@ -3031,6 +3032,7 @@ and quote_value_pattern ~scopes p =
     p.pat_extra (Pat.wrap pat_quoted)
 
 and quote_core_type ~scopes ty =
+  let env = ty.ctyp_env in
   let loc = of_location ~scopes ty.ctyp_loc in
   match ty.ctyp_desc with
   | Ttyp_var (None, jkind) ->
@@ -3069,7 +3071,7 @@ and quote_core_type ~scopes ty =
     in
     Type.unboxed_tuple loc tups |> Type.wrap
   | Ttyp_constr (path, _, tys) ->
-    let ident = type_for_path loc path
+    let ident = type_for_path env loc path
     and tys = List.map (quote_core_type ~scopes) tys in
     Type.constr loc ident tys |> Type.wrap
   | Ttyp_object (object_fields, closed) ->
@@ -3169,7 +3171,7 @@ and quote_core_type ~scopes ty =
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
   | Ttyp_package package ->
     let { pack_path; pack_fields; pack_type = _; pack_txt = _ } = package in
-    let mod_type = module_type_for_path loc pack_path
+    let mod_type = module_type_for_path env loc pack_path
     and with_types =
       List.map
         (fun (lid, ty) ->
@@ -3568,7 +3570,7 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
   | Texp_inspected_type (Label_disambiguation ambiguity) ->
     lambda
     |> maybe_constrain_exp_desc_with_type loc
-         (type_constraint_of_ambiguity loc ambiguity)
+         (type_constraint_of_ambiguity env loc ambiguity)
   | Texp_inspected_type (Polymorphic_parameter poly_param) ->
     (* unused dummy for [core_type.ctyp_type] *)
     let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
