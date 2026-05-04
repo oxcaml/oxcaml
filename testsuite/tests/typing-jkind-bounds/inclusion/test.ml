@@ -1,4 +1,5 @@
 (* TEST
+   flags = "-no-ikinds";
    readonly_files = "inclusion.mli inclusion.ml";
    setup-ocamlc.byte-build-env;
    module = "inclusion.mli";

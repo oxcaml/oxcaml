@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension small_numbers -ikinds";
+ flags = "-extension small_numbers";
  expect;
 *)
 
