@@ -350,15 +350,7 @@ let enter_set_of_closures
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
       join_analysis = _
-    } ~in_static_stub =
-  let disable_inlining : Disable_inlining.t =
-    if in_static_stub then Disable_inlining Stub else disable_inlining
-  in
-  let disable_partial_application_stub_generation =
-    if in_static_stub && Flambda_features.simplify_stubs ()
-    then true
-    else disable_partial_application_stub_generation
-  in
+    } =
   { machine_width;
     round;
     typing_env = TE.closure_env typing_env;
