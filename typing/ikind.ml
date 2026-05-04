@@ -16,6 +16,8 @@
    These are intended to be easy to flip while iterating on
    performance or correctness. *)
 (* CR jujacobs: remove toggles in the final version. *)
+let () = Clflags.ikinds := true
+
 let enable_crossing = true
 
 let enable_sub_jkind_l = true
