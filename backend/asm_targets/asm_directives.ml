@@ -671,6 +671,10 @@ module Directive = struct
     | Private_extern _ | Section _ | Size _ | Type _ | Protected _ | Hidden _
     | Weak _ | External _ | Reloc _ ->
       offset_in_bytes
+
+  let map_new_label f = function[@warning "-4"]
+    | New_label (Label l, c) -> New_label (Label (f l), c)
+    | d -> d
 end
 
 (* A higher-level version of [Constant.t] which contains some more abstractions

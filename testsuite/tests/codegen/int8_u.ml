@@ -165,13 +165,13 @@ let div x y = Int8_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L114
+  je    .L0
   cqto
   idivq %rcx
   salq  $56, %rax
   sarq  $56, %rax
   ret
-.L114:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -184,14 +184,14 @@ let rem x y = Int8_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L114
+  je    .L0
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
-.L114:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -465,7 +465,7 @@ to_float:
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L105
-.L107:
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtsi2sdq %rbx, %xmm0, %xmm0
@@ -489,7 +489,7 @@ to_float32:
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L105
-.L107:
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
@@ -541,7 +541,7 @@ to_int32:
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L105
-.L107:
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -566,7 +566,7 @@ to_int64:
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L104
-.L106:
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
@@ -597,7 +597,7 @@ to_nativeint:
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L104
-.L106:
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
