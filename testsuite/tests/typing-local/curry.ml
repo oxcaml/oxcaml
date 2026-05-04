@@ -19,9 +19,13 @@ module M : sig
   val all_heap : int -> int -> string -> int -> int -> int -> int list
 end = struct
   let part_local a b (local_ c) d e f =
-    (* opaque identity is required otherwise the partial application to a fixed set
-       of arguments is a constant and can be statically allocated which.
-       And is_stack consider it to be not stack allocated. *)
+    (* This function is used to test that its partial applications up
+       to the second argument are heap allocated, then further partial
+       applications to more arguments are stack allocated. If the 'c'
+       argument is unused, the reaper can detect it and remove it from
+       the closure of the partial application. All the other arguments
+       are statically known, so the partial applications ends up being
+       statically allocated. *)
     let _ = Sys.opaque_identity c in
     [a; b; d; e; f]
   let all_heap a b c d e f = [a;b;int_of_string c;d;e;f]
