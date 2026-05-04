@@ -1346,7 +1346,8 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   base, Array.of_list coeffs
 
 let substitute_decl_ikind_with_lookup
-    ~(lookup : Path.t -> Subst.Ikind_substitution.lookup_result)
+    ~(lookup_type : Path.t -> Subst.Ikind_substitution.type_lookup_result)
+    ~(lookup_jkind : Path.t -> Subst.Ikind_substitution.jkind_lookup_result)
     (ikind_entry : Types.type_ikind) : Types.type_ikind =
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
@@ -1366,16 +1367,19 @@ let substitute_decl_ikind_with_lookup
       | Param _ -> Ldd.node_of_var (Ldd.rigid name)
       | Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
       | KAtom path -> (
-        match lookup path with
-        | Subst.Ikind_substitution.Lookup_identity ->
+        match lookup_jkind path with
+        | Subst.Ikind_substitution.Lookup_jkind_identity ->
           Ldd.node_of_var (Ldd.rigid name)
-        | Subst.Ikind_substitution.Lookup_path alias_path ->
+        | Subst.Ikind_substitution.Lookup_jkind_path alias_path ->
           Ldd.node_of_var (Ldd.rigid (Ldd.Name.katom alias_path))
-        | Subst.Ikind_substitution.Lookup_type_fun (_params, _body) ->
-          failwith
-            "ikind: unexpected type function while rewriting k-atoms")
+        | Subst.Ikind_substitution.Lookup_jkind_const jkind_const ->
+          let raw =
+            let ctx = create_ctx ~mode:Solver.Normal ~env:None in
+            Solver.normalize (Solver.ckind_of_jkind_desc ctx jkind_const)
+          in
+          map_poly expanding raw)
       | Atom { constr = path; arg_index } -> (
-        match lookup path with
+        match lookup_type path with
         | Subst.Ikind_substitution.Lookup_identity ->
           Ldd.node_of_var (Ldd.rigid name)
         | Subst.Ikind_substitution.Lookup_path alias_path ->
