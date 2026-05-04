@@ -123,6 +123,14 @@ jobs:
         opam install --yes ppx_string ppx_compare ocamlformat.0.29.0
         opam install . --deps-only --with-test --yes
 
+    - name: Create dune workspace file
+      working-directory: oxcaml/external/merlin
+      # This will tell dune to treat external/merlin as its own workspace. Once
+      # Merlin is kept in sync with the compiler, this should be removed so that
+      # Merlin is built in the same workspace as the compiler.
+      run: |
+        touch dune-workspace
+
     - name: Check formatting
       working-directory: oxcaml/external/merlin
       run: |
