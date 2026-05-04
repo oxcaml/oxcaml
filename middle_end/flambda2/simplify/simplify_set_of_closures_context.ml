@@ -69,10 +69,19 @@ let closure_bound_names_inside_functions_exactly_one_set t =
 
 let previously_free_depth_variables t = t.previously_free_depth_variables
 
-let function_can_be_simplified code =
+let stub_can_be_simplified denv =
+  (* Stubs can only be simplified with "-flambda2-simplify-stubs". We want to
+     avoid stub resimplifications because it's costly and often useless. The
+     most problematic case are nested stub definitions. To avoid going through
+     those multiple times, we don't simplify stub definitions while inlining
+     stubs (stub depth > 0) *)
+  Flambda_features.simplify_stubs ()
+  && Inlining_state.stub_depth (DE.get_inlining_state denv) = 0
+
+let function_can_be_simplified denv code =
   Code_or_metadata.code_present code
   && ((not (Code_metadata.stub (Code_or_metadata.code_metadata code)))
-     || Flambda_features.simplify_stubs ())
+     || stub_can_be_simplified denv)
 
 let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_inside_functions_all_sets
@@ -217,7 +226,7 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
                 Misc.fatal_errorf "Missing code for %a" Code_id.print
                   old_code_id
             in
-            if function_can_be_simplified code
+            if function_can_be_simplified denv code
             then
               let new_code_id = Code_id.rename old_code_id in
               Code_id.Map.add old_code_id new_code_id old_to_new_code_ids
