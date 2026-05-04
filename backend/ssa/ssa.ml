@@ -772,6 +772,8 @@ let make_builder (function_info : function_info) :
 
         let successors = successors
 
+        let exception_successor = exception_successor
+
         let dominates = dominates
 
         let common_dominator = common_dominator

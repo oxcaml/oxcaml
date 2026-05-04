@@ -293,6 +293,19 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
         then
           Format.fprintf ppf_m "Trap handler mismatch at old=%a new=%a@."
             Label.format ol Label.format nl;
+        if not (Bool.equal ob.can_raise nb.can_raise)
+        then
+          Format.fprintf ppf_m "can_raise mismatch at old=%a(%b) new=%a(%b)@."
+            Label.format ol ob.can_raise Label.format nl nb.can_raise;
+        if not (Bool.equal ob.cold nb.cold)
+        then
+          Format.fprintf ppf_m "cold mismatch at old=%a(%b) new=%a(%b)@."
+            Label.format ol ob.cold Label.format nl nb.cold;
+        if not (Int.equal ob.stack_offset nb.stack_offset)
+        then
+          Format.fprintf ppf_m
+            "stack_offset mismatch at old=%a(%d) new=%a(%d)@." Label.format ol
+            ob.stack_offset Label.format nl nb.stack_offset;
         if
           Label.Set.is_empty ob.predecessors
           && Label.Set.is_empty nb.predecessors

@@ -220,17 +220,9 @@ module Make (S : Ssa.Finished_graph) = struct
       main
 
   let is_exception_predecessor (pred : S.Block.t) (target : S.Block.t) =
-    let may_raise =
-      match[@warning "-fragile-match"] pred.terminator with
-      | Raise _ -> true
-      | Call { may_raise; _ } -> may_raise
-      | _ -> false
-    in
-    may_raise
-    &&
-    match pred.block_end_trap_stack with
-    | h :: _ -> S.Block.equal h target
-    | [] -> false
+    match S.exception_successor pred with
+    | Some h -> S.Block.equal h target
+    | None -> false
 
   let is_call_predecessor (pred : S.Block.t) (target : S.Block.t) =
     (* [Probe] uses the [Call] constructor but has no return value to receive in
@@ -361,7 +353,7 @@ module Make (S : Ssa.Finished_graph) = struct
                [||] [||] Debuginfo.none))
       block.body;
     let dbg = block.terminator_dbg in
-    let terminator, can_raise =
+    let terminator =
       match block.terminator with
       | Goto { goto; args } ->
         let dst_regs = get_block_params_regs env goto in
@@ -377,39 +369,38 @@ module Make (S : Ssa.Finished_graph) = struct
           emit_moves body ~src:src_regs ~dst:tmp_regs;
           emit_moves body ~src:tmp_regs ~dst:dst_regs)
         else emit_moves body ~src:src_regs ~dst:dst_regs;
-        make_cfg_instr (Cfg.Always (label_of env goto)) [||] [||] dbg, false
+        make_cfg_instr (Cfg.Always (label_of env goto)) [||] [||] dbg
       | Branch { cond; ifso; ifnot } -> (
         let true_label = label_of env ifso in
         let false_label = label_of env ifnot in
         match fuse_comparison cond ~true_label ~false_label with
         | Some (term, args) ->
-          make_cfg_instr term (Array.map (get_reg env) args) [||] dbg, false
+          make_cfg_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
-          ( make_cfg_instr
-              (Cfg.Truth_test { ifso = true_label; ifnot = false_label })
-              [| get_reg env cond |]
-              [||] dbg,
-            false ))
+          make_cfg_instr
+            (Cfg.Truth_test { ifso = true_label; ifnot = false_label })
+            [| get_reg env cond |]
+            [||] dbg)
       | Switch { index; targets } ->
         let index_reg = get_reg env index in
         let labels = Array.map (label_of env) targets in
-        make_cfg_instr (Cfg.Switch labels) [| index_reg |] [||] dbg, false
+        make_cfg_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
       | Return { args } ->
         let arg = Array.map (get_reg env) args in
         let loc_res = Proc.loc_results_return (Reg.typv arg) in
         emit_moves body ~src:arg ~dst:loc_res;
-        make_cfg_instr Cfg.Return loc_res [||] dbg, false
+        make_cfg_instr Cfg.Return loc_res [||] dbg
       | Raise { raise_kind; args } ->
         let exn_val = Array.map (get_reg env) args in
         let exn_bucket = [| Proc.loc_exn_bucket |] in
         let extra_dst =
-          match block.block_end_trap_stack with
-          | hb :: _ ->
+          match S.exception_successor block with
+          | Some hb ->
             let handler_regs = get_block_params_regs env hb in
             if Array.length handler_regs > 1
             then Array.sub handler_regs 1 (Array.length handler_regs - 1)
             else [||]
-          | [] -> [||]
+          | None -> [||]
         in
         let dst = Array.append exn_bucket extra_dst in
         let src =
@@ -418,15 +409,14 @@ module Make (S : Ssa.Finished_graph) = struct
           else exn_val
         in
         emit_moves body ~src ~dst;
-        make_cfg_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg, true
+        make_cfg_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg
       | Tailcall_self { destination; args } ->
         let virt_args = Array.map (get_reg env) args in
         let loc_arg = Proc.loc_parameters (Reg.typv virt_args) in
         emit_moves body ~src:virt_args ~dst:loc_arg;
-        ( make_cfg_instr
-            (Cfg.Tailcall_self { destination = label_of env destination })
-            loc_arg [||] dbg,
-          false )
+        make_cfg_instr
+          (Cfg.Tailcall_self { destination = label_of env destination })
+          loc_arg [||] dbg
       | Tailcall_func { op = call_op; args } ->
         let virt_args = Array.map (get_reg env) args in
         let rarg, loc_arg =
@@ -445,7 +435,7 @@ module Make (S : Ssa.Finished_graph) = struct
           | Indirect _ -> Array.append [| virt_args.(0) |] loc_arg
           | Direct _ -> loc_arg
         in
-        make_cfg_instr (Cfg.Tailcall_func call_op) call_arg [||] dbg, false
+        make_cfg_instr (Cfg.Tailcall_func call_op) call_arg [||] dbg
       | Call { op; args; continuation; may_raise = _ } -> (
         let virt_args = Array.map (get_reg env) args in
         let virt_res = get_block_params_regs env continuation in
@@ -478,11 +468,9 @@ module Make (S : Ssa.Finished_graph) = struct
           in
           S.Block.Tbl.replace env.call_result_locs continuation loc_res;
           S.Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
-          ( make_cfg_instr
-              (Cfg.Call
-                 { op = call_op; label_after = label_of env continuation })
-              call_arg loc_res dbg,
-            true )
+          make_cfg_instr
+            (Cfg.Call { op = call_op; label_after = label_of env continuation })
+            call_arg loc_res dbg
         | Prim (External ({ ty_args; _ } as ext)) ->
           let ty_args =
             if ty_args = []
@@ -519,19 +507,16 @@ module Make (S : Ssa.Finished_graph) = struct
             virt_args;
           S.Block.Tbl.replace env.call_result_locs continuation loc_res;
           S.Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
-          ( make_cfg_instr
-              (Cfg.Prim
-                 { op = External { ext with stack_ofs; stack_align };
-                   label_after = label_of env continuation
-                 })
-              loc_arg loc_res dbg,
-            true )
+          make_cfg_instr
+            (Cfg.Prim
+               { op = External { ext with stack_ofs; stack_align };
+                 label_after = label_of env continuation
+               })
+            loc_arg loc_res dbg
         | Prim (Probe _ as prim_op) ->
-          ( make_cfg_instr
-              (Cfg.Prim
-                 { op = prim_op; label_after = label_of env continuation })
-              virt_args virt_res dbg,
-            true ))
+          make_cfg_instr
+            (Cfg.Prim { op = prim_op; label_after = label_of env continuation })
+            virt_args virt_res dbg)
       | Invalid { message; args; continuation } ->
         let virt_args = Array.map (get_reg env) args in
         let ty_args = [Cmm.XInt] in
@@ -559,28 +544,13 @@ module Make (S : Ssa.Finished_graph) = struct
             Some (label_of env cont_block), loc_res
           | None -> None, [||]
         in
-        ( make_cfg_instr
-            (Cfg.Invalid { message; stack_ofs; stack_align; label_after })
-            loc_arg loc_res dbg,
-          true )
+        make_cfg_instr
+          (Cfg.Invalid { message; stack_ofs; stack_align; label_after })
+          loc_arg loc_res dbg
     in
     let is_trap_handler = S.Block.Tbl.mem env.trap_handlers block in
-    let raises =
-      can_raise
-      &&
-      match[@warning "-fragile-match"] block.terminator with
-      | Raise _ -> true
-      | Call { may_raise; _ } -> may_raise
-      | _ -> false
-    in
-    let exn =
-      if raises
-      then
-        match block.block_end_trap_stack with
-        | h :: _ -> Some (label_of env h)
-        | [] -> None
-      else None
-    in
+    let exn = Option.map (label_of env) (S.exception_successor block) in
+    let can_raise = Cfg.can_raise_terminator terminator.desc in
     { Cfg.start = label_of env block;
       body;
       terminator;
