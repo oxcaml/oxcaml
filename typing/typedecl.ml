@@ -1143,19 +1143,16 @@ let transl_declaration env sdecl (id, uid) =
             transl_labels ~record_form:Unboxed_product ~new_var_jkind:Any
               env None true lbls Record_unboxed_product ~extension:false
           in
-          (* The jkinds below, and the ones in [lbls], are dummy jkinds which
-             are replaced and made to correspond to each other in
-             [update_decl_jkind]. *)
-          let rep : record_unboxed_product_representation =
-            Record_unboxed_product
-              (Array.make (List.length lbls) Jkind.Sort.Const.void)
-          in
+          (* The [None] (variable) representation, the jkind below, and the
+             jkinds in [lbls] are dummy jkinds which are replaced and made to
+             correspond to each other in [update_decl_jkind]. *)
+          let rep = None in
           let jkind =
             Jkind.Builtin.product_of_any ~why:Unboxed_record
               (List.length lbls) Jkind_types.Scannable_axes.max
           in
           Ttype_record_unboxed_product lbls,
-          Type_record_unboxed_product(lbls', Some rep, None), jkind
+          Type_record_unboxed_product(lbls', rep, None), jkind
       | Ptype_open ->
         Ttype_open, Type_open,
         Jkind.for_non_float ~why:Extensible_variant

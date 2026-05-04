@@ -209,3 +209,72 @@ Error: Signature mismatch:
        Hint: Is there a type that has a representable layout in the first
          but has layout any in the second?
 |}]
+
+
+(* CR rtjoa: This is a regression test for the recursive declarations in [M]'s
+   signature
+
+   It worked before the any-fields PR, because
+   1. in the temporary environment, [pt] gets a jkind made with
+      [product_of_sorts]
+   2. when updating the constructor [A], those sorts are defaulted to [value]
+
+   but after the first version of the any-fields PR,
+   1. in the temporary environment, [pt] gets a jkind made with
+   [product_of_any]s
+   2. when updating the constructor [A], we see those [any] jkinds, and think
+      erroneously that [t]'s representation is variable
+*)
+module M : sig
+  type pt = #{ x : int; y : int }
+  and t = A of pt
+end = struct
+  type pt = #{ x : int; y : int }
+  type t = A of pt
+end
+[%%expect{|
+module M : sig type pt = #{ x : int; y : int; } and t = A of pt end
+|}]
+
+module M : sig
+  type pt = #{ x : unit#; y : unit# }
+  and t = A of pt
+end = struct
+  type pt = #{ x : unit#; y : unit# }
+  type t = A of pt
+end
+[%%expect{|
+module M : sig type pt = #{ x : unit#; y : unit#; } and t = A of pt end
+|}]
+
+(* CR rtjoa: this one is still broken *)
+module M : sig
+  type pt = { x : int; y : int }
+  and t = A of pt#
+end = struct
+  type pt = { x : int; y : int }
+  type t = A of pt#
+end
+[%%expect{|
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   type pt = { x : int; y : int }
+6 |   type t = A of pt#
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type pt = { x : int; y : int; } type t = A of pt# end
+       is not included in
+         sig type pt = { x : int; y : int; } and t = A of pt# end
+       Type declarations do not match:
+         type t = A of pt#
+       is not included in
+         type t = A of pt#
+       Constructors do not match:
+         "A of pt#"
+       is not the same as:
+         "A of pt#"
+       The first has a fixed representation and the second doesn't.
+       Hint: Is there a type that has a representable layout in the first
+         but has layout any in the second?
+|}]
