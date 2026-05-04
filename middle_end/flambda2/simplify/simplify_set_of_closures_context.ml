@@ -45,7 +45,7 @@ let create_for_static_stub dacc ~all_code ~simplify_function_body =
              code creates a context to simplify a function while looking at the
              let code rather than the set of closure. We should rename this
              `DE.enter_set_of_closures` function *)
-          (DE.enter_set_of_closures denv ~in_static_stub:true))
+          (DE.enter_stub_function (DE.enter_set_of_closures denv)))
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;
@@ -325,7 +325,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
-    DE.enter_set_of_closures denv ~in_static_stub:false
+    DE.enter_set_of_closures denv
     (* Even if we are not rebuilding terms we should always rebuild them for
        local functions. The type of a function is dependent on its term and not
        knowing it prohibits us from inlining it. *)
