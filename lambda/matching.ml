@@ -4594,7 +4594,7 @@ let for_trywith ~scopes ~return_layout loc param pat_act_list =
     None param pat_act_list Partial
 
 let for_handler ~scopes ~return_layout loc param cont cont_tail pat_act_list =
-  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
+  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_scannable
     ~arg_layout:layout_block ~return_layout loc
     ~failer:(Reperform_noloc [param; cont; cont_tail])
     None param pat_act_list Partial
