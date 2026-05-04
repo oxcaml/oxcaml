@@ -241,7 +241,6 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
      come from the function ABI and are kept verbatim; other blocks may drop
      unused params per [compute_kept]. *)
   let entry_out = Out.entry in
-  Out.Block.set_label_hint entry_out In.entry.label_hint;
   In.Block.Tbl.replace block_map In.entry entry_out;
   In.Block.Tbl.replace kept_params In.entry
     (Array.init (Array.length In.entry.params) Fun.id);
@@ -253,9 +252,6 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         In.Block.Tbl.replace kept_params blk kept;
         let params = Array.map (fun i -> blk.params.(i)) kept in
         let { Out.block = new_out; _ } = Out.new_block ~params in
-        (* Carry the [label_hint] forward so the downstream [cfg_of_ssa] reuses
-           the aligned labels. *)
-        Out.Block.set_label_hint new_out blk.label_hint;
         In.Block.Tbl.replace block_map blk new_out
       end)
     In.blocks;

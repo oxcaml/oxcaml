@@ -75,11 +75,6 @@ module type Graph_builder = sig
 
     val params : t -> Cmm.machtype
 
-    (** Cache of the CFG label corresponding to this block. Set by
-        [Cfg_of_ssa.convert] so that a second conversion pass can reuse it, and
-        updated after [Cfg_compare] to align with the old pipeline. *)
-    val set_label_hint : t -> Label.t option -> unit
-
     val equal : t -> t -> bool
 
     val compare : t -> t -> int
@@ -282,10 +277,6 @@ module type Finished_graph = sig
         mutable terminator : Terminator.t;
         mutable terminator_dbg : Debuginfo.t;
         mutable dominator_info : dominator_info;
-        mutable label_hint : Label.t option;
-            (** Cached CFG label. Set by [Cfg_of_ssa.convert] so a second
-                conversion pass can reuse it, and updated after [Cfg_compare] to
-                align labels with the old pipeline. *)
         mutable param_usage_counts : usage_count array;
             (** Per-parameter usage counts, symmetric with [Op]'s [usage_count].
                 A param with count 0 is "dead": no arg passed via an
@@ -306,8 +297,6 @@ module type Finished_graph = sig
     val compare : t -> t -> int
 
     val hash : t -> int
-
-    val set_label_hint : t -> Label.t option -> unit
 
     module Map : Map.S with type key = t
 

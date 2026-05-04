@@ -547,25 +547,10 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
            fd_cmm Ssa_print.print ssa;
          Printexc.raise_with_backtrace exn bt
      in
-     let new_to_old =
+     let _new_to_old =
        Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
          ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
      in
-     (* Align SSA label hints with the old pipeline's labels, so the second
-        conversion produces identical label numbers. For blocks whose new label
-        isn't in the map, draw from the pool of old labels that weren't matched
-        — this avoids bumping the label counter with fresh allocations that
-        would shift labels allocated by later pipeline stages (e.g. edge
-        splitting in the register allocator). *)
-     let module S = (val ssa : Ssa.Finished_graph) in
-     List.iter
-       (fun (bl : S.Block.t) ->
-         match bl.label_hint with
-         | None -> ()
-         | Some l ->
-           let new_hint = Label.Tbl.find_opt new_to_old l in
-           S.Block.set_label_hint bl new_hint)
-       S.blocks;
      if !Oxcaml_flags.dump_cfg
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      (* Second conversion: produces the CFG that feeds the real pipeline. This

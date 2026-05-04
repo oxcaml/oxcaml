@@ -165,13 +165,13 @@ let div x y = Int8_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L114
+  je    .L0
   cqto
   idivq %rcx
   salq  $56, %rax
   sarq  $56, %rax
   ret
-.L114:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -184,14 +184,14 @@ let rem x y = Int8_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L114
+  je    .L0
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
-.L114:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -463,14 +463,13 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    .L1
+.L0:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
   vcvtsi2sdq %rax, %xmm0, %xmm0
   vmovsd %xmm0, (%rbx)
   movq  %rbx, %rax
->>>>>>> 42782c097b (passes testsuite)
   addq  $8, %rsp
   ret
 |}]
@@ -488,11 +487,10 @@ to_float32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    .L1
+.L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
->>>>>>> 42782c097b (passes testsuite)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rbx)
   vcvtsi2ssq %rax, %xmm0, %xmm0
@@ -541,11 +539,10 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    .L1
+.L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
->>>>>>> 42782c097b (passes testsuite)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rbx)
   movslq %eax, %rax
@@ -567,11 +564,10 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    .L1
+.L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
->>>>>>> 42782c097b (passes testsuite)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rbx)
   movq  %rax, 8(%rbx)
@@ -599,11 +595,10 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    .L1
+.L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
->>>>>>> 42782c097b (passes testsuite)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rbx)
   movq  %rax, 8(%rbx)

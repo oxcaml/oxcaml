@@ -121,9 +121,6 @@ module Make (S : Ssa.Finished_graph) = struct
     let name = if blk.is_function_start then "FUNCTION_START" else "BLOCK" in
     Format.fprintf ppf "%a: %s(%a)" print_block_id blk name print_typed_params
       blk;
-    (match blk.label_hint with
-    | None -> ()
-    | Some l -> Format.fprintf ppf " [label=%a]" Label.format l);
     Format.fprintf ppf " [idom=%a depth=%d]" print_block_id
       blk.dominator_info.dominator blk.dominator_info.depth;
     match S.predecessors blk with
