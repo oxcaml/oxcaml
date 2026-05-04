@@ -1025,6 +1025,10 @@ module Record_diffing = struct
            Some (Record_mismatch (Mixed_representation Second))
 
         | Record_boxed, Record_boxed -> None
+
+        | Record_dummy _, _ | _, Record_dummy _ ->
+          Misc.fatal_error
+            "compare_with_representation: dummy record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with

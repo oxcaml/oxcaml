@@ -2143,6 +2143,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined (Null, _, _) ->
         Misc.fatal_errorf "Cannot handle record kind for Pduprecord: %a"
           Printlambda.primitive prim
+      | Record_dummy _ ->
+        Misc.fatal_error "convert_lprim: Pduprecord: dummy representation"
     in
     [Unary (Duplicate_block { kind }, arg)]
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]
