@@ -386,6 +386,16 @@ module Make (S : Ssa.Finished_graph) = struct
         let labels = Array.map (label_of env) targets in
         make_cfg_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
       | Return { args } ->
+        (* Emit a [Poptrap] for each handler still on the trap stack at block
+           exit, so the runtime trap stack is empty when the function
+           returns. *)
+        List.iter
+          (fun (h : S.Block.t) ->
+            DLL.add_end body
+              (make_cfg_instr
+                 (Cfg.Poptrap { lbl_handler = label_of env h })
+                 [||] [||] Debuginfo.none))
+          block.block_end_trap_stack;
         let arg = Array.map (get_reg env) args in
         let loc_res = Proc.loc_results_return (Reg.typv arg) in
         emit_moves body ~src:arg ~dst:loc_res;
