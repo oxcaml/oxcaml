@@ -1482,11 +1482,11 @@ let message = function
   | Use_during_borrowing ->
       msg "This value is used while being borrowed."
   | Useless_lpoly ->
-      msg "This binding has no layout variables, so \"poly_\" has no effect. \
-           Consider using a regular \"let\" instead."
+      msg "This binding has no layout variables, so poly_ has no effect. \
+           Consider using a regular let instead."
   | Lpoly_in_letrec ->
-      msg "\"poly_\" has no effect in recursive bindings, which do not support \
-           layout polymorphism. Consider using a regular \"let rec\" instead."
+      msg "poly_ has no effect in recursive bindings, which do not support \
+           layout polymorphism. Consider using a regular let rec instead."
 ;;
 
 let nerrors = ref 0
