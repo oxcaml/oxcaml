@@ -1,17 +1,17 @@
-(lldb) breakpoint set -b Test_large_data_dwarf.f_start
+(lldb) b Test_large_data_dwarf.f_start
 (lldb) run
-(lldb) breakpoint set -b Test_large_data_dwarf.f_large_string
+(lldb) b Test_large_data_dwarf.f_large_string
 (lldb) c
-(lldb) breakpoint set -b Test_large_data_dwarf.f_large_bytes
+(lldb) b Test_large_data_dwarf.f_large_bytes
 (lldb) c
-(lldb) breakpoint set -b Test_large_data_dwarf.f_large_int_array
+(lldb) b Test_large_data_dwarf.f_large_int_array
 (lldb) c
-(lldb) breakpoint set -b Test_large_data_dwarf.f_large_float_array
+(lldb) b Test_large_data_dwarf.f_large_float_array
 (lldb) c
-(lldb) breakpoint set -b Test_large_data_dwarf.f_large_list
+(lldb) b Test_large_data_dwarf.f_large_list
 (lldb) c
-(lldb) breakpoint set -b Test_large_data_dwarf.f_polymorphic_large
+(lldb) b Test_large_data_dwarf.f_polymorphic_large
 (lldb) c
-(lldb) breakpoint set -b Test_large_data_dwarf.f_large_bigarray
+(lldb) b Test_large_data_dwarf.f_large_bigarray
 (lldb) c
 (lldb) quit
