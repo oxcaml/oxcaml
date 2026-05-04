@@ -2540,7 +2540,7 @@ module Label = NameChoice (struct
   let in_env lbl =
     match lbl.lbl_repres with
     | Some (Record_boxed _ | Record_float | Record_ufloat | Record_unboxed
-           | Record_mixed _)
+           | Record_mixed _ | Record_dummy _)
     | None -> true
     | Some (Record_inlined _) -> false
 end)
@@ -2556,7 +2556,9 @@ module Unboxed_label = NameChoice (struct
       env
   let in_env (lbl : t) =
     match lbl.lbl_repres with
-    | Some (Record_unboxed_product _) | None  -> true
+    | Some (Record_unboxed_product _ | Record_unboxed_product_dummy)
+    | None ->
+      true
 end)
 
 let label_get_type_path
@@ -6273,9 +6275,13 @@ and type_expect_
                                          | Variant_extensible)))
           | None
             -> true
+          | Some (Record_dummy _) ->
+            Misc.fatal_error "type_expect: dummy record representation"
         end
         | Unboxed_product -> begin match rep with
           | Some (Record_unboxed_product _) | None -> false
+          | Some (Record_unboxed_product_dummy) ->
+            Misc.fatal_error "type_expect: dummy unboxed record representation"
         end
       in
       let is_boxed =
@@ -8282,6 +8288,8 @@ and type_block_access env expected_base_ty principal
         raise (Error (lid.loc, env, Block_access_record_unboxed))
       | Some (Record_inlined _) ->
         Misc.fatal_error "Typecore.type_block_access: inlined record"
+      | Some (Record_dummy _) ->
+        Misc.fatal_error "Typecore.type_block_access: dummy representation"
       | None ->
         (* Records with [any] fields are never flattened *)
         false

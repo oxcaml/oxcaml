@@ -1122,17 +1122,8 @@ let transl_declaration env sdecl (id, uid) =
             if unbox then
               Record_unboxed,
               Jkind.Builtin.any ~why:Old_style_unboxed_type
-            else if represent_as_float_array then
-            (* In [update_decls_jkind], we check whether the fields are really
-                all [float64] *)
-              Record_ufloat,
-              Jkind.for_non_float ~why:Boxed_record
             else
-            (* Note this is inaccurate, using `Record_boxed` in cases where the
-               correct representation is [Record_float], or [Record_mixed].
-               Those cases are fixed up after we can get accurate sorts for the
-               fields, in [update_decl_jkind]. *)
-              Record_boxed (Array.make (List.length lbls) Jkind.Sort.Const.void),
+              Record_dummy { represent_as_float_array },
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', Some rep, None), jkind
@@ -1267,6 +1258,7 @@ let transl_declaration env sdecl (id, uid) =
    1. In the temporary environment computed by [enter_type], all types get an
       unboxed version.
 
+   (* CR rtjoa: update these instructions *)
    2. After translating declarations, [derive_unboxed_versions] gives the
       [Record_boxed] records unboxed versions.
 
@@ -1302,10 +1294,14 @@ let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
   | Record_unboxed | Record_inlined _ | Record_boxed _
   | Record_float | Record_ufloat -> false
+  | Record_dummy _ ->
+    fatal_error "record_has_float_boxed: unexpected dummy representation"
 
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed _ -> true
+  | Record_dummy { represent_as_float_array } ->
+    not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1366,6 +1362,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         (fun rep : record_unboxed_product_representation ->
            match rep with
            | Record_boxed sorts -> Record_unboxed_product sorts
+           | Record_dummy { represent_as_float_array = false } ->
+             Record_unboxed_product_dummy
            | Record_mixed elements ->
              (* CR lmaurer: I assume this is also somewhere else? *)
              let rec transl (element : mixed_block_element) =
@@ -2121,7 +2119,8 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       Ok Record_unboxed
     in
     [ld_sort], rep, jkind
-  | Legacy, _, (Some (Record_boxed _ | Record_ufloat) | None)
+  (* CR rtjoa: *only* dummy? *)
+  | Legacy, _, (Some (Record_boxed _ | Record_ufloat | Record_dummy _) | None)
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
     let sorts, jkinds = update_label_sorts env loc types ~form in
@@ -2324,7 +2323,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
           ~float64s:true, ~non_float64_unboxed_fields:false,
           ~voids:false, ~first_any:None, .. ) ->
         (match rep with
-         | Some Record_ufloat ->
+         | Some Record_dummy { represent_as_float_array = true } ->
            (* CR rtjoa: part of changes to represent_as_float_array *)
            (* This is only the case if it got the [@@represent_as_float_array]
               attribute *)
@@ -2337,7 +2336,9 @@ let update_record_kind (type rep) env loc (form : rep record_form)
         then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
         let rep =
           match rep with
-          | Some rep -> rep
+          | Some _ ->
+            (* CR rtjoa: this array is a lie, but we should remove it *)
+            Record_boxed [||]
           | None -> Misc.fatal_error "no any but also no representation"
         in
         Ok rep
@@ -2555,7 +2556,8 @@ let rec update_decl_jkind env dpath decl =
       in
       (* CR rtjoa: to do with represent_as_float_array *)
       (* Was marked as ufloat, but fields aren't actually all float64s *)
-      if old_rep = Some Record_ufloat && rep <> Ok Record_ufloat then
+      if old_rep = Some (Record_dummy { represent_as_float_array = true })
+      && rep <> Ok Record_ufloat then
         raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute));
       let rep = Result.to_option rep in
       (* See Note [Quality of jkinds during inference] for more information about when we

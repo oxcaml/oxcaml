@@ -619,6 +619,8 @@ module Type_decl_shape = struct
                  [Foo { a : int; b : int }], then [r] is an inline record in \
                  [match e with Foo r -> ...]."
             else unknown_shape ()
+          | Some (Record_dummy _) ->
+            Misc.fatal_error "unexpected dummy representation"
           | None -> unknown_shape ())
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()

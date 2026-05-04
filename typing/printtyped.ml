@@ -256,10 +256,17 @@ let record_representation i ppf = let open Types in function
   | Record_mixed shape ->
     line i ppf "Record_mixed\n";
     array (i+1) mixed_block_element ppf shape
+  | Record_dummy { represent_as_float_array = true } ->
+    line i ppf "Record_dummy [@@represent_as_float_array]\n"
+  | Record_dummy { represent_as_float_array = false } ->
+    line i ppf "Record_dummy\n"
+
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product _ ->
     line i ppf "Record_unboxed_product\n"
+  | Record_unboxed_product_dummy ->
+    line i ppf "Record_unboxed_product_dummy\n"
 
 let attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.Parsetree.attr_name.txt;

@@ -508,9 +508,11 @@ and record_representation =
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
+  | Record_dummy of { represent_as_float_array : bool }
 
 and record_unboxed_product_representation =
   | Record_unboxed_product of Jkind_types.Sort.Const.t array
+  | Record_unboxed_product_dummy
 
 and variant_representation =
   | Variant_unboxed
@@ -973,14 +975,19 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       true
   | Record_mixed mx1, Record_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Record_dummy { represent_as_float_array = a },
+    Record_dummy { represent_as_float_array = b } ->
+      Bool.equal a b
   | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
-    | Record_ufloat | Record_mixed _), _ ->
+    | Record_ufloat | Record_mixed _ | Record_dummy _), _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
   match r1, r2 with
   | Record_unboxed_product sorts1, Record_unboxed_product sorts2 ->
       Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
+  | Record_unboxed_product_dummy, Record_unboxed_product_dummy -> true
+  | (Record_unboxed_product _ | Record_unboxed_product_dummy), _ -> false
 
 let may_equal_constr c1 c2 =
   c1.cstr_arity = c2.cstr_arity
@@ -1077,15 +1084,19 @@ let find_unboxed_type decl =
        Some (Record_inlined (_, _, Variant_unboxed)), _)
   | Type_record_unboxed_product
       ([{ld_type = arg; ld_modalities = ms; _ }],
-       (Some (Record_unboxed_product _) | None), _)
+       (Some (Record_unboxed_product _ | Record_unboxed_product_dummy) | None),
+       _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
   | Type_record (_, ( Some ( Record_inlined _ | Record_unboxed
                            | Record_boxed _ | Record_float | Record_ufloat
-                           | Record_mixed _)
+                           | Record_mixed _ | Record_dummy _)
                     | None), _)
-  | Type_record_unboxed_product (_, (Some (Record_unboxed_product _) | None), _)
+  | Type_record_unboxed_product
+      (_,
+       (Some (Record_unboxed_product _ | Record_unboxed_product_dummy) | None),
+       _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
                      | Variant_extensible | Variant_with_null), _)
   | Type_abstract _ | Type_open ->

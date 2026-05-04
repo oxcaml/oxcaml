@@ -1014,6 +1014,9 @@ module Record_diffing = struct
         | None, Some _ -> Some (Fixed_representation Second)
         | Some rep1, Some rep2 ->
           begin match rep1, rep2 with
+          | Record_dummy _, _ | _, Record_dummy _ ->
+            Misc.fatal_error
+              "compare_with_representation: dummy record representation"
           | Record_unboxed, Record_unboxed -> None
           | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
           | _, Record_unboxed -> Some (Unboxed_representation (Second, []))
@@ -1053,6 +1056,10 @@ module Record_diffing = struct
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
+        | Some Record_unboxed_product_dummy, _
+        | _, Some Record_unboxed_product_dummy ->
+          Misc.fatal_error
+            "compare_with_representation: dummy unboxed record representation"
         | None, None
         | Some (Record_unboxed_product _), Some (Record_unboxed_product _) ->
             None

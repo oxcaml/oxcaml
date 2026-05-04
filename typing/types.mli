@@ -940,9 +940,11 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
+  | Record_dummy of { represent_as_float_array : bool }
 
 and record_unboxed_product_representation =
   | Record_unboxed_product of Jkind_types.Sort.Const.t array
+  | Record_unboxed_product_dummy
 
 and variant_representation =
   | Variant_unboxed
