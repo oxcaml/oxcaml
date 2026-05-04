@@ -190,7 +190,7 @@ val disable_partial_application_stub_generation : t -> bool
 
 val enter_set_of_closures : t -> in_static_stub:bool -> t
 
-val enter_stub : t -> t
+val enter_stub_function : t -> t
 
 val set_rebuild_terms : t -> t
 

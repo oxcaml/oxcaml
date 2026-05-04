@@ -40,7 +40,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
          (Inlining_history.Tracker.inside_function absolute_history)
   in
   let denv =
-    if Code_metadata.stub code_metadata then DE.enter_stub denv else denv
+    if Code_metadata.stub code_metadata
+    then DE.enter_stub_function denv
+    else denv
   in
   let my_closure_duid = Flambda_debug_uid.none in
   let denv =
