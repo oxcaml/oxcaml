@@ -68,6 +68,8 @@ let field_offset_for_label lbl =
   | Record_inlined (_, Constructor_mixed _, Variant_with_null)
   | Record_mixed _ ->
       lbl.lbl_pos
+  | Record_dummy _ ->
+      fatal_error "field_offset_for_label: dummy record representation"
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -758,6 +760,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           in
           Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_dummy _ ->
+          fatal_error "transl_exp0: dummy record representation"
       in
       begin match prim_and_args with
       | None -> targ
@@ -840,6 +844,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Psetmixedfield([lbl.lbl_pos], shape, mode),
           [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_dummy _ ->
+            fatal_error "transl_exp0: unexpected dummy representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
@@ -2133,6 +2139,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 Psetmixedfield
                   ([lbl.lbl_pos], shape, Assignment modify_heap)
             | Record_inlined (_, _, Variant_with_null) -> assert false
+            | Record_dummy _ ->
+              fatal_error "transl_record: unexpected dummy representation"
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
                                 transl_exp ~scopes lbl.lbl_sort expr],
@@ -2213,6 +2221,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    in
                    Pmixedfield ([i], shape, sem)
                  | Record_inlined (_, _, Variant_with_null) -> assert false
+                 | Record_dummy _ ->
+                   fatal_error "transl_record: unexpected dummy representation"
                in
                Lprim(access, [Lvar init_id],
                      of_location ~scopes loc),
@@ -2272,6 +2282,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (_, _, (Variant_extensible | Variant_with_null))
         | Record_inlined ((Extension _ | Null), _, _) ->
             raise Not_constant
+        | Record_dummy _ ->
+          fatal_error "transl_record: unexpected dummy representation"
       with Not_constant ->
         let loc = of_location ~scopes loc in
         match repres with
@@ -2323,6 +2335,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_inlined (Null, _, _) -> assert false
+        | Record_dummy _ ->
+          fatal_error "transl_record: unexpected dummy representation"
     in
     begin match opt_init_expr with
       None -> lam
@@ -2338,7 +2352,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
   let arg = transl_exp ~scopes arg_sort arg in
   begin match lbl.lbl_repres with
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
-  | Record_float | Record_ufloat
+  | Record_float | Record_ufloat | Record_dummy _
     ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
@@ -2382,7 +2396,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       | [l] -> l (* erase singleton unboxed records before lambda *)
       | _ -> Lprim(Pmake_unboxed_product shape, ll, of_location ~scopes loc)
     in
-    match opt_init_expr with
+    begin match opt_init_expr with
     | None -> lam
     | Some (init_expr, init_expr_sort) ->
       let init_expr_sort =
@@ -2391,6 +2405,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       let layout = layout_exp init_expr_sort init_expr in
       let exp = transl_exp ~scopes init_expr_sort init_expr in
       Llet(Strict, layout, init_id, init_id_duid, exp, lam)
+    end
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
 and transl_idx ~scopes loc env ba uas =
@@ -2447,6 +2462,8 @@ and transl_idx ~scopes loc env ba uas =
         raise (Error (loc, Block_index_gap_overflow_possible));
       Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
+    | Record_dummy _ ->
+      fatal_error "transl_idx: unexpected dummy representation"
     end
   end
 
