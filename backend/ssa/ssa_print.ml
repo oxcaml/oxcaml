@@ -138,9 +138,9 @@ module Make (S : Ssa.Finished_graph) = struct
       (fun bi -> Format.fprintf ppf "  %a@." print_instruction bi)
       blk.body;
     Format.fprintf ppf "  %a" print_terminator blk.terminator;
-    (match S.exception_successor blk with
+    (match S.trap_successor blk with
     | None -> ()
-    | Some h -> Format.fprintf ppf " exception_successor=%a" print_block_id h);
+    | Some h -> Format.fprintf ppf " trap_successor=%a" print_block_id h);
     Format.fprintf ppf "@.@."
 
   let print ppf =

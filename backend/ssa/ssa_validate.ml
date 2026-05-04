@@ -6,14 +6,52 @@
 module Make (S : Ssa.Finished_graph) = struct
   module P = Ssa_print.Make (S)
 
-  let validate () =
-    let error fmt =
-      Format.kasprintf
-        (fun s ->
-          Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.fun_name s)
-        fmt
+  let error fmt =
+    Format.kasprintf
+      (fun s ->
+        Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.fun_name s)
+      fmt
+
+  let pb = P.print_block_id
+
+  (* The trap stack at entry to [bl] must agree across all predecessors: on a
+     normal edge it's the predecessor's [block_end_trap_stack]; on an trap edge
+     the runtime pops the handler, so the successor sees [List.tl] of the
+     predecessor's stack. *)
+  let check_trap_stacks (bl : S.Block.t) =
+    let trap_stack_at_entry_from (pred : S.Block.t) : S.Block.t list =
+      let via_exception_edge =
+        match S.trap_successor pred with
+        | Some h -> S.Block.equal h bl
+        | None -> false
+      in
+      if via_exception_edge
+      then List.tl pred.block_end_trap_stack
+      else pred.block_end_trap_stack
     in
-    let pb = P.print_block_id in
+    let print_trap_stack ppf stack =
+      Format.fprintf ppf "[%a]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+           pb)
+        stack
+    in
+    match S.predecessors bl with
+    | [] -> ()
+    | first_pred :: rest ->
+      let expected = trap_stack_at_entry_from first_pred in
+      rest
+      |> List.iter (fun pred ->
+          let actual = trap_stack_at_entry_from pred in
+          if not (List.equal S.Block.equal expected actual)
+          then
+            error
+              "block %a: trap-stack mismatch at entry — predecessor %a brings \
+               %a, predecessor %a brings %a"
+              pb bl pb first_pred print_trap_stack expected pb pred
+              print_trap_stack actual)
+
+  let validate () =
     let block_set = S.Block.Tbl.create 16 in
     List.iter (fun bl -> S.Block.Tbl.replace block_set bl ()) S.blocks;
     let block_exists b = S.Block.Tbl.mem block_set b in
@@ -69,7 +107,7 @@ module Make (S : Ssa.Finished_graph) = struct
                appear in a block body"
               pb bl)
         bl.body;
-      match bl.terminator with
+      (match bl.terminator with
       | Goto { args; _ } -> check_args bl args
       | Branch { cond; _ } -> check_arg bl cond
       | Switch { index; _ } -> check_arg bl index
@@ -78,7 +116,8 @@ module Make (S : Ssa.Finished_graph) = struct
       | Tailcall_self { args; _ } -> check_args bl args
       | Tailcall_func { args; _ } -> check_args bl args
       | Call { args; _ } -> check_args bl args
-      | Invalid { args; _ } -> check_args bl args
+      | Invalid { args; _ } -> check_args bl args);
+      check_trap_stacks bl
     in
     List.iter visit_block S.blocks
 end
