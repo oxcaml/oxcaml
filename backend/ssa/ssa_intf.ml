@@ -421,6 +421,12 @@ module type Finished_graph = sig
 
   val successors : Block.t -> Block.t list
 
+  (** The implicit exception successor of [blk]: the topmost handler in
+      [block_end_trap_stack] when the terminator can raise (a [Raise] or a
+      [Call] with [may_raise = true]); [None] otherwise, or when the trap stack
+      is empty (the exception escapes the function). *)
+  val exception_successor : Block.t -> Block.t option
+
   val dominates : Block.t -> Block.t -> bool
 
   val common_dominator : Block.t -> Block.t -> Block.t

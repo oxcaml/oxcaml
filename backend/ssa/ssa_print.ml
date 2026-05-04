@@ -140,7 +140,11 @@ module Make (S : Ssa.Finished_graph) = struct
     Array.iter
       (fun bi -> Format.fprintf ppf "  %a@." print_instruction bi)
       blk.body;
-    Format.fprintf ppf "  %a@.@." print_terminator blk.terminator
+    Format.fprintf ppf "  %a" print_terminator blk.terminator;
+    (match S.exception_successor blk with
+    | None -> ()
+    | Some h -> Format.fprintf ppf " exception_successor=%a" print_block_id h);
+    Format.fprintf ppf "@.@."
 
   let print ppf =
     Format.fprintf ppf "ssa %s(%a)@." S.function_info.fun_name Printcmm.machtype
