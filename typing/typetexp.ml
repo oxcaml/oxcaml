@@ -885,26 +885,40 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
-          let default_arity = Ctype.arity arg_cty.ctyp_type in
-          let za =
-            Builtin_attributes.get_zero_alloc_attribute
-              ~in_signature:false
-              ~on_application:false
-              ~on_function_argument:true
-              ~default_arity
-              arg_cty.ctyp_attributes
-          in
+          let fun_arity = Ctype.arity arg_cty.ctyp_type in
           let zero_alloc =
-            match za with
-            | Check {arity; _} when arity = 0 || default_arity = 0 ->
-              raise (Error (loc, env, Zero_alloc_attr_non_function))
-            | Check {arity; _} when arity <> default_arity ->
-              raise (Error (loc, env,
-                            Zero_alloc_arity_mismatch (arity, default_arity)))
-            | Check za -> Some za
-            | Assume _ ->
-              raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
-            | Ignore_assert_all | Default_zero_alloc -> None
+            if fun_arity = 0 then
+              let za =
+                Builtin_attributes.get_zero_alloc_attribute
+                  ~in_signature:false
+                  ~on_application:false
+                  ~on_function_argument:false
+                  ~default_arity:None
+                  arg_cty.ctyp_attributes
+              in
+              (match za with
+              | Check _ ->
+                raise (Error (loc, env, Zero_alloc_attr_non_function))
+              | Assume _ ->
+                raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+              | Ignore_assert_all | Default_zero_alloc -> None)
+            else
+              let za =
+                Builtin_attributes.get_zero_alloc_attribute
+                  ~in_signature:false
+                  ~on_application:false
+                  ~on_function_argument:true
+                  ~default_arity:(Some fun_arity)
+                  arg_cty.ctyp_attributes
+              in
+              (match za with
+              | Check {arity; _} when fun_arity <> arity ->
+                raise (Error (loc, env,
+                              Zero_alloc_arity_mismatch (arity, fun_arity)))
+              | Check za -> Some za
+              | Assume _ ->
+                raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+              | Ignore_assert_all | Default_zero_alloc -> None)
           in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
@@ -1187,12 +1201,22 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | Ptyp_arrow _ -> true
         | _ -> false
       in
+      let default_arity =
+        if on_function_argument then
+          let rec count_arrows = function
+            | Ptyp_arrow (_, _, st, _, _) -> 1 + count_arrows st.ptyp_desc
+            | _ -> 0
+          in
+          Some (count_arrows st.ptyp_desc)
+        else
+          None
+      in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute
           ~in_signature:false
           ~on_application:false
           ~on_function_argument
-          ~default_arity:0
+          ~default_arity
           styp.ptyp_attributes
       in
       let zero_alloc =
@@ -1202,8 +1226,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           | Assume _ ->
             raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
           | Default_zero_alloc | Ignore_assert_all -> None
-          (* arity=0 means no explicit arity; will be inferred in
-             transl_type_poly *)
           | Check check -> Some check
         end
       in
@@ -1341,40 +1363,47 @@ and transl_type_poly env ~policy ~row_context ~zero_alloc mode loc vars st =
       ~post:(fun (_,_,cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
-  let default_arity = Ctype.arity ty in
-  (* Validate and resolve a zero_alloc check against the inner type.
-     arity=0 in the check means "no explicit arity was given"; we infer it
-     from the inner type.  A non-zero arity must match exactly. *)
+  let fun_arity = Ctype.arity ty in
   let resolve_check err_loc (check : Zero_alloc.check) =
-    let arity =
-      if check.arity = 0 then default_arity
-      else check.arity
-    in
-    if arity = 0 then
-      raise (Error (err_loc, env, Zero_alloc_attr_non_function))
-    else if arity <> default_arity then
+    if check.arity <> fun_arity then
       raise (Error (err_loc, env,
-        Zero_alloc_arity_mismatch (arity, default_arity)))
+        Zero_alloc_arity_mismatch (check.arity, fun_arity)))
     else
-      Some { check with arity }
+      Some check
   in
   let zero_alloc =
     match zero_alloc with
     | Some check -> resolve_check loc check
     | None ->
-      let za =
-        Builtin_attributes.get_zero_alloc_attribute
-          ~in_signature:false
-          ~on_application:false
-          ~on_function_argument:true
-          ~default_arity
-          st.ptyp_attributes
-      in
-      match za with
-      | Check check -> resolve_check st.ptyp_loc check
-      | Assume _ ->
-        raise (Error (st.ptyp_loc, env, Invalid_payload_arg_zero_alloc))
-      | Ignore_assert_all | Default_zero_alloc -> None
+      if fun_arity = 0 then
+        let za =
+          Builtin_attributes.get_zero_alloc_attribute
+            ~in_signature:false
+            ~on_application:false
+            ~on_function_argument:false
+            ~default_arity:None
+            st.ptyp_attributes
+        in
+        (match za with
+        | Check _ ->
+          raise (Error (st.ptyp_loc, env, Zero_alloc_attr_non_function))
+        | Assume _ ->
+          raise (Error (st.ptyp_loc, env, Invalid_payload_arg_zero_alloc))
+        | Ignore_assert_all | Default_zero_alloc -> None)
+      else
+        let za =
+          Builtin_attributes.get_zero_alloc_attribute
+            ~in_signature:false
+            ~on_application:false
+            ~on_function_argument:true
+            ~default_arity:(Some fun_arity)
+            st.ptyp_attributes
+        in
+        (match za with
+        | Check check -> resolve_check st.ptyp_loc check
+        | Assume _ ->
+          raise (Error (st.ptyp_loc, env, Invalid_payload_arg_zero_alloc))
+        | Ignore_assert_all | Default_zero_alloc -> None)
   in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in

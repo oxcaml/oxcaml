@@ -356,7 +356,6 @@ type error =
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Wrong_arg_zero_alloc of Zero_alloc.error
   | Unsupported_arg_zero_alloc
-  | Must_provide_zero_alloc_arity
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
   | Zero_alloc_arity_mismatch of int * int

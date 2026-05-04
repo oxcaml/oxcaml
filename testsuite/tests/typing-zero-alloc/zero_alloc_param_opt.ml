@@ -85,9 +85,9 @@ val f : ((int -> int) [@zero_alloc opt arity 1]) -> int [@@zero_alloc] =
 let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
   fun (g [@zero_alloc opt arity 1]) -> g 42;;  (* should fail in the frontend *)
 [%%expect {|
-Line 2, characters 6-35:
+Line 2, characters 2-43:
 2 |   fun (g [@zero_alloc opt arity 1]) -> g 42;;  (* should fail in the frontend *)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "zero_alloc" attribute on this function parameter conflicts
        with the one on its type.
        The former provides a weaker "zero_alloc" guarantee than the latter.

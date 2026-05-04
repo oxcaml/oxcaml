@@ -86,9 +86,9 @@ val f : ((int -> int) [@zero_alloc arity 1]) -> int [@@zero_alloc] = <fun>
 let[@zero_alloc] f : ((int -> int -> int) [@zero_alloc]) -> int =
   fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
 [%%expect {|
-Line 2, characters 6-31:
+Line 2, characters 2-43:
 2 |   fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "zero_alloc" attribute on this function parameter conflicts
        with the one on its type.
        When using "zero_alloc" on function parameters, the arities in the
@@ -127,9 +127,9 @@ val f : ((int -> int) [@zero_alloc strict arity 1]) -> int [@@zero_alloc] =
 let[@zero_alloc] f : ((int -> int) [@zero_alloc strict]) -> int =
   fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
 [%%expect {|
-Line 2, characters 6-31:
+Line 2, characters 2-39:
 2 |   fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "zero_alloc" attribute on this function parameter conflicts
        with the one on its type.
        The former provides a weaker "zero_alloc" guarantee than the latter.
@@ -186,9 +186,9 @@ val f : ((int -> int) [@zero_alloc opt arity 1]) -> int [@@zero_alloc] =
 let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
   fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
 [%%expect {|
-Line 2, characters 6-35:
+Line 2, characters 2-43:
 2 |   fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "zero_alloc" attribute on this function parameter conflicts
        with the one on its type.
        The former provides a weaker "zero_alloc" guarantee than the latter.
@@ -515,9 +515,9 @@ val w2 :
 let w3 : ('a. 'a -> int) [@zero_alloc] -> int =
   fun (f [@zero_alloc arity 1]) -> f 123;;
 [%%expect {|
-Line 1, characters 9-45:
+Line 1, characters 27-37:
 1 | let w3 : ('a. 'a -> int) [@zero_alloc] -> int =
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                               ^^^^^^^^^^
 Error: "zero_alloc" attributes on function arguments require the argument
        to be a function type.
 |}];;
@@ -546,9 +546,9 @@ Error: The arity in the "zero_alloc" attribute (2) does not match the
 let w6 : ('a. 'a) [@zero_alloc] -> int =
   fun _ -> 1;;
 [%%expect {|
-Line 1, characters 9-17:
+Line 1, characters 20-30:
 1 | let w6 : ('a. 'a) [@zero_alloc] -> int =
-             ^^^^^^^^
+                        ^^^^^^^^^^
 Error: "zero_alloc" attributes on function arguments require the argument
        to be a function type.
 |}];;
@@ -920,9 +920,9 @@ module type S_ext_bad_nonfun = sig
   external f : (int [@zero_alloc]) -> int = "f"
 end;;
 [%%expect {|
-Line 2, characters 15-41:
+Line 2, characters 22-32:
 2 |   external f : (int [@zero_alloc]) -> int = "f"
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                          ^^^^^^^^^^
 Error: "zero_alloc" attributes on function arguments require the argument
        to be a function type.
 |}];;

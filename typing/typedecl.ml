@@ -4246,7 +4246,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
   let v =
   match valdecl.pval_prim with
     [] when Env.is_in_signature env ->
-      let default_arity =
+      let fun_arity =
         let rec count_arrows n ty =
           match get_desc ty with
           | Tarrow (_, _, t2, _) -> count_arrows (n+1) t2
@@ -4254,27 +4254,35 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         count_arrows 0 ty
       in
+      let default_arity =
+        if fun_arity = 0 then None else Some fun_arity
+      in
       let zero_alloc =
-        Builtin_attributes.get_zero_alloc_attribute
-          ~in_signature:true
-          ~on_application:false
-          ~on_function_argument:false
-          ~default_arity
-          valdecl.pval_attributes
+        (try
+          Builtin_attributes.get_zero_alloc_attribute
+            ~in_signature:true
+            ~on_application:false
+            ~on_function_argument:false
+            ~default_arity
+            valdecl.pval_attributes
+        with
+        | Builtin_attributes.Error_builtin
+            (_, Builtin_attributes.Zero_alloc_attr_non_function) ->
+          raise (Error (valdecl.pval_loc, Zero_alloc_attr_non_function)))
       in
       let zero_alloc =
         match zero_alloc with
         | Default_zero_alloc ->
           (* We fabricate a "Check" attribute if a top-level annotation
              specifies that all functions should be checked for zero alloc. *)
-          if default_arity = 0 then begin
+          if fun_arity = 0 then begin
             check_for_hidden_arrow env loc ty;
             Zero_alloc.default
           end else
             let create_const ~opt =
               Zero_alloc.create_const
                 (Check { strict = false;
-                         arity = default_arity;
+                         arity = fun_arity;
                          custom_error_msg = None;
                          loc;
                          opt })
@@ -4285,7 +4293,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
              | Assert_all_opt -> create_const ~opt:true)
         | Ignore_assert_all -> Zero_alloc.ignore_assert_all
         | Check {arity; _} ->
-          if default_arity = 0 && arity <= 0 then
+          if fun_arity = 0 && arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_non_function));
           if arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_bad_user_arity));
