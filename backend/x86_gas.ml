@@ -344,8 +344,7 @@ let format_asm_for_expect_asm ~name ~body =
     | Mem ({ sym; _ } as addr) ->
       Mem { addr with sym = Option.map rewrite_str sym }
     | Mem64_RIP (typ, s, displ) -> Mem64_RIP (typ, rewrite_str s, displ)
-    | (Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _) as a
-      ->
+    | (Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _) as a ->
       a
   in
   let body =
