@@ -18,7 +18,7 @@ one_or_two_element_list:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L110
+  jb    .L5
 .L0:
   leaq  8(%r15), %rdi
   movq  $2048, -8(%rdi)
@@ -32,7 +32,7 @@ one_or_two_element_list:
 .L1:
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L113
+  jb    .L3
 .L2:
   leaq  8(%r15), %rax
   movq  $2048, -8(%rax)
@@ -40,6 +40,14 @@ one_or_two_element_list:
   movq  %rdi, 8(%rax)
   addq  $8, %rsp
   ret
+.L3:
+  call  .Lcaml_call_gc_
+.L4:
+  jmp   .L2
+.L5:
+  call  .Lcaml_call_gc_
+.L6:
+  jmp   .L0
 |}]
 
 
@@ -72,7 +80,7 @@ spill_slot_lifetime:
 .L3:
   subq  $40, %r15
   cmpq  (%r14), %r15
-  jb    .L116
+  jb    .L5
 .L4:
   leaq  8(%r15), %rax
   movabsq $72057594037932032, %rbx
@@ -86,6 +94,10 @@ spill_slot_lifetime:
   vmovsd %xmm0, 24(%rax)
   addq  $24, %rsp
   ret
+.L5:
+  call  .Lcaml_call_gc_sse_
+.L6:
+  jmp   .L4
 
 spill_slot_lifetime.get_one:
   vmovsd .L122(%rip), %xmm0

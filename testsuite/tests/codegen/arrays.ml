@@ -130,7 +130,7 @@ poly_unsafe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L112
+  jb    .L2
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
@@ -141,6 +141,10 @@ poly_unsafe_get:
 .L1:
   movq  -4(%rdi,%rbx,4), %rax
   ret
+.L2:
+  call  .Lcaml_call_gc_
+.L3:
+  jmp   .L0
 |}]
 
 let poly_unsafe_set (a : 'a array) (i : int) (v : 'a) =
@@ -485,7 +489,7 @@ poly_safe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L126
+  jb    .L3
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
@@ -503,6 +507,10 @@ poly_safe_get:
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L3:
+  call  .Lcaml_call_gc_
+.L4:
+  jmp   .L0
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =

@@ -172,7 +172,7 @@ two_element_list:
   movq  %rax, %rbx
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rdi
   addq  $24, %rdi
@@ -185,6 +185,10 @@ two_element_list:
   movq  %rdi, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 
@@ -267,11 +271,15 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   .L105
+  jbe   .L1
 .L0:
   movl  $1, %eax
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 (* Cross-type conversions between unboxed types *)

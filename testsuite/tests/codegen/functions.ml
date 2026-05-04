@@ -38,7 +38,7 @@ mutual_recursion:
   subq  $8, %rsp
   subq  $56, %r15
   cmpq  (%r14), %r15
-  jb    .L106
+  jb    .L1
 .L0:
   leaq  8(%r15), %rdi
   movq  $6391, -8(%rdi)
@@ -55,6 +55,10 @@ mutual_recursion:
   leaq  24(%rdi), %rbx
   addq  $8, %rsp
   jmp   camlTOP3__f_5_8_code@PLT
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 
 mutual_recursion.f:
   movq  %rbx, %rdi
@@ -97,7 +101,7 @@ f:
   jge   .L1
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L128
+  jb    .L6
 .L0:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
@@ -110,7 +114,7 @@ f:
 .L1:
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L131
+  jb    .L4
 .L2:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
@@ -124,6 +128,14 @@ f:
   movq  (%rbx), %rdi
   addq  $8, %rsp
   jmp   *%rdi
+.L4:
+  call  .Lcaml_call_gc_
+.L5:
+  jmp   .L2
+.L6:
+  call  .Lcaml_call_gc_
+.L7:
+  jmp   .L0
 |}]
 
 

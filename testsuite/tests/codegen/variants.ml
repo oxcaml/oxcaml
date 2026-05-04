@@ -270,7 +270,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L124
+  jl    .L8
 .L0:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -282,7 +282,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L126
+  jl    .L7
 .L2:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -294,7 +294,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L128
+  jl    .L6
 .L4:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -306,4 +306,13 @@ double_match:
   movq  %rsi, 64(%r14)
   addq  $8, %rsp
   ret
+.L6:
+  call  caml_call_local_realloc@PLT
+  jmp   .L4
+.L7:
+  call  caml_call_local_realloc@PLT
+  jmp   .L2
+.L8:
+  call  caml_call_local_realloc@PLT
+  jmp   .L0
 |}]

@@ -381,7 +381,7 @@ unsigned_to_int:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L115
+  jb    .L2
 .L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
@@ -392,6 +392,10 @@ unsigned_to_int:
 .L1:
   movl  $1, %eax
   ret
+.L2:
+  call  .Lcaml_call_gc_
+.L3:
+  jmp   .L0
 |}]
 
 let of_float x = Int64_u.of_float x
@@ -409,13 +413,17 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_sse_
+.L2:
+  jmp   .L0
 |}]
 
 let of_int32 x = Int64_u.of_int32 x
@@ -432,7 +440,7 @@ to_int32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L106
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -442,6 +450,10 @@ to_int32:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let of_nativeint x = Int64_u.of_nativeint x
@@ -458,7 +470,7 @@ to_nativeint:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -467,6 +479,10 @@ to_nativeint:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let of_int32_u x = Int64_u.of_int32_u x
@@ -509,7 +525,7 @@ float_of_bits:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
@@ -517,6 +533,10 @@ float_of_bits:
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 (* CR ttebbi: Subtraction should be done on byte registers. *)
@@ -613,7 +633,7 @@ to_int64:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -622,6 +642,10 @@ to_int64:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let of_int64 x = Int64_u.of_int64 x

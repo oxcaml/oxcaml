@@ -357,7 +357,7 @@ double_loop_no_definition_at_beginning:
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    .L156
+  jl    .L6
 .L1:
   addq  72(%r14), %rbx
   addq  $8, %rbx
@@ -400,6 +400,9 @@ double_loop_no_definition_at_beginning:
   movl  $1, %eax
   addq  $72, %rsp
   ret
+.L6:
+  call  caml_call_local_realloc@PLT
+  jmp   .L1
 
 double_loop_no_definition_at_beginning.f:
   movq  24(%rbx), %rsi
