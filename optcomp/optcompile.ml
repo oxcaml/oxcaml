@@ -368,7 +368,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     let files =
       List.map
         (fun f ->
-          if Sys.file_exists f then f
+          if Sys.file_exists f
+          then f
           else Compenv.fatal (Printf.sprintf "File %s not found" f))
         files
     in
