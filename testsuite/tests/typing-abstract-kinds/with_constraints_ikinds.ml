@@ -1,4 +1,5 @@
 (* TEST
+   flags = "-ikinds";
    expect;
 *)
 
@@ -785,17 +786,13 @@ module F2(X : S with kind_ k := immediate) = struct
 end
 
 [%%expect {|
-module F1 :
-  functor
-    (X : sig
-           kind_ k = immediate
-           type t : immediate
-           type s : value mod portable with t
-         end)
-    -> sig type r = X.s end
-module F2 :
-  functor (X : sig type t : immediate type s : value mod portable with t end)
-    -> sig type r = X.s end
+Line 2, characters 2-35:
+2 |   type r : value mod portable = X.s
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "X.s" is value mod portable with X.t
+         because of the definition of s at line 4, characters 2-36.
+       But the kind of type "X.s" must be a subkind of value mod portable
+         because of the definition of r at line 2, characters 2-35.
 |}]
 
 module F1(X : S with kind_ k = value) = struct
@@ -805,9 +802,9 @@ end
 Line 2, characters 2-35:
 2 |   type r : value mod portable = X.s
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "X.s" is value mod portable with X.t
+Error: The kind of type "X/2.s" is value mod portable with X/2.t
          because of the definition of s at line 4, characters 2-36.
-       But the kind of type "X.s" must be a subkind of value mod portable
+       But the kind of type "X/2.s" must be a subkind of value mod portable
          because of the definition of r at line 2, characters 2-35.
 |}]
 
@@ -819,9 +816,9 @@ end
 Line 2, characters 2-35:
 2 |   type r : value mod portable = X.s
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "X/2.s" is value mod portable with X/2.t
+Error: The kind of type "X/3.s" is value mod portable with X/3.t
          because of the definition of s at line 4, characters 2-36.
-       But the kind of type "X/2.s" must be a subkind of value mod portable
+       But the kind of type "X/3.s" must be a subkind of value mod portable
          because of the definition of r at line 2, characters 2-35.
 |}]
 
