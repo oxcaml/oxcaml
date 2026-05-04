@@ -1407,6 +1407,20 @@ Error: The primitive [foo] is used in an invalid declaration.
 Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
+external error_with_multiple_hints
+  : #(int * int) -> #(int * int) -> #(int * int * int)
+  = "foo" "bar"
+[%%expect{|
+Line 2, characters 4-54:
+2 |   : #(int * int) -> #(int * int) -> #(int * int * int)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
+|}]
+
 type t = #{ i : int; b : bool }
 external ext_record_return_with_attr_u : int -> (t [@unboxed]) = "foo"
 [%%expect{|

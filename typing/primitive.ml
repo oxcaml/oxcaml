@@ -65,14 +65,17 @@ type 'repr description_gen =
 
 type description = native_repr description_gen
 
+(* Is [[@@immediate]], so poly-compare can be used to de-dup errors. If a [loc]
+   is added, then errors will always be unique and de-duping will no longer be
+   necessary. *)
 type wrong_repr_error =
   | Product_arg
   | Expected_value_prim
   | Product_return
   | Unpacked_product_return
   | Repr_mismatch
+[@@immediate]
 
-(* [wrong_repr_error] is immediate, so poly-compare is ok *)
 let compare_wrong_repr_error (a : wrong_repr_error) (b : wrong_repr_error) =
   Stdlib.compare a b
 
@@ -489,7 +492,7 @@ module Repr_check = struct
     (prim.prim_native_repr_args @ [prim.prim_native_repr_res])
     |> List.map snd
 
-  let is expected_repr repr =
+  let is expected_repr repr : wrong_repr_error list =
     if equal_native_repr expected_repr repr
     then []
     else [Repr_mismatch]
@@ -529,6 +532,12 @@ module Repr_check = struct
     | Same_as_ocaml_repr (Genvar _) ->
       Misc.fatal_error "c_stub_return_errors: genvar"
 
+  (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
+     each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
+     If the returned list is empty, then the check succeeded. For example,
+     [check [any; is (Same_as_ocaml_repr C.scannable)] prim_desc] checks that
+     [prim_desc] accepts a single argument of any layout and returns a
+     scannable value. *)
   let check checks prim =
     let reprs = args_res_reprs prim in
     if List.length reprs <> List.length checks
