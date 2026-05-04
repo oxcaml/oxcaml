@@ -528,6 +528,7 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
           fd_cmm Ssa_print.print ssa;
         Printexc.raise_with_backtrace exn bt);
+     let ssa = Ssa_tail_call.run ssa in
      let cfg_from_ssa_for_compare =
        (* First conversion: used only for [Cfg_compare], so we emit a CFG that
           stays faithful to plain [cfg_selectgen]. No optimizations here. Labels

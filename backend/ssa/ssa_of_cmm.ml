@@ -14,29 +14,29 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
 
   let ( let* ) x f = match x with Never_returns -> Never_returns | Ok x -> f x
 
-  (* The result of emitting an expression: the produced values and the
-     unfinished_block to continue building into. *)
-  type result = (B.Instruction.t array * B.unfinished_block) or_never_returns
+  (* The result of emitting an expression: just the produced values. The
+     [unfinished_block ref] passed through emission is mutated in place; on
+     [Never_returns] its contents are no longer meaningful and the caller must
+     re-bind it (typically via [B.start_block]) before emitting again. *)
+  type result = B.Instruction.t array or_never_returns
 
-  type static_handler =
-    { handler_block : B.Block.t;
-      traps_ref : SU.trap_stack_info ref
+  type static_handler = { handler_block : B.Block.t }
+
+  (* Per-handler local state used by [emit_catch] while translating a [Ccatch].
+     The slim {!static_handler} stored in the env carries only what other
+     functions need ([handler_block] for [Goto]/[Push_trap]/[Pop_trap] targets,
+     ; [handler_info] is the working record kept locally. *)
+  type handler_info =
+    { params : (VP.t * Cmm.machtype) list;
+      body : Cmm.expression;
+      handler_params : B.Instruction.t array;
+      handler_ub : B.unfinished_block ref
     }
 
   type env =
     { vars : B.Instruction.t array V.Map.t;
-      static_exceptions : static_handler Static_label.Map.t;
-      trap_stack : Operation.trap_stack;
-      tailrec_block : B.Block.t
+      static_exceptions : static_handler Static_label.Map.t
     }
-
-  let current_exn_continuation env : B.Block.t option =
-    match env.trap_stack with
-    | Operation.Uncaught -> None
-    | Specific_trap (static_label, _) -> (
-      match Static_label.Map.find_opt static_label env.static_exceptions with
-      | Some handler -> Some handler.handler_block
-      | None -> None)
 
   let env_find v env =
     try V.Map.find v env.vars
@@ -45,57 +45,43 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
   let env_add v instrs env =
     { env with vars = V.Map.add (VP.var v) instrs env.vars }
 
+  (* === [unfinished_block ref] helpers ================================= *)
+
+  (* Emit [i] into [b] without binding its result. *)
+  let emit_instruction_no_res (b : B.unfinished_block ref) (i : B.Instruction.t)
+      : unit =
+    let nb, _ = B.emit_instruction !b i in
+    b := nb
+
+  (* Single-result wrapper around [B.emit_op]. *)
+  let emit_op (b : B.unfinished_block ref) ~op ~dbg ~typ ~args : B.Instruction.t
+      =
+    let nb, i = B.emit_op !b ~op ~dbg ~typ ~args in
+    b := nb;
+    i
+
+  (* Emit an Op and return its results as an array. *)
+  let emit_op_res b ?(dbg = Debuginfo.none) op typ args : B.Instruction.t array
+      =
+    let i = emit_op b ~op ~dbg ~typ ~args in
+    if Array.length typ = 1
+    then [| i |]
+    else
+      Array.init (Array.length typ) (fun index ->
+          B.Instruction.make_proj ~index i)
+
+  let finish_block (b : B.unfinished_block ref) ~dbg term =
+    B.finish_block !b ~dbg term
+
   let bind_let env b v r1 =
     let env = env_add v r1 env in
     let provenance = VP.provenance v in
-    let b =
-      if Option.is_some provenance
-      then
-        let b, _ =
-          B.emit_instruction b
-            (Name_for_debugger
-               { ident = VP.var v;
-                 provenance;
-                 which_parameter = None;
-                 regs = r1
-               })
-        in
-        b
-      else b
-    in
-    env, b
-
-  let insert_op_debug b op dbg args typ :
-      B.unfinished_block * B.Instruction.t array =
-    let b, i = B.emit_op b ~op ~dbg ~typ ~args in
-    if Array.length typ = 1
-    then b, [| i |]
-    else
-      let arr =
-        Array.init (Array.length typ) (fun index ->
-            B.Instruction.make_proj ~index i)
-      in
-      b, arr
-
-  let insert_op b op args typ = insert_op_debug b op Debuginfo.none args typ
-
-  let pop_all_traps env =
-    let rec pop_all acc = function
-      | Operation.Uncaught -> acc
-      | Operation.Specific_trap (lbl, t) -> pop_all (Cmm.Pop lbl :: acc) t
-    in
-    pop_all [] env.trap_stack |> List.rev
-
-  let set_traps_for_raise env =
-    match env.trap_stack with
-    | Operation.Uncaught -> ()
-    | Specific_trap (lbl, _) -> (
-      match Static_label.Map.find_opt lbl env.static_exceptions with
-      | Some handler ->
-        SU.set_traps lbl handler.traps_ref env.trap_stack [Pop lbl]
-      | None ->
-        Misc.fatal_errorf "Ssa_of_cmm: trap %a not registered in env"
-          Static_label.format lbl)
+    if Option.is_some provenance
+    then
+      emit_instruction_no_res b
+        (Name_for_debugger
+           { ident = VP.var v; provenance; which_parameter = None; regs = r1 });
+    env
 
   let chunk_of_component (c : Cmm.machtype_component) : Cmm.memory_chunk =
     match c with
@@ -105,7 +91,6 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     | Vec256 -> Twofiftysix_unaligned
     | Vec512 -> Fivetwelve_unaligned
     | Val | Int | Addr | Valx2 -> Word_val
-
 
   let size_of_cmm_expr env (e : Cmm.expression) =
     let rec size (e : Cmm.expression) =
@@ -132,10 +117,9 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     in
     size e
 
-  let emit_branch b (test : Operation.test) rarg ~true_block ~false_block :
-      B.unfinished_block * B.Terminator.t =
-    let make_cond b op args =
-      B.emit_op b ~op ~dbg:Debuginfo.none ~typ:Cmm.typ_int ~args
+  let emit_branch b (test : Operation.test) rarg ~true_block ~false_block =
+    let make_cond op args =
+      emit_op b ~op ~dbg:Debuginfo.none ~typ:Cmm.typ_int ~args
     in
     let is_comparison (v : B.Instruction.t) =
       match v with
@@ -150,33 +134,36 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         true
       | _ -> false
     in
-    let wrap_truth_test b v =
+    let wrap_truth_test v =
       if is_comparison v
-      then make_cond b (Intop_imm (Icomp Cne, 0)) [| v |]
-      else b, v
+      then make_cond (Intop_imm (Icomp Cne, 0)) [| v |]
+      else v
     in
-    match test with
-    | Itruetest ->
-      let b, cond = wrap_truth_test b rarg.(0) in
-      b, B.Terminator.Branch { cond; ifso = true_block; ifnot = false_block }
-    | Ifalsetest ->
-      let b, cond = wrap_truth_test b rarg.(0) in
-      b, B.Terminator.Branch { cond; ifso = false_block; ifnot = true_block }
-    | Iinttest cmp ->
-      let b, cond = make_cond b (Intop (Icomp cmp)) rarg in
-      b, B.Terminator.Branch { cond; ifso = true_block; ifnot = false_block }
-    | Iinttest_imm (cmp, n) ->
-      let b, cond = make_cond b (Intop_imm (Icomp cmp, n)) [| rarg.(0) |] in
-      b, B.Terminator.Branch { cond; ifso = true_block; ifnot = false_block }
-    | Ifloattest (w, cmp) ->
-      let b, cond = make_cond b (Floatop (w, Icompf cmp)) rarg in
-      b, B.Terminator.Branch { cond; ifso = true_block; ifnot = false_block }
-    | Ioddtest ->
-      let b, cond = make_cond b (Intop_imm (Iand, 1)) [| rarg.(0) |] in
-      b, B.Terminator.Branch { cond; ifso = true_block; ifnot = false_block }
-    | Ieventest ->
-      let b, cond = make_cond b (Intop_imm (Iand, 1)) [| rarg.(0) |] in
-      b, B.Terminator.Branch { cond; ifso = false_block; ifnot = true_block }
+    let term : B.Terminator.t =
+      match test with
+      | Itruetest ->
+        let cond = wrap_truth_test rarg.(0) in
+        Branch { cond; ifso = true_block; ifnot = false_block }
+      | Ifalsetest ->
+        let cond = wrap_truth_test rarg.(0) in
+        Branch { cond; ifso = false_block; ifnot = true_block }
+      | Iinttest cmp ->
+        let cond = make_cond (Intop (Icomp cmp)) rarg in
+        Branch { cond; ifso = true_block; ifnot = false_block }
+      | Iinttest_imm (cmp, n) ->
+        let cond = make_cond (Intop_imm (Icomp cmp, n)) [| rarg.(0) |] in
+        Branch { cond; ifso = true_block; ifnot = false_block }
+      | Ifloattest (w, cmp) ->
+        let cond = make_cond (Floatop (w, Icompf cmp)) rarg in
+        Branch { cond; ifso = true_block; ifnot = false_block }
+      | Ioddtest ->
+        let cond = make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |] in
+        Branch { cond; ifso = true_block; ifnot = false_block }
+      | Ieventest ->
+        let cond = make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |] in
+        Branch { cond; ifso = false_block; ifnot = true_block }
+    in
+    finish_block b ~dbg:Debuginfo.none term
 
   let rec emit_parts env b ~effects_after exp =
     let module EC = SU.Effect_and_coeffect in
@@ -197,16 +184,16 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
           | Arbitrary | Raise -> false))
     in
     if may_defer_evaluation && Sel.is_simple_expr exp
-    then Some (exp, env, b)
+    then Some (exp, env)
     else
       match emit env b exp ~tail:false with
       | Never_returns -> None
-      | Ok (r, b) ->
+      | Ok r ->
         if Array.length r = 0
-        then Some (Cmm.Ctuple [], env, b)
+        then Some (Cmm.Ctuple [], env)
         else
           let id = V.create_local "bind" in
-          Some (Cmm.Cvar id, { env with vars = V.Map.add id r env.vars }, b)
+          Some (Cmm.Cvar id, { env with vars = V.Map.add id r env.vars })
 
   and emit_parts_list env b exp_list =
     let module EC = SU.Effect_and_coeffect in
@@ -221,27 +208,27 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       (fun acc (exp, effects_after) ->
         match acc with
         | None -> None
-        | Some (result, env, b) -> (
+        | Some (result, env) -> (
           match emit_parts env b ~effects_after exp with
           | None -> None
-          | Some (exp_result, env, b) -> Some (exp_result :: result, env, b)))
-      (Some ([], env, b))
+          | Some (exp_result, env) -> Some (exp_result :: result, env)))
+      (Some ([], env))
       exp_list_right_to_left
 
   and emit_tuple_not_flattened env b exp_list : _ or_never_returns =
-    let rec emit_list b = function
-      | [] -> Ok ([], b)
+    let rec emit_list = function
+      | [] -> Ok []
       | exp :: rem -> (
-        let* loc_rem, b = emit_list b rem in
+        let* loc_rem = emit_list rem in
         match emit env b exp ~tail:false with
         | Never_returns -> Never_returns
-        | Ok (loc_exp, b) -> Ok (loc_exp :: loc_rem, b))
+        | Ok loc_exp -> Ok (loc_exp :: loc_rem))
     in
-    emit_list b exp_list
+    emit_list exp_list
 
   and emit_tuple env b exp_list : result =
-    let* l, b = emit_tuple_not_flattened env b exp_list in
-    Ok (Array.concat l, b)
+    let* l = emit_tuple_not_flattened env b exp_list in
+    Ok (Array.concat l)
 
   and emit_stores env b dbg (args : Cmm.expression list) regs_addr =
     let byte_offset = ref (-Arch.size_int) in
@@ -249,34 +236,31 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       ref (Arch.offset_addressing Arch.identity_addressing !byte_offset)
     in
     let base = ref regs_addr in
-    let reset_addressing b =
-      let b, tmp =
-        B.emit_op b
+    let reset_addressing () =
+      let tmp =
+        emit_op b
           ~op:(SU.make_const_int (Nativeint.of_int !byte_offset))
           ~dbg ~typ:Cmm.typ_int ~args:[||]
       in
       assert (!byte_offset > 0);
-      let b, new_base =
-        B.emit_op b ~op:(Operation.Intop Iadd) ~dbg ~typ:Cmm.typ_addr
+      let new_base =
+        emit_op b ~op:(Operation.Intop Iadd) ~dbg ~typ:Cmm.typ_addr
           ~args:[| !base; tmp |]
       in
       base := new_base;
       byte_offset := 0;
-      addressing_mode := Arch.identity_addressing;
-      b
+      addressing_mode := Arch.identity_addressing
     in
-    let advance b bytes =
+    let advance bytes =
       byte_offset := !byte_offset + bytes;
       match Cfg_selection.is_offset_out_of_range !byte_offset with
       | Within_range ->
-        addressing_mode := Arch.offset_addressing !addressing_mode bytes;
-        b
-      | Out_of_range -> reset_addressing b
+        addressing_mode := Arch.offset_addressing !addressing_mode bytes
+      | Out_of_range -> reset_addressing ()
     in
     let is_store (op : Operation.t) =
       match op with Store (_, _, _) -> true | _ -> false
     in
-    let b = ref b in
     let for_one_arg arg =
       let original_arg = arg in
       let select_store_result =
@@ -287,9 +271,8 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         | Maybe_out_of_range | Use_default -> arg
         | Rewritten (_, arg) -> arg
       in
-      match emit env !b arg ~tail:false with
-      | Ok (regs, new_b) -> (
-        b := new_b;
+      match emit env b arg ~tail:false with
+      | Ok regs -> (
         let operation_replacing_store =
           match select_store_result with
           | Maybe_out_of_range -> None
@@ -301,229 +284,187 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
           Array.iter
             (fun (r : B.Instruction.t) ->
               let chunk = chunk_of_component (B.Instruction.arg_type r) in
-              let nb, _ =
-                B.emit_op !b
-                  ~op:(Operation.Store (chunk, !addressing_mode, false))
-                  ~dbg ~typ:[||] ~args:[| r; !base |]
-              in
-              b := nb;
-              b
-                := advance !b
-                     (Select_utils.size_component (B.Instruction.arg_type r)))
+              ignore
+                (emit_op b
+                   ~op:(Operation.Store (chunk, !addressing_mode, false))
+                   ~dbg ~typ:[||] ~args:[| r; !base |]
+                  : B.Instruction.t);
+              advance (Select_utils.size_component (B.Instruction.arg_type r)))
             regs
         | Some op ->
-          let nb, _ =
-            B.emit_op !b ~op ~dbg ~typ:[||]
-              ~args:(Array.append regs [| !base |])
-          in
-          b := nb;
-          b := advance !b (size_of_cmm_expr env original_arg))
+          ignore
+            (emit_op b ~op ~dbg ~typ:[||] ~args:(Array.append regs [| !base |])
+              : B.Instruction.t);
+          advance (size_of_cmm_expr env original_arg))
       | Never_returns ->
         Misc.fatal_error "Ssa_of_cmm.emit_stores: never_returns"
     in
-    List.iter for_one_arg args;
-    !b
+    List.iter for_one_arg args
 
   and emit env b (exp : Cmm.expression) ~tail : result =
     let r =
       match exp with
-      | Clet (v, e1, e2) -> (
-        match emit env b e1 ~tail:false with
-        | Never_returns -> Never_returns
-        | Ok (r1, b) ->
-          let env, b = bind_let env b v r1 in
-          emit env b e2 ~tail)
+      | Clet (v, e1, e2) ->
+        let* r1 = emit env b e1 ~tail:false in
+        let env = bind_let env b v r1 in
+        emit env b e2 ~tail
       | Cphantom_let (_var, _defining_expr, body) -> emit env b body ~tail
-      | Csequence (e1, e2) -> (
-        match emit env b e1 ~tail:false with
-        | Never_returns -> Never_returns
-        | Ok (_, b) -> emit env b e2 ~tail)
-      | Cop
-          ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
-        when tail ->
-        emit_tail_apply env b ty op args dbg
+      | Csequence (e1, e2) ->
+        let* _ = emit env b e1 ~tail:false in
+        emit env b e2 ~tail
       | Cifthenelse (econd, _ifso_dbg, eif, _ifnot_dbg, eelse, _dbg) ->
         emit_ifthenelse env b ~tail econd eif eelse
       | Cswitch (esel, index, ecases, _dbg) ->
         emit_switch env b ~tail esel index ecases
       | Ccatch (_, [], e1) -> emit env b e1 ~tail
-      | Ccatch (_flag, handlers, body) -> emit_catch env b ~tail handlers body
+      | Ccatch (flag, handlers, body) ->
+        emit_catch env b ~tail flag handlers body
       (* Leaf expressions *)
       | Cconst_int (n, _dbg) ->
-        let b, instrs =
-          insert_op b (SU.make_const_int (Nativeint.of_int n)) [||] Cmm.typ_int
-        in
-        Ok (instrs, b)
+        Ok
+          (emit_op_res b
+             (SU.make_const_int (Nativeint.of_int n))
+             Cmm.typ_int [||])
       | Cconst_natint (n, _dbg) ->
-        let b, instrs = insert_op b (SU.make_const_int n) [||] Cmm.typ_int in
-        Ok (instrs, b)
+        Ok (emit_op_res b (SU.make_const_int n) Cmm.typ_int [||])
       | Cconst_float32 (n, _dbg) ->
-        let b, instrs =
-          insert_op b
-            (SU.make_const_float32 (Int32.bits_of_float n))
-            [||] Cmm.typ_float32
-        in
-        Ok (instrs, b)
+        Ok
+          (emit_op_res b
+             (SU.make_const_float32 (Int32.bits_of_float n))
+             Cmm.typ_float32 [||])
       | Cconst_float (n, _dbg) ->
-        let b, instrs =
-          insert_op b
-            (SU.make_const_float (Int64.bits_of_float n))
-            [||] Cmm.typ_float
-        in
-        Ok (instrs, b)
+        Ok
+          (emit_op_res b
+             (SU.make_const_float (Int64.bits_of_float n))
+             Cmm.typ_float [||])
       | Cconst_vec128 (bits, _dbg) ->
-        let b, instrs =
-          insert_op b (SU.make_const_vec128 bits) [||] Cmm.typ_vec128
-        in
-        Ok (instrs, b)
+        Ok (emit_op_res b (SU.make_const_vec128 bits) Cmm.typ_vec128 [||])
       | Cconst_vec256 (bits, _dbg) ->
-        let b, instrs =
-          insert_op b (Operation.Const_vec256 bits) [||] Cmm.typ_vec256
-        in
-        Ok (instrs, b)
+        Ok (emit_op_res b (Operation.Const_vec256 bits) Cmm.typ_vec256 [||])
       | Cconst_vec512 (bits, _dbg) ->
-        let b, instrs =
-          insert_op b (Operation.Const_vec512 bits) [||] Cmm.typ_vec512
-        in
-        Ok (instrs, b)
+        Ok (emit_op_res b (Operation.Const_vec512 bits) Cmm.typ_vec512 [||])
       | Cconst_symbol (n, _dbg) ->
-        let b, instrs = insert_op b (SU.make_const_symbol n) [||] Cmm.typ_int in
-        Ok (instrs, b)
-      | Cvar v -> Ok (env_find v env, b)
-      | Ctuple [] -> Ok ([||], b)
+        Ok (emit_op_res b (SU.make_const_symbol n) Cmm.typ_int [||])
+      | Cvar v -> Ok (env_find v env)
+      | Ctuple [] -> Ok [||]
       | Ctuple exp_list -> (
         match emit_parts_list env b exp_list with
         | None -> Never_returns
-        | Some (simple_list, ext_env, b) -> emit_tuple ext_env b simple_list)
-      | Cop (Craise k, args, dbg) -> emit_expr_raise env b k args dbg
+        | Some (simple_list, ext_env) -> emit_tuple ext_env b simple_list)
+      | Cop (Craise k, args, dbg) ->
+        let* r = emit_tuple env b args in
+        finish_block b ~dbg (Raise { raise_kind = k; args = r });
+        Never_returns
       | Cop (Copaque, args, dbg) -> (
         match emit_parts_list env b args with
         | None -> Never_returns
-        | Some (simple_args, env, b) ->
-          let* rs, b = emit_tuple env b simple_args in
+        | Some (simple_args, env) ->
+          let* rs = emit_tuple env b simple_args in
           let typ = Array.map B.Instruction.arg_type rs in
-          let b, instrs = insert_op_debug b Opaque dbg rs typ in
-          Ok (instrs, b))
-      | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
-        match emit env b arg ~tail:false with
-        | Never_returns -> Never_returns
-        | Ok (loc_exp, b) ->
-          let flat_size a =
-            Array.fold_left (fun acc t -> acc + Array.length t) 0 a
-          in
-          assert (Array.length loc_exp = flat_size fields_layout);
-          let before = Array.sub fields_layout 0 field in
-          let size_before = flat_size before in
-          Ok
-            ( Array.sub loc_exp size_before (Array.length fields_layout.(field)),
-              b ))
+          Ok (emit_op_res b ~dbg Opaque typ rs))
+      | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) ->
+        let* loc_exp = emit env b arg ~tail:false in
+        let flat_size a =
+          Array.fold_left (fun acc t -> acc + Array.length t) 0 a
+        in
+        assert (Array.length loc_exp = flat_size fields_layout);
+        let before = Array.sub fields_layout 0 field in
+        let size_before = flat_size before in
+        Ok (Array.sub loc_exp size_before (Array.length fields_layout.(field)))
       | Cop (op, args, dbg) -> emit_expr_op env b op args dbg
       | Cexit (lbl, args, traps) -> emit_expr_exit env b lbl args traps
       | Cinvalid { message; symbol } -> emit_invalid env b message symbol
     in
-    match r with
-    | Ok _ when tail -> insert_return env r (pop_all_traps env)
-    | _ -> r
+    match r with Ok _ when tail -> insert_return b r | _ -> r
 
-  and insert_return env (r : result) (traps : Cmm.trap_action list) : result =
+  and insert_return b (r : result) : result =
     match r with
     | Never_returns -> Never_returns
-    | Ok (r, b) ->
-      let b = emit_trap_actions env b traps in
-      B.finish_block b ~dbg:Debuginfo.none (Return { args = r });
+    | Ok r ->
+      finish_block b ~dbg:Debuginfo.none (Return { args = r });
       Never_returns
 
   and emit_invalid env b message symbol =
     let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
-    let* arg_instrs, b = emit_tuple env b [arg_expr] in
+    let* arg_instrs = emit_tuple env b [arg_expr] in
     if !SU.current_function_is_check_enabled
     then (
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:Cmm.typ_int
       in
-      B.finish_block b ~dbg:Debuginfo.none
+      finish_block b ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = Some cont_block });
-      set_traps_for_raise env;
-      Ok (cont_params, B.start_block cont_block))
+      b := B.start_block cont_block;
+      Ok cont_params)
     else (
-      B.finish_block b ~dbg:Debuginfo.none
+      finish_block b ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = None });
-      set_traps_for_raise env;
       Never_returns)
 
-  and emit_expr_raise env b k args dbg =
-    let* r, b = emit_tuple env b args in
-    let handler_block = current_exn_continuation env in
-    B.finish_block b ~dbg
-      (Raise { raise_kind = k; args = r; handler = handler_block });
-    set_traps_for_raise env;
-    Never_returns
-
-  and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
-      dbg : result =
+  and emit_call _env b ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
+      result =
     let ty =
       match new_op with
-      | Terminator (Prim { op = External { ty_res; _ }; _ }) -> ty_res
+      | Prim { op = External { ty_res; _ }; _ } -> ty_res
       | _ -> ty
     in
     match new_op with
-    | Terminator (Call { op = call_op; _ }) ->
+    | Call { op = call_op; _ } ->
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:ty
       in
-      let exn_cont = current_exn_continuation env in
-      B.finish_block b ~dbg
+      finish_block b ~dbg
         (Call
            { op = Func call_op;
              args = arg_instrs;
              continuation = cont_block;
-             exn_continuation = exn_cont
+             may_raise = Cfg.can_raise_terminator new_op;
+             nontail
            });
-      set_traps_for_raise env;
-      Ok (cont_params, B.start_block cont_block)
-    | Terminator (Prim { op = External ({ ty_res; _ } as ext_call); _ }) ->
+      b := B.start_block cont_block;
+      Ok cont_params
+    | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:ty_res
       in
-      let exn_cont = current_exn_continuation env in
-      B.finish_block b ~dbg
+      finish_block b ~dbg
         (Call
            { op = Prim (External ext_call);
              args = arg_instrs;
              continuation = cont_block;
-             exn_continuation = exn_cont
+             may_raise = Cfg.can_raise_terminator new_op;
+             nontail
            });
-      set_traps_for_raise env;
-      Ok (cont_params, B.start_block cont_block)
-    | Terminator (Prim { op = Probe _ as probe_op; _ }) ->
+      b := B.start_block cont_block;
+      Ok cont_params
+    | Prim { op = Probe _ as probe_op; _ } ->
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:ty
       in
-      B.finish_block b ~dbg
+      finish_block b ~dbg
         (Call
            { op = Prim probe_op;
              args = arg_instrs;
              continuation = cont_block;
-             exn_continuation = None
+             may_raise = Cfg.can_raise_terminator new_op;
+             nontail
            });
-      set_traps_for_raise env;
-      Ok (cont_params, B.start_block cont_block)
-    | Terminator (Call_no_return _) ->
-      B.finish_block b ~dbg
-        (Invalid { message = "unreachable"; args = [||]; continuation = None });
-      set_traps_for_raise env;
-      Never_returns
-    | Basic _ ->
-      Misc.fatal_errorf "Ssa_of_cmm.emit_expr_op_cont: unexpected basic"
-    | Terminator term ->
+      b := B.start_block cont_block;
+      Ok cont_params
+    | Call_no_return _ ->
+      Misc.fatal_errorf
+        "Ssa_of_cmm: Currently unused codepath, implement if hit"
+    | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
+    | Invalid _ ->
       Misc.fatal_errorf "Ssa_of_cmm: unexpected terminator (%a)"
         (Cfg.dump_terminator ~sep:"")
-        term
+        new_op
 
   and emit_expr_op env b op args dbg : result =
     match emit_parts_list env b args with
     | None -> Never_returns
-    | Some (simple_args, env, b) -> (
+    | Some (simple_args, env) -> (
       let ty = SU.oper_result_type op in
       let new_op, new_args =
         Sel.select_operation op simple_args dbg ~label_after:Label.none
@@ -543,303 +484,208 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
               mode
             }
         in
-        let b, rd = B.emit_op b ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
-        set_traps_for_raise env;
-        let b = emit_stores env b dbg new_args rd in
-        Ok ([| rd |], b)
+        let rd = emit_op b ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
+        emit_stores env b dbg new_args rd;
+        Ok [| rd |]
       | _ -> (
-        let* arg_instrs, b = emit_tuple env b new_args in
+        let* arg_instrs = emit_tuple env b new_args in
         match new_op with
-        | Terminator _ -> emit_expr_op_cont env b ~ty new_op arg_instrs dbg
-        | Basic (Op op) ->
-          let b, instrs = insert_op_debug b op dbg arg_instrs ty in
-          Ok (instrs, b)
+        | Terminator term ->
+          (* Mirror the [Rc_normal] check in [Cfg_selectgen.emit_tail]:
+             [Rc_normal] is the only [region_close] eligible for tail-call
+             optimization at this level. [Rc_close_at_apply] (close region and
+             tail call) is desugared by Flambda2 before reaching Cmm. *)
+          let nontail =
+            match[@warning "-4"] op with
+            | Cmm.Capply { region; _ } -> (
+              match (region : Lambda.region_close) with
+              | Rc_normal -> false
+              | Rc_nontail | Rc_close_at_apply -> true)
+            | _ -> true
+          in
+          emit_call env b ~ty ~nontail term arg_instrs dbg
+        | Basic (Op op) -> Ok (emit_op_res b ~dbg op ty arg_instrs)
         | Basic basic ->
           Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Cfg.dump_basic
             basic))
 
   and emit_ifthenelse env b ~tail econd eif eelse : result =
     let cond, earg = Sel.select_condition econd in
-    match emit env b earg ~tail:false with
-    | Never_returns -> Never_returns
-    | Ok (rarg, b) ->
-      let { B.block = then_block; _ } = B.new_block ~params:[||] in
-      let { B.block = else_block; _ } = B.new_block ~params:[||] in
-      let b, term =
-        emit_branch b cond rarg ~true_block:then_block ~false_block:else_block
-      in
-      B.finish_block b ~dbg:Debuginfo.none term;
-      let r_then = emit env (B.start_block then_block) eif ~tail in
-      let r_else = emit env (B.start_block else_block) eelse ~tail in
-      if tail
-      then (
-        assert (match r_then with Never_returns -> true | Ok _ -> false);
-        assert (match r_else with Never_returns -> true | Ok _ -> false);
-        Never_returns)
-      else join_branches r_then r_else
+    let* rarg = emit env b earg ~tail:false in
+    let { B.block = then_block; _ } = B.new_block ~params:[||] in
+    let { B.block = else_block; _ } = B.new_block ~params:[||] in
+    emit_branch b cond rarg ~true_block:then_block ~false_block:else_block;
+    let then_b = ref (B.start_block then_block) in
+    let r_then = emit env then_b eif ~tail in
+    let else_b = ref (B.start_block else_block) in
+    let r_else = emit env else_b eelse ~tail in
+    join_branches b (r_then, then_b) (r_else, else_b)
 
   and emit_switch env b ~tail esel index ecases : result =
-    match emit env b esel ~tail:false with
-    | Never_returns -> Never_returns
-    | Ok (rsel, b) ->
-      let case_blocks =
-        Array.map
-          (fun (_case_expr, _dbg) ->
-            let { B.block; _ } = B.new_block ~params:[||] in
-            block)
-          ecases
-      in
-      let targets = Array.map (fun idx -> case_blocks.(idx)) index in
-      let index =
-        assert (Array.length rsel = 1);
-        rsel.(0)
-      in
-      B.finish_block b ~dbg:Debuginfo.none (Switch { index; targets });
-      let case_results =
-        Array.mapi
-          (fun i (case_expr, _dbg) ->
-            emit env (B.start_block case_blocks.(i)) case_expr ~tail)
-          ecases
-      in
-      if tail
-      then (
-        Array.iter
-          (fun r ->
-            assert (match r with Never_returns -> true | Ok _ -> false))
-          case_results;
-        Never_returns)
-      else join_array case_results
+    let* rsel = emit env b esel ~tail:false in
+    let case_blocks =
+      Array.map
+        (fun (_case_expr, _dbg) ->
+          let { B.block; _ } = B.new_block ~params:[||] in
+          block)
+        ecases
+    in
+    let targets = Array.map (fun idx -> case_blocks.(idx)) index in
+    let index =
+      assert (Array.length rsel = 1);
+      rsel.(0)
+    in
+    finish_block b ~dbg:Debuginfo.none (Switch { index; targets });
+    let case_results =
+      Array.mapi
+        (fun i (case_expr, _dbg) ->
+          let case_b = ref (B.start_block case_blocks.(i)) in
+          emit env case_b case_expr ~tail, case_b)
+        ecases
+    in
+    join_array b case_results
 
-  and emit_catch env b ~tail handlers body : result =
-    let { B.block = body_block; _ } = B.new_block ~params:[||] in
-    let body_ub = B.start_block body_block in
+  and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
     (* Create one block per handler up front so they can refer to one another
        (mutually recursive [Recursive] handlers). All handlers are emitted
        unconditionally, regardless of whether the body or peer handlers reach
-       them — later passes drop unreachable blocks. *)
-    let handler_infos =
-      List.map
-        (fun Cmm.{ label = nfail; params; body = h_body; _ } ->
+       them — The SSA graph builder will drop unreachable blocks. *)
+    let _ = flag in
+    let env, handler_infos =
+      List.fold_left_map
+        (fun env Cmm.{ label = nfail; params; body = h_body; _ } ->
           let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
           let { B.block = handler_block; params = handler_params } =
             B.new_block ~params:types
           in
-          let traps_ref = ref SU.Unreachable in
-          ( nfail,
-            params,
-            h_body,
-            handler_block,
-            handler_params,
-            B.start_block handler_block,
-            traps_ref ))
-        handlers
+          let info =
+            { params;
+              body = h_body;
+              handler_params;
+              handler_ub = ref (B.start_block handler_block)
+            }
+          in
+          let env =
+            { env with
+              static_exceptions =
+                Static_label.Map.add nfail { handler_block }
+                  env.static_exceptions
+            }
+          in
+          env, info)
+        env handlers
     in
-    let env =
-      List.fold_left
-        (fun env (nfail, _, _, handler_block, _, _, traps_ref) ->
-          { env with
-            static_exceptions =
-              Static_label.Map.add nfail
-                { handler_block; traps_ref }
-                env.static_exceptions
-          })
-        env handler_infos
-    in
-    B.finish_block b ~dbg:Debuginfo.none
-      (Goto { goto = body_block; args = [||] });
-    let r_body = emit env body_ub body ~tail in
-    let translate_handler params handler_block handler_params handler_ub
-        traps_ref handler_body =
-      (* If no [Cexit]/raise populated [traps_ref], the handler is dead and its
-         trap stack defaults to the ambient one; later passes drop the resulting
-         unreachable block and rewrite [Push_trap]/[Pop_trap] references to
-         [None]. *)
-      let trap_stack =
-        match !traps_ref with
-        | SU.Reachable trap_stack -> trap_stack
-        | SU.Unreachable -> env.trap_stack
-      in
-      let handler_env = { env with trap_stack } in
+    (* The body is not a [Cexit] target — handlers always jump to a
+       [handler_block], not to a [body_block] — so we emit the body straight
+       into the current cursor [b] rather than spinning up a one-instruction
+       pass-through block. *)
+    let r_body = emit env b body ~tail in
+    let translate_handler (info : handler_info) =
       let handler_env =
         let param_idx = ref 0 in
         List.fold_left
           (fun env (id, ty) ->
             let n = Array.length ty in
             let proj_instrs =
-              Array.init n (fun i -> Array.get handler_params (!param_idx + i))
+              Array.init n (fun i ->
+                  Array.get info.handler_params (!param_idx + i))
             in
             param_idx := !param_idx + n;
             env_add id proj_instrs env)
-          handler_env params
+          env info.params
       in
-      let handler_ub =
-        List.fold_left
-          (fun ub (id, _ty) ->
-            let provenance = VP.provenance id in
-            if Option.is_some provenance
-            then
-              let regs = V.Map.find (VP.var id) handler_env.vars in
-              let ub, _ =
-                B.emit_instruction ub
-                  (Name_for_debugger
-                     { ident = VP.var id;
-                       provenance;
-                       which_parameter = None;
-                       regs
-                     })
-              in
-              ub
-            else ub)
-          handler_ub params
-      in
-      ignore (handler_block : B.Block.t);
-      emit handler_env handler_ub handler_body ~tail
+      List.iter
+        (fun (id, _ty) ->
+          let provenance = VP.provenance id in
+          if Option.is_some provenance
+          then
+            let regs = V.Map.find (VP.var id) handler_env.vars in
+            emit_instruction_no_res info.handler_ub
+              (Name_for_debugger
+                 { ident = VP.var id; provenance; which_parameter = None; regs }))
+        info.params;
+      emit handler_env info.handler_ub info.body ~tail
     in
-    let all_results =
-      Array.of_list
-        (r_body
-        :: List.map
-             (fun ( _nfail,
-                    params,
-                    h_body,
-                    handler_block,
-                    handler_params,
-                    handler_ub,
-                    traps_ref ) ->
-               translate_handler params handler_block handler_params handler_ub
-                 traps_ref h_body)
-             handler_infos)
+    let handler_results =
+      List.map
+        (fun info -> translate_handler info, info.handler_ub)
+        handler_infos
     in
-    if tail
-    then (
-      assert (
-        Array.for_all
-          (fun r -> match r with Never_returns -> true | Ok _ -> false)
-          all_results);
-      Never_returns)
-    else join_array all_results
+    join_array b (Array.of_list ((r_body, b) :: handler_results))
 
-  and find_handler env handler_id =
+  and find_handler env handler_id : static_handler =
     try Static_label.Map.find handler_id env.static_exceptions
     with Not_found ->
       Misc.fatal_errorf "Ssa_of_cmm: unbound trap handler %a"
         Static_label.format handler_id
 
   and emit_trap_actions env b traps =
-    List.fold_left
-      (fun b (trap : Cmm.trap_action) ->
+    List.iter
+      (fun (trap : Cmm.trap_action) ->
         let h =
-          match trap with
-          | Push handler_id -> find_handler env handler_id
-          | Pop handler_id -> find_handler env handler_id
+          (find_handler env
+             (match trap with Push handler_id | Pop handler_id -> handler_id))
+            .handler_block
         in
-        let b, _ =
-          B.emit_instruction b
-            (match trap with
-            | Push _ -> Push_trap { handler = Some h.handler_block }
-            | Pop _ -> Pop_trap { handler = Some h.handler_block })
-        in
-        b)
-      b traps
+        emit_instruction_no_res b
+          (match trap with
+          | Push _ -> Push_trap { handler = Some h }
+          | Pop _ -> Pop_trap { handler = Some h }))
+      traps
 
   and emit_expr_exit env b (lbl : Cmm.exit_label) args traps : result =
     match emit_parts_list env b args with
     | None -> Never_returns
-    | Some (simple_list, ext_env, b) -> (
+    | Some (simple_list, ext_env) -> (
       match lbl with
       | Lbl nfail ->
-        let* src, b = emit_tuple ext_env b simple_list in
+        let* src = emit_tuple ext_env b simple_list in
         let handler = find_handler env nfail in
-        let b = emit_trap_actions env b traps in
-        SU.set_traps nfail handler.traps_ref env.trap_stack traps;
-        B.finish_block b ~dbg:Debuginfo.none
+        emit_trap_actions env b traps;
+        finish_block b ~dbg:Debuginfo.none
           (Goto { goto = handler.handler_block; args = src });
         Never_returns
       | Return_lbl ->
-        let* src, b = emit_tuple ext_env b simple_list in
-        let b = emit_trap_actions env b traps in
-        B.finish_block b ~dbg:Debuginfo.none (Return { args = src });
+        let* src = emit_tuple ext_env b simple_list in
+        emit_trap_actions env b traps;
+        finish_block b ~dbg:Debuginfo.none (Return { args = src });
         Never_returns)
 
-  and emit_tail_apply env b _ty op args dbg : result =
-    match emit_parts_list env b args with
-    | None -> Never_returns
-    | Some (simple_args, env, b) -> (
-      let new_op, new_args =
-        Sel.select_operation op simple_args dbg ~label_after:Label.none
-      in
-      match emit_tuple env b new_args with
-      | Never_returns -> Never_returns
-      | Ok (arg_instrs, b) -> (
-        let can_tailcall call_op =
-          if not (trap_stack_is_empty env)
-          then false
-          else
-            let rarg =
-              match call_op with
-              | Cfg.Indirect _ ->
-                Array.sub arg_instrs 1 (Array.length arg_instrs - 1)
-              | Cfg.Direct _ -> arg_instrs
-            in
-            let arg_types = Array.map B.Instruction.arg_type rarg in
-            let _, stack_ofs_args = Proc.loc_arguments arg_types in
-            let res_type = SU.oper_result_type op in
-            let _, stack_ofs_res = Proc.loc_results_call res_type in
-            Stdlib.Int.max stack_ofs_args stack_ofs_res = 0
-        in
-        match new_op with
-        | Terminator (Call { op = Indirect callees; _ })
-          when can_tailcall (Indirect callees) ->
-          B.finish_block b ~dbg
-            (Tailcall_func { op = Indirect callees; args = arg_instrs });
-          Never_returns
-        | Terminator (Call { op = Direct func; _ })
-          when String.equal func.sym_name !SU.current_function_name
-               && can_tailcall (Direct func) ->
-          B.finish_block b ~dbg
-            (Tailcall_self
-               { destination = env.tailrec_block; args = arg_instrs });
-          Never_returns
-        | Terminator (Call { op = Direct func; _ })
-          when can_tailcall (Direct func) ->
-          B.finish_block b ~dbg
-            (Tailcall_func { op = Direct func; args = arg_instrs });
-          Never_returns
-        | _ ->
-          let ty = SU.oper_result_type op in
-          let r = emit_expr_op_cont env b ~ty new_op arg_instrs dbg in
-          insert_return env r (pop_all_traps env)))
-
-  and trap_stack_is_empty env =
-    match env.trap_stack with
-    | Operation.Uncaught -> true
-    | Specific_trap _ -> false
-
-  and join_branches (r1 : result) (r2 : result) : result =
+  (* Join two branches into a fresh block. After this call [b] points at the
+     joined block (or is unchanged if both branches did not return). *)
+  and join_branches b (r1, b1) (r2, b2) : result =
     match r1, r2 with
     | Never_returns, Never_returns -> Never_returns
-    | Ok (r, b), Never_returns | Never_returns, Ok (r, b) -> Ok (r, b)
-    | Ok (r1_instrs, b1), Ok (r2_instrs, b2) ->
+    | Ok r, Never_returns ->
+      b := !b1;
+      Ok r
+    | Never_returns, Ok r ->
+      b := !b2;
+      Ok r
+    | Ok r1_instrs, Ok r2_instrs ->
       assert (Array.length r1_instrs = Array.length r2_instrs);
       let join_types = Array.map B.Instruction.arg_type r1_instrs in
       let { B.block = join_block; params = join_params } =
         B.new_block ~params:join_types
       in
-      B.finish_block b1 ~dbg:Debuginfo.none
+      finish_block b1 ~dbg:Debuginfo.none
         (Goto { goto = join_block; args = r1_instrs });
-      B.finish_block b2 ~dbg:Debuginfo.none
+      finish_block b2 ~dbg:Debuginfo.none
         (Goto { goto = join_block; args = r2_instrs });
-      if Array.length join_types = 0
-      then Ok ([||], B.start_block join_block)
-      else Ok (join_params, B.start_block join_block)
+      b := B.start_block join_block;
+      Ok join_params
 
-  and join_array (results : result array) : result =
+  (* Join a set of branches (each with its own end-cursor) into a fresh block.
+     [b] is left pointing at the joined block, or unchanged if every branch did
+     not return. *)
+  and join_array b (results : (result * B.unfinished_block ref) array) : result
+      =
     let join_info = ref None in
     Array.iter
-      (fun r ->
+      (fun (r, _) ->
         match r with
         | Never_returns -> ()
-        | Ok (instrs, _b) -> (
+        | Ok instrs -> (
           let types = Array.map B.Instruction.arg_type instrs in
           match !join_info with
           | None -> join_info := Some types
@@ -859,16 +705,15 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         B.new_block ~params:join_types
       in
       Array.iter
-        (fun r ->
+        (fun (r, b_branch) ->
           match r with
           | Never_returns -> ()
-          | Ok (instrs, b) ->
-            B.finish_block b ~dbg:Debuginfo.none
+          | Ok instrs ->
+            finish_block b_branch ~dbg:Debuginfo.none
               (Goto { goto = join_block; args = instrs }))
         results;
-      if Array.length join_types = 0
-      then Ok ([||], B.start_block join_block)
-      else Ok (join_params, B.start_block join_block)
+      b := B.start_block join_block;
+      Ok join_params
 end
 
 let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
@@ -890,14 +735,8 @@ let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
     in
     let module B = (val Ssa.make_builder fi : Ssa.Standalone_graph_builder) in
     let module C = Make (B) in
-    let entry_block = B.entry in
-    let entry_ub = B.start_block entry_block in
     let env =
-      { C.vars = V.Map.empty;
-        static_exceptions = Static_label.Map.empty;
-        trap_stack = Operation.Uncaught;
-        tailrec_block = entry_block
-      }
+      { C.vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
     in
     let env, _offset =
       List.fold_left
@@ -909,7 +748,7 @@ let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
           C.env_add id projs env, offset + n)
         (env, 0) f.fun_args
     in
-    let r = C.emit env entry_ub f.fun_body ~tail:true in
+    let r = C.emit env (ref (B.start_block B.entry)) f.fun_body ~tail:true in
     assert (match r with Never_returns -> true | Ok _ -> false);
     B.finish ()
   with exn ->

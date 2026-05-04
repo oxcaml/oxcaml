@@ -191,8 +191,8 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
     end in
   (module Combined : Reducer)
 
-let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
-    (module Ssa.Finished_graph) =
+let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
+    (input : (module Ssa.Finished_graph)) : (module Ssa.Finished_graph) =
   let module In = (val input : Ssa.Finished_graph) in
   let module Out =
     (val Ssa.make_builder In.function_info : Ssa.Standalone_graph_builder)
@@ -227,7 +227,7 @@ let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
           | _ -> true)
         blk.predecessors
     in
-    if any_non_goto_pred
+    if any_non_goto_pred || keep_unused_ops
     then Array.init n Fun.id
     else
       let counts = blk.param_usage_counts in
@@ -262,10 +262,12 @@ let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
   let map_block_impl (old : In.Block.t) : Out.Block.t =
     In.Block.Tbl.find block_map old
   in
-  (* Select from [args] the entries at positions whose target params were
-     kept. *)
-  let filter_args_for (old : In.Block.t) (args : Out.Instruction.t array) :
-      Out.Instruction.t array =
+  (* Select from [args] the entries at positions whose target params were kept.
+     Filtering before [map_arg] avoids touching args that feed dropped params:
+     those args may be defined by dead [Op]s skipped by [visit_instruction], so
+     they are absent from [op_map]. *)
+  let filter_in_args_for (old : In.Block.t) (args : In.Instruction.t array) :
+      In.Instruction.t array =
     let kept = In.Block.Tbl.find kept_params old in
     if Array.length kept = Array.length args
     then args
@@ -311,7 +313,7 @@ let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
   let rewrite_terminator_impl (t : In.Terminator.t) : Out.Terminator.t =
     match t with
     | Goto { goto; args } ->
-      let mapped_args = filter_args_for goto (Array.map map_arg_impl args) in
+      let mapped_args = Array.map map_arg_impl (filter_in_args_for goto args) in
       Goto { goto = map_block_impl goto; args = mapped_args }
     | Branch { cond; ifso; ifnot } ->
       Branch
@@ -325,24 +327,19 @@ let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
           targets = Array.map map_block_impl targets
         }
     | Return { args } -> Return { args = map_args args }
-    | Raise { raise_kind; args; handler } ->
-      let handler = Option.map map_block_impl handler in
-      Option.iter
-        (fun h ->
-          assert (Array.length args = Array.length (Out.Block.params h)))
-        handler;
-      Raise { raise_kind; args = map_args args; handler }
+    | Raise { raise_kind; args } -> Raise { raise_kind; args = map_args args }
     | Tailcall_self { destination; args } ->
       let destination = map_block_impl destination in
       assert (Array.length args = Array.length (Out.Block.params destination));
       Tailcall_self { destination; args = map_args args }
     | Tailcall_func { op; args } -> Tailcall_func { op; args = map_args args }
-    | Call { op; args; continuation; exn_continuation } ->
+    | Call { op; args; continuation; may_raise; nontail } ->
       Call
         { op;
           args = map_args args;
           continuation = map_block_impl continuation;
-          exn_continuation = Option.map map_block_impl exn_continuation
+          may_raise;
+          nontail
         }
     | Invalid { message; args; continuation } ->
       Invalid
@@ -402,8 +399,10 @@ let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
              dropped (see [compute_kept]), and emitting them would propagate
              those dangling references into the new graph. An Op with
              [usage_count = 0] is by definition not referenced by any live
-             consumer. *)
-          | Op { usage_count = 0; _ } -> b
+             consumer. [keep_unused_ops] disables this filtering so the output
+             is structurally faithful to the input — used before [Cfg_compare]
+             so it can match the baseline pipeline. *)
+          | Op { usage_count = 0; _ } when not keep_unused_ops -> b
           | _ ->
             let rewritten : Out.Instruction.t =
               match i with
@@ -481,8 +480,8 @@ let run (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
   let module Red = M.Red in
   let module Ctx = M.Ctx in
   Red.analyze ();
-  (* Step 2: walk the input graph in [In.blocks] order, which already
-     guarantees each block's dominators come before it. *)
+  (* Step 2: walk the input graph in [In.blocks] order, which already guarantees
+     each block's dominators come before it. *)
   List.iter
     (fun (blk : In.Block.t) ->
       let out_blk = In.Block.Tbl.find block_map blk in

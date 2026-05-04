@@ -39,7 +39,8 @@ let make_builder (function_info : function_info) :
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
           mutable label_hint : Label.t option;
-          mutable param_usage_counts : usage_count array
+          mutable param_usage_counts : usage_count array;
+          mutable block_end_trap_stack : t list
         }
 
       val id : t -> Block_id.t
@@ -81,7 +82,8 @@ let make_builder (function_info : function_info) :
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
           mutable label_hint : Label.t option;
-          mutable param_usage_counts : usage_count array
+          mutable param_usage_counts : usage_count array;
+          mutable block_end_trap_stack : t list
         }
 
       let id b = b.id
@@ -256,8 +258,7 @@ let make_builder (function_info : function_info) :
         | Return of { args : Instruction.t array }
         | Raise of
             { raise_kind : Lambda.raise_kind;
-              args : Instruction.t array;
-              handler : Block.t option
+              args : Instruction.t array
             }
         | Tailcall_self of
             { destination : Block.t;
@@ -271,15 +272,14 @@ let make_builder (function_info : function_info) :
             { op : call_op;
               args : Instruction.t array;
               continuation : Block.t;
-              exn_continuation : Block.t option
+              may_raise : bool;
+              nontail : bool
             }
         | Invalid of
             { message : string;
               args : Instruction.t array;
               continuation : Block.t option
             }
-
-      val successors : t -> Block.t list
     end = struct
       type t =
         | Goto of
@@ -298,8 +298,7 @@ let make_builder (function_info : function_info) :
         | Return of { args : Instruction.t array }
         | Raise of
             { raise_kind : Lambda.raise_kind;
-              args : Instruction.t array;
-              handler : Block.t option
+              args : Instruction.t array
             }
         | Tailcall_self of
             { destination : Block.t;
@@ -313,29 +312,14 @@ let make_builder (function_info : function_info) :
             { op : call_op;
               args : Instruction.t array;
               continuation : Block.t;
-              exn_continuation : Block.t option
+              may_raise : bool;
+              nontail : bool
             }
         | Invalid of
             { message : string;
               args : Instruction.t array;
               continuation : Block.t option
             }
-
-      let successors (t : t) : Block.t list =
-        match t with
-        | Return _ | Tailcall_func _ -> []
-        | Raise { handler; _ } -> (
-          match handler with Some h -> [h] | None -> [])
-        | Goto { goto; _ } -> [goto]
-        | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
-        | Switch { targets; _ } -> Array.to_list targets
-        | Tailcall_self { destination; _ } -> [destination]
-        | Call { continuation; exn_continuation; _ } -> (
-          match exn_continuation with
-          | Some l -> [continuation; l]
-          | None -> [continuation])
-        | Invalid { continuation; _ } -> (
-          match continuation with Some l -> [l] | None -> [])
     end
 
     (* === Builder state === *)
@@ -373,7 +357,8 @@ let make_builder (function_info : function_info) :
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
         label_hint = None;
-        param_usage_counts = [||]
+        param_usage_counts = [||];
+        block_end_trap_stack = []
       }
 
     let create_block ~is_function_start ~params : Block.t =
@@ -386,7 +371,8 @@ let make_builder (function_info : function_info) :
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
         label_hint = None;
-        param_usage_counts = [||]
+        param_usage_counts = [||];
+        block_end_trap_stack = []
       }
 
     let make_block_result ~is_function_start ~params : new_block_result =
@@ -454,17 +440,12 @@ let make_builder (function_info : function_info) :
       | Tailcall_self { destination; args } ->
         check_args_arity ~term_name:"Tailcall_self" ~args
           ~expected:destination.params
-      | Raise { handler = Some h; args; _ } ->
-        check_args_arity ~term_name:"Raise" ~args ~expected:h.params
       | Branch { ifso; ifnot; _ } ->
         check_target_has_no_params ~term_name:"Branch" ifso;
         check_target_has_no_params ~term_name:"Branch" ifnot
       | Switch { targets; _ } ->
         Array.iter (check_target_has_no_params ~term_name:"Switch") targets
-      | Return _
-      | Raise { handler = None; _ }
-      | Tailcall_func _ | Call _ | Invalid _ ->
-        ()
+      | Return _ | Raise _ | Tailcall_func _ | Call _ | Invalid _ -> ()
 
     let finish_block (ub : unfinished_block) ~(dbg : Debuginfo.t)
         (term : Terminator.t) : unit =
@@ -482,8 +463,40 @@ let make_builder (function_info : function_info) :
     let predecessors (blk : Block.t) : Block.t list =
       Block_set.elements blk.predecessors
 
+    (* Structural successors of [t] — the block targets the terminator names
+       directly. Excludes the exception successor (which depends on the
+       enclosing block's [block_end_trap_stack]; see {!successors}). *)
+    let terminator_structural_successors (t : Terminator.t) : Block.t list =
+      match t with
+      | Return _ | Tailcall_func _ | Raise _ -> []
+      | Goto { goto; _ } -> [goto]
+      | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
+      | Switch { targets; _ } -> Array.to_list targets
+      | Tailcall_self { destination; _ } -> [destination]
+      | Call { continuation; _ } -> [continuation]
+      | Invalid { continuation; _ } -> (
+        match continuation with Some l -> [l] | None -> [])
+
+    (* The implicit exception successor of [blk]: the topmost handler in
+       [block_end_trap_stack], if the terminator can raise. *)
+    let exception_successor (blk : Block.t) : Block.t option =
+      let raises =
+        match blk.terminator with
+        | Raise _ -> true
+        | Call { may_raise; _ } -> may_raise
+        | Goto _ | Branch _ | Switch _ | Return _ | Tailcall_self _
+        | Tailcall_func _ | Invalid _ ->
+          false
+      in
+      if raises
+      then match blk.block_end_trap_stack with [] -> None | h :: _ -> Some h
+      else None
+
     let successors (blk : Block.t) : Block.t list =
-      Terminator.successors blk.terminator
+      let structural = terminator_structural_successors blk.terminator in
+      match exception_successor blk with
+      | None -> structural
+      | Some h -> structural @ [h]
 
     let rec dominates (a : Block.t) (b : Block.t) =
       Block.equal a b
@@ -513,24 +526,70 @@ let make_builder (function_info : function_info) :
 
     (* === Compute metadata: predecessors, dominators, use counts === *)
 
+    (* Apply the [Push_trap]/[Pop_trap] effects of [body] to [start_stack]. *)
+    let apply_body_trap_effects (start_stack : Block.t list)
+        (body : Instruction.t array) : Block.t list =
+      Array.fold_left
+        (fun stack (instr : Instruction.t) ->
+          match instr with
+          | Push_trap { handler = Some h } -> h :: stack
+          | Pop_trap { handler = Some _ } -> (
+            match stack with [] -> stack | _ :: rest -> rest)
+          | Push_trap { handler = None }
+          | Pop_trap { handler = None }
+          | Op _ | Block_param _ | Proj _ | Tuple _ | Stack_check _
+          | Name_for_debugger _ ->
+            stack)
+        start_stack body
+
     (* Forward search from [entry]: populates [predecessors] on each reachable
-       block, assigns DFS post-order numbers (immutable, used by the dominator
-       pass), and verifies that every reachable block has been finished. *)
+       block, computes [block_end_trap_stack] for each visited block (and uses
+       it to derive exception successors), and verifies that every reachable
+       block has been finished. Blocks ending in [Return] with a non-empty trap
+       stack get explicit [Pop_trap]s appended so the runtime stack is balanced
+       at function exit. *)
     let compute_reachability ~(entry : Block.t)
         ~(finished_blocks : Block.t list) : Block.t list =
       let visited = Block.Tbl.create 64 in
-      let worklist = ref [entry] in
+      let worklist = ref [entry, []] in
       while not (List.is_empty !worklist) do
-        let blk = List.hd !worklist in
+        let blk, start_stack = List.hd !worklist in
         worklist := List.tl !worklist;
         if not (Block.Tbl.mem visited blk)
         then begin
           Block.Tbl.add visited blk ();
+          let end_stack = apply_body_trap_effects start_stack blk.body in
+          let end_stack =
+            match blk.terminator with
+            | Return _ when not (List.is_empty end_stack) ->
+              (* Insert [Pop_trap]s for each remaining handler so the runtime
+                 trap stack is empty when the function returns. *)
+              let pops =
+                List.map
+                  (fun (h : Block.t) : Instruction.t ->
+                    Pop_trap { handler = Some h })
+                  end_stack
+              in
+              blk.body <- Array.append blk.body (Array.of_list pops);
+              []
+            | Return _ | Goto _ | Branch _ | Switch _ | Raise _
+            | Tailcall_self _ | Tailcall_func _ | Call _ | Invalid _ ->
+              end_stack
+          in
+          blk.block_end_trap_stack <- end_stack;
+          let push_succ (succ : Block.t) start_stack =
+            succ.predecessors <- Block_set.add blk succ.predecessors;
+            worklist := (succ, start_stack) :: !worklist
+          in
           List.iter
-            (fun (succ : Block.t) ->
-              succ.predecessors <- Block_set.add blk succ.predecessors;
-              worklist := succ :: !worklist)
-            (successors blk)
+            (fun succ -> push_succ succ end_stack)
+            (terminator_structural_successors blk.terminator);
+          match exception_successor blk with
+          | None -> ()
+          | Some h ->
+            (* On entry to an exception handler, the runtime has popped the
+               topmost handler off the trap stack. *)
+            push_succ h (List.tl end_stack)
         end
       done;
       let reachable_blocks =
