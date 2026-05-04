@@ -170,7 +170,7 @@ spill_unspill_loop_movement:
   movq  %rbx, %rax
   cmpq  $3, %rax
   jl    .L4
-  movq  %rdi, 24(%rsp)
+  movq  %rdi, 32(%rsp)
   movq  %rax, %rbx
   movq  %rax, (%rsp)
   sarq  $1, %rbx
@@ -188,19 +188,19 @@ spill_unspill_loop_movement:
   movq  16(%rsp), %rbx
   cmpq  $11, %rdx
   jle   .L3
-  movq  %rsi, 32(%rsp)
+  movq  %rsi, 24(%rsp)
   movq  %rdi, 8(%rsp)
   call  camlTOP9__f_20_23_code@PLT
 .L2:
   movq  (%rsp), %rax
   movq  8(%rsp), %rdi
-  movq  32(%rsp), %rsi
+  movq  24(%rsp), %rsi
   movq  16(%rsp), %rbx
 .L3:
   incq  %rdi
   cmpq  %rbx, %rdi
   jle   .L0
-  movq  24(%rsp), %rdi
+  movq  32(%rsp), %rdi
   jmp   .L5
 .L4:
   movl  $1, %esi
@@ -249,7 +249,7 @@ spill_xmm_on_caml_modify:
   movq  %rax, %r12
   vmovsd (%r12), %xmm0
   vmovsd %xmm0, (%rsp)
-  vmovsd .L112(%rip), %xmm0
+  vmovsd .L113(%rip), %xmm0
   vmovsd (%rsp), %xmm1
   vaddsd %xmm0, %xmm1, %xmm0
   vmovsd %xmm0, 8(%rsp)
@@ -344,15 +344,15 @@ double_loop_no_definition_at_beginning:
   movq  64(%r14), %rbx
   cmpq  $1, %rsi
   jl    .L5
-  movq  %rbx, 56(%rsp)
-  movq  %rdi, 8(%rsp)
-  movq  %rax, (%rsp)
+  movq  %rbx, 16(%rsp)
+  movq  %rdi, 32(%rsp)
+  movq  %rax, 24(%rsp)
   sarq  $1, %rsi
-  movq  %rsi, 24(%rsp)
+  movq  %rsi, 48(%rsp)
   xorl  %edx, %edx
 .L0:
   movq  64(%r14), %rbx
-  movq  %rbx, 48(%rsp)
+  movq  %rbx, 8(%rsp)
   movq  64(%r14), %rbx
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
@@ -367,34 +367,34 @@ double_loop_no_definition_at_beginning:
   movabsq $108086391056891911, %rcx
   movq  %rcx, 8(%rbx)
   leaq  1(%rdx,%rdx), %rcx
-  movq  %rdx, 40(%rsp)
+  movq  %rdx, (%rsp)
   movq  %rcx, 16(%rbx)
   movq  %rax, 24(%rbx)
-  movq  %rbx, 32(%rsp)
+  movq  %rbx, 56(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
   jne   .L4
 .L2:
   movq  (%rdx), %rax
-  movq  %rdx, 16(%rsp)
+  movq  %rdx, 40(%rsp)
   call  camlTOP15__f_33_37_code@PLT
 .L3:
-  movq  16(%rsp), %rdx
+  movq  40(%rsp), %rdx
   movq  8(%rdx), %rdx
-  movq  (%rsp), %rax
-  movq  8(%rsp), %rdi
-  movq  24(%rsp), %rsi
-  movq  32(%rsp), %rbx
+  movq  24(%rsp), %rax
+  movq  32(%rsp), %rdi
+  movq  48(%rsp), %rsi
+  movq  56(%rsp), %rbx
   testb $1, %dl
   je    .L2
 .L4:
-  movq  48(%rsp), %rbx
+  movq  8(%rsp), %rbx
   movq  %rbx, 64(%r14)
-  movq  40(%rsp), %rdx
+  movq  (%rsp), %rdx
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
-  movq  56(%rsp), %rbx
+  movq  16(%rsp), %rbx
 .L5:
   movq  %rbx, 64(%r14)
   movl  $1, %eax
@@ -553,7 +553,7 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L150(%rip), %xmm0
+  vmovsd .L158(%rip), %xmm0
   ret
 |}]
 

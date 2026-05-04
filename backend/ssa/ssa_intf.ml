@@ -195,13 +195,9 @@ module type Graph_builder = sig
             args : Instruction.t array;
             continuation : Block.t;
             may_raise : bool;
-                (** If [true], an exception escaping the call branches to the
-                    topmost handler in the enclosing block's
-                    [block_end_trap_stack]. *)
             nontail : bool
                 (** If [true], this call must not be tail-call optimized even if
-                    its continuation is a trivial [Return]. Set for [Cmm]
-                    [Capply]s with [Rc_nontail] (e.g. [[@nontail]]). *)
+                    its continuation is a trivial [Return]. *)
           }
       | Invalid of
           { message : string;
@@ -286,7 +282,7 @@ module type Finished_graph = sig
             (** Trap stack at the end of the block (after applying the body's
                 [Push_trap]/[Pop_trap] effects to the stack inherited from
                 predecessors), innermost handler first. Computed by
-                {!Ssa.finish} and used to resolve exception successors of the
+                {!Ssa.finish} and used to resolve trap successors of the
                 terminator: a [Call] with [may_raise = true] (or any [Raise])
                 branches to [List.hd block_end_trap_stack] when the stack is
                 non-empty. *)
@@ -408,13 +404,12 @@ module type Finished_graph = sig
 
   val predecessors : Block.t -> Block.t list
 
+  (** All successors of a block, including [trap_successor]. *)
   val successors : Block.t -> Block.t list
 
-  (** The implicit exception successor of [blk]: the topmost handler in
-      [block_end_trap_stack] when the terminator can raise (a [Raise] or a
-      [Call] with [may_raise = true]); [None] otherwise, or when the trap stack
-      is empty (the exception escapes the function). *)
-  val exception_successor : Block.t -> Block.t option
+  (** The implicit trap successor of [blk]: the topmost handler in
+      [block_end_trap_stack], if the terminator can raise. *)
+  val trap_successor : Block.t -> Block.t option
 
   val dominates : Block.t -> Block.t -> bool
 

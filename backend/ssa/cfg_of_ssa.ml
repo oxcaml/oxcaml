@@ -220,7 +220,7 @@ module Make (S : Ssa.Finished_graph) = struct
       main
 
   let is_exception_predecessor (pred : S.Block.t) (target : S.Block.t) =
-    match S.exception_successor pred with
+    match S.trap_successor pred with
     | Some h -> S.Block.equal h target
     | None -> false
 
@@ -241,11 +241,11 @@ module Make (S : Ssa.Finished_graph) = struct
     let is_call_continuation =
       S.Block.Tbl.find_opt env.call_result_locs block |> Option.is_some
     in
-    (* A trap handler block must only be reached via the exception path — a
-       [Raise] handler or a [Call]/[Prim] exception continuation. The runtime
-       supplies the exn bucket on those edges; a normal-path predecessor would
-       not, leaving the handler's first param undefined. Similarly, call
-       continuation blocks must only be reached via a call. *)
+    (* A trap handler block must only be reached via a [Raise] handler or a
+       [Call]/[Prim] trap continuation. The runtime supplies the exn bucket on
+       those edges; a normal-path predecessor would not, leaving the handler's
+       first param undefined. Similarly, call continuation blocks must only be
+       reached via a call. *)
     List.iter
       (fun (pred : S.Block.t) ->
         if
@@ -253,13 +253,11 @@ module Make (S : Ssa.Finished_graph) = struct
         then
           Misc.fatal_errorf
             "Cfg_of_ssa: %strap-handler block %d has predecessor %d reaching \
-             it via %s edge"
+             it via a %strap edge"
             (if is_trap_handler then "" else "non-")
             (block.id :> int)
             (pred.id :> int)
-            (if is_exception_predecessor pred block
-             then "a non-exception"
-             else "an excpetion");
+            (if is_exception_predecessor pred block then "" else "non-");
         if
           not (Bool.equal (is_call_predecessor pred block) is_call_continuation)
         then
@@ -404,7 +402,7 @@ module Make (S : Ssa.Finished_graph) = struct
         let exn_val = Array.map (get_reg env) args in
         let exn_bucket = [| Proc.loc_exn_bucket |] in
         let extra_dst =
-          match S.exception_successor block with
+          match S.trap_successor block with
           | Some hb ->
             let handler_regs = get_block_params_regs env hb in
             if Array.length handler_regs > 1
@@ -559,7 +557,7 @@ module Make (S : Ssa.Finished_graph) = struct
           loc_arg loc_res dbg
     in
     let is_trap_handler = S.Block.Tbl.mem env.trap_handlers block in
-    let exn = Option.map (label_of env) (S.exception_successor block) in
+    let exn = Option.map (label_of env) (S.trap_successor block) in
     let can_raise = Cfg.can_raise_terminator terminator.desc in
     { Cfg.start = label_of env block;
       body;

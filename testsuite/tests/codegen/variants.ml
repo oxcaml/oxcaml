@@ -205,7 +205,7 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L131(%rip), %rdx
+  leaq  .L135(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx

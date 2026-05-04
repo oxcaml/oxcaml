@@ -455,10 +455,9 @@ let make_builder (function_info : function_info) :
     let predecessors (blk : Block.t) : Block.t list =
       Block_set.elements blk.predecessors
 
-    (* Structural successors of [t] — the block targets the terminator names
-       directly. Excludes the exception successor (which depends on the
-       enclosing block's [block_end_trap_stack]; see {!successors}). *)
-    let terminator_structural_successors (t : Terminator.t) : Block.t list =
+    (* The terminator is missing the trap successors, which are derived from
+       [block_end_trap_stack]. *)
+    let non_trap_successors (t : Terminator.t) : Block.t list =
       match t with
       | Return _ | Tailcall_func _ | Raise _ -> []
       | Goto { goto; _ } -> [goto]
@@ -469,9 +468,9 @@ let make_builder (function_info : function_info) :
       | Invalid { continuation; _ } -> (
         match continuation with Some l -> [l] | None -> [])
 
-    (* The implicit exception successor of [blk]: the topmost handler in
+    (* The implicit trap successor of [blk]: the topmost handler in
        [block_end_trap_stack], if the terminator can raise. *)
-    let exception_successor (blk : Block.t) : Block.t option =
+    let trap_successor (blk : Block.t) : Block.t option =
       let raises =
         match blk.terminator with
         | Raise _ -> true
@@ -485,8 +484,8 @@ let make_builder (function_info : function_info) :
       else None
 
     let successors (blk : Block.t) : Block.t list =
-      let structural = terminator_structural_successors blk.terminator in
-      match exception_successor blk with
+      let structural = non_trap_successors blk.terminator in
+      match trap_successor blk with
       | None -> structural
       | Some h -> structural @ [h]
 
@@ -516,17 +515,32 @@ let make_builder (function_info : function_info) :
       | Tailcall_func _ | Call _ | Invalid _ ->
         None
 
-    (* === Compute metadata: predecessors, dominators, use counts === *)
+    (* === Compute metadata: predecessors, traps, dominators, use counts === *)
 
-    (* Apply the [Push_trap]/[Pop_trap] effects of [body] to [start_stack]. *)
-    let apply_body_trap_effects (start_stack : Block.t list)
+    (* Apply the [Push_trap]/[Pop_trap] effects of [body] to [start_stack]. Each
+       [Pop_trap { handler = Some h }] must find [h] at the top of the current
+       stack. *)
+    let apply_body_trap_effects ~(blk : Block.t) (start_stack : Block.t list)
         (body : Instruction.t array) : Block.t list =
       Array.fold_left
-        (fun stack (instr : Instruction.t) ->
+        (fun (stack : Block.t list) (instr : Instruction.t) ->
           match instr with
           | Push_trap { handler = Some h } -> h :: stack
-          | Pop_trap { handler = Some _ } -> (
-            match stack with [] -> stack | _ :: rest -> rest)
+          | Pop_trap { handler = Some h } -> (
+            match stack with
+            | [] ->
+              Misc.fatal_errorf
+                "Ssa.finish: block B%d pops handler B%d off an empty trap stack"
+                (Block_id.hash blk.id) (Block_id.hash h.id)
+            | top :: rest ->
+              if not (Block.equal top h)
+              then
+                Misc.fatal_errorf
+                  "Ssa.finish: block B%d pops handler B%d but top of trap \
+                   stack is B%d"
+                  (Block_id.hash blk.id) (Block_id.hash h.id)
+                  (Block_id.hash top.id);
+              rest)
           | Push_trap { handler = None }
           | Pop_trap { handler = None }
           | Op _ | Block_param _ | Proj _ | Tuple _ | Stack_check _
@@ -535,10 +549,10 @@ let make_builder (function_info : function_info) :
         start_stack body
 
     (* Forward search from [entry]: populates [predecessors] on each reachable
-       block, computes [block_end_trap_stack] for each visited block (and uses
-       it to derive exception successors), and verifies that every reachable
+       block, computes [block_end_trap_stack] for each visited block (also
+       needed to derive trap successors), and verifies that every reachable
        block has been finished. *)
-    let compute_reachability ~(entry : Block.t)
+    let compute_reachability_and_trap_stacks ~(entry : Block.t)
         ~(finished_blocks : Block.t list) : Block.t list =
       let visited = Block.Tbl.create 64 in
       let worklist = ref [entry, []] in
@@ -548,7 +562,7 @@ let make_builder (function_info : function_info) :
         if not (Block.Tbl.mem visited blk)
         then begin
           Block.Tbl.add visited blk ();
-          let end_stack = apply_body_trap_effects start_stack blk.body in
+          let end_stack = apply_body_trap_effects ~blk start_stack blk.body in
           blk.block_end_trap_stack <- end_stack;
           let push_succ (succ : Block.t) start_stack =
             succ.predecessors <- Block_set.add blk succ.predecessors;
@@ -556,12 +570,12 @@ let make_builder (function_info : function_info) :
           in
           List.iter
             (fun succ -> push_succ succ end_stack)
-            (terminator_structural_successors blk.terminator);
-          match exception_successor blk with
+            (non_trap_successors blk.terminator);
+          match trap_successor blk with
           | None -> ()
           | Some h ->
-            (* On entry to an exception handler, the runtime has popped the
-               topmost handler off the trap stack. *)
+            (* On entry to a trap handler, the runtime has popped the topmost
+               handler off the trap stack. *)
             push_succ h (List.tl end_stack)
         end
       done;
@@ -713,7 +727,7 @@ let make_builder (function_info : function_info) :
     let compute_metadata ~(entry : Block.t) ~(finished_blocks : Block.t list) :
         Block.t list =
       let reachable_blocks : Block.t list =
-        compute_reachability ~entry ~finished_blocks
+        compute_reachability_and_trap_stacks ~entry ~finished_blocks
       in
       compute_dominators ~entry ~reachable_blocks;
       compute_use_counts ~reachable_blocks;
@@ -745,7 +759,7 @@ let make_builder (function_info : function_info) :
 
         let successors = successors
 
-        let exception_successor = exception_successor
+        let trap_successor = trap_successor
 
         let dominates = dominates
 
