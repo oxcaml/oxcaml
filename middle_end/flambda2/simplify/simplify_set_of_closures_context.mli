@@ -60,3 +60,5 @@ val function_decl_type :
   rec_info:T.t ->
   Code_id.t ->
   Function_type.t Or_unknown.t
+
+val stub_can_be_simplified : DE.t -> bool
