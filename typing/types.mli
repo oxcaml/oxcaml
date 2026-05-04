@@ -866,10 +866,11 @@ and unsafe_mode_crossing =
 
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
-  | Type_record of 'lbl list * record_representation * unsafe_mode_crossing option
+  | Type_record of
+      'lbl list * record_representation option * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
-      record_unboxed_product_representation *
+      record_unboxed_product_representation option *
       unsafe_mode_crossing option
   | Type_variant of 'cstr list * variant_representation * unsafe_mode_crossing option
   | Type_open
@@ -923,6 +924,12 @@ and type_origin =
 
 and module_representation = Jkind_types.Sort.t array
 
+and record_dummy_representation =
+  | Record_dummy_other
+    (* boxed, mixed, or variable (none) *)
+  | Record_dummy_unboxed
+  | Record_dummy_ufloat
+
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
@@ -939,7 +946,7 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
-  | Record_dummy of { represent_as_float_array : bool }
+  | Record_dummy of record_dummy_representation
   (* We typecheck type declarations before updating their kinds, yet some record
      representations are kind-dependent. In particular, we don't choose between
      [Record_boxed], [Record_float], [Record_ufloat], and [Record_mixed] until
@@ -954,14 +961,11 @@ and record_representation =
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  (* We give all unboxed records the same representation, as their layouts are
-     encapsulated by their label's jkinds. We keep this variant for uniformity with boxed
-     records, and to make it easier to support different representations in the future. *)
 
 and variant_representation =
   | Variant_unboxed
   | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t array) array
+                      Jkind_types.Sort.Const.t array) option array
   (* The outer array has an element for each constructor. Each inner array
      has a jkind for each argument of the corresponding constructor.
 
@@ -993,7 +997,7 @@ and label_declaration =
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
-    ld_sort: Jkind_types.Sort.Const.t;
+    ld_sort: Jkind_types.Sort.Const.t option;
     ld_loc: Location.t;
     ld_attributes: Parsetree.attributes;
     ld_uid: Uid.t;
@@ -1013,7 +1017,7 @@ and constructor_argument =
   {
     ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
-    ca_sort: Jkind_types.Sort.Const.t;
+    ca_sort: Jkind_types.Sort.Const.t option;
     ca_loc: Location.t;
   }
 
@@ -1256,7 +1260,8 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
+    cstr_shape: constructor_representation option;
+                                        (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if all args are void *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
@@ -1308,10 +1313,12 @@ type 'a gen_label_description =
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)
-    lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
+    lbl_sort: Jkind_types.Sort.Const.t option;
+                                        (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
-    lbl_repres: 'a;  (* Representation for outer record *)
+    lbl_all: 'a gen_label_description array;
+                                        (* All the labels in this type *)
+    lbl_repres: 'a option;              (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
     lbl_loc: Location.t;
     lbl_attributes: Parsetree.attributes;
@@ -1321,6 +1328,9 @@ type 'a gen_label_description =
 type label_description = record_representation gen_label_description
 
 type unboxed_label_description = record_unboxed_product_representation gen_label_description
+
+val label_declaration_of_label_description :
+  _ gen_label_description -> label_declaration
 
 (** This type tracks the distinction between legacy records ([{ field }]) and unboxed
     records ([#{ field }]). Note that [Legacy] includes normal boxed records, as well as

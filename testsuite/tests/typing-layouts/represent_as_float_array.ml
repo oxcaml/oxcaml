@@ -34,6 +34,15 @@ Lines 1-3, characters 0-28:
 Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
 |}]
 
+type ('a : any) t = { a : 'a }
+[@@represent_as_float_array]
+[%%expect{|
+Lines 1-2, characters 0-28:
+1 | type ('a : any) t = { a : 'a }
+2 | [@@represent_as_float_array]
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+
 type t [@@represent_as_float_array]
 [%%expect{|
 Line 1, characters 0-35:
