@@ -3141,11 +3141,13 @@ and type_pat_aux
       let lbl_a_list = List.map type_label_pat lbl_a_list in
       rvp @@ solve_expected (make_record_pat lbl_a_list ambiguity)
   in
-  (* begin match sp.ppat_desc, zero_alloc with
-   * | Ppat_var _, _ -> ()
-   * | _, None -> ()
-   * | _, Some _ -> fatal_error "type_pat_aux: zero_alloc"
-   * end; *)
+  begin match sp.ppat_desc, zero_alloc with
+  | Ppat_var _, _ -> ()
+  | Ppat_alias _, _ -> ()
+  | Ppat_constraint _, _ -> ()
+  | _, None -> ()
+  | _, Some _ -> fatal_error "type_pat_aux: zero_alloc"
+  end;
   match sp.ppat_desc with
     Ppat_any ->
       rvp {
@@ -11485,7 +11487,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
         List.map
           (type_comprehension_binding
              ~loc ~comprehension_type ~container_type ~env tps)
-         bindings
+          bindings
       in
       let env =
         let check s = Warnings.Unused_var { name = s; mutated = false } in
