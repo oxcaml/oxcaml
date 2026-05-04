@@ -927,16 +927,26 @@ let transl_declaration env sdecl (id, uid) =
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
+  let represent_as_float_array =
+    Builtin_attributes.has_represent_as_float_array sdecl.ptype_attributes
+  in
   let unbox, unboxed_default =
     match sdecl.ptype_kind with
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
     | Ptype_variant [{pcd_args = Pcstr_record [{pld_mutable=Immutable; _}]; _}]
     | Ptype_record [{pld_mutable=Immutable; _}] ->
-      Option.value unboxed_attr ~default:!Clflags.unboxed_types,
+      Option.value unboxed_attr
+        ~default:(!Clflags.unboxed_types && not represent_as_float_array),
       Option.is_none unboxed_attr
     | Ptype_record_unboxed_product _ -> false, false
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
+  if represent_as_float_array then begin
+    match sdecl.ptype_kind with
+    | Ptype_record _ when not unbox -> ()
+    | _ ->
+      raise (Error (sdecl.ptype_loc, Bad_represent_as_float_array_attribute))
+  end;
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
     let cty =
@@ -1111,11 +1121,7 @@ let transl_declaration env sdecl (id, uid) =
               Jkind.of_new_sort ~why:Old_style_unboxed_type
                 ~level:(Ctype.get_current_level ())
             else
-            (* Note this is inaccurate, using `Record_boxed` in cases where the
-               correct representation is [Record_float], [Record_ufloat], or
-               [Record_mixed].  Those cases are fixed up after we can get
-               accurate sorts for the fields, in [update_decl_jkind]. *)
-              Record_boxed,
+              Record_dummy { represent_as_float_array },
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
@@ -1251,20 +1257,20 @@ let transl_declaration env sdecl (id, uid) =
       unboxed version.
 
    2. After translating declarations, [derive_unboxed_versions] gives the
-      [Record_boxed] records unboxed versions.
+      all [Record_dummy { represent_as_float_array = false }] records unboxed
+      versions.
 
-   3. But some of these [Record_boxed]s are a lie, and become
-      [Record_float]/[Record_ufloat]/[Record_mixed] after [update_decls_jkind].
-      As float records should not end up with unboxed versions, we then remove
-      theirs in [remove_unboxed_versions].
+   3. But not all of these [Record_dummy]s will end up with unboxed versions:
+      they become [Record_float]/[Record_boxed]/[Record_mixed], and float
+      records don't have unboxed versions. These unboxed versions are removed in
+      [remove_unboxed_versions].
 
    After steps 2 and 3, the set of unboxed versions decreases, so we check for
    newly-unbound unboxed paths with [check_unboxed_paths].
 *)
 
-(* Record declarations with representation [Record_boxed] get an implicit
-   unboxed record stored in [type_unboxed_version]. If that record is also an
-   alias, so is its stored unboxed version. E.g. [type t = r = { i : int }]'s
+(* If a record with an unboxed version is also an alias, so is its unboxed
+   version stored in [type_unboxed_version]. E.g. [type t = r = { i : int }]'s
    unboxed version gets kind [#{ i : int}] and manifest [r#].
 
    Note that all aliases of types with unboxed versions, with an abstract kind,
@@ -1285,10 +1291,14 @@ let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
   | Record_unboxed | Record_inlined _ | Record_boxed
   | Record_float | Record_ufloat -> false
+  | Record_dummy _ ->
+    fatal_error "record_has_float_boxed: unexpected dummy representation"
 
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed -> true
+  | Record_dummy { represent_as_float_array } ->
+    not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1311,14 +1321,6 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
          if both have unboxed versions (because the unboxed version is a second
          alias). *)
       not (Builtin_attributes.attr_equals_builtin a "deprecated_mutable")
-    in
-    let keep_decl_attribute a =
-      (* [@@represent_as_float_array] records don't have unboxed versions, but
-         we still produce one for the phase of typechecking where every record
-         has an unboxed version (see Note [Typechecking unboxed versions of
-         types]). For those unboxed versions, we don't keep the attribute, since
-         it's not valid on an unboxed record. *)
-      not (Builtin_attributes.attr_equals_builtin a "represent_as_float_array")
     in
     let lbls_unboxed =
       List.map
@@ -1388,7 +1390,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_is_newtype = false;
         type_expansion_scope = Btype.lowest_level;
         type_loc = decl.type_loc;
-        type_attributes = List.filter keep_decl_attribute decl.type_attributes;
+        type_attributes = decl.type_attributes;
         type_unboxed_default = false;
         type_uid = Uid.unboxed_version decl.type_uid;
         type_unboxed_version = None;
@@ -2028,14 +2030,6 @@ let rec update_decl_jkind env dpath decl =
          voids : bool;
     }
   end in
-  let represent_as_float_array =
-    Builtin_attributes.has_represent_as_float_array decl.type_attributes
-  in
-  if represent_as_float_array then begin
-    match decl.type_kind with
-    | Type_record _ -> ()
-    | _ -> raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute))
-  end;
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with
@@ -2049,7 +2043,7 @@ let rec update_decl_jkind env dpath decl =
       let sort = Jkind.sort_of_jkind env jkind in
       let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
-    | _, Record_boxed ->
+    | _, Record_dummy { represent_as_float_array } ->
       let lbls, jkinds = update_label_sorts env loc lbls in
       let jkind = Jkind.for_boxed_record lbls in
       let reprs =
@@ -2173,7 +2167,7 @@ let rec update_decl_jkind env dpath decl =
         (* value-only records are stored as boxed records *)
         | { values = true; float64s = false; non_float64_unboxed_fields = false;
             voids = false }
-          -> rep
+          -> Record_boxed
         (* All-nonatomic-float and all-nonatomic-float64 records are stored as
            flat float records.
         *)
@@ -2192,7 +2186,7 @@ let rec update_decl_jkind env dpath decl =
         | { atomic_floats = true; floats; values; _ } ->
           if floats && not values
           then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
-          rep
+          Record_boxed
         | { voids=false; values=false; floats=true; atomic_floats=false;
             atomic_fields=true; float64s=true; non_float64_unboxed_fields=false
           } ->
@@ -2205,8 +2199,10 @@ let rec update_decl_jkind env dpath decl =
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
+      if represent_as_float_array && rep <> Record_ufloat then
+        raise (Error (loc, Bad_represent_as_float_array_attribute));
       lbls, rep, jkind
-    | _, ( Record_inlined _ | Record_float | Record_ufloat
+    | _, ( Record_boxed | Record_inlined _ | Record_float | Record_ufloat
          | Record_mixed _)
     | ([] | (_ :: _)), Record_unboxed ->
       (* These are never created by [transl_declaration]. *)
@@ -2342,8 +2338,6 @@ let rec update_decl_jkind env dpath decl =
       }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
-      if represent_as_float_array && rep <> Record_ufloat then
-        raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute));
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in

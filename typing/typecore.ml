@@ -2490,7 +2490,7 @@ module Label = NameChoice (struct
   let in_env lbl =
     match lbl.lbl_repres with
     | Record_boxed | Record_float | Record_ufloat | Record_unboxed
-    | Record_mixed _ -> true
+    | Record_mixed _ | Record_dummy _ -> true
     | Record_inlined _ -> false
 end)
 
@@ -6141,6 +6141,8 @@ and type_expect_
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
             -> true
+          | Record_dummy _ ->
+            Misc.fatal_error "type_expect: dummy record representation"
         end
         | Unboxed_product -> begin match rep with
           | Record_unboxed_product -> false
@@ -8084,6 +8086,8 @@ and type_block_access env expected_base_ty principal
         raise (Error (lid.loc, env, Block_access_record_unboxed))
       | Record_inlined _ ->
         Misc.fatal_error "Typecore.type_block_access: inlined record"
+      | Record_dummy _ ->
+        Misc.fatal_error "Typecore.type_block_access: dummy representation"
     in
     let () =
       match label.lbl_private with
