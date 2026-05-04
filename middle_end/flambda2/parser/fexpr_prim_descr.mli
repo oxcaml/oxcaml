@@ -174,30 +174,41 @@ module Describe : sig
     'a param_cons ->
     'b param_cons
 
-  (** Simple pattern-matching of parameters. Takes a list of case construction
-      (see {!val:case}) and represents the first that matches in appearance
-      order.
+  (** Pattern maching *)
 
-      Caution: exhaustivity is no enforced. And patterns may be fragile, take
-      care to order them properly to avoid mismatch, especially with optional
-      parameters. *)
-  val either :
-    ?no_match_handler:('p -> unit) -> 'p case_cons list -> 'p param_cons
+  (** Using monadic notation, we define patterns using [let|] binding a
+      [param_cons] and a boxing function, ending with a call to [return_either]
+      with a full pattern matching on the outer type. This is then bound to the
+      resulting [param_cons] with [let|=]. The order of declaration of pattern
+      is the order in which they will be tried against. Example:
 
-  (** Describes a constructor pattern. Takes the construction we want to match.
-      - [~box] allows mapping of the matched value, usually to wrap it in the
-        type of the enclosing {!val:either}.
-      - [~unbox] is the reverse but expect an optional return value, to tell if
-        the value corresponds to the described case. This is the only place
-        where exhaustivity can be enforced. *)
-  val case :
-    box:(decode_env -> 'c -> 'p) ->
-    unbox:(encode_env -> 'p -> 'c option) ->
-    'c param_cons ->
-    'p case_cons
+      {[
+      let|= example =
+          let| b = bool, (fun _ b -> if b then 1 else 0) in
+          let| i = int, (fun _ -> Fun.id) in
+          return_either
+            (fun env p ->
+               match p with
+               | 0 -> b env false
+               | 1 -> b env true
+               | x -> i env x)
+      ]}
 
-  (** Same as {!val:case}, but [~box] and [~unbox] are identity. *)
-  val id_case : 'p param_cons -> 'p case_cons
+      This is a [int param_cons] encoded to either a bool ["true" | "false"] or
+      an int. *)
+
+  type 'p encode_case = encode_env -> 'p -> param list
+
+  type 'p build_either
+
+  val return_either : (encode_env -> 'p -> param list) -> 'p build_either
+
+  val ( let| ) :
+    'case param_cons * (decode_env -> 'case -> 'p) ->
+    ('case encode_case -> 'p build_either) ->
+    'p build_either
+
+  val ( let|= ) : 'p build_either -> ('p param_cons -> 'a) -> 'a
 
   (** {2 Parameter payload descriptors}
 

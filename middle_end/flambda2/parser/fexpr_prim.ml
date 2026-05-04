@@ -109,55 +109,44 @@ let block_access_field_kind =
     @@ constructor_flag ["imm", P.Block_access_field_kind.Immediate])
 
 let block_access_kind =
-  let value_k =
-    D.(
-      param3 block_access_field_kind
-        (or_unknown @@ labeled "tag" scannable_tag)
-        (or_unknown @@ labeled "size" target_ocaml_int))
+  let open D in
+  let|= bak =
+    let| naked_float =
+      ( param2 (flag "float") (or_unknown @@ labeled "size" target_ocaml_int),
+        fun _ ((), size) -> P.Block_access_kind.Naked_floats { size } )
+    in
+    let| value_k =
+      ( param3 block_access_field_kind
+          (or_unknown @@ labeled "tag" scannable_tag)
+          (or_unknown @@ labeled "size" target_ocaml_int),
+        fun _ (field_kind, tag, size) ->
+          P.Block_access_kind.Values { field_kind; tag; size } )
+    in
+    P.Block_access_kind.(
+      return_either (fun env bak ->
+          match bak with
+          | Values { field_kind; tag; size } ->
+            value_k env (field_kind, tag, size)
+          | Naked_floats { size } -> naked_float env ((), size)
+          | Mixed _ -> Misc.fatal_errorf "Unsupported %a" print bak))
   in
-  let naked_float =
-    D.(param2 (flag "float") (or_unknown @@ labeled "size" target_ocaml_int))
-  in
-  D.(
-    either
-      ~no_match_handler:
-        P.Block_access_kind.(
-          function
-          | Mixed _ as bak -> Misc.fatal_errorf "Unsupported %a" print bak
-          | Values _ | Naked_floats _ -> assert false)
-      [ case
-          ~box:(fun _ ((), size) -> P.Block_access_kind.Naked_floats { size })
-          ~unbox:(fun _ bak ->
-            match (bak : P.Block_access_kind.t) with
-            | Naked_floats { size } -> Some ((), size)
-            | Values _ | Mixed _ -> None)
-          naked_float;
-        case
-          ~box:(fun _ (field_kind, tag, size) ->
-            P.Block_access_kind.Values { field_kind; tag; size })
-          ~unbox:(fun _ bak ->
-            match (bak : P.Block_access_kind.t) with
-            | Values { field_kind; tag; size } -> Some (field_kind, tag, size)
-            | Naked_floats _ | Mixed _ -> None)
-          value_k ])
+  bak
 
 type block_kind =
   | FNaked_floats
   | FValues of Tag.Scannable.t
 
 let block_kind : block_kind param_cons =
-  D.(
-    either
-      [ case
-          ~box:(fun _ () -> FNaked_floats)
-          ~unbox:(fun _ bk ->
-            match bk with FNaked_floats -> Some () | FValues _ -> None)
-          (flag "floats");
-        case
-          ~box:(fun _ tag -> FValues tag)
-          ~unbox:(fun _ bk ->
-            match bk with FValues tag -> Some tag | FNaked_floats -> None)
-          (positional scannable_tag) ])
+  let open D in
+  let|= bk =
+    let| floats = flag "floats", fun _ () -> FNaked_floats in
+    let| values = positional scannable_tag, fun _ tag -> FValues tag in
+    return_either (fun env bk ->
+        match bk with
+        | FNaked_floats -> floats env ()
+        | FValues tag -> values env tag)
+  in
+  bk
 
 let string_accessor_width =
   D.value
@@ -209,38 +198,43 @@ let init_or_assign =
              "lassign", Assignment (Alloc_mode.For_assignments.local ()) ])
 
 let alloc_mode_for_allocation =
-  D.(
-    default ~def:Alloc_mode.For_allocations.heap
-    @@ either
-         [ case (labeled "local" string)
-             ~box:(fun env r ->
-               let region =
-                 if String.equal (unwrap_loc r) "toplevel"
-                 then env.toplevel_region
-                 else Fexpr_to_flambda_commons.find_var env r
-               in
-               Alloc_mode.For_allocations.local ~region)
-             ~unbox:(fun env -> function
-               | Alloc_mode.For_allocations.Local { region } ->
-                 let r =
-                   match
-                     Flambda_to_fexpr_commons.Env.find_region_exn env region
-                   with
-                   | Fexpr.Toplevel -> wrap_loc "toplevel"
-                   | Named s -> s
-                 in
-                 Some r
-               | Alloc_mode.For_allocations.Heap -> None) ])
+  let open D in
+  let|= am =
+    let| local =
+      ( labeled "local" string,
+        fun env r ->
+          let region =
+            if String.equal (unwrap_loc r) "toplevel"
+            then env.toplevel_region
+            else Fexpr_to_flambda_commons.find_var env r
+          in
+          Alloc_mode.For_allocations.local ~region )
+    in
+    let| heap = param0, fun _ () -> Alloc_mode.For_allocations.heap in
+    return_either (fun env -> function
+      | Alloc_mode.For_allocations.Local { region } ->
+        let r =
+          match Flambda_to_fexpr_commons.Env.find_region_exn env region with
+          | Fexpr.Toplevel -> wrap_loc "toplevel"
+          | Named s -> s
+        in
+        local env r
+      | Alloc_mode.For_allocations.Heap -> heap env ())
+  in
+  am
 
 let alloc_mode_for_assignments =
-  D.(
-    default ~def:Alloc_mode.For_assignments.heap
-    @@ either
-         [ case (flag "local")
-             ~box:(fun _env () -> Alloc_mode.For_assignments.local ())
-             ~unbox:(fun _env -> function
-               | Alloc_mode.For_assignments.Local -> Some ()
-               | Alloc_mode.For_assignments.Heap -> None) ])
+  let open D in
+  let|= am =
+    let| local =
+      flag "local", fun _env () -> Alloc_mode.For_assignments.local ()
+    in
+    let| heap = param0, fun _ () -> Alloc_mode.For_assignments.heap in
+    return_either (fun env -> function
+      | Alloc_mode.For_assignments.Local -> local env ()
+      | Alloc_mode.For_assignments.Heap -> heap env ())
+  in
+  am
 
 let boxable_number =
   D.constructor_flag
@@ -274,14 +268,16 @@ let array_kind =
              "gc_ign", Gc_ignorable_values ])
 
 let array_kind_for_length =
-  D.(
-    either
-      P.Array_kind_for_length.
-        [ id_case @@ constructor_flag ["generic", Float_array_opt_dynamic];
-          case array_kind
-            ~box:(fun _ k -> Array_kind k)
-            ~unbox:(fun _ -> function
-              | Float_array_opt_dynamic -> None | Array_kind k -> Some k) ])
+  let open D in
+  let open P.Array_kind_for_length in
+  let|= ak =
+    let| generic = flag "generic", fun _ () -> Float_array_opt_dynamic in
+    let| arrayk = array_kind, fun _ k -> Array_kind k in
+    return_either (fun env -> function
+      | Float_array_opt_dynamic -> generic env ()
+      | Array_kind k -> arrayk env k)
+  in
+  ak
 
 let lazy_tag =
   D.(
@@ -768,45 +764,25 @@ let int_comp =
   let open D in
   let open Flambda_primitive in
   let sign = default ~def:Signed @@ constructor_flag ["unsigned", Unsigned] in
-  let[@warning "-fragile-match"] comp =
-    either
-      [ case
-          (param2 sign (flag "lt"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Lt s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Lt s) -> Some (s, ())
-            | Yielding_bool (Le _ | Gt _ | Ge _ | Eq | Neq)
-            | Yielding_int_like_compare_functions _ ->
-              None);
-        case
-          (param2 sign (flag "le"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Le s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Le s) -> Some (s, ()) | _ -> None);
-        case
-          (param2 sign (flag "gt"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Gt s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Gt s) -> Some (s, ()) | _ -> None);
-        case
-          (param2 sign (flag "ge"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Ge s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Ge s) -> Some (s, ()) | _ -> None);
-        case
-          (param2 sign (flag "qmark"))
-          ~box:(fun _ (s, ()) -> Yielding_int_like_compare_functions s)
-          ~unbox:(fun _ -> function
-            | Yielding_int_like_compare_functions s -> Some (s, ()) | _ -> None);
-        case (flag "eq")
-          ~box:(fun _ () -> Yielding_bool Eq)
-          ~unbox:(fun _ -> function Yielding_bool Eq -> Some () | _ -> None);
-        case (flag "ne")
-          ~box:(fun _ () -> Yielding_bool Neq)
-          ~unbox:(fun _ -> function Yielding_bool Neq -> Some () | _ -> None)
-        (* id_case *)
-        (*   (constructor_flag ["eq", Yielding_bool Eq; "ne", Yielding_bool Neq]); *)
-      ]
+  let|= comp =
+    let| lt = param2 sign (flag "lt"), fun _ (s, ()) -> Yielding_bool (Lt s) in
+    let| le = param2 sign (flag "le"), fun _ (s, ()) -> Yielding_bool (Le s) in
+    let| gt = param2 sign (flag "gt"), fun _ (s, ()) -> Yielding_bool (Gt s) in
+    let| ge = param2 sign (flag "ge"), fun _ (s, ()) -> Yielding_bool (Ge s) in
+    let| qmark =
+      ( param2 sign (flag "qmark"),
+        fun _ (s, ()) -> Yielding_int_like_compare_functions s )
+    in
+    let| eq = flag "eq", fun _ () -> Yielding_bool Eq in
+    let| neq = flag "ne", fun _ () -> Yielding_bool Neq in
+    return_either (fun env -> function
+      | Yielding_bool (Lt s) -> lt env (s, ())
+      | Yielding_bool (Le s) -> le env (s, ())
+      | Yielding_bool (Gt s) -> gt env (s, ())
+      | Yielding_bool (Ge s) -> ge env (s, ())
+      | Yielding_bool Eq -> eq env ()
+      | Yielding_bool Neq -> neq env ()
+      | Yielding_int_like_compare_functions s -> qmark env (s, ()))
   in
   binary "%int_comp" ~params:(param2 standard_int comp) (fun _ (i, c) ->
       P.Int_comp (i, c))

@@ -47,7 +47,9 @@ type _ param_cons =
   | CLabeled : ('p, 'a) labeled_lens * 'a param_cons -> 'p param_cons
   | COptional : 'p param_cons -> 'p option param_cons
   | CDefault : 'p param_cons * 'p * ('p -> 'p -> bool) -> 'p param_cons
-  | CEither : 'p case_cons list * ('p -> unit) -> 'p param_cons
+  | CEither :
+      (encode_env -> 'p -> param list) * 'p case_cons list
+      -> 'p param_cons
   | CMap : 'a param_cons * ('b, 'a) map_lens -> 'b param_cons
   | CParam2 : 'a param_cons * 'b param_cons -> ('a * 'b) param_cons
   | CParam3 :
@@ -55,7 +57,7 @@ type _ param_cons =
       -> ('a * 'b * 'c) param_cons
 
 and 'p case_cons =
-  | Case : ('p, 'c option, 'p) lens * 'c param_cons -> 'p case_cons
+  | Case : 'a param_cons * (decode_env -> 'a -> 'p) -> 'p case_cons
 
 let wrap_loc txt = Fexpr.{ txt; loc = Debuginfo.Scoped_location.Loc_unknown }
 
@@ -106,9 +108,9 @@ let extract_param (env : decode_env) (params : param list)
    fun cases params ->
     match cases with
     | [] -> None
-    | Case (conv, param_cons) :: cases -> (
+    | Case (param_cons, decode) :: cases -> (
       match aux param_cons params with
-      | Some (p, params) -> Some (conv.decode env (Some p), params)
+      | Some (p, params) -> Some (decode env p, params)
       | None -> etr cases params)
   and map : type a b.
       a param_cons ->
@@ -142,7 +144,7 @@ let extract_param (env : decode_env) (params : param list)
     | CLabeled (llens, pc) -> lbl llens pc []
     | CDefault (pcons, default, _) -> def default pcons
     | COptional pcons -> opt pcons
-    | CEither (cases, _) -> etr cases
+    | CEither (_, cases) -> etr cases
     | CMap (pcons, l) -> map pcons l.decode
     | CVoid -> void
     | CAtom pc -> atom pc []
@@ -164,13 +166,7 @@ let rec build_param : type p. encode_env -> p -> p param_cons -> param list =
     match p with None -> [] | Some p -> build_param env p pcons)
   | CDefault (pcons, default, eq) ->
     if eq p default then [] else build_param env p pcons
-  | CEither ([], failure) ->
-    failure p;
-    []
-  | CEither (Case (conv, param_cons) :: cases, f) -> (
-    match conv.encode env p with
-    | None -> build_param env p (CEither (cases, f))
-    | Some p -> build_param env p param_cons)
+  | CEither (encode, _) -> encode env p
   | CMap (pcons, f) -> build_param env (f.encode env p) pcons
   | CParam2 (pc1, pc2) ->
     let p1, p2 = p in
@@ -289,25 +285,34 @@ module Describe = struct
 
   let option (pcons : 'p param_cons) : 'p option param_cons = COptional pcons
 
-  let either ?(no_match_handler = fun _ -> ()) (cases : 'p case_cons list) :
-      'p param_cons =
-    CEither (cases, no_match_handler)
+  type 'p encode_case = encode_env -> 'p -> param list
 
-  let case ~(box : _ -> 'c -> 'p) ~(unbox : _ -> 'p -> 'c option)
-      (param_cons : 'c param_cons) : 'p case_cons =
-    Case
-      ( { encode = unbox;
-          decode =
-            (fun e -> function Some p -> box e p | None -> assert false)
-        },
-        param_cons )
+  type 'p build_either = 'p case_cons list -> 'p case_cons list * 'p encode_case
 
-  let id_case (param_cons : 'p param_cons) : 'p case_cons =
-    Case
-      ( { encode = (fun _ p -> Some p);
-          decode = (fun _ -> function Some p -> p | None -> assert false)
-        },
-        param_cons )
+  let bind_case (cases : 'p case_cons list) (cons : 'case param_cons)
+      (box : decode_env -> 'case -> 'p) :
+      'p case_cons list * (encode_env -> 'case -> param list) =
+    let case = Case (cons, box) in
+    let encode env p = build_param env p cons in
+    case :: cases, encode
+
+  let build_match (cases : 'p case_cons list) (destruct_param : 'p encode_case)
+      : 'p param_cons =
+    CEither (destruct_param, List.rev cases)
+
+  let return_either (p : 'p encode_case) : 'p build_either =
+   fun cases -> cases, p
+
+  let ( let| ) ((cons, box) : 'case param_cons * (decode_env -> 'case -> 'p))
+      (f : 'case encode_case -> 'p build_either) : 'p build_either =
+   fun cases ->
+    let cases, encode = bind_case cases cons box in
+    f encode cases
+
+  let ( let|= ) (cb : 'p build_either) (f : 'p param_cons -> 'a) : 'a =
+    let cases, destruct_param = cb [] in
+    let p = build_match cases destruct_param in
+    f p
 
   let maps ~(to_ : encode_env -> 'b -> 'a) ~(from : decode_env -> 'a -> 'b)
       (pcons : 'a param_cons) : 'b param_cons =
