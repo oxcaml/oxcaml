@@ -21,38 +21,13 @@ type t : immutable_data = int list list list list list list list list list list 
 (* CR layouts v2.8: The "because of the definition of t at line 1" part of the message
    is not great. It should say something about the kind annotation on t. Internal ticket 4770. *)
 [%%expect {|
-Line 1, characters 0-94:
-1 | type t : immutable_data = int list list list list list list list list list list list list list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int list list list list list list list list list list
-                        list list list" is
-           immutable_data
-             with int list list list list list list list list list list list list
-         because it's a boxed variant type.
-       But the kind of type "int list list list list list list list list list
-                            list list list list" must be a subkind of
-           immutable_data
-         because of the definition of t at line 1, characters 0-94.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type t = int list list list list list list list list list list list list list
 |}]
 
 type 'a t : immutable_data with 'a = 'a list list list list list list list list list list list list list
 [%%expect {|
-Line 1, characters 0-104:
-1 | type 'a t : immutable_data with 'a = 'a list list list list list list list list list list list list list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a list list list list list list list list list list
-                        list list list" is
-           immutable_data
-             with 'a list list list list list list list list list list list list
-         because it's a boxed variant type.
-       But the kind of type "'a list list list list list list list list list
-                            list list list list" must be a subkind of
-           immutable_data with 'a
-         because of the definition of t at line 1, characters 0-104.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type 'a t =
+    'a list list list list list list list list list list list list list
 |}]
 
 (* Differences in fuel consumption do not cause errors for module inclusion check

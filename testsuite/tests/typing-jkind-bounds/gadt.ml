@@ -401,25 +401,7 @@ end
    are in a sub-kind relationship -- but only if at least the argument on the
    right is best. Subtle. *)
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = P : ('a : immediate). 'a abstract -> t
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = P : ('a : immediate). 'a abstract -> t end
-       is not included in
-         sig type t : immutable_data with (type : value) abstract end
-       Type declarations do not match:
-         type t = P : ('a : immediate). 'a abstract -> t
-       is not included in
-         type t : immutable_data with (type : value) abstract
-       The kind of the first is
-           immutable_data with (type : immediate) abstract
-         because of the definition of t at line 4, characters 2-49.
-       But the kind of the first must be a subkind of
-           immutable_data with (type : value) abstract
-         because of the definition of t at line 2, characters 2-54.
+module M : sig type t : immutable_data with (type : value) abstract end
 |}]
 
 (* Some hard recursive types with existentials *)
@@ -785,16 +767,7 @@ type _ t : immutable_data =
 [%%expect {|
 type zero = Zero
 type 'a succ = Succ
-Lines 3-5, characters 0-28:
-3 | type _ t : immutable_data =
-4 |   | Zero : zero t
-5 |   | Succ : 'a t -> 'a succ t
-Error: The kind of type "t" is immutable_data with (type : value) t
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type _ t = Zero : zero t | Succ : 'a t -> 'a succ t
 |}]
 
 type zero = private Zero
@@ -806,16 +779,7 @@ type _ t : immutable_data =
 [%%expect {|
 type zero = private Zero
 type 'a succ = private Succ
-Lines 3-5, characters 0-28:
-3 | type _ t : immutable_data =
-4 |   | Zero : zero t
-5 |   | Succ : 'a t -> 'a succ t
-Error: The kind of type "t" is immutable_data with (type : value) t
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type _ t = Zero : zero t | Succ : 'a t -> 'a succ t
 |}]
 
 type zero
@@ -827,16 +791,7 @@ type _ t : immutable_data =
 [%%expect {|
 type zero
 type !'a succ
-Lines 3-5, characters 0-28:
-3 | type _ t : immutable_data =
-4 |   | Zero : zero t
-5 |   | Succ : 'a t -> 'a succ t
-Error: The kind of type "t" is immutable_data with (type : value) t
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type _ t = Zero : zero t | Succ : 'a t -> 'a succ t
 |}]
 
 type _ t : value mod portable =
@@ -844,16 +799,7 @@ type _ t : value mod portable =
   | Succ : 'a t -> [ `succ of 'a ] t
 (* CR: This should be accepted. Internal ticket 6194. *)
 [%%expect {|
-Lines 1-3, characters 0-36:
-1 | type _ t : value mod portable =
-2 |   | Zero : [ `zero ] t
-3 |   | Succ : 'a t -> [ `succ of 'a ] t
-Error: The kind of type "t" is immutable_data with (type : value) t/2
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod portable
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type _ t = Zero : [ `zero ] t | Succ : 'a t -> [ `succ of 'a ] t
 |}]
 
 (*********************************************************)
