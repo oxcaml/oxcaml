@@ -6,7 +6,6 @@
 (* Doc comments should attach to abstract-kind declarations the same way
    they attach to type/value declarations. *)
 
-(* Doc comment before, no manifest. *)
 module type S1 = sig
   (** Doc for k *)
   kind_ k
@@ -18,7 +17,6 @@ module type S1  = sig kind_ k[@@ocaml.doc " Doc for k "] end;;
 module type S1 = sig kind_ k end
 |}]
 
-(* Doc comment before, with manifest. *)
 module type S2 = sig
   (** Doc for k *)
   kind_ k = value
@@ -30,7 +28,6 @@ module type S2  = sig kind_ k = value[@@ocaml.doc " Doc for k "] end;;
 module type S2 = sig kind_ k = value end
 |}]
 
-(* Doc comment after, no manifest. *)
 module type S3 = sig
   kind_ k
   (** Doc for k *)
@@ -42,7 +39,6 @@ module type S3  = sig kind_ k[@@ocaml.doc " Doc for k "] end;;
 module type S3 = sig kind_ k end
 |}]
 
-(* Doc comment after, with manifest. *)
 module type S4 = sig
   kind_ k = value
   (** Doc for k *)
@@ -54,8 +50,6 @@ module type S4  = sig kind_ k = value[@@ocaml.doc " Doc for k "] end;;
 module type S4 = sig kind_ k = value end
 |}]
 
-(* Doc comment + non-doc attribute, no manifest.  The doc should still
-   appear; today only the non-doc attribute survives. *)
 module type S5 = sig
   (** Doc for k *)
   kind_ k [@@deprecated "use k' instead"]
@@ -68,7 +62,6 @@ module type S5  =
 module type S5 = sig kind_ k end
 |}]
 
-(* Doc comment + non-doc attribute, with manifest. *)
 module type S6 = sig
   (** Doc for k *)
   kind_ k = value [@@deprecated "use k' instead"]
@@ -81,4 +74,82 @@ module type S6  =
     kind_ k = value[@@ocaml.doc " Doc for k "][@@deprecated "use k' instead"]
   end;;
 module type S6 = sig kind_ k = value end
+|}]
+
+module type S7 = sig
+  kind_ k [@@deprecated "use k' instead"]
+  (** Doc for k *)
+end;;
+
+[%%expect {|
+
+module type S7  =
+  sig kind_ k[@@deprecated "use k' instead"][@@ocaml.doc " Doc for k "] end;;
+module type S7 = sig kind_ k end
+|}]
+
+module type S8 = sig
+  kind_ k = value [@@deprecated "use k' instead"]
+  (** Doc for k *)
+end;;
+
+[%%expect {|
+
+module type S8  =
+  sig
+    kind_ k = value[@@deprecated "use k' instead"][@@ocaml.doc " Doc for k "]
+  end;;
+module type S8 = sig kind_ k = value end
+|}]
+
+module type S9 = sig
+  (** Doc for k *)
+  kind_ [@deprecated "use k' instead"] k
+end;;
+
+[%%expect {|
+
+module type S9  =
+  sig kind_ k[@@ocaml.doc " Doc for k "][@@deprecated "use k' instead"] end;;
+module type S9 = sig kind_ k end
+|}]
+
+module type S10 = sig
+  (** Doc for k *)
+  kind_[@deprecated "use k' instead"] k = value
+end;;
+
+[%%expect {|
+
+module type S10  =
+  sig
+    kind_ k = value[@@ocaml.doc " Doc for k "][@@deprecated "use k' instead"]
+  end;;
+module type S10 = sig kind_ k = value end
+|}]
+
+module type S11 = sig
+  kind_[@deprecated "use k' instead"] k
+  (** Doc for k *)
+end;;
+
+[%%expect {|
+
+module type S11  =
+  sig kind_ k[@@deprecated "use k' instead"][@@ocaml.doc " Doc for k "] end;;
+module type S11 = sig kind_ k end
+|}]
+
+module type S12 = sig
+  kind_[@deprecated "use k' instead"] k = value
+  (** Doc for k *)
+end;;
+
+[%%expect {|
+
+module type S12  =
+  sig
+    kind_ k = value[@@deprecated "use k' instead"][@@ocaml.doc " Doc for k "]
+  end;;
+module type S12 = sig kind_ k = value end
 |}]
