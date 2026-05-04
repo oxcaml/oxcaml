@@ -204,14 +204,7 @@ module Pattern_env : sig
       is_lpoly : bool;
       (* true iff the pattern is under let poly_ *)
     }
-<<<<<<< HEAD
-  val make: Env.t -> equations_scope:int -> in_counterexample:bool -> t
-||||||| 5.2.0minus-31
-  val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
-=======
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
-    -> allow_recursive_equations:bool -> t
->>>>>>> 5.2.0minus-37
+  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
 end
@@ -367,22 +360,6 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
 val occur_in: Env.t -> type_expr -> type_expr -> bool
-val deep_occur: type_expr -> type_expr -> bool
-        (* Check whether a type occurs structurally within another. *)
-val deep_occur_list: type_expr -> type_expr list -> bool
-        (* Check whether a type occurs structurally within any type from
-           a list of types. *)
-<<<<<<< HEAD
-val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
-        (* Check if the first type scheme is more general than the second. *)
-||||||| 5.2.0minus-31
-val deep_occur: type_expr -> type_expr -> bool
-        (* Check whether a type occurs structurally within another. *)
-val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
-        (* Check if the first type scheme is more general than the second. *)
-=======
-val deep_occur: type_expr -> type_expr -> bool
-        (* Check whether a type occurs structurally within another. *)
 val moregeneral: Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
   type_expr -> type_expr -> Jkind_types.Sort.t option list
@@ -392,7 +369,11 @@ val moregeneral: Env.t -> bool ->
            Returns, for each pattern sort variable (in order), the sort it was
            constrained to during the check, or [None] if unconstrained. Sorts
            in the result may contain subject sort variables. *)
->>>>>>> 5.2.0minus-37
+val deep_occur: type_expr -> type_expr -> bool
+        (* Check whether a type occurs structurally within another. *)
+val deep_occur_list: type_expr -> type_expr list -> bool
+        (* Check whether a type occurs structurally within any type from
+           a list of types. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
 val all_distinct_vars: Env.t -> type_expr list -> bool
         (* Check those types are all distinct type variables *)

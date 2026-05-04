@@ -145,14 +145,8 @@ and out_type =
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_repr of string list * out_type
-<<<<<<< HEAD
-  | Otyp_module of out_package
-||||||| 5.2.0minus-31
-  | Otyp_module of out_ident * (string * out_type) list
-=======
   | Otyp_newlayout of out_sort_genvar list * out_type
-  | Otyp_module of out_ident * (string * out_type) list
->>>>>>> 5.2.0minus-37
+  | Otyp_module of out_package
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
