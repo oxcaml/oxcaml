@@ -537,9 +537,7 @@ let make_builder (function_info : function_info) :
     (* Forward search from [entry]: populates [predecessors] on each reachable
        block, computes [block_end_trap_stack] for each visited block (and uses
        it to derive exception successors), and verifies that every reachable
-       block has been finished. Blocks ending in [Return] with a non-empty trap
-       stack get explicit [Pop_trap]s appended so the runtime stack is balanced
-       at function exit. *)
+       block has been finished. *)
     let compute_reachability ~(entry : Block.t)
         ~(finished_blocks : Block.t list) : Block.t list =
       let visited = Block.Tbl.create 64 in
@@ -551,23 +549,6 @@ let make_builder (function_info : function_info) :
         then begin
           Block.Tbl.add visited blk ();
           let end_stack = apply_body_trap_effects start_stack blk.body in
-          let end_stack =
-            match blk.terminator with
-            | Return _ when not (List.is_empty end_stack) ->
-              (* Insert [Pop_trap]s for each remaining handler so the runtime
-                 trap stack is empty when the function returns. *)
-              let pops =
-                List.map
-                  (fun (h : Block.t) : Instruction.t ->
-                    Pop_trap { handler = Some h })
-                  end_stack
-              in
-              blk.body <- Array.append blk.body (Array.of_list pops);
-              []
-            | Return _ | Goto _ | Branch _ | Switch _ | Raise _
-            | Tailcall_self _ | Tailcall_func _ | Call _ | Invalid _ ->
-              end_stack
-          in
           blk.block_end_trap_stack <- end_stack;
           let push_succ (succ : Block.t) start_stack =
             succ.predecessors <- Block_set.add blk succ.predecessors;

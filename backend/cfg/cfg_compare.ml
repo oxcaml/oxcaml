@@ -566,7 +566,7 @@ let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
 let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
   let mismatches = Buffer.create 256 in
   let ppf_m = Format.formatter_of_buffer mismatches in
-  let new_to_old =
+  begin
     let old_cfg = Cfg_with_layout.cfg old_cfg in
     let new_cfg = Cfg_with_layout.cfg new_cfg in
     (* Phase 1: structural matching *)
@@ -595,9 +595,8 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
     if old_cfg.fun_poll <> new_cfg.fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
     if old_cfg.fun_ret_type <> new_cfg.fun_ret_type
-    then Format.fprintf ppf_m "fun_ret_type mismatch@.";
-    new_to_old
-  in
+    then Format.fprintf ppf_m "fun_ret_type mismatch@."
+  end;
   (* Report *)
   Format.pp_print_flush ppf_m ();
   let msg = Buffer.contents mismatches in
@@ -611,6 +610,4 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
       new_cfg;
     Format.pp_print_flush ppf ();
     Format.print_flush ();
-    Misc.fatal_errorf "CFG comparison MISMATCH for %s" fun_name);
-  (* Return (new_to_old mapping, unmatched_old_labels pool). *)
-  new_to_old
+    Misc.fatal_errorf "CFG comparison MISMATCH for %s" fun_name)
