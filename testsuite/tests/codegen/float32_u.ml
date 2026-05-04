@@ -84,7 +84,7 @@ to_float:
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L105
-.L107:
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtss2sd %xmm0, %xmm0, %xmm0
