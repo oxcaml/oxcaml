@@ -38,7 +38,6 @@ let make_builder (function_info : function_info) :
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
-          mutable label_hint : Label.t option;
           mutable param_usage_counts : usage_count array;
           mutable block_end_trap_stack : t list
         }
@@ -54,8 +53,6 @@ let make_builder (function_info : function_info) :
       val compare : t -> t -> int
 
       val hash : t -> int
-
-      val set_label_hint : t -> Label.t option -> unit
 
       module Map : Map.S with type key = t
 
@@ -81,7 +78,6 @@ let make_builder (function_info : function_info) :
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
-          mutable label_hint : Label.t option;
           mutable param_usage_counts : usage_count array;
           mutable block_end_trap_stack : t list
         }
@@ -97,8 +93,6 @@ let make_builder (function_info : function_info) :
       let compare a b = Block_id.compare a.id b.id
 
       let hash b = Block_id.hash b.id
-
-      let set_label_hint b hint = b.label_hint <- hint
 
       module Self = struct
         type nonrec t = t
@@ -356,7 +350,6 @@ let make_builder (function_info : function_info) :
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
-        label_hint = None;
         param_usage_counts = [||];
         block_end_trap_stack = []
       }
@@ -370,7 +363,6 @@ let make_builder (function_info : function_info) :
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
-        label_hint = None;
         param_usage_counts = [||];
         block_end_trap_stack = []
       }

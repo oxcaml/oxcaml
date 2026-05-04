@@ -20,22 +20,9 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
      re-bind it (typically via [B.start_block]) before emitting again. *)
   type result = B.Instruction.t array or_never_returns
 
-  type static_handler = { handler_block : B.Block.t }
-
-  (* Per-handler local state used by [emit_catch] while translating a [Ccatch].
-     The slim {!static_handler} stored in the env carries only what other
-     functions need ([handler_block] for [Goto]/[Push_trap]/[Pop_trap] targets,
-     ; [handler_info] is the working record kept locally. *)
-  type handler_info =
-    { params : (VP.t * Cmm.machtype) list;
-      body : Cmm.expression;
-      handler_params : B.Instruction.t array;
-      handler_ub : B.unfinished_block ref
-    }
-
   type env =
     { vars : B.Instruction.t array V.Map.t;
-      static_exceptions : static_handler Static_label.Map.t
+      static_exceptions : B.Block.t Static_label.Map.t
     }
 
   let env_find v env =
@@ -317,8 +304,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       | Cswitch (esel, index, ecases, _dbg) ->
         emit_switch env b ~tail esel index ecases
       | Ccatch (_, [], e1) -> emit env b e1 ~tail
-      | Ccatch (flag, handlers, body) ->
-        emit_catch env b ~tail flag handlers body
+      | Ccatch (_flag, handlers, body) -> emit_catch env b ~tail handlers body
       (* Leaf expressions *)
       | Cconst_int (n, _dbg) ->
         Ok
@@ -545,42 +531,27 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     in
     join_array b case_results
 
-  and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
-    (* Create one block per handler up front so they can refer to one another
-       (mutually recursive [Recursive] handlers). All handlers are emitted
-       unconditionally, regardless of whether the body or peer handlers reach
-       them — The SSA graph builder will drop unreachable blocks. *)
-    let _ = flag in
-    let env, handler_infos =
+  and emit_catch env b ~tail handlers body : result =
+    (* Create one block per handler up front to also support mutually recursive
+       handlers. All handlers are emitted unconditionally, the SSA graph builder
+       will drop unreachable blocks. *)
+    let env, handler_blocks =
       List.fold_left_map
-        (fun env Cmm.{ label = nfail; params; body = h_body; _ } ->
+        (fun env Cmm.{ label = nfail; params; _ } ->
           let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
-          let { B.block = handler_block; params = handler_params } =
-            B.new_block ~params:types
-          in
-          let info =
-            { params;
-              body = h_body;
-              handler_params;
-              handler_ub = ref (B.start_block handler_block)
-            }
-          in
+          let new_block = B.new_block ~params:types in
           let env =
             { env with
               static_exceptions =
-                Static_label.Map.add nfail { handler_block }
-                  env.static_exceptions
+                Static_label.Map.add nfail new_block.block env.static_exceptions
             }
           in
-          env, info)
+          env, new_block)
         env handlers
     in
-    (* The body is not a [Cexit] target — handlers always jump to a
-       [handler_block], not to a [body_block] — so we emit the body straight
-       into the current cursor [b] rather than spinning up a one-instruction
-       pass-through block. *)
     let r_body = emit env b body ~tail in
-    let translate_handler (info : handler_info) =
+    let translate_handler (handler : Cmm.static_handler)
+        (handler_block : B.new_block_result) =
       let handler_env =
         let param_idx = ref 0 in
         List.fold_left
@@ -588,50 +559,43 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
             let n = Array.length ty in
             let proj_instrs =
               Array.init n (fun i ->
-                  Array.get info.handler_params (!param_idx + i))
+                  Array.get handler_block.params (!param_idx + i))
             in
             param_idx := !param_idx + n;
             env_add id proj_instrs env)
-          env info.params
+          env handler.params
       in
+      let b = ref (B.start_block handler_block.block) in
       List.iter
         (fun (id, _ty) ->
           let provenance = VP.provenance id in
           if Option.is_some provenance
           then
             let regs = V.Map.find (VP.var id) handler_env.vars in
-            emit_instruction_no_res info.handler_ub
+            emit_instruction_no_res b
               (Name_for_debugger
                  { ident = VP.var id; provenance; which_parameter = None; regs }))
-        info.params;
-      emit handler_env info.handler_ub info.body ~tail
+        handler.params;
+      emit handler_env b handler.body ~tail, b
     in
-    let handler_results =
-      List.map
-        (fun info -> translate_handler info, info.handler_ub)
-        handler_infos
-    in
+    let handler_results = List.map2 translate_handler handlers handler_blocks in
     join_array b (Array.of_list ((r_body, b) :: handler_results))
 
-  and find_handler env handler_id : static_handler =
+  and find_handler env handler_id : B.Block.t =
     try Static_label.Map.find handler_id env.static_exceptions
     with Not_found ->
       Misc.fatal_errorf "Ssa_of_cmm: unbound trap handler %a"
         Static_label.format handler_id
 
   and emit_trap_actions env b traps =
-    List.iter
-      (fun (trap : Cmm.trap_action) ->
-        let h =
-          (find_handler env
-             (match trap with Push handler_id | Pop handler_id -> handler_id))
-            .handler_block
-        in
+    traps
+    |> List.iter (fun (trap : Cmm.trap_action) ->
         emit_instruction_no_res b
           (match trap with
-          | Push _ -> Push_trap { handler = Some h }
-          | Pop _ -> Pop_trap { handler = Some h }))
-      traps
+          | Push handler_id ->
+            Push_trap { handler = Some (find_handler env handler_id) }
+          | Pop handler_id ->
+            Pop_trap { handler = Some (find_handler env handler_id) }))
 
   and emit_expr_exit env b (lbl : Cmm.exit_label) args traps : result =
     match emit_parts_list env b args with
@@ -642,8 +606,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         let* src = emit_tuple ext_env b simple_list in
         let handler = find_handler env nfail in
         emit_trap_actions env b traps;
-        finish_block b ~dbg:Debuginfo.none
-          (Goto { goto = handler.handler_block; args = src });
+        finish_block b ~dbg:Debuginfo.none (Goto { goto = handler; args = src });
         Never_returns
       | Return_lbl ->
         let* src = emit_tuple ext_env b simple_list in

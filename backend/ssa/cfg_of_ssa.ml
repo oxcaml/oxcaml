@@ -625,14 +625,7 @@ module Make (S : Ssa.Finished_graph) = struct
     collect_trap_handlers env;
     S.blocks
     |> List.iter (fun (block : S.Block.t) ->
-        let label =
-          match block.label_hint with
-          | Some l -> l
-          | None ->
-            let l = Label.new_label () in
-            S.Block.set_label_hint block (Some l);
-            l
-        in
+        let label = Label.new_label () in
         S.Block.Tbl.replace env.block_labels block label;
         S.Block.Tbl.replace env.block_params_regs block
           (Reg.createv block.params));
