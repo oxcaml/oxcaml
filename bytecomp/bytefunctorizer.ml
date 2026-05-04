@@ -129,8 +129,8 @@ let functorize_files ~ppf_dump:_ initial_env files target =
   let files =
     List.map
       (fun f ->
-        try Load_path.find f
-        with Not_found -> Compenv.fatal (Printf.sprintf "File %s not found" f))
+        if Sys.file_exists f then f
+        else Compenv.fatal (Printf.sprintf "File %s not found" f))
       files
   in
   match files with

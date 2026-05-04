@@ -47,18 +47,6 @@ let read_unit_info_of_cmi (cmi_file : string) : unit_info =
     | [] -> Mb_struct { mb_repr = Module_value_only { field_count = 0 } }
     | _ ->
         let self_name = CU.name_as_string ui_unit in
-        (* Build a set of module names that have real (non-alias) CRC entries,
-           i.e., genuine compile-time dependencies. *)
-        let real_imports : (string, unit) Hashtbl.t = Hashtbl.create 8 in
-        Array.iter
-          (fun imp ->
-            match Import_info.crc imp with
-            | None -> ()
-            | Some _ ->
-                Hashtbl.replace real_imports
-                  (CU.Name.to_string (Import_info.name imp))
-                  ())
-          cmi.cmi_crcs;
         let rp_params =
           List.map
             (fun p ->
@@ -71,7 +59,6 @@ let read_unit_info_of_cmi (cmi_file : string) : unit_info =
           |> List.filter_map (fun (gm, _prec) ->
               let name = gm.GM.head in
               if String.equal name self_name then None
-              else if not (Hashtbl.mem real_imports name) then None
               else Some (Rp_main_module_block gm))
         in
         Mb_instantiating_functor
