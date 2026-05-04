@@ -1036,19 +1036,18 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
     let empty arity custom_error_msg =
       Check { strict = false; opt = false; arity; loc; custom_error_msg; }
     in
+    let default_arity () = begin
+      match default_arity with
+      | None ->
+        if on_function_argument then
+          raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
+        else
+          raise (Error_builtin (loc, Zero_alloc_attr_non_function))
+      | Some arity -> arity
+    end in
     match get_optional_payload get_ids_and_constants_from_exp payload with
     | Error () -> warn (); Default_zero_alloc
-    | Ok None ->
-      let default_arity = begin
-        match default_arity with
-        | None ->
-          if on_function_argument then
-            raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
-          else
-            raise (Error_builtin (loc, Zero_alloc_attr_non_function))
-        | Some arity -> arity
-      end in
-      empty default_arity None
+    | Ok None -> empty (default_arity ()) None
     | Ok (Some payload) ->
       let custom_error_message, payload =
         match filter_custom_error_message payload with
@@ -1069,15 +1068,6 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
            (function (Ident, s) -> Some s | _ -> None) payload
          = ["ignore"] then Ignore_assert_all
       else
-      let default_arity () = begin
-        match default_arity with
-        | None ->
-          if on_function_argument then
-            raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
-          else
-            raise (Error_builtin (loc, Zero_alloc_attr_non_function))
-        | Some arity -> arity
-      end in
       let arity, payload =
         match filter_arity payload with
         | None -> default_arity (), payload
