@@ -314,7 +314,7 @@ let increment_continuation_scope t =
 let bump_current_level_scope t =
   { t with typing_env = TE.bump_current_level_scope t.typing_env }
 
-let enter_stub t =
+let enter_stub_function t =
   { t with
     disable_inlining = Disable_inlining Stub;
     disable_partial_application_stub_generation =
