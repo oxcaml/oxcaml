@@ -1637,9 +1637,9 @@ let narrow_to_manifest_jkind env loc path decl =
           Format.eprintf
             "[ikind-narrow] path=%a branch=ikind_sub_jkind_l@."
             (Format_doc.compat Path.print) path;
-        (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
-           [try_allow_r] returns [None] and we route through Ikind. We also
-           fall back here when [decl.type_jkind] cannot allow-right
+        (* When ikinds are enabled, we keep [decl.type_jkind] in left/Best
+           form, so [try_allow_r] returns [None] and we route through Ikind.
+           We also fall back here when [decl.type_jkind] cannot allow-right
            (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
