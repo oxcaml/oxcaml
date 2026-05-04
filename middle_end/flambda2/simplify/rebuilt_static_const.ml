@@ -437,6 +437,11 @@ module Group = struct
       t.free_names <- Known free_names;
       free_names
 
+  let cost_metrics t =
+    List.fold_left
+      (fun cm const -> Cost_metrics.( + ) cm (cost_metrics const))
+      Cost_metrics.zero t.consts
+
   let to_named t =
     ListLabels.map t.consts ~f:(fun (const : rebuilt_static_const) ->
         match const with
