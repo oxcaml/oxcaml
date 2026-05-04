@@ -945,7 +945,7 @@ let compile_alloc size =
         alloc alloc_mixed_record_prim [size; value_prefix_len]
       else
         let size = Array.length shape in
-        alloc_mixed_record_prim, [size; size]
+        alloc alloc_mixed_record_prim [size; size]
 
 let compile_update size dummy newval =
   let prim, newval =
