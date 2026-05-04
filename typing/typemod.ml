@@ -2976,12 +2976,6 @@ let rec package_constraints_sig env loc sg constrs =
       | Sig_type (id, ({type_params=[]} as td), rs, priv)
         when List.mem_assoc [Ident.name id] constrs ->
           let ty = List.assoc [Ident.name id] constrs in
-<<<<<<< HEAD
-          let td = {td with type_manifest = Some ty} in
-          Sig_type (id, td, rs, priv)
-||||||| 5.2.0minus-31
-          Sig_type (id, {td with type_manifest = Some ty}, rs, priv)
-=======
           let reason =
             Format_doc.asprintf
               "package constraint path=%a"
@@ -2996,7 +2990,6 @@ let rec package_constraints_sig env loc sg constrs =
               },
               rs,
               priv )
->>>>>>> 5.2.0minus-37
       | Sig_module (id, pres, md, rs, priv) ->
           let rec aux = function
             | (m :: ((_ :: _) as l), t) :: rest when m = Ident.name id ->
@@ -3523,8 +3516,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                   Format.eprintf
                     "[nondep-supertype] unexpected coercion@;original=%a@;\
                      nondep=%a@."
-                    (Format_doc.compat Printtyp.modtype) mty_res
-                    (Format_doc.compat Printtyp.modtype) nondep_mty;
+                    Printtyp.modtype mty_res
+                    Printtyp.modtype nondep_mty;
                 fatal_error
                   "unexpected coercion from original module type to \
                    nondep_supertype one"
@@ -3533,8 +3526,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                   Format.eprintf
                     "[nondep-supertype] inclusion failure@;original=%a@;\
                      nondep=%a@."
-                    (Format_doc.compat Printtyp.modtype) mty_res
-                    (Format_doc.compat Printtyp.modtype) nondep_mty;
+                    Printtyp.modtype mty_res
+                    Printtyp.modtype nondep_mty;
                 fatal_error
                   "nondep_supertype not included in original module type"
             end;

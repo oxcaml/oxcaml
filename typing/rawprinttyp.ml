@@ -128,6 +128,8 @@ and raw_type_desc ppf ty =
       fprintf ppf "@[Tquote@ %a@]" raw_type t
   | Tsplice t ->
       fprintf ppf "@[Tsplice@ %a@]" raw_type t
+  | Tquote_eval t ->
+      fprintf ppf "@[Tquote_eval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -145,10 +147,8 @@ and raw_type_desc ppf ty =
         raw_type t
         raw_type_list tl
   | Trepr (t, sort_vars) ->
-      let print_sort_univar ppf (uv : Jkind_types.Sort.univar) =
-        match uv.name with
-        | Some n -> fprintf ppf "%s" n
-        | None -> fprintf ppf "_"
+      let print_sort_univar ppf uv =
+        fprintf ppf "%s" (Option.value uv.Jkind_types.Sort.name ~default:"_")
       in
       fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
         raw_type t
@@ -161,7 +161,7 @@ and raw_type_desc ppf ty =
       path pack.pack_path
       raw_lid_type_list pack.pack_cstrs
   | Tof_kind jkind ->
-    fprintf ppf "(type@ :@ %a)" (Format_doc.compat (Jkind.format env)) jkind
+    fprintf ppf "Tof_kind@ %a" (Format_doc.compat (Jkind.format env)) jkind
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"

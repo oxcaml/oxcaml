@@ -719,6 +719,7 @@ module Digraph = struct
     | Types.Tnil -> mk "[Nil]"
     | Types.Tquote t -> mk "[Quote]" |> std_edge t
     | Types.Tsplice t -> mk "[Splice]" |> std_edge t
+    | Types.Tquote_eval t -> mk "[QuoteEval]" |> std_edge t
     | Types.Tlink t -> add_tynode Decoration.(make [Style Dash]) |> std_edge t
     | Types.Tsubst (t, o) ->
         let dg = add_tynode (labelr "[Subst]") |> std_edge t in

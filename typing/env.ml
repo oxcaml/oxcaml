@@ -5033,7 +5033,6 @@ let print_unbound_in_quotation ppf =
   | Label -> fprintf ppf "Label"
   | Constructor -> fprintf ppf "Constructor"
 
-<<<<<<< HEAD
 let report_lookup_error_doc loc env = function
   | Unbound_value(lid, hint) ->
       Location.aligned_error_hint ~loc
@@ -5053,45 +5052,6 @@ let report_lookup_error_doc loc env = function
                 line
              ]
         )
-||||||| 5.2.0minus-31
-let quoted_longident = Style.as_inline_code pp_longident
-
-let report_lookup_error_doc ~level _loc env ppf = function
-  | Unbound_value(lid, hint) -> begin
-      fprintf ppf "Unbound value %a" quoted_longident lid;
-      spellcheck ppf extract_values env lid;
-      match hint with
-      | No_hint -> ()
-      | Missing_rec def_loc ->
-          let (_, line, _) =
-            Location.get_pos_info def_loc.Location.loc_start
-          in
-          fprintf ppf
-            "@.@[@{<hint>Hint@}: If this is a recursive definition,@ \
-             you should add the %a keyword on line %i@]"
-            Style.inline_code "rec"
-            line
-    end
-=======
-let quoted_longident = Style.as_inline_code pp_longident
-
-let report_lookup_error_doc _loc env ppf = function
-  | Unbound_value(lid, hint) -> begin
-      fprintf ppf "Unbound value %a" quoted_longident lid;
-      spellcheck ppf extract_values env lid;
-      match hint with
-      | No_hint -> ()
-      | Missing_rec def_loc ->
-          let (_, line, _) =
-            Location.get_pos_info def_loc.Location.loc_start
-          in
-          fprintf ppf
-            "@.@[@{<hint>Hint@}: If this is a recursive definition,@ \
-             you should add the %a keyword on line %i@]"
-            Style.inline_code "rec"
-            line
-    end
->>>>>>> 5.2.0minus-37
   | Unbound_type lid ->
      Location.aligned_error_hint ~loc
        "@{<ralign>Unbound type constructor @}%a"
@@ -5313,13 +5273,7 @@ let report_lookup_error_doc _loc env ppf = function
         quoted_longident lid
         (fun ppf v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
-<<<<<<< HEAD
-           ~level:Btype.generic_level env ppf v)
-||||||| 5.2.0minus-31
-           ~level env v)
-=======
-           env v)
->>>>>>> 5.2.0minus-37
+           env ppf v)
         err
   | No_unboxed_version (lid, decl) ->
       let sub =
@@ -5373,19 +5327,9 @@ let report_lookup_error_doc _loc env ppf = function
         quoted_longident lid
         print_stage avail_stage
 
-<<<<<<< HEAD
 let report_error_doc = function
   | Missing_module(loc, path1, path2) ->
      let pp_path path1 path2 ppf =
-||||||| 5.2.0minus-31
-let report_error_doc ~level ppf = function
-  | Missing_module(_, path1, path2) ->
-      fprintf ppf "@[@[<hov>";
-=======
-let report_error_doc ppf = function
-  | Missing_module(_, path1, path2) ->
-      fprintf ppf "@[@[<hov>";
->>>>>>> 5.2.0minus-37
       if Path.same path1 path2 then
         fprintf ppf "Internal path@ %a@ is dangling."
           Style.inline_code (Path.name path1)
@@ -5407,12 +5351,6 @@ let report_error_doc ppf = function
         "@[<hov>The implicit kind for %a is already defined at %a.@]"
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc ~level loc t ppf err
-=======
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t ppf err
->>>>>>> 5.2.0minus-37
   | Incomplete_instantiation { unset_param } ->
       Location.errorf ~loc:Location.none
         "@[<hov>Not enough instance arguments: \
@@ -5435,47 +5373,7 @@ let () =
   Location.register_error_of_exn
     (function
       | Error err ->
-<<<<<<< HEAD
           Some (report_error_doc err)
-||||||| 5.2.0minus-31
-          let loc =
-            match err with
-            | Missing_module (loc, _, _)
-            | Illegal_value_name (loc, _)
-            | Implicit_jkind_already_defined { loc; _ }
-            | Toplevel_splice loc
-            | Unsupported_inside_quotation (loc, _)
-            | Lookup_error(loc, _, _) -> loc
-            | Incomplete_instantiation _ -> Location.none
-          in
-          let error_of_printer =
-            if loc = Location.none
-            then Location.error_of_printer_file
-            else Location.error_of_printer ~loc ?sub:None
-          in
-          Some
-            (error_of_printer
-               (report_error_doc ~level:Btype.generic_level) err)
-=======
-          let loc =
-            match err with
-            | Missing_module (loc, _, _)
-            | Illegal_value_name (loc, _)
-            | Implicit_jkind_already_defined { loc; _ }
-            | Toplevel_splice loc
-            | Unsupported_inside_quotation (loc, _)
-            | Lookup_error(loc, _, _) -> loc
-            | Incomplete_instantiation _ -> Location.none
-          in
-          let error_of_printer =
-            if loc = Location.none
-            then Location.error_of_printer_file
-            else Location.error_of_printer ~loc ?sub:None
-          in
-          Some
-            (error_of_printer
-               report_error_doc err)
->>>>>>> 5.2.0minus-37
       | _ ->
           None
     )
@@ -5485,15 +5383,3 @@ let () =
     Option.map Unit_info.modname (get_current_unit ())
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-
-let report_lookup_error ~level loc t =
-  Format_doc.compat (report_lookup_error_doc ~level loc t)
-let report_error ~level = Format_doc.compat (report_error_doc ~level)
-=======
-
-let report_lookup_error loc t =
-  Format_doc.compat (report_lookup_error_doc loc t)
-let report_error = Format_doc.compat report_error_doc
->>>>>>> 5.2.0minus-37

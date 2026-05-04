@@ -361,6 +361,11 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
 val occur_in: Env.t -> type_expr -> type_expr -> bool
+val deep_occur: type_expr -> type_expr -> bool
+        (* Check whether a type occurs structurally within another. *)
+val deep_occur_list: type_expr -> type_expr list -> bool
+        (* Check whether a type occurs structurally within any type from
+           a list of types. *)
 val moregeneral: Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
   type_expr -> type_expr -> Jkind_types.Sort.t option list
@@ -370,11 +375,6 @@ val moregeneral: Env.t -> bool ->
            Returns, for each pattern sort variable (in order), the sort it was
            constrained to during the check, or [None] if unconstrained. Sorts
            in the result may contain subject sort variables. *)
-val deep_occur: type_expr -> type_expr -> bool
-        (* Check whether a type occurs structurally within another. *)
-val deep_occur_list: type_expr -> type_expr list -> bool
-        (* Check whether a type occurs structurally within any type from
-           a list of types. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
 val all_distinct_vars: Env.t -> type_expr list -> bool
         (* Check those types are all distinct type variables *)

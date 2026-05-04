@@ -383,14 +383,14 @@ let explanation (type variety) intro prev env
                ~offender:(fun ppf ->
                    prepare_for_printing [t];
                    prepared_type_expr ppf t)
-               ~level:(Ctype.get_current_level ()) env) e)
+               env) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
     Some (doc_printf "@ @[<hov>%a@]"
             (Jkind.Violation.report_with_offender_sort
                ~offender:(fun ppf ->
                    prepare_for_printing [t];
                    prepared_type_expr ppf t)
-               ~level:(Ctype.get_current_level ()) env) e)
+               env) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
     let fmt_history t k ppf =
       Jkind.(format_history env ~intro:(

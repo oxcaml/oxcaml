@@ -354,13 +354,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
-<<<<<<< HEAD
-    | Tpat_var (id, name, _, _, _) ->
-||||||| 5.2.0minus-31
-    | Tpat_var (id, name,_,_,_) ->
-=======
     | Tpat_var { id; name; _ } ->
->>>>>>> 5.2.0minus-37
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -373,26 +367,13 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        The compiler transforms (x:t) into (_ as x : t).
        This avoids transforming a warning 27 into a 26.
      *)
-<<<<<<< HEAD
-    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _, _, _ty)
-||||||| 5.2.0minus-31
-    | Tpat_alias
-      ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
-=======
     | Tpat_alias
       { pattern = {pat_desc = Tpat_any; pat_loc};
         name; _ }
->>>>>>> 5.2.0minus-37
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
-<<<<<<< HEAD
-    | Tpat_alias (pat, _id, name, _, _, _, _ty) ->
-||||||| 5.2.0minus-31
-    | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
-=======
     | Tpat_alias { pattern = pat; name; _ } ->
->>>>>>> 5.2.0minus-37
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
@@ -1164,16 +1145,8 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
-<<<<<<< HEAD
-    | { pat_desc = Tpat_alias (p, id, _s, _, _, _, _ty) }
-      when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
-||||||| 5.2.0minus-31
-    | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
-      when string_is_prefix "selfpat-" (Ident.name id) ->
-=======
     | { pat_desc = Tpat_alias { pattern = p; id; _ } }
-      when string_is_prefix "selfpat-" (Ident.name id) ->
->>>>>>> 5.2.0minus-37
+      when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
   in
@@ -1202,16 +1175,8 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
-<<<<<<< HEAD
-  | { pat_desc = Tpat_alias(_pat, id, _, _, _, _, _ty) } ->
-      String.starts_with ~prefix:"self-" (Ident.name id)
-||||||| 5.2.0minus-31
-  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
-      string_is_prefix "self-" (Ident.name id)
-=======
   | { pat_desc = Tpat_alias { id; _ } } ->
-      string_is_prefix "self-" (Ident.name id)
->>>>>>> 5.2.0minus-37
+      String.starts_with ~prefix:"self-" (Ident.name id)
   | _ -> false
 
 (* [Typeclass] adds a [self] parameter to initializers and methods that isn't

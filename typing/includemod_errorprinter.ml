@@ -1234,15 +1234,9 @@ let all env = function
       in
       signature ~expansion_token:true ~env ~before:[first] ~ctx:[] diff.symptom
   | In_Type_declaration (id,reason) ->
-<<<<<<< HEAD
       [Location.msg "%t" (core env.i_env id reason)]
-||||||| 5.2.0minus-31
-      [Location.msg "%t" (core env id reason)]
-=======
-      [Location.msg "%t" (core env id reason)]
   | In_Jkind_declaration (id,reason) ->
-      [Location.msg "%t" (core env id reason)]
->>>>>>> 5.2.0minus-37
+      [Location.msg "%t" (core env.i_env id reason)]
   | In_Module_type diff ->
       module_type ~expansion_token:true ~eqmode:false ~before:[] ~env ~ctx:[]
         diff

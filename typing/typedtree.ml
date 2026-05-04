@@ -392,29 +392,7 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
-<<<<<<< HEAD
   | Baccess_field of Longident.t loc * label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
-||||||| 5.2.0minus-31
-  | Baccess_field of Longident.t loc * Types.label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
-=======
-  | Baccess_field of Longident.t loc * Types.label_description
->>>>>>> 5.2.0minus-37
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
@@ -1454,81 +1432,9 @@ let split_pattern pat =
   in
   split_pattern pat
 
-<<<<<<< HEAD
 let map_apply_arg f = function
   | Arg arg -> Arg (f arg)
   | Omitted _ as arg -> arg
-||||||| 5.2.0minus-31
-(* Expressions are considered nominal if they can be used as the subject of a
-   sentence or action. In practice, we consider that an expression is nominal
-   if they satisfy one of:
-   - Similar to an identifier: words separated by '.' or '#'.
-   - Do not contain spaces when printed.
-  *)
-let nominal_exp_doc lid t =
-  let open Format_doc.Doc in
-  let longident l = Format_doc.doc_printer lid l.Location.txt in
-  let rec nominal_exp_doc doc exp =
-    match exp.exp_desc with
-    | _ when exp.exp_attributes <> [] -> None
-    | Texp_ident (_,l,_,_,_,_) ->
-        Some (longident l doc)
-    | Texp_instvar (_,_,s) ->
-        Some (string s.Location.txt doc)
-    | Texp_constant _ -> assert false
-    | Texp_variant (lbl, None) ->
-        Some (printf "`%s" lbl doc)
-    | Texp_construct (l, _, [], _) -> Some (longident l doc)
-    | Texp_field (parent, _, lbl, _, _, _) ->
-        Option.map
-          (printf ".%t" (longident lbl))
-          (nominal_exp_doc doc parent)
-    | Texp_send (parent, meth, _) ->
-        let name = match meth with
-          | Tmeth_name name -> name
-          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
-        Option.map
-          (printf "#%s" name)
-          (nominal_exp_doc doc parent)
-    | _ -> None
-  in
-  nominal_exp_doc empty t
-=======
-(* Expressions are considered nominal if they can be used as the subject of a
-   sentence or action. In practice, we consider that an expression is nominal
-   if they satisfy one of:
-   - Similar to an identifier: words separated by '.' or '#'.
-   - Do not contain spaces when printed.
-  *)
-let nominal_exp_doc lid t =
-  let open Format_doc.Doc in
-  let longident l = Format_doc.doc_printer lid l.Location.txt in
-  let rec nominal_exp_doc doc exp =
-    match exp.exp_desc with
-    | _ when exp.exp_attributes <> [] -> None
-    | Texp_ident { lid; _ } ->
-        Some (longident lid doc)
-    | Texp_instvar (_,_,s) ->
-        Some (string s.Location.txt doc)
-    | Texp_constant _ -> assert false
-    | Texp_variant (lbl, None) ->
-        Some (printf "`%s" lbl doc)
-    | Texp_construct (l, _, [], _) -> Some (longident l doc)
-    | Texp_field (parent, _, lbl, _, _, _) ->
-        Option.map
-          (printf ".%t" (longident lbl))
-          (nominal_exp_doc doc parent)
-    | Texp_send (parent, meth, _) ->
-        let name = match meth with
-          | Tmeth_name name -> name
-          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
-        Option.map
-          (printf "#%s" name)
-          (nominal_exp_doc doc parent)
-    | _ -> None
-  in
-  nominal_exp_doc empty t
->>>>>>> 5.2.0minus-37
 
 let loc_of_decl ~uid =
   let of_option { txt; loc } =

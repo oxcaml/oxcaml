@@ -300,17 +300,11 @@ module Sort = struct
 
     let for_type_extension = scannable
 
-<<<<<<< HEAD
-    let for_class = value
-
-    let for_effect = value
-
-    let for_continuation = value
-||||||| 5.2.0minus-31
-    let for_class = value
-=======
     let for_class = scannable
->>>>>>> 5.2.0minus-37
+
+    let for_effect = scannable
+
+    let for_continuation = scannable
   end
 
   module Var = struct
