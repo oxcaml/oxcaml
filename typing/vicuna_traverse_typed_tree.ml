@@ -394,6 +394,7 @@ and value_kind_record env subst ~visited ~depth
              (Other "Record_unboxed should have been handled above"))
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
+      | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
     in
     non_consts
 
