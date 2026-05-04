@@ -48,7 +48,7 @@ let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
 let field_offset_for_label lbl =
   match lbl.lbl_repres with
-  | Record_boxed _
+  | Record_boxed
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
   | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
       lbl.lbl_pos
@@ -696,7 +696,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
       let prim_and_args =
         match lbl.lbl_repres with
-          Record_boxed _
+          Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer e in
           if Types.is_atomic lbl.lbl_mut
@@ -796,7 +796,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let newval_lambda = transl_exp ~scopes lbl.lbl_sort newval in
       let prim, args =
         match lbl.lbl_repres with
-          Record_boxed _
+          Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
@@ -2100,7 +2100,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       | Overridden (_lid, expr) ->
           let upd =
             match repres with
-              Record_boxed _
+              Record_boxed
             | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                 let ptr, _ = maybe_pointer expr in
                 Psetfield(lbl.lbl_pos, ptr, Assignment modify_heap)
@@ -2170,7 +2170,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                let sem = add_barrier_to_read unique_barrier sem in
                let access =
                  match repres with
-                   Record_boxed _
+                   Record_boxed
                  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                    let ptr, _ = maybe_pointer_type env typ in
                    Pfield (i, ptr, sem)
@@ -2232,7 +2232,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         if mut = Mutable then raise Not_constant;
         let cl = List.map extract_constant ll in
         match repres with
-        | Record_boxed _ -> Lconst(Const_block(0, cl))
+        | Record_boxed -> Lconst(Const_block(0, cl))
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
             Lconst(Const_block(runtime_tag, cl))
@@ -2275,7 +2275,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       with Not_constant ->
         let loc = of_location ~scopes loc in
         match repres with
-          Record_boxed _ ->
+          Record_boxed ->
             let shape = List.map must_be_value shape in
             Lprim(Pmakeblock(0, mut,
                              Lambda.block_shape_of_value_kinds (Some shape),
@@ -2342,7 +2342,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
     ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
-  | Record_boxed _
+  | Record_boxed
   | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
                           | Variant_with_null))
@@ -2422,7 +2422,7 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_field (_id, lbl) ->
     begin match lbl.lbl_repres with
-    | Record_boxed _
+    | Record_boxed
     | Record_float | Record_ufloat ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter

@@ -315,7 +315,7 @@ let print_bigarray name unsafe kind ppf layout =
 
 let record_rep ppf r = match r with
   | Record_unboxed -> fprintf ppf "unboxed"
-  | Record_boxed _ -> fprintf ppf "boxed"
+  | Record_boxed -> fprintf ppf "boxed"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"

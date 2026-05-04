@@ -2489,7 +2489,7 @@ module Label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Legacy ~loc usage path env
   let in_env lbl =
     match lbl.lbl_repres with
-    | Record_boxed _ | Record_float | Record_ufloat | Record_unboxed
+    | Record_boxed | Record_float | Record_ufloat | Record_unboxed
     | Record_mixed _ -> true
     | Record_inlined _ -> false
 end)
@@ -6138,7 +6138,7 @@ and type_expect_
           | Record_unboxed
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
             -> false
-          | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _
+          | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
             -> true
         end
@@ -8069,7 +8069,7 @@ and type_block_access env expected_base_ty principal
           to [float#] here because it could be a singleton unboxed record
           containing a float, and thus be followed by an unboxed access *)
       match label.lbl_repres with
-      | Record_boxed _ -> false
+      | Record_boxed -> false
       | Record_mixed mixed ->
         begin match mixed.(label.lbl_pos) with
         | Float_boxed -> true

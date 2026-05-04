@@ -563,7 +563,7 @@ module Type_decl_shape = struct
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
-          | Record_boxed _ ->
+          | Record_boxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
           | Record_mixed fields ->
             record_of_labels ~shape_for_constr ~type_subst

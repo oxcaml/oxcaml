@@ -243,7 +243,7 @@ let compute_static_size lam =
 
     | Pduprecord (repres, size) ->
         begin match repres with
-        | Record_boxed _
+        | Record_boxed
         | Record_inlined (_, Constructor_uniform_value,
                           (Variant_boxed _ | Variant_extensible)) ->
             Block (Regular_block size)

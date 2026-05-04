@@ -2092,7 +2092,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pduprecord (repr, num_fields), [[arg]] ->
     let kind : P.Duplicate_block_kind.t =
       match repr with
-      | Record_boxed _ ->
+      | Record_boxed ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields

@@ -384,7 +384,7 @@ and value_kind_record env subst ~visited ~depth
       | Record_inlined (Ordinary { runtime_tag; _ }, _, _) ->
         Block (Some (runtime_tag, fields))
       | Record_float -> FloatArray
-      | Record_boxed _ -> Block (Some (0, fields))
+      | Record_boxed -> Block (Some (0, fields))
       | Record_inlined (Extension _, _, _) -> Block (Some (0, fields))
       | Record_inlined (Null, _, _) ->
         raise (Vicuna_unsupported With_null_variants)
