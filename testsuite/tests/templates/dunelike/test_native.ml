@@ -40,7 +40,8 @@
    copy;
 
    src = "\
-     bad_access_submodule_directly.ml fancy.ml fancy.mli flourish.ml flourish.mli \
+     bad_access_submodule_directly.ml \
+     fancy.ml fancy.mli flourish.ml flourish.mli \
      ornament.ml ornament.mli fancy__.ml \
    ";
    dst = "fancy/";
@@ -83,7 +84,7 @@
    copy;
 
    set flg_alias_deps = "-w -53";
-   set flg = "$flg_alias_deps -no-alias-deps";
+   set flg = "$flg_alias_deps -no-alias-deps -nocwd";
    set flg_int_iface = "$flg -w -49";
    set flg_instance = "-H instances -w -24 -w -58";
 
@@ -95,7 +96,7 @@
    module = "p/p__.ml";
    ocamlopt.byte;
 
-   flags = "$flg -as-parameter -I p -open P__ -open No_direct_access_to_p";
+   flags = "$flg -as-parameter -I p -open P__";
    module = "p/p.mli";
    ocamlopt.byte;
 
@@ -103,14 +104,11 @@
    module = "q/q__.ml";
    ocamlopt.byte;
 
-   flags = "$flg -as-parameter -I q -open Q__ -open No_direct_access_to_q";
+   flags = "$flg -as-parameter -I q -open Q__";
    module = "q/q.mli";
    ocamlopt.byte;
 
-   set flg_basic = "\
-     $flg -parameter P -I p -I basic \
-     -open Basic__ -open No_direct_access_to_basic \
-   ";
+   set flg_basic = "$flg -parameter P -I p -I basic -open Basic__";
 
    flags = "$flg_int_iface";
    module = "basic/basic__.ml";
@@ -122,7 +120,7 @@
 
    set flg_fancy = "\
      $flg -parameter P -parameter Q -I p -I q -I basic -I fancy -I util \
-     -open Fancy__ -open No_direct_access_to_fancy \
+     -open Fancy__ \
    ";
 
    flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
@@ -145,8 +143,12 @@
    module = "fancy/ornament.ml";
    ocamlopt.byte;
 
+   (* -nocwd blocks access to mangled names even when the .cmi is in cwd *)
+   script = "cp fancy/fancy__Flourish.cmi .";
+   script;
+
    {
-     flags = "$flg_fancy -o fancy/fancy__Bad_access_submodule_directly.cmx";
+     flags = "$flg";
      module = "fancy/bad_access_submodule_directly.ml";
      ocamlopt_byte_exit_status = "2";
      compiler_output = "bad_access_submodule_directly.output";
@@ -168,10 +170,7 @@
    module = "fancy/fancy.ml";
    ocamlopt.byte;
 
-   set flg_p_int = "\
-     $flg -I p -I p_int \
-     -open P_int__ -open No_direct_access_to_p_int \
-   ";
+   set flg_p_int = "$flg -I p -I p_int -open P_int__";
 
    flags = "$flg_int_iface";
    module = "p_int/p_int__.ml";
@@ -181,10 +180,7 @@
    module = "p_int/p_int.mli p_int/p_int.ml";
    ocamlopt.byte;
 
-   set flg_p_string = "\
-     $flg -I p -I p_string \
-     -open P_string__ -open No_direct_access_to_p_string \
-   ";
+   set flg_p_string = "$flg -I p -I p_string -open P_string__";
 
    flags = "$flg_int_iface";
    module = "p_string/p_string__.ml";
@@ -212,7 +208,7 @@
 
    set flg_main_basic = "\
      $flg -I p_int -I p_string -I basic -I main_basic -I instances \
-     -open Main_basic__ -open No_direct_access_to_main_basic \
+     -open Main_basic__ \
    ";
 
    flags = "$flg_int_iface";
@@ -243,10 +239,7 @@
    }
 
  {
-   set flg_q_impl = "\
-     $flg -I q -I q_impl \
-     -open Q_impl__ -open No_direct_access_to_q_impl \
-   ";
+   set flg_q_impl = "$flg -I q -I q_impl -open Q_impl__";
 
    flags = "$flg_int_iface";
    module = "q_impl/q_impl__.ml";
@@ -312,7 +305,7 @@
 
    set flg_util = "\
      $flg -parameter P -I p -I q_impl -I basic -I fancy -I util \
-     -open Util__ -open No_direct_access_to_util \
+     -open Util__ \
    ";
 
    flags = "$flg_int_iface -parameter P -I p";
@@ -352,7 +345,7 @@
    set flg_export_fancy_q_impl = "\
      $flg -parameter P -I p -I q_impl -I basic -I fancy \
      -I export_fancy_q_impl -I util \
-     -open Export_fancy_q_impl__ -open No_direct_access_to_export_fancy_q_impl \
+     -open Export_fancy_q_impl__ \
    ";
 
    flags = "$flg_int_iface -parameter P -I p";
@@ -384,7 +377,7 @@
    set flg_use_fancy_q_impl = "\
      $flg -parameter P -I p -I q_impl -I basic -I fancy \
      -I export_fancy_q_impl -I use_fancy_q_impl -I util \
-     -open Use_fancy_q_impl__ -open No_direct_access_to_use_fancy_q_impl \
+     -open Use_fancy_q_impl__ \
    ";
 
    flags = "$flg_int_iface -parameter P -I p";
@@ -413,7 +406,7 @@
    set flg_main = "\
      $flg -I p_int -I p_string -I q_impl -I fancy -I basic -I main \
      -H export_fancy_q_impl -I use_fancy_q_impl -I util -I instances \
-     -open Main__ -open No_direct_access_to_main \
+     -open Main__ \
    ";
 
    flags = "$flg_int_iface";
@@ -443,7 +436,7 @@
    module = "test_native.ml";
    ocamlopt.byte;
 
-   flags = "$flg";
+   flags = "";
    module = "";
    program = "$test_build_directory/test_native.exe";
    all_modules = "\

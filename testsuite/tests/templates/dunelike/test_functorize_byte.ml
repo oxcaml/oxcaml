@@ -13,6 +13,7 @@
    main_functorize_derived.ml \
    main_functorize_share.ml \
    main_functorize_type_share.ml \
+   message.mli message.ml with_message.ml \
    bad_mix_bundles.ml \
    bad_mix_share.ml \
    test_functorize.reference \
@@ -35,7 +36,7 @@
 
    set OCAMLPARAM = "";
 
-   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int bundle bundle2 bundle_derived bundle_share bundle_stopafter bundle_cmifile bundle_phases bundle_onestep bundle_cms bundle_bad bundle_swap bundle_crc";
+   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int message with_message bundle bundle2 bundle_derived bundle_share bundle_msg bundle_stopafter bundle_cmifile bundle_phases bundle_onestep bundle_cms bundle_bad bundle_swap bundle_crc";
    script;
 
    src = "p.mli p__.ml";
@@ -70,11 +71,19 @@
    dst = "p_int/";
    copy;
 
+   src = "message.mli message.ml";
+   dst = "message/";
+   copy;
+
+   src = "with_message.ml";
+   dst = "with_message/";
+   copy;
+
    src = "bundle_bad.mli";
    dst = "bundle_bad/";
    copy;
 
-   set flg = "-no-alias-deps -w -53";
+   set flg = "-no-alias-deps -nocwd -w -53";
    set flg_int_iface = "$flg -w -49";
 
    (* Parameter P *)
@@ -83,7 +92,7 @@
    module = "p/p__.ml";
    ocamlc.byte;
 
-   flags = "$flg -as-parameter -I p -open P__ -open No_direct_access_to_p";
+   flags = "$flg -as-parameter -I p -open P__";
    module = "p/p.mli";
    ocamlc.byte;
 
@@ -93,10 +102,7 @@
    module = "basic/basic__.ml";
    ocamlc.byte;
 
-   flags = "\
-     $flg -parameter P -I p -I basic \
-     -open Basic__ -open No_direct_access_to_basic \
-   ";
+   flags = "$flg -parameter P -I p -I basic -open Basic__";
    module = "basic/basic.mli basic/basic.ml";
    ocamlc.byte;
 
@@ -106,10 +112,7 @@
    module = "util/util__.ml";
    ocamlc.byte;
 
-   flags = "\
-     $flg -parameter P -I p -I util \
-     -open Util__ -open No_direct_access_to_util \
-   ";
+   flags = "$flg -parameter P -I p -I util -open Util__";
    module = "util/util.mli util/util.ml";
    ocamlc.byte;
 
@@ -119,10 +122,7 @@
    module = "p_int/p_int__.ml";
    ocamlc.byte;
 
-   flags = "\
-     $flg -as-argument-for P -I p -I p_int \
-     -open P_int__ -open No_direct_access_to_p_int \
-   ";
+   flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
    module = "p_int/p_int.mli p_int/p_int.ml";
    ocamlc.byte;
 
@@ -525,6 +525,25 @@
      compiler_reference = "bad_crc_mismatch_byte.reference";
      check-ocamlc.byte-output;
    }
+
+ {
+   (* Real module alias: functorizer must track it as a concrete dependency
+      even when compiled with -no-alias-deps. *)
+
+   flags = "$flg -parameter P -I p -I message";
+   module = "message/message.mli message/message.ml";
+   ocamlc.byte;
+
+   flags = "$flg -parameter P -I p -I message";
+   module = "with_message/with_message.ml";
+   ocamlc.byte;
+
+   flags = "$flg -functorize -I p -I message -I with_message";
+   module = "";
+   program = "bundle_msg/bundle_msg.cmo";
+   all_modules = "message/message.cmo with_message/with_message.cmo";
+   ocamlc.byte;
+ }
 
  {
    (* Bundle basic_share and util_share: util_share.t = basic_share.t *)
