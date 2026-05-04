@@ -1131,8 +1131,10 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
     all_sets_of_closures_and_symbols
     closure_bound_names_inside_functions_all_sets value_slots_and_types_all_sets
 
-let simplify_stub_function dacc code ~all_code ~simplify_function_body =
-  let context = C.create_for_stub dacc ~all_code ~simplify_function_body in
+let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
+  let context =
+    C.create_for_static_stub dacc ~all_code ~simplify_function_body
+  in
   let closure_bound_names_inside_function =
     (* Unused, the type of the value slot is going to be unknown *)
     Function_slot.Map.empty

@@ -188,7 +188,7 @@ val disable_inlining : t -> Disable_inlining.t
 
 val disable_partial_application_stub_generation : t -> bool
 
-val enter_set_of_closures : t -> in_stub:bool -> t
+val enter_set_of_closures : t -> in_static_stub:bool -> t
 
 val enter_stub : t -> t
 
