@@ -466,7 +466,7 @@ to_float:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
@@ -474,6 +474,10 @@ to_float:
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let to_float_u x = Int8_u.to_float_u x
@@ -490,7 +494,7 @@ to_float32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -500,6 +504,10 @@ to_float32:
   vmovss %xmm0, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let to_float32_u x = Int8_u.to_float32_u x
@@ -542,7 +550,7 @@ to_int32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -552,6 +560,10 @@ to_int32:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let to_int32_u x = Int8_u.to_int32_u x
@@ -567,7 +579,7 @@ to_int64:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -576,6 +588,10 @@ to_int64:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let to_int64_u x = Int8_u.to_int64_u x
@@ -598,7 +614,7 @@ to_nativeint:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -607,6 +623,10 @@ to_nativeint:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let to_nativeint_u x = Int8_u.to_nativeint_u x

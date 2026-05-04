@@ -131,7 +131,7 @@ f:
   subq  $8, %rsp
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
@@ -143,6 +143,10 @@ f:
   movl  $1, %eax
   addq  $8, %rsp
   jmp   camlTOP5__do_work_11_15_code@PLT
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 
 f.do_work:
   movq  16(%rbx), %rax

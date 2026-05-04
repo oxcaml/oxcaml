@@ -110,13 +110,17 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L104
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_sse_
+.L2:
+  jmp   .L0
 |}]
 
 

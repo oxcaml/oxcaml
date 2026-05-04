@@ -92,7 +92,7 @@ header:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -102,6 +102,10 @@ header:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 (* int_as_pointer *)
@@ -138,13 +142,17 @@ make_ref:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L104
+  jb    .L1
 .L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
+.L1:
+  call  .Lcaml_call_gc_
+.L2:
+  jmp   .L0
 |}]
 
 let deref r = !r
