@@ -79,6 +79,17 @@ let regset ppf s =
       else fprintf ppf "@ %a" reg r)
     s
 
+let regmap ppf s =
+  let first = ref true in
+  Map.iter
+    (fun r _ ->
+      if !first
+      then (
+        first := false;
+        fprintf ppf "%a" reg r)
+      else fprintf ppf "@ %a" reg r)
+    s
+
 let regsetaddr' ?(print_reg = reg) ppf s =
   let reg = print_reg in
   let first = ref true in

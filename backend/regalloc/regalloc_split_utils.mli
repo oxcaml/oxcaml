@@ -33,3 +33,5 @@ type destruction_kind =
 val equal_destruction_kind : destruction_kind -> destruction_kind -> bool
 
 val destruction_point_at_end : Cfg.basic_block -> destruction_kind option
+
+type definition_kind = Reload

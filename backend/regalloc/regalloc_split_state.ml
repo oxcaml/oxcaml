@@ -7,7 +7,9 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 type destructions_at_end = (destruction_kind * Reg.Set.t) Label.Map.t
 
-type definitions_at_beginning = Reg.Set.t Label.Map.t
+type unqualified_definitions_at_beginning = Reg.Set.t Label.Map.t
+
+type definitions_at_beginning = definition_kind Reg.Map.t Label.Map.t
 
 type phi_at_beginning = Reg.Set.t Label.Map.t
 
@@ -36,9 +38,9 @@ let log_renaming_info : t -> unit =
   log "definitions:";
   indent ();
   Label.Map.iter
-    (fun label regset ->
-      log " - beginning of block %a (%a)" Label.format label Printreg.regset
-        regset)
+    (fun label regs ->
+      log " - beginning of block %a (reloads: %a)" Label.format label
+        Printreg.regmap regs)
     state.definitions_at_beginning;
   dedent ();
   log "phi:";
@@ -62,8 +64,8 @@ module ExtractSpillsAndReloadsFromLoops : sig
   val optimize :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
-    destructions_at_end * definitions_at_beginning
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    destructions_at_end * unqualified_definitions_at_beginning
 end = struct
   type loop_sets =
     { destroyed : Reg.Set.t;
@@ -135,7 +137,7 @@ end = struct
       (* Remove destructions for not-written and definitions for not-occurring
          registers from inside the loop. *)
       let (destructions_at_end, definitions_at_beginning) :
-          destructions_at_end * definitions_at_beginning =
+          destructions_at_end * unqualified_definitions_at_beginning =
         Label.Set.fold
           (fun label (destructions_at_end, definitions_at_beginning) ->
             let destructions_at_end =
@@ -187,7 +189,7 @@ end = struct
              loop Label.Set.empty)
           loop
       in
-      let definitions_at_beginning : definitions_at_beginning =
+      let definitions_at_beginning : unqualified_definitions_at_beginning =
         Label.Set.fold
           (fun label acc ->
             if debug then log "definitions now happen at %a" Label.print label;
@@ -233,8 +235,8 @@ module MoveSpillsAndReloads : sig
   val optimize :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
-    destructions_at_end * definitions_at_beginning
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    destructions_at_end * unqualified_definitions_at_beginning
 end = struct
   (** A definition at the begin of a block can be moved down if:
 
@@ -245,8 +247,8 @@ end = struct
       - the defined register has no occurrences in the block. *)
   let move_definitions_at_beginning_down :
       Cfg_with_infos.t ->
-      definitions_at_beginning:definitions_at_beginning ->
-      definitions_at_beginning * Label.t Stack.t =
+      definitions_at_beginning:unqualified_definitions_at_beginning ->
+      unqualified_definitions_at_beginning * Label.t Stack.t =
    fun cfg_with_infos ~definitions_at_beginning ->
     if debug
     then (
@@ -324,7 +326,7 @@ end = struct
   let move_destructions_at_end_up :
       Cfg_with_infos.t ->
       Label.t Stack.t ->
-      definitions_at_beginning:definitions_at_beginning ->
+      definitions_at_beginning:unqualified_definitions_at_beginning ->
       destructions_at_end:destructions_at_end ->
       destructions_at_end =
    fun cfg_with_infos stack ~definitions_at_beginning ~destructions_at_end ->
@@ -419,8 +421,8 @@ module RemoveReloadSpillInSameBlock : sig
   val optimize :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
-    destructions_at_end * definitions_at_beginning
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    destructions_at_end * unqualified_definitions_at_beginning
 end = struct
   let optimize cfg_with_infos ~destructions_at_end ~definitions_at_beginning =
     if debug
@@ -690,7 +692,7 @@ let compute_destructions : Cfg_with_infos.t -> destructions_at_end =
 let compute_definitions :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning =
+    unqualified_definitions_at_beginning =
  fun cfg_with_infos ~destructions_at_end ->
   let definitions_at_beginning = Label.Map.empty in
   let definitions_at_beginning =
@@ -820,7 +822,7 @@ let rec fix_point_phi : Cfg_with_infos.t -> phi_at_beginning -> phi_at_beginning
 let compute_phis :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
     phi_at_beginning =
  fun cfg_with_infos ~destructions_at_end ~definitions_at_beginning ->
   let phi_at_beginning = Label.Map.empty in
@@ -880,6 +882,14 @@ let make cfg_with_infos =
     compute_phis cfg_with_infos ~destructions_at_end ~definitions_at_beginning
   in
   let stack_slots = Regalloc_stack_slots.make () in
+  let definitions_at_beginning =
+    Label.Map.map
+      (fun regs ->
+        Reg.Set.fold
+          (fun reg acc -> Reg.Map.add reg Reload acc)
+          regs Reg.Map.empty)
+      definitions_at_beginning
+  in
   { destructions_at_end;
     definitions_at_beginning;
     phi_at_beginning;
