@@ -1,5 +1,10 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
+(* Since Branch has zero-comparison semantics, we can fold away nested
+   comparisons to zero. We have inserted such trivial comparisons in Ssa_of_cmm
+   to preserve the graph shape for CFG comparison validation. Removing them
+   enables Cfg_of_ssa to duplicate branch conditions without materializing
+   bits. *)
 module SimplifyConditions (C : Ssa_reducer.Context) = struct
   include Ssa_reducer.Default (C)
 
@@ -20,30 +25,5 @@ module SimplifyConditions (C : Ssa_reducer.Context) = struct
     | _ -> `Unchanged
 end
 
-(* Inline single-predecessor blocks: the (unique) predecessor's [Goto] args can
-   globally substitute the block's params, so folding the body and terminator
-   into the predecessor is sound — all uses of the params (wherever they appear
-   in the graph) see the same values. *)
-module Inline_merge (C : Ssa_reducer.Context) = struct
-  include Ssa_reducer.Default (C)
-
-  let is_inlinable (blk : C.In.Block.t) =
-    C.In.Block_set.cardinal blk.predecessors = 1
-
-  let map_args (args : C.In.Instruction.t array) : C.Out.Instruction.t array =
-    Array.map C.map_arg args
-
-  let visit_terminator (blk : C.In.Block.t) (b : C.Out.unfinished_block) =
-    match[@warning "-fragile-match"] blk.terminator with
-    | Goto { goto; args } when is_inlinable goto ->
-      C.inline_block goto ~block_args:(map_args args) b;
-      `Replaced
-    | _ -> `Unchanged
-end
-
 let run ssa =
-  Ssa_reducer.run
-    (Ssa_reducer.combine
-       [ (module SimplifyConditions : Ssa_reducer.Reducer);
-         (module Inline_merge : Ssa_reducer.Reducer) ])
-    ssa
+  Ssa_reducer.run (module SimplifyConditions : Ssa_reducer.Reducer) ssa

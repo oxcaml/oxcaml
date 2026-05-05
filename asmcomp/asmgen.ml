@@ -519,14 +519,6 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
        Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
      in
      let ssa = Ssa_of_cmm.convert fd_cmm in
-     (try Ssa_validate.validate ssa
-      with exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        Format.fprintf ppf_dump
-          "*** SSA validation error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
-          fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
-          fd_cmm Ssa_print.print ssa;
-        Printexc.raise_with_backtrace exn bt);
      let ssa = Ssa_tail_call.run ssa in
      let cfg_from_ssa_for_compare =
        (* First conversion: used only for [Cfg_compare], so we emit a CFG that
@@ -544,14 +536,14 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
      in
      Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
        ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump;
-     if !Oxcaml_flags.dump_cfg
+     if !Oxcaml_flags.dump_ssa
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      (* Second conversion: produces the CFG that feeds the real pipeline. This
         is where SSA-level optimizations run. *)
      let ssa =
        if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ssa else ssa
      in
-     if !Oxcaml_flags.dump_cfg && !Oxcaml_flags.ssa_simplify
+     if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_simplify
      then
        Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a"
          Ssa_print.print ssa;

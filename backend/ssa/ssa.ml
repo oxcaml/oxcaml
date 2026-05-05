@@ -1,13 +1,36 @@
 [@@@ocaml.warning "+a-30-40-41-42-67"]
 
-include Ssa_intf
+(** SSA graph implementation; signatures are in {!Ssa_intf}.
 
-(* ========================================================================
-   Implementation: a single underlying module satisfies both
-   [Standalone_graph_builder] and [Finished_graph]. During construction the
-   abstract types in [Graph_builder] hide the use counts, predecessors and
-   dominator info; at [finish] time the same module is repackaged with the
-   [Finished_graph] view that exposes them. *)
+    A single underlying module satisfies both [Standalone_graph_builder] and
+    [Finished_graph]. During construction the abstract types in [Graph_builder]
+    hide use counts, predecessors and dominator info; at [finish] time the same
+    module is repackaged with the [Finished_graph] view that exposes them.
+
+    Construction is mostly functional: each [emit_*] returns a new
+    [unfinished_block] cursor that carries the appended instruction list; blocks
+    themselves are mutated only by [finish_block] (which seals the body and
+    terminator) and by [finish] (which fills in metadata).
+
+    [finish] performs three passes over the finished blocks, in order:
+    - [compute_reachability_and_trap_stacks]: forward DFS from [entry] following
+      structural and exception successors, threading the trap stack so each
+      reachable block gets its [block_end_trap_stack] populated; unreachable
+      blocks are pruned.
+    - [compute_dominators]: iterative meet-over-predecessors fixpoint that walks
+      reachable blocks until no [dominator_info] changes.
+    - [compute_use_counts]: refcount over op args and block params; the latter
+      propagate to predecessors' [Goto] args, so a transitively-unused arg keeps
+      its defining op count at zero.
+
+    Invariants enforced here:
+    - Every reachable block is [finish_block]ed.
+    - [Tuple] never appears in a finished body, only transiently as an
+      [Ssa_reducer] instruction representative.
+    - [Block_param], [Proj] never appear in a block body.
+    - [Block_param.index] is bounds-checked by [make_block_param]. *)
+
+include Ssa_intf
 
 let make_builder (function_info : function_info) :
     (module Standalone_graph_builder) =
@@ -765,6 +788,7 @@ let make_builder (function_info : function_info) :
 
         let common_dominator = common_dominator
       end in
-      (module Finished : Finished_graph)
+      let result = (module Finished : Finished_graph) in
+      result
   end in
   (module M : Standalone_graph_builder)

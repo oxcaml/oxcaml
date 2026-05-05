@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -122,7 +123,7 @@ let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
 let use_ssa = ref true                       (* -use-ssa *)
 
-let ssa_simplify = ref false                 (* -ssa-simplify *)
+let ssa_simplify = ref true                 (* -ssa-simplify *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
