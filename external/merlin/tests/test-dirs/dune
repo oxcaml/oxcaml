@@ -1,0 +1,46 @@
+(cram
+ (applies_to no-escape type-expr environment_on_open locate-type
+   polarity-search)
+ (enabled_if
+  (<> %{os_type} Win32)))
+
+(cram
+ (applies_to parameters)
+ (locks server-tests/merlin_server))
+
+(cram
+ (applies_to typing-recovery)
+ (enabled_if
+  (and
+   (<> %{ocaml_version} 4.12.0+multicore)
+   (<> %{ocaml_version} 4.12.0+domains))))
+
+(cram
+  (deps ../../src/kernel/mconfig.ml)
+  (applies_to ocaml-flags))
+
+; FIXME: re-enable once ppxlib for 5.1 is released
+(cram
+ (applies_to with-ppx)
+ (enabled_if false))
+
+; Jane Street disabled tests -- they use dune.
+; Revisit when dune can run the flambda-backend compiler.
+(cram
+  (enabled_if false)
+  (applies_to
+    issue1518))
+
+; FIXME: disabled Jane Street tests that are failing internally
+(cram
+  (enabled_if false)
+  (applies_to
+     ; Enable this test when the Stdlib.Effect module is added.
+     issue1558))
+
+; TODO: this test is flaky. See
+; https://github.com/janestreet/merlin-jst/actions/runs/12831007336/job/35788214467?pr=124
+(cram
+  (enabled_if false)
+  (applies_to
+    stack-or-heap))
