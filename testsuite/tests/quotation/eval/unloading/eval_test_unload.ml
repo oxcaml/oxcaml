@@ -58,6 +58,13 @@ let[@inline never] run_reference_to_global () =
   in
   Printf.printf "Output: %s\n" (Buffer.contents output)
 
+let[@inline never] run_heap_value_returned_directly () =
+  Printf.printf "\nTest heap value returned directly\n";
+  let r : int ref = Eval.eval <[ ref 0 ]> in
+  r := 17;
+  r := !r + 1;
+  Printf.printf "Output: %d\n" !r
+
 let[@inline never] run_late_compilation_error () =
   Printf.printf "\nTest late compilation error\n";
   let quote = <[
@@ -120,6 +127,10 @@ let () =
   run_reference_to_global ();
   Gc.compact ();
   report "after reference_to_global + compact";
+
+  run_heap_value_returned_directly ();
+  Gc.compact ();
+  report "after heap_value_returned_directly + compact";
 
   run_late_compilation_error ();
   Gc.compact ();

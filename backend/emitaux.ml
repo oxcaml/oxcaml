@@ -85,6 +85,12 @@ let is_long_stack_index n =
 
 let record_frame_descr ~label ~frame_size ~live_offset ~code_ptr_live_offset
     ~unloadable debuginfo =
+  (* REVIEW: We now encode additional flags in the low 4 bits of the
+     frame_data word (see FRAME_DESCRIPTOR_FLAGS = 0xF). This relies on
+     [frame_size] being 16-byte aligned for any frame descriptor that may
+     carry these flags; otherwise frame_size bits would collide with flags and
+     break stack walking. Consider asserting [frame_size land 0xF = 0] (or
+     documenting the invariant centrally). *)
   assert (frame_size land 3 = 0);
   let fd_long =
     is_long (frame_size + get_flags debuginfo)

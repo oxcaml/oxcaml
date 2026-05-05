@@ -228,6 +228,16 @@ let eval (expr : 'a expr) =
         ("Cannot find module block symbol '" ^ linkage_name
        ^ "' which should have been output by the JIT")
   in
+  (* REVIEW: This assumes that extracting the eval'd result leaves no remaining
+     liveness edge from the compilation unit's static data to the result. That
+     seems true for the current test suite (mostly `fun ...` quotations where
+     the module block is fully static), but for quotations like `<[ ref 0 ]>`
+     the module block may store a heap-allocated value. If the unit's
+     `gc_roots` table is registered as global roots, that could keep the
+     returned value alive even after the caller drops it, potentially pinning
+     the unit and preventing unloading. Consider clearing field 0 here after
+     extraction (write `Val_unit` back) or adding an explicit regression test
+     that `Eval.eval <[ ref 0 ]>` units still unload when the ref is dropped. *)
   let obj = Obj.field struct_obj 0 in
   (Obj.obj obj : 'a eval)
 

@@ -57,6 +57,10 @@ static void ensure_mutex_initialized(void) {
    * explicit [caml_init_unloadable] hook runs. The first registration
    * initializes; subsequent calls are no-ops. */
   if (!units_mutex_initialized) {
+    /* REVIEW: This is not thread-safe: concurrent registrations can race and
+       initialize the mutex multiple times (or observe a half-initialized
+       mutex). Prefer a static initializer (CAML_PLAT_MUTEX_INITIALIZER) or
+       an atomic once-style init. */
     caml_plat_mutex_init(&units_mutex);
     units_mutex_initialized = 1;
   }
@@ -78,6 +82,9 @@ static void ensure_mutex_initialized(void) {
  * UNMARKED, after which standard marking takes over. */
 static void normalize_block_color(value v) {
   header_t hd = Hd_val(v);
+  /* REVIEW: This writes the header non-atomically. During concurrent marking,
+     other domains update/read headers via [Hp_atomic_val]; consider using
+     [atomic_store_relaxed(Hp_atomic_val(v), ...)] for consistency. */
   *Hp_val(v) = With_status_hd(hd, caml_allocation_status());
 }
 
@@ -115,6 +122,12 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
    * the unit's static blocks. The runtime would otherwise leave them
    * unmarked (they are emitted with white headers per B.1). */
   if (u->gc_roots != NULL) {
+    /* REVIEW: Registering [gc_roots] here means global-root scanning will walk
+       the unit every major cycle, regardless of whether any heap root reaches
+       the unit. Please confirm this cannot keep an otherwise-dead unit live
+       (e.g. via the module block pointing at other markable unit blocks), and
+       that scanning via reachability (closures/stack/code_ptr slots) would be
+       insufficient. */
     caml_register_dyn_globals(&u->gc_roots, 1);
   }
 

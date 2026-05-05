@@ -63,6 +63,11 @@
    unloadable code pointer across an indirect call, so we need this
    everywhere. */
 #define FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS 8
+/* REVIEW: FRAME_DESCRIPTOR_FLAGS now consumes the low 4 bits, but the comment
+   above still says "bottom two bits". This relies on frame sizes being 16-byte
+   aligned on all architectures/paths that emit frame descriptors; otherwise
+   the extra flag bits would collide with frame_size(). Please document and/or
+   assert the invariant in the emitter. */
 #define FRAME_DESCRIPTOR_FLAGS 0xF
 #define FRAME_RETURN_TO_C 0xFFFF
 #define FRAME_LONG_MARKER 0x7FFF
