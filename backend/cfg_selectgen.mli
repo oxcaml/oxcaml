@@ -37,24 +37,7 @@ module Make (_ : Cfg_selectgen_target_intf.S) : sig
 
   val is_immediate : Operation.integer_operation -> int -> bool
 
-  val is_immediate_test : Operation.integer_comparison -> int -> bool
-
   val select_condition : Cmm.expression -> Operation.test * Cmm.expression
-
-  val select_arith_comm :
-    Operation.integer_operation ->
-    Cmm.expression list ->
-    Cfg.basic_or_terminator * Cmm.expression list
-
-  val select_arith :
-    Operation.integer_operation ->
-    Cmm.expression list ->
-    Cfg.basic_or_terminator * Cmm.expression list
-
-  val select_arith_comp :
-    Operation.integer_comparison ->
-    Cmm.expression list ->
-    Cfg.basic_or_terminator * Cmm.expression list
 
   val select_operation :
     Cmm.operation ->

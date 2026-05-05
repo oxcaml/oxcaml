@@ -28,11 +28,4 @@ val get : sequence -> t
 
 val get_and_incr : sequence -> t
 
-val save : sequence -> t
-
-val restore : sequence -> t -> unit
-
-(** Run [f ()] and restore the counter to its value at entry afterwards. *)
-val with_saved_counter : sequence -> (unit -> 'a) -> 'a
-
 val to_int_unsafe : t -> int

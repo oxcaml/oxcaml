@@ -42,6 +42,14 @@ type call_op =
   | Func of Cfg_intf.S.func_call_operation
   | Prim of Cfg_intf.S.prim_call_operation
 
+(** A block parameter: its machtype component and an optional human-readable
+    name (set from the corresponding Cmm variable name where known — function
+    args on [entry], [Ccatch] handler params; [None] otherwise). *)
+type block_param =
+  { typ : Cmm.machtype_component;
+    mutable name : string option
+  }
+
 type function_info =
   { fun_name : string;
     fun_args : Cmm.machtype;
@@ -73,7 +81,7 @@ module type Graph_builder = sig
 
     val is_function_start : t -> bool
 
-    val params : t -> Cmm.machtype
+    val params : t -> block_param array
 
     val equal : t -> t -> bool
 
@@ -121,7 +129,9 @@ module type Graph_builder = sig
         typ : Cmm.machtype;
         args : Instruction.t array;
         dbg : Debuginfo.t;
-        mutable usage_count : usage_count
+        mutable usage_count : usage_count;
+        mutable name : string option
+            (** Optional human-readable hint for the result. *)
       }
 
     and block_param_data = private
@@ -141,6 +151,9 @@ module type Graph_builder = sig
         since [op_data] is private. *)
     val make_op :
       op:op -> typ:Cmm.machtype -> args:t array -> dbg:Debuginfo.t -> t
+
+    (** Set the [name] hint on an [Op]. No-op for non-[Op] instructions. *)
+    val set_name : t -> string -> unit
 
     (** Smart constructor for [Block_param]. [index] is bounds-checked against
         [block]'s param array. The component type is not stored; reach for it
@@ -267,7 +280,7 @@ module type Finished_graph = sig
     and t = private
       { id : Block_id.t;
         is_function_start : bool;
-        params : Cmm.machtype;
+        params : block_param array;
         mutable predecessors : predecessors;
         mutable body : Instruction.t array;
         mutable terminator : Terminator.t;
@@ -334,7 +347,8 @@ module type Finished_graph = sig
         typ : Cmm.machtype;
         args : Instruction.t array;
         dbg : Debuginfo.t;
-        mutable usage_count : usage_count
+        mutable usage_count : usage_count;
+        mutable name : string option
       }
 
     and block_param_data = private
@@ -403,6 +417,9 @@ module type Finished_graph = sig
   val blocks : Block.t list
 
   val predecessors : Block.t -> Block.t list
+
+  (** Project just the machtype out of a block's [params] array. *)
+  val params_machtype : Block.t -> Cmm.machtype
 
   (** All successors of a block, including [trap_successor]. *)
   val successors : Block.t -> Block.t list
