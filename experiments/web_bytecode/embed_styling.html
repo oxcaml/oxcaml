@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OxCaml Embeds</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f6f4ef;
+        --panel: #ffffff;
+        --ink: #182231;
+        --muted: #667386;
+        --rule: rgba(24, 34, 49, 0.14);
+        --accent: #b94d31;
+        --accent-strong: #83341e;
+        --code-bg: #eef2f4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Avenir Next, Segoe UI, system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      header,
+      main {
+        width: min(1060px, calc(100vw - 32px));
+        margin: 0 auto;
+      }
+
+      header {
+        padding: 44px 0 24px;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 250px;
+        gap: 42px;
+        padding: 30px 0 64px;
+      }
+
+      nav {
+        position: sticky;
+        top: 18px;
+        align-self: start;
+        border-left: 1px solid var(--rule);
+        padding-left: 18px;
+      }
+
+      nav a {
+        display: block;
+        color: var(--muted);
+        font-size: 0.92rem;
+        text-decoration: none;
+        padding: 0.18rem 0;
+      }
+
+      nav a:hover,
+      nav a:focus-visible {
+        color: var(--accent);
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        max-width: 780px;
+        font-size: clamp(2.2rem, 6vw, 4.3rem);
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 3rem 0 0.8rem;
+        border-top: 1px solid var(--rule);
+        padding-top: 2rem;
+        font-size: 1.65rem;
+      }
+
+      article > section:first-child h2 {
+        margin-top: 0;
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      h3 {
+        margin: 1.6rem 0 0.55rem;
+        font-size: 1.12rem;
+      }
+
+      p,
+      ul,
+      ol {
+        max-width: 78ch;
+      }
+
+      a {
+        color: var(--accent-strong);
+      }
+
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      code {
+        border-radius: 4px;
+        background: var(--code-bg);
+        font-size: 0.94em;
+        padding: 0.08em 0.28em;
+      }
+
+      article > section > pre {
+        overflow: auto;
+        border: 1px solid var(--rule);
+        border-radius: 8px;
+        background: #111923;
+        color: #e9f0f8;
+        font-size: 0.86rem;
+        line-height: 1.5;
+        padding: 1rem;
+      }
+
+      article > section > pre code {
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        font-size: inherit;
+        padding: 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0 1.6rem;
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      table code {
+        white-space: nowrap;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--rule);
+        padding: 0.58rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .lede {
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+
+      .doc-note {
+        border-left: 4px solid var(--accent);
+        background: rgba(255, 255, 255, 0.62);
+        padding: 0.9rem 1rem;
+      }
+
+      .example-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin: 1rem 0 1.5rem;
+      }
+
+      .theme-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1rem 0;
+      }
+
+      .theme-controls button {
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--ink);
+        cursor: pointer;
+        font: 700 0.88rem/1 Avenir Next, Segoe UI, system-ui, sans-serif;
+        padding: 0.55rem 0.75rem;
+      }
+
+      .theme-controls button:hover,
+      .theme-controls button:focus-visible {
+        border-color: rgba(185, 77, 49, 0.5);
+        color: var(--accent-strong);
+        outline: none;
+      }
+
+      .compact-example {
+        --oxcaml-editor-min-height: 6.5rem;
+        --oxcaml-editor-max-height: 16rem;
+        --oxcaml-output-min-height: 2.35rem;
+        --oxcaml-output-font-size: 0.8rem;
+      }
+
+      .blue-example {
+        --oxcaml-accent: #2563eb;
+        --oxcaml-ok: #0f766e;
+        --syntax-keyword: #6d28d9;
+        --syntax-string: #166534;
+        --syntax-type: #1d4ed8;
+      }
+
+      .flat-example {
+        --oxcaml-radius: 0;
+        --oxcaml-border: rgba(15, 23, 42, 0.28);
+        --oxcaml-bg: #ffffff;
+        --oxcaml-editor: #ffffff;
+        --oxcaml-output-bg: #f8fafc;
+      }
+
+      .flat-box-example {
+        --oxcaml-radius: 0;
+        --oxcaml-margin-block: 0.85rem 1.35rem;
+        --oxcaml-bg: #ffffff;
+        --oxcaml-border: #cbd5e1;
+        --oxcaml-editor: #ffffff;
+        --oxcaml-editor-active: transparent;
+        --oxcaml-editor-min-height: 5.25rem;
+        --oxcaml-output-bg: #ffffff;
+        --oxcaml-output-border: #cbd5e1;
+      }
+
+      .flat-box-example .cm-gutters {
+        display: none;
+      }
+
+      .flat-box-example .cm-content {
+        padding-left: 0.95rem;
+      }
+
+      .dense-doc-theme {
+        --oxcaml-font-family: Inter, Segoe UI, system-ui, sans-serif;
+        --oxcaml-mono-font-family: IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --oxcaml-editor-font-size: 0.82rem;
+        --oxcaml-output-font-size: 0.78rem;
+        --oxcaml-editor-min-height: 7rem;
+        --oxcaml-editor-max-height: 18rem;
+      }
+
+      @media (max-width: 1000px) {
+        main {
+          display: block;
+        }
+
+        nav {
+          position: static;
+          border-left: 0;
+          border-top: 1px solid var(--rule);
+          margin-top: 2rem;
+          padding: 1rem 0 0;
+        }
+
+        .example-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>OxCaml Embeds</h1>
+      <p class="lede">
+        Embed runnable, checkable, and toplevel OxCaml examples in ordinary
+        HTML pages. Start with the basic <code>&lt;oxcaml&gt;</code> tag,
+        then choose an execution mode, optional JavaScript mounting, output
+            behavior, color scheme, and styling hooks.
+      </p>
+    </header>
+
+    <main>
+      <article>
+        <section id="quick-start">
+          <h2>Quick Start</h2>
+          <p>
+            Add <code>oxcaml-embed.js</code> to the page and write examples as
+            <code>&lt;oxcaml&gt;</code> tags. With no mode attribute, the
+            snippet runs as a small program.
+          </p>
+
+          <h3>Run a Program</h3>
+          <pre><code>&lt;oxcaml&gt;
+let greeting name =
+  "Hello, " ^ name
+
+let () =
+  print_endline (greeting "OxCaml")
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml>
+let greeting name =
+  "Hello, " ^ name
+
+let () =
+  print_endline (greeting "OxCaml")
+          </oxcaml>
+
+          <h3>Use Toplevel Phrases</h3>
+          <p>
+            Add <code>utop</code> for examples that should behave like
+            toplevel phrases. End each phrase with <code>;;</code>.
+          </p>
+
+          <pre><code>&lt;oxcaml utop&gt;
+let language = "OxCaml";;
+let answer = 40 + 2;;
+Printf.sprintf "%s: %d" language answer;;
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml utop>
+let language = "OxCaml";;
+let answer = 40 + 2;;
+Printf.sprintf "%s: %d" language answer;;
+          </oxcaml>
+
+          <p>
+            Load the embed script once on the page, usually just before
+            <code>&lt;/body&gt;</code>.
+          </p>
+
+          <pre><code>&lt;script src="./oxcaml-embed.js"&gt;&lt;/script&gt;</code></pre>
+
+          <p>
+            After the script loads, each tag becomes an editor with a status
+            and output panel. User edits are saved in <code>localStorage</code>
+            and the reset button restores the original source.
+          </p>
+        </section>
+
+        <section id="execution-modes">
+          <h2>Execution Modes</h2>
+          <p>
+            A widget normally runs the source as a program. Add
+            <code>check</code> when an example should only type-check, or
+            <code>utop</code> when the source should behave like toplevel
+            phrases. In <code>utop</code> mode, terminate phrases with
+            <code>;;</code> and the transcript shows evaluated values and
+            inferred types for each phrase.
+          </p>
+
+          <table>
+            <thead>
+              <tr><th>Mode</th><th>Markup</th><th>Use it for</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Run</td><td><code>&lt;oxcaml&gt;</code></td><td>Small programs that print output or emit rendered HTML.</td></tr>
+              <tr><td>Check</td><td><code>&lt;oxcaml check&gt;</code></td><td>Type-checking examples, expected errors, and snippets without side effects.</td></tr>
+              <tr><td>Utop</td><td><code>&lt;oxcaml utop&gt;</code></td><td>Interactive lesson examples where each phrase should show its value and type.</td></tr>
+            </tbody>
+          </table>
+
+          <pre><code>&lt;oxcaml utop data-filename="lesson_values.ml"&gt;
+let language = "OxCaml";;
+let answer = 40 + 2;;
+Printf.sprintf "%s: %d" language answer;;
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml class="compact-example" utop data-filename="lesson_values.ml">
+let language = "OxCaml";;
+let answer = 40 + 2;;
+Printf.sprintf "%s: %d" language answer;;
+          </oxcaml>
+
+          <p>
+            Programmatic mounts use the same mode names:
+          </p>
+
+          <pre><code>window.OxCamlPlayground.mount(element, {
+  mode: "utop",
+  source: "let x = 1 + 2;;",
+});</code></pre>
+        </section>
+
+        <section id="programmatic-mounting">
+          <h2>Programmatic Mounting</h2>
+          <p>
+            Use markup when the source belongs in the HTML document. Use
+            <code>mount</code> when the source comes from JavaScript, an
+            exercise database, or another dynamic source. If the target is an
+            ordinary DOM element, the target stays in the document and the
+            generated widget replaces its children.
+          </p>
+
+          <pre><code>&lt;div id="programmatic-example" class="compact-example blue-example"&gt;&lt;/div&gt;
+
+&lt;script&gt;
+  window.OxCamlPlayground.load.then((api) =&gt; {
+    api.mount(document.querySelector("#programmatic-example"), {
+      mode: "run",
+      filename: "programmatic_example.ml",
+      source: `let message = "mounted from JavaScript"
+
+let () =
+  print_endline message`,
+    });
+  });
+&lt;/script&gt;</code></pre>
+
+          <div id="programmatic-example" class="compact-example blue-example"></div>
+
+          <p>
+            When the target is not an <code>&lt;oxcaml&gt;</code> tag,
+            <code>mount</code> requires <code>source</code>. It accepts the
+            same option names as the markup API: <code>mode</code>,
+            <code>filename</code>, <code>emptyOutput</code>,
+            <code>runTrigger</code>, and <code>storageKey</code>. CSS custom
+            properties on the target element inherit into the generated widget.
+          </p>
+
+          <pre><code>const editor = api.mount(target, {
+  mode: "check",
+  filename: "exercise.ml",
+  emptyOutput: "hide",
+  runTrigger: "manual-after-initial",
+  storageKey: "chapter-2/exercise-4",
+  source: "let add_tax cents = cents + (cents / 10)",
+});</code></pre>
+
+          <p>
+            The same <code>mount</code> function can also replace an existing
+            <code>&lt;oxcaml&gt;</code> tag:
+          </p>
+
+          <pre><code>const editor = api.mount(document.querySelector("oxcaml[data-example='intro']"), {
+  mode: "utop",
+});</code></pre>
+        </section>
+
+        <section id="output-panel">
+          <h2>Output Panel</h2>
+          <p>
+            By default, completed widgets keep the output panel visible and
+            show <code>(no output)</code> when the program or check produced no
+            transcript. Add <code>data-oxcaml-empty-output="hide"</code> to
+            remove the output panel only when there is no transcript and no
+            inferred-type panel.
+          </p>
+          <p>
+            Diagnostics, warnings, exceptions, stdout, rendered HTML output,
+            and inferred types still show the output panel. The panel also
+            remains visible while the widget is loading or running.
+          </p>
+
+          <pre><code>&lt;oxcaml check data-oxcaml-empty-output="hide"&gt;
+let add_tax cents =
+  cents + (cents / 10)
+&lt;/oxcaml&gt;</code></pre>
+
+          <p>
+            Programmatic mounts use the same setting name:
+          </p>
+
+          <pre><code>window.OxCamlPlayground.mount(element, {
+  mode: "check",
+  emptyOutput: "hide",
+  source: "let add_tax cents = cents + (cents / 10)",
+});</code></pre>
+        </section>
+
+        <section id="run-trigger">
+          <h2>Run Trigger</h2>
+          <p>
+            Widgets run or check as you type by default. Add
+            <code>data-oxcaml-run-trigger="manual"</code> when an example
+            should wait for the reader. Manual widgets show a
+            mode-specific button with the keyboard shortcut in its label.
+            Use <code>manual-after-initial</code> to run or check once on
+            initial load, then require the button after edits.
+          </p>
+
+          <pre><code>&lt;oxcaml check data-oxcaml-run-trigger="manual"&gt;
+let add_tax cents =
+  cents + (cents / 10)
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml check data-oxcaml-run-trigger="manual">
+let add_tax cents =
+  cents + (cents / 10)
+          </oxcaml>
+
+          <pre><code>&lt;oxcaml data-oxcaml-run-trigger="manual"&gt;
+let message = "Run me with the button"
+let () = print_endline message
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml class="compact-example" data-oxcaml-run-trigger="manual">
+let message = "Run me with the button"
+let () = print_endline message
+          </oxcaml>
+
+          <pre><code>&lt;oxcaml check data-oxcaml-run-trigger="manual-after-initial"&gt;
+let discounted cents =
+  cents - (cents / 5)
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml check data-oxcaml-run-trigger="manual-after-initial">
+let discounted cents =
+  cents - (cents / 5)
+          </oxcaml>
+
+          <p>
+            Programmatic mounts use <code>runTrigger: "manual"</code> or
+            <code>runTrigger: "manual-after-initial"</code>. The shortcut is
+            <code>⌘↵</code> on macOS and <code>Ctrl+Enter</code> elsewhere
+            when the editor has focus.
+          </p>
+        </section>
+
+        <section id="settings-reference">
+          <h2>Settings Reference</h2>
+          <p>
+            Each behavior has one supported spelling. Prefer these canonical
+            forms in docs and course material; aliases such as
+            <code>theme</code>, <code>data-theme</code>,
+            <code>data-oxcaml-theme</code>, and <code>filename</code> are not
+            part of the public embed API.
+          </p>
+
+          <table>
+            <thead>
+              <tr><th>Behavior</th><th>Markup</th><th>JavaScript</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Source text</td><td>Put source between <code>&lt;oxcaml&gt;</code> and <code>&lt;/oxcaml&gt;</code>.</td><td>Pass <code>source: "..."</code>.</td></tr>
+              <tr><td>Mount into a target element</td><td>Use an <code>&lt;oxcaml&gt;</code> tag when the source belongs in the document.</td><td>Use <code>api.mount(target, { source })</code> when source is supplied separately.</td></tr>
+              <tr><td>Replace an existing <code>&lt;oxcaml&gt;</code> tag</td><td>The script automatically replaces discovered <code>&lt;oxcaml&gt;</code> tags.</td><td>Use <code>api.mount(oxcamlElement, options)</code>.</td></tr>
+              <tr><td>Execution mode</td><td><code>&lt;oxcaml&gt;</code>, <code>&lt;oxcaml check&gt;</code>, or <code>&lt;oxcaml utop&gt;</code></td><td><code>mode: "run" | "check" | "utop"</code></td></tr>
+              <tr><td>Filename for diagnostics</td><td><code>data-filename="example.ml"</code></td><td><code>filename: "example.ml"</code></td></tr>
+              <tr><td>Empty output panel</td><td><code>data-oxcaml-empty-output="show|hide"</code></td><td><code>emptyOutput: "show" | "hide"</code></td></tr>
+              <tr><td>Run trigger</td><td><code>data-oxcaml-run-trigger="auto|manual|manual-after-initial"</code></td><td><code>runTrigger: "auto" | "manual" | "manual-after-initial"</code></td></tr>
+              <tr><td>Color scheme</td><td><code>style="--oxcaml-color-scheme: auto|light|dark"</code></td><td>Set <code>--oxcaml-color-scheme</code> on the target or an ancestor.</td></tr>
+              <tr><td>Reusable visual variant</td><td><code>class="..."</code></td><td>Set a class on the target before mounting.</td></tr>
+              <tr><td>One-off visual override</td><td><code>style="--oxcaml-accent: ..."</code></td><td>Set CSS variables on the target or generated root.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="theme-mode">
+          <h2>Color Scheme</h2>
+          <p>
+            Every widget reads <code>--oxcaml-color-scheme</code> from the
+            cascade. Valid values are <code>auto</code>, <code>light</code>,
+            and <code>dark</code>. Auto follows
+            <code>prefers-color-scheme</code>.
+          </p>
+
+          <h3>Markup</h3>
+          <p>
+            Set <code>--oxcaml-color-scheme</code> on the original
+            <code>&lt;oxcaml&gt;</code> tag, a class, or any ancestor. The
+            generated widget root preserves inline style and class attributes,
+            so the custom property keeps cascading after mounting.
+          </p>
+
+          <pre><code>&lt;oxcaml style="--oxcaml-color-scheme: dark"&gt;...&lt;/oxcaml&gt;</code></pre>
+
+          <div class="example-row">
+            <oxcaml class="compact-example" style="--oxcaml-color-scheme: light">
+let mode = "forced light"
+let () = print_endline mode
+            </oxcaml>
+
+            <oxcaml class="compact-example" style="--oxcaml-color-scheme: dark">
+let mode = "forced dark"
+let () = print_endline mode
+            </oxcaml>
+          </div>
+
+          <h3>JavaScript</h3>
+          <p>
+            The wrapper exposes <code>window.OxCamlPlayground.load</code>, a
+            promise for the module, and then installs the public API on
+            <code>window.OxCamlPlayground</code>.
+          </p>
+
+          <pre><code>await window.OxCamlPlayground.load;
+
+// Update every mounted widget and make future widgets inherit the same scheme.
+document.documentElement.style.setProperty("--oxcaml-color-scheme", "dark");
+document.documentElement.style.setProperty("--oxcaml-color-scheme", "light");
+document.documentElement.style.setProperty("--oxcaml-color-scheme", "auto");</code></pre>
+
+          <p>
+            Set the same custom property on a generated
+            <code>.oxcaml-embed</code> root or container element to update a
+            smaller scope.
+          </p>
+
+          <pre><code>const editor = window.OxCamlPlayground.mount(element, {
+  source: "print_endline \"hello\"",
+});
+
+editor.root.style.setProperty("--oxcaml-color-scheme", "light");
+document
+  .querySelector("#chapter-2")
+  .style.setProperty("--oxcaml-color-scheme", "dark");</code></pre>
+
+          <div class="theme-controls" aria-label="Color controls for this page">
+            <button type="button" data-choice="auto">Auto</button>
+            <button type="button" data-choice="light">Light</button>
+            <button type="button" data-choice="dark">Dark</button>
+          </div>
+
+          <p class="doc-note">
+            The buttons above set <code>--oxcaml-color-scheme</code> on this
+            page, so they are also a working example of global CSS control.
+          </p>
+        </section>
+
+        <section id="attribute-transfer">
+          <h2>Preserved Attributes</h2>
+          <p>
+            The generated widget root keeps useful presentation attributes from
+            the original <code>&lt;oxcaml&gt;</code> tag:
+          </p>
+          <ul>
+            <li><code>id</code> for anchors and direct selection.</li>
+            <li><code>class</code> for reusable styling variants.</li>
+            <li><code>style</code> for per-widget custom properties.</li>
+            <li><code>title</code>, <code>aria-*</code>, and supported <code>data-*</code> attributes.</li>
+          </ul>
+
+          <pre><code>&lt;oxcaml
+  id="intro-example"
+  class="compact-example flat-example"
+  data-topic="functions"
+  aria-label="Runnable square function"
+  style="--oxcaml-editor-min-height: 5.5rem"&gt;
+let square x = x * x
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml
+            id="intro-example"
+            class="compact-example flat-example"
+            data-topic="functions"
+            aria-label="Runnable square function"
+            style="--oxcaml-editor-min-height: 5.5rem">
+let square x = x * x
+
+let () =
+  Printf.printf "%d\n" (square 9)
+          </oxcaml>
+        </section>
+
+        <section id="css-variables">
+          <h2>CSS Custom Properties</h2>
+          <p>
+            Set variables on an ancestor to style a whole article, on a class
+            to create a named variant, or inline on one
+            <code>&lt;oxcaml&gt;</code> tag. Variables inherit into widgets,
+            and widget-local variables override page-level values.
+          </p>
+
+          <pre><code>.tutorial-page {
+  --oxcaml-accent: #0f766e;
+  --oxcaml-editor-min-height: 8rem;
+}
+
+.tutorial-page .warning-example {
+  --oxcaml-accent: #b45309;
+  --syntax-string: #166534;
+}</code></pre>
+
+          <h3>Surface And Layout</h3>
+          <table>
+            <thead>
+              <tr><th>Variable</th><th>Controls</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>--oxcaml-color-scheme</code></td><td><code>auto</code>, <code>light</code>, or <code>dark</code> widget color mode.</td></tr>
+              <tr><td><code>--oxcaml-bg</code></td><td>Widget background.</td></tr>
+              <tr><td><code>--oxcaml-ink</code></td><td>Main text color.</td></tr>
+              <tr><td><code>--oxcaml-muted</code></td><td>Muted labels and placeholders.</td></tr>
+              <tr><td><code>--oxcaml-border</code></td><td>Outer border color.</td></tr>
+              <tr><td><code>--oxcaml-radius</code></td><td>Outer, tooltip, and HTML-output corner radius.</td></tr>
+              <tr><td><code>--oxcaml-margin-block</code></td><td>Vertical margin around the widget.</td></tr>
+              <tr><td><code>--oxcaml-font-family</code></td><td>Status labels and UI controls.</td></tr>
+              <tr><td><code>--oxcaml-mono-font-family</code></td><td>Editor, output, and diagnostics text.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Editor</h3>
+          <table>
+            <thead>
+              <tr><th>Variable</th><th>Controls</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>--oxcaml-editor</code></td><td>Editor background.</td></tr>
+              <tr><td><code>--oxcaml-editor-ink</code></td><td>Editor foreground.</td></tr>
+              <tr><td><code>--oxcaml-editor-gutter</code></td><td>Line-number gutter background.</td></tr>
+              <tr><td><code>--oxcaml-editor-gutter-ink</code></td><td>Line-number text.</td></tr>
+              <tr><td><code>--oxcaml-editor-gutter-border</code></td><td>Border between gutter and source.</td></tr>
+              <tr><td><code>--oxcaml-editor-active</code></td><td>Active line and active gutter background.</td></tr>
+              <tr><td><code>--oxcaml-editor-selection</code></td><td>Selection highlight.</td></tr>
+              <tr><td><code>--oxcaml-editor-cursor</code></td><td>Cursor and drop cursor.</td></tr>
+              <tr><td><code>--oxcaml-editor-font-size</code></td><td>Source editor font size.</td></tr>
+              <tr><td><code>--oxcaml-editor-min-height</code></td><td>Minimum editor height.</td></tr>
+              <tr><td><code>--oxcaml-editor-max-height</code></td><td>Maximum scrollable editor height.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Output And Diagnostics</h3>
+          <table>
+            <thead>
+              <tr><th>Variable</th><th>Controls</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>--oxcaml-output-bg</code></td><td>Output panel background.</td></tr>
+              <tr><td><code>--oxcaml-output-border</code></td><td>Output panel and rendered HTML frame borders.</td></tr>
+              <tr><td><code>--oxcaml-output-font-size</code></td><td>Transcript font size.</td></tr>
+              <tr><td><code>--oxcaml-output-min-height</code></td><td>Minimum output panel height.</td></tr>
+              <tr><td><code>--oxcaml-html-output-height</code></td><td>Height of rendered HTML/SVG output if a program emits HTML markers.</td></tr>
+              <tr><td><code>--oxcaml-tooltip-bg</code></td><td>Diagnostic tooltip background.</td></tr>
+              <tr><td><code>--oxcaml-tooltip-ink</code></td><td>Diagnostic tooltip text.</td></tr>
+              <tr><td><code>--oxcaml-stream</code></td><td>Plain stdout/stderr output.</td></tr>
+              <tr><td><code>--oxcaml-code</code></td><td>Diagnostic source-code lines.</td></tr>
+              <tr><td><code>--oxcaml-detail</code></td><td>Diagnostic details and trace lines.</td></tr>
+              <tr><td><code>--oxcaml-prefix</code></td><td>Diagnostic line prefixes and punctuation.</td></tr>
+              <tr><td><code>--oxcaml-interface-bg</code></td><td>Inferred-type panel background.</td></tr>
+              <tr><td><code>--oxcaml-interface-ink</code></td><td>Inferred-type panel text.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Status Colors</h3>
+          <table>
+            <thead>
+              <tr><th>Variable</th><th>Controls</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>--oxcaml-accent</code></td><td>Running/loading status and OxCaml token emphasis.</td></tr>
+              <tr><td><code>--oxcaml-ok</code></td><td>Successful status and inferred-type accent.</td></tr>
+              <tr><td><code>--oxcaml-warn</code></td><td>Warning status and warning output.</td></tr>
+              <tr><td><code>--oxcaml-error</code></td><td>Error status, exception output, and caret diagnostics.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="syntax-tokens">
+          <h2>Syntax Tokens</h2>
+          <p>
+            Syntax colors are also variables. They affect highlighted source in
+            the editor and highlighted output in transcripts.
+          </p>
+
+          <table>
+            <thead>
+              <tr><th>Variable</th><th>Token class</th><th>Typical use</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>--syntax-keyword</code></td><td><code>.tok-keyword</code></td><td><code>let</code>, <code>type</code>, <code>match</code>.</td></tr>
+              <tr><td><code>--syntax-module</code></td><td><code>.tok-module</code></td><td>Module names.</td></tr>
+              <tr><td><code>--syntax-string</code></td><td><code>.tok-string</code></td><td>String and character literals.</td></tr>
+              <tr><td><code>--syntax-comment</code></td><td><code>.tok-comment</code></td><td>Comments.</td></tr>
+              <tr><td><code>--syntax-number</code></td><td><code>.tok-number</code></td><td>Numeric literals.</td></tr>
+              <tr><td><code>--syntax-operator</code></td><td><code>.tok-operator</code></td><td>Operators and punctuation-like operators.</td></tr>
+              <tr><td><code>--syntax-function</code></td><td><code>.tok-function</code></td><td>Declared function names.</td></tr>
+              <tr><td><code>--syntax-parameter</code></td><td><code>.tok-parameter</code></td><td>Function parameters.</td></tr>
+              <tr><td><code>--syntax-type</code></td><td><code>.tok-type</code></td><td>Type names and primitive types.</td></tr>
+              <tr><td><code>--syntax-constructor</code></td><td><code>.tok-constructor</code></td><td>Constructors.</td></tr>
+              <tr><td><code>--syntax-annotation</code></td><td><code>.tok-annotation</code></td><td>Annotations such as <code>@ local</code>.</td></tr>
+              <tr><td><code>--syntax-package</code></td><td><code>.tok-package</code></td><td>Recognized package modules such as <code>Base</code>.</td></tr>
+              <tr><td><code>--syntax-package-open</code></td><td><code>.tok-package-open</code></td><td>Package names in <code>open</code>.</td></tr>
+              <tr><td><code>--syntax-label</code></td><td><code>.tok-label</code></td><td>Labels and hints.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="structural-hooks">
+          <h2>Structural Hooks</h2>
+          <p>
+            Variables should cover most styling. These class names are stable
+            hooks for layout or advanced rules.
+          </p>
+          <table>
+            <thead>
+              <tr><th>Selector</th><th>Element</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>.oxcaml-embed</code></td><td>Generated widget root and style-query scope.</td></tr>
+              <tr><td><code>.oxcaml-embed__surface</code></td><td>Painted widget surface.</td></tr>
+              <tr><td><code>.oxcaml-embed__editor-host</code></td><td>Editor container.</td></tr>
+              <tr><td><code>.oxcaml-embed__output</code></td><td>Output panel.</td></tr>
+              <tr><td><code>.oxcaml-embed__transcript</code></td><td>Transcript wrapper inside the output panel.</td></tr>
+              <tr><td><code>.oxcaml-embed__status</code></td><td>Status label.</td></tr>
+              <tr><td><code>.oxcaml-embed__controls</code></td><td>Top-right button group.</td></tr>
+              <tr><td><code>.oxcaml-embed__run</code></td><td>Manual run/check button.</td></tr>
+              <tr><td><code>.oxcaml-embed__reset</code></td><td>Reset button shown after user edits.</td></tr>
+            </tbody>
+          </table>
+
+          <pre><code>.oxcaml-embed.flat-example .oxcaml-embed__surface {
+  border-radius: 0;
+}
+
+.oxcaml-embed.flat-example .oxcaml-embed__output {
+  border-top-style: dashed;
+}</code></pre>
+        </section>
+
+        <section id="complete-examples">
+          <h2>Complete Examples</h2>
+          <p>
+            These examples combine the settings above into copyable visual
+            variants. Put shared CSS on a class, then reuse that class on any
+            <code>&lt;oxcaml&gt;</code> tag or programmatic mount target.
+          </p>
+
+          <h3>Flat Box Without Line Numbers</h3>
+          <pre><code>.flat-box-example {
+  --oxcaml-radius: 0;
+  --oxcaml-bg: #ffffff;
+  --oxcaml-border: #cbd5e1;
+  --oxcaml-editor: #ffffff;
+  --oxcaml-editor-active: transparent;
+  --oxcaml-output-bg: #ffffff;
+  --oxcaml-output-border: #cbd5e1;
+}
+
+.flat-box-example .cm-gutters {
+  display: none;
+}
+
+.flat-box-example .cm-content {
+  padding-left: 0.95rem;
+}</code></pre>
+
+          <pre><code>&lt;oxcaml class="flat-box-example" check data-oxcaml-empty-output="hide"&gt;
+let add_tax cents =
+  cents + (cents / 10)
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml class="flat-box-example" check data-oxcaml-empty-output="hide">
+let add_tax cents =
+  cents + (cents / 10)
+          </oxcaml>
+
+          <h3>Compact Dense Variant</h3>
+          <pre><code>.dense-doc-theme {
+  --oxcaml-editor-font-size: 0.82rem;
+  --oxcaml-output-font-size: 0.78rem;
+  --oxcaml-editor-min-height: 7rem;
+  --oxcaml-editor-max-height: 18rem;
+}</code></pre>
+
+          <oxcaml class="dense-doc-theme" check>
+type 'a tree =
+  | Leaf
+  | Node of 'a tree * 'a * 'a tree
+
+let rec size = function
+  | Leaf -> 0
+  | Node (left, _, right) -> 1 + size left + size right
+          </oxcaml>
+
+          <h3>Forced Dark Example With Custom Accent</h3>
+          <pre><code>&lt;oxcaml style="--oxcaml-color-scheme: dark; --oxcaml-accent: #60a5fa"&gt;
+  ...
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml
+            class="compact-example"
+            style="--oxcaml-color-scheme: dark; --oxcaml-accent: #60a5fa; --syntax-keyword: #f0abfc">
+let stack_message =
+  "This widget stays dark regardless of the page color scheme."
+
+let () =
+  print_endline stack_message
+          </oxcaml>
+
+          <h3>Per-Widget Inline Size</h3>
+          <pre><code>&lt;oxcaml style="--oxcaml-editor-min-height: 12rem; --oxcaml-html-output-height: 420px"&gt;
+  ...
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml style="--oxcaml-editor-min-height: 8rem; --oxcaml-html-output-height: 220px">
+let print_html html =
+  print_endline "%%OXCAML_HTML_BEGIN%%";
+  print_endline html;
+  print_endline "%%OXCAML_HTML_END%%"
+
+let cute_card =
+  String.concat "" [
+    "&lt;div style='display:flex;align-items:center;gap:14px;font-family:system-ui,sans-serif'&gt;";
+    "&lt;svg width='92' height='92' viewBox='0 0 92 92' role='img' aria-label='Smiling sun' xmlns='http://www.w3.org/2000/svg'&gt;";
+    "&lt;circle cx='46' cy='46' r='22' fill='#fde68a' stroke='#f59e0b' stroke-width='4'/&gt;";
+    "&lt;g stroke='#f59e0b' stroke-width='5' stroke-linecap='round'&gt;";
+    "&lt;path d='M46 8v10M46 74v10M8 46h10M74 46h10M19 19l7 7M66 66l7 7M73 19l-7 7M26 66l-7 7'/&gt;";
+    "&lt;/g&gt;";
+    "&lt;circle cx='38' cy='42' r='3' fill='#78350f'/&gt;";
+    "&lt;circle cx='54' cy='42' r='3' fill='#78350f'/&gt;";
+    "&lt;path d='M36 53c5 7 15 7 20 0' fill='none' stroke='#78350f' stroke-width='3' stroke-linecap='round'/&gt;";
+    "&lt;/svg&gt;";
+    "&lt;div&gt;&lt;strong&gt;Rendered HTML output&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#64748b'&gt;Inline SVG works too.&lt;/span&gt;&lt;/div&gt;";
+    "&lt;/div&gt;";
+  ]
+
+let () =
+  print_html cute_card
+          </oxcaml>
+        </section>
+      </article>
+
+      <nav aria-label="Documentation sections">
+        <a href="#quick-start">Quick start</a>
+        <a href="#execution-modes">Execution modes</a>
+        <a href="#programmatic-mounting">Programmatic mounting</a>
+        <a href="#output-panel">Output panel</a>
+        <a href="#run-trigger">Run trigger</a>
+        <a href="#settings-reference">Settings reference</a>
+        <a href="#theme-mode">Color scheme</a>
+        <a href="#attribute-transfer">Preserved attributes</a>
+        <a href="#css-variables">CSS variables</a>
+        <a href="#syntax-tokens">Syntax tokens</a>
+        <a href="#structural-hooks">Structural hooks</a>
+        <a href="#complete-examples">Complete examples</a>
+      </nav>
+    </main>
+
+    <script src="./oxcaml-embed.js"></script>
+    <script>
+      window.OxCamlPlayground.load.then((api) => {
+        const target = document.querySelector("#programmatic-example");
+        if (!target || target.querySelector(".oxcaml-embed")) {
+          return;
+        }
+        api.mount(target, {
+          mode: "run",
+          filename: "programmatic_example.ml",
+          source: `let message = "mounted from JavaScript"
+
+let () =
+  print_endline message`,
+        });
+      });
+
+      for (const button of document.querySelectorAll("[data-choice]")) {
+        button.addEventListener("click", () => {
+          document.documentElement.style.setProperty(
+            "--oxcaml-color-scheme",
+            button.dataset.choice
+          );
+        });
+      }
+    </script>
+  </body>
+</html>

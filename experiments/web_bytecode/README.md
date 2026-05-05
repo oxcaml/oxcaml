@@ -104,6 +104,100 @@ URL, the original tag contents, and the tag's duplicate index when a page has
 multiple identical examples. Each editor includes a reset button that restores
 the original tag contents and clears that stored edit.
 
+### Embeddable widgets
+
+Use `<oxcaml>...</oxcaml>` for runnable program snippets and
+`<oxcaml utop>...</oxcaml>` for toplevel phrases. The generated widgets stay in
+light DOM and expose a CSS-variable styling API. The script preserves `id`,
+`class`, `style`, `title`, `aria-*`, and supported `data-*` attributes from the
+original `<oxcaml>` tag on the generated `.oxcaml-embed` root, so a host page
+can style all widgets, a reusable class, or one individual example:
+
+```html
+<style>
+  .lesson-example {
+    --oxcaml-accent: #2563eb;
+    --oxcaml-color-scheme: auto;
+    --oxcaml-editor-min-height: 7rem;
+    --syntax-keyword: #6d28d9;
+  }
+</style>
+
+<oxcaml id="lesson" class="lesson-example">
+let square x = x * x
+</oxcaml>
+```
+
+Color scheme is controlled by the cascaded `--oxcaml-color-scheme` custom
+property. Valid values are `auto`, `light`, and `dark`. Set it globally, on a
+container, or on one widget:
+
+```js
+await window.OxCamlPlayground.load;
+document.documentElement.style.setProperty("--oxcaml-color-scheme", "dark");
+document
+  .querySelector("#lesson")
+  .style.setProperty("--oxcaml-color-scheme", "auto");
+```
+
+The canonical filename attribute for diagnostics is `data-filename`. The
+styling API intentionally does not support duplicate aliases such as `theme`,
+`data-theme`, `data-oxcaml-theme`, or `filename`.
+
+By default, widgets run or check shortly after every edit. Add
+`data-oxcaml-run-trigger="manual"` to show a mode-specific `Run` or `Check`
+button instead. The button includes its keyboard shortcut, `⌘↵` on macOS and
+`Ctrl+Enter` elsewhere:
+
+```html
+<oxcaml check data-oxcaml-run-trigger="manual">
+let add_tax cents = cents + (cents / 10)
+</oxcaml>
+```
+
+Programmatic mounts use `runTrigger: "manual"` for the same behavior.
+Use `manual-after-initial` to run/check once on initial load, then require the
+button after edits.
+
+For programmatic widgets where the source is supplied by JavaScript, mount into
+a target DOM element:
+
+```html
+<div id="programmatic-example"></div>
+<script>
+  window.OxCamlPlayground.load.then((api) => {
+    api.mount(document.querySelector("#programmatic-example"), {
+      mode: "run",
+      filename: "programmatic_example.ml",
+      source: "print_endline \"mounted from JavaScript\"",
+    });
+  });
+</script>
+```
+
+`mount(target, options)` is the single programmatic mount API. When `target` is
+an ordinary DOM element, `options.source` is required and the generated widget
+replaces the target's children. When `target` is an `<oxcaml>` tag, the tag is
+replaced with the generated widget.
+
+Use `data-oxcaml-empty-output="hide"` to hide the output panel after a
+successful run/check that produces no transcript and no inferred-type panel.
+Diagnostics, warnings, exceptions, stdout, rendered HTML output, and inferred
+types still show the output panel. Programmatic mounts use the same spelling:
+
+```js
+window.OxCamlPlayground.mount(target, {
+  mode: "check",
+  source: "let add_tax cents = cents + (cents / 10)",
+  emptyOutput: "hide",
+  runTrigger: "manual-after-initial",
+});
+```
+
+See `embed_styling.html` for the complete embed guide, including markup,
+programmatic mounting, execution modes, output behavior, manual run controls,
+color controls, CSS variables, token variables, and structural hooks.
+
 ### Rendered HTML Output
 
 Program output is escaped by default. To intentionally render HTML or SVG in the
@@ -162,9 +256,10 @@ The full playground page also needs:
 - `sample_catalog.js`
 - `unsupported_samples.js`
 
-The demo page also needs:
+The supplemental demo and documentation pages also need:
 
 - `embed_demo.html`
+- `embed_styling.html`
 
 `deploy_pages.sh` copies this complete static bundle to the configured GitHub
 Pages repository. It is specific to the default target
