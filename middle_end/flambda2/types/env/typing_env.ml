@@ -645,7 +645,7 @@ let with_aliases t ~aliases =
 
 let cached t = One_level.just_after_level t.current_level
 
-let add_variable_definition t var kind name_mode =
+let add_variable_definition t var kind ty name_mode =
   (* We can add equations in our own compilation unit on variables and symbols
      defined in another compilation unit. However we can't define other
      compilation units' variables or symbols (except for predefined symbols such
@@ -669,8 +669,8 @@ let add_variable_definition t var kind name_mode =
       var kind t.next_binding_time
   in
   let just_after_level =
-    Cached_level.add_or_replace_binding (cached t) name (MTC.unknown kind)
-      t.next_binding_time name_mode
+    Cached_level.add_or_replace_binding (cached t) name ty t.next_binding_time
+      name_mode
   in
   let current_level =
     One_level.create (current_scope t) level ~just_after_level
@@ -711,18 +711,6 @@ let add_symbol_projection t var proj =
 
 let find_symbol_projection t var =
   Cached_level.find_symbol_projection (cached t) var
-
-let add_definition t (name : Bound_name.t) kind =
-  let name_mode = Bound_name.name_mode name in
-  Name.pattern_match (Bound_name.name name)
-    ~var:(fun var -> add_variable_definition t var kind name_mode)
-    ~symbol:(fun sym ->
-      if not (Name_mode.equal name_mode Name_mode.normal)
-      then
-        Misc.fatal_errorf
-          "Cannot define symbol %a with name mode that is not `normal'"
-          Bound_name.print name;
-      add_symbol_definition t sym)
 
 let invariant_for_alias (t : t) name ty =
   (* Check that no canonical element gets an [Equals] type *)
@@ -821,6 +809,25 @@ let replace_equation (t : t) name ty =
   in
   with_current_level t ~current_level
 
+let add_definition t (name : Bound_name.t) kind ty =
+  let name_mode = Bound_name.name_mode name in
+  Name.pattern_match (Bound_name.name name)
+    ~var:(fun var -> add_variable_definition t var kind ty name_mode)
+    ~symbol:(fun sym ->
+      if not (Name_mode.equal name_mode Name_mode.normal)
+      then
+        Misc.fatal_errorf
+          "Cannot define symbol %a with name mode that is not `normal'"
+          Bound_name.print name;
+      if not (K.equal (TG.kind ty) K.value)
+      then
+        Misc.fatal_errorf "Cannot define symbol %a with non-value kind"
+          Bound_name.print name;
+      let t = add_symbol_definition t sym in
+      if TG.is_obviously_unknown ty
+      then t
+      else replace_equation t (Name.symbol sym) ty)
+
 let aliases_add t ~canonical_element1 ~canonical_element2 =
   (* This may raise [Binding_time_resolver_failure]. *)
   Aliases.add ~binding_time_resolver:t.binding_time_resolver (aliases t)
@@ -851,8 +858,8 @@ let add_definitions_of_params t ~params =
       let name =
         Bound_name.create (Bound_parameter.name param) Name_mode.normal
       in
-      add_definition t name
-        (Flambda_kind.With_subkind.kind (Bound_parameter.kind param)))
+      let kind = Flambda_kind.With_subkind.kind (Bound_parameter.kind param) in
+      add_definition t name kind (MTC.unknown kind))
     t
     (Bound_parameters.to_list params)
 

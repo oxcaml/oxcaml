@@ -376,10 +376,11 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
           in
           (* We need to add the new variable to the typing env in order to be
              able to compute binding times for the following rounds. *)
+          let kind = K.With_subkind.kind (BP.kind extra_param) in
           let typing_env_with_extra_params =
             TE.add_definition typing_env_with_extra_params
               (Bound_name.create (BP.name extra_param) Name_mode.normal)
-              (K.With_subkind.kind (BP.kind extra_param))
+              kind (T.unknown kind)
           in
           extra_bindings, typing_env_with_extra_params)
     in

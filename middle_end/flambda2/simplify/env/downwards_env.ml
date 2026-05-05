@@ -170,7 +170,7 @@ let define_continuations ~can_be_lifted t conts =
   in
   { t with replay_history }
 
-let define_variable0 ~extra t var kind =
+let define_variable0 ~extra t var kind ty =
   let replay_history =
     if extra
     then t.replay_history
@@ -194,7 +194,7 @@ let define_variable0 ~extra t var kind =
   in
   let typing_env =
     let var = Bound_name.create_var var in
-    TE.add_definition t.typing_env var kind
+    TE.add_definition t.typing_env var kind ty
   in
   let variables_defined_at_toplevel =
     if t.at_unit_toplevel
@@ -209,10 +209,10 @@ let define_variable0 ~extra t var kind =
   }
 
 let define_variable t var kind =
-  (define_variable0 [@inlined hint]) ~extra:false t var kind
+  (define_variable0 [@inlined hint]) ~extra:false t var kind (T.unknown kind)
 
 let define_extra_variable t var kind =
-  (define_variable0 [@inlined hint]) ~extra:true t var kind
+  (define_variable0 [@inlined hint]) ~extra:true t var kind (T.unknown kind)
 
 let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
@@ -365,12 +365,15 @@ let enter_set_of_closures
     has_seen_a_non_liftable_continuation = false
   }
 
-let define_symbol t sym kind =
+let define_symbol0 t sym kind ty =
   let typing_env =
     let sym = Bound_name.create (Name.symbol sym) Name_mode.normal in
-    TE.add_definition t.typing_env sym kind
+    TE.add_definition t.typing_env sym kind ty
   in
   { t with typing_env }
+
+let define_symbol t sym kind =
+  (define_symbol0 [@inlined hint]) t sym kind (T.unknown kind)
 
 let define_name t name kind =
   Name.pattern_match (Bound_name.name name)
@@ -384,17 +387,12 @@ let define_name t name kind =
     ~symbol:(fun[@inline] sym -> (define_symbol [@inlined hint]) t sym kind)
 
 let add_variable0 ~extra t var ty =
-  let t = (define_variable0 [@inlined hint]) ~extra t var (T.kind ty) in
-  { t with
-    typing_env = TE.add_equation t.typing_env (Name.var (Bound_var.var var)) ty
-  }
+  (define_variable0 [@inlined hint]) ~extra t var (T.kind ty) ty
 
 let add_variable t var ty =
   (add_variable0 [@inlined hint]) ~extra:false t var ty
 
-let add_symbol t sym ty =
-  let t = (define_symbol [@inlined hint]) t sym (T.kind ty) in
-  { t with typing_env = TE.add_equation t.typing_env (Name.symbol sym) ty }
+let add_symbol t sym ty = (define_symbol0 [@inlined hint]) t sym (T.kind ty) ty
 
 let add_name t name ty =
   Name.pattern_match (Bound_name.name name)
@@ -445,7 +443,8 @@ let define_parameters ~extra t ~params =
     (fun t param ->
       let param_var, param_duid = BP.var_and_uid param in
       let var = Bound_var.create param_var param_duid Name_mode.normal in
-      define_variable0 ~extra t var (K.With_subkind.kind (BP.kind param)))
+      let kind = K.With_subkind.kind (BP.kind param) in
+      define_variable0 ~extra t var kind (T.unknown kind))
     t
     (Bound_parameters.to_list params)
 
