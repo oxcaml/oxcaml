@@ -500,7 +500,7 @@ module Tree_operations (Tree : Tree) : sig
   val update_many :
     (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
 
-  val subset : 'a t -> 'a t -> bool
+  val subset : 'a t -> 'b t -> bool
 
   val find : key -> 'a t -> 'a
 
@@ -1999,6 +1999,8 @@ module Map = struct
 
   (* CR-someday lmaurer: See comment on [keys] *)
   let of_set f set = Set.fold (fun e map -> add e (f e) map) set empty
+
+  let subset_domain t1 t2 = Ops.subset t1 t2
 end
 
 type set = Set.t

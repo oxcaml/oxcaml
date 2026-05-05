@@ -604,23 +604,25 @@ let add_usages_through_function_slots :
   fun ~follow_known_arity_calls db (Usages s) ->
     Usages (run stmt db follow_known_arity_calls s)
 
-let add_usages_by_function_slots :
+let compute_usages_by_function_slots :
     follow_known_arity_calls:bool ->
     Datalog.database ->
     usages ->
     Function_slot.t ->
-    usages Function_slot.Map.t =
+    usages Function_slot.Map.t Or_unknown.t =
   let open! Fixit in
   let stmt =
     let@ in_ = param "in_" Cols.[f; n] in
-    let@ out = fix1' in_ in
+    let@ [out; top] = fix' [in_; empty One.cols] in
     [ (let$ [fs; x; field; y; z] = ["fs"; "x"; "field"; "y"; "z"] in
        [ out % [fs; x];
          rev_accessor ~base:x field ~to_:y;
          when1 Field.is_function_slot field;
          usages y z;
          has_usage z ]
-       ==> out % [field; z]) ]
+       ==> out % [field; z]);
+      (let$ [fs; x] = ["fs"; "x"] in
+       [out % [fs; x]; any_usage x] ==> One.flag top) ]
   in
   fun ~follow_known_arity_calls db (Usages s) current_function_slot ->
     if follow_known_arity_calls
@@ -631,15 +633,17 @@ let add_usages_by_function_slots :
     let table =
       Field.Map.singleton (Field.function_slot current_function_slot) s
     in
-    let r = run stmt db table in
-    Field.Map.fold
-      (fun field usages acc ->
-        match Field.view field with
-        | Function_slot fs -> Function_slot.Map.add fs (Usages usages) acc
-        | Value_slot _ | Is_int | Get_tag | Block _ | Code_id_of_call_witness
-        | Call_witness _ | Return_of_call _ ->
-          assert false)
-      r Function_slot.Map.empty
+    let [r; top] = run stmt db table in
+    if One.to_bool top
+    then Or_unknown.Unknown
+    else
+      Or_unknown.Known
+        (Field.Map.fold
+           (fun field usages acc ->
+             Function_slot.Map.add
+               (Field.must_be_function_slot field)
+               (Usages usages) acc)
+           r Function_slot.Map.empty)
 
 let get_direct_usages : Datalog.database -> unit Code_id_or_name.Map.t -> usages
     =
