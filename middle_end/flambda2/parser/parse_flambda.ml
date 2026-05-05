@@ -92,13 +92,5 @@ let parse filename =
       let old_unit_info = Env.get_current_unit () in
       Env.set_current_unit unit_info;
       let flambda = Fexpr_to_flambda.conv comp_unit fexpr in
-<<<<<<< HEAD
       Option.iter Env.set_current_unit old_unit_info;
-      flambda)
-||||||| 5.2.0minus-31
-      Env.set_unit_name old_unit_info;
-      flambda)
-=======
-      Env.set_unit_name old_unit_info;
       flambda.unit)
->>>>>>> 5.2.0minus-37

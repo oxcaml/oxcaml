@@ -159,13 +159,6 @@ camlPervasives__loop_1128:
     ])],
     [as_debug_prefix_map_flag="--debug-prefix-map"
     AC_MSG_RESULT([yes])],
-<<<<<<< HEAD
-    [as_has_debug_prefix_map=false
-    AC_MSG_RESULT([no])])
-||||||| 5.2.0minus-31
-    [ashas_debug_prefix_map=false
-    AC_MSG_RESULT([no])])
-=======
     [AC_MSG_RESULT([no])])
 
   # Try --fdebug-prefix-map (used by llvm-mc)
@@ -181,7 +174,6 @@ camlPervasives__loop_1128:
       [as_debug_prefix_map_flag="--fdebug-prefix-map"
       AC_MSG_RESULT([yes])],
       [AC_MSG_RESULT([no])])])
->>>>>>> 5.2.0minus-37
 
   OCAML_CC_RESTORE_VARIABLES
 ])

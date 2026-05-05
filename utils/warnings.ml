@@ -133,16 +133,12 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-<<<<<<< HEAD
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
-||||||| 5.2.0minus-31
-=======
   (* Oxcaml specific warnings: numbers should go down from 199 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
   | Overridden_kind_modifier of string      (* 185 *)
->>>>>>> 5.2.0minus-37
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -609,7 +605,6 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
-<<<<<<< HEAD
   { number = 74;
     names = ["degraded-to-partial-match"];
     description = "A pattern-matching is compiled as partial \
@@ -620,8 +615,6 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
-||||||| 5.2.0minus-31
-=======
   { number = 183;
     names = ["redundant-kind-modifier"];
     (* CR layouts-scannable: As more axes are added, this description (and
@@ -640,7 +633,6 @@ let descriptions = [
     names = ["overridden-kind-modifier"];
     description = "A kind modifier is present but overridden later.";
     since = since 5 2 };
->>>>>>> 5.2.0minus-37
   { number = 186;
     names = ["unmutated-mutable"];
     description =
@@ -1029,13 +1021,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-<<<<<<< HEAD
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
-||||||| 5.2.0minus-31
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70"
-=======
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..185"
->>>>>>> 5.2.0minus-37
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..185"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1407,7 +1393,6 @@ let message = function
         Style.inline_code "[@tail_mod_cons]"
         Style.inline_code "[@tailcall false]"
   | Generative_application_expects_unit ->
-<<<<<<< HEAD
       msg "A generative functor@ \
            should be applied@ to@ %a;@ using@ %a@ is deprecated."
         Style.inline_code "()"
@@ -1420,72 +1405,17 @@ let message = function
          typically@ occurs@ due@ to@ complex@ matches@ on@ mutable@ fields.@ %a"
         Style.inline_code "Match_failure"
         Misc.print_see_manual ref_manual
-||||||| 5.2.0minus-31
-      "A generative functor\n\
-       should be applied to '()'; using '(struct end)' is deprecated."
-  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Immediate_erasure id)  ->
-      Printf.sprintf
-      "Usage of layout immediate/immediate64 in %s \n\
-       can't be erased for compatibility with upstream OCaml."
-      id
-  | Incompatible_with_upstream (Non_value_sort layout) ->
-      Printf.sprintf
-      "External declaration here is not upstream compatible. \n\
-       The only types with non-value layouts allowed are float#, \n\
-       int32#, int64#, and nativeint#. Unknown type with layout \n\
-       %s encountered."
-      layout
-  | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      Printf.sprintf
-      "[@unboxed] attribute must be added to external declaration \n\
-       argument type with layout %s for upstream compatibility."
-      layout
-  | Incompatible_with_upstream Immediate_void_variant ->
-      "This variant is immediate \n\
-       because all its constructors have all-void arguments, but after \n\
-       erasure for upstream compatibility, void is no longer zero-width, \n\
-       so it won't be immediate."
-  | Incompatible_with_upstream Separability_check ->
-      "This type relies on OxCaml's extended separability checking \n\
-       and would not be accepted by upstream OCaml."
-  | Unerasable_position_argument -> "this position argument cannot be erased."
-=======
-      "A generative functor\n\
-       should be applied to '()'; using '(struct end)' is deprecated."
   | Redundant_kind_modifier abbrev ->
-      "This kind modifier is already implied by the kind \"" ^ abbrev ^ "\"."
+      msg "This kind modifier is already implied by the kind %a."
+        Style.inline_code abbrev
   | Ignored_kind_modifier (abbrev, modifiers) ->
-      Printf.sprintf
-      "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
-      (String.concat " " modifiers) abbrev
+      msg "The kind modifier(s) %a have no effect on the kind %a."
+        Style.inline_code (String.concat " " modifiers) Style.inline_code abbrev
   | Overridden_kind_modifier overridden_by ->
-      "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
-  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Non_value_sort layout) ->
-      Printf.sprintf
-      "External declaration here is not upstream compatible. \n\
-       The only types with non-value layouts allowed are float#, \n\
-       int32#, int64#, and nativeint#. Unknown type with layout \n\
-       %s encountered."
-      layout
-  | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      Printf.sprintf
-      "[@unboxed] attribute must be added to external declaration \n\
-       argument type with layout %s for upstream compatibility."
-      layout
-  | Incompatible_with_upstream Immediate_void_variant ->
-      "This variant is immediate \n\
-       because all its constructors have all-void arguments, but after \n\
-       erasure for upstream compatibility, void is no longer zero-width, \n\
-       so it won't be immediate."
-  | Incompatible_with_upstream Separability_check ->
-      "This type relies on OxCaml's extended separability checking \n\
-       and would not be accepted by upstream OCaml."
+      msg "This kind modifier is overridden by %a later."
+        Style.inline_code overridden_by
   | Incompatible_with_upstream Unpacked_attribute ->
-      "[@unpacked] is not supported by upstream OCaml."
-  | Unerasable_position_argument -> "this position argument cannot be erased."
->>>>>>> 5.2.0minus-37
+      msg "[@@unpacked] is not supported by upstream OCaml."
   | Unnecessarily_partial_tuple_pattern ->
       msg
         "This tuple pattern@ unnecessarily@ ends in %a,@ as@ it@ explicitly@ \
@@ -1493,9 +1423,6 @@ let message = function
         Style.inline_code ".."
   | Unmutated_mutable v ->
       msg "mutable variable %a was never mutated." Style.inline_code v
-  | Incompatible_with_upstream (Immediate_erasure id) ->
-      msg "Usage of layout immediate/immediate64 in %s@ \
-           can't be erased for compatibility with upstream OCaml." id
   | Incompatible_with_upstream (Non_value_sort layout) ->
       msg "External declaration here is not upstream compatible.@ \
            @[The only types with non-value layouts allowed are@ \
@@ -1553,19 +1480,13 @@ let message = function
         Style.inline_code (Printf.sprintf "[@%s]" implied)
         Style.inline_code (Printf.sprintf "[@%s]" implying)
   | Use_during_borrowing ->
-<<<<<<< HEAD
       msg "This value is used while being borrowed."
-||||||| 5.2.0minus-31
-      "This value is used while being borrowed."
-=======
-      "This value is used while being borrowed."
   | Useless_lpoly ->
-      "This binding has no layout variables, so \"poly_\" has no effect. \
-       Consider using a regular \"let\" instead."
+      msg "This binding has no layout variables, so poly_ has no effect. \
+           Consider using a regular let instead."
   | Lpoly_in_letrec ->
-      "\"poly_\" has no effect in recursive bindings, which do not support \
-       layout polymorphism. Consider using a regular \"let rec\" instead."
->>>>>>> 5.2.0minus-37
+      msg "poly_ has no effect in recursive bindings, which do not support \
+           layout polymorphism. Consider using a regular let rec instead."
 ;;
 
 let nerrors = ref 0

@@ -42,7 +42,6 @@ exception Error of error * Location.t
 
 (* The table of keywords *)
 
-<<<<<<< HEAD
 let all_keywords =
   let v5_3 = Some (5,3) in
   let v1_0 = Some (1,0) in
@@ -80,6 +79,7 @@ let all_keywords =
     "initializer", INITIALIZER, v1_0;
     "kind_", KIND, oxcaml;
     "kind_of_", KIND_OF, oxcaml;
+    "layout_", LAYOUT, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
     "local_", LOCAL, oxcaml;
@@ -96,100 +96,6 @@ let all_keywords =
     "open", OPEN, always;
     "or", OR, always;
     "overwrite_", OVERWRITE, oxcaml;
-||||||| 5.2.0minus-31
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_", KIND;
-    "kind_of_", KIND_OF;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "once_", ONCE;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
-=======
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_", KIND;
-    "kind_of_", KIND_OF;
-    "layout_", LAYOUT;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "once_", ONCE;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
->>>>>>> 5.2.0minus-37
 (*  "parser", PARSER; *)
     "poly_", POLY, oxcaml;
     "private", PRIVATE, v1_0;

@@ -40,18 +40,12 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
     List.concat
       [!Compenv.last_include_dirs;
        visible;
-<<<<<<< HEAD
-       (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
-          reference to the Standard Library when -nostdlib was specified. *)
-       (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
-||||||| 5.2.0minus-31
-       Config.flexdll_dirs;
-=======
        List.map
          (fun path : Clflags.visible_include ->
             { path; cmx_guaranteed = false })
-         Config.flexdll_dirs;
->>>>>>> 5.2.0minus-37
+         (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
+            reference to the Standard Library when -nostdlib was specified. *)
+         (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
        !Compenv.first_include_dirs]
   in
   let visible =

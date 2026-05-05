@@ -501,15 +501,9 @@ and type_with_label ctxt f (label, c, mode) =
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-<<<<<<< HEAD
-  | Pjk_abbreviation s -> value_longident_loc f s
-||||||| 5.2.0minus-31
-  | Pjk_abbreviation s -> longident_loc f s
-=======
   | Pjk_abbreviation (s, sa) ->
-    longident_loc f s;
+    value_longident_loc f s;
     List.iter (fun a -> pp f " %s" a.Location.txt) sa
->>>>>>> 5.2.0minus-37
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
@@ -1593,17 +1587,11 @@ and with_constraint ctxt f = function
   | Pwith_module (li, li2) ->
       pp f "module %a =@ %a" value_longident_loc li value_longident_loc li2;
   | Pwith_modtype (li, mty) ->
-<<<<<<< HEAD
       pp f "module type %a =@ %a"
         (with_loc type_longident) li
         (module_type ctxt) mty;
-||||||| 5.2.0minus-31
-      pp f "module type %a =@ %a" longident_loc li (module_type ctxt) mty;
-=======
-      pp f "module type %a =@ %a" longident_loc li (module_type ctxt) mty;
   | Pwith_jkind (li, jd) ->
-      pp f "kind_ %a =@ %a" longident_loc li (jkind_declaration ctxt) jd;
->>>>>>> 5.2.0minus-37
+      pp f "kind_ %a =@ %a" value_longident_loc li (jkind_declaration ctxt) jd;
   | Pwith_typesubst (li, ({ptype_params=ls;_} as td)) ->
       pp f "type@ %a %a :=@ %a"
         type_params ls
@@ -1612,17 +1600,11 @@ and with_constraint ctxt f = function
   | Pwith_modsubst (li, li2) ->
       pp f "module %a :=@ %a" value_longident_loc li value_longident_loc li2
   | Pwith_modtypesubst (li, mty) ->
-<<<<<<< HEAD
       pp f "module type %a :=@ %a"
         (with_loc type_longident) li
         (module_type ctxt) mty;
-||||||| 5.2.0minus-31
-      pp f "module type %a :=@ %a" longident_loc li (module_type ctxt) mty;
-=======
-      pp f "module type %a :=@ %a" longident_loc li (module_type ctxt) mty;
   | Pwith_jkindsubst (li, jd) ->
-      pp f "kind_ %a :=@ %a" longident_loc li (jkind_declaration ctxt) jd;
->>>>>>> 5.2.0minus-37
+      pp f "kind_ %a :=@ %a" value_longident_loc li (jkind_declaration ctxt) jd;
 
 
 and module_type1 ctxt f x =
@@ -2337,43 +2319,7 @@ and directive_argument f x =
 
 and block_access ctxt f = function
   | Baccess_field li ->
-<<<<<<< HEAD
     pp f ".%a" value_longident_loc li
-  | Baccess_array (mut, index_kind, index) ->
-    let dotop =
-      match mut with
-      | Mutable -> "."
-      | Immutable -> ".:"
-    in
-    let suffix = match index_kind with
-      | Index_int -> ""
-      | Index_unboxed_int64 -> "L"
-      | Index_unboxed_int32 -> "l"
-      | Index_unboxed_int16 -> "S"
-      | Index_unboxed_int8 -> "s"
-      | Index_unboxed_nativeint -> "n"
-    in
-    pp f "%s%s(%a)" dotop suffix (expression ctxt) index
-||||||| 5.2.0minus-31
-    pp f ".%a" longident_loc li
-  | Baccess_array (mut, index_kind, index) ->
-    let dotop =
-      match mut with
-      | Mutable -> "."
-      | Immutable -> ".:"
-    in
-    let suffix = match index_kind with
-      | Index_int -> ""
-      | Index_unboxed_int64 -> "L"
-      | Index_unboxed_int32 -> "l"
-      | Index_unboxed_int16 -> "S"
-      | Index_unboxed_int8 -> "s"
-      | Index_unboxed_nativeint -> "n"
-    in
-    pp f "%s%s(%a)" dotop suffix (expression ctxt) index
-=======
-    pp f ".%a" longident_loc li
->>>>>>> 5.2.0minus-37
   | Baccess_block (mut, index) ->
     let s =
       match mut with

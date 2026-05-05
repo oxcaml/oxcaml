@@ -393,29 +393,17 @@ module MT = struct
     | Pwith_module (lid, lid2) ->
         Pwith_module (map_loc_lid sub lid, map_loc_lid sub lid2)
     | Pwith_modtype (lid, mty) ->
-<<<<<<< HEAD
         Pwith_modtype (map_loc_lid sub lid, sub.module_type sub mty)
-||||||| 5.2.0minus-31
-        Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
-=======
-        Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
     | Pwith_jkind (lid, d) ->
-        Pwith_jkind (map_loc sub lid, sub.jkind_declaration sub d)
->>>>>>> 5.2.0minus-37
+        Pwith_jkind (map_loc_lid sub lid, sub.jkind_declaration sub d)
     | Pwith_typesubst (lid, d) ->
         Pwith_typesubst (map_loc_lid sub lid, sub.type_declaration sub d)
     | Pwith_modsubst (s, lid) ->
         Pwith_modsubst (map_loc_lid sub s, map_loc_lid sub lid)
     | Pwith_modtypesubst (lid, mty) ->
-<<<<<<< HEAD
         Pwith_modtypesubst (map_loc_lid sub lid, sub.module_type sub mty)
-||||||| 5.2.0minus-31
-        Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
-=======
-        Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
     | Pwith_jkindsubst (lid, d) ->
-        Pwith_jkindsubst (map_loc sub lid, sub.jkind_declaration sub d)
->>>>>>> 5.2.0minus-37
+        Pwith_jkindsubst (map_loc_lid sub lid, sub.jkind_declaration sub d)
 
   let map_signature_item sub {psig_desc = desc; psig_loc = loc} =
     let open Sig in
@@ -540,15 +528,7 @@ module E = struct
     }
 
   let map_block_access sub = function
-<<<<<<< HEAD
     | Baccess_field lid -> Baccess_field (map_loc_lid sub lid)
-    | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
-||||||| 5.2.0minus-31
-    | Baccess_field lid -> Baccess_field (map_loc sub lid)
-    | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
-=======
-    | Baccess_field lid -> Baccess_field (map_loc sub lid)
->>>>>>> 5.2.0minus-37
     | Baccess_block (mut, e) -> Baccess_block (mut, sub.expr sub e)
 
   let map_unboxed_access sub = function

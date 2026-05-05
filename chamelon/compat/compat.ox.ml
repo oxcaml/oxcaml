@@ -213,16 +213,8 @@ let mkTexp_sequence ?id:(sort = Jkind.Sort.scannable) (e1, e2) =
 
 type texp_match_identifier = Jkind.sort
 
-<<<<<<< HEAD
-let mkTexp_match ?id:(sort = Jkind.Sort.value) (e, cases, partial) =
-  Texp_match (e, sort, cases, [], partial)
-||||||| 5.2.0minus-31
-let mkTexp_match ?id:(sort = Jkind.Sort.value) (e, cases, partial) =
-  Texp_match (e, sort, cases, partial)
-=======
 let mkTexp_match ?id:(sort = Jkind.Sort.scannable) (e, cases, partial) =
-  Texp_match (e, sort, cases, partial)
->>>>>>> 5.2.0minus-37
+  Texp_match (e, sort, cases, [], partial)
 
 let mkTexp_assert e loc = Texp_assert (e, loc)
 

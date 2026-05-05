@@ -933,15 +933,19 @@ let compile_alloc size =
             [Lambda.lambda_unit],
             no_loc)
   | Mixed_record shape ->
-      let shape =
-        Mixed_block_shape.of_mixed_block_elements
-          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          shape
-      in
-      let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-      let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-      let size = value_prefix_len + flat_suffix_len in
-      alloc alloc_mixed_record_prim [size; value_prefix_len]
+      if !Clflags.native_code then
+        let shape =
+          Mixed_block_shape.of_mixed_block_elements
+            ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+            shape
+        in
+        let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
+        let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
+        let size = value_prefix_len + flat_suffix_len in
+        alloc alloc_mixed_record_prim [size; value_prefix_len]
+      else
+        let size = Array.length shape in
+        alloc alloc_mixed_record_prim [size; size]
 
 let compile_update size dummy newval =
   let prim, newval =
@@ -1068,55 +1072,7 @@ let compile_letrec input_bindings body =
   in
   let body_with_pre_allocations =
     List.fold_left (fun body (id, duid, size, _lam) ->
-<<<<<<< HEAD
         let alloc = compile_alloc size in
-||||||| 5.2.0minus-31
-        let alloc_prim, const_args =
-          match size with
-          | Regular_block size -> alloc_prim, [size]
-          | Float_record size -> alloc_float_record_prim, [size]
-          | Mixed_record shape ->
-              let shape =
-                Mixed_block_shape.of_mixed_block_elements
-                  ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-                  shape
-              in
-              let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-              let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-              let size = value_prefix_len + flat_suffix_len in
-              alloc_mixed_record_prim, [size; value_prefix_len]
-        in
-        let alloc =
-          Lprim (Pccall alloc_prim,
-                 List.map Lambda.tagged_immediate const_args,
-                 no_loc)
-        in
-=======
-        let alloc_prim, const_args =
-          match size with
-          | Regular_block size -> alloc_prim, [size]
-          | Float_record size -> alloc_float_record_prim, [size]
-          | Mixed_record shape ->
-            if !Clflags.native_code then
-              let shape =
-                Mixed_block_shape.of_mixed_block_elements
-                  ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-                  shape
-              in
-              let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-              let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-              let size = value_prefix_len + flat_suffix_len in
-              alloc_mixed_record_prim, [size; value_prefix_len]
-            else
-              let size = Array.length shape in
-              alloc_mixed_record_prim, [size; size]
-        in
-        let alloc =
-          Lprim (Pccall alloc_prim,
-                 List.map Lambda.tagged_immediate const_args,
-                 no_loc)
-        in
->>>>>>> 5.2.0minus-37
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))
       body_with_dynamic_values all_bindings_rev.static
   in

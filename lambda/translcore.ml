@@ -2618,12 +2618,12 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
    Effect handlers require all types to have layout [value]. *)
 and transl_handler ~scopes ~return_sort ~body_sort e body
                    val_caselist exn_caselist eff_caselist =
-  if not (Jkind.Sort.Const.equal body_sort (Base Value)) then
+  if not (Jkind.Sort.Const.equal body_sort (Base Scannable)) then
     Misc.fatal_errorf_doc "Matching with effect handlers is only supported for \
                            scrutinees of kind [value], received %a at %a"
                            Jkind.Sort.Const.format return_sort
                            (Location.Doc.loc ~capitalize_first:false) e.exp_loc;
-  if not (Jkind.Sort.Const.equal return_sort (Base Value)) then
+  if not (Jkind.Sort.Const.equal return_sort (Base Scannable)) then
     Misc.fatal_errorf_doc "Matching with effect handlers is only supported for \
                            resulting types of kind [value], received %a at %a"
                            Jkind.Sort.Const.format return_sort
