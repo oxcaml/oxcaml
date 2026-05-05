@@ -21,9 +21,8 @@
     checker prevents accidentally mixing references between them. *)
 
 (** Framework-provided context: bindings to the input and output modules,
-    builder ops on the output, lookups from input- to output-graph references,
-    and inlining helpers the reducer can use to splice another input block's
-    content into the current output position. *)
+    builder ops on the output, and lookups from input- to output-graph
+    references. *)
 module type Context = sig
   module In : Ssa.Finished_graph
 
@@ -57,30 +56,6 @@ module type Context = sig
 
   (** Resolve an input-graph block reference to its output-graph counterpart. *)
   val map_block : In.Block.t -> Out.Block.t
-
-  (** Inline [blk]'s body and terminator into the current cursor, treating
-      [Block_param { block = blk; index; _ }] as aliasing [block_args.(index)]
-      in all subsequent [map_arg] lookups. The reducer's hooks fire with
-      [~is_inlining:true] for [blk]'s instructions and terminator. *)
-  val inline_block :
-    In.Block.t ->
-    block_args:Out.Instruction.t array ->
-    Out.unfinished_block ->
-    unit
-
-  (** Inline a single instruction: consults the reducer's [visit_instruction]
-      with [~is_inlining:true] and falls back to the default translation
-      (rewrite args, then [rewrite_instruction]). Returns the advanced cursor.
-  *)
-  val inline_instruction :
-    In.Block.t ->
-    instr_index:int ->
-    Out.unfinished_block ->
-    Out.unfinished_block
-
-  (** Inline an input block's terminator: same layering as [inline_instruction].
-  *)
-  val inline_terminator : In.Block.t -> Out.unfinished_block -> unit
 end
 
 (** A reducer functor. Given a [Context], returns the per-run hooks. *)

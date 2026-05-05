@@ -61,12 +61,12 @@ module Make (S : Ssa.Finished_graph) = struct
       | Op { id; _ } -> (
         match S.Instruction_id.Tbl.find_opt defined_ops id with
         | None ->
-          error "block %a: Op v%d used but not defined" pb bl
+          error "block %a: v%d used but not defined" pb bl
             (S.Instruction_id.hash id)
         | Some def_block ->
           if not (S.dominates def_block bl)
           then
-            error "block %a: Op v%d defined in non-dominating block %a" pb bl
+            error "block %a: v%d defined in non-dominating block %a" pb bl
               (S.Instruction_id.hash id) pb def_block)
       | Block_param { block; _ } ->
         if not (block_exists block)
@@ -125,4 +125,10 @@ end
 let validate (m : (module Ssa.Finished_graph)) =
   let module S = (val m : Ssa.Finished_graph) in
   let module V = Make (S) in
-  V.validate ()
+  try V.validate ()
+  with exn ->
+    let bt = Printexc.get_raw_backtrace () in
+    Format.eprintf "*** SSA validation failed for %s: %s@.*** SSA:@.%a@."
+      S.function_info.fun_name (Printexc.to_string exn) Ssa_print.print m;
+    Format.pp_print_flush Format.err_formatter ();
+    Printexc.raise_with_backtrace exn bt

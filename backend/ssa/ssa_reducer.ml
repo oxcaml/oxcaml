@@ -1,5 +1,36 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
+(** Framework for SSA-to-SSA transformations.
+
+    A reducer is a functor over a [Context] (input + output graphs and the
+    builder ops to translate between them). {!run} drives the framework: it
+    allocates a fresh output graph (so input and output have distinct [Block.t]
+    / [Instruction.t] types and can't be accidentally mixed), creates an output
+    block per input block, then walks the input in the Finished_graph default
+    order (which is guaranteedd to have dominators first) and translates each
+    block, skipping unused operations and block parameters.
+
+    Two layered hooks:
+    - [visit_block] / [visit_instruction] / [visit_terminator]: intercept the
+      walk over the input. Return [`Replaced] to take over (e.g. emit something
+      else, or [`Unchanged] to let the framework apply its default translation.
+    - [rewrite_instruction] / [rewrite_terminator]: intercept emissions into the
+      output. Fire on every emission — both the framework's default translation
+      and reducer-driven ones go through here.
+
+    Default translation, applied when [visit_*] returns [`Unchanged]:
+    - Args (op args, block-param uses, terminator args) and blocks are mapped
+      from the input to the output via [map_arg] and [map_block].
+    - Block params with [usage_count = 0] are dropped both from block the block
+      parameter list and from [Goto]s.
+    - [Push_trap] / [Pop_trap] handlers are replaced by [None] if the handler
+      block has become unreachable. CFG lowering routes those through a shared
+      invalid handler.
+    - Other terminators are reconstructed with their args mapped through.
+
+    [keep_unused_ops] disables the dead-Op skip and the dead-param drop, so the
+    output is structurally faithful to the input. Used before [Cfg_compare]. *)
+
 module type Context = sig
   module In : Ssa.Finished_graph
 
@@ -26,20 +57,6 @@ module type Context = sig
   val map_arg : In.Instruction.t -> Out.Instruction.t
 
   val map_block : In.Block.t -> Out.Block.t
-
-  val inline_block :
-    In.Block.t ->
-    block_args:Out.Instruction.t array ->
-    Out.unfinished_block ->
-    unit
-
-  val inline_instruction :
-    In.Block.t ->
-    instr_index:int ->
-    Out.unfinished_block ->
-    Out.unfinished_block
-
-  val inline_terminator : In.Block.t -> Out.unfinished_block -> unit
 end
 
 module type Reducer = functor (C : Context) -> sig
@@ -346,11 +363,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   in
   (* [Ctx] and [Red] are mutually recursive: [Ctx]'s emissions route through
      [Red]'s rewrite hooks, and [Red]'s visit hooks default to [Ctx]'s
-     translation helpers. [Ctx]'s [inline_*] family (exposed via [Context]) is
-     used by reducers to splice another block's content into the current
-     builder; the matching [visit_*] helpers are the same translation logic
-     exposed via [Ctx]'s richer signature so the main loop can drive them
-     directly. *)
+     translation helpers. *)
   let module M = struct
     module rec Ctx : sig
       include Context with module In = In and module Out = Out
@@ -428,21 +441,6 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         | `Unchanged ->
           let term = rewrite_terminator_impl blk.terminator in
           finish_block b ~dbg:blk.terminator_dbg term
-
-      let inline_instruction = visit_instruction
-
-      let inline_terminator = visit_terminator
-
-      let inline_block (blk : In.Block.t) ~block_args b =
-        match Red.visit_block blk b with
-        | `Replaced -> ()
-        | `Unchanged ->
-          In.Block.Tbl.replace block_param_subst blk block_args;
-          let b = ref b in
-          Array.iteri
-            (fun instr_index _ -> b := inline_instruction blk ~instr_index !b)
-            blk.body;
-          inline_terminator blk !b
     end
 
     and Red : sig
@@ -502,11 +500,5 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         Printexc.raise_with_backtrace exn bt)
     In.blocks;
   let result = Out.finish () in
-  (try Ssa_validate.validate result
-   with exn ->
-     let bt = Printexc.get_raw_backtrace () in
-     Format.eprintf "*** Ssa_reducer.run: validation failed for %s: %s@."
-       In.function_info.fun_name (Printexc.to_string exn);
-     Format.pp_print_flush Format.err_formatter ();
-     Printexc.raise_with_backtrace exn bt);
+  Ssa_validate.validate result;
   result

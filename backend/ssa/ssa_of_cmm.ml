@@ -2,6 +2,23 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-4-9-40-41-42-45"]
 
+(** Cmm → SSA conversion.
+
+    Walks a [Cmm.fundecl] in expression order, emitting into an
+    {!Ssa.Standalone_graph_builder} via the [Make] functor. Operation-level
+    lowering is delegated to {!Cfg_selectgen} via [Sel.select_operation].
+
+    Trap handling: [Cexit]'s trap actions are emitted as [Push_trap] /
+    [Pop_trap] body instructions. In contrast to {!Cfg_selectgen}, we do not
+    compute trap stacks and trap continuations, relying on the SSA machinery to
+    do this automatically instead.
+
+    Also in contrast to Cfg_selectgen, we do not emit tail calls.
+    {!Ssa_tail_call} later rewrites that pattern into [Tailcall_self] /
+    [Tailcall_func] when the calling-convention and trap stack constraints are
+    satisfied. The [Capply]'s [region_close] is forwarded as the [Call.nontail]
+    flag so [@nontail] annotations suppress the rewrite. *)
+
 module SU = Select_utils
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -32,22 +49,17 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
   let env_add v instrs env =
     { env with vars = V.Map.add (VP.var v) instrs env.vars }
 
-  (* === [unfinished_block ref] helpers ================================= *)
-
-  (* Emit [i] into [b] without binding its result. *)
   let emit_instruction_no_res (b : B.unfinished_block ref) (i : B.Instruction.t)
       : unit =
     let nb, _ = B.emit_instruction !b i in
     b := nb
 
-  (* Single-result wrapper around [B.emit_op]. *)
   let emit_op (b : B.unfinished_block ref) ~op ~dbg ~typ ~args : B.Instruction.t
       =
     let nb, i = B.emit_op !b ~op ~dbg ~typ ~args in
     b := nb;
     i
 
-  (* Emit an Op and return its results as an array. *)
   let emit_op_res b ?(dbg = Debuginfo.none) op typ args : B.Instruction.t array
       =
     let i = emit_op b ~op ~dbg ~typ ~args in
@@ -56,9 +68,6 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     else
       Array.init (Array.length typ) (fun index ->
           B.Instruction.make_proj ~index i)
-
-  let finish_block (b : B.unfinished_block ref) ~dbg term =
-    B.finish_block !b ~dbg term
 
   let bind_let env b v r1 =
     let env = env_add v r1 env in
@@ -150,7 +159,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         let cond = make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |] in
         Branch { cond; ifso = false_block; ifnot = true_block }
     in
-    finish_block b ~dbg:Debuginfo.none term
+    B.finish_block !b ~dbg:Debuginfo.none term
 
   let rec emit_parts env b ~effects_after exp =
     let module EC = SU.Effect_and_coeffect in
@@ -339,7 +348,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         | Some (simple_list, ext_env) -> emit_tuple ext_env b simple_list)
       | Cop (Craise k, args, dbg) ->
         let* r = emit_tuple env b args in
-        finish_block b ~dbg (Raise { raise_kind = k; args = r });
+        B.finish_block !b ~dbg (Raise { raise_kind = k; args = r });
         Never_returns
       | Cop (Copaque, args, dbg) -> (
         match emit_parts_list env b args with
@@ -367,7 +376,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     match r with
     | Never_returns -> Never_returns
     | Ok r ->
-      finish_block b ~dbg:Debuginfo.none (Return { args = r });
+      B.finish_block !b ~dbg:Debuginfo.none (Return { args = r });
       Never_returns
 
   and emit_invalid env b message symbol =
@@ -378,12 +387,12 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:Cmm.typ_int
       in
-      finish_block b ~dbg:Debuginfo.none
+      B.finish_block !b ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = Some cont_block });
       b := B.start_block cont_block;
       Ok cont_params)
     else (
-      finish_block b ~dbg:Debuginfo.none
+      B.finish_block !b ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = None });
       Never_returns)
 
@@ -399,7 +408,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:ty
       in
-      finish_block b ~dbg
+      B.finish_block !b ~dbg
         (Call
            { op = Func call_op;
              args = arg_instrs;
@@ -413,7 +422,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:ty_res
       in
-      finish_block b ~dbg
+      B.finish_block !b ~dbg
         (Call
            { op = Prim (External ext_call);
              args = arg_instrs;
@@ -427,7 +436,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       let { B.block = cont_block; params = cont_params } =
         B.new_block ~params:ty
       in
-      finish_block b ~dbg
+      B.finish_block !b ~dbg
         (Call
            { op = Prim probe_op;
              args = arg_instrs;
@@ -477,16 +486,13 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         let* arg_instrs = emit_tuple env b new_args in
         match new_op with
         | Terminator term ->
-          (* Mirror the [Rc_normal] check in [Cfg_selectgen.emit_tail]:
-             [Rc_normal] is the only [region_close] eligible for tail-call
-             optimization at this level. [Rc_close_at_apply] (close region and
-             tail call) is desugared by Flambda2 before reaching Cmm. *)
           let nontail =
             match[@warning "-4"] op with
             | Cmm.Capply { region; _ } -> (
               match (region : Lambda.region_close) with
               | Rc_normal -> false
-              | Rc_nontail | Rc_close_at_apply -> true)
+              | Rc_nontail -> true
+              | Rc_close_at_apply -> assert false (* desugared in Flambda2 *))
             | _ -> true
           in
           emit_call env b ~ty ~nontail term arg_instrs dbg
@@ -505,7 +511,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     let r_then = emit env then_b eif ~tail in
     let else_b = ref (B.start_block else_block) in
     let r_else = emit env else_b eelse ~tail in
-    join_branches b (r_then, then_b) (r_else, else_b)
+    join_branches b (r_then, !then_b) (r_else, !else_b)
 
   and emit_switch env b ~tail esel index ecases : result =
     let* rsel = emit env b esel ~tail:false in
@@ -521,12 +527,12 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       assert (Array.length rsel = 1);
       rsel.(0)
     in
-    finish_block b ~dbg:Debuginfo.none (Switch { index; targets });
+    B.finish_block !b ~dbg:Debuginfo.none (Switch { index; targets });
     let case_results =
       Array.mapi
         (fun i (case_expr, _dbg) ->
           let case_b = ref (B.start_block case_blocks.(i)) in
-          emit env case_b case_expr ~tail, case_b)
+          emit env case_b case_expr ~tail, !case_b)
         ecases
     in
     join_array b case_results
@@ -576,10 +582,10 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
               (Name_for_debugger
                  { ident = VP.var id; provenance; which_parameter = None; regs }))
         handler.params;
-      emit handler_env b handler.body ~tail, b
+      emit handler_env b handler.body ~tail, !b
     in
     let handler_results = List.map2 translate_handler handlers handler_blocks in
-    join_array b (Array.of_list ((r_body, b) :: handler_results))
+    join_array b (Array.of_list ((r_body, !b) :: handler_results))
 
   and find_handler env handler_id : B.Block.t =
     try Static_label.Map.find handler_id env.static_exceptions
@@ -606,12 +612,13 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         let* src = emit_tuple ext_env b simple_list in
         let handler = find_handler env nfail in
         emit_trap_actions env b traps;
-        finish_block b ~dbg:Debuginfo.none (Goto { goto = handler; args = src });
+        B.finish_block !b ~dbg:Debuginfo.none
+          (Goto { goto = handler; args = src });
         Never_returns
       | Return_lbl ->
         let* src = emit_tuple ext_env b simple_list in
         emit_trap_actions env b traps;
-        finish_block b ~dbg:Debuginfo.none (Return { args = src });
+        B.finish_block !b ~dbg:Debuginfo.none (Return { args = src });
         Never_returns)
 
   (* Join two branches into a fresh block. After this call [b] points at the
@@ -620,10 +627,10 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     match r1, r2 with
     | Never_returns, Never_returns -> Never_returns
     | Ok r, Never_returns ->
-      b := !b1;
+      b := b1;
       Ok r
     | Never_returns, Ok r ->
-      b := !b2;
+      b := b2;
       Ok r
     | Ok r1_instrs, Ok r2_instrs ->
       assert (Array.length r1_instrs = Array.length r2_instrs);
@@ -631,9 +638,9 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       let { B.block = join_block; params = join_params } =
         B.new_block ~params:join_types
       in
-      finish_block b1 ~dbg:Debuginfo.none
+      B.finish_block b1 ~dbg:Debuginfo.none
         (Goto { goto = join_block; args = r1_instrs });
-      finish_block b2 ~dbg:Debuginfo.none
+      B.finish_block b2 ~dbg:Debuginfo.none
         (Goto { goto = join_block; args = r2_instrs });
       b := B.start_block join_block;
       Ok join_params
@@ -641,8 +648,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
   (* Join a set of branches (each with its own end-cursor) into a fresh block.
      [b] is left pointing at the joined block, or unchanged if every branch did
      not return. *)
-  and join_array b (results : (result * B.unfinished_block ref) array) : result
-      =
+  and join_array b (results : (result * B.unfinished_block) array) : result =
     let join_info = ref None in
     Array.iter
       (fun (r, _) ->
@@ -672,7 +678,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
           match r with
           | Never_returns -> ()
           | Ok instrs ->
-            finish_block b_branch ~dbg:Debuginfo.none
+            B.finish_block b_branch ~dbg:Debuginfo.none
               (Goto { goto = join_block; args = instrs }))
         results;
       b := B.start_block join_block;
@@ -713,7 +719,9 @@ let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
     in
     let r = C.emit env (ref (B.start_block B.entry)) f.fun_body ~tail:true in
     assert (match r with Never_returns -> true | Ok _ -> false);
-    B.finish ()
+    let result = B.finish () in
+    Ssa_validate.validate result;
+    result
   with exn ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "*** Ssa_of_cmm error for %s: %s@.*** CMM:@.%a@."

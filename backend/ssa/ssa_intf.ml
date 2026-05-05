@@ -2,7 +2,7 @@
 
 (** SSA graph interface.
 
-    An SSA graph is a first-class module instance, not a record: each call to
+    An SSA graph is a first-class module instance: each call to
     {!Ssa.make_builder} creates a fresh module that owns its own [Block_id] /
     [Instruction_id] generators and its own concrete
     [Block]/[Instruction]/[Terminator] modules. Two distinct graphs therefore

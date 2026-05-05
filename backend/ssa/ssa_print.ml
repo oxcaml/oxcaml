@@ -1,5 +1,17 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
+(** Pretty-printer for {!Ssa.Finished_graph} instances.
+
+    Format conventions:
+    - Op result names are [v<id>], block ids are [B<id>], block params are
+      [B<id>.<index>].
+    - References to ops use the result name, references to block params use the
+      [B<id>.<index>] form, projections render as nested [v<i>.<index>].
+    - Each block prints its header (id, kind, typed params, label hint, idom,
+      depth, predecessors), then its body one instruction per line, then its
+      terminator with the implicit {!Ssa.trap_successor} appended as
+      [trap_successor=B<id>] when applicable. *)
+
 module Make (S : Ssa.Finished_graph) = struct
   let print_block_id ppf (b : S.Block.t) =
     Format.fprintf ppf "B%d" (b.id :> int)
@@ -20,9 +32,6 @@ module Make (S : Ssa.Finished_graph) = struct
         Format.fprintf ppf "v%d = %s(%a)"
           (id :> int)
           formatted_op print_args args
-    | Block_param { block; index; _ } -> print_block_param ppf (block, index)
-    | Proj { index; src } ->
-      Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
     | Push_trap { handler } ->
       Format.fprintf ppf "push_trap %a"
         (Format.pp_print_option
@@ -39,17 +48,17 @@ module Make (S : Ssa.Finished_graph) = struct
       Format.fprintf ppf "stack_check %d" max_frame_size_bytes
     | Name_for_debugger { ident; _ } ->
       Format.fprintf ppf "name_for_debugger %a" Ident.print ident
-    | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
+    | Block_param _ | Tuple _ | Proj _ -> assert false
 
   and print_instr_ref ppf (i : S.Instruction.t) =
     match i with
     | Op { id; _ } -> Format.fprintf ppf "v%d" (id :> int)
     | Block_param { block; index; _ } -> print_block_param ppf (block, index)
     | Proj { index; src } ->
-      Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
+      Format.fprintf ppf "%d.%a" index print_instr_ref src
     | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
     | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
-      print_instruction ppf i
+      assert false
 
   and print_args ppf args =
     Array.iteri
