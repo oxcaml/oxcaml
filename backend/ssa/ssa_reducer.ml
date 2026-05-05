@@ -12,13 +12,13 @@
 
     Two layered hooks:
     - [visit_block] / [visit_instruction] / [visit_terminator]: intercept the
-      walk over the input. Return [`Replaced] to take over (e.g. emit something
-      else, or [`Unchanged] to let the framework apply its default translation.
+      walk over the input. Return [Replaced] to take over (e.g. emit something
+      else, or [Unchanged] to let the framework apply its default translation.
     - [rewrite_instruction] / [rewrite_terminator]: intercept emissions into the
       output. Fire on every emission — both the framework's default translation
       and reducer-driven ones go through here.
 
-    Default translation, applied when [visit_*] returns [`Unchanged]:
+    Default translation, applied when [visit_*] returns [Unchanged]:
     - Args (op args, block-param uses, terminator args) and blocks are mapped
       from the input to the output via [map_arg] and [map_block].
     - Block params with [usage_count = 0] are dropped both from block the block
@@ -59,31 +59,30 @@ module type Context = sig
   val map_block : In.Block.t -> Out.Block.t
 end
 
+type 'a result =
+  | Unchanged
+  | Replaced of 'a
+
 module type Reducer = functor (C : Context) -> sig
   val analyze : unit -> unit
 
-  val visit_block :
-    C.In.Block.t -> C.Out.unfinished_block -> [> `Unchanged | `Replaced]
+  val visit_block : C.In.Block.t -> C.Out.unfinished_block -> unit result
 
   val visit_instruction :
-    C.In.Block.t ->
-    instr_index:int ->
-    C.Out.unfinished_block ->
-    [> `Unchanged | `Replaced]
+    C.In.Block.t -> instr_index:int -> C.Out.unfinished_block -> unit result
 
-  val visit_terminator :
-    C.In.Block.t -> C.Out.unfinished_block -> [> `Unchanged | `Replaced]
+  val visit_terminator : C.In.Block.t -> C.Out.unfinished_block -> unit result
 
   val rewrite_instruction :
     C.Out.unfinished_block ->
     C.Out.Instruction.t ->
-    [> `Unchanged | `Replaced of C.Out.unfinished_block * C.Out.Instruction.t]
+    (C.Out.unfinished_block * C.Out.Instruction.t) result
 
   val rewrite_terminator :
     C.Out.unfinished_block ->
     dbg:Debuginfo.t ->
     C.Out.Terminator.t ->
-    [> `Unchanged | `Replaced]
+    unit result
 end
 
 module Default : Reducer =
@@ -93,22 +92,22 @@ functor
   struct
     let analyze () = ()
 
-    let visit_block (_ : C.In.Block.t) (_ : C.Out.unfinished_block) = `Unchanged
+    let visit_block (_ : C.In.Block.t) (_ : C.Out.unfinished_block) = Unchanged
 
     let visit_instruction (_ : C.In.Block.t) ~instr_index:(_ : int)
         (_ : C.Out.unfinished_block) =
-      `Unchanged
+      Unchanged
 
     let visit_terminator (_ : C.In.Block.t) (_ : C.Out.unfinished_block) =
-      `Unchanged
+      Unchanged
 
     let rewrite_instruction (_ : C.Out.unfinished_block)
         (_ : C.Out.Instruction.t) =
-      `Unchanged
+      Unchanged
 
     let rewrite_terminator (_ : C.Out.unfinished_block) ~dbg:(_ : Debuginfo.t)
         (_ : C.Out.Terminator.t) =
-      `Unchanged
+      Unchanged
   end
 
 let combine (rs : (module Reducer) list) : (module Reducer) =
@@ -120,29 +119,27 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
       module type S = sig
         val analyze : unit -> unit
 
-        val visit_block :
-          C.In.Block.t -> C.Out.unfinished_block -> [`Unchanged | `Replaced]
+        val visit_block : C.In.Block.t -> C.Out.unfinished_block -> unit result
 
         val visit_instruction :
           C.In.Block.t ->
           instr_index:int ->
           C.Out.unfinished_block ->
-          [`Unchanged | `Replaced]
+          unit result
 
         val visit_terminator :
-          C.In.Block.t -> C.Out.unfinished_block -> [`Unchanged | `Replaced]
+          C.In.Block.t -> C.Out.unfinished_block -> unit result
 
         val rewrite_instruction :
           C.Out.unfinished_block ->
           C.Out.Instruction.t ->
-          [ `Unchanged
-          | `Replaced of C.Out.unfinished_block * C.Out.Instruction.t ]
+          (C.Out.unfinished_block * C.Out.Instruction.t) result
 
         val rewrite_terminator :
           C.Out.unfinished_block ->
           dbg:Debuginfo.t ->
           C.Out.Terminator.t ->
-          [`Unchanged | `Replaced]
+          unit result
       end
 
       let children : (module S) list =
@@ -158,51 +155,51 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
 
       let visit_block blk b =
         let rec loop = function
-          | [] -> `Unchanged
+          | [] -> Unchanged
           | (module Red : S) :: rest -> (
             match Red.visit_block blk b with
-            | `Unchanged -> loop rest
-            | `Replaced -> `Replaced)
+            | Unchanged -> loop rest
+            | Replaced () -> Replaced ())
         in
         loop children
 
       let visit_instruction blk ~instr_index b =
         let rec loop = function
-          | [] -> `Unchanged
+          | [] -> Unchanged
           | (module Red : S) :: rest -> (
             match Red.visit_instruction blk ~instr_index b with
-            | `Unchanged -> loop rest
-            | `Replaced -> `Replaced)
+            | Unchanged -> loop rest
+            | Replaced () -> Replaced ())
         in
         loop children
 
       let visit_terminator blk b =
         let rec loop = function
-          | [] -> `Unchanged
+          | [] -> Unchanged
           | (module Red : S) :: rest -> (
             match Red.visit_terminator blk b with
-            | `Unchanged -> loop rest
-            | `Replaced -> `Replaced)
+            | Unchanged -> loop rest
+            | Replaced () -> Replaced ())
         in
         loop children
 
       let rewrite_instruction b i =
         let rec loop = function
-          | [] -> `Unchanged
+          | [] -> Unchanged
           | (module Red : S) :: rest -> (
             match Red.rewrite_instruction b i with
-            | `Unchanged -> loop rest
-            | `Replaced (b', i') -> `Replaced (b', i'))
+            | Unchanged -> loop rest
+            | Replaced (b', i') -> Replaced (b', i'))
         in
         loop children
 
       let rewrite_terminator b ~dbg t =
         let rec loop = function
-          | [] -> `Unchanged
+          | [] -> Unchanged
           | (module Red : S) :: rest -> (
             match Red.rewrite_terminator b ~dbg t with
-            | `Unchanged -> loop rest
-            | `Replaced -> `Replaced)
+            | Unchanged -> loop rest
+            | Replaced () -> Replaced ())
         in
         loop children
     end in
@@ -389,16 +386,16 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
 
       let emit_instruction b i =
         match Red.rewrite_instruction b i with
-        | `Unchanged -> Out.emit_instruction b i
-        | `Replaced (b', i') -> b', i'
+        | Unchanged -> Out.emit_instruction b i
+        | Replaced (b', i') -> b', i'
 
       let emit_op b ~op ~dbg ~typ ~args =
         emit_instruction b (Out.Instruction.make_op ~op ~typ ~args ~dbg)
 
       let finish_block b ~dbg term =
         match Red.rewrite_terminator b ~dbg term with
-        | `Unchanged -> Out.finish_block b ~dbg term
-        | `Replaced -> ()
+        | Unchanged -> Out.finish_block b ~dbg term
+        | Replaced () -> ()
 
       let new_block = Out.new_block
 
@@ -408,8 +405,8 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
 
       let visit_instruction (blk : In.Block.t) ~instr_index b =
         match Red.visit_instruction blk ~instr_index b with
-        | `Replaced -> b
-        | `Unchanged -> (
+        | Replaced () -> b
+        | Unchanged -> (
           let i = Array.get blk.body instr_index in
           match[@warning "-fragile-match"] i with
           (* Skip dead Ops: their args may reference [Block_param]s that we've
@@ -449,8 +446,8 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
 
       let visit_terminator (blk : In.Block.t) b =
         match Red.visit_terminator blk b with
-        | `Replaced -> ()
-        | `Unchanged ->
+        | Replaced () -> ()
+        | Unchanged ->
           let term = rewrite_terminator_impl blk.terminator in
           finish_block b ~dbg:blk.terminator_dbg term
     end
@@ -458,28 +455,23 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     and Red : sig
       val analyze : unit -> unit
 
-      val visit_block :
-        In.Block.t -> Out.unfinished_block -> [`Unchanged | `Replaced]
+      val visit_block : In.Block.t -> Out.unfinished_block -> unit result
 
       val visit_instruction :
-        In.Block.t ->
-        instr_index:int ->
-        Out.unfinished_block ->
-        [`Unchanged | `Replaced]
+        In.Block.t -> instr_index:int -> Out.unfinished_block -> unit result
 
-      val visit_terminator :
-        In.Block.t -> Out.unfinished_block -> [`Unchanged | `Replaced]
+      val visit_terminator : In.Block.t -> Out.unfinished_block -> unit result
 
       val rewrite_instruction :
         Out.unfinished_block ->
         Out.Instruction.t ->
-        [`Unchanged | `Replaced of Out.unfinished_block * Out.Instruction.t]
+        (Out.unfinished_block * Out.Instruction.t) result
 
       val rewrite_terminator :
         Out.unfinished_block ->
         dbg:Debuginfo.t ->
         Out.Terminator.t ->
-        [`Unchanged | `Replaced]
+        unit result
     end =
       Red_ctor (Ctx)
   end in
@@ -494,8 +486,8 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       let b = Out.start_block out_blk in
       try
         match Red.visit_block blk b with
-        | `Replaced -> ()
-        | `Unchanged ->
+        | Replaced () -> ()
+        | Unchanged ->
           let b = ref b in
           Array.iteri
             (fun instr_index _ ->
@@ -504,11 +496,11 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
           Ctx.visit_terminator blk !b
       with exn ->
         let bt = Printexc.get_raw_backtrace () in
-        let module InPrint = Ssa_print.Make (In) in
+        let module In_print = Ssa_print.Make (In) in
         Format.eprintf
           "*** Ssa_reducer.run error for %s while processing block %a: %s@.*** \
            Input SSA:@.%a@."
-          In.function_info.fun_name InPrint.print_block_id blk
+          In.function_info.fun_name In_print.print_block_id blk
           (Printexc.to_string exn) Ssa_print.print
           (module In : Ssa.Finished_graph);
         Format.pp_print_flush Format.err_formatter ();

@@ -71,11 +71,12 @@ module Make (S : Ssa.Finished_graph) = struct
       | Block_param { block; _ } ->
         if not (block_exists block)
         then
-          error "block %a: BlockParam references non-existent block %a" pb bl pb
-            block;
+          error "block %a: Block_param references non-existent block %a" pb bl
+            pb block;
         if not (S.dominates block bl)
         then
-          error "block %a: BlockParam of non-dominating block %a" pb bl pb block
+          error "block %a: Block_param of non-dominating block %a" pb bl pb
+            block
       | Proj { src; _ } -> (
         match src with
         | Op _ -> check_arg bl src
