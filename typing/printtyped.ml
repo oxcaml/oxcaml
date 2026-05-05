@@ -745,12 +745,11 @@ and expression i ppf x =
       sort i ppf record_sort;
       longident i ppf li;
       sort i ppf field_sort;
-  | Texp_unboxed_field { record = e; lid = li; record_sort; field_sort; _ } ->
+  | Texp_unboxed_field { record = e; lid = li; record_sort; _ } ->
       line i ppf "Texp_unboxed_field\n";
       expression i ppf e;
       sort i ppf record_sort;
       longident i ppf li;
-      sort i ppf field_sort;
   | Texp_setfield { record = e1; field_sort; modality = am; lid = li;
                     newval = e2; _ } ->
       line i ppf "Texp_setfield\n";

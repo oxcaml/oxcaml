@@ -597,11 +597,10 @@ let expr sub x =
                      unique_barrier;
                    }
     | Texp_unboxed_field { record; record_sort; record_sorts; record_repres;
-                           field_sort; lid; label; unique_use; } ->
+                           lid; label; unique_use; } ->
         Texp_unboxed_field { record = sub.expr sub record;
-                             lid = map_loc sub lid;
-                             record_sort; record_sorts; record_repres;
-                             field_sort; label; unique_use;
+                             lid = map_loc sub lid; record_sort; record_sorts;
+                             record_repres; label; unique_use;
                            }
     | Texp_setfield { record; record_repres; field_sort; record_sorts; modality;
                       lid; label; newval } ->

@@ -7130,7 +7130,7 @@ and type_expect_
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       let (record, record_sort, record_sorts, rmode, label, _, ambiguity,
-           ty_arg, field_sort, record_repres) =
+           ty_arg, _field_sort, record_repres) =
         type_label_projection Unboxed_product loc env srecord lid
       in
       if Types.is_mutable label.lbl_mut then
@@ -7155,7 +7155,7 @@ and type_expect_
       rue {
         exp_desc =
           Texp_unboxed_field
-            { record; record_sort; record_sorts; field_sort; record_repres; lid;
+            { record; record_sort; record_sorts; record_repres; lid;
               label; unique_use = uu };
         exp_loc = loc; exp_extra = [];
         exp_type = ty_arg;

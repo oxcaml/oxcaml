@@ -341,7 +341,6 @@ and expression_desc =
       record_sort : Jkind.sort;
       record_sorts : record_sorts;
       record_repres : Types.record_unboxed_product_representation;
-      field_sort : Jkind.sort;
       lid : Longident.t loc;
       label : unboxed_label_description;
       unique_use : unique_use;
