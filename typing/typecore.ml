@@ -1719,19 +1719,18 @@ and build_as_type_aux (env : Env.t) p ~mode =
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
-let update_labels (type rep) env labels (form : rep record_form) ~loc
-      ~containing_type
+let update_labels (type rep) env (form : rep record_form) ~representative_label
+      ~loc ~containing_type
     : record_sorts * rep =
   (* Might be good to short-circuit this. Possible we could do so by noticing
      that [containing_type] has no arguments (or only variables as
      arguments). *)
-  let all_labels = labels.(0).lbl_all in
   let vars_and_ty_args, ty_res =
-    Ctype.instance_labels ~fixed:false all_labels
+    Ctype.instance_labels ~fixed:false representative_label.lbl_all
   in
   unify_exp_types loc env containing_type ty_res;
   let sorts, rep =
-    match labels.(0).lbl_repres with
+    match representative_label.lbl_repres with
     | Some rep -> Fixed, rep
     | None ->
         let lbls_and_ty_args =
@@ -1739,7 +1738,7 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
             (fun lbl (_vars, ty_arg) ->
                (lbl |> Types.label_declaration_of_label_description),
                ty_arg)
-            all_labels
+            representative_label.lbl_all
             vars_and_ty_args
         in
         match
@@ -1753,13 +1752,6 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
             raise (Error (loc, env,
                           Indeterminate_record_layout(containing_type, name)))
   in
-  sorts, rep
-
-let update_label (type rep) env label (form : rep record_form) ~loc
-      ~containing_type
-    : record_sorts * rep =
-  let labels = [| label |] in
-  let sorts, rep = update_labels env labels form ~loc ~containing_type in
   sorts, rep
 
 (* Constraint solving during typing of patterns *)
@@ -3186,13 +3178,13 @@ and type_pat_aux
              Env.Projection expected_type)
           lid_sp_list
       in
-      let all_labels =
+      let representative_label =
         match lbl_a_list with
         | [] -> assert false
-        | (_, label, _) :: _ -> label.lbl_all
+        | (_, label, _) :: _ -> label
       in
       let sorts, rep =
-        update_labels !!penv all_labels record_form ~loc
+        update_labels !!penv record_form ~representative_label ~loc
           ~containing_type:(instance record_ty)
       in
       let lbl_a_list = List.map (type_label_pat sorts) lbl_a_list in
@@ -7191,7 +7183,8 @@ and type_expect_
       in
       unify_exp env record ty_record;
       let record_sorts, record_repres =
-        update_label env label Legacy ~loc ~containing_type:ty_record
+        update_labels env Legacy ~representative_label:label ~loc
+          ~containing_type:ty_record
       in
       rue {
         exp_desc = Texp_setfield {
@@ -8259,7 +8252,7 @@ and type_block_access env expected_base_ty principal
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     if mut then Env.mark_label_used Mutation label.lbl_uid;
     let _sorts, rep =
-      update_label env label Legacy ~loc:lid.loc
+      update_labels env Legacy ~representative_label:label ~loc:lid.loc
         ~containing_type:expected_base_ty
     in
     let ba = Baccess_field (lid, label, rep) in
@@ -8344,7 +8337,7 @@ and type_unboxed_access env loc el_ty ua =
         raise (Error (lid.loc, env, err))
     end;
     let sorts, _rep =
-      update_labels env label.lbl_all Unboxed_product ~loc:lid.loc
+      update_labels env Unboxed_product ~representative_label:label ~loc:lid.loc
         ~containing_type:el_ty
     in
     (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, sorts)
@@ -9073,7 +9066,8 @@ and type_label_projection
            level, but weird errors happen if we don't, and it's also
            necessary to do it in _this_ inner level so that the correct type
            hits a [generalize_structure] *)
-        update_label env label record_form ~loc ~containing_type:record.exp_type
+        update_labels env record_form ~representative_label:label ~loc
+          ~containing_type:record.exp_type
       in
       ty_arg, record_sorts, record_repres
     end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
