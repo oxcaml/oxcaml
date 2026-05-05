@@ -809,8 +809,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield{ record = arg; record_repres; field_sort; modality = arg_mode;
-                   lid = _id; label = lbl; newval } ->
+  | Texp_setfield{ record = arg; record_repres; record_sorts;
+                   modality = arg_mode; lid = _id; label = lbl; newval } ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
@@ -824,9 +824,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            above. *)
         Jkind.Sort.Const.for_boxed_record
       in
-      let sort_newval =
-        Jkind.Sort.default_for_transl_and_get field_sort
-      in
+      let sort_newval = label_sort lbl record_sorts in
       let arg_lambda = transl_exp ~scopes sort_arg arg in
       let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
       let newval_lambda = transl_exp ~scopes sort_newval newval in

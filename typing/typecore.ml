@@ -1757,10 +1757,10 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
 
 let update_label (type rep) env label (form : rep record_form) ~loc
       ~containing_type
-    : Jkind.Sort.Const.t * record_sorts * rep =
+    : record_sorts * rep =
   let labels = [| label |] in
   let sorts, rep = update_labels env labels form ~loc ~containing_type in
-  label_sort label sorts, sorts, rep
+  sorts, rep
 
 (* Constraint solving during typing of patterns *)
 
@@ -7190,14 +7190,13 @@ and type_expect_
             :: record.exp_extra }
       in
       unify_exp env record ty_record;
-      let sort, record_sorts, record_repres =
+      let record_sorts, record_repres =
         update_label env label Legacy ~loc ~containing_type:ty_record
       in
       rue {
         exp_desc = Texp_setfield {
           record;
           record_repres;
-          field_sort = sort |> Jkind.Sort.of_const;
           record_sorts;
           modality =
             Locality.disallow_right (regional_to_local
@@ -8259,7 +8258,7 @@ and type_block_access env expected_base_ty principal
     let mut = is_mutable label.lbl_mut in
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     if mut then Env.mark_label_used Mutation label.lbl_uid;
-    let _sort, _sorts, rep =
+    let _sorts, rep =
       update_label env label Legacy ~loc:lid.loc
         ~containing_type:expected_base_ty
     in
@@ -9066,7 +9065,7 @@ and type_label_projection
       | Error err ->
           raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
       end;
-      let _sort, record_sorts, record_repres =
+      let record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
            and it also gives a nicer error message *)

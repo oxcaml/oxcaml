@@ -637,7 +637,6 @@ and expression_desc =
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
-      field_sort : Jkind.sort;
       record_sorts : record_sorts;
       modality : Mode.Locality.l;
       lid : Longident.t loc;

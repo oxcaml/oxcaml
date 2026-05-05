@@ -347,8 +347,6 @@ and expression_desc =
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
-      (* CR rtjoa: consider deleting field_sort *)
-      field_sort : Jkind.sort;
       record_sorts : record_sorts;
       modality : Mode.Locality.l;
       lid : Longident.t loc;

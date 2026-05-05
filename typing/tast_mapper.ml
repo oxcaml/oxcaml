@@ -601,13 +601,13 @@ let expr sub x =
                              lid = map_loc sub lid; record_sort; record_sorts;
                              record_repres; label; unique_use;
                            }
-    | Texp_setfield { record; record_repres; field_sort; record_sorts; modality;
-                      lid; label; newval } ->
+    | Texp_setfield { record; record_repres; record_sorts; modality; lid; label;
+                      newval } ->
         Texp_setfield {
           record = sub.expr sub record;
           lid = map_loc sub lid;
           newval = sub.expr sub newval;
-          record_repres; field_sort; record_sorts; modality; label;
+          record_repres; record_sorts; modality; label;
         }
     | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
         Texp_atomic_loc

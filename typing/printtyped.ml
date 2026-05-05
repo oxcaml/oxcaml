@@ -749,13 +749,11 @@ and expression i ppf x =
       expression i ppf e;
       sort i ppf record_sort;
       longident i ppf li;
-  | Texp_setfield { record = e1; field_sort; modality = am; lid = li;
-                    newval = e2; _ } ->
+  | Texp_setfield { record = e1; modality = am; lid = li; newval = e2; _ } ->
       line i ppf "Texp_setfield\n";
       locality_mode i ppf am;
       expression i ppf e1;
       longident i ppf li;
-      sort i ppf field_sort;
       expression i ppf e2;
   | Texp_array (amut, sort, l, amode) ->
       line i ppf "Texp_array %a\n" fmt_mutable_mode_flag amut;
