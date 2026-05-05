@@ -26,7 +26,7 @@
  ******************************************************************************)
 
 (* Binary emitter verification: compare binary emitter output against system
-   assembler output to ensure they produce identical machine code. *)
+   assembler output according to the selected comparison mode. *)
 
 module Owee_buf = Compiler_owee.Owee_buf
 module Owee_object = Compiler_owee.Owee_object
@@ -58,6 +58,17 @@ type mismatch =
         actual : int
       }
   | Relocation of relocation_mismatch
+  | Instruction of
+      { section_name : string;
+        index : int;
+        assembler : string;
+        binary_emitter : string
+      }
+  | Instruction_count of
+      { section_name : string;
+        assembler : int;
+        binary_emitter : int
+      }
   | Missing_section of string
   | Missing_binary_sections_dir of string
 
@@ -68,6 +79,7 @@ type result =
       }
   | Mismatch of mismatch
   | Object_file_error of string
+  | Error of string
 
 (* Text sections: either a single .text section or per-function sections *)
 type text_sections =
@@ -203,38 +215,211 @@ let read_text_relocations dir ~include_main_text =
 
 (* Section comparison *)
 
-let compare_section ~section_name ~expected ~actual =
+type comparison_mode =
+  | Exact
+  | Disassembly
+
+(* Disassembly-based comparison: disassemble both binary emitter output and
+   assembler output using objdump in raw binary mode, then compare the textual
+   instruction representations (mnemonic + operands). Since both byte streams go
+   through the same disassembler, any difference that changes the decoded
+   instruction text is caught. This is intentionally not a byte-exact check:
+   different encodings with the same decoded text are accepted, and details that
+   objdump omits (for example branch/call targets when [--no-addresses] is used)
+   are not compared. *)
+module Disassembly = struct
+  (* Classify a single line of objdump output. With --no-addresses, instruction
+     lines start with a tab followed by the instruction text. The text runs up
+     to an optional '#' comment, which we strip so that RIP-relative comment
+     targets don't cause spurious mismatches. Expected non-instruction lines
+     (file header, section headers, blanks) are skipped. Anything else is a
+     parse error; we'd rather fail loudly than silently drop lines and report a
+     false match. *)
+  let classify_line line =
+    let trimmed = String.trim line in
+    if
+      trimmed = ""
+      || String.starts_with ~prefix:"Disassembly of section" trimmed
+      || String.starts_with ~prefix:"<" trimmed
+      ||
+      (* e.g. "foo.bin: file format binary" *)
+      Misc.Stdlib.String.is_substring trimmed ~substring:"file format"
+    then `Skip
+    else if String.starts_with ~prefix:"\t" line
+    then
+      let mnemonic_end =
+        match String.index_opt line '#' with
+        | Some i -> i
+        | None -> String.length line
+      in
+      (* Skip the leading tab (index 0), take up to the comment or end. *)
+      `Instr (String.trim (String.sub line 1 (mnemonic_end - 1)))
+    else `Parse_error line
+
+  let extract_instructions output =
+    let rec loop acc = function
+      | [] -> Result.Ok (List.rev acc)
+      | line :: rest -> (
+        match classify_line line with
+        | `Skip -> loop acc rest
+        | `Instr s -> loop (s :: acc) rest
+        | `Parse_error l ->
+          Result.Error (Printf.sprintf "unexpected objdump line: %S" l))
+    in
+    loop [] (String.split_on_char '\n' output)
+
+  type redirect =
+    | Null
+    | File of string
+    | Pipe
+
+  let run ~command ?(stdout = Pipe) ?(stderr = Pipe) args =
+    let stdout_str =
+      match stdout with
+      | Pipe -> ""
+      | Null -> " > /dev/null"
+      | File path -> Printf.sprintf " > %s" (Filename.quote path)
+    in
+    let stderr_str =
+      match stderr with
+      | Pipe -> ""
+      | Null -> " 2> /dev/null"
+      | File path -> Printf.sprintf " 2> %s" (Filename.quote path)
+    in
+    let cmd =
+      String.concat " " (Filename.quote command :: List.map Filename.quote args)
+      ^ stdout_str ^ stderr_str
+    in
+    Ccomp.command cmd
+
+  let disassemble bin_path =
+    let out_file = Filename.temp_file "caml_objdump" ".txt" in
+    let machine =
+      match Target_system.architecture () with
+      | X86_64 -> "i386:x86-64"
+      | AArch64 -> "aarch64"
+      | _ -> "i386:x86-64"
+    in
+    let rc =
+      run ~command:"objdump" ~stdout:(File out_file)
+        [ "-D";
+          "-b";
+          "binary";
+          "-m";
+          machine;
+          "--no-show-raw-insn";
+          "--no-addresses";
+          "-z";
+          bin_path ]
+    in
+    if rc <> 0
+    then (
+      (try Sys.remove out_file with Sys_error _ -> ());
+      Result.Error (Printf.sprintf "objdump failed (exit %d)" rc))
+    else
+      let output = read_file out_file in
+      (try Sys.remove out_file with Sys_error _ -> ());
+      extract_instructions output
+
+  let compare_instruction_lists ~section_name ~assembler ~binary_emitter =
+    let rec loop i asm be =
+      match asm, be with
+      | [], [] -> None
+      | [], _ :: _ ->
+        Some
+          (Instruction_count
+             { section_name;
+               assembler = i;
+               binary_emitter = i + List.length be
+             })
+      | _ :: _, [] ->
+        Some
+          (Instruction_count
+             { section_name;
+               assembler = i + List.length asm;
+               binary_emitter = i
+             })
+      | a :: asm_rest, b :: be_rest ->
+        if String.equal a b
+        then loop (i + 1) asm_rest be_rest
+        else
+          Some
+            (Instruction
+               { section_name; index = i; assembler = a; binary_emitter = b })
+    in
+    loop 0 assembler binary_emitter
+
+  let write_temp_bin contents =
+    let path = Filename.temp_file "caml_verify" ".bin" in
+    let oc = open_out_bin path in
+    output_string oc contents;
+    close_out oc;
+    path
+
+  let disassemble_contents contents =
+    (* [objdump -D -b binary] exits with status 1 on a zero-byte file. Empty
+       sections are legitimate (e.g. [.note.GNU-stack], or [code_end]/empty
+       jump-tables under [-function-sections]), so short-circuit instead of
+       invoking objdump. *)
+    if String.length contents = 0
+    then Result.Ok []
+    else
+      let bin_path = write_temp_bin contents in
+      let result = disassemble bin_path in
+      (try Sys.remove bin_path with Sys_error _ -> ());
+      result
+
+  let compare_sections ~section_name ~expected ~actual =
+    match disassemble_contents expected, disassemble_contents actual with
+    | Result.Error e, _ | _, Result.Error e -> Some (Error e)
+    | Result.Ok be_instrs, Result.Ok asm_instrs ->
+      Option.map
+        (fun m -> Mismatch m)
+        (compare_instruction_lists ~section_name ~assembler:asm_instrs
+           ~binary_emitter:be_instrs)
+end
+
+let byte_mismatch ~section_name ~expected ~actual byte_offset =
+  let instruction_offset =
+    if is_text_section section_name
+    then Some (align_to_instruction byte_offset)
+    else None
+  in
+  let display_offset = Option.value instruction_offset ~default:byte_offset in
+  Section_content
+    { section_name;
+      byte_offset;
+      instruction_offset;
+      expected = hex_dump expected display_offset;
+      actual = hex_dump actual display_offset;
+      expected_size = String.length expected;
+      actual_size = String.length actual
+    }
+
+(* Returns [result option]: [None] means match, [Some r] means mismatch or
+   error. *)
+let compare_section ~comparison_mode ~section_name ~expected ~actual =
   let expected_size = String.length expected in
   let actual_size = String.length actual in
   if expected_size <> actual_size
   then
     Some
-      (Section_size
-         { section_name; expected = expected_size; actual = actual_size })
+      (Mismatch
+         (Section_size
+            { section_name; expected = expected_size; actual = actual_size }))
   else
-    match find_first_difference expected actual with
-    | None -> None
-    | Some byte_offset ->
-      let instruction_offset =
-        if is_text_section section_name
-        then Some (align_to_instruction byte_offset)
-        else None
-      in
-      let display_offset =
-        Option.value instruction_offset ~default:byte_offset
-      in
-      Some
-        (Section_content
-           { section_name;
-             byte_offset;
-             instruction_offset;
-             expected = hex_dump expected display_offset;
-             actual = hex_dump actual display_offset;
-             expected_size;
-             actual_size
-           })
+    match comparison_mode with
+    | Disassembly when is_text_section section_name ->
+      Disassembly.compare_sections ~section_name ~expected ~actual
+    | Exact | Disassembly -> (
+      match find_first_difference expected actual with
+      | None -> None
+      | Some byte_offset ->
+        Some
+          (Mismatch (byte_mismatch ~section_name ~expected ~actual byte_offset))
+      )
 
-let compare_sections ~expected ~actual =
+let compare_sections ~comparison_mode ~expected ~actual =
   let actual_map = Hashtbl.create (List.length actual) in
   List.iter (fun (name, content) -> Hashtbl.add actual_map name content) actual;
   let expected_map = Hashtbl.create (List.length expected) in
@@ -244,14 +429,16 @@ let compare_sections ~expected ~actual =
     | [] -> None
     | (name, expected) :: rest -> (
       match Hashtbl.find_opt actual_map name with
-      | None -> Some (Missing_section (name ^ " (in object file)"))
+      | None -> Some (Mismatch (Missing_section (name ^ " (in object file)")))
       | Some actual -> (
-        match compare_section ~section_name:name ~expected ~actual with
-        | Some mismatch -> Some mismatch
+        match
+          compare_section ~comparison_mode ~section_name:name ~expected ~actual
+        with
+        | Some _ as r -> r
         | None -> check_expected rest))
   in
   match check_expected expected with
-  | Some _ as mismatch -> mismatch
+  | Some _ as r -> r
   | None -> (
     (* Check for sections in actual that are missing from expected *)
     let extra_in_actual =
@@ -261,7 +448,7 @@ let compare_sections ~expected ~actual =
     in
     match extra_in_actual with
     | Some (name, _) ->
-      Some (Missing_section (name ^ " (in binary emitter output)"))
+      Some (Mismatch (Missing_section (name ^ " (in binary emitter output)")))
     | None -> None)
 
 (* Relocation comparison *)
@@ -374,7 +561,7 @@ let compare_section_relocations ~expected ~actual =
 
 (* Main comparison *)
 
-let compare unix ~obj_file ~binary_sections_dir =
+let compare ~comparison_mode unix ~obj_file ~binary_sections_dir =
   if not (Sys.file_exists binary_sections_dir)
   then Mismatch (Missing_binary_sections_dir binary_sections_dir)
   else if not (Sys.is_directory binary_sections_dir)
@@ -399,64 +586,74 @@ let compare unix ~obj_file ~binary_sections_dir =
         ( (match be_opt with Some s -> [".text", s] | None -> []),
           match asm_opt with Some s -> [".text", s] | None -> [] ))
     in
-    (* Normalize text relocations to (name, relocs) list *)
-    let be_text_relocs, asm_text_relocs =
-      match be_text with
-      | Function_sections _ ->
-        ( read_text_relocations binary_sections_dir ~include_main_text:true,
-          Owee_object.extract_individual_text_relocations buf )
-      | No_function_sections _ ->
-        ( [".text", read_relocations binary_sections_dir "text"],
-          [".text", Owee_object.extract_text_relocations buf] )
-    in
     (* Compare text sections *)
     let text_result =
-      compare_sections ~expected:be_text_list ~actual:asm_text_list
+      compare_sections ~comparison_mode ~expected:be_text_list
+        ~actual:asm_text_list
     in
     match text_result with
-    | Some m -> Mismatch m
+    | Some r -> r
     | None -> (
       (* Compare data section *)
       let data_result =
         match be_data, asm_data with
         | Some expected, Some actual ->
-          compare_section ~section_name:"data" ~expected ~actual
+          compare_section ~comparison_mode ~section_name:"data" ~expected
+            ~actual
         | None, None -> None
-        | Some _, None -> Some (Missing_section "data (in object file)")
+        | Some _, None ->
+          Some (Mismatch (Missing_section "data (in object file)"))
         | None, Some _ ->
-          Some (Missing_section "data (in binary emitter output)")
+          Some (Mismatch (Missing_section "data (in binary emitter output)"))
       in
       match data_result with
-      | Some m -> Mismatch m
+      | Some r -> r
       | None -> (
-        (* Compare text relocations *)
-        let text_reloc_result =
-          compare_section_relocations ~expected:be_text_relocs
-            ~actual:asm_text_relocs
+        let text_size =
+          List.fold_left
+            (fun acc (_, c) -> acc + String.length c)
+            0 be_text_list
         in
-        match text_reloc_result with
-        | Some m -> Mismatch m
-        | None -> (
-          (* Compare data relocations *)
-          let be_data_relocs =
-            [".data", read_relocations binary_sections_dir "data"]
+        let data_size = Option.fold ~none:0 ~some:String.length be_data in
+        match comparison_mode with
+        | Disassembly ->
+          (* Disassembly mode is instruction-stream-only for text sections. It
+             intentionally skips relocation checks, including data relocations,
+             because relocation differences are not represented in raw-binary
+             objdump output. *)
+          Match { text_size; data_size }
+        | Exact -> (
+          (* Normalize text relocations to (name, relocs) list *)
+          let be_text_relocs, asm_text_relocs =
+            match be_text with
+            | Function_sections _ ->
+              ( read_text_relocations binary_sections_dir ~include_main_text:true,
+                Owee_object.extract_individual_text_relocations buf )
+            | No_function_sections _ ->
+              ( [".text", read_relocations binary_sections_dir "text"],
+                [".text", Owee_object.extract_text_relocations buf] )
           in
-          let asm_data_relocs =
-            [".data", Owee_object.extract_data_relocations buf]
+          (* Compare text relocations *)
+          let text_reloc_result =
+            compare_section_relocations ~expected:be_text_relocs
+              ~actual:asm_text_relocs
           in
-          match
-            compare_section_relocations ~expected:be_data_relocs
-              ~actual:asm_data_relocs
-          with
+          match text_reloc_result with
           | Some m -> Mismatch m
-          | None ->
-            let text_size =
-              List.fold_left
-                (fun acc (_, c) -> acc + String.length c)
-                0 be_text_list
+          | None -> (
+            (* Compare data relocations *)
+            let be_data_relocs =
+              [".data", read_relocations binary_sections_dir "data"]
             in
-            let data_size = Option.fold ~none:0 ~some:String.length be_data in
-            Match { text_size; data_size })))
+            let asm_data_relocs =
+              [".data", Owee_object.extract_data_relocations buf]
+            in
+            match
+              compare_section_relocations ~expected:be_data_relocs
+                ~actual:asm_data_relocs
+            with
+            | Some m -> Mismatch m
+            | None -> Match { text_size; data_size }))))
 
 let print_result ppf = function
   | Match { text_size; data_size } ->
@@ -501,6 +698,24 @@ let print_result ppf = function
        Assembler:      %s@,\
        Binary emitter: %s@]@."
       r.section_name r.offset r.actual r.expected
+  | Mismatch (Instruction m) ->
+    Format.fprintf ppf
+      "@[<v>Binary emitter verification FAILED@,\
+       @,\
+       Section: %s@,\
+       Instruction #%d:@,\
+      \  Assembler:      %s@,\
+      \  Binary emitter: %s@]@."
+      m.section_name m.index m.assembler m.binary_emitter
+  | Mismatch (Instruction_count m) ->
+    Format.fprintf ppf
+      "@[<v>Binary emitter verification FAILED@,\
+       @,\
+       Section: %s@,\
+       Instruction count mismatch:@,\
+      \  Assembler:      %d instructions@,\
+      \  Binary emitter: %d instructions@]@."
+      m.section_name m.assembler m.binary_emitter
   | Mismatch (Missing_section name) ->
     Format.fprintf ppf
       "@[<v>Binary emitter verification FAILED@,@,Missing section: %s@]@." name
@@ -517,6 +732,9 @@ let print_result ppf = function
        @,\
        Error reading object file: %s@]@."
       msg
+  | Error msg ->
+    Format.fprintf ppf
+      "@[<v>Binary emitter verification FAILED@,@,Error: %s@]@." msg
 
 module For_testing = struct
   let extract_text_sections buf =
@@ -551,30 +769,30 @@ module For_testing = struct
     let actual_text_relocs = extract_text_relocs actual_buf in
     (* Compare text sections *)
     match
-      compare_sections ~expected:expected_text_list ~actual:actual_text_list
+      compare_sections ~comparison_mode:Exact ~expected:expected_text_list
+        ~actual:actual_text_list
     with
-    | Some m -> Mismatch m
+    | Some r -> r
     | None -> (
       (* Compare data section *)
       let data_result =
         match expected_data, actual_data with
         | Some expected, Some actual ->
-          compare_section ~section_name:"data" ~expected ~actual
+          compare_section ~comparison_mode:Exact ~section_name:"data" ~expected
+            ~actual
         | None, None -> None
-        | Some _, None -> Some (Missing_section "data (in actual)")
-        | None, Some _ -> Some (Missing_section "data (in expected)")
+        | Some _, None -> Some (Mismatch (Missing_section "data (in actual)"))
+        | None, Some _ -> Some (Mismatch (Missing_section "data (in expected)"))
       in
       match data_result with
-      | Some m -> Mismatch m
+      | Some r -> r
       | None -> (
-        (* Compare text relocations *)
         match
           compare_section_relocations ~expected:expected_text_relocs
             ~actual:actual_text_relocs
         with
         | Some m -> Mismatch m
         | None -> (
-          (* Compare data relocations *)
           let expected_data_relocs =
             [".data", Owee_object.extract_data_relocations expected_buf]
           in
