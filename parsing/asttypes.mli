@@ -72,23 +72,4 @@ type injectivity =
   | Injective
   | NoInjectivity
 
-<<<<<<< HEAD
-type index_kind =
-  | Index_int
-  | Index_unboxed_int64
-  | Index_unboxed_int32
-  | Index_unboxed_int16
-  | Index_unboxed_int8
-  | Index_unboxed_nativeint
-
 val string_of_label: arg_label -> string
-||||||| 5.2.0minus-31
-type index_kind =
-  | Index_int
-  | Index_unboxed_int64
-  | Index_unboxed_int32
-  | Index_unboxed_int16
-  | Index_unboxed_int8
-  | Index_unboxed_nativeint
-=======
->>>>>>> 5.2.0minus-37

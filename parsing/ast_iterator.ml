@@ -327,29 +327,17 @@ module MT = struct
     | Pwith_module (lid, lid2) ->
         iter_loc_lid sub lid; iter_loc_lid sub lid2
     | Pwith_modtype (lid, mty) ->
-<<<<<<< HEAD
         iter_loc_lid sub lid; sub.module_type sub mty
-||||||| 5.2.0minus-31
-        iter_loc sub lid; sub.module_type sub mty
-=======
-        iter_loc sub lid; sub.module_type sub mty
     | Pwith_jkind (lid, d) ->
         iter_loc sub lid; sub.jkind_declaration sub d
->>>>>>> 5.2.0minus-37
     | Pwith_typesubst (lid, d) ->
         iter_loc_lid sub lid; sub.type_declaration sub d
     | Pwith_modsubst (s, lid) ->
         iter_loc_lid sub s; iter_loc_lid sub lid
     | Pwith_modtypesubst (lid, mty) ->
-<<<<<<< HEAD
         iter_loc_lid sub lid; sub.module_type sub mty
-||||||| 5.2.0minus-31
-        iter_loc sub lid; sub.module_type sub mty
-=======
-        iter_loc sub lid; sub.module_type sub mty
     | Pwith_jkindsubst (lid, d) ->
         iter_loc sub lid; sub.jkind_declaration sub d
->>>>>>> 5.2.0minus-37
 
   let iter_signature_item sub {psig_desc = desc; psig_loc = loc} =
     sub.location sub loc;
@@ -492,15 +480,7 @@ module E = struct
         sub.attributes sub attrs
 
   let iter_block_access sub = function
-<<<<<<< HEAD
     | Baccess_field lid -> iter_loc_lid sub lid
-    | Baccess_array (_, _, index) -> sub.expr sub index
-||||||| 5.2.0minus-31
-    | Baccess_field lid -> iter_loc sub lid
-    | Baccess_array (_, _, index) -> sub.expr sub index
-=======
-    | Baccess_field lid -> iter_loc sub lid
->>>>>>> 5.2.0minus-37
     | Baccess_block (_, idx) -> sub.expr sub idx
 
   let iter_unboxed_access sub = function

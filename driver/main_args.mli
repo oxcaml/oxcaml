@@ -22,13 +22,9 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
-<<<<<<< HEAD
   val _i_variance : unit -> unit
-||||||| 5.2.0minus-31
-=======
   val _ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
->>>>>>> 5.2.0minus-37
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
