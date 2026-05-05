@@ -502,8 +502,11 @@ val add_signature_lazy: Subst.Lazy.signature_item list -> t -> t
 
 (* Insertion of all fields of a signature, relative to the given path.
    Used to implement open. Returns None if the path refers to a functor,
-   not a structure. *)
+   not a structure.
+   [allow_hidden] permits resolving the path to a module reachable only
+   via [-H] / [-H-manifest]; intended for command-line [-open] flags. *)
 val open_signature:
+    ?allow_hidden:bool ->
     used_slot:bool ref ->
     loc:Location.t -> toplevel:bool ->
     Asttypes.override_flag -> Longident.t Location.loc ->
