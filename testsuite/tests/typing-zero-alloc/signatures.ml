@@ -614,6 +614,11 @@ Error: Signature mismatch:
        Here the former is 1 and the latter is 2.
 |}]
 
+module type S_with_newtype = sig
+  type 'a t
+  val[@zero_alloc] f : 'a. 'a t -> int -> 'a
+end
+
 module type S_alias_explicit_arity_1 = sig
   val[@zero_alloc arity 1] f : t_two_args
 end
@@ -622,12 +627,14 @@ module M_bad_explicit_arity_1 : S_alias_explicit_arity_1 = struct
   let[@zero_alloc] f x y = x + y
 end
 [%%expect{|
+module type S_with_newtype =
+  sig type 'a t val f : 'a t -> int -> 'a [@@zero_alloc] end
 module type S_alias_explicit_arity_1 =
   sig val f : t_two_args [@@zero_alloc arity 1] end
-Lines 5-7, characters 59-3:
-5 | ...........................................................struct
-6 |   let[@zero_alloc] f x y = x + y
-7 | end
+Lines 10-12, characters 59-3:
+10 | ...........................................................struct
+11 |   let[@zero_alloc] f x y = x + y
+12 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : int -> int -> int [@@zero_alloc] end
@@ -642,6 +649,14 @@ Error: Signature mismatch:
        syntactic arity of the implementation must match the function type in
        the interface.
        Here the former is 2 and the latter is 1.
+|}]
+
+module M : S_with_newtype = struct
+  type 'a t = 'a list
+  let[@zero_alloc] f (type a) l n : a = List.nth l n
+end
+[%%expect {|
+module M : S_with_newtype
 |}]
 
 module M_good_explicit_arity_1 : S_alias_explicit_arity_1 = struct

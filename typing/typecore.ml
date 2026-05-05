@@ -10883,8 +10883,16 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let rec arity_of_fun sexp =
     match sexp.pexp_desc with
     | Pexp_function (params, _, body) ->
-      ((match body with | Pfunction_body _ -> 0 | Pfunction_cases _ -> 1) +
-       List.length params)
+      let n_value_params =
+        List.length
+          (List.filter
+             (fun p -> match p.pparam_desc with
+               | Pparam_val _ -> true
+               | Pparam_newtype _ -> false)
+             params)
+      in
+      (match body with | Pfunction_body _ -> 0 | Pfunction_cases _ -> 1) +
+      n_value_params
     | Pexp_constraint (e, _, _)
     | Pexp_newtype (_, _, e) -> arity_of_fun e
     (* function is only ever invoked if sexp_is_fun is true *)
@@ -11030,7 +11038,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         let exp_env =
           if is_recursive then
             let pvs_no_za =
-              List.map (fun pv -> { pv with pv_zero_alloc = Zero_alloc.default }) pvs
+              List.map
+                (fun pv -> { pv with pv_zero_alloc = Zero_alloc.default }) pvs
             in
             add_module_variables
               (add_pattern_variables env_before_pvs pvs_no_za)
