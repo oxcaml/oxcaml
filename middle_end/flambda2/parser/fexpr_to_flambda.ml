@@ -595,6 +595,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             params_and_body;
             code_size;
             is_tupled;
+            stub;
             loopify;
             result_mode
           } ->
@@ -713,7 +714,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           Code.create code_id ~params_and_body ~free_names_of_params_and_body
             ~newer_version_of ~params_arity ~param_modes
             ~first_complex_local_param:(Flambda_arity.num_params params_arity)
-            ~result_arity ~result_types:Unknown ~result_mode ~stub:false ~inline
+            ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
             ~is_a_functor:false ~is_opaque:false ~recursive
