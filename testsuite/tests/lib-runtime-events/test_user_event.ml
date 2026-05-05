@@ -55,23 +55,23 @@ let got_span_end = ref false
 let counter_value = ref 0
 let custom_value = ref ""
 
-let event_handler domain_id ts e () =
+let event_handler _domain_id _ts e () _perf =
   match User.tag e with
   | Libname -> got_event := true
   | _ -> ()
 
-let counter_handler domain_id ts e v =
+let counter_handler _domain_id _ts e v _perf =
   match User.tag e with
   | Counters 2 -> counter_value := v
   | _ -> ()
 
-let span_handler domain_id ts e v =
+let span_handler _domain_id _ts e v _perf =
   match User.tag e with
   | Libname when v = Type.Begin -> got_span_begin := true
   | Libname when v = Type.End -> got_span_end := true
   | _ -> ()
 
-let custom_handler domain_id ts e v =
+let custom_handler _domain_id _ts e v _perf =
   match User.tag e with
   | Libname -> custom_value := v
   | _ -> ()

@@ -13,7 +13,7 @@ open Runtime_events
 
 exception Test_exception
 
-let runtime_begin domain_id ts phase =
+let runtime_begin domain_id ts phase _perf_samples =
     match phase with
     | EV_MINOR ->
       raise Test_exception

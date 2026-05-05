@@ -189,6 +189,10 @@ val runtime_phase_name : runtime_phase -> string
 val runtime_counter_name : runtime_counter -> string
 (** Return a string representation of a given runtime counter type. *)
 
+type perf_sample = #{ config: int64#; value: int64# }
+(** An unboxed record containing a performance counter configuration ID
+    and its corresponding counter value. *)
+
 type cursor
 (** Type of the cursor used when consuming. *)
 
@@ -258,10 +262,10 @@ module Callbacks : sig
   type t
   (** Type of callbacks. *)
 
-  val create : ?runtime_begin:(int -> Timestamp.t -> runtime_phase
-                                -> unit) ->
-             ?runtime_end:(int -> Timestamp.t -> runtime_phase
-                                -> unit) ->
+  val create : ?runtime_begin:(int -> Timestamp.t -> runtime_phase ->
+                                local_ perf_sample array -> unit) ->
+             ?runtime_end:(int -> Timestamp.t -> runtime_phase ->
+                            local_ perf_sample array -> unit) ->
              ?runtime_counter:(int -> Timestamp.t -> runtime_counter
                                 -> int -> unit) ->
              ?alloc:(int -> Timestamp.t -> int array -> unit) ->
@@ -274,9 +278,13 @@ module Callbacks : sig
       existence. After a domain terminates, a newly spawned domain may take
       ownership of the ring buffer. A [runtime_begin] callback is called when
       the runtime enters a new phase (e.g a runtime_begin with EV_MINOR is
-      called at the start of a minor GC). A [runtime_end] callback is called
-      when the runtime leaves a certain phase. The [runtime_counter] callback
-      is called when a counter is emitted by the runtime. [lifecycle] callbacks
+      called at the start of a minor GC). The [runtime_begin] callback receives
+      an array of [perf_sample] unboxed records, each containing a performance
+      counter configuration ID and its corresponding counter value. The array
+      will be empty if no performance counters are available. A [runtime_end]
+      callback is called when the runtime leaves a certain phase and receives
+      the same [perf_sample] array format. The [runtime_counter] callback is
+      called when a counter is emitted by the runtime. [lifecycle] callbacks
       are called when the ring undergoes a change in lifecycle and a consumer
       may need to respond. [alloc] callbacks are currently only called on the
       instrumented runtime. [lost_events] callbacks are called if the consumer
@@ -284,11 +292,15 @@ module Callbacks : sig
       *)
 
   val add_user_event : 'a Type.t ->
-                        (int -> Timestamp.t -> 'a User.t -> 'a -> unit) ->
+                        (int -> Timestamp.t -> 'a User.t -> 'a ->
+                         local_ perf_sample array -> unit) ->
                         t -> t
   (** [add_user_event ty callback t] extends [t] to additionally subscribe to
       user events of type [ty]. When such an event happens, [callback] is called
-      with the corresponding event and payload. *)
+      with the corresponding event, payload, and an array of [perf_sample]
+      unboxed records containing performance counter data. The array will be
+      non-empty only for span events when performance counters are configured
+      via the [OCAML_RUNTIME_EVENTS_PERF_COUNTERS] environment variable. *)
 end
 
 val start : unit -> unit
@@ -314,6 +326,15 @@ val resume : unit -> unit
    Traces are collected if the program has called [Runtime_events.start ()] or
    the OCAML_RUNTIME_EVENTS_START environment variable has been set.
 *)
+
+val perf_counters_active : unit -> bool
+(** [perf_counters_active ()] returns [true] if hardware performance counters
+   are currently being sampled alongside runtime and user span events. This
+   requires a build with Linux x86-64 PMC support (see
+   {!Config.perf_counters_supported}), a valid
+   [OCAML_RUNTIME_EVENTS_PERF_COUNTERS] configuration, and a successful
+   [perf_event_open]/rdpmc setup by the runtime. Returns [false]
+   otherwise. *)
 
 val create_cursor : (string * int) option -> cursor
 (** [create_cursor path_pid] creates a cursor to read from an runtime_events.

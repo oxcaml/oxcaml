@@ -42,7 +42,7 @@ let in_minor = ref false
 let majors = ref 0
 let minors = ref 0
 
-let runtime_begin domain_id ts phase =
+let runtime_begin domain_id ts phase _perf_samples =
     match phase with
     | EV_MAJOR_FINISH_CYCLE ->
         begin
@@ -56,7 +56,7 @@ let runtime_begin domain_id ts phase =
         end
     | _ -> ()
 
-let runtime_end domain_id ts phase =
+let runtime_end domain_id ts phase _perf_samples =
     match phase with
     | EV_MAJOR_FINISH_CYCLE ->
         begin

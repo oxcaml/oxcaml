@@ -49,12 +49,12 @@ let () =
   begin
   Unix.waitpid [] child_pid |> ignore;
   let cursor = create_cursor (Some (parent_cwd, child_pid)) in
-  let callback_counter _ _ ev v =
+  let callback_counter _ _ ev v _perf =
     match User.tag ev with
     | Ev i -> Printf.printf "known event ev %d => %d\n" i v
     | _ -> Printf.printf "unknown event %s => %d\n" (User.name ev) v
   in
-  let callback_span _ _ ev v =
+  let callback_span _ _ ev v _perf =
     Printf.printf "span %s => %b\n" (User.name ev) (v ==  Type.Begin)
   in
   let callbacks =

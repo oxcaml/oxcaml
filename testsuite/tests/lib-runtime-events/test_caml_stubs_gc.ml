@@ -16,7 +16,7 @@ let got_minor = ref false
 let () =
     start ();
     let cursor = create_cursor None in
-    let runtime_begin domain_id ts phase =
+    let runtime_begin domain_id ts phase _perf_samples =
       match phase with
       | EV_MINOR ->
         Gc.full_major ();
