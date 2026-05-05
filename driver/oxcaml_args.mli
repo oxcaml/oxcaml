@@ -193,6 +193,7 @@ module type Oxcaml_options = sig
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val x : string -> unit
 end
 
 (** Command line arguments required for ocamlopt.*)
@@ -247,4 +248,31 @@ module Extra_params : sig
   val read_param :
     Format.formatter -> Compenv.readenv_position -> string -> string -> bool
   (** [read_param ppf pos name value] returns whether the param was handled. *)
+end
+
+module Extra_options : sig
+  (** This module allows to define new [-X] options.
+
+      [-X] options can be passed on the command line as [-X name=value], and
+      from the [OCAMLPARAM] environment variable as [Xname=value].
+
+      {b Note}: [-X] options are intended for internal use only. They are not
+      documented in the output of [--help] and may be removed without notice. *)
+
+  val string : string -> string -> string -> unit -> string
+  (** [string __LOC__ name default] defines a new extra option which accepts
+      arbitrary strings. *)
+
+  val int : string -> string -> int -> unit -> int
+  (** [int __LOC__ name default] defines a new extra option which accepts only
+      integers. *)
+
+  val bool : string -> string -> unit -> bool
+  (** [bool __LOC__ name] defines a new extra option which accepts booleans
+      written as the integers '0' and '1'. *)
+
+  val symbol : string -> string -> 'a -> (string * 'a) list -> unit -> 'a
+  (** [symbol __LOC__ name default spec] defines a new extra option which
+      accepts only the strings in [spec] and associates them with the
+      corresponding value. *)
 end
