@@ -101,6 +101,8 @@ let classify_field_map fields =
 type rewrite_context =
   { db : Datalog.database;
     unboxing : UA.result;
+    (* All the sets of closures defined in the current compilation unit that
+       have a given function slot *)
     sets_of_closures_by_function_slot :
       (Code_id_or_name.t * Code_id.t Or_unknown.t) Function_slot.Map.t list
       Function_slot.Map.t
@@ -475,12 +477,11 @@ module Rewriter = struct
     let usages_of_t0 x =
       match x with
       | No_source | At_least_one_source_no_usages -> assert false
-      | Single_source source ->
-        if PTA.any_usage db source
-        then None
-        else
-          Some
-            (PTA.get_direct_usages db (Code_id_or_name.Map.singleton source ()))
+      | Single_source source -> (
+        match PTA.get_usages db source with
+        | Unknown -> None
+        | Ok usages -> Some usages
+        | Bottom -> Some (PTA.Usages Code_id_or_name.Map.empty))
       | Many_sources_any_usage -> None
       | Many_sources_usages usages -> Some usages
     in
@@ -567,13 +568,13 @@ module Rewriter = struct
           | Bottom -> Never_called))
       set_of_closures
 
-  (* XXX expose ptree function *)
-  let subset_domain m1 m2 =
-    Code_id_or_name.Map.for_all (fun x _ -> Code_id_or_name.Map.mem x m2) m1
+  type must_be_local =
+    | Must_be_local
+    | Can_be_external
 
   let refine_sets_of_closures context t0 current_function_slot
-      code_ids_of_function_slots ~closure_must_be_local =
-    let check_one_set_of_closures set_of_closures =
+      code_ids_of_function_slots ~must_be_local =
+    let can_be_source_for_this_type set_of_closures =
       Function_slot.Map.for_all
         (fun function_slot code_id_in_types ->
           match Function_slot.Map.find_opt function_slot set_of_closures with
@@ -589,7 +590,7 @@ module Rewriter = struct
         code_ids_of_function_slots
     in
     let candidates =
-      List.filter check_one_set_of_closures
+      List.filter can_be_source_for_this_type
         (match
            Function_slot.Map.find_opt current_function_slot
              context.sets_of_closures_by_function_slot
@@ -597,34 +598,47 @@ module Rewriter = struct
         | None -> []
         | Some l -> l)
     in
-    let[@local] for_sources sources =
-      let check_one set_of_closures =
-        let name, _ =
-          Function_slot.Map.find current_function_slot set_of_closures
-        in
-        Code_id_or_name.Map.mem name sources
-      in
-      List.filter check_one candidates, false
+    let get_source_of_current_function_slot set_of_closures =
+      match
+        Function_slot.Map.find_opt current_function_slot set_of_closures
+      with
+      | None ->
+        Misc.fatal_errorf
+          "In [refine_sets_of_closures], missing function slot %a in set of \
+           closures"
+          Function_slot.print current_function_slot
+      | Some (source, _) -> source
     in
-    let[@local] for_any_source usages_or_top =
-      let check_one set_of_closures =
-        let name, _ =
-          Function_slot.Map.find current_function_slot set_of_closures
+    let[@local] for_known_sources sources =
+      let must_be_erased set_of_closures =
+        let candidate_source =
+          get_source_of_current_function_slot set_of_closures
         in
-        PTA.any_usage context.db name
+        Code_id_or_name.Map.mem candidate_source sources
+      in
+      List.filter must_be_erased candidates, Must_be_local
+    in
+    let[@local] for_any_source_with_usages usages_or_top =
+      let must_be_erased set_of_closures =
+        let candidate_source =
+          get_source_of_current_function_slot set_of_closures
+        in
+        (* Check that the uses of [candidate_source] are larger than the uses we
+           are considering. If not, this cannot be a possible source. *)
+        PTA.any_usage context.db candidate_source
         ||
         match usages_or_top with
         | None -> false
         | Some (PTA.Usages usages) ->
           let (PTA.Usages usages_of_name) =
             PTA.get_direct_usages context.db
-              (Code_id_or_name.Map.singleton name ())
+              (Code_id_or_name.Map.singleton candidate_source ())
           in
-          subset_domain usages usages_of_name
+          Code_id_or_name.Map.subset_domain usages usages_of_name
       in
       (* find all allowed sets of closures with code_ids that are
          newer_version_of and for which check_usages is ok *)
-      List.filter check_one candidates, not closure_must_be_local
+      List.filter must_be_erased candidates, must_be_local
     in
     match t0 with
     | No_source ->
@@ -637,8 +651,9 @@ module Rewriter = struct
         "Unexpected [At_least_one_source_no_usages] usages in \
          [uses_for_set_of_closures] for function slot %a"
         Function_slot.print current_function_slot
-    | Many_sources_any_usage -> for_any_source None
+    | Many_sources_any_usage -> for_any_source_with_usages None
     | Many_sources_usages (Usages s) ->
+      (* Try to recover sources from usages *)
       let usages_sources =
         Code_id_or_name.Map.filter_map
           (fun usage () ->
@@ -653,12 +668,58 @@ module Rewriter = struct
       if Code_id_or_name.Map.is_empty usages_sources
       then
         (* Every usage is [any_source] *)
-        for_any_source (Some (Usages s))
+        for_any_source_with_usages (Some (Usages s))
       else
         let possible_sources = inter_many usages_sources in
-        for_sources possible_sources
+        for_known_sources possible_sources
     | Single_source source ->
-      for_sources (Code_id_or_name.Map.singleton source ())
+      for_known_sources (Code_id_or_name.Map.singleton source ())
+
+  let get_set_of_closures_changed_representation context set_of_closures =
+    if
+      Function_slot.Map.exists
+        (fun _ (clos, _code_id) ->
+          Code_id_or_name.Map.mem clos context.unboxing.changed_representation)
+        set_of_closures
+    then (
+      assert (
+        Function_slot.Map.for_all
+          (fun _ (clos, _code_id) ->
+            Code_id_or_name.Map.mem clos context.unboxing.changed_representation)
+          set_of_closures);
+      let changed_representation =
+        List.map
+          (fun (_, (clos, _code_id)) ->
+            let repr, clos' =
+              Code_id_or_name.Map.find clos
+                context.unboxing.changed_representation
+            in
+            assert (Code_id_or_name.equal clos clos');
+            repr)
+          (Function_slot.Map.bindings set_of_closures)
+      in
+      let value_slots_reprs, function_slots_reprs =
+        match List.hd changed_representation with
+        | Closure_representation (value_slots_reprs, function_slots_reprs, _) ->
+          value_slots_reprs, function_slots_reprs
+        | Block_representation _ ->
+          Misc.fatal_errorf
+            "Changed representation of a closure with [Block_representation]"
+      in
+      List.iter
+        (function
+          | UA.Closure_representation (vs, fs, _) ->
+            if vs != value_slots_reprs || fs != function_slots_reprs
+            then
+              Misc.fatal_errorf
+                "In set of closures, all closures do not have the same \
+                 representation changes."
+          | UA.Block_representation _ ->
+            Misc.fatal_errorf
+              "Changed representation of a closure with [Block_representation]")
+        changed_representation;
+      Some (value_slots_reprs, function_slots_reprs))
+    else None
 
   let rewrite (context, usages) typing_env flambda_type =
     let open Flambda2_types.Rewriter in
@@ -737,82 +798,35 @@ module Rewriter = struct
               (Value_slot.Map.keys value_slot_types)
               Function_slot.Set.print
               (Function_slot.Map.keys function_slot_types);
-        let closure_must_be_local =
-          has_local_fields
-          || Function_slot.Map.exists
-               (fun _ code_id ->
-                 match code_id with
-                 | Or_unknown.Unknown -> false
-                 | Or_unknown.Known code_id ->
-                   Compilation_unit.is_current
-                     (Code_id.get_compilation_unit code_id))
-               code_id_of_function_slots
+        let must_be_local =
+          if
+            has_local_fields
+            || Function_slot.Map.exists
+                 (fun _ code_id ->
+                   match code_id with
+                   | Or_unknown.Unknown -> false
+                   | Or_unknown.Known code_id ->
+                     Compilation_unit.is_current
+                       (Code_id.get_compilation_unit code_id))
+                 code_id_of_function_slots
+          then Must_be_local
+          else Can_be_external
         in
         (* refine *)
-        let local_sets_of_closures, can_have_external_sources =
+        let local_sets_of_closures, must_be_local =
           refine_sets_of_closures context usages current_function_slot
-            code_id_of_function_slots ~closure_must_be_local
-        in
-        let get_set_of_closures_changed_representation set_of_closures =
-          if
-            Function_slot.Map.exists
-              (fun _ (clos, _code_id) ->
-                Code_id_or_name.Map.mem clos
-                  context.unboxing.changed_representation)
-              set_of_closures
-          then (
-            assert (
-              Function_slot.Map.for_all
-                (fun _ (clos, _code_id) ->
-                  Code_id_or_name.Map.mem clos
-                    context.unboxing.changed_representation)
-                set_of_closures);
-            let changed_representation =
-              List.map
-                (fun (_, (clos, _code_id)) ->
-                  let repr, clos' =
-                    Code_id_or_name.Map.find clos
-                      context.unboxing.changed_representation
-                  in
-                  assert (Code_id_or_name.equal clos clos');
-                  repr)
-                (Function_slot.Map.bindings set_of_closures)
-            in
-            let value_slots_reprs, function_slots_reprs =
-              match List.hd changed_representation with
-              | Closure_representation
-                  (value_slots_reprs, function_slots_reprs, _) ->
-                value_slots_reprs, function_slots_reprs
-              | Block_representation _ ->
-                Misc.fatal_errorf
-                  "Changed representation of a closure with \
-                   [Block_representation]"
-            in
-            List.iter
-              (function
-                | UA.Closure_representation (vs, fs, _) ->
-                  if vs != value_slots_reprs || fs != function_slots_reprs
-                  then
-                    Misc.fatal_errorf
-                      "In set of closures, all closures do not have the same \
-                       representation changes."
-                | UA.Block_representation _ ->
-                  Misc.fatal_errorf
-                    "Changed representation of a closure with \
-                     [Block_representation]")
-              changed_representation;
-            Some (value_slots_reprs, function_slots_reprs))
-          else None
+            code_id_of_function_slots ~must_be_local
         in
         let all_changed_representation =
-          List.map get_set_of_closures_changed_representation
+          List.map
+            (get_set_of_closures_changed_representation context)
             local_sets_of_closures
         in
         if List.for_all Option.is_none all_changed_representation
         then begin
           (* No set of closures changed representation. We can keep the shape of
              the type, but might need to delete some value slots. *)
-          let for_local_sets_of_closures =
+          let from_local_sets_of_closures =
             List.filter_map
               (fun set_of_closures ->
                 let set_of_closures =
@@ -847,22 +861,26 @@ module Rewriter = struct
                              [refine_sets_of_closures]"
                             Function_slot.print function_slot
                         | Some source ->
-                          ( Single_source source,
-                            PTA.field_used context.db source
-                              Field.known_arity_call_witness
-                            || PTA.field_used context.db source
-                                 Field.unknown_arity_call_witness ))
+                          let code_id_must_be_erased =
+                            not
+                              (PTA.field_used context.db source
+                                 Field.known_arity_call_witness
+                              || PTA.field_used context.db source
+                                   Field.unknown_arity_call_witness)
+                          in
+                          Single_source source, code_id_must_be_erased)
                       function_slot_types
                   in
                   Some (value_slot_usages, function_slot_usages))
               local_sets_of_closures
           in
-          let for_external_sources =
-            if not can_have_external_sources
-            then None
-            else
+          let from_external_sources =
+            match must_be_local with
+            | Must_be_local -> None
+            | Can_be_external -> (
               (* There can be external sources, so no local slots, thus making
                  the calls to [follow_field] correct. *)
+              assert (not has_local_fields);
               let[@local] any_usage () =
                 let value_slots =
                   Value_slot.Map.map
@@ -871,7 +889,7 @@ module Rewriter = struct
                 in
                 let function_slots =
                   Function_slot.Map.map
-                    (fun _ -> Many_sources_any_usage, true)
+                    (fun _ -> Many_sources_any_usage, false)
                     function_slot_types
                 in
                 Some (value_slots, function_slots)
@@ -883,21 +901,14 @@ module Rewriter = struct
                   "While rewriting set of closures, usages was [Single_source] \
                    but [can_have_external_sources] was true."
               | Many_sources_any_usage -> any_usage ()
-              | Many_sources_usages usages ->
-                let by_function_slot =
-                  PTA.add_usages_by_function_slots
+              | Many_sources_usages usages -> (
+                match
+                  PTA.compute_usages_by_function_slots
                     ~follow_known_arity_calls:false context.db usages
                     current_function_slot
-                in
-                if
-                  Function_slot.Map.exists
-                    (fun _ (PTA.Usages usages) ->
-                      Code_id_or_name.Map.exists
-                        (fun x _ -> PTA.any_usage context.db x)
-                        usages)
-                    by_function_slot
-                then any_usage ()
-                else
+                with
+                | Unknown -> any_usage ()
+                | Known by_function_slot ->
                   let all_usages =
                     Function_slot.Map.fold
                       (fun _ (PTA.Usages x) (PTA.Usages y) ->
@@ -922,32 +933,23 @@ module Rewriter = struct
                             by_function_slot
                         with
                         | None -> None
-                        | Some usages ->
-                          let may_be_called =
-                            match
-                              Function_slot.Map.find function_slot
-                                code_id_of_function_slots
-                            with
-                            | Or_unknown.Unknown -> false
-                            | Or_unknown.Known _ -> true
-                          in
-                          Some (Many_sources_usages usages, may_be_called))
+                        | Some usages -> Some (Many_sources_usages usages, false))
                       function_slot_types
                   in
-                  Some (value_slots, function_slots)
+                  Some (value_slots, function_slots)))
           in
           if
-            List.is_empty for_local_sets_of_closures
-            && Option.is_none for_external_sources
+            List.is_empty from_local_sets_of_closures
+            && Option.is_none from_external_sources
           then
             Rule.rewrite Pattern.any
               (Expr.bottom (Flambda2_types.kind flambda_type))
           else
-            let for_everything =
-              match for_external_sources with
-              | None -> for_local_sets_of_closures
+            let from_everything =
+              match from_external_sources with
+              | None -> from_local_sets_of_closures
               | Some for_external_sources ->
-                for_external_sources :: for_local_sets_of_closures
+                for_external_sources :: from_local_sets_of_closures
             in
             let value_slots, function_slots =
               List.fold_left
@@ -960,12 +962,14 @@ module Rewriter = struct
                   in
                   let function_slots =
                     Function_slot.Map.inter
-                      (fun _ (t1, call1) (t2, call2) ->
-                        join_t0 context.db t1 t2, call1 && call2)
+                      (fun _ (t1, code_id_must_be_erased1)
+                           (t2, code_id_must_be_erased2) ->
+                        ( join_t0 context.db t1 t2,
+                          code_id_must_be_erased1 || code_id_must_be_erased2 ))
                       function_slots1 function_slots2
                   in
                   value_slots, function_slots)
-                (List.hd for_everything) (List.tl for_everything)
+                (List.hd from_everything) (List.tl from_everything)
             in
             let all_patterns = ref [] in
             let at_least_these_value_slots =
@@ -981,7 +985,7 @@ module Rewriter = struct
             in
             let at_least_these_closure_types =
               Function_slot.Map.mapi
-                (fun function_slot (metadata, _called) ->
+                (fun function_slot (metadata, _) ->
                   let v = Var.create () in
                   all_patterns
                     := Pattern.function_slot function_slot
@@ -992,8 +996,8 @@ module Rewriter = struct
             in
             let at_least_these_function_slots =
               Function_slot.Map.mapi
-                (fun function_slot (_, called) ->
-                  if not called
+                (fun function_slot (_, code_id_must_be_erased) ->
+                  if code_id_must_be_erased
                   then Or_unknown.Unknown
                   else
                     let v = Var.create () in
@@ -1020,7 +1024,10 @@ module Rewriter = struct
         end
         else if
           List.compare_length_with local_sets_of_closures 1 > 0
-          || can_have_external_sources
+          ||
+          match must_be_local with
+          | Can_be_external -> true
+          | Must_be_local -> false
         then
           (* At least one set of closures changed representation, and there are
              more than one sets of closures. They now have incompatible
