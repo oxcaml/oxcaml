@@ -147,10 +147,8 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                                     0)
                                                                 in
                                                                 (switch prim_2
-                                                                   | 0 -> 
-                                                                   k2
-                                                                   | 1 -> 
-                                                                   k
+                                                                   | 0 -> k2
+                                                                   | 1 -> k
                                                                    where 
                                                                     k2 =
                                                                     let Pfield_1 =

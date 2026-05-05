@@ -355,10 +355,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
-                                                                 | 0 -> 
-                                                                 k5
-                                                                 | 1 -> 
-                                                                 k6
+                                                                 | 0 -> k5
+                                                                 | 1 -> k6
                                                                  where 
                                                                    k6 =
                                                                    let Pmakeblock =
@@ -380,10 +378,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     (c_2, 0)
                                                                    in
                                                                    (switch prim_10
-                                                                    | 0 -> 
-                                                                    k5
-                                                                    | 1 -> 
-                                                                    k6
+                                                                    | 0 -> k5
+                                                                    | 1 -> k6
                                                                     where 
                                                                     k6 =
                                                                     let Pmakeblock =
@@ -476,10 +472,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
-                                                                 | 0 -> 
-                                                                 k4
-                                                                 | 1 -> 
-                                                                 k5
+                                                                 | 0 -> k4
+                                                                 | 1 -> k5
                                                                  where 
                                                                    k5 =
                                                                    let Pmakeblock =
@@ -501,10 +495,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     (c_2, 0)
                                                                    in
                                                                    (switch prim_10
-                                                                    | 0 -> 
-                                                                    k4
-                                                                    | 1 -> 
-                                                                    k5
+                                                                    | 0 -> k4
+                                                                    | 1 -> k5
                                                                     where 
                                                                     k5 =
                                                                     let Pmakeblock =
@@ -752,10 +744,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
-                                                                 | 0 -> 
-                                                                 k5
-                                                                 | 1 -> 
-                                                                 k6
+                                                                 | 0 -> k5
+                                                                 | 1 -> k6
                                                                  where 
                                                                    k6 =
                                                                    let Pmakeblock =
@@ -777,10 +767,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     (c_2, 0)
                                                                    in
                                                                    (switch prim_10
-                                                                    | 0 -> 
-                                                                    k5
-                                                                    | 1 -> 
-                                                                    k6
+                                                                    | 0 -> k5
+                                                                    | 1 -> k6
                                                                     where 
                                                                     k6 =
                                                                     let Pmakeblock =
@@ -873,10 +861,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
-                                                                 | 0 -> 
-                                                                 k4
-                                                                 | 1 -> 
-                                                                 k5
+                                                                 | 0 -> k4
+                                                                 | 1 -> k5
                                                                  where 
                                                                    k5 =
                                                                    let Pmakeblock =
@@ -898,10 +884,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     (c_2, 0)
                                                                    in
                                                                    (switch prim_10
-                                                                    | 0 -> 
-                                                                    k4
-                                                                    | 1 -> 
-                                                                    k5
+                                                                    | 0 -> k4
+                                                                    | 1 -> k5
                                                                     where 
                                                                     k5 =
                                                                     let Pmakeblock =

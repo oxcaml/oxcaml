@@ -450,16 +450,12 @@ let trap_action ppf = function
       (pp_option ~space:After raise_kind)
       rk continuation exn_handler
 
-let apply_cont ppf (ac : Fexpr.apply_cont) =
-  match ac with
-  | { cont; trap_action = action; args } ->
-    Format.fprintf ppf "@[<hv2>%a%a%a@]" continuation cont
-      (pp_option ~space:Before trap_action)
-      action
-      (simple_args ~space:Before ~omit_if_empty:true)
-      args
-
-let switch_case ppf (v, c) = Format.fprintf ppf "@;| %i -> %a" v apply_cont c
+let apply_cont ppf ({ cont; trap_action = action; args } : Fexpr.apply_cont) =
+  Format.fprintf ppf "@[<hv2>%a%a%a@]" continuation cont
+    (pp_option ~space:Before trap_action)
+    action
+    (simple_args ~space:Before ~omit_if_empty:true)
+    args
 
 let value_slots expr_or_static ppf = function
   | None -> ()
@@ -640,6 +636,26 @@ let rec expr scope ppf = function
       func_name_with_optional_arities (func, arities)
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
+
+(* CR keryan/bclement: Printing inlined goto only occurs when reprinting parsed
+   fexpr, conversion to and from flambda does not preserve this.
+
+   To do so without breaking scoping, it requires three properties to inline:
+   single use goto, last one declared yet to be inlined, no let expression
+   between declaration and use.
+
+   We could use a stack of declared single use gotos to preserve scoping order,
+   droping it when meeting lets or out of order use. But since a switch is
+   almost always preceded by a get_tag of is_int, we would never inline in
+   practice, except for converted inlining written by hand (which does add let
+   conts right above switches). We deem this not worth the effort for now. *)
+and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
+  match ac with
+  | Named_cont ac -> apply_cont ppf ac
+  | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
+
+and switch_case ppf (v, c) =
+  Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
 
 and let_expr scope ppf : let_ -> unit = function
   | { bindings = first :: rest; body; value_slots = ces } ->
