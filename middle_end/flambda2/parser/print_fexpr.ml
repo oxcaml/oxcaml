@@ -736,7 +736,7 @@ and code_binding ppf
     newer_version_of
     (fun ppf is_tupled -> if is_tupled then Format.fprintf ppf "@ tupled@ ")
     is_tupled
-    (fun ppf stub -> if stub then Format.fprintf ppf "@ stub@ ")
+    (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
     stub Flambda_colours.pop code_id id;
   let { params;
         closure_var;
