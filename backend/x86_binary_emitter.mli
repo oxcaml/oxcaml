@@ -51,13 +51,38 @@ end
 
 module StringMap : Map.S with type key = string
 
+(** Output of [assemble_section]. Cannot be consumed directly; must be
+    passed through [resolve_global_patches] first. This type-level
+    distinction ensures callers cannot forget the global-resolution
+    pass, which folds same-section symbol differences to literals and
+    emits ELF relocations for external references and supported
+    cross-section PC-relative references. *)
+type unresolved_buffer
+
+(** Fully resolved buffer. Once [resolve_global_patches] has run, the
+    bytes and relocation list are in their final form and can be
+    consumed via [contents]/[relocations]. *)
 type buffer
 
 val size : buffer -> int
 
 val relocations : buffer -> Relocation.t list
 
-val assemble_section : arch -> section -> buffer
+val assemble_section : arch -> section -> unresolved_buffer
+
+
+(** Resolve every buffer's deferred data-directive patches using a
+    global symbol table built from all the buffers' labels. Same-section
+    symbol differences fold to literal bytes; external absolute
+    references and supported current-section-anchored PC-relative
+    references produce ELF relocations. Unsupported cross-section
+    subtractions are rejected with a fatal error. Returns the same
+    buffers with their type refined to [buffer]. *)
+val resolve_global_patches : unresolved_buffer list -> buffer list
+
+(** Assemble and resolve a single self-contained section in one step. Use this
+    only when the section definitely has no cross-section references. *)
+val assemble_singleton_section : arch -> section -> buffer
 
 val get_symbol : buffer -> StringMap.key -> symbol
 

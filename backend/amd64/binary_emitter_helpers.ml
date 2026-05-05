@@ -41,6 +41,10 @@ let should_save_binary_sections () =
 let save_binary_sections () =
   let dir = !Emitaux.output_prefix ^ ".binary-sections" in
   (try Sys.mkdir dir 0o755 with Sys_error _ -> ());
+  (* Assemble every section first; defer writing until after
+     [resolve_global_patches] has resolved cross-section data-directive
+     references using a global view over all buffers' labels. *)
+  let unresolved = ref [] in
   X86_proc.iter_sections (fun name instructions ->
       let buf =
         X86_binary_emitter.assemble_section X64
@@ -55,10 +59,17 @@ let save_binary_sections () =
         else sec_name
       in
       let safe_name = "section_" ^ bare_name in
+      unresolved := (safe_name, buf) :: !unresolved);
+  let resolved =
+    X86_binary_emitter.resolve_global_patches (List.map snd !unresolved)
+  in
+  List.iter2
+    (fun (safe_name, _) buf ->
       let bin_path = Filename.concat dir (safe_name ^ ".bin") in
       let oc = open_out_bin bin_path in
       output_string oc (X86_binary_emitter.contents buf);
       close_out oc)
+    !unresolved resolved
 
 let end_emission () =
   if should_save_binary_sections () then save_binary_sections ()
