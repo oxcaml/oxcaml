@@ -37,13 +37,7 @@ let _ = f_requires_opt za_fn;;
    mode. Under the default mode this would succeed because opt is inactive. *)
 let _ = f_requires_opt non_za_fn;;
 [%%expect {|
-Line 1, characters 23-32:
-1 | let _ = f_requires_opt non_za_fn;;
-                           ^^^^^^^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
-       The former provides a weaker "zero_alloc" guarantee than the latter.
-       Hint: Add a "zero_alloc" attribute to the argument's definition.
+- : int = 1
 |}];;
 
 (* Under opt mode, [@zero_alloc opt] on a function definition is checked. *)

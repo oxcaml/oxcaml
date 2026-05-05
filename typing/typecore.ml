@@ -1336,7 +1336,7 @@ type pattern_variable =
     pv_attributes: attributes;
     pv_sort: Jkind_types.Sort.t;
     pv_lpoly: Lpoly.t;
-    pv_zero_alloc: Zero_alloc.check option;
+    pv_zero_alloc: Zero_alloc.t;
   }
 
 type module_variable =
@@ -1444,9 +1444,7 @@ let add_pattern_variables ?check ?check_as env pv =
          {val_type = pv_type; val_kind = pv_kind; val_lpoly = pv_lpoly;
           Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
-          val_zero_alloc = (match pv_zero_alloc with
-            | None -> Zero_alloc.default
-            | Some c -> Zero_alloc.create_const (Zero_alloc.Check c));
+          val_zero_alloc = pv_zero_alloc;
           val_uid = pv_uid
          } env
     )
@@ -2179,7 +2177,7 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
           ~pv_loc:loc
           ~pv_as_var:false
           ~pv_attributes:[]
-          ~pv_zero_alloc:None
+          ~pv_zero_alloc:Zero_alloc.default
   | _ ->
       raise (Error (param.ppat_loc, env, error))
 
@@ -2933,7 +2931,7 @@ let rec type_pat
   : type k . type_pat_state -> k pattern_category ->
       no_existentials: existential_restriction option ->
       alloc_mode:expected_pat_mode -> mutable_flag:_ ->
-      penv: Pattern_env.t -> zero_alloc:Zero_alloc.check option ->
+      penv: Pattern_env.t -> zero_alloc:Zero_alloc.t ->
       Parsetree.pattern -> type_expr -> Jkind.Sort.t -> k general_pattern
   = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
       ~zero_alloc sp expected_ty sort ->
@@ -2946,7 +2944,7 @@ let rec type_pat
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
          alloc_mode:expected_pat_mode -> mutable_flag:mutable_flag -> penv:_ ->
-         zero_alloc:Zero_alloc.check option -> _ -> _ -> _ -> k general_pattern
+         zero_alloc:Zero_alloc.t -> _ -> _ -> _ -> k general_pattern
   = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
         ~zero_alloc sp expected_ty sort ->
   let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) ~zero_alloc =
@@ -3023,7 +3021,7 @@ and type_pat_aux
         lbl,
         type_pat tps Value ~alloc_mode p t
           Jkind.Sort.(of_const Const.for_tuple_element)
-          ~zero_alloc:None)
+          ~zero_alloc:Zero_alloc.default)
         spl_ann
     in
     rvp {
@@ -3108,7 +3106,8 @@ and type_pat_aux
         in
         let alloc_mode = simple_pat_mode mode in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
-          (Jkind.Sort.of_const label.lbl_sort) ~zero_alloc:None)
+          (Jkind.Sort.of_const label.lbl_sort)
+          ~zero_alloc:Zero_alloc.default)
       in
       let make_record_pat
             (lbl_pat_list : (_ * rep gen_label_description * _) list) amb =
@@ -3141,12 +3140,14 @@ and type_pat_aux
       let lbl_a_list = List.map type_label_pat lbl_a_list in
       rvp @@ solve_expected (make_record_pat lbl_a_list ambiguity)
   in
-  begin match sp.ppat_desc, zero_alloc with
-  | Ppat_var _, _ -> ()
-  | Ppat_alias _, _ -> ()
-  | Ppat_constraint _, _ -> ()
-  | _, None -> ()
-  | _, Some _ -> fatal_error "type_pat_aux: zero_alloc"
+  begin match sp.ppat_desc with
+  | Ppat_var _ -> ()
+  | Ppat_alias _ -> ()
+  | Ppat_constraint _ -> ()
+  | _ ->
+    (match Zero_alloc.sub ~context:Default zero_alloc Zero_alloc.default with
+    | Ok () -> ()
+    | Error _ -> fatal_error "type_pat_aux: zero_alloc")
   end;
   match sp.ppat_desc with
     Ppat_any ->
@@ -3216,7 +3217,8 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v alloc_mode.mode t ~is_module:true
-              ~kind:(Val_reg sort) sp.ppat_attributes None sort
+              ~kind:(Val_reg sort) sp.ppat_attributes
+              Zero_alloc.default sort
           in
           rvp {
             pat_desc = Tpat_var { id; name = v; uid; sort;
@@ -3286,7 +3288,7 @@ and type_pat_aux
         let p = {p with ppat_loc=loc} in
         type_pat tps category p expected_ty
           Jkind.Sort.(of_const Const.for_predef_scannable)
-          ~zero_alloc:None
+          ~zero_alloc:Zero_alloc.default
         (* TODO: record 'extra' to remember about interval *)
       in
       begin match
@@ -3418,7 +3420,8 @@ and type_pat_aux
              in
              let alloc_mode = simple_pat_mode alloc_mode in
              type_pat ~alloc_mode tps Value p arg.ca_type
-               (Jkind.Sort.of_const arg.ca_sort) ~zero_alloc:None)
+               (Jkind.Sort.of_const arg.ca_sort)
+               ~zero_alloc:Zero_alloc.default)
           sargs args
       in
       rvp { pat_desc = Tpat_construct (lid, constr, args, existential_ctyp);
@@ -3441,7 +3444,7 @@ and type_pat_aux
           Some
             (type_pat tps Value sp ty
                Jkind.Sort.(of_const Const.for_variant_arg)
-               ~zero_alloc:None)
+               ~zero_alloc:Zero_alloc.default)
         | _ -> None
       in
       rvp {
@@ -3481,7 +3484,7 @@ and type_pat_aux
           let type_pat_rec tps penv sp =
             let alloc_mode = dynamic_pat_mode alloc_mode in
             type_pat ~alloc_mode tps category sp expected_ty sort ~penv
-              ~zero_alloc:None
+              ~zero_alloc
           in
           let penv1 =
             Pattern_env.copy ~equations_scope:(get_current_level ()) penv in
@@ -3532,7 +3535,7 @@ and type_pat_aux
       let p1 =
         type_pat ~alloc_mode tps Value sp1 nv
           Jkind.Sort.(of_const Const.for_lazy_body)
-          ~zero_alloc:None
+          ~zero_alloc:Zero_alloc.default
       in
       rvp {
         pat_desc = Tpat_lazy p1;
@@ -3576,7 +3579,8 @@ and type_pat_aux
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
-      let p = type_pat tps category ~penv p expected_ty sort ~zero_alloc:None in
+      let p = type_pat tps category ~penv p expected_ty sort
+                ~zero_alloc:Zero_alloc.default in
       let new_env = !!penv in
       begin match Env.remove_last_open path new_env with
       | None -> assert false
@@ -3589,7 +3593,7 @@ and type_pat_aux
       let p_exn =
         type_pat tps Value ~alloc_mode p Predef.type_exn
           Jkind.Sort.(of_const Const.for_exception)
-          ~zero_alloc:None
+          ~zero_alloc:Zero_alloc.default
       in
       rcp {
         pat_desc = Tpat_exception p_exn;
@@ -3631,15 +3635,6 @@ let type_pattern_list
       ~equations_scope ~allow_recursive_equations:false in
   let type_pat (attrs, zero_alloc, pat_mode, env_alloc_mode, exp_mode, pat) ty
         sort =
-    let zero_alloc : Zero_alloc.check option =
-      match zero_alloc with
-      | None
-      | Some (Builtin_attributes.Ignore_assert_all
-             | Builtin_attributes.Default_zero_alloc
-             | Builtin_attributes.Assume _)
-        -> None
-      | Some (Builtin_attributes.Check c) -> Some c
-    in
     Pattern_env.set_env_alloc_mode new_penv env_alloc_mode;
     Builtin_attributes.warning_scope ~ppwarning:false attrs
       (fun () ->
@@ -3669,7 +3664,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
         type_pat tps Value ~no_existentials:In_class_args ~alloc_mode
           ~mutable_flag:Immutable new_penv spat nv
           Jkind.Sort.(of_const Const.for_class_arg)
-          ~zero_alloc:None
+          ~zero_alloc:Zero_alloc.default
       in
       if has_variants pat then begin
         Parmatch.pressure_variants val_env [pat];
@@ -3700,9 +3695,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_reg pv_sort
             ; val_lpoly = Lpoly.determined []
             ; val_attributes = pv_attributes
-            ; val_zero_alloc = (match pv_zero_alloc with
-                | None -> Zero_alloc.default
-                | Some c -> Zero_alloc.create_const (Zero_alloc.Check c))
+            ; val_zero_alloc = pv_zero_alloc
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
@@ -3715,9 +3708,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_ivar (Immutable, cl_num)
             ; val_lpoly = Lpoly.determined []
             ; val_attributes = pv_attributes
-            ; val_zero_alloc = (match pv_zero_alloc with
-                | None -> Zero_alloc.default
-                | Some c -> Zero_alloc.create_const (Zero_alloc.Check c))
+            ; val_zero_alloc = pv_zero_alloc
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
@@ -3738,7 +3729,7 @@ let type_self_pattern env spat =
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
       ~equations_scope ~allow_recursive_equations:false in
-  let zero_alloc = None in
+  let zero_alloc = Zero_alloc.default in
   let pat =
     type_pat tps Value ~no_existentials:In_self_pattern ~alloc_mode
       ~mutable_flag:Immutable new_penv spat nv
@@ -6103,8 +6094,8 @@ let add_zero_alloc_attribute expr zero_alloc_attribute =
   match expr.exp_desc with
   | Texp_function fn ->
     begin match zero_alloc_attribute with
-    | None | Some Default_zero_alloc -> expr
-    | Some za ->
+    | Default_zero_alloc -> expr
+    | za ->
       begin match Zero_alloc.get fn.zero_alloc with
       | Default_zero_alloc -> ()
       | Ignore_assert_all | Assume _ | Check _ ->
@@ -6133,15 +6124,13 @@ let add_parsed_zero_alloc_attribute ~default_arity vb =
       ~in_signature:false
       ~on_application:false
       ~on_function_argument:false
-      ~default_arity
+      ~default_arity:(Some default_arity)
       vb.pvb_attributes
   in
-  let zero_alloc : Zero_alloc.const option =
+  let zero_alloc =
     match val_attr with
-    | Default_zero_alloc -> None
-    | Ignore_assert_all -> Some Ignore_assert_all
-    | Assume a -> Some (Assume a)
-    | Check c -> Some (Check c)
+    | Default_zero_alloc -> Zero_alloc.create_var vb.pvb_loc default_arity
+    | Ignore_assert_all | Assume _ | Check _ -> Zero_alloc.create_const val_attr
   in
   vb, zero_alloc
 
@@ -10248,6 +10237,11 @@ and map_half_typed_cases
                 with_local_level ~post:generalize_structure
                   (fun () -> instance ?partial:take_partial_instance ty_arg)
               in
+              let zero_alloc =
+                match zero_alloc with
+                | None -> Zero_alloc.default
+                | Some c -> Zero_alloc.create_const (Check c)
+              in
               let (pat, ext_env, force, pvs, mvs) =
                 type_pattern category ~lev ~alloc_mode:pat_mode env pattern
                   ty_arg sort_arg allow_modules ~zero_alloc
@@ -10666,9 +10660,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     List.map
       (fun vb ->
          if vb_is_fun vb then
-           let default_arity = Some (vb_fun_arity vb) in
+           let default_arity = vb_fun_arity vb in
            add_parsed_zero_alloc_attribute ~default_arity vb
-         else (vb, None))
+         else (vb, Zero_alloc.default))
       spat_sexp_list
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
@@ -10783,7 +10777,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         let exp_env =
           if is_recursive then
             let pvs_no_za =
-              List.map (fun pv -> { pv with pv_zero_alloc = None }) pvs
+              List.map (fun pv -> { pv with pv_zero_alloc = Zero_alloc.default }) pvs
             in
             add_module_variables
               (add_pattern_variables env_before_pvs pvs_no_za)
@@ -10897,7 +10891,23 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       (fun (s, ((_,p,_), (e, _))) (pvb, zero_alloc) ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
-        let e = add_zero_alloc_attribute e zero_alloc in
+        let e =
+          let za = Zero_alloc.get zero_alloc in
+          match za, e.exp_desc with
+          | Default_zero_alloc, Texp_function fn
+            when existential_context <> At_toplevel ->
+            (match Zero_alloc.get fn.zero_alloc with
+             | Default_zero_alloc ->
+               (* For local lets, link fn.zero_alloc to the binding's Var so
+                  that mutations from body type-checking (sub_var_const_exn at
+                  call sites) are visible to the backend.  Module-level
+                  inference uses the signature-comparison path instead, which
+                  correctly constrains the Var created by the function
+                  expression itself. *)
+               { e with exp_desc = Texp_function { fn with zero_alloc } }
+             | _ -> e)
+          | _ -> add_zero_alloc_attribute e za
+        in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
@@ -11592,7 +11602,7 @@ and type_comprehension_iterator
           pattern
           item_ty
           Jkind.Sort.(of_const Const.for_loop_index)
-          ~zero_alloc:None
+          ~zero_alloc:Zero_alloc.default
       in
       Texp_comp_in { pattern; sequence }
 

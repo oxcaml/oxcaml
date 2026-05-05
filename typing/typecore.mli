@@ -74,7 +74,7 @@ type pattern_variable =
     pv_lpoly: Types.Lpoly.t;
     (** Not yet determined; gets determined during generalization in
         [type_let]. *)
-    pv_zero_alloc: Zero_alloc.check option;
+    pv_zero_alloc: Zero_alloc.t;
   }
 
 val mk_expected:
