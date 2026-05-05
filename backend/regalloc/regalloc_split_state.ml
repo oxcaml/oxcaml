@@ -494,24 +494,17 @@ module RemoveDominatedSpillsForConstants : sig
   val optimize :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
+    uses:Uses.t ->
     destructions_at_end
 end = struct
-  type set =
-    | At_most_once
-    | Maybe_more_than_once
-
-  let string_of_set = function
-    | At_most_once -> "at most once"
-    | Maybe_more_than_once -> "maybe more than once"
-
   let rec remove_dominated_spills :
       Cfg_dominators.t ->
       Cfg_dominators.dominator_tree ->
-      num_sets:set Reg.Tbl.t ->
+      uses:Uses.t ->
       already_spilled:Label.t Reg.Map.t ->
       destructions_at_end:destructions_at_end ->
       destructions_at_end =
-   fun doms tree ~num_sets ~already_spilled ~destructions_at_end ->
+   fun doms tree ~uses ~already_spilled ~destructions_at_end ->
     if debug
     then (
       log "remove_dominated_spills %a" Label.format tree.label;
@@ -526,9 +519,9 @@ end = struct
                 (fun (reg : Reg.t) ->
                   if debug then log "register %a" Printreg.reg reg;
                   let keep =
-                    match Reg.Tbl.find_opt num_sets reg with
+                    match Reg.Tbl.find_opt uses reg with
                     | None | Some Maybe_more_than_once -> true
-                    | Some At_most_once -> (
+                    | Some (At_most_once _) -> (
                       match Reg.Map.find_opt reg !already_spilled with
                       | None ->
                         if debug
@@ -594,53 +587,29 @@ end = struct
       List.fold_left tree.children ~init:destructions_at_end
         ~f:(fun destructions_at_end (child : Cfg_dominators.dominator_tree) ->
           if debug then log "child %a" Label.format child.label;
-          remove_dominated_spills doms child ~num_sets
+          remove_dominated_spills doms child ~uses
             ~already_spilled:!already_spilled ~destructions_at_end)
     in
     if debug then dedent ();
     res
 
-  let optimize cfg_with_infos ~destructions_at_end =
+  let optimize cfg_with_infos ~destructions_at_end ~uses =
     if debug
     then (
       log "RemoveDominatedSpillsForConstants.optimize";
       indent ());
-    let loops = Cfg_with_infos.loop_infos cfg_with_infos in
-    let incr_set (tbl : set Reg.Tbl.t) (arr : Reg.t array) ~(in_loop : bool) :
-        unit =
-      Array.iter arr ~f:(fun (reg : Reg.t) ->
-          match Reg.Tbl.find_opt tbl reg with
-          | None ->
-            Reg.Tbl.replace tbl reg
-              (if in_loop then Maybe_more_than_once else At_most_once)
-          | Some At_most_once -> Reg.Tbl.replace tbl reg Maybe_more_than_once
-          | Some Maybe_more_than_once -> ())
-    in
-    let num_sets =
-      Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)
-        ~f:(fun label block acc ->
-          let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
-          if debug then log "block %a in_loop? %B" Label.format label in_loop;
-          incr_set acc block.terminator.res ~in_loop;
-          DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-              incr_set acc instr.res ~in_loop);
-          acc)
-    in
     if debug
     then (
-      log "num_sets:";
+      log "uses:";
       indent ();
-      Reg.Tbl.iter
-        (fun reg num_set ->
-          log "%a ~> %s" Printreg.reg reg (string_of_set num_set))
-        num_sets;
+      log "%a" Uses.format uses;
       dedent ());
     let doms = Cfg_with_infos.dominators cfg_with_infos in
     let forest = Cfg_dominators.dominator_forest doms in
     let res =
       List.fold_left forest ~init:destructions_at_end
         ~f:(fun destructions_at_end dominator_tree ->
-          remove_dominated_spills doms dominator_tree ~num_sets
+          remove_dominated_spills doms dominator_tree ~uses
             ~already_spilled:Reg.Map.empty ~destructions_at_end)
     in
     dedent ();
@@ -870,9 +839,10 @@ let make cfg_with_infos =
     RemoveReloadSpillInSameBlock.optimize cfg_with_infos ~destructions_at_end
       ~definitions_at_beginning
   in
+  let uses = Uses.compute cfg_with_infos in
   let destructions_at_end =
     RemoveDominatedSpillsForConstants.optimize cfg_with_infos
-      ~destructions_at_end
+      ~destructions_at_end ~uses
   in
   let definitions_at_beginning =
     remove_empty_sets definitions_at_beginning ~f:Fun.id

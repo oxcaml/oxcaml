@@ -115,3 +115,85 @@ let destruction_point_at_end : Cfg.basic_block -> destruction_kind option =
     else Some Destruction_only_on_exceptional_path)
 
 type definition_kind = Reload
+
+module Uses = struct
+  type source =
+    | Load of Cfg.basic Cfg.instruction
+    | Move of Reg.t
+    | Other
+
+  let format_source : Format.formatter -> source -> unit =
+   fun fmt source ->
+    match source with
+    | Load instr -> Format.fprintf fmt "Load %a" Printreg.regs instr.arg
+    | Move arg -> Format.fprintf fmt "Move %a" Printreg.reg arg
+    | Other -> Format.fprintf fmt "Other"
+
+  type set =
+    | At_most_once of { source : source }
+    | Maybe_more_than_once
+
+  let format_set : Format.formatter -> set -> unit =
+   fun fmt set ->
+    match set with
+    | At_most_once { source } ->
+      Format.fprintf fmt "At_most_once %a" format_source source
+    | Maybe_more_than_once -> Format.fprintf fmt "Maybe_more_than_once"
+
+  type t = set Reg.Tbl.t
+
+  let format : Format.formatter -> t -> unit =
+   fun fmt t ->
+    Reg.Tbl.iter
+      (fun reg num_set ->
+        Format.fprintf fmt "%a ~> %a" Printreg.reg reg format_set num_set)
+      t
+
+  let compute : Cfg_with_infos.t -> t =
+   fun cfg_with_infos ->
+    let loops = Cfg_with_infos.loop_infos cfg_with_infos in
+    let incr_set (tbl : set Reg.Tbl.t) (regs : Reg.t array) ~(in_loop : bool)
+        ~(source : source) : unit =
+      Array.iter regs ~f:(fun (reg : Reg.t) ->
+          if Reg.is_unknown reg
+          then
+            begin match Reg.Tbl.find_opt tbl reg with
+            | None ->
+              Reg.Tbl.replace tbl reg
+                (if in_loop
+                 then Maybe_more_than_once
+                 else At_most_once { source })
+            | Some (At_most_once _) ->
+              Reg.Tbl.replace tbl reg Maybe_more_than_once
+            | Some Maybe_more_than_once -> ()
+            end)
+    in
+    Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)
+      ~f:(fun label block acc ->
+        let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
+        incr_set acc block.terminator.res ~in_loop ~source:Other;
+        DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+            let source =
+              match[@ocaml.warning "-fragile-match"] instr.desc with
+              | Op
+                  (Load
+                     { memory_chunk = _;
+                       addressing_mode = _;
+                       mutability = Immutable;
+                       (* CR-soon xclerc for xclerc: check whether an aotmic
+                          load could be rematerialized. *)
+                       is_atomic = false
+                     })
+              (* CR-soon xclerc for xclerc: lift the condition on the length of
+                 `instr.res`. *)
+                when Array.length instr.res = 1 ->
+                Load instr
+              | Op Move
+                when Cmm.equal_machtype_component instr.arg.(0).typ
+                       instr.res.(0).typ ->
+                Move instr.arg.(0)
+              | _ -> Other
+            in
+            incr_set acc instr.res ~in_loop ~source);
+        acc)
+end

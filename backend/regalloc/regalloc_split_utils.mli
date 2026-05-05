@@ -35,3 +35,24 @@ val equal_destruction_kind : destruction_kind -> destruction_kind -> bool
 val destruction_point_at_end : Cfg.basic_block -> destruction_kind option
 
 type definition_kind = Reload
+
+module Uses : sig
+  type source =
+    | Load of Cfg.basic Cfg.instruction
+    | Move of Reg.t
+    | Other
+
+  val format_source : Format.formatter -> source -> unit
+
+  type set =
+    | At_most_once of { source : source }
+    | Maybe_more_than_once
+
+  val format_set : Format.formatter -> set -> unit
+
+  type t = set Reg.Tbl.t
+
+  val format : Format.formatter -> t -> unit
+
+  val compute : Cfg_with_infos.t -> set Reg.Tbl.t
+end
