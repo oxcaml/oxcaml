@@ -70,3 +70,6 @@ val symbols :
   Symbols.t
 (** Return a mapping from symbols to absolute address for the symbols defined in the given
     text section. *)
+
+val binary_section : ('a, _) t -> 'a
+(** The underlying assembled binary section (without the GOT/PLT tables). *)

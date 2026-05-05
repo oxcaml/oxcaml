@@ -63,7 +63,7 @@ let make_header identification shnum e_shoff : Compiler_owee.Owee_elf.header =
   }
 
 let create_section name ~sh_type ~size ~offset ?align ?entsize ?flags ?sh_link
-    ?sh_info shstrtab =
+    ?sh_info ?(sh_addr = 0L) shstrtab =
   let sh_addralign = Option.value ~default:1L align in
   let sh_entsize = Option.value ~default:0L entsize in
   let sh_flags = Option.value ~default:0L flags in
@@ -74,7 +74,7 @@ let create_section name ~sh_type ~size ~offset ?align ?entsize ?flags ?sh_link
     { sh_name = String_table.current_length shstrtab;
       sh_type;
       sh_flags;
-      sh_addr = 0L;
+      sh_addr;
       sh_offset = offset;
       sh_size = size;
       sh_link;
@@ -88,24 +88,37 @@ let create_section name ~sh_type ~size ~offset ?align ?entsize ?flags ?sh_link
   section
 
 let make_section sections name ~sh_type ~size ?align ?entsize ?flags ?sh_link
-    ?sh_info ?body shstrtab =
+    ?sh_info ?body ?sh_addr shstrtab =
   let section : Compiler_owee.Owee_elf.section =
     create_section name ~sh_type ~size
       ~offset:(Section_table.current_offset sections)
-      ?align ?entsize ?flags ?sh_link ?sh_info shstrtab
+      ?align ?entsize ?flags ?sh_link ?sh_info ?sh_addr shstrtab
   in
   Section_table.add_section sections name ?body section
 
-let make_text sections name raw_section ~align sh_string_table =
+let pick_size raw_section runtime_size =
+  let body_size = X86_binary_emitter.size raw_section in
+  match runtime_size with
+  | None -> Int64.of_int body_size
+  | Some n when n < body_size ->
+    failwith
+      (Printf.sprintf
+         "Internal_assembler: runtime_size (%d) smaller than body size (%d)"
+         n body_size)
+  | Some n -> Int64.of_int n
+
+let make_text sections name raw_section ~align ?sh_addr ?runtime_size
+    sh_string_table =
   make_section sections name ~sh_type:1
-    ~size:(Int64.of_int (X86_binary_emitter.size raw_section))
-    ~flags:0x6L sh_string_table ~align
+    ~size:(pick_size raw_section runtime_size)
+    ~flags:0x6L sh_string_table ~align ?sh_addr
     ~body:(X86_binary_emitter.contents_mut raw_section)
 
-let make_data sections name raw_section ~align sh_string_table =
+let make_data sections name raw_section ~align ?sh_addr ?runtime_size
+    sh_string_table =
   make_section sections name ~sh_type:1
-    ~size:(Int64.of_int (X86_binary_emitter.size raw_section))
-    ~flags:0x3L sh_string_table ~align
+    ~size:(pick_size raw_section runtime_size)
+    ~flags:0x3L sh_string_table ~align ?sh_addr
     ~body:(X86_binary_emitter.contents_mut raw_section)
 
 let make_shstrtab sections sh_string_table =
@@ -141,12 +154,13 @@ let parse_flags flags =
   in
   inner 0L (String.to_seq flags ())
 
-let make_custom_section sections name raw_section sh_string_table =
+let make_custom_section sections name raw_section ?sh_addr ?runtime_size
+    sh_string_table =
   let flags = parse_flags (X86_proc.Section_name.flags name) in
   let align = X86_proc.Section_name.alignment name in
   make_section sections name
-    ~size:(Int64.of_int (X86_binary_emitter.size raw_section))
-    ~align ~flags
+    ~size:(pick_size raw_section runtime_size)
+    ~align ~flags ?sh_addr
     ~body:(X86_binary_emitter.contents_mut raw_section)
     sh_string_table
 
@@ -196,26 +210,34 @@ let get_sections ~delayed sections =
   Emitaux.Dwarf_helpers.emit_delayed_dwarf ();
   get acc (delayed ())
 
-let make_compiler_sections section_table compiler_sections symbol_table
-    sh_string_table =
+let make_compiler_sections ?section_address ?section_runtime_size section_table
+    compiler_sections symbol_table sh_string_table =
   let section_symbols = Section_name.Tbl.create 100 in
+  let addr_for name =
+    match section_address with None -> None | Some f -> f name
+  in
+  let runtime_size_for name =
+    match section_runtime_size with None -> None | Some f -> f name
+  in
   Section_name.Map.iter
     (fun name (align, raw_section) ->
+      let sh_addr = addr_for name in
+      let runtime_size = runtime_size_for name in
       if Section_name.is_text_like name
       then
         make_text section_table name raw_section ~align:(Int64.of_int align)
-          sh_string_table
+          ?sh_addr ?runtime_size sh_string_table
       else if Section_name.is_data_like name
       then
         make_data section_table name raw_section ~align:(Int64.of_int align)
-          sh_string_table
+          ?sh_addr ?runtime_size sh_string_table
       else if Section_name.is_note_like name
       then
         make_custom_section section_table name raw_section ~sh_type:7
-          (* SHT_NOTE *) sh_string_table
+          (* SHT_NOTE *) ?sh_addr ?runtime_size sh_string_table
       else
         make_custom_section section_table name raw_section ~sh_type:1
-          (* SHT_PROGBITS *) sh_string_table;
+          (* SHT_PROGBITS *) ?sh_addr ?runtime_size sh_string_table;
       Section_name.Tbl.add section_symbols name
         (Symbol_table.make_section_symbol symbol_table
            (Section_table.num_sections section_table - 1)
@@ -321,3 +343,4 @@ let assemble unix ~delayed asm output_file =
       + (header.e_shnum * header.e_shentsize))
   in
   write elf header sections symbol_table relocation_tables string_table
+
