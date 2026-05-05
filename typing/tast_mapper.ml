@@ -589,12 +589,11 @@ let expr sub x =
             Option.map
               (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
         }
-    | Texp_field { record; record_sort; record_repres; field_sort; lid; label;
-                   boxing; unique_barrier; } ->
+    | Texp_field { record; record_sort; record_repres; lid; label; boxing;
+                   unique_barrier; } ->
         Texp_field { record = sub.expr sub record;
                      lid = map_loc sub lid;
-                     record_sort; record_repres; field_sort; label; boxing;
-                     unique_barrier;
+                     record_sort; record_repres; label; boxing; unique_barrier;
                    }
     | Texp_unboxed_field { record; record_sort; record_sorts; record_repres;
                            lid; label; unique_use; } ->

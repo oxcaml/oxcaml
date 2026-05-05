@@ -7062,7 +7062,7 @@ and type_expect_
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
       let (record, record_sort, _record_sorts, rmode, label, _, ambiguity,
-           ty_arg, field_sort, record_repres) =
+           ty_arg, record_repres) =
         type_label_projection Legacy loc env srecord lid
       in
       check_project_mutability ~loc:record.exp_loc ~env
@@ -7117,7 +7117,6 @@ and type_expect_
             record;
             record_sort;
             record_repres;
-            field_sort;
             lid;
             label;
             boxing;
@@ -7130,7 +7129,7 @@ and type_expect_
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       let (record, record_sort, record_sorts, rmode, label, _, ambiguity,
-           ty_arg, _field_sort, record_repres) =
+           ty_arg, record_repres) =
         type_label_projection Unboxed_product loc env srecord lid
       in
       if Types.is_mutable label.lbl_mut then
@@ -9045,12 +9044,12 @@ and type_label_access
 
 and type_label_projection
   : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * _ * _ * 'rep
+    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep
   = fun record_form loc env srecord lid ->
   let record, record_sort, mode, label, expected_type, ambiguity =
     type_label_access record_form env srecord Env.Projection lid
   in
-  let ty_arg, field_sort, record_sorts, record_repres =
+  let ty_arg, record_sorts, record_repres =
     (* XXX Not clear to me why this can't be done in [type_label_access] so that
        the [Texp_setfield] case wouldn't have to have its own call to
        [update_label], but doing it that way causes principality issues.
@@ -9062,12 +9061,11 @@ and type_label_projection
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
       unify_exp env record ty_res;
-      let sort =
-        match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-        | Ok sort -> sort
-        | Error err ->
-            raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
-      in
+      begin match type_sort ~why:Field_projection ~fixed:false env ty_arg with
+      | Ok _ -> ()
+      | Error err ->
+          raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
+      end;
       let _sort, record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
@@ -9078,12 +9076,12 @@ and type_label_projection
            hits a [generalize_structure] *)
         update_label env label record_form ~loc ~containing_type:record.exp_type
       in
-      ty_arg, sort, record_sorts, record_repres
-    end ~post:(fun (ty_arg, _, _, _) -> generalize_structure ty_arg)
+      ty_arg, record_sorts, record_repres
+    end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
   in
   (record, record_sort, record_sorts,
    Mode.Value.disallow_right mode, label, expected_type,
-   ambiguity, ty_arg, field_sort, record_repres)
+   ambiguity, ty_arg, record_repres)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.

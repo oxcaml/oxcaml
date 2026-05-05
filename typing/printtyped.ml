@@ -739,12 +739,11 @@ and expression i ppf x =
       record_unboxed_product_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";
       option (i+1) expression ppf (Option.map fst extended_expression);
-  | Texp_field { record = e; lid = li; record_sort; field_sort; _ } ->
+  | Texp_field { record = e; lid = li; record_sort; _ } ->
       line i ppf "Texp_field\n";
       expression i ppf e;
       sort i ppf record_sort;
       longident i ppf li;
-      sort i ppf field_sort;
   | Texp_unboxed_field { record = e; lid = li; record_sort; _ } ->
       line i ppf "Texp_unboxed_field\n";
       expression i ppf e;

@@ -702,10 +702,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
              [arg; lbl], loc)
   | Texp_field { record = arg; record_sort = arg_sort; record_repres;
-                 field_sort; lid = _; label = lbl; boxing = float;
+                 lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
-      let _field_sort = Jkind.Sort.default_for_transl_and_get field_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree

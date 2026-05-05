@@ -329,7 +329,6 @@ and expression_desc =
       record : expression;
       record_sort : Jkind.sort;
       record_repres : Types.record_representation;
-      field_sort : Jkind.sort;
       lid : Longident.t loc;
       label : Types.label_description;
       boxing : texp_field_boxing;
