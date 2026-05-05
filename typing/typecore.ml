@@ -3110,7 +3110,7 @@ and type_pat_aux
       pat_unique_barrier = Unique_barrier.not_computed () }
   in
   let type_record_pat (type rep) (record_form : rep record_form) lid_sp_list
-        closed =
+        closed record_sort =
       assert (lid_sp_list <> []);
       let expected_type, record_ty =
         match extract_concrete_record record_form !!penv expected_ty with
@@ -3130,7 +3130,8 @@ and type_pat_aux
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           raise (Error (loc, !!penv, error))
       in
-      let type_label_pat sorts (label_lid, label, sarg) =
+      let type_label_pat sorts (label_lid, (label : rep gen_label_description),
+                                sarg) =
         let ty_arg =
           solve_Ppat_record_field ~refine:false loc penv label label_lid
             record_ty record_form in
@@ -3146,7 +3147,12 @@ and type_pat_aux
             alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
-        let ty_sort = label_sort label sorts |> Jkind.Sort.of_const in
+        let ty_sort =
+          match record_form, label.lbl_repres with
+          | Legacy, Some Record_unboxed ->
+            record_sort
+          | _ -> label_sort label sorts |> Jkind.Sort.of_const
+        in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
       in
       let make_record_pat
@@ -3511,10 +3517,10 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_record(lid_sp_list, closed) ->
-      type_record_pat Legacy lid_sp_list closed
+      type_record_pat Legacy lid_sp_list closed sort
   | Ppat_record_unboxed_product(lid_sp_list, closed) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      type_record_pat Unboxed_product lid_sp_list closed
+      type_record_pat Unboxed_product lid_sp_list closed sort
   | Ppat_array (mut, spl) ->
       let mut =
         match mut with
