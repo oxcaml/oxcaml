@@ -197,7 +197,7 @@ let label_pos b lbl =
 (* Try to compute some statically computable arithmetic expressions
    in labels, or to simplify them to a form that is encodable by
    relocations. *)
-let eval_const b current_pos cst =
+let eval_with_lookup ~lookup ~current_pos cst =
   let rec eval = function
     | C.Signed_int n -> Rint n
     | C.Unsigned_int n -> Rint (Numbers.Uint64.to_int64 n)
@@ -213,41 +213,40 @@ let eval_const b current_pos cst =
         | Rrel (s, n1), Rint n2 -> Rrel (s, Int64.sub n1 n2)
         | Rabs ("", n1), Rabs ("", n2) -> Rint (Int64.sub n1 n2)
         | Rabs ("", n1), Rabs (s2, n2) -> (
-            try
-              let sy2 = String.Tbl.find b.labels s2 in
-              match sy2.sy_pos with
-              | Some pos2 ->
-                  let pos2 = Int64.of_int pos2 in
-                  Rint
-                    (Int64.sub
-                       (Int64.add n1 (Int64.of_int current_pos))
-                       (Int64.add pos2 n2))
-              | _ -> assert false
-            with Not_found -> assert false)
+            match lookup s2 with
+            | Some sy2 -> (
+                match sy2.sy_pos with
+                | Some pos2 ->
+                    let pos2 = Int64.of_int pos2 in
+                    Rint
+                      (Int64.sub
+                         (Int64.add n1 (Int64.of_int current_pos))
+                         (Int64.add pos2 n2))
+                | _ -> assert false)
+            | None -> assert false)
         | Rabs (s, n1), Rabs ("", n2) -> (
-            try
-              let sy = String.Tbl.find b.labels s in
-              match sy.sy_pos with
-              | Some pos ->
-                  let pos = Int64.of_int pos in
-                  Rint
-                    (Int64.sub (Int64.add pos n1)
-                       (Int64.add n2 (Int64.of_int current_pos)))
-              | _ -> assert false
-            with Not_found -> Rrel (s, Int64.sub n1 n2))
+            match lookup s with
+            | Some sy -> (
+                match sy.sy_pos with
+                | Some pos ->
+                    let pos = Int64.of_int pos in
+                    Rint
+                      (Int64.sub (Int64.add pos n1)
+                         (Int64.add n2 (Int64.of_int current_pos)))
+                | _ -> assert false)
+            | None -> Rrel (s, Int64.sub n1 n2))
         | Rabs (s1, n1), Rabs (s2, n2) -> (
-            try
-              let sy2 = String.Tbl.find b.labels s2 in
-              try
-                let sy1 = String.Tbl.find b.labels s1 in
+            match lookup s1, lookup s2 with
+            | Some sy1, Some sy2 -> (
                 assert (sy1.sy_sec == sy2.sy_sec);
-                match (sy1.sy_pos, sy2.sy_pos) with
+                match sy1.sy_pos, sy2.sy_pos with
                 | Some pos1, Some pos2 ->
                     let pos1 = Int64.of_int pos1 in
                     let pos2 = Int64.of_int pos2 in
-                    Rint (Int64.sub (Int64.add pos1 n1) (Int64.add pos2 n2))
-                | _ -> assert false
-              with Not_found -> (
+                    Rint
+                      (Int64.sub (Int64.add pos1 n1) (Int64.add pos2 n2))
+                | _ -> assert false)
+            | None, Some sy2 -> (
                 match sy2.sy_pos with
                 | Some pos2 ->
                     let pos2 = Int64.of_int pos2 in
@@ -257,7 +256,7 @@ let eval_const b current_pos cst =
                           (Int64.add n1 (Int64.of_int current_pos))
                           (Int64.add pos2 n2) )
                 | _ -> assert false)
-            with Not_found -> assert false)
+            | Some _, None | None, None -> assert false)
         | _ -> assert false)
     | C.Add (c1, c2) -> (
         let c1 = eval c1 and c2 = eval c2 in
@@ -273,8 +272,12 @@ let eval_const b current_pos cst =
         | Rrel (s, n1), Rabs ("", n2) -> Rabs (s, Int64.add n1 n2)
         | _ -> assert false)
   in
+  eval cst
+
+let eval_const b current_pos cst =
+  let lookup name = String.Tbl.find_opt b.labels name in
   try
-    let r = eval cst in
+    let r = eval_with_lookup ~lookup ~current_pos cst in
     (*
     if debug then
       Printf.eprintf "eval_const (%s) = %s at @%d\n%!"
@@ -1663,6 +1666,27 @@ let assemble_line b loc ins =
 
 let add_patch b pos size v = b.patches <- (pos, size, v) :: b.patches
 
+let resolve_reloc_result b pos result data_size =
+  match result, data_size with
+  | Rint n, _ -> add_patch b pos data_size n
+  | Rabs (lbl, offset), B32 ->
+      record_reloc b pos (Relocation.Kind.DIR32 (lbl, offset))
+  | Rabs (lbl, offset), B64 ->
+      record_reloc b pos (Relocation.Kind.DIR64 (lbl, offset))
+  (* Relative relocation in data segment. We add an offset of 4 because
+     REL32 relocations are computed with a PC at the end, while here, it
+     is at the beginning. *)
+  | Rrel (lbl, offset), B32 ->
+      record_reloc b pos (Relocation.Kind.REL32 (lbl, Int64.add offset 4L))
+  | Rrel _, _ -> assert false
+  | Rabs _, _ -> assert false
+
+let resolve_reloc_constant b pos cst data_size =
+  (* Printf.eprintf "RelocConstant (%s, %s)\n%!"
+     (X86_gas.string_of_constant cst)
+     (string_of_data_size data_size); *)
+  resolve_reloc_result b pos (eval_const b pos cst) data_size
+
 let rec assemble_section arch section =
   try assemble_section0 arch section
   with Misc.Fatal_error ->
@@ -1726,25 +1750,8 @@ and assemble_section0 arch section =
          allow one external symbol per expression. We could tolerate more complex
          expressions if we delay resolution later, i.e. after all sections have
          been generated and all symbol positions are known. *)
-      | RelocConstant (cst, data_size) -> (
-          (* Printf.eprintf "RelocConstant (%s, %s)\n%!"
-             (X86_gas.string_of_constant cst)
-             (string_of_data_size data_size); *)
-          let v = eval_const b pos cst in
-          match (v, data_size) with
-          | Rint n, _ -> add_patch b pos data_size n
-          | Rabs (lbl, offset), B32 ->
-              record_reloc b pos (Relocation.Kind.DIR32 (lbl, offset))
-          | Rabs (lbl, offset), B64 ->
-              record_reloc b pos (Relocation.Kind.DIR64 (lbl, offset))
-          (* Relative relocation in data segment. We add an offset of 4 because
-              REL32 relocations are computed with a PC at the end, while here, it
-              is at the beginning. *)
-          | Rrel (lbl, offset), B32 ->
-              record_reloc b pos
-                (Relocation.Kind.REL32 (lbl, Int64.add offset 4L))
-          | Rrel _, _ -> assert false
-          | Rabs _, _ -> assert false)
+      | RelocConstant (cst, data_size) ->
+          resolve_reloc_constant b pos cst data_size
     in
 
     ListLabels.iter !local_relocs ~f:(fun (pos, local_reloc) ->
