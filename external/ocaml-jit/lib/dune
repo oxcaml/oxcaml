@@ -3,7 +3,7 @@
  (libraries ocamlcommon ocamloptcomp ocamlopttoplevel flambda2 unix)
  (foreign_stubs
   (language c)
-  (names jit_stubs)))
+  (names jit_stubs perf_jitdump_stubs)))
 
 (install
  (files
