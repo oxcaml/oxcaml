@@ -25,7 +25,7 @@ let code_block_symbol_for code_id : Cmm.symbol =
   (* Code_block symbols always belong to the current CU (we only emit them for
      code defined here); they are exported because back-pointers in foreign CUs
      may reference them via direct calls into our text. *)
-  (* REVIEW: The motivation for exporting Code_block symbols is a bit unclear:
+  (* REVIEW(codex): The motivation for exporting Code_block symbols is a bit unclear:
      the back-pointer word is emitted in this function's own .text and points
      at this function's Code_block, so it is not obvious why "foreign CUs" need
      to reference the Code_block symbol. If the intent is "ensure the symbol is
@@ -52,7 +52,7 @@ let emit_code_block_for ~all_code (code : Code.t) res =
       Name_occurrences.symbols free_names |> Symbol.Set.elements
     in
     let dep_fields =
-      (* REVIEW: [Symbol] occurrences here are assumed to denote static blocks
+      (* REVIEW(codex): [Symbol] occurrences here are assumed to denote static blocks
          whose addresses are valid OCaml values (so they can safely live in a
          scannable [Code_block]). If any non-value symbol can appear (e.g. code
          labels, C globals), the GC would treat the address as a heap pointer

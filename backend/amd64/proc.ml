@@ -130,7 +130,7 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
   match (ty : machtype_component) with
   | Int | Addr | Val | Code_pointer ->
-    (* REVIEW: Unlike arm64, this path returns a physical reg with whatever
+    (* REVIEW(codex): Unlike arm64, this path returns a physical reg with whatever
        machtype [hard_int_reg] was created with (typically [Int]) unless the
        LLVM backend flag is set. If any post-regalloc logic relies on
        preserving [Code_pointer] on physical regs (e.g. to emit the parallel

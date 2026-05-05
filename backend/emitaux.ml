@@ -85,7 +85,7 @@ let is_long_stack_index n =
 
 let record_frame_descr ~label ~frame_size ~live_offset ~code_ptr_live_offset
     ~unloadable debuginfo =
-  (* REVIEW: We now encode additional flags in the low 4 bits of the
+  (* REVIEW(codex): We now encode additional flags in the low 4 bits of the
      frame_data word (see FRAME_DESCRIPTOR_FLAGS = 0xF). This relies on
      [frame_size] being 16-byte aligned for any frame descriptor that may
      carry these flags; otherwise frame_size bits would collide with flags and

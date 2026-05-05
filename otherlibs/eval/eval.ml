@@ -228,7 +228,7 @@ let eval (expr : 'a expr) =
         ("Cannot find module block symbol '" ^ linkage_name
        ^ "' which should have been output by the JIT")
   in
-  (* REVIEW: This assumes that extracting the eval'd result leaves no remaining
+  (* REVIEW(codex): This assumes that extracting the eval'd result leaves no remaining
      liveness edge from the compilation unit's static data to the result. That
      seems true for the current test suite (mostly `fun ...` quotations where
      the module block is fully static), but for quotations like `<[ ref 0 ]>`

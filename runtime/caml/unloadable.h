@@ -160,7 +160,7 @@ CAMLextern uintnat caml_unloadable_units_unloaded_total(void);
  * Note: callers may prefer [caml_find_code_fragment_by_pc] when they need
  * only to know whether [pc] is in unloadable code (cheap negative answer);
  * use this when the unit pointer itself is needed. */
-/* REVIEW: [caml_find_code_fragment_by_pc] is not a reliable "unloadable code"
+/* REVIEW(codex): [caml_find_code_fragment_by_pc] is not a reliable "unloadable code"
  * predicate as written: the main program's .text is also registered as a code
  * fragment (startup_nat.c), and Dynlink/meta fragments may be too. Any use of
  * code-fragment presence to gate dereferencing the [entry - 1] back-pointer
@@ -213,7 +213,7 @@ Caml_inline void caml_darken_code_block_for_entry(void *state, value entry) {
  * part of the prefix. */
 Caml_inline void caml_darken_unloadable_code_blocks_in_closure(
     void *state, value closure) {
-  /* REVIEW: The slot-walk logic here is subtle and tightly coupled to the
+  /* REVIEW(codex): The slot-walk logic here is subtle and tightly coupled to the
      current closure-prefix layout. In particular, the inference of slot size
      from [Arity_closinfo] (and the skip by an assumed infix header) risks
      out-of-bounds reads if the closure layout evolves. Consider factoring the
@@ -283,7 +283,7 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
     for (uint32_t k = 0; k < n; k++) {
       uint32_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
-      /* REVIEW: This currently treats any registered code fragment as
+      /* REVIEW(codex): This currently treats any registered code fragment as
        * unloadable, but the code fragment table also contains non-unloadable
        * code (e.g. the main program, Dynlink). Calling
        * [caml_visit_code_block_for_entry] on such a [cp] will dereference an
@@ -303,7 +303,7 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
     for (uint16_t k = 0; k < n; k++) {
       uint16_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
-      /* REVIEW: See long-format case above; same concern. */
+      /* REVIEW(codex): See long-format case above; same concern. */
       if (caml_find_code_fragment_by_pc((char *)cp) != NULL) {
         caml_visit_code_block_for_entry(f, fdata, cp);
       }

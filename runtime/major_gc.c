@@ -947,7 +947,7 @@ static intnat mark_stack_push_block(struct mark_stack* stk, value block)
        Native-code only: closures with unloadable code only exist in the
        native runtime. */
 #ifdef NATIVE_CODE
-    /* REVIEW: This is currently invoked for every closure encountered during
+    /* REVIEW(codex): This is currently invoked for every closure encountered during
        major marking. If unloadable closures are expected to be rare compared
        to regular ones, consider gating this call on
        [Unloadable_closinfo(closinfo)] (or similar) to avoid repeatedly walking
@@ -1156,7 +1156,7 @@ again:
         me.start += env_offset;
         /* F.1: see [mark_stack_push_block] for the same injection. */
 #ifdef NATIVE_CODE
-        /* REVIEW: Same perf consideration as in [mark_stack_push_block]. */
+        /* REVIEW(codex): Same perf consideration as in [mark_stack_push_block]. */
         caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
 #endif
       }

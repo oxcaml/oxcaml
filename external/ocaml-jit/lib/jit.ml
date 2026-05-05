@@ -230,7 +230,7 @@ let unloadable_metadata local_symbols =
       let code_blocks = Array.of_list (List.rev code_blocks_rev) in
       let entries = Array.of_list (List.rev entries_rev) in
       Array.sort Nativeint.compare entries;
-      (* REVIEW: On Mach-O the assembler/linker can expose both global and
+      (* REVIEW(codex): On Mach-O the assembler/linker can expose both global and
          local alias symbols for the same address. If those aliases end in
          [_code_block], this can introduce duplicate [entries] (and possibly
          duplicate [code_blocks]) at the same address. Passing duplicates down
