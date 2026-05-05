@@ -397,7 +397,8 @@ type unification_environment =
       { penv : Pattern_env.t;
         equated_types : TypePairs.t;
         assume_injective : bool;
-        unify_eq_set : TypePairs.t }
+        unify_eq_set : TypePairs.t;
+        pattern_stage : Env.stage; }
     (* GADT constraint unification mode:
        only used for type indices of GADT constructors
        during pattern matching.
@@ -441,6 +442,11 @@ let unify_eq uenv t1 t2 =
 let in_subst_mode = function
   | Expression {in_subst} -> in_subst
   | Pattern _ -> false
+
+let can_generate_equations = function
+  | Expression _ -> false
+  | Pattern { penv; pattern_stage } ->
+    Env.stage penv.env >= pattern_stage
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
@@ -4552,7 +4558,7 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 pack2 =
 let rec is_instantiable_ty uenv ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
-      in_pattern_mode uenv &&
+      can_generate_equations uenv &&
       is_instantiable (get_env uenv) ~for_jkind_eqn:false path
   | Tquote ty' ->
     unify_with_incr_stage uenv (fun uenv ->
@@ -4843,7 +4849,7 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
       | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) when Path.same p1 p2 ->
-          if not (in_pattern_mode uenv) then
+          if not (can_generate_equations uenv) then
             unify_list uenv tl1 tl2
           else if can_assume_injective uenv then
             without_assume_injective uenv (fun uenv -> unify_list uenv tl1 tl2)
@@ -4866,7 +4872,7 @@ and unify3 uenv t1 t1' t2 t2' =
               inj (List.combine tl1 tl2)
       | (Tconstr (path,[],_),
          Tconstr (path',[],_))
-        when in_pattern_mode uenv &&
+        when can_generate_equations uenv &&
         let env = get_env uenv in
         is_instantiable env ~for_jkind_eqn:false path
         && is_instantiable env ~for_jkind_eqn:false path' ->
@@ -4878,13 +4884,13 @@ and unify3 uenv t1 t1' t2 t2' =
           record_equation uenv t1' t2';
           add_gadt_equation uenv source destination
       | (Tconstr (path,[],_), _)
-        when in_pattern_mode uenv
+        when can_generate_equations uenv
           && is_instantiable (get_env uenv) ~for_jkind_eqn:false path ->
           reify uenv t2';
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t2'
       | (_, Tconstr (path,[],_))
-        when in_pattern_mode uenv
+        when can_generate_equations uenv
           && is_instantiable (get_env uenv) ~for_jkind_eqn:false path ->
           reify uenv t1';
           record_equation uenv t1' t2';
@@ -5326,7 +5332,8 @@ let unify_gadt (penv : Pattern_env.t) ~pat:ty1 ~expected:ty2 =
         { penv;
           equated_types;
           assume_injective = true;
-          unify_eq_set = TypePairs.create 11; }
+          unify_eq_set = TypePairs.create 11;
+          pattern_stage = Env.stage penv.env; }
     in
     unify uenv ty1 ty2;
     equated_types
