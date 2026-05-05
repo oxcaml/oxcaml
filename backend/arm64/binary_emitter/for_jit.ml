@@ -183,6 +183,5 @@ module Gdb_jit_symfile = struct
     Some
       (Jit_symfile.build
          (module Assembled_section)
-         ~e_machine:em_aarch64 ~sections ~section_address
-         ~section_runtime_size)
+         ~e_machine:em_aarch64 ~sections ~section_address ~section_runtime_size)
 end

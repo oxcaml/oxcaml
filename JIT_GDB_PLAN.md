@@ -77,8 +77,8 @@ single-threaded so this is free.
 
 A new submodule on `Binary_emitter_intf.S` named `Gdb_jit_symfile` lets
 ocaml-jit stay backend-agnostic: it calls `For_jit.Gdb_jit_symfile.build`
-without knowing the concrete section type. X86 implements it via
-`internal_assembler`; arm64 returns `None` for now.
+without knowing the concrete section type. Both x86 and arm64 implement it
+by delegating to a shared, generic ELF builder.
 
 ```
 module type Gdb_jit_symfile = sig
@@ -86,19 +86,23 @@ module type Gdb_jit_symfile = sig
   val build :
     sections:(string * assembled_section) list ->
     section_address:(string -> int64 option) ->
+    section_runtime_size:(string -> int option) ->
     Compiler_owee.Owee_buf.t option
 end
 ```
 
-`internal_assembler` gains a new public entry point that:
+The generic builder lives in a new tiny library `backend/jit_symfile/` so
+both `x86_binary_emitter` (in the main library) and `arm64_binary_emitter`
+(a separate library) can depend on it without circularity. Its only inputs
+are an `Assembled_section` first-class module (taking
+`size`/`contents_mut`/`iter_labels_and_symbols`), the `e_machine` value, and
+the per-section address/runtime-size callbacks. It allocates a
+`Bigarray.Array1` of the right size, zero-fills it, and writes a complete
+ET_REL ELF: ELF header, section bodies, symtab, strtab, shstrtab, section
+header table. No `.rela*`, no DWARF.
 
-- Takes already-assembled `X86_binary_emitter.section`s (no DWARF callback).
-- Takes a `section_address : Section_name.t -> int64 option`.
-- Skips `create_relocation_tables` / `make_relocation_section`.
-- Sets `sh_addr` for `SHF_ALLOC` sections from `section_address`.
-- Allocates a `Bigarray.Array1` of the right size and writes into it
-  instead of mmap'ing a file.
-- Returns the `Owee_buf.t`.
+The existing `Internal_assembler.assemble` (the on-disk path used by the
+normal `.o`-emitting compiler driver) is unchanged.
 
 A new module `external/ocaml-jit/lib/gdb_jit.{ml,mli}` owns the protocol.
 The `Owee_buf.t` (Bigarray) is held in OCaml so it stays live; the
@@ -112,60 +116,89 @@ compilation phrase.
 
 ## File-level changes
 
-1. `backend/binary_emitter_intf/binary_emitter_intf.ml`
+1. `backend/binary_emitter_intf/binary_emitter_intf.ml` (+ dune)
    - Add `module type Gdb_jit_symfile`.
    - Add `module Gdb_jit_symfile : Gdb_jit_symfile with type assembled_section = Assembled_section.t` to `module type S`.
+   - Dune now depends on `compiler_owee` (because the signature mentions
+     `Compiler_owee.Owee_buf.t`).
 
-2. `backend/internal_assembler/internal_assembler.{ml,mli}`
-   - Factor the inner ELF-writing logic so it can run on pre-assembled
-     sections (skipping `get_sections`'s assemble + DWARF passes).
-   - Add `val assemble_in_memory :
-       sections:(X86_proc.Section_name.t * X86_binary_emitter.section) list ->
-       section_address:(X86_proc.Section_name.t -> int64 option) ->
-       Compiler_owee.Owee_buf.t`.
-   - Internally allocate a Bigarray of computed total size and write into it.
-   - In the SHF_ALLOC section creators, look up `section_address name` and
-     use it for `sh_addr` (default `0L`).
-   - Skip relocation table creation entirely on this path.
+2. `backend/jit_symfile/` — new library.
+   - `Jit_symfile.build` takes a `(module Binary_emitter_intf.Assembled_section)`,
+     `e_machine`, sections, address/runtime-size callbacks; returns an
+     in-memory `Owee_buf.t`.
+   - Skips DWARF and relocation tables.
+   - Symbols come from `iter_labels_and_symbols`; names starting `.L` are
+     stripped (standard ELF convention). All emitted symbols are
+     `STB_GLOBAL` with type heuristically `STT_FUNC` for text-like
+     sections, `STT_OBJECT` for data-like, else `STT_NOTYPE`. (See
+     "Caveats" below — this is a deliberate fidelity loss versus the
+     existing `internal_assembler` path.)
 
-3. `backend/x86_binary_emitter.{ml,mli}`
-   - In `For_jit`, add `module Gdb_jit_symfile` that converts the input
-     list to the form `internal_assembler.assemble_in_memory` wants and
-     calls it; returns `Some buf`.
-   - The public `.mli` doesn't need extra signature work because `For_jit
-     : Binary_emitter_intf.S` propagates the new submodule automatically.
+3. `backend/x86_binary_emitter.ml`
+   - In `For_jit`, add `module Gdb_jit_symfile` that calls
+     `Jit_symfile.build (module Assembled_section) ~e_machine:0x3E …`.
+   - The public `.mli` doesn't need extra signature work because
+     `For_jit : Binary_emitter_intf.S` propagates the new submodule
+     automatically.
+   - `Internal_assembler` (the on-disk x86 ELF writer) is untouched.
 
-4. `backend/arm64/binary_emitter/for_jit.ml`
-   - Add a `Gdb_jit_symfile` stub returning `None`.
+4. `backend/arm64/binary_emitter/for_jit.ml` (+ dune)
+   - Add `module Gdb_jit_symfile` calling
+     `Jit_symfile.build (module Assembled_section) ~e_machine:0xB7 …`.
+   - Dune depends on `jit_symfile`.
 
-5. `external/ocaml-jit/lib/jit_stubs.c`
-   - Add `__jit_debug_descriptor` (version=1) and `__jit_debug_register_code`.
+5. `dune` (top-level main library) — add `jit_symfile` dependency so
+   `x86_binary_emitter` (which is in the main library) can use it.
+
+6. `external/ocaml-jit/lib/jit_stubs.c`
+   - Add `__jit_debug_descriptor` (version=1) and `__jit_debug_register_code`
+     (`noinline` + memory-clobber asm).
    - Add `caml_jit_gdb_register` taking a Bigarray; mallocs an entry,
-     splices it in, sets action_flag, calls the trampoline. Returns the
-     entry pointer as a nativeint.
-   - Add `caml_jit_gdb_unregister` for completeness (may not call it in
-     v1).
+     splices it in at the head of the doubly-linked list, sets
+     `action_flag = JIT_REGISTER`, calls the trampoline. Returns the entry
+     pointer as a nativeint.
+   - Add `caml_jit_gdb_unregister` for completeness.
 
-6. `external/ocaml-jit/lib/gdb_jit.{ml,mli}` (new)
-   - `type handle` — record holding `bigarray : Owee_buf.t` (root) and
-     `entry_ptr : nativeint`.
+7. `external/ocaml-jit/lib/gdb_jit.{ml,mli}` (new)
+   - `type handle = { symfile : Owee_buf.t; entry : nativeint }` — keeps
+     the Bigarray header live so the underlying off-heap data is not
+     freed.
    - `val register : Owee_buf.t -> handle`.
    - `val unregister : handle -> unit`.
 
-7. `external/ocaml-jit/lib/jit.ml`
-   - In `jit_load`, after `load_text`/`load_sections`, call the emitter's
-     `For_jit.Gdb_jit_symfile.build`, passing:
-     - `sections`: the binary-section map flattened to `(string,
-       assembled_section) list` (just `.text` plus the other sections;
-       relocations have already been applied).
-     - `section_address`: lookup against the `addressed_text` and
-       `addressed_sections` maps.
-   - If `Some buf`, call `Gdb_jit.register buf`, store the handle in
-     `Globals`.
+8. `external/ocaml-jit/lib/jit.ml`
+   - New `register_with_gdb` runs after `load_text`/`load_sections`. Builds
+     a per-section address table from `text.address` and
+     `addressed_sections`, plus a single runtime-size override for `.text`
+     equal to `Jit_text_section.in_memory_size` so the section spans the
+     GOT and PLT padding. Calls `E.Gdb_jit_symfile.build`; if `Some buf`,
+     calls `Gdb_jit.register` and stores the handle in `Globals`.
 
-8. `external/ocaml-jit/lib/globals.{ml,mli}`
-   - Add a `gdb_handles : Gdb_jit.handle list ref` (or a Stack) so
-     handles stay reachable.
+9. `external/ocaml-jit/lib/jit_text_section.{ml,mli}` — exposes
+   `binary_section : ('a, _) t -> 'a` so jit.ml can pull out the underlying
+   assembled section to feed to `Gdb_jit_symfile.build`.
+
+10. `external/ocaml-jit/lib/globals.{ml,mli}`
+    - Add `val gdb_jit_handles : Gdb_jit.handle list ref` so handles stay
+      reachable for the process lifetime.
+
+## Caveats (known loss-of-fidelity / leak)
+
+- **Symbols emitted as global only.** `Jit_symfile` infers symbol type
+  from the containing section's name and emits everything as
+  `STB_GLOBAL`. The previous on-disk x86 path used the rich
+  `X86_binary_emitter.symbol` metadata (`Sy_local`/`Sy_global`/`Sy_weak`,
+  `Function`/`Object`/`None`, `sy_protected`). For OCaml code most
+  user-visible symbols are global, so this is a cosmetic loss — GDB still
+  finds everything by name.
+- **`Globals.gdb_jit_handles` never pruned.** Every JIT phrase appends a
+  handle that stays alive for the process. For a long-running JIT
+  toplevel this is a slow leak. Pruning would require also tracking which
+  handles correspond to which phrases, which we don't currently.
+- **`Owee_elf.write_elf` writes section names into shstrtab at the
+  computed `sh_name` offsets**, and `Jit_symfile` then writes the entire
+  shstrtab linearly over the same region. Both produce the same bytes by
+  construction; just an unimportant duplication of effort.
 
 ## Risks / unknowns
 

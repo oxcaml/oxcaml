@@ -143,10 +143,10 @@ module type Gdb_jit_symfile = sig
       [sections] and are assumed to be post-relocation.
 
       [section_runtime_size] returns an override for [sh_size] when the
-      section's runtime extent is larger than the assembled bytes (e.g. the
-      JIT appends GOT/PLT padding after [.text]). The trailing bytes inside
-      the symfile are zero-padded. Returning [None] uses the natural assembled
-      size. *)
+      section's runtime extent is larger than the assembled bytes (e.g. the JIT
+      appends GOT/PLT padding after [.text]). The trailing bytes inside the
+      symfile are zero-padded. Returning [None] uses the natural assembled size.
+  *)
   val build :
     sections:(string * assembled_section) list ->
     section_address:(string -> int64 option) ->
