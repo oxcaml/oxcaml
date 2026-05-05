@@ -290,7 +290,7 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
 let array_load_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
     arr index =
   let index =
-    C.lsl_int ~int_width:Int64
+    C.lsl_int64
       (C.untag_int index dbg) (Cconst_int (element_width_log2, dbg)) dbg
   in
   match vec_kind with
@@ -307,7 +307,7 @@ let array_load_512 = array_load_vector ~vec_kind:Vec512
 let array_set_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
     arr index new_value =
   let index =
-    C.lsl_int ~int_width:Int64
+    C.lsl_int64
       (C.untag_int index dbg) (Cconst_int (element_width_log2, dbg)) dbg
   in
   match vec_kind with
@@ -963,18 +963,19 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
       (* the operators below operate on register-width naked nativeints *)
       wrap naked_nativeint f
     in
+    let width = C.Scalar_type.Integer.to_int_width untagged in
     let dividend_cannot_be_min_int =
       C.Scalar_type.Integer.bit_width untagged < C.arch_bits
     in
     match op with
-    | Add -> wrap C.add_int
-    | Sub -> wrap C.sub_int
-    | Mul -> wrap C.mul_int
+    | Add -> wrap (C.add_int ~width)
+    | Sub -> wrap (C.sub_int ~width)
+    | Mul -> wrap (C.mul_int ~width)
     | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
     | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
-    | And -> wrap C.and_int
-    | Or -> wrap C.or_int
-    | Xor -> wrap C.xor_int)
+    | And -> wrap (C.and_int ~width)
+    | Or -> wrap (C.or_int ~width)
+    | Xor -> wrap (C.xor_int ~width))
 
 let relevant_bits_for_shift_amount =
   if Arch.ocaml_shifts_are_wrapping
@@ -1008,7 +1009,8 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
       | Lsl ->
         (* Left shifts operate on nativeints since they might shift arbitrary
            bits into the high bits of the register. *)
-        C.lsl_int, C.Scalar_type.Integer.nativeint
+        (* CR jrayman: set width properly *)
+        C.lsl_int ~width:Int64, C.Scalar_type.Integer.nativeint
     in
     let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
     C.Scalar_type.Integral.conjugate ~outer:kind ~inner:(Untagged op_kind) ~dbg
@@ -1019,6 +1021,7 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
       x
 
 let binary_int_comp_primitive _env dbg kind cmp x y =
+  let width : Cmm.int_width = Int64 in
   match
     integral_of_standard_int kind, (cmp : P.signed_or_unsigned P.comparison)
   with
@@ -1032,14 +1035,14 @@ let binary_int_comp_primitive _env dbg kind cmp x y =
 
      See middle_end/flambda2/z3/comparisons.smt2 for a Z3 script to prove
      this. *)
-  | Tagged _, Lt Signed -> C.lt ~dbg x (C.ignore_low_bit_int y)
-  | Tagged _, Le Signed -> C.le ~dbg (C.ignore_low_bit_int x) y
-  | Tagged _, Gt Signed -> C.gt ~dbg (C.ignore_low_bit_int x) y
-  | Tagged _, Ge Signed -> C.ge ~dbg x (C.ignore_low_bit_int y)
-  | Tagged _, Lt Unsigned -> C.ult ~dbg x (C.ignore_low_bit_int y)
-  | Tagged _, Le Unsigned -> C.ule ~dbg (C.ignore_low_bit_int x) y
-  | Tagged _, Gt Unsigned -> C.ugt ~dbg (C.ignore_low_bit_int x) y
-  | Tagged _, Ge Unsigned -> C.uge ~dbg x (C.ignore_low_bit_int y)
+  | Tagged _, Lt Signed -> C.lt ~dbg x (C.ignore_low_bit_int ~width y)
+  | Tagged _, Le Signed -> C.le ~dbg (C.ignore_low_bit_int ~width x) y
+  | Tagged _, Gt Signed -> C.gt ~dbg (C.ignore_low_bit_int ~width x) y
+  | Tagged _, Ge Signed -> C.ge ~dbg x (C.ignore_low_bit_int ~width y)
+  | Tagged _, Lt Unsigned -> C.ult ~dbg x (C.ignore_low_bit_int ~width y)
+  | Tagged _, Le Unsigned -> C.ule ~dbg (C.ignore_low_bit_int ~width x) y
+  | Tagged _, Gt Unsigned -> C.ugt ~dbg (C.ignore_low_bit_int ~width x) y
+  | Tagged _, Ge Unsigned -> C.uge ~dbg x (C.ignore_low_bit_int ~width y)
   (* Naked integers. *)
   | Untagged _, Lt Signed -> C.lt ~dbg x y
   | Untagged _, Le Signed -> C.le ~dbg x y
@@ -1130,7 +1133,7 @@ let unary_primitive env res dbg f arg =
          ~effects:No_effects ~coeffects:Has_coeffects ~ty_args:[] "caml_obj_dup"
          Cmm.typ_val [arg])
         .extcall )
-  | Is_int _ -> None, res, C.and_int arg (C.int ~dbg 1) dbg
+  | Is_int _ -> None, res, C.and_int64 arg (C.int ~dbg 1) dbg
   | Is_null -> None, res, C.eq ~dbg arg (C.nativeint ~dbg 0n)
   | Get_tag -> None, res, C.get_tag arg dbg
   | Array_length (Array_kind array_kind) ->
@@ -1160,7 +1163,7 @@ let unary_primitive env res dbg f arg =
     let cmm =
       match reinterpret with
       | Tagged_int63_as_unboxed_int64 -> arg
-      | Unboxed_int64_as_tagged_int63 -> C.or_int (C.int 1 ~dbg) arg dbg
+      | Unboxed_int64_as_tagged_int63 -> C.or_int64 (C.int 1 ~dbg) arg dbg
       | Unboxed_int64_as_unboxed_float64 -> C.int64_as_float ~dbg arg
       | Unboxed_float64_as_unboxed_int64 -> C.float_as_int64 ~dbg arg
     in
@@ -1229,7 +1232,7 @@ let unary_primitive env res dbg f arg =
     ( None,
       res,
       C.ite
-        (C.and_int arg (C.int 1 ~dbg) dbg)
+        (C.and_int64 arg (C.int 1 ~dbg) dbg)
         ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
         ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
         ~else_dbg:dbg )
@@ -1283,7 +1286,7 @@ let binary_primitive env dbg f x y =
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
   | Read_offset (kind, mut) ->
-    let addr = C.add_int x y dbg in
+    let addr = C.add_int64 x y dbg in
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
@@ -1321,7 +1324,7 @@ let ternary_primitive _env dbg f x y z =
         let write_into_block =
           match mode with
           | Heap ->
-            let addr = C.add_int x y dbg in
+            let addr = C.add_int64 x y dbg in
             C.caml_modify ~dbg addr z
           | Local ->
             (* divide to convert offset from bytes to field number *)
@@ -1340,7 +1343,7 @@ let ternary_primitive _env dbg f x y z =
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
       else
-        let addr = C.add_int x y dbg in
+        let addr = C.add_int64 x y dbg in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store

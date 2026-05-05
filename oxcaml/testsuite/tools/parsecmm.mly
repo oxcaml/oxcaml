@@ -49,7 +49,7 @@ let access_array base numelt size =
   | _ ->
       let dbg = Debuginfo.none in
       Cop(Cadda, [base;
-                  Cop(Clsl, [numelt; Cconst_int(Misc.log2 size, dbg)],
+                  Cop(Clsl Int64, [numelt; Cconst_int(Misc.log2 size, dbg)],
                   dbg)],
           dbg)
 
@@ -386,15 +386,15 @@ unaryop:
 ;
 binaryop:
     STORE chunk                 { Cstore ($2, Assignment) }
-  | ADDI                        { Caddi }
-  | SUBI                        { Csubi }
-  | STAR                        { Cmuli }
+  | ADDI                        { Caddi Int64 }
+  | SUBI                        { Csubi Int64 }
+  | STAR                        { Cmuli Int64 }
   | DIVI                        { Cdivi }
   | MODI                        { Cmodi }
-  | AND                         { Cand }
-  | OR                          { Cor }
-  | XOR                         { Cxor }
-  | LSL                         { Clsl }
+  | AND                         { Cand Int64 }
+  | OR                          { Cor Int64 }
+  | XOR                         { Cxor Int64 }
+  | LSL                         { Clsl Int64 }
   | LSR                         { Clsr }
   | ASR                         { Casr }
   | EQI                         { Ccmpi Ceq }

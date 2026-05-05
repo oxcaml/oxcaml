@@ -133,35 +133,43 @@ val int_const : Debuginfo.t -> int -> expression
 
 (** Arithmetical operations on integers *)
 val add_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
-
-(* Shorthand for [add_int ~int_width:I64] *)
-val add_int64 : expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val sub_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val neg_int :
-  int_width:int_width -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> Debuginfo.t -> expression
 
 val lsl_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val mul_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val lsr_int : expression -> expression -> Debuginfo.t -> expression
 
 val asr_int : expression -> expression -> Debuginfo.t -> expression
 
 val and_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val or_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
 
 val xor_int :
-  int_width:int_width -> expression -> expression -> Debuginfo.t -> expression
+  width:int_width -> expression -> expression -> Debuginfo.t -> expression
+
+(** Shorthands for Int64. E.g, [add_int64] is [add_int ~width:Int64] *)
+val add_int64 : expression -> expression -> Debuginfo.t -> expression
+
+val neg_int64 : expression -> Debuginfo.t -> expression
+
+val lsl_int64 : expression -> expression -> Debuginfo.t -> expression
+
+val and_int64 : expression -> expression -> Debuginfo.t -> expression
+
+val or_int64 : expression -> expression -> Debuginfo.t -> expression
 
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
     [ptr_out_of_heap] is [false]. *)
@@ -482,7 +490,7 @@ val bigarray_word_kind : Lambda.bigarray_kind -> memory_chunk
 
 (** Simplify the given expression knowing the low bit of the argument will be
     irrelevant *)
-val ignore_low_bit_int : expression -> expression
+val ignore_low_bit_int : width:int_width -> expression -> expression
 
 (** Simplify the given expression knowing that bits other than the low [bits]
     bits will be irrelevant *)
@@ -1650,6 +1658,8 @@ module Scalar_type : sig
     val create_exn : bit_width:int -> signedness:Signedness.t -> t
 
     val bit_width : t -> int
+
+    val to_int_width : t -> int_width
 
     include Integral_ops with type t := t
   end

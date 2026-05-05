@@ -210,14 +210,14 @@ let native_pointer_atomic_add size (arg1, arg2) dbg =
           bind "dst" arg1 (fun dst -> Cop (op, [src; dst], dbg))))
 
 let native_pointer_atomic_sub size (arg1, arg2) dbg =
-  native_pointer_atomic_add size (arg1, neg_int ~int_width:Int64 arg2 dbg) dbg
+  native_pointer_atomic_add size (arg1, neg_int64 arg2 dbg) dbg
 
 let ext_pointer_atomic_add size (arg1, arg2) dbg =
   native_pointer_atomic_add size (int_as_pointer arg1 dbg, arg2) dbg
 
 let ext_pointer_atomic_sub size (arg1, arg2) dbg =
   native_pointer_atomic_add size
-    (int_as_pointer arg1 dbg, neg_int ~int_width:Int64 arg2 dbg) dbg
+    (int_as_pointer arg1 dbg, neg_int64 arg2 dbg) dbg
 
 let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
   let op = Catomic { op = Fetch_and_add; size } in
@@ -232,7 +232,7 @@ let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
                           Cop (op, [src; dst], dbg)))))))
 
 let bigstring_atomic_sub size (arg1, arg2, arg3) dbg =
-  bigstring_atomic_add size (arg1, arg2, neg_int ~int_width:Int64 arg3 dbg) dbg
+  bigstring_atomic_add size (arg1, arg2, neg_int64 arg3 dbg) dbg
 
 let rec const_args_gen ~extract ~type_name n args name =
   match n, args with
@@ -1012,7 +1012,7 @@ let transl_builtin name args dbg typ_res =
           Cop (op, [cond; ifso; ifnot], dbg))
   | "caml_int32_shift_left_by_int32_unboxed" ->
     let arg, count = two_args name args in
-    shift32 (lsl_int ~int_width:Int32) arg count dbg
+    shift32 (lsl_int ~width:Int32) arg count dbg
   | "caml_int32_shift_right_by_int32_unboxed" ->
     let arg, count = two_args name args in
     shift32 asr_int arg count dbg
@@ -1023,7 +1023,7 @@ let transl_builtin name args dbg typ_res =
   | "caml_nativeint_shift_left_by_nativeint_unboxed"
   | "caml_int64_shift_left_by_int64_unboxed" ->
     let arg, count = two_args name args in
-    Some (lsl_int ~int_width:Int32 arg count dbg)
+    Some (lsl_int ~width:Int32 arg count dbg)
   | "caml_nativeint_shift_right_by_nativeint_unboxed"
   | "caml_int64_shift_right_by_int64_unboxed" ->
     let arg, count = two_args name args in
