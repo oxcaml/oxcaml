@@ -3601,7 +3601,8 @@ type _ load =
   | Don't_load : unit load
 
 let lookup_global_name_module_no_locks
-      (type a) (load : a load) ?(allow_hidden=false) ~errors ~use ~loc name env =
+      (type a) (load : a load) ?(allow_hidden=false)
+      ~errors ~use ~loc name env =
   let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
@@ -3630,9 +3631,9 @@ let lookup_ident_module
         path, locks, data
     end
     | exception Not_found when allow_hidden ->
-        (* [Typemod.initial_env] only seeds visible basenames, so a hidden module
-           may not be in [env.modules]. Treat it as [Mod_persistent] and let the
-           branch below dispatch to [find_pers_mod ~allow_hidden:true]. *)
+        (* [Typemod.initial_env] only seeds visible basenames, so a hidden
+           module may not be in [env.modules]. Treat it as [Mod_persistent]
+           and let the branch below call [find_pers_mod ~allow_hidden:true]. *)
         Pident (Ident.create_persistent s), [], Mod_persistent
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
