@@ -359,7 +359,8 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
 (* Compute the environment after opening a module *)
 
 let type_open_
-    ?(allow_hidden=false) ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
+    ?(allow_hidden=false) ?(used_slot=ref false) ?(toplevel=false)
+    ovf env loc lid =
   Env.open_signature ~allow_hidden ~loc ~used_slot ~toplevel ovf lid env
 
 let initial_env ~loc ~initially_opened_module
