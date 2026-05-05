@@ -419,8 +419,7 @@ let mkTpat_record_unboxed_product ?id (args, closed) =
   let sorts, repres =
     match id with
     | Some (sorts, repres) -> sorts, repres
-    | None ->
-      dummy_record_sorts, dummy_record_unboxed_product_repres
+    | None -> dummy_record_sorts, dummy_record_unboxed_product_repres
   in
   Tpat_record_unboxed_product (args, sorts, repres, closed)
 
