@@ -46,7 +46,7 @@ module Detect (C : Context) = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
-  let visit_terminator (blk : C.In.Block.t) (b : C.Out.unfinished_block) =
+  let visit_terminator (blk : C.In.Block.t) (c : C.Out.cursor) =
     match[@warning "-fragile-match"] blk.terminator with
     | Call
         { op = Func call_op;
@@ -69,7 +69,7 @@ module Detect (C : Context) = struct
         | Direct _ | Indirect _ ->
           Tailcall_func { op = call_op; args = mapped_args }
       in
-      C.finish_block b ~dbg:blk.terminator_dbg term;
+      C.finish_block c ~dbg:blk.terminator_dbg term;
       Replaced ()
     | _ -> Unchanged
 end

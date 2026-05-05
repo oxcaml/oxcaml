@@ -29,24 +29,20 @@ module type Context = sig
   module Out : Ssa.Graph_builder
 
   (** Emit an instruction into the cursor (subject to the reducer's
-      [rewrite_instruction] hook). Returns the new cursor and the instruction
-      that was actually appended (for the canonical builder this is just the
-      input; chained reducers may rewrite). *)
-  val emit_instruction :
-    Out.unfinished_block ->
-    Out.Instruction.t ->
-    Out.unfinished_block * Out.Instruction.t
+      [rewrite_instruction] hook). Returns the instruction that was actually
+      appended (for the canonical builder this is just the input; chained
+      reducers may rewrite). *)
+  val emit_instruction : Out.cursor -> Out.Instruction.t -> Out.Instruction.t
 
   val emit_op :
-    Out.unfinished_block ->
+    Out.cursor ->
     op:Out.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
     args:Out.Instruction.t array ->
-    Out.unfinished_block * Out.Instruction.t
+    Out.Instruction.t
 
-  val finish_block :
-    Out.unfinished_block -> dbg:Debuginfo.t -> Out.Terminator.t -> unit
+  val finish_block : Out.cursor -> dbg:Debuginfo.t -> Out.Terminator.t -> unit
 
   val new_block : params:Cmm.machtype -> Out.new_block_result
 
@@ -72,36 +68,30 @@ module type Reducer = functor (C : Context) -> sig
   (** Called once per input block, before its body is visited. [Unchanged]:
       defer to the framework (which visits body and terminator in turn).
       [Replaced]: the reducer has handled this block already. *)
-  val visit_block : C.In.Block.t -> C.Out.unfinished_block -> unit result
+  val visit_block : C.In.Block.t -> C.Out.cursor -> unit result
 
   (** Called for each instruction in each input block. [Unchanged]: defer to the
       framework's default translation. [Replaced]: the reducer has handled the
       instruction itself (via direct emission on the cursor or through one of
       the [Context] helpers). *)
   val visit_instruction :
-    C.In.Block.t -> instr_index:int -> C.Out.unfinished_block -> unit result
+    C.In.Block.t -> instr_index:int -> C.Out.cursor -> unit result
 
   (** Called once per input block, after its body. *)
-  val visit_terminator : C.In.Block.t -> C.Out.unfinished_block -> unit result
+  val visit_terminator : C.In.Block.t -> C.Out.cursor -> unit result
 
   (** Called each time the framework is about to emit an instruction into the
-      cursor. [Unchanged]: keep as-is. [Replaced (b', i)]: the reducer has
-      emitted a replacement; [b'] is the continuation cursor and [i] is the
-      representative for op-id remapping (use [Tuple [||]] to remap to nothing).
-  *)
+      cursor. [Unchanged]: keep as-is. [Replaced i]: the reducer has emitted a
+      replacement; [i] is the representative for op-id remapping (use
+      [Tuple [||]] to remap to nothing). *)
   val rewrite_instruction :
-    C.Out.unfinished_block ->
-    C.Out.Instruction.t ->
-    (C.Out.unfinished_block * C.Out.Instruction.t) result
+    C.Out.cursor -> C.Out.Instruction.t -> C.Out.Instruction.t result
 
   (** Called each time the framework is about to finish a block. [Unchanged]:
       finish with this terminator. [Replaced]: the reducer has already finalised
       the block. *)
   val rewrite_terminator :
-    C.Out.unfinished_block ->
-    dbg:Debuginfo.t ->
-    C.Out.Terminator.t ->
-    unit result
+    C.Out.cursor -> dbg:Debuginfo.t -> C.Out.Terminator.t -> unit result
 end
 
 (** A trivial reducer: every hook returns [Unchanged], so the framework always

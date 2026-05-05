@@ -10,17 +10,16 @@ open Ssa_reducer
 module Simplify_conditions (C : Context) = struct
   include Default (C)
 
-  let rewrite_terminator (b : C.Out.unfinished_block) ~dbg
-      (t : C.Out.Terminator.t) =
+  let rewrite_terminator (c : C.Out.cursor) ~dbg (t : C.Out.Terminator.t) =
     match[@warning "-fragile-match"] t with
     | Branch { cond = Op { op; args = [| arg |]; _ }; ifso; ifnot } -> (
       match op with
       | Operation.Intop_imm (Icomp Cne, 0) ->
-        C.finish_block b ~dbg
+        C.finish_block c ~dbg
           (C.Out.Terminator.Branch { cond = arg; ifso; ifnot });
         Replaced ()
       | Intop_imm (Icomp Ceq, 0) ->
-        C.finish_block b ~dbg
+        C.finish_block c ~dbg
           (C.Out.Terminator.Branch { cond = arg; ifnot = ifso; ifso = ifnot });
         Replaced ()
       | _ -> Unchanged)

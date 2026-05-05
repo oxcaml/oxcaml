@@ -219,29 +219,31 @@ module type Graph_builder = sig
           }
   end
 
-  type unfinished_block
+  type cursor
 
-  (** Start emitting into [blk]: the resulting cursor is empty (no instructions
-      yet appended). *)
-  val start_block : Block.t -> unfinished_block
+  (** A new cursor pointing to the given block. *)
+  val start_block : Block.t -> cursor
+
+  (** Move the given cursor to the given position. As they now point to the same
+      block, only one of the two cursors can be finished with [finish_block].*)
+  val move_cursor : cursor -> new_pos:cursor -> unit
 
   (** Emit [i] and return the instruction that was actually added. For the
       canonical builder this is just [i]; for chained builders used in
       [Ssa_reducer], the chain may rewrite the instruction and return the
       rewritten version, so callers that intend to reference the emission must
       use the returned value. *)
-  val emit_instruction :
-    unfinished_block -> Instruction.t -> unfinished_block * Instruction.t
+  val emit_instruction : cursor -> Instruction.t -> Instruction.t
 
   val emit_op :
-    unfinished_block ->
+    cursor ->
     op:op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
     args:Instruction.t array ->
-    unfinished_block * Instruction.t
+    Instruction.t
 
-  val finish_block : unfinished_block -> dbg:Debuginfo.t -> Terminator.t -> unit
+  val finish_block : cursor -> dbg:Debuginfo.t -> Terminator.t -> unit
 
   type new_block_result =
     { block : Block.t;
