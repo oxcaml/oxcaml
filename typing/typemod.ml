@@ -181,10 +181,12 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
     Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
     Mode.Modality.infer ~md_mode ~mode
 
-(** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
-[M] with [modalities] on it, calculate the modalities on the [item] to be used
-in the enclosing structure which is at [md_mode] and [loc_md]. *)
-let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
+(** For an [include M] clause where [M] is at [mode_with_locks] and [loc], and
+an [item] in [M] with [modalities] on it, calculate the modalities on the
+[item] to be used in the enclosing structure which is at [md_mode] and
+[loc_md]. *)
+let rebase_modalities ~loc ~loc_md (item_kind, id as item) ~md_mode ~env
+    ~mode_with_locks ?(crossing = Mode.Crossing.max) modalities =
   let pp : Hint.pinpoint = (loc, Structure_item item) in
   let is_contained_by : Hint.is_contained_by =
     { containing = Structure (item, Modality);
@@ -194,23 +196,57 @@ let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
     { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
       comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
   in
+  (* We apply modalities before walking locks, so that the locks are walked on
+     the item's effective mode rather than the module's mode. See the analogous
+     reasoning in [Typecore.type_ident]. *)
+  let (mode, held_locks) = mode_with_locks in
   let mode = Modality.apply ~hint modalities mode in
+  (* Apply type-based mode crossing before lock walking, following
+     [Typecore.type_ident]. This allows e.g. [int ref] to cross portability. *)
+  let mode = Mode.Crossing.apply_left crossing mode in
+  let mode =
+    match held_locks with
+    | None -> mode
+    | Some (locks, lid, hloc) ->
+        let lid = Longident.Ldot (lid, Ident.name id) in
+        Env.walk_locks ~env ~loc:hloc lid ~item:item_kind None (mode, locks)
+  in
+  (* Apply crossing again after lock walking, as locks may weaken the monadic
+     fragment. See [Typecore.type_ident] for the same pattern. *)
+  let mode = Mode.Crossing.apply_left crossing mode in
   infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
-let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
+let rebase_modalities_sg ~loc ~loc_md ~md_mode ~env ~mode_with_locks sg =
+  (* Walk locks for the structure's memory block itself to trigger any errors
+     (e.g. accessing a structure through a closure lock). This is analogous to
+     how [Includemod] checks [mode_crossing_structure_memaddr] before
+     descending into signature items. The resulting mode is discarded; the
+     original [mode_with_locks] is used for the items. *)
+  let (mode, held_locks) = mode_with_locks in
+  (match held_locks with
+  | None -> ()
+  | Some (locks, lid, hloc) ->
+      let mode =
+        Mode.Crossing.apply_left Ctype.mode_crossing_structure_memaddr mode
+      in
+      ignore
+        (Env.walk_locks ~env ~loc:hloc lid ~item:Module None (mode, locks)));
   List.map (function
     | Sig_value (id, vd, vis) ->
+        let crossing = Ctype.crossing_of_ty env vd.val_type in
         let val_modalities =
           vd.val_modalities
-          |> rebase_modalities ~loc ~loc_md (Value, id) ~md_mode ~mode
+          |> rebase_modalities ~loc ~loc_md (Value, id) ~md_mode ~env
+               ~mode_with_locks ~crossing
         in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
         let md_modalities =
           md.md_modalities
-          |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~mode
+          |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~env
+               ~mode_with_locks
         in
         let md = {md with md_modalities} in
         Sig_module (id, pres, md, rec_, vis)
@@ -2165,7 +2201,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let sg =
           sg
           |> rebase_modalities_sg ~loc:smty.pmty_loc ~loc_md:psg_loc
-              ~md_mode ~mode
+              ~md_mode ~env ~mode_with_locks:(Value.disallow_right mode, None)
           |> remove_modality_and_zero_alloc_variables_sg env ~zap_modality
         in
         incl_kind, sg
@@ -3580,10 +3616,12 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
     let smodl = sincl.pincl_mod in
     let modl, modl_shape =
       Builtin_attributes.warning_scope sincl.pincl_attributes
-        (fun () -> type_module true funct_body None env smodl)
+        (fun () ->
+           type_module_maybe_hold_locks ~hold_locks:true
+             true funct_body None env smodl)
     in
     let scope = Ctype.create_scope () in
-    let incl_kind, sg, mode =
+    let incl_kind, sg, mode_with_locks =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
@@ -3591,18 +3629,21 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           extract_sig_functor_open funct_body env smodl.pmod_loc
             modl.mod_type sig_acc md_mode
         in
-        incl_kind, sg, Value.disallow_right mode
+        incl_kind, sg, (Value.disallow_right mode, None)
       | Structure ->
-        Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
-          (Typedtree.mode_without_locks_exn modl.mod_mode)
+        let sg = extract_sig_open env smodl.pmod_loc modl.mod_type in
+        Tincl_structure, sg, modl.mod_mode
     in
+    let sg =
+      rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~env
+        ~mode_with_locks sg
+    in
+    (* [rebase_modalities_sg] adjusted modalities relative to [md_mode], so
+       [sg] items are now based on [md_mode]. *)
     (* Rename all identifiers bound by this signature to avoid clashes *)
     let sg, shape, new_env =
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
-        modl_shape sg ~mode env
-    in
-    let sg =
-      rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
+        modl_shape sg ~mode:md_mode env
     in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
@@ -3929,7 +3970,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         in
         let sg =
           rebase_modalities_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
-            ~md_mode ~mode sg
+            ~md_mode ~env ~mode_with_locks:(mode, None) sg
         in
         Tstr_open od, sg, shape_map, newenv
     | Pstr_class cl ->

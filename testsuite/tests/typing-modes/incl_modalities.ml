@@ -331,3 +331,120 @@ end
 [%%expect{|
 module type S' = sig val foo : 'a -> 'a @@ contended end
 |}]
+
+(* include a nonportable module in a portable functor is allowed if the
+   module is empty - no items are imported so no lock needs to be walked *)
+module (Foo @ nonportable) = struct end
+
+module (Bar @ portable) (M : sig end) = struct
+  include Foo
+end
+[%%expect{|
+module Foo : sig end @@ stateless nonportable
+module Bar : functor (M : sig end) -> sig end @@ stateless
+|}]
+
+(* if Foo contains a stateless identity function, it still passes *)
+module (Foo @ nonportable) = struct
+  let foo x = x
+end
+
+module (Bar @ portable) (M : sig end) = struct
+  include Foo
+end
+[%%expect{|
+module Foo : sig val foo : 'a -> 'a @@ portable end @@ stateless nonportable
+module Bar : functor (M : sig end) -> sig val foo : 'a -> 'a @@ stateless end
+  @@ stateless
+|}]
+
+(* if Foo contains a function closing over a mutable ref, it fails *)
+let x = ref 0
+
+module (Foo @ nonportable) = struct
+  let bar () = x := 24
+end
+
+module (Bar @ portable) (M : sig end) = struct
+  include Foo
+end
+[%%expect{|
+val x : int ref = {contents = 0}
+module Foo : sig val bar : unit -> unit end
+Lines 7-9, characters 24-3:
+7 | ........................(M : sig end) = struct
+8 |   include Foo
+9 | end
+Error: The module is "nonportable"
+         because it closes over the value "Foo.bar" at line 8, characters 10-13
+         which is "nonportable"
+         because it contains a usage (of the value "x" at line 4, characters 15-16)
+         which is expected to be "uncontended".
+       However, the module highlighted is expected to be "portable".
+|}]
+
+(* if Foo contains a string (naturally stateless), it passes *)
+module (Foo @ nonportable) = struct
+  let s = "hello"
+end
+
+module (Bar @ portable) (M : sig end) = struct
+  include Foo
+end
+[%%expect{|
+module Foo : sig val s : string @@ portable end @@ stateless nonportable
+module Bar : functor (M : sig end) -> sig val s : string @@ stateless end @@
+  stateless
+|}]
+
+(* if Foo contains a mutable ref, in Bar after inclusion x is contended *)
+module (Foo @ nonportable) = struct
+  let x = ref 0
+end
+
+module (Bar @ portable) (M : sig end) = struct
+  include Foo
+  let _ = (x : int ref @ contended)
+end
+[%%expect{|
+module Foo : sig val x : int ref end
+module Bar :
+  functor (M : sig end) -> sig val x : int ref @@ stateless immutable end @@
+  stateless
+|}]
+
+(* using x as uncontended in Bar fails *)
+module (Bar @ portable) (M : sig end) = struct
+  include Foo
+  let _ = (x : int ref @ uncontended)
+end
+[%%expect{|
+Lines 1-4, characters 24-3:
+1 | ........................(M : sig end) = struct
+2 |   include Foo
+3 |   let _ = (x : int ref @ uncontended)
+4 | end
+Error: The module is "nonportable"
+         because it contains a usage (of the value "Foo.x" at line 2, characters 10-13)
+         which is expected to be "uncontended".
+       However, the module highlighted is expected to be "portable".
+|}]
+
+(* if Foo is local and empty, including it in a global Bar fails even though
+   there are no items - the memaddr check catches the locality violation *)
+let f () =
+  let module Foo @ local = struct end in
+  let module Bar (M : sig end) = struct
+    include Foo
+  end in
+  ignore Bar
+[%%expect{|
+Line 4, characters 12-15:
+4 |     include Foo
+                ^^^
+Error: The module "Foo" is "local"
+       but is expected to be "global"
+         because it is used inside the functor at lines 3-5, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
