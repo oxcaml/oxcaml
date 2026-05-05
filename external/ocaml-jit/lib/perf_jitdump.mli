@@ -3,10 +3,11 @@
     Writes the streaming format consumed by [perf inject --jit] (see
     linux/tools/perf/Documentation/jitdump-specification.txt). The dump file
     lives under [$JITDUMP_DIR] (default [~/.debug/jit/]) as
-    [jit-<pid>.dump]; a [PROT_EXEC] [mmap] of the file's header is
-    established so [perf record] captures it as a [PERF_RECORD_MMAP] event,
-    which is the cue [perf inject --jit] uses to find the dump after the
-    fact.
+    [jit-<pid>.dump]. At [init] time we briefly [mmap] the file's header
+    with [PROT_READ | PROT_EXEC] and immediately [munmap]; the kernel emits
+    a [PERF_RECORD_MMAP] event at the moment of the [mmap] syscall, which
+    is the cue [perf inject --jit] uses to associate the dump with this
+    process.
 
     On non-Linux platforms [init] returns [None]; the rest of the API is
     a no-op. *)

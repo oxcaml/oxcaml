@@ -50,21 +50,27 @@ CAMLprim value caml_perf_jitdump_clock_monotonic(value unit) {
 #endif
 }
 
-/* mmap [size] bytes of [fd] at offset 0 with PROT_READ | PROT_EXEC. The
-   resulting mapping is the "marker" `perf record` captures as a
-   PERF_RECORD_MMAP, letting `perf inject --jit` later locate the dump file
-   by path. The mapping is intentionally never unmapped — the kernel reaps it
-   at process exit, and saved perf.data must remain replayable.
+/* Generate a single PROT_EXEC mmap event for [fd]. This is the marker
+   `perf record` captures as PERF_RECORD_MMAP; `perf inject --jit` later
+   scans for executable mmaps of paths matching jit-<pid>.dump to locate the
+   dump file by name.
 
-   Best-effort: if mmap fails, we silently continue. The dump still gets
-   written to disk; only the marker is missing, so `perf inject` will not
-   find it automatically. */
+   The kernel records the mmap event at mmap(2) time, so the mapping itself
+   only has to live long enough for that event to be emitted into the kernel
+   ring buffer — i.e. not at all from a userspace point of view. We munmap
+   immediately to avoid leaking a VMA for the process lifetime.
+
+   Best-effort: if either call fails, we silently continue. The dump still
+   gets written to disk; only the marker is missing, so `perf inject` will
+   not find it automatically. */
 CAMLprim value caml_perf_jitdump_mmap_marker(value v_fd, value v_size) {
 #ifdef __linux__
   int fd = Int_val(v_fd);
   size_t size = (size_t)Long_val(v_size);
   void *p = mmap(NULL, size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
-  (void)p; /* leak intentional */
+  if (p != MAP_FAILED) {
+    munmap(p, size);
+  }
 #else
   (void)v_fd;
   (void)v_size;

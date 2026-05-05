@@ -8,10 +8,14 @@ external is_linux : unit -> bool = "caml_perf_jitdump_is_linux" [@@noalloc]
 external clock_monotonic_ns : unit -> int64
   = "caml_perf_jitdump_clock_monotonic"
 
+(* Generates a single PROT_EXEC mmap event then unmaps. The kernel records
+   the event at mmap-time, so the mapping itself does not need to persist. *)
 external mmap_exec_marker : Unix.file_descr -> int -> unit
   = "caml_perf_jitdump_mmap_marker"
 
-let header_size = 48
+(* Six u32s (magic, version, total_size, elf_mach, pad1, pid) plus two u64s
+   (timestamp, flags) = 24 + 16 = 40 bytes. *)
+let header_size = 40
 
 let record_prefix_size = 16
 
