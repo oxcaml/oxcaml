@@ -2031,7 +2031,7 @@ let rec update_decl_jkind env dpath decl =
     }
   end in
   (* returns updated labels, updated rep, and updated jkind *)
-  let update_record_kind loc lbls rep =
+  let update_record_kind' loc lbls rep =
     match lbls, rep with
     | [Types.{ld_type} as lbl], Record_unboxed ->
       let jkind =
@@ -2199,8 +2199,6 @@ let rec update_decl_jkind env dpath decl =
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
-      if represent_as_float_array && rep <> Record_ufloat then
-        raise (Error (loc, Bad_represent_as_float_array_attribute));
       lbls, rep, jkind
     | _, ( Record_boxed | Record_inlined _ | Record_float | Record_ufloat
          | Record_mixed _)
@@ -2209,7 +2207,21 @@ let rec update_decl_jkind env dpath decl =
       Misc.fatal_error
         "Typedecl.update_record_kind: unexpected record representation"
   in
-
+  let update_record_kind loc lbls rep =
+    let lbls, rep', jkind = update_record_kind' loc lbls rep in
+    let represent_as_float_array =
+      rep = Record_dummy { represent_as_float_array = true }
+    in
+    let record_floatu =
+      rep' = Record_ufloat
+    in
+    if represent_as_float_array && not record_floatu then
+      raise (Error (loc, Bad_represent_as_float_array_attribute));
+    if not represent_as_float_array && record_floatu then
+      Misc.fatal_error
+        "got floatu record without [@@represent_as_float_array]";
+    lbls, rep', jkind
+  in
   (* returns updated constructors, updated rep, and updated jkind *)
   let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
