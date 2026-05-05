@@ -358,9 +358,10 @@ let make_builder (function_info : function_info) :
 
     (* === Builder state === *)
 
-    type unfinished_block =
-      | Empty_block of Block.t
-      | Add_instruction of unfinished_block * Instruction.t
+    type cursor =
+      { mutable block : Block.t;
+        mutable instrs_rev : Instruction.t list
+      }
 
     type new_block_result =
       { block : Block.t;
@@ -437,12 +438,15 @@ let make_builder (function_info : function_info) :
         function_info.fun_args_names;
       block, params
 
-    (* === Builder operations: functional, returning new unfinished_block === *)
+    (* === Builder operations: mutate the cursor in place === *)
 
-    let start_block (blk : Block.t) : unfinished_block = Empty_block blk
+    let start_block (blk : Block.t) : cursor = { block = blk; instrs_rev = [] }
 
-    let emit_instruction (ub : unfinished_block) (i : Instruction.t) :
-        unfinished_block * Instruction.t =
+    let move_cursor (c : cursor) ~(new_pos : cursor) : unit =
+      c.block <- new_pos.block;
+      c.instrs_rev <- new_pos.instrs_rev
+
+    let emit_instruction (c : cursor) (i : Instruction.t) : Instruction.t =
       (match i with
       | Instruction.Block_param _ | Instruction.Proj _ | Instruction.Tuple _ ->
         Misc.fatal_errorf
@@ -456,16 +460,11 @@ let make_builder (function_info : function_info) :
       | Instruction.Op _ | Instruction.Push_trap _ | Instruction.Pop_trap _
       | Instruction.Stack_check _ | Instruction.Name_for_debugger _ ->
         ());
-      Add_instruction (ub, i), i
+      c.instrs_rev <- i :: c.instrs_rev;
+      i
 
-    let emit_op (ub : unfinished_block) ~op ~dbg ~typ ~args :
-        unfinished_block * Instruction.t =
-      emit_instruction ub (Instruction.make_op ~op ~typ ~args ~dbg)
-
-    let rec collect_body_into acc (ub : unfinished_block) =
-      match ub with
-      | Empty_block blk -> blk, acc
-      | Add_instruction (ub', i) -> collect_body_into (i :: acc) ub'
+    let emit_op (c : cursor) ~op ~dbg ~typ ~args : Instruction.t =
+      emit_instruction c (Instruction.make_op ~op ~typ ~args ~dbg)
 
     let check_args_arity ~term_name ~args ~expected =
       if Array.length args <> Array.length expected
@@ -493,16 +492,17 @@ let make_builder (function_info : function_info) :
         Array.iter (check_target_has_no_params ~term_name:"Switch") targets
       | Return _ | Raise _ | Tailcall_func _ | Call _ | Invalid _ -> ()
 
-    let finish_block (ub : unfinished_block) ~(dbg : Debuginfo.t)
-        (term : Terminator.t) : unit =
-      let blk, body_list = collect_body_into [] ub in
+    let finish_block (c : cursor) ~(dbg : Debuginfo.t) (term : Terminator.t) :
+        unit =
+      let blk = c.block in
       if blk.terminator != pending_terminator
       then Misc.fatal_error "Ssa.finish_block: block already finished";
       check_terminator term;
-      blk.body <- Array.of_list body_list;
+      blk.body <- Array.of_list (List.rev c.instrs_rev);
       blk.terminator <- term;
       blk.terminator_dbg <- dbg;
-      finished_blocks := blk :: !finished_blocks
+      finished_blocks := blk :: !finished_blocks;
+      c.instrs_rev <- []
 
     (* === Predecessors / dominators === *)
 

@@ -7,13 +7,13 @@
     allocates a fresh output graph (so input and output have distinct [Block.t]
     / [Instruction.t] types and can't be accidentally mixed), creates an output
     block per input block, then walks the input in the Finished_graph default
-    order (which is guaranteedd to have dominators first) and translates each
+    order (which is guaranteed to have dominators first) and translates each
     block, skipping unused operations and block parameters.
 
     Two layered hooks:
     - [visit_block] / [visit_instruction] / [visit_terminator]: intercept the
       walk over the input. Return [Replaced] to take over (e.g. emit something
-      else, or [Unchanged] to let the framework apply its default translation.
+      else), or [Unchanged] to let the framework apply its default translation.
     - [rewrite_instruction] / [rewrite_terminator]: intercept emissions into the
       output. Fire on every emission — both the framework's default translation
       and reducer-driven ones go through here.
@@ -21,7 +21,7 @@
     Default translation, applied when [visit_*] returns [Unchanged]:
     - Args (op args, block-param uses, terminator args) and blocks are mapped
       from the input to the output via [map_arg] and [map_block].
-    - Block params with [usage_count = 0] are dropped both from block the block
+    - Block params with [usage_count = 0] are dropped from both the block
       parameter list and from [Goto]s.
     - [Push_trap] / [Pop_trap] handlers are replaced by [None] if the handler
       block has become unreachable. CFG lowering routes those through a shared
@@ -36,21 +36,17 @@ module type Context = sig
 
   module Out : Ssa.Graph_builder
 
-  val emit_instruction :
-    Out.unfinished_block ->
-    Out.Instruction.t ->
-    Out.unfinished_block * Out.Instruction.t
+  val emit_instruction : Out.cursor -> Out.Instruction.t -> Out.Instruction.t
 
   val emit_op :
-    Out.unfinished_block ->
+    Out.cursor ->
     op:Out.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
     args:Out.Instruction.t array ->
-    Out.unfinished_block * Out.Instruction.t
+    Out.Instruction.t
 
-  val finish_block :
-    Out.unfinished_block -> dbg:Debuginfo.t -> Out.Terminator.t -> unit
+  val finish_block : Out.cursor -> dbg:Debuginfo.t -> Out.Terminator.t -> unit
 
   val new_block : params:Cmm.machtype -> Out.new_block_result
 
@@ -66,23 +62,18 @@ type 'a result =
 module type Reducer = functor (C : Context) -> sig
   val analyze : unit -> unit
 
-  val visit_block : C.In.Block.t -> C.Out.unfinished_block -> unit result
+  val visit_block : C.In.Block.t -> C.Out.cursor -> unit result
 
   val visit_instruction :
-    C.In.Block.t -> instr_index:int -> C.Out.unfinished_block -> unit result
+    C.In.Block.t -> instr_index:int -> C.Out.cursor -> unit result
 
-  val visit_terminator : C.In.Block.t -> C.Out.unfinished_block -> unit result
+  val visit_terminator : C.In.Block.t -> C.Out.cursor -> unit result
 
   val rewrite_instruction :
-    C.Out.unfinished_block ->
-    C.Out.Instruction.t ->
-    (C.Out.unfinished_block * C.Out.Instruction.t) result
+    C.Out.cursor -> C.Out.Instruction.t -> C.Out.Instruction.t result
 
   val rewrite_terminator :
-    C.Out.unfinished_block ->
-    dbg:Debuginfo.t ->
-    C.Out.Terminator.t ->
-    unit result
+    C.Out.cursor -> dbg:Debuginfo.t -> C.Out.Terminator.t -> unit result
 end
 
 module Default : Reducer =
@@ -92,20 +83,18 @@ functor
   struct
     let analyze () = ()
 
-    let visit_block (_ : C.In.Block.t) (_ : C.Out.unfinished_block) = Unchanged
+    let visit_block (_ : C.In.Block.t) (_ : C.Out.cursor) = Unchanged
 
     let visit_instruction (_ : C.In.Block.t) ~instr_index:(_ : int)
-        (_ : C.Out.unfinished_block) =
+        (_ : C.Out.cursor) =
       Unchanged
 
-    let visit_terminator (_ : C.In.Block.t) (_ : C.Out.unfinished_block) =
+    let visit_terminator (_ : C.In.Block.t) (_ : C.Out.cursor) = Unchanged
+
+    let rewrite_instruction (_ : C.Out.cursor) (_ : C.Out.Instruction.t) =
       Unchanged
 
-    let rewrite_instruction (_ : C.Out.unfinished_block)
-        (_ : C.Out.Instruction.t) =
-      Unchanged
-
-    let rewrite_terminator (_ : C.Out.unfinished_block) ~dbg:(_ : Debuginfo.t)
+    let rewrite_terminator (_ : C.Out.cursor) ~dbg:(_ : Debuginfo.t)
         (_ : C.Out.Terminator.t) =
       Unchanged
   end
@@ -119,27 +108,18 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
       module type S = sig
         val analyze : unit -> unit
 
-        val visit_block : C.In.Block.t -> C.Out.unfinished_block -> unit result
+        val visit_block : C.In.Block.t -> C.Out.cursor -> unit result
 
         val visit_instruction :
-          C.In.Block.t ->
-          instr_index:int ->
-          C.Out.unfinished_block ->
-          unit result
+          C.In.Block.t -> instr_index:int -> C.Out.cursor -> unit result
 
-        val visit_terminator :
-          C.In.Block.t -> C.Out.unfinished_block -> unit result
+        val visit_terminator : C.In.Block.t -> C.Out.cursor -> unit result
 
         val rewrite_instruction :
-          C.Out.unfinished_block ->
-          C.Out.Instruction.t ->
-          (C.Out.unfinished_block * C.Out.Instruction.t) result
+          C.Out.cursor -> C.Out.Instruction.t -> C.Out.Instruction.t result
 
         val rewrite_terminator :
-          C.Out.unfinished_block ->
-          dbg:Debuginfo.t ->
-          C.Out.Terminator.t ->
-          unit result
+          C.Out.cursor -> dbg:Debuginfo.t -> C.Out.Terminator.t -> unit result
       end
 
       let children : (module S) list =
@@ -189,7 +169,7 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
           | (module Red : S) :: rest -> (
             match Red.rewrite_instruction b i with
             | Unchanged -> loop rest
-            | Replaced (b', i') -> Replaced (b', i'))
+            | Replaced i' -> Replaced i')
         in
         loop children
 
@@ -213,12 +193,6 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   in
   (* Map each input block to its output counterpart. *)
   let block_map : Out.Block.t In.Block.Tbl.t = In.Block.Tbl.create 64 in
-  (* Global [Block_param] substitution table, populated by [visit_block]: for a
-     block [blk] in this table, references to [Block_param { block = blk; index
-     = i; _ }] resolve through [map_arg] to [subst.(i)]. *)
-  let block_param_subst : Out.Instruction.t array In.Block.Tbl.t =
-    In.Block.Tbl.create 16
-  in
   (* For each input block, the array of input param indices kept in the output
      block (in order). See [compute_kept] for the dropping criterion. *)
   let kept_params : int array In.Block.Tbl.t = In.Block.Tbl.create 64 in
@@ -314,12 +288,9 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   let rec map_arg_impl (i : In.Instruction.t) : Out.Instruction.t =
     match i with
     | Op { id; _ } -> In.Instruction_id.Tbl.find op_map id
-    | Block_param { block; index } -> (
-      match In.Block.Tbl.find_opt block_param_subst block with
-      | Some subst -> subst.(index)
-      | None ->
-        Out.Instruction.make_block_param (map_block_impl block)
-          (remap_param_index block index))
+    | Block_param { block; index } ->
+      Out.Instruction.make_block_param (map_block_impl block)
+        (remap_param_index block index)
     | Proj { index; src } -> Out.Instruction.make_proj ~index (map_arg_impl src)
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
       ->
@@ -366,20 +337,14 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
           continuation = Option.map map_block_impl continuation
         }
   in
-  (* [Ctx] and [Red] are mutually recursive: [Ctx]'s emissions route through
-     [Red]'s rewrite hooks, and [Red]'s visit hooks default to [Ctx]'s
-     translation helpers. *)
   let module M = struct
     module rec Ctx : sig
       include Context with module In = In and module Out = Out
 
       val visit_instruction :
-        In.Block.t ->
-        instr_index:int ->
-        Out.unfinished_block ->
-        Out.unfinished_block
+        In.Block.t -> instr_index:int -> Out.cursor -> unit
 
-      val visit_terminator : In.Block.t -> Out.unfinished_block -> unit
+      val visit_terminator : In.Block.t -> Out.cursor -> unit
     end = struct
       module In = In
       module Out = Out
@@ -387,7 +352,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       let emit_instruction b i =
         match Red.rewrite_instruction b i with
         | Unchanged -> Out.emit_instruction b i
-        | Replaced (b', i') -> b', i'
+        | Replaced i' -> i'
 
       let emit_op b ~op ~dbg ~typ ~args =
         emit_instruction b (Out.Instruction.make_op ~op ~typ ~args ~dbg)
@@ -405,7 +370,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
 
       let visit_instruction (blk : In.Block.t) ~instr_index b =
         match Red.visit_instruction blk ~instr_index b with
-        | Replaced () -> b
+        | Replaced () -> ()
         | Unchanged -> (
           let i = Array.get blk.body instr_index in
           match[@warning "-fragile-match"] i with
@@ -416,8 +381,8 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
              consumer. [keep_unused_ops] disables this filtering so the output
              is structurally faithful to the input — used before [Cfg_compare]
              so it can match the baseline pipeline. *)
-          | Op { usage_count = 0; _ } when not keep_unused_ops -> b
-          | _ ->
+          | Op { usage_count = 0; _ } when not keep_unused_ops -> ()
+          | _ -> (
             let rewritten : Out.Instruction.t =
               match i with
               | Op { op; typ; args; dbg; name; _ } ->
@@ -438,11 +403,10 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
                   { ident; provenance; which_parameter; regs = map_args regs }
               | Block_param _ | Proj _ | Tuple _ -> assert false
             in
-            let b, new_i = emit_instruction b rewritten in
-            (match[@warning "-fragile-match"] i with
+            let new_i = emit_instruction b rewritten in
+            match[@warning "-fragile-match"] i with
             | Op { id; _ } -> In.Instruction_id.Tbl.replace op_map id new_i
-            | _ -> ());
-            b)
+            | _ -> ()))
 
       let visit_terminator (blk : In.Block.t) b =
         match Red.visit_terminator blk b with
@@ -455,23 +419,18 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     and Red : sig
       val analyze : unit -> unit
 
-      val visit_block : In.Block.t -> Out.unfinished_block -> unit result
+      val visit_block : In.Block.t -> Out.cursor -> unit result
 
       val visit_instruction :
-        In.Block.t -> instr_index:int -> Out.unfinished_block -> unit result
+        In.Block.t -> instr_index:int -> Out.cursor -> unit result
 
-      val visit_terminator : In.Block.t -> Out.unfinished_block -> unit result
+      val visit_terminator : In.Block.t -> Out.cursor -> unit result
 
       val rewrite_instruction :
-        Out.unfinished_block ->
-        Out.Instruction.t ->
-        (Out.unfinished_block * Out.Instruction.t) result
+        Out.cursor -> Out.Instruction.t -> Out.Instruction.t result
 
       val rewrite_terminator :
-        Out.unfinished_block ->
-        dbg:Debuginfo.t ->
-        Out.Terminator.t ->
-        unit result
+        Out.cursor -> dbg:Debuginfo.t -> Out.Terminator.t -> unit result
     end =
       Red_ctor (Ctx)
   end in
@@ -483,17 +442,15 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   List.iter
     (fun (blk : In.Block.t) ->
       let out_blk = In.Block.Tbl.find block_map blk in
-      let b = Out.start_block out_blk in
+      let c = Out.start_block out_blk in
       try
-        match Red.visit_block blk b with
+        match Red.visit_block blk c with
         | Replaced () -> ()
         | Unchanged ->
-          let b = ref b in
           Array.iteri
-            (fun instr_index _ ->
-              b := Ctx.visit_instruction blk ~instr_index !b)
+            (fun instr_index _ -> Ctx.visit_instruction blk ~instr_index c)
             blk.body;
-          Ctx.visit_terminator blk !b
+          Ctx.visit_terminator blk c
       with exn ->
         let bt = Printexc.get_raw_backtrace () in
         let module In_print = Ssa_print.Make (In) in
