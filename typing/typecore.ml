@@ -3140,15 +3140,19 @@ and type_pat_aux
       let lbl_a_list = List.map type_label_pat lbl_a_list in
       rvp @@ solve_expected (make_record_pat lbl_a_list ambiguity)
   in
-  begin match sp.ppat_desc with
-  | Ppat_var _ -> ()
-  | Ppat_alias _ -> ()
-  | Ppat_constraint _ -> ()
-  | _ ->
-    (match Zero_alloc.sub ~context:Default zero_alloc Zero_alloc.default with
-    | Ok () -> ()
-    | Error _ -> fatal_error "type_pat_aux: zero_alloc")
-  end;
+  let verify_zero_alloc desc zero_alloc =
+    match desc with
+    | Ppat_var _ | Ppat_alias _ | Ppat_constraint _ -> ()
+    | Ppat_any | Ppat_constant _ | Ppat_interval _ | Ppat_unboxed_unit
+    | Ppat_unboxed_bool _ | Ppat_unboxed_tuple _ | Ppat_variant _
+    | Ppat_construct _ | Ppat_type _ | Ppat_unpack _ | Ppat_extension _
+    | Ppat_exception _ | Ppat_lazy _ | Ppat_open _ | Ppat_tuple _ | Ppat_array _
+    | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_or _ ->
+      (match Zero_alloc.sub ~context:Default zero_alloc Zero_alloc.default with
+       | Ok () -> ()
+       | Error _ -> fatal_error "type_pat_aux: zero_alloc")
+  in
+  verify_zero_alloc sp.ppat_desc zero_alloc;
   match sp.ppat_desc with
     Ppat_any ->
       rvp {
