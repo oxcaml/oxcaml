@@ -267,8 +267,16 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       then begin
         let kept = compute_kept blk in
         In.Block.Tbl.replace kept_params blk kept;
-        let params = Array.map (fun i -> blk.params.(i)) kept in
+        let params =
+          Array.map (fun i -> (blk.params.(i) : Ssa_intf.block_param).typ) kept
+        in
         let { Out.block = new_out; _ } = Out.new_block ~params in
+        let out_params = Out.Block.params new_out in
+        Array.iteri
+          (fun i k ->
+            (out_params.(i) : Ssa_intf.block_param).name
+              <- (blk.params.(k) : Ssa_intf.block_param).name)
+          kept;
         In.Block.Tbl.replace block_map blk new_out
       end)
     In.blocks;
@@ -415,8 +423,12 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
           | _ ->
             let rewritten : Out.Instruction.t =
               match i with
-              | Op { op; typ; args; dbg; _ } ->
-                Out.Instruction.make_op ~op ~typ ~args:(map_args args) ~dbg
+              | Op { op; typ; args; dbg; name; _ } ->
+                let new_op =
+                  Out.Instruction.make_op ~op ~typ ~args:(map_args args) ~dbg
+                in
+                Option.iter (Out.Instruction.set_name new_op) name;
+                new_op
               | Push_trap { handler } ->
                 Push_trap { handler = map_handler handler }
               | Pop_trap { handler } ->
@@ -494,9 +506,12 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         let bt = Printexc.get_raw_backtrace () in
         let module InPrint = Ssa_print.Make (In) in
         Format.eprintf
-          "*** Ssa_reducer.run error for %s while processing block %a: %s@."
+          "*** Ssa_reducer.run error for %s while processing block %a: %s@.*** \
+           Input SSA:@.%a@."
           In.function_info.fun_name InPrint.print_block_id blk
-          (Printexc.to_string exn);
+          (Printexc.to_string exn) Ssa_print.print
+          (module In : Ssa.Finished_graph);
+        Format.pp_print_flush Format.err_formatter ();
         Printexc.raise_with_backtrace exn bt)
     In.blocks;
   let result = Out.finish () in

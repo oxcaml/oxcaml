@@ -55,7 +55,7 @@ let make_builder (function_info : function_info) :
       and t =
         { id : Block_id.t;
           is_function_start : bool;
-          params : Cmm.machtype;
+          params : Ssa_intf.block_param array;
           mutable predecessors : predecessors;
           mutable body : Instruction.t array;
           mutable terminator : Terminator.t;
@@ -69,7 +69,7 @@ let make_builder (function_info : function_info) :
 
       val is_function_start : t -> bool
 
-      val params : t -> Cmm.machtype
+      val params : t -> Ssa_intf.block_param array
 
       val equal : t -> t -> bool
 
@@ -95,7 +95,7 @@ let make_builder (function_info : function_info) :
       and t =
         { id : Block_id.t;
           is_function_start : bool;
-          params : Cmm.machtype;
+          params : Ssa_intf.block_param array;
           mutable predecessors : predecessors;
           mutable body : Instruction.t array;
           mutable terminator : Terminator.t;
@@ -156,7 +156,8 @@ let make_builder (function_info : function_info) :
           typ : Cmm.machtype;
           args : Instruction.t array;
           dbg : Debuginfo.t;
-          mutable usage_count : usage_count
+          mutable usage_count : usage_count;
+          mutable name : string option
         }
 
       and block_param_data =
@@ -173,6 +174,8 @@ let make_builder (function_info : function_info) :
 
       val make_op :
         op:op -> typ:Cmm.machtype -> args:t array -> dbg:Debuginfo.t -> t
+
+      val set_name : t -> string -> unit
 
       val make_block_param : Block.t -> int -> t
 
@@ -201,7 +204,8 @@ let make_builder (function_info : function_info) :
           typ : Cmm.machtype;
           args : Instruction.t array;
           dbg : Debuginfo.t;
-          mutable usage_count : usage_count
+          mutable usage_count : usage_count;
+          mutable name : string option
         }
 
       and block_param_data =
@@ -226,7 +230,7 @@ let make_builder (function_info : function_info) :
           Misc.fatal_errorf
             "Ssa.Instruction.arg_type: Op has %d-component type; project first"
             (Array.length typ)
-        | Block_param { block; index } -> block.params.(index)
+        | Block_param { block; index } -> block.params.(index).typ
         | Proj { index; src = Op { typ; _ } } -> typ.(index)
         | Proj _ | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _
         | Name_for_debugger _ ->
@@ -234,7 +238,20 @@ let make_builder (function_info : function_info) :
 
       let make_op ~op ~typ ~args ~dbg =
         Op
-          { id = Instruction_id.create (); op; typ; args; dbg; usage_count = 0 }
+          { id = Instruction_id.create ();
+            op;
+            typ;
+            args;
+            dbg;
+            usage_count = 0;
+            name = None
+          }
+
+      let set_name (i : t) name =
+        match[@warning "-4"] i with
+        | Op r -> r.name <- Some name
+        | Block_param { block; index } -> block.params.(index).name <- Some name
+        | _ -> ()
 
       let make_block_param (block : Block.t) (index : int) =
         if index < 0 || index >= Array.length block.params
@@ -390,8 +407,14 @@ let make_builder (function_info : function_info) :
         block_end_trap_stack = []
       }
 
-    let make_block_result ~is_function_start ~params : new_block_result =
-      let block = create_block ~is_function_start ~params in
+    let make_block_result ~is_function_start ~(params : Cmm.machtype) :
+        new_block_result =
+      let block_params : Ssa_intf.block_param array =
+        Array.map
+          (fun typ : Ssa_intf.block_param -> { typ; name = None })
+          params
+      in
+      let block = create_block ~is_function_start ~params:block_params in
       let params_arr =
         Array.init (Array.length params) (fun i ->
             Instruction.make_block_param block i)
@@ -404,6 +427,14 @@ let make_builder (function_info : function_info) :
       let { block; params } =
         make_block_result ~is_function_start:true ~params:function_info.fun_args
       in
+      (* Initialize names from the function's argument names, when known. *)
+      List.iteri
+        (fun i (var, _ty) ->
+          if i < Array.length block.params
+          then
+            block.params.(i).name
+              <- Some (Backend_var.name (Backend_var.With_provenance.var var)))
+        function_info.fun_args_names;
       block, params
 
     (* === Builder operations: functional, returning new unfinished_block === *)
@@ -436,7 +467,7 @@ let make_builder (function_info : function_info) :
       | Empty_block blk -> blk, acc
       | Add_instruction (ub', i) -> collect_body_into (i :: acc) ub'
 
-    let check_args_arity ~term_name ~args ~(expected : Cmm.machtype) =
+    let check_args_arity ~term_name ~args ~expected =
       if Array.length args <> Array.length expected
       then
         Misc.fatal_errorf "Ssa.finish_block: %s passes %d args but expected %d"
@@ -477,6 +508,9 @@ let make_builder (function_info : function_info) :
 
     let predecessors (blk : Block.t) : Block.t list =
       Block_set.elements blk.predecessors
+
+    let params_machtype (blk : Block.t) : Cmm.machtype =
+      Array.map (fun (p : Ssa_intf.block_param) -> p.typ) blk.params
 
     (* The terminator is missing the trap successors, which are derived from
        [block_end_trap_stack]. *)
@@ -779,6 +813,8 @@ let make_builder (function_info : function_info) :
         let blocks = reachable
 
         let predecessors = predecessors
+
+        let params_machtype = params_machtype
 
         let successors = successors
 

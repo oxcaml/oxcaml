@@ -588,14 +588,13 @@ module Make (S : Ssa.Finished_graph) = struct
           (Cfg.Invalid { message; stack_ofs; stack_align; label_after })
           loc_arg loc_res dbg
     in
-    let exn = Option.map (label_of env) (S.trap_successor block) in
     let can_raise = Cfg.can_raise_terminator terminator.desc in
     { Cfg.start = label_of env block;
       body;
       terminator;
       predecessors = Label.Set.empty;
       stack_offset = Cfg.invalid_stack_offset;
-      exn;
+      exn = None;
       can_raise;
       is_trap_handler;
       cold = false
@@ -666,7 +665,7 @@ module Make (S : Ssa.Finished_graph) = struct
         let label = Label.new_label () in
         S.Block.Tbl.replace env.block_labels block label;
         S.Block.Tbl.replace env.block_params_regs block
-          (Reg.createv block.params));
+          (Reg.createv (S.params_machtype block)));
     let fun_arg_regs = get_block_params_regs env S.entry in
     let loc_arg = Proc.loc_parameters (Reg.typv fun_arg_regs) in
     let prologue_poll_instr_id = ref None in

@@ -42,7 +42,7 @@ module Detect (C : Ssa_reducer.Context) = struct
     let arg_types = Array.map C.In.Instruction.arg_type real_args in
     let _, stack_ofs_args = Proc.loc_arguments arg_types in
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
-    Stdlib.Int.max stack_ofs_args stack_ofs_res = 0
+    stack_ofs_args = 0 && stack_ofs_res = 0
 
   let visit_terminator (blk : C.In.Block.t) (b : C.Out.unfinished_block) =
     match[@warning "-fragile-match"] blk.terminator with
@@ -53,9 +53,10 @@ module Detect (C : Ssa_reducer.Context) = struct
           may_raise = _;
           nontail = false
         }
-      when blk.block_end_trap_stack = []
+      when List.is_empty blk.block_end_trap_stack
            && returns_args_unchanged continuation
-           && stack_offsets_zero call_op args continuation.params ->
+           && stack_offsets_zero call_op args
+                (C.In.params_machtype continuation) ->
       let mapped_args = Array.map C.map_arg args in
       let term : C.Out.Terminator.t =
         match call_op with

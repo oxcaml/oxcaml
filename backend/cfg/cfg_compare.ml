@@ -1,5 +1,35 @@
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
+(** Structural and register-equivalence check between two CFGs for the same
+    function. Used to validate the SSA pipeline against the baseline
+    [Cfg_selectgen] output.
+
+    The comparison runs in two phases:
+
+    - [collect_matching_blocks]: Walks from the entry blocks of both CFGs in
+      lockstep, building a bijection between old and new labels via [map_label].
+      Calls to [map_label] come from terminator successor fields (Goto target,
+      Branch arms, Switch cases, Tailcall_self destination, Call/Prim
+      continuation, Invalid continuation), from [Pushtrap]/[Poptrap] body
+      instructions, and from block-level [exn] pointers. As blocks are paired up
+      the framework checks that their bodies match instruction-by-instruction
+      (modulo Move skipping), that their terminators have the same shape, and
+      that block-level metadata (is_trap_handler, can_raise, cold, stack_offset)
+      agrees. Unreachable trap handlers (no predecessors on both sides) are
+      skipped — their bodies may differ harmlessly between [Cfg_of_ssa]'s
+      [make_invalid_handler_bloc] and [Cfg_selectgen]'s [unreachable_handler] or
+      a remaining input block.
+
+    - [verify_register_equivalence]: Backward fixpoint over matched block pairs:
+      starting from the observable register set at exits (return, raise,
+      tailcall, indirect call), propagate equality obligations between old and
+      new registers up through each block's instructions until reaching a
+      fixpoint. The [Equations] module tracks these (old_reg, new_reg) pairs
+      symmetrically; moves are handled as substitutions rather than re-emitted
+      equations. Any obligation that survives back to a block's entry must be
+      derivable from the entry's incoming equations, which the pass checks
+      against the meet of all predecessors' exit equations. *)
+
 module DLL = Oxcaml_utils.Doubly_linked_list
 
 (* A set of (old_reg, new_reg) pairs asserting that these registers hold equal
@@ -563,7 +593,7 @@ let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
 
 (* === Entry point === *)
 
-let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
+let compare ~fun_name ~old_cfg ~new_cfg ppf =
   let mismatches = Buffer.create 256 in
   let ppf_m = Format.formatter_of_buffer mismatches in
   begin
@@ -603,8 +633,6 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
   if String.length msg > 0
   then (
     Format.fprintf ppf "*** CFG comparison MISMATCH for %s:@.%s@." fun_name msg;
-    Format.fprintf ppf "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
-    Format.fprintf ppf "*** SSA:@.%a@." Ssa_print.print ssa;
     Format.fprintf ppf "*** Old CFG:@.%a@." Printcfg.cfg_with_layout old_cfg;
     Format.fprintf ppf "*** New CFG (from SSA):@.%a@." Printcfg.cfg_with_layout
       new_cfg;

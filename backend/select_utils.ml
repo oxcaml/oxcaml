@@ -592,22 +592,11 @@ module Stack_offset_and_exn = struct
         (Cfg.successor_labels ~normal:true ~exn:false block);
       (* exceptional successor *)
       if block.can_raise
-      then
-        let exn_from_traps =
-          match traps with
-          | [] -> None
-          | handler_label :: _ -> Some handler_label
-        in
-        match block.exn with
-        | None -> block.exn <- exn_from_traps
-        | Some existing ->
-          if not (Option.equal Label.equal block.exn exn_from_traps)
-          then
-            Misc.fatal_errorf
-              "Stack_offset_and_exn: block %a has exn=%a but trap stack says %a"
-              Label.format label Label.format existing
-              (Format.pp_print_option Label.format)
-              exn_from_traps)
+      then (
+        assert (Option.is_none block.exn);
+        match traps with
+        | [] -> ()
+        | handler_label :: _ -> block.exn <- Some handler_label))
 
   let update_cfg : Cfg.t -> unit =
    fun cfg ->

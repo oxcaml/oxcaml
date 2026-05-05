@@ -534,8 +534,14 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
            fd_cmm Ssa_print.print ssa;
          Printexc.raise_with_backtrace exn bt
      in
-     Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
-       ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump;
+     (try
+        Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
+          ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
+      with exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
+        Format.fprintf ppf_dump "*** SSA:@.%a@." Ssa_print.print ssa;
+        Printexc.raise_with_backtrace exn bt);
      if !Oxcaml_flags.dump_ssa
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      (* Second conversion: produces the CFG that feeds the real pipeline. This

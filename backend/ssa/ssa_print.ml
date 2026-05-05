@@ -3,7 +3,8 @@
 (** Pretty-printer for {!Ssa.Finished_graph} instances.
 
     Format conventions:
-    - Op result names are [v<id>], block ids are [B<id>], block params are
+    - Op result names are [v<id>] (or [<name>/v<id>] when the op carries a name
+      from a Cmm let-binding), block ids are [B<id>], block params are
       [B<id>.<index>].
     - References to ops use the result name, references to block params use the
       [B<id>.<index>] form, projections render as nested [v<i>.<index>].
@@ -17,21 +18,28 @@ module Make (S : Ssa.Finished_graph) = struct
     Format.fprintf ppf "B%d" (b.id :> int)
 
   let print_block_param ppf ((b : S.Block.t), index) =
-    Format.fprintf ppf "%a.%d" print_block_id b index
+    let p : Ssa_intf.block_param = b.params.(index) in
+    match p.name with
+    | None -> Format.fprintf ppf "%a.%d" print_block_id b index
+    | Some n -> Format.fprintf ppf "%s/%a.%d" n print_block_id b index
+
+  let print_op_id ppf (od : S.Instruction.op_data) =
+    match od.name with
+    | None -> Format.fprintf ppf "v%d" (od.id :> int)
+    | Some n -> Format.fprintf ppf "%s/v%d" n (od.id :> int)
 
   let rec print_instruction ppf (i : S.Instruction.t) =
     match i with
-    | Op { id; op; args; _ } ->
+    | Op ({ op; args; _ } as od) ->
       let op_str = Format.asprintf "%a" Operation.dump op in
       if Array.length args = 0
-      then Format.fprintf ppf "v%d = %s" (id :> int) op_str
+      then Format.fprintf ppf "%a = %s" print_op_id od op_str
       else
         let formatted_op =
           if String.contains op_str ' ' then "(" ^ op_str ^ ")" else op_str
         in
-        Format.fprintf ppf "v%d = %s(%a)"
-          (id :> int)
-          formatted_op print_args args
+        Format.fprintf ppf "%a = %s(%a)" print_op_id od formatted_op print_args
+          args
     | Push_trap { handler } ->
       Format.fprintf ppf "push_trap %a"
         (Format.pp_print_option
@@ -52,7 +60,7 @@ module Make (S : Ssa.Finished_graph) = struct
 
   and print_instr_ref ppf (i : S.Instruction.t) =
     match i with
-    | Op { id; _ } -> Format.fprintf ppf "v%d" (id :> int)
+    | Op od -> print_op_id ppf od
     | Block_param { block; index; _ } -> print_block_param ppf (block, index)
     | Proj { index; src } ->
       Format.fprintf ppf "%d.%a" index print_instr_ref src
@@ -120,10 +128,10 @@ module Make (S : Ssa.Finished_graph) = struct
 
   let print_typed_params ppf (blk : S.Block.t) =
     Array.iteri
-      (fun i typ ->
+      (fun i (p : Ssa_intf.block_param) ->
         if i > 0 then Format.fprintf ppf ", ";
         Format.fprintf ppf "%a : %a" print_block_param (blk, i)
-          Printcmm.machtype_component typ)
+          Printcmm.machtype_component p.typ)
       blk.params
 
   let print_block_header ppf (blk : S.Block.t) =

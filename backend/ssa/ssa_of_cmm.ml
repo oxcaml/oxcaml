@@ -71,6 +71,8 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
 
   let bind_let env b v r1 =
     let env = env_add v r1 env in
+    let name = V.name (VP.var v) in
+    Array.iter (fun i -> B.Instruction.set_name i name) r1;
     let provenance = VP.provenance v in
     if Option.is_some provenance
     then
@@ -511,7 +513,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     let r_then = emit env then_b eif ~tail in
     let else_b = ref (B.start_block else_block) in
     let r_else = emit env else_b eelse ~tail in
-    join_branches b (r_then, !then_b) (r_else, !else_b)
+    join_branches b (r_then, then_b) (r_else, else_b)
 
   and emit_switch env b ~tail esel index ecases : result =
     let* rsel = emit env b esel ~tail:false in
@@ -532,7 +534,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       Array.mapi
         (fun i (case_expr, _dbg) ->
           let case_b = ref (B.start_block case_blocks.(i)) in
-          emit env case_b case_expr ~tail, !case_b)
+          emit env case_b case_expr ~tail, case_b)
         ecases
     in
     join_array b case_results
@@ -546,6 +548,18 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
         (fun env Cmm.{ label = nfail; params; _ } ->
           let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
           let new_block = B.new_block ~params:types in
+          let block_params = B.Block.params new_block.block in
+          let pos = ref 0 in
+          List.iter
+            (fun (id, ty) ->
+              let n = Array.length ty in
+              let name = V.name (VP.var id) in
+              for i = 0 to n - 1 do
+                (block_params.(!pos + i) : Ssa_intf.block_param).name
+                  <- Some name
+              done;
+              pos := !pos + n)
+            params;
           let env =
             { env with
               static_exceptions =
@@ -582,10 +596,10 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
               (Name_for_debugger
                  { ident = VP.var id; provenance; which_parameter = None; regs }))
         handler.params;
-      emit handler_env b handler.body ~tail, !b
+      emit handler_env b handler.body ~tail, b
     in
     let handler_results = List.map2 translate_handler handlers handler_blocks in
-    join_array b (Array.of_list ((r_body, !b) :: handler_results))
+    join_array b (Array.of_list ((r_body, b) :: handler_results))
 
   and find_handler env handler_id : B.Block.t =
     try Static_label.Map.find handler_id env.static_exceptions
@@ -627,10 +641,10 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
     match r1, r2 with
     | Never_returns, Never_returns -> Never_returns
     | Ok r, Never_returns ->
-      b := b1;
+      b := !b1;
       Ok r
     | Never_returns, Ok r ->
-      b := b2;
+      b := !b2;
       Ok r
     | Ok r1_instrs, Ok r2_instrs ->
       assert (Array.length r1_instrs = Array.length r2_instrs);
@@ -638,9 +652,9 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
       let { B.block = join_block; params = join_params } =
         B.new_block ~params:join_types
       in
-      B.finish_block b1 ~dbg:Debuginfo.none
+      B.finish_block !b1 ~dbg:Debuginfo.none
         (Goto { goto = join_block; args = r1_instrs });
-      B.finish_block b2 ~dbg:Debuginfo.none
+      B.finish_block !b2 ~dbg:Debuginfo.none
         (Goto { goto = join_block; args = r2_instrs });
       b := B.start_block join_block;
       Ok join_params
@@ -648,7 +662,8 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
   (* Join a set of branches (each with its own end-cursor) into a fresh block.
      [b] is left pointing at the joined block, or unchanged if every branch did
      not return. *)
-  and join_array b (results : (result * B.unfinished_block) array) : result =
+  and join_array b (results : (result * B.unfinished_block ref) array) : result
+      =
     let join_info = ref None in
     Array.iter
       (fun (r, _) ->
@@ -678,7 +693,7 @@ module Make (B : Ssa.Standalone_graph_builder) = struct
           match r with
           | Never_returns -> ()
           | Ok instrs ->
-            B.finish_block b_branch ~dbg:Debuginfo.none
+            B.finish_block !b_branch ~dbg:Debuginfo.none
               (Goto { goto = join_block; args = instrs }))
         results;
       b := B.start_block join_block;
