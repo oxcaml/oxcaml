@@ -2289,6 +2289,10 @@ static void caml_do_tick_all_domains(void)
 static void* caml_tick(void *arg)
 {
   (void)arg;
+#ifdef HAS_INTERRUPTIBLE_TICK
+  uintnat total_interval_us = 0;
+  bool cputime_check_done = false;
+#endif
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)
@@ -2312,6 +2316,24 @@ static void* caml_tick(void *arg)
       tick_thread_arm_timer(interval);
       if (tick_thread_wait()) {
         caml_do_tick_all_domains();
+        /* Some gnarly LD_PRELOAD hacks replace epoll_wait with an
+           implementation that busy-waits. This is hugely wasteful
+           for the tick thread, so fall back to caml_tick_use_usleep
+           if we turn out to be using a lot of CPU. */
+        total_interval_us += interval;
+        if (total_interval_us >= 1000000 && !cputime_check_done) {
+          struct timespec ts = {};
+          int rc = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+          uintnat us_spent =
+            (uintnat)ts.tv_sec * 1000000 + (uintnat)ts.tv_nsec / 1000;
+          if (rc == 0 && us_spent > total_interval_us / 2) {
+            CAML_GC_MESSAGE(DOMAIN,
+              "Disabling epoll-based ticker due to %.0f%% CPU usage\n",
+              100. * (double)us_spent / (double)total_interval_us);
+            caml_tick_use_usleep = true;
+          }
+          cputime_check_done = true;
+        }
       }
 
       /* If we were interrupted (rather than the timer going off), we loop back
