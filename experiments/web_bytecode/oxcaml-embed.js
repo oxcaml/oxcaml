@@ -1,5 +1,5 @@
 (function () {
-  const assetVersion = "20260427-worker-blob";
+  const assetVersion = "20260505-manual-run-trigger";
   const script = document.currentScript;
   const moduleUrl = script?.dataset.moduleSrc
     ? new URL(script.dataset.moduleSrc, script.src || document.baseURI).href
