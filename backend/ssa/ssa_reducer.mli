@@ -5,7 +5,7 @@
 
     - [visit_*] intercepts the walk: when an input instruction is reached, the
       reducer can handle it itself (skip, duplicate, inline from other blocks,
-      etc.) or return [`Unchanged] to let the framework apply the default
+      etc.) or return [Unchanged] to let the framework apply the default
       translation.
 
     - [rewrite_*] intercepts every emission into the output graph: as the
@@ -13,8 +13,8 @@
       reducer can keep it as-is or swap in a replacement.
 
     The hooks are interleaved for each instruction: if [visit] returns
-    [`Unchanged], the framework's default translation rewrites args and calls
-    the output-side [rewrite] hook before moving on.
+    [Unchanged], the framework's default translation rewrites args and calls the
+    output-side [rewrite] hook before moving on.
 
     The new interface keeps input and output graphs in separate modules ([C.In]
     for the read-only input, [C.Out] for the in-progress output): the type
@@ -58,6 +58,10 @@ module type Context = sig
   val map_block : In.Block.t -> Out.Block.t
 end
 
+type 'a result =
+  | Unchanged
+  | Replaced of 'a
+
 (** A reducer functor. Given a [Context], returns the per-run hooks. *)
 module type Reducer = functor (C : Context) -> sig
   (** Called once at the start, before any [visit_*] / [rewrite_*]. The reducer
@@ -65,55 +69,50 @@ module type Reducer = functor (C : Context) -> sig
       state for the per-instruction hooks to consult. *)
   val analyze : unit -> unit
 
-  (** Called once per input block, before its body is visited. [`Unchanged]:
+  (** Called once per input block, before its body is visited. [Unchanged]:
       defer to the framework (which visits body and terminator in turn).
-      [`Replaced]: the reducer has handled this block already. *)
-  val visit_block :
-    C.In.Block.t -> C.Out.unfinished_block -> [> `Unchanged | `Replaced]
+      [Replaced]: the reducer has handled this block already. *)
+  val visit_block : C.In.Block.t -> C.Out.unfinished_block -> unit result
 
-  (** Called for each instruction in each input block. [`Unchanged]: defer to
-      the framework's default translation. [`Replaced]: the reducer has handled
-      the instruction itself (via direct emission on the cursor or through one
-      of the [Context] helpers). *)
+  (** Called for each instruction in each input block. [Unchanged]: defer to the
+      framework's default translation. [Replaced]: the reducer has handled the
+      instruction itself (via direct emission on the cursor or through one of
+      the [Context] helpers). *)
   val visit_instruction :
-    C.In.Block.t ->
-    instr_index:int ->
-    C.Out.unfinished_block ->
-    [> `Unchanged | `Replaced]
+    C.In.Block.t -> instr_index:int -> C.Out.unfinished_block -> unit result
 
   (** Called once per input block, after its body. *)
-  val visit_terminator :
-    C.In.Block.t -> C.Out.unfinished_block -> [> `Unchanged | `Replaced]
+  val visit_terminator : C.In.Block.t -> C.Out.unfinished_block -> unit result
 
   (** Called each time the framework is about to emit an instruction into the
-      cursor. [`Unchanged]: keep as-is. [`Replaced (b', i)]: the reducer has
+      cursor. [Unchanged]: keep as-is. [Replaced (b', i)]: the reducer has
       emitted a replacement; [b'] is the continuation cursor and [i] is the
       representative for op-id remapping (use [Tuple [||]] to remap to nothing).
   *)
   val rewrite_instruction :
     C.Out.unfinished_block ->
     C.Out.Instruction.t ->
-    [> `Unchanged | `Replaced of C.Out.unfinished_block * C.Out.Instruction.t]
+    (C.Out.unfinished_block * C.Out.Instruction.t) result
 
-  (** Called each time the framework is about to finish a block. [`Unchanged]:
-      finish with this terminator. [`Replaced]: the reducer has already
-      finalised the block. *)
+  (** Called each time the framework is about to finish a block. [Unchanged]:
+      finish with this terminator. [Replaced]: the reducer has already finalised
+      the block. *)
   val rewrite_terminator :
     C.Out.unfinished_block ->
     dbg:Debuginfo.t ->
     C.Out.Terminator.t ->
-    [> `Unchanged | `Replaced]
+    unit result
 end
 
-(** A trivial reducer: every hook returns [`Unchanged], so the framework always
+(** A trivial reducer: every hook returns [Unchanged], so the framework always
     takes the default path. Typically used via [include] so a reducer only
     writes the hooks it actually overrides. *)
 module Default : Reducer
 
 (** Combine several reducers into one. For each hook, children are tried in
-    order; the first one to return a non-[`Unchanged] result wins and its result
-    is propagated. If every child returns [`Unchanged], the combined reducer
-    also returns [`Unchanged]. *)
+    order; the first one to return a non-[Unchanged] result wins and its result
+    is propagated. If every child returns [Unchanged], the combined reducer also
+    returns [Unchanged]. *)
 val combine : (module Reducer) list -> (module Reducer)
 
 (** Run the given reducer over the input graph, producing a new

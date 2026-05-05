@@ -1,12 +1,14 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
+open Ssa_reducer
+
 (* Detects [Call] terminators whose continuation does nothing but [Return] the
    call's results, and whose enclosing block has an empty trap stack. Rewrites
    them as [Tailcall_self] (when the callee is the current function by name) or
    [Tailcall_func]. The matching predicates are the SSA-level analogue of the
    eager checks that used to live in [Ssa_of_cmm.emit_tail_apply]. *)
-module Detect (C : Ssa_reducer.Context) = struct
-  include Ssa_reducer.Default (C)
+module Detect (C : Context) = struct
+  include Default (C)
 
   let returns_args_unchanged (k : C.In.Block.t) : bool =
     Array.for_all
@@ -68,11 +70,8 @@ module Detect (C : Ssa_reducer.Context) = struct
           Tailcall_func { op = call_op; args = mapped_args }
       in
       C.finish_block b ~dbg:blk.terminator_dbg term;
-      `Replaced
-    | _ -> `Unchanged
+      Replaced ()
+    | _ -> Unchanged
 end
 
-let run ssa =
-  Ssa_reducer.run ~keep_unused_ops:true
-    (module Detect : Ssa_reducer.Reducer)
-    ssa
+let run ssa = run ~keep_unused_ops:true (module Detect : Reducer) ssa
