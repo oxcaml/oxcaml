@@ -1163,8 +1163,8 @@ Line 4, characters 25-45:
                              ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
@@ -1193,8 +1193,8 @@ Line 1, characters 27-43:
                                ^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
@@ -1204,8 +1204,8 @@ Line 1, characters 29-47:
                                  ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
@@ -1239,6 +1239,7 @@ Line 1, characters 29-58:
                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
@@ -1248,6 +1249,7 @@ Line 1, characters 35-64:
                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_tuple_return_with_attr_u :
@@ -1284,6 +1286,7 @@ Line 1, characters 32-50:
                                     ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
@@ -1333,8 +1336,8 @@ Line 2, characters 26-54:
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 type ext_record_arg_record_3 = #{ i : int; b : bool; s : string }
@@ -1346,8 +1349,8 @@ Line 2, characters 28-58:
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 type ext_record_arg_attr_record = #{ i : int; b : bool }
@@ -1389,6 +1392,7 @@ Line 2, characters 31-41:
                                    ^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 type ext_record_nested = #{ x : int; y : ext_record_arg_record }
@@ -1400,6 +1404,21 @@ Line 2, characters 30-54:
                                   ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
+|}]
+
+external error_with_multiple_hints
+  : #(int * int) -> #(int * int) -> #(int * int * int)
+  = "foo" "bar"
+[%%expect{|
+Line 2, characters 4-54:
+2 |   : #(int * int) -> #(int * int) -> #(int * int * int)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 type t = #{ i : int; b : bool }
@@ -1487,8 +1506,8 @@ Line 2, characters 2-22:
       ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 (* @unpacked allows product types as arguments to C stubs *)
@@ -1538,6 +1557,7 @@ Line 2, characters 2-36:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: The "[@unpacked]" attribute is not allowed on C stub returns.
 |}]
 
 (* @unpacked combined with @unboxed should error *)
@@ -1731,8 +1751,8 @@ Line 1, characters 16-60:
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [caml_array_make] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =

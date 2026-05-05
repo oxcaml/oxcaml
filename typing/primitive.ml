@@ -65,6 +65,20 @@ type 'repr description_gen =
 
 type description = native_repr description_gen
 
+(* Is [[@@immediate]], so poly-compare can be used to de-dup errors. If a [loc]
+   is added, then errors will always be unique and de-duping will no longer be
+   necessary. *)
+type wrong_repr_error =
+  | Product_arg
+  | Expected_value_prim
+  | Product_return
+  | Unpacked_product_return
+  | Repr_mismatch
+[@@immediate]
+
+let compare_wrong_repr_error (a : wrong_repr_error) (b : wrong_repr_error) =
+  Stdlib.compare a b
+
 type error =
   | Old_style_float_with_native_repr_attribute
   | Old_style_float_with_non_value
@@ -75,7 +89,7 @@ type error =
   | Inconsistent_noalloc_attributes_for_effects
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
-      { prim_name : string; has_product_arg : bool }
+      { prim_name : string; errors : wrong_repr_error list }
 
 exception Error of Location.t * error
 
@@ -471,16 +485,19 @@ module Repr_check = struct
 
   type result =
     | Wrong_arity
-    | Wrong_repr
+    | Wrong_repr of wrong_repr_error list (* non-empty list *)
     | Success
 
   let args_res_reprs prim =
     (prim.prim_native_repr_args @ [prim.prim_native_repr_res])
     |> List.map snd
 
-  let is repr = equal_native_repr repr
+  let is expected_repr repr : wrong_repr_error list =
+    if equal_native_repr expected_repr repr
+    then []
+    else [Repr_mismatch]
 
-  let any = fun _ -> true
+  let any = fun _ -> []
 
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
@@ -493,34 +510,46 @@ module Repr_check = struct
     | Univar _ -> Misc.fatal_error "sort_is_product: univar"
     | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
 
-  let valid_c_stub_arg = function
+  let c_stub_arg_errors = function
     | Same_as_ocaml_repr s ->
-      not (sort_is_product s)
+      if sort_is_product s then [Product_arg] else []
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unpacked_product _ | Repr_poly -> true
+    | Unpacked_product _ | Repr_poly -> []
 
-  let valid_c_stub_return = function
+  let c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Repr_poly -> true
-    | Unpacked_product _ -> false
+    | Repr_poly -> []
+    | Unpacked_product _ -> [Unpacked_product_return]
     | Same_as_ocaml_repr (Product [s1; s2]) ->
-      not (sort_is_product s1) &&
-      not (sort_is_product s2)
-    | Same_as_ocaml_repr (Product _) -> false
+      if (sort_is_product s1) ||
+         (sort_is_product s2)
+      then [Product_return]
+      else []
+    | Same_as_ocaml_repr (Product _) -> [Product_return]
     | Same_as_ocaml_repr (Univar _) ->
-      Misc.fatal_error "valid_c_stub_return: univar"
+      Misc.fatal_error "c_stub_return_errors: univar"
     | Same_as_ocaml_repr (Genvar _) ->
-      Misc.fatal_error "valid_c_stub_return: genvar"
+      Misc.fatal_error "c_stub_return_errors: genvar"
 
+  (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
+     each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
+     If the returned list is empty, then the check succeeded. For example,
+     [check [any; is (Same_as_ocaml_repr C.scannable)] prim_desc] checks that
+     [prim_desc] accepts a single argument of any layout and returns a
+     scannable value. *)
   let check checks prim =
     let reprs = args_res_reprs prim in
     if List.length reprs <> List.length checks
     then Wrong_arity
-    else
-    if not (List.for_all2 (fun f x -> f x) checks reprs)
-    then Wrong_repr
-    else Success
+    else begin
+      let repr_errors =
+        List.concat (List.map2 (fun f x -> f x) checks reprs)
+      in
+      if List.is_empty repr_errors
+      then Success
+      else Wrong_repr repr_errors
+    end
 
   let exactly required =
     check (List.map is required)
@@ -534,7 +563,11 @@ module Repr_check = struct
   let no_non_value_repr prim =
     let arity = List.length prim.prim_native_repr_args in
     check
-      (List.init (arity+1) (fun _ -> value_or_unboxed_or_untagged))
+      (List.init (arity+1)
+         (fun _ repr ->
+            if value_or_unboxed_or_untagged repr
+            then []
+            else [Expected_value_prim]))
       prim
 
   let check_c_stub prim =
@@ -542,7 +575,8 @@ module Repr_check = struct
        arguments or return products with more than two elements. *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
-      (List.init arity (fun _ -> valid_c_stub_arg)) @ [valid_c_stub_return]
+      (List.init arity (fun _ -> c_stub_arg_errors))
+      @ [c_stub_return_errors]
     in
     check checks prim
 end
@@ -1044,18 +1078,10 @@ let prim_has_valid_reprs ~loc prim =
        primitives here but not all, and it would be weird to raise different
        errors dependent on the [prim_name]. *)
     ()
-  | Wrong_repr ->
-    let has_product_arg =
-      not (is_builtin_prim_name prim.prim_name)
-      && List.exists (fun (_, repr) ->
-           match repr with
-           | Same_as_ocaml_repr (Product _) -> true
-           | _ -> false)
-           prim.prim_native_repr_args
-    in
+  | Wrong_repr errors ->
     raise (Error (loc,
             Invalid_native_repr_for_primitive
-              { prim_name = prim.prim_name; has_product_arg }))
+              { prim_name = prim.prim_name; errors }))
 
 let prim_can_contain_layout_any prim =
   match prim.prim_name with
@@ -1118,17 +1144,39 @@ let report_error ppf err =
     Format_doc.fprintf ppf "Attribute %a can only be used \
                         on built-in primitives."
       Style.inline_code "[@layout_poly]"
-  | Invalid_native_repr_for_primitive { prim_name; has_product_arg } ->
+  | Invalid_native_repr_for_primitive { prim_name; errors } ->
     Format_doc.fprintf ppf
       "The primitive [%s] is used in an invalid declaration.@ \
        The declaration contains argument/return types with the@ \
        wrong layout."
       prim_name;
-    if has_product_arg then
-      Format_doc.fprintf ppf
-        "@ Hint: Types with product layouts in C stub arguments@ \
-         require the %a attribute."
-        Style.inline_code "[@unpacked]"
+    let errors = List.sort_uniq compare_wrong_repr_error errors in
+    List.iter
+      (function
+      | Product_arg ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           Types with product layouts in C stub arguments require the@ \
+           %a attribute.@]"
+          Style.inline_code "[@unpacked]"
+      | Expected_value_prim ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           This was expected to be a value-only primitive. You might've@ \
+           misspelled the primitive name.@]"
+      | Product_return ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           Unboxed products in C stub returns must be a pair of non-products.@]"
+      | Unpacked_product_return ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           The %a attribute is not allowed on C stub returns.@]"
+          Style.inline_code "[@unpacked]"
+      | Repr_mismatch -> ()
+        (* The error message already says "wrong layout", so a hint here would
+           be redundant. *))
+      errors
 
 let () =
   Location.register_error_of_exn

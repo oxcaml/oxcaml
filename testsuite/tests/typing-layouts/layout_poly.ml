@@ -681,6 +681,8 @@ Line 1, characters 29-49:
                                  ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [%obj_dup] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 external dup : float# -> float# = "%obj_dup"
@@ -690,6 +692,8 @@ Line 1, characters 15-31:
                    ^^^^^^^^^^^^^^^^
 Error: The primitive [%obj_dup] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 (*************************************************************)

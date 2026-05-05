@@ -151,6 +151,13 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
     the layout of type parameters ([%array_length] for example). *)
 val prim_can_contain_layout_any : description -> bool
 
+type wrong_repr_error =
+  | Product_arg
+  | Expected_value_prim
+  | Product_return
+  | Unpacked_product_return
+  | Repr_mismatch
+
 type error =
   | Old_style_float_with_native_repr_attribute
   | Old_style_float_with_non_value
@@ -161,6 +168,6 @@ type error =
   | Inconsistent_noalloc_attributes_for_effects
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
-      { prim_name : string; has_product_arg : bool }
+      { prim_name : string; errors : wrong_repr_error list }
 
 exception Error of Location.t * error
