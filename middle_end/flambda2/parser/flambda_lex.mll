@@ -86,6 +86,7 @@ let keyword_table =
     "set_of_closures", KWD_SET_OF_CLOSURES;
     "size", KWD_SIZE;
     "succ", KWD_SUCC;
+    "stub", KWD_STUB;
     "switch", KWD_SWITCH;
     "tagged", KWD_TAGGED;
     "tailrec", KWD_TAILREC;

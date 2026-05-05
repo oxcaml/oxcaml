@@ -144,6 +144,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_SET_OF_CLOSURES [@symbol "set_of_closures"]
 %token KWD_SIZE   [@symbol "size"]
 %token KWD_SUCC   [@symbol "succ"]
+%token KWD_STUB   [@symbol "stub"]
 %token KWD_SWITCH [@symbol "switch"]
 %token KWD_TAGGED [@symbol "tagged"]
 %token KWD_TAILREC [@symbol "tailrec"]
@@ -257,7 +258,8 @@ code:
     result_mode = boption(KWD_LOCAL);
     EQUAL; body = expr;
     { let
-        recursive, inline, loopify, id, newer_version_of, code_size, is_tupled
+        recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,
+        stub
         =
         header
       in
@@ -265,7 +267,7 @@ code:
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_var; ghost_region_var; depth_var;
                             ret_cont; exn_cont; body };
-        code_size; is_tupled; loopify; result_mode; } }
+        code_size; is_tupled; stub; loopify; result_mode; } }
 ;
 
 code_header:
@@ -276,8 +278,10 @@ code_header:
     KWD_SIZE LPAREN; code_size = code_size; RPAREN;
     newer_version_of = option(newer_version_of);
     is_tupled = boption(KWD_TUPLED);
+    stub = boption(KWD_STUB);
     id = code_id;
-    { recursive, inline, loopify, id, newer_version_of, code_size, is_tupled }
+    { recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,
+      stub }
 ;
 
 newer_version_of:
