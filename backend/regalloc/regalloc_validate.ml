@@ -316,6 +316,21 @@ module Instruction = struct
     }
 end
 
+(* The split pass may rematerialize a register by inserting a copy of the
+   immutable, non-atomic load that originally produced its value. Such an
+   instruction is a legitimate addition during register allocation even though
+   its [desc] is not [Op (Spill | Reload | Move)]. We recognize it by shape: [Op
+   (Load _)] with [Immutable] mutability, [is_atomic = false], and a single
+   result register; this matches the predicate used by
+   [Regalloc_split_utils.Uses.compute] when classifying rematerialization
+   sources. *)
+let is_rematerialized_immutable_load_shape (instr : basic Cfg.instruction) =
+  match[@ocaml.warning "-4"] instr.desc with
+  | Op (Load { mutability = Immutable; is_atomic = false; _ })
+    when Array.length instr.res = 1 ->
+    true
+  | _ -> false
+
 module Description : sig
   (** A snapshot of the [desc], [arg] and [res] fields of all instructions in
       the CFG and [fun_args] of the CFG. It is used by the validator to record
@@ -556,6 +571,15 @@ end = struct
       | Op Move ->
         (* A move instruction, while no regalloc-specific, can be inserted
            because of phi moves in split/rename. *)
+        successor_id
+      | _ when is_rematerialized_immutable_load_shape instr ->
+        (* The split pass may rematerialize a register by emitting a copy of the
+           immutable load that produced its value (cf.
+           [Regalloc_split.RewriteAsRematerialize]). The shape check above
+           guards us against accepting arbitrary new loads: only loads that the
+           rematerialization analysis would itself emit can pass it. Like [Op
+           Move] additions, this instruction does not advance the pre-allocation
+           successor chain, so we keep [successor_id] as-is. *)
         successor_id
       | _ ->
         Regalloc_utils.fatal
@@ -1212,6 +1236,31 @@ module Transfer (Desc_val : Description_value) :
       match instr.desc with
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
+      | _ when is_rematerialized_immutable_load_shape instr ->
+        (* Rematerialized immutable load added by the split pass. Unlike [Op
+           (Spill | Reload | Move)] (which transport an existing value between
+           locations and are handled by [rename_location]), this instruction
+           computes a fresh value: [loc_res := mem[loc_arg]]. However, its
+           [arg]/[res] arrays still carry the abstract registers that were
+           assigned during split (only the [loc] field gets overwritten by the
+           allocator), so we can synthesize a [reg_instr] directly from the
+           post-allocation instruction and reuse the generic equation transfer.
+           The result register is fresh — created by [compute_substitution_tree]
+           for this rematerialization — so it does not collide with any abstract
+           register from the pre-allocation description, and the equations stay
+           self-consistent for all downstream uses, which refer to the same
+           fresh register. The instruction's [desc] is preserved verbatim, so
+           [destroyed_at_basic] returns the same destroyed locations as for the
+           original load. *)
+        let reg_instr : basic Instruction.t =
+          { Instruction.desc = instr.desc;
+            arg = Array.map Register.create instr.arg;
+            res = Array.map Register.create instr.res
+          }
+        in
+        append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
+          ~reg_instr ~loc_instr:instr
+          ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       | _ -> assert false)
     | Some instr_before -> (
       match instr.desc with

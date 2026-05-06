@@ -13,16 +13,11 @@ let split_more_destruction_points : bool Lazy.t =
 let split_around_loops : bool Lazy.t =
   bool_of_param "SPLIT_AROUND_LOOPS" ~default:true
 
-(* CR-soon xclerc for xclerc: this flag is off by default until the regalloc
-   validator is taught about rematerialized immutable loads. Today
-   `Regalloc_validate.verify_basic` only accepts a newly-inserted basic
-   instruction if it is `Op Move` (phi moves) or one of `Op (Spill | Reload)`,
-   and the equation-transfer in `Regalloc_validate.basic` only handles those
-   shapes (via `rename_location`/`rename_register`). To enable rematerialization
-   in production both call sites need to recognize a copy of an immutable,
-   non-atomic, single-result load and thread the appropriate equations through,
-   so the validator can confirm that the rematerialized result holds the same
-   value as the original load's result. *)
+(* CR-soon xclerc for xclerc: this flag is off by default while we gain
+   confidence in the rematerialization analysis (heuristics, code-size impact,
+   benchmarks). The regalloc validator already accepts rematerialized immutable
+   loads (cf. [is_rematerialized_immutable_load_shape] in
+   `Regalloc_validate`). *)
 let split_rematerialize : bool Lazy.t =
   bool_of_param "SPLIT_REMATERIALIZE" ~default:false
 
