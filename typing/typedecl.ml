@@ -1259,10 +1259,9 @@ let transl_declaration env sdecl (id, uid) =
       unboxed version.
 
    2. After translating declarations, [derive_unboxed_versions] gives the
-      all [Record_dummy { represent_as_float_array = false }] records unboxed
-      versions.
+      all [Record_dummy Record_dummy_other] records unboxed versions.
 
-   3. But not all of these [Record_dummy]s will end up with unboxed versions:
+   3. But not all of these records will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
       records don't have unboxed versions. These unboxed versions are removed in
       [remove_unboxed_versions].
@@ -2054,7 +2053,6 @@ let compute_record_repr
   (* Important: If [refining_block_with_any] is true, we must use a plain
       value block or mixed block. *)
   match
-    (* Need to separate the GADT match from the labeled tuple *)
     ( ~refining_block_with_any, ~values, ~floats, ~atomic_floats,
       ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
       ~first_any )
@@ -2132,7 +2130,7 @@ let compute_record_repr
   (* value-only records are stored as boxed records, as are records whose
       declared types have fields of kind [any] *)
   | ~values:true, ~float64s:false, ~non_float64_unboxed_fields: false,
-    ~voids:false, ..
+      ~voids:false, ..
   | ~refining_block_with_any:true, .. ->
     Ok Record_boxed
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
@@ -2305,11 +2303,11 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         let record_floatu =
           rep = Ok Record_ufloat
         in
-        if record_dummy_representation = Record_dummy_ufloat
-            && not record_floatu then
+        let marked_ufloat = record_dummy_representation = Record_dummy_ufloat in
+        let ufloat = rep = Ok Record_ufloat in
+        if marked_ufloat && not ufloat then
           raise (Error (loc, Bad_represent_as_float_array_attribute));
-        if record_dummy_representation <> Record_dummy_ufloat && record_floatu
-        then
+        if not marked_ufloat && ufloat then
           Misc.fatal_error
             "got floatu record without [@@represent_as_float_array]";
         rep
