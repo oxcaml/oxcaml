@@ -208,7 +208,7 @@ module type Finished_graph = sig
 
   val blocks : Block.t list
 
-  val predecessors : Block.t -> Block.t list
+  val predecessors : Block.t -> Block.Set.t
 
   (** Project just the machtype out of a block's [params] array. *)
   val params_machtype : Block.t -> Cmm.machtype

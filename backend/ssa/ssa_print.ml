@@ -140,7 +140,7 @@ module Make (S : Ssa.Finished_graph) = struct
       blk;
     Format.fprintf ppf " [idom=%a depth=%d]" print_block_id
       blk.dominator_info.dominator blk.dominator_info.depth;
-    match S.predecessors blk with
+    match S.predecessors blk |> S.Block.Set.elements with
     | [] -> ()
     | preds ->
       Format.fprintf ppf " <- %a"
