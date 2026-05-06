@@ -3205,10 +3205,15 @@ let constrain_type_jkind ~fixed env ty jkind =
                if List.for_all Result.is_ok results
                then Ok ()
                else
-                 (* CR rtjoa: tried to adapt this to 5178, not sure *)
                  (* [ty's_jkind] may be an approximation that we tried to refine
                     when we recursed. We're in an error case anyway so just do
-                    the easy, slow thing of recomputing the jkind now. *)
+                    the easy, slow thing of recomputing the jkind now.
+
+                    Previously, we used to just use [ty's_jkind], but with any
+                    fields, this became more approximate for types in the
+                    temporary environment, which now use a product of anys
+                    rather than a product of sort variables.
+                 *)
                  let ty's_best_jkind =
                    let tys_and_modalities =
                      List.map (fun { ty; modality } -> ty, modality)
