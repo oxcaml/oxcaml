@@ -126,9 +126,39 @@ type definition_kind =
   | Reload
   | Rematerialize of Instruction.t
 
+(* Centralized predicate: an instruction is a legitimate rematerialization
+   source iff it is pure, cheap, doesn't read mutable state, and doesn't destroy
+   hardware registers in ways that change the surrounding allocation. This
+   predicate is shared between [Uses.compute] (which classifies sources) and the
+   regalloc validator (which recognizes the rematerialized instruction in the
+   post-allocation CFG). *)
+let is_rematerializable_shape : Cfg.basic -> bool =
+ fun desc ->
+  match[@ocaml.warning "-fragile-match"] desc with
+  | Op (Load { mutability = Immutable; is_atomic = false; _ })
+  (* Multi-result loads are accepted: [RewriteAsRematerialize] only emits a copy
+     when *all* of the load's result registers need to be redefined at the same
+     site. *)
+  | Op
+      ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ )
+  (* CR-soon xclerc for xclerc: also handle [Stackoffset]. *)
+  | Op
+      (Intop_imm
+         ( ( Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
+           | Ipopcnt | Iclz | Ictz ),
+           _ )) ->
+    (* Excluded [Intop_imm] cases: - [Idiv]/[Imod]: trap on zero divisor and
+       destroy [%rax]/[%rdx]; - [Imulh _]: destroys [%rax]; - [Icomp _]:
+       destroys [%rax]. *)
+    true
+  | _ -> false
+
 module Uses = struct
   type source =
     | Load of Instruction.t
+    | Const of Instruction.t
+    | Intop_imm of Instruction.t
     | Move of Reg.t
     | Other
 
@@ -136,6 +166,9 @@ module Uses = struct
    fun fmt source ->
     match source with
     | Load instr -> Format.fprintf fmt "Load %a" Printreg.regs instr.arg
+    | Const _ -> Format.fprintf fmt "Const"
+    | Intop_imm instr ->
+      Format.fprintf fmt "Intop_imm %a" Printreg.regs instr.arg
     | Move arg -> Format.fprintf fmt "Move %a" Printreg.reg arg
     | Other -> Format.fprintf fmt "Other"
 
@@ -158,6 +191,29 @@ module Uses = struct
       (fun reg num_set ->
         Format.fprintf fmt "%a ~> %a" Printreg.reg reg format_set num_set)
       t
+
+  (* Classify [instr] as a rematerialization source. The accepted shapes for
+     [Load]/[Const]/[Intop_imm] mirror [is_rematerializable_shape] (which is
+     re-used by the validator). [Move] is classified separately because it is
+     not itself a rematerialization source, but rather a step on the chain that
+     [try_rematerialize] follows back to the actual source. *)
+  let classify_source (instr : Cfg.basic Cfg.instruction) : source =
+    match[@ocaml.warning "-fragile-match"] instr.desc with
+    | Op (Load { mutability = Immutable; is_atomic = false; _ }) -> Load instr
+    | Op
+        ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
+        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ) ->
+      Const instr
+    | Op
+        (Intop_imm
+           ( ( Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
+             | Ipopcnt | Iclz | Ictz ),
+             _ )) ->
+      Intop_imm instr
+    | Op Move
+      when Cmm.equal_machtype_component instr.arg.(0).typ instr.res.(0).typ ->
+      Move instr.arg.(0)
+    | _ -> Other
 
   let compute : Cfg_with_infos.t -> t =
    fun cfg_with_infos ->
@@ -183,28 +239,7 @@ module Uses = struct
         let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
         incr_set acc block.terminator.res ~in_loop ~source:Other;
         DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-            let source =
-              match[@ocaml.warning "-fragile-match"] instr.desc with
-              | Op
-                  (Load
-                     { memory_chunk = _;
-                       addressing_mode = _;
-                       mutability = Immutable;
-                       (* CR-soon xclerc for xclerc: check whether an atomic
-                          load could be rematerialized. *)
-                       is_atomic = false
-                     }) ->
-                (* Multi-result loads are accepted: the rematerialization
-                   analysis (cf. [RewriteAsRematerialize]) will only emit a copy
-                   when *all* of the load's result registers need to be
-                   redefined at the same site, so no result slot is wasted. *)
-                Load instr
-              | Op Move
-                when Cmm.equal_machtype_component instr.arg.(0).typ
-                       instr.res.(0).typ ->
-                Move instr.arg.(0)
-              | _ -> Other
-            in
+            let source = classify_source instr in
             incr_set acc instr.res ~in_loop ~source);
         acc)
 end
@@ -221,10 +256,14 @@ let try_rematerialize :
     Uses.t -> is_arg_ok:(Reg.t -> bool) -> Reg.t -> Instruction.t option =
  fun uses ~is_arg_ok reg ->
   (* Walk the at-most-once-set-by chain of [reg]: through any number of moves,
-     stopping at the load that ultimately produces the value. The chain is
-     guaranteed to be acyclic and finite because every visited register is
-     [At_most_once] (set exactly once, outside any loop), so no register can
-     appear twice as a target in the chain. *)
+     stopping at the rematerialization source ([Load], [Const], or [Intop_imm])
+     that ultimately produces the value. The chain is guaranteed to be acyclic
+     and finite because every visited register is [At_most_once] (set exactly
+     once, outside any loop), so no register can appear twice as a target in the
+     chain. *)
+  let accept (instr : Instruction.t) =
+    if Array.for_all instr.arg ~f:is_arg_ok then Some instr else None
+  in
   let rec chase reg =
     match Reg.Tbl.find_opt uses reg with
     | None
@@ -232,7 +271,9 @@ let try_rematerialize :
     | Some (Uses.At_most_once { source = Other }) ->
       None
     | Some (Uses.At_most_once { source = Move arg }) -> chase arg
-    | Some (Uses.At_most_once { source = Load load }) ->
-      if Array.for_all load.arg ~f:is_arg_ok then Some load else None
+    | Some (Uses.At_most_once { source = Load instr })
+    | Some (Uses.At_most_once { source = Const instr })
+    | Some (Uses.At_most_once { source = Intop_imm instr }) ->
+      accept instr
   in
   chase reg

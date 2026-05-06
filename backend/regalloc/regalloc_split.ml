@@ -319,22 +319,24 @@ let make_reload : type a. (a, definition_kind) make_operation =
     Move.make_instr Move.Load
       ~id:(InstructionId.get_and_incr instr_id)
       ~copy ~from:stack_reg ~to_:new_reg
-  | Rematerialize load ->
-    (* Use the post-substitution names of the load's arguments and results. For
-       a multi-result load, all of the result registers are defined by this
-       single rematerialized instruction; their substitution mappings were
-       established by [compute_substitution_tree] (since
+  | Rematerialize source ->
+    (* The rematerialization source can be a [Load], [Const], or [Intop_imm]
+       (cf. [Regalloc_split_utils.Uses.source]); its [desc] is preserved
+       verbatim. We use the post-substitution names of the source's arguments
+       and results. For a multi-result source, all of the result registers are
+       defined by this single rematerialized instruction; their substitution
+       mappings were established by [compute_substitution_tree] (since
        [RewriteAsRematerialize] only emits [Rematerialize] when all of the
-       load's result registers need to be redefined at this block). The
+       source's result registers need to be redefined at this block). The
        [old_reg]/[new_reg] pair is just one of those, used here for the log
        message. *)
-    let arg = Substitution.apply_array block_subst load.arg in
-    let res = Substitution.apply_array block_subst load.res in
+    let arg = Substitution.apply_array block_subst source.arg in
+    let res = Substitution.apply_array block_subst source.res in
     if debug
     then
       log "remat %a -> %a (from %a)" Printreg.reg old_reg Printreg.regs res
         Printreg.regs arg;
-    Cfg.make_instruction_from_copy copy ~desc:load.desc
+    Cfg.make_instruction_from_copy copy ~desc:source.desc
       ~id:(InstructionId.get_and_incr instr_id)
       ~arg ~res ()
 
@@ -366,24 +368,25 @@ let insert_reloads_in_block :
     | None -> dummy_instr_of_terminator block.terminator
     | Some hd -> hd
   in
-  (* A multi-result load that is rematerialized at this block appears in
-     [remats] once per result register, all sharing the same load instruction
-     [id]. We must emit only one copy per distinct source load: that single
-     rematerialized instruction defines all of the result registers (with their
-     substituted names) in one go. Tracking the set of already-emitted
-     source-load ids makes the deduplication explicit. *)
+  (* A multi-result rematerialization source (today only multi-result loads;
+     constants and [Intop_imm] are single-result) that is rematerialized at this
+     block appears in [remats] once per result register, all sharing the same
+     source instruction [id]. We must emit only one copy per distinct source:
+     that single rematerialized instruction defines all of the result registers
+     (with their substituted names) in one go. Tracking the set of
+     already-emitted source ids makes the deduplication explicit. *)
   let already_emitted = ref Instruction.IdSet.empty in
   Reg.Map.iter
     (fun old_reg kind ->
-      let load =
+      let source =
         match (kind : definition_kind) with
-        | Rematerialize load -> load
+        | Rematerialize source -> source
         (* [remats] only contains [Rematerialize] entries by construction. *)
         | Reload -> assert false
       in
-      if not (Instruction.IdSet.mem load.id !already_emitted)
+      if not (Instruction.IdSet.mem source.id !already_emitted)
       then (
-        already_emitted := Instruction.IdSet.add load.id !already_emitted;
+        already_emitted := Instruction.IdSet.add source.id !already_emitted;
         let new_reg = Substitution.apply_reg block_subst old_reg in
         let remat =
           make_reload state ~instr_id ~stack_subst ~block_subst ~old_reg

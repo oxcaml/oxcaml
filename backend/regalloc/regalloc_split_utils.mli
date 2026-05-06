@@ -40,9 +40,26 @@ type definition_kind =
   | Reload
   | Rematerialize of Regalloc_utils.Instruction.t
 
+(** [is_rematerializable_shape desc] is [true] iff a basic instruction with that
+    [desc] is a legitimate rematerialization source: it must be pure (no side
+    effects, no observable memory write or fence), cheap enough to be worth
+    duplicating, and must not destroy hardware registers in ways that change the
+    surrounding allocation. The set of accepted shapes is shared between the
+    analysis (cf. {!Uses.compute}) that classifies rematerialization sources and
+    the validator (cf. [Regalloc_validate]) that recognizes the rematerialized
+    instructions in the post-allocation CFG. *)
+val is_rematerializable_shape : Cfg.basic -> bool
+
 module Uses : sig
   type source =
-    | Load of Regalloc_utils.Instruction.t
+    | Load of Regalloc_utils.Instruction.t  (** Immutable, non-atomic load. *)
+    | Const of Regalloc_utils.Instruction.t
+        (** Integer / float / vector / symbol constant. Always rematerializable
+            (zero arguments). *)
+    | Intop_imm of Regalloc_utils.Instruction.t
+        (** Integer-with-immediate operation, restricted to the safe subset (see
+            [is_rematerializable_shape]). One register argument plus an
+            immediate. *)
     | Move of Reg.t
     | Other
 
@@ -65,11 +82,13 @@ end
     and is a member of [available]. *)
 val at_most_once_in : Uses.t -> Reg.Set.t -> Reg.t -> bool
 
-(** [try_rematerialize uses ~is_arg_ok reg] returns [Some ld] if [reg] can be
-    rematerialized as a copy of the immutable load [ld]. The chain
-    [reg <- move ... <- move <- load] is followed of arbitrary length; every
-    register on the chain must be set at most once. The load is accepted iff
-    [is_arg_ok] holds for every one of its arguments. *)
+(** [try_rematerialize uses ~is_arg_ok reg] returns [Some instr] if [reg] can be
+    rematerialized as a copy of the rematerializable instruction [instr]. The
+    chain [reg <- move <- ... <- move <- source] is followed of arbitrary
+    length; every register on the chain must be set at most once. [source] is a
+    [Load], [Const], or [Intop_imm] (cf. {!Uses.source}). The source is accepted
+    iff [is_arg_ok] holds for every one of its register arguments (which is
+    vacuously true for zero-arg constants). *)
 val try_rematerialize :
   Uses.t ->
   is_arg_ok:(Reg.t -> bool) ->
