@@ -266,7 +266,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let varhashtbl_map f t =
     let t' = VarHashtbl.create (VarHashtbl.length t) in
-    VarHashtbl.iter (fun k v -> VarHashtbl.add t' k (f v)) t;
+    VarHashtbl.iter (fun k v -> VarHashtbl.replace t' k (f v)) t;
     t'
 
   let varhashtbl_singleton k v =
@@ -568,7 +568,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       VarHashtbl.iter
         (fun _ mv ->
           let mv = apply_morphvar dst morph hint mv in
-          VarHashtbl.add new_vs (get_key dst mv) mv)
+          VarHashtbl.replace new_vs (get_key dst mv) mv)
         vs;
       Amodejoin (C.apply dst morph a, Apply (hint, a_hint), new_vs)
     | Amodemeet (a, a_hint, vs) ->
@@ -577,7 +577,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       VarHashtbl.iter
         (fun _ mv ->
           let mv = apply_morphvar dst morph hint mv in
-          VarHashtbl.add new_vs (get_key dst mv) mv)
+          VarHashtbl.replace new_vs (get_key dst mv) mv)
         vs;
       Amodemeet (C.apply dst morph a, Apply (hint, a_hint), new_vs)
 
