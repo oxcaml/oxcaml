@@ -1062,7 +1062,10 @@ type nullary_primitive =
       { name : string;
         enabled_at_init : bool option
       }
-  | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
+  | Enter_inlined_apply of
+      { dbg : Inlined_debuginfo.t;
+        inlined_attribute : Inlined_attribute.t
+      }
   | Dls_get
   | Tls_get
   | Domain_index
@@ -1096,8 +1099,13 @@ let compare_nullary_primitive p1 p2 =
     if c <> 0
     then c
     else Option.compare Bool.compare enabled_at_init1 enabled_at_init2
-  | Enter_inlined_apply { dbg = dbg1 }, Enter_inlined_apply { dbg = dbg2 } ->
-    Inlined_debuginfo.compare dbg1 dbg2
+  | ( Enter_inlined_apply { dbg = dbg1; inlined_attribute = inlined_attribute1 },
+      Enter_inlined_apply { dbg = dbg2; inlined_attribute = inlined_attribute2 }
+    ) ->
+    let c = Inlined_debuginfo.compare dbg1 dbg2 in
+    if c <> 0
+    then c
+    else Inlined_attribute.compare inlined_attribute1 inlined_attribute2
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
   | Domain_index, Domain_index -> 0
@@ -1125,9 +1133,9 @@ let print_nullary_primitive ppf p =
       (match enabled_at_init with
       | None | Some false -> ""
       | Some true -> " enabled_at_init")
-  | Enter_inlined_apply { dbg } ->
-    Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a)@]"
-      Inlined_debuginfo.print dbg
+  | Enter_inlined_apply { dbg; inlined_attribute } ->
+    Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a@ %a)@]"
+      Inlined_debuginfo.print dbg Inlined_attribute.print inlined_attribute
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
   | Domain_index -> Format.pp_print_string ppf "Domain_index"

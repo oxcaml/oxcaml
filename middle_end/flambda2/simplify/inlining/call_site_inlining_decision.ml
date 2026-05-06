@@ -211,7 +211,8 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
         | Missing_code | Definition_says_not_to_inline | In_a_stub
         | Doing_speculative_inlining | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-        | Never_inlined_attribute | Attribute_always
+        | Never_inlined_attribute
+        | Forward_inlined_attribute_but_nothing_to_forward | Attribute_always
         | Replay_history_says_must_inline _ | Begin_unrolling _
         | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
           ->
@@ -273,6 +274,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
   | Never_inlined ->
     fail_if_must_inline ();
     Never_inlined_attribute
+  | Forward_inlined ->
+    fail_if_must_inline ();
+    Forward_inlined_attribute_but_nothing_to_forward
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
     let code_or_metadata =
       DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
@@ -330,7 +334,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
         else
           let policy =
             match inlined with
-            | Never_inlined -> assert false
+            | Never_inlined | Forward_inlined -> assert false
             | Default_inlined -> `Heuristic
             | Unroll (to_, _) -> `Unroll to_
             | Always_inlined _ | Hint_inlined -> (

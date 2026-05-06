@@ -368,7 +368,10 @@ type nullary_primitive =
           Semaphore initialization code may be emitted as a consequence of
           seeing this instruction, but the emitter checks that all occurrences
           of [enabled_at_init] are consistent for a given probe [name]. *)
-  | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
+  | Enter_inlined_apply of
+      { dbg : Inlined_debuginfo.t;
+        inlined_attribute : Inlined_attribute.t
+      }
       (** Used in classic mode to denote the start of an inlined function body.
           This is then used in to_cmm to correctly add inlined debuginfo. *)
   | Dls_get  (** Obtain the domain-local state block. *)

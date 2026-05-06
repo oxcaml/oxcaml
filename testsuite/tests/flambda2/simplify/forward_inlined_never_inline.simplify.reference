@@ -1,0 +1,53 @@
+let code f_0 deleted in
+let code g_1 deleted in
+let code call_g_with_default_inlined_2 deleted in
+let code call_g_with_always_inlined_3 deleted in
+let code call_g_with_never_inlined_4 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(f_0)
+      f_0_1 (x) my_closure _region _ghost_region my_depth -> k * k1 =
+  cont k (x)
+in
+let $camlForward_inlined_never_inline__f_5 = closure f_0_1 @f in
+let code inline(always) loopify(never) size(4) newer_version_of(g_1)
+      g_1_1 (x) my_closure _region _ghost_region my_depth -> k * k1 =
+  apply direct(f_0_1) inlined(forward)
+    $camlForward_inlined_never_inline__f_5 (x) -> k * k1
+in
+let $camlForward_inlined_never_inline__g_6 = closure g_1_1 @g in
+let code loopify(never) size(4) newer_version_of(call_g_with_default_inlined_2)
+      call_g_with_default_inlined_2_1 (x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  apply direct(f_0_1) inlining_state(depth(1))
+    $camlForward_inlined_never_inline__f_5 (x) -> k * k1
+in
+let $camlForward_inlined_never_inline__call_g_with_default_inlined_7 =
+  closure call_g_with_default_inlined_2_1 @call_g_with_default_inlined
+in
+let code loopify(never) size(1) newer_version_of(call_g_with_always_inlined_3)
+      call_g_with_always_inlined_3_1 (x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k (x)
+in
+let $camlForward_inlined_never_inline__call_g_with_always_inlined_8 =
+  closure call_g_with_always_inlined_3_1 @call_g_with_always_inlined
+in
+let code loopify(never) size(4) newer_version_of(call_g_with_never_inlined_4)
+      call_g_with_never_inlined_4_1 (x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  apply direct(g_1_1) inlined(never)
+    $camlForward_inlined_never_inline__g_6 (x) -> k * k1
+in
+let $camlForward_inlined_never_inline__call_g_with_never_inlined_9 =
+  closure call_g_with_never_inlined_4_1 @call_g_with_never_inlined
+in
+let $camlForward_inlined_never_inline =
+  Block 0 ($camlForward_inlined_never_inline__f_5,
+           $camlForward_inlined_never_inline__g_6,
+           $camlForward_inlined_never_inline__call_g_with_default_inlined_7,
+           $camlForward_inlined_never_inline__call_g_with_always_inlined_8,
+           $camlForward_inlined_never_inline__call_g_with_never_inlined_9)
+in
+cont done ($camlForward_inlined_never_inline)

@@ -759,7 +759,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     when (not (Flambda_features.stack_allocation_enabled ()))
          && Flambda_primitive.is_begin_or_end_region p ->
     expr env res body
-  | Singleton _, Prim (Nullary (Enter_inlined_apply { dbg }), _) ->
+  | ( Singleton _,
+      Prim (Nullary (Enter_inlined_apply { dbg; inlined_attribute = _ }), _) )
+    ->
     let env = Env.enter_inlined_apply env dbg in
     expr env res body
   | Singleton v, Prim ((Unary (End_region _, _) as p), dbg) ->

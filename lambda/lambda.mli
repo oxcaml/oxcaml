@@ -687,6 +687,7 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 

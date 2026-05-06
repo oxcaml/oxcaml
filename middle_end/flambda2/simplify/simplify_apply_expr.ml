@@ -224,6 +224,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
     match function_type with
     | None ->
       (* No rec info available, prevent inlining to avoid problems *)
+      if Flambda_features.debug_flambda2 ()
+      then Format.eprintf "no rec info :( @.";
       Do_not_inline { erase_attribute = false }
     | Some function_type -> (
       let decision =
@@ -426,7 +428,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       (Warnings.Inlining_impossible
          Inlining_helpers.(
            inlined_attribute_on_partial_application_msg Unrolled))
-  | Default_inlined | Hint_inlined -> ());
+  | Default_inlined | Hint_inlined | Forward_inlined -> ());
   let num_non_unarized_params = Flambda_arity.num_params param_arity in
   let num_non_unarized_args = Flambda_arity.num_params args_arity in
   assert (num_non_unarized_params > num_non_unarized_args);
@@ -837,7 +839,9 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     ~down_to_up =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
-  | Some _, (Hint_inlined | Unroll _ | Default_inlined | Always_inlined _) ->
+  | ( Some _,
+      ( Hint_inlined | Forward_inlined | Unroll _ | Default_inlined
+      | Always_inlined _ ) ) ->
     Misc.fatal_errorf
       "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
        always be marked as [Never_inline]:@ %a"
@@ -1391,6 +1395,17 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
 
 let simplify_apply ~simplify_expr dacc apply ~down_to_up =
+  let apply =
+    match Apply.inlined apply with
+    | Never_inlined | Default_inlined | Unroll _ | Always_inlined _
+    | Hint_inlined ->
+      apply
+    | Forward_inlined -> (
+      match DE.forward_inlined (DA.denv dacc) with
+      | None -> apply
+      | Some inlined_attribute ->
+        Apply.with_inlined_attribute apply inlined_attribute)
+  in
   match simplify_apply_shared dacc apply with
   | Invalid args_arity ->
     replace_apply_by_invalid dacc ~down_to_up

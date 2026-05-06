@@ -521,6 +521,7 @@ let inlined_attribute ~space ppf (i : Fexpr.inlined_attribute) =
     match i with
     | Always_inlined -> Some "inlined(always)"
     | Hint_inlined -> Some "inlined(hint)"
+    | Forward_inlined -> Some "inlined(forward)"
     | Never_inlined -> Some "inlined(never)"
     | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
     | Default_inlined -> None
