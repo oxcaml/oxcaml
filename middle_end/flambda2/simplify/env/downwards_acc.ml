@@ -123,6 +123,10 @@ let[@inline always] map_denv t ~f = { t with denv = f t.denv }
 
 let[@inline always] with_denv t denv = { t with denv }
 
+let clear_cse_equations_on_coeffectful_primitives t =
+  let denv = DE.clear_cse_equations_on_coeffectful_primitives t.denv in
+  if denv == t.denv then t else { t with denv }
+
 let with_continuation_uses_env t ~cont_uses_env =
   { t with continuation_uses_env = cont_uses_env }
 

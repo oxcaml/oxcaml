@@ -16,15 +16,14 @@ and code loopify(never) size(5) newer_version_of(f_0)
 in
 let $camlToplevel_closures__g_3 =
   closure g_1_1 @g
-and code loopify(never) size(8) newer_version_of(g_1)
+and code loopify(never) size(7) newer_version_of(g_1)
       g_1_1 (x : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
   let r_1 = %project_value_slot.[g].[r_1] ($camlToplevel_closures__g_3) in
   let Pfield = %block_load.mut.[`0`] (r_1) in
-  let Pfield_1 = %block_load.mut.[`0`] (r_1) in
-  let int_add = %int_barith.add (x, Pfield_1) in
+  let int_add = %int_barith.add (x, Pfield) in
   let int_add_1 = %int_barith.add (int_add, Pfield) in
   cont k (int_add_1)
   with { r_1 = r }

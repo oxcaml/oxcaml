@@ -1251,7 +1251,11 @@ type unary_primitive =
    for CSE, since we deal with projections through types. *)
 let unary_primitive_eligible_for_cse p ~arg =
   match p with
-  | Block_load _ -> false
+  | Block_load { mut; _ } ->
+    (* Immutable block loads are dealt with via projection types. Mutable block
+       loads can be CSEd subject to invalidation around program points that may
+       cause coeffects to be observed differently. *)
+    Mutability.is_mutable mut
   | Duplicate_array _ -> false
   | Duplicate_block { kind = _ } -> false
   | Is_int _ | Is_null | Get_tag | Get_header -> true
@@ -1833,7 +1837,12 @@ type binary_primitive =
 
 let binary_primitive_eligible_for_cse p =
   match p with
-  | Array_load _ | Block_set _ -> false
+  | Array_load (_, _, mut) ->
+    (* Immutable array loads are dealt with via projection types. Mutable array
+       loads can be CSEd subject to invalidation around program points that may
+       cause coeffects to be observed differently. *)
+    Mutability.is_mutable mut
+  | Block_set _ -> false
   | String_or_bigstring_load _ -> false (* CR mshinwell: review *)
   | Bigarray_load _ -> false
   | Bigarray_get_alignment _ -> true
@@ -2907,6 +2916,80 @@ let only_generative_effects t =
   | Only_generative_effects _, _, _, _ -> true
   | (No_effects | Arbitrary_effects), _, _, _ -> false
 
+let has_coeffects t =
+  match effects_and_coeffects t with
+  | _, Has_coeffects, _, _ -> true
+  | _, No_coeffects, _, _ -> false
+
+(* These are the primitives that have generative effects yet never allocate on
+   the OCaml heap: they only allocate on the local allocation stack, or (in the
+   case of the region primitives) just manipulate that stack's pointers.
+   Operations on the local allocation stack never trigger the execution of
+   arbitrary code such as finalizers or signal handlers: see
+   [caml_alloc_local_reserved] and [caml_local_realloc] in the runtime, which at
+   most extend the local allocation stack using [malloc]. (A [Local] allocation
+   mode can only arise when stack allocation is enabled, in which case the
+   runtime's stack allocation support, for native code, will be in use.) *)
+let only_allocates_locally (t : t) =
+  match t with
+  | Unary (Box_number (_, Local _), _)
+  | Variadic (Make_block (_, _, Local _), _)
+  | Variadic (Make_array (_, _, Local _), _)
+  | Variadic ((Begin_region _ | Begin_try_region _), _) ->
+    true
+  | Nullary
+      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
+    false
+  | Unary
+      ( ( Block_load _ | Duplicate_block _ | Duplicate_array _ | Is_int _
+        | Is_null | Get_tag | Array_length _ | Bigarray_length _
+        | String_length _ | Int_as_pointer _ | Opaque_identity _ | Int_arith _
+        | Float_arith _ | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+        | Reinterpret_boxed_vector | Unbox_number _
+        | Box_number (_, Heap)
+        | Untag_immediate | Tag_immediate | Project_function_slot _
+        | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
+        | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
+        | Make_lazy _ ),
+        _ ) ->
+    false
+  | Binary
+      ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
+        | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _
+        | Int_comp _ | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
+        | Atomic_load_field _ | Poke _ | Read_offset _ ),
+        _,
+        _ ) ->
+    false
+  | Ternary
+      ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
+        | Atomic_field_int_arith _ | Atomic_set_field _
+        | Atomic_exchange_field _ | Write_offset _ ),
+        _,
+        _,
+        _ ) ->
+    false
+  | Quaternary
+      ( (Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _),
+        _,
+        _,
+        _,
+        _ ) ->
+    false
+  | Variadic ((Make_block (_, _, Heap) | Make_array (_, _, Heap)), _) -> false
+
+let invalidates_cse_equations_on_coeffectful_primitives t =
+  match effects_and_coeffects t with
+  | No_effects, _, _, _ -> false
+  | Only_generative_effects _, _, _, _ ->
+    (* Allocation points on the OCaml heap can trigger the execution of
+       arbitrary code (finalizers, signal handlers, memprof callbacks, context
+       switches between threads), which may write to mutable state. Allocations
+       on the local allocation stack never do (see [only_allocates_locally]). *)
+    not (only_allocates_locally t)
+  | Arbitrary_effects, _, _, _ -> true
+
 module Eligible_for_cse : sig
   type t
 
@@ -2952,8 +3035,24 @@ end = struct
       | Only_generative_effects Immutable, No_coeffects, _, _ ->
         (* Allow constructions of immutable blocks to be shared. *)
         true
-      | ( ( No_effects
-          | Only_generative_effects (Immutable | Immutable_unique | Mutable)
+      (* CSE for a primitive that reads mutable state is only sound because the
+         simplifier discards the corresponding equations at every program point
+         where that state could be written: non-inlined function calls,
+         primitives with arbitrary effects and allocations on the OCaml heap
+         (heap allocation points can run arbitrary code, e.g. finalizers and
+         signal handlers; local allocations cannot). See [Simplify_let_expr],
+         [Simplify_apply_expr] and [Common_subexpression_elimination]. Any
+         primitive added to the list below must be checked against that kill
+         discipline first. *)
+      | No_effects, Has_coeffects, _, _ -> (
+        match[@ocaml.warning "-fragile-match"] t with
+        | Unary (Block_load { mut = Mutable; _ }, _) -> true
+        | Binary (Array_load (_, _, Mutable), _, _) -> true
+        | _ -> false)
+      | Only_generative_effects Immutable, Has_coeffects, _, _ ->
+        (* For example local-mode allocations of immutable blocks. *)
+        false
+      | ( ( Only_generative_effects (Immutable_unique | Mutable)
           | Arbitrary_effects ),
           (No_coeffects | Has_coeffects),
           _,

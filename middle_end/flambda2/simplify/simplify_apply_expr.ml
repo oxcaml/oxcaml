@@ -17,6 +17,19 @@
 open! Flambda.Import
 open! Simplify_import
 
+(* When an [Apply] is not inlined the called function is treated as opaque, so
+   any CSE equation whose left-hand side is a primitive that has coeffects must
+   be discarded: such a primitive could behave differently before and after the
+   call.
+
+   This must be applied to [dacc] before any continuation use of the [Apply] is
+   recorded -- including the use of the exception continuation, since an
+   exception is raised after the callee may have performed effects -- because
+   the environments captured at such uses determine the CSE state at the
+   corresponding join points. *)
+let clear_cse_for_non_inlined_apply dacc =
+  DA.clear_cse_equations_on_coeffectful_primitives dacc
+
 let fail_if_probe apply =
   match Apply.probe apply with
   | None -> ()
@@ -274,6 +287,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
     | Loopify self_cont ->
       simplify_self_tail_call dacc apply self_cont ~down_to_up
     | Do_not_loopify ->
+      let dacc = clear_cse_for_non_inlined_apply dacc in
       let dacc, use_id, result_continuation =
         let result_continuation = Apply.continuation apply in
         match result_continuation, result_types with
@@ -1003,6 +1017,7 @@ let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
 let simplify_function_call_where_callee's_type_unavailable dacc apply
     (call : Call_kind.Function_call.t) ~down_to_up =
   fail_if_probe apply;
+  let dacc = clear_cse_for_non_inlined_apply dacc in
   let denv = DA.denv dacc in
   if Are_rebuilding_terms.do_rebuild_terms (DE.are_rebuilding_terms denv)
   then
@@ -1251,6 +1266,7 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       Misc.fatal_error "Cannot simplify a method call that never returns"
     | Return continuation -> continuation
   in
+  let dacc = clear_cse_for_non_inlined_apply dacc in
   let denv = DA.denv dacc in
   DE.check_simple_is_bound denv obj;
   let dacc, use_id =
@@ -1303,6 +1319,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     in
     simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
+    let dacc = clear_cse_for_non_inlined_apply dacc in
     let dacc, use_id =
       match Apply.continuation apply with
       | Return apply_continuation ->
@@ -1345,6 +1362,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
 
 let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
   fail_if_probe apply;
+  let dacc = clear_cse_for_non_inlined_apply dacc in
   let denv = DA.denv dacc in
   let op =
     let module E = Call_kind.Effect in

@@ -436,6 +436,30 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
       let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
+      (* If evaluation of the defining expression could write to mutable memory,
+         any CSE equation whose left-hand side has coeffects must be
+         invalidated. In addition to primitives with arbitrary effects, this
+         includes primitives that allocate on the OCaml heap, and heap-allocated
+         sets of closures: heap allocation points can trigger the execution of
+         arbitrary code (finalizers, signal handlers, memprof callbacks, context
+         switches between threads), which may write to mutable state. The
+         backend makes the same assumption when it removes equations on mutable
+         loads at allocation and poll points (see [Cfg_cse]). Allocations on the
+         local allocation stack never trigger the execution of such code (see
+         e.g. [caml_alloc_local] in the runtime), so they do not invalidate
+         anything. *)
+      let dacc =
+        match defining_expr with
+        | Prim (prim, _dbg) ->
+          if P.invalidates_cse_equations_on_coeffectful_primitives prim
+          then DA.clear_cse_equations_on_coeffectful_primitives dacc
+          else dacc
+        | Set_of_closures (_, alloc_mode) -> (
+          match alloc_mode with
+          | Heap -> DA.clear_cse_equations_on_coeffectful_primitives dacc
+          | Local _ -> dacc)
+        | Simple _ | Static_consts _ | Rec_info _ -> dacc
+      in
       (* Simplify the body of the let-expression and make the new [Let] bindings
          around the simplified body. [Simplify_named] will already have prepared
          [dacc] with the necessary bindings for the simplification of the
