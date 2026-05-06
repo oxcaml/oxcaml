@@ -513,9 +513,9 @@ val open_signature_by_path: Path.t -> t -> t
 
 val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
 
-(* Like [open_pers_signature], but loads the named [.cmi] from any include
-   path (visible or hidden) and ignores any in-scope module of the same
-   name. Used to implement [-open-cmi]. *)
+(* Like [open_pers_signature], but takes a [.cmi] file path and loads it
+   directly (bypassing the include path) and ignores any in-scope module of
+   the same name. Used to implement [-open-cmi]. *)
 val open_pers_signature_cmi: string -> t -> Path.t * mode_with_locks * t
 
 val remove_last_open: Path.t -> t -> t option

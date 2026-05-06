@@ -4271,8 +4271,18 @@ let remove_last_open root env0 =
 let open_pers_signature name env =
   open_signature ~errors:false ~loc:Location.none None (Lident name) env
 
-let open_pers_signature_cmi name env =
-  let global_name = Global_module.Name.create_no_args name in
+let open_pers_signature_cmi filename env =
+  let artifact =
+    Unit_info.Artifact.from_filename
+      ~for_pack_prefix:Compilation_unit.Prefix.empty filename
+  in
+  let modname =
+    Unit_info.Artifact.modname artifact
+    |> Compilation_unit.name
+    |> Compilation_unit.Name.to_string
+  in
+  let global_name = Global_module.Name.create_no_args modname in
+  let _sign : Subst.Lazy.signature = read_pers_mod global_name artifact in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
   in

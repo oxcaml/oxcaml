@@ -173,17 +173,17 @@ ocamlc.byte;
   ocamlc.byte;
 }
 
-(* Test that [-open-cmi] resolves through -I. *)
+(* Test that [-open-cmi] works alongside -I. *)
 {
-  flags = "-I liba -I libb -nocwd -open-cmi A";
+  flags = "-I liba -I libb -nocwd -open-cmi liba/a.cmi";
   module = "libb/b_open.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 
-(* Test that [-open-cmi] resolves through -H. *)
+(* Test that [-open-cmi] works alongside -H. *)
 {
-  flags = "-H liba -I libb -nocwd -open-cmi A";
+  flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
   module = "libb/b_open.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
@@ -192,7 +192,7 @@ ocamlc.byte;
 (* Test that [-open-cmi] of a hidden module does not make user-code
    references to that module legal. *)
 {
-  flags = "-H liba -I libb -nocwd -open-cmi A";
+  flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
   module = "libc/c3.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";
