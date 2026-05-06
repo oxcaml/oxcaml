@@ -46,7 +46,7 @@ module Detect (C : Context) = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
-  let visit_terminator (blk : C.In.Block.t) (c : C.Out.cursor) =
+  let visit_terminator (blk : C.In.Block.t) (c : C.cursor) =
     match[@warning "-fragile-match"] blk.terminator with
     | Call
         { op = Func call_op;
@@ -60,7 +60,7 @@ module Detect (C : Context) = struct
            && stack_offsets_zero call_op args
                 (C.In.params_machtype continuation) ->
       let mapped_args = Array.map C.map_arg args in
-      let term : C.Out.Terminator.t =
+      let term : C.Terminator.t =
         match call_op with
         | Direct func
           when String.equal func.sym_name C.In.function_info.fun_name ->
