@@ -174,7 +174,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
           Some (Constructor_uniform_value, [| sort |])
         | Variant_with_null_payload
             { payload_arg = { ca_sort = None; _ }; _ } ->
-          Misc.fatal_error "Custom or_null payload with non-fixed layout"
+          (* Sort may be [None] during the recursive-decl temp-env phase
+             (see Note [Default jkinds in transl_declaration] in typedecl.ml);
+             the temp-env descriptors are not consumed, and the real ones are
+             recomputed after [update_decls_jkind] fills the sorts. *)
+          None
       in
       Array.of_list (List.map shape cstrs), false
   in
@@ -303,7 +307,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
-    lbl_sort = Some Jkind_types.Sort.Const.void;
+    lbl_sort = None;
     lbl_pos = -1; lbl_all = [||];
     lbl_repres = Some repres;
     lbl_private = Public;

@@ -600,7 +600,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
           ld_modalities = ld.ld_modalities.moda_modalities;
-          ld_sort = Some Jkind.Sort.Const.void;
+          ld_sort = None;
             (* Updated by [update_label_sorts] *)
           ld_type = ty;
           ld_loc = ld.ld_loc;
@@ -632,7 +632,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
       Types.ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
-      ca_sort = Some Jkind.Sort.Const.void;
+      ca_sort = None;
             (* Updated by [update_constructor_arguments_sorts] *)
     }) tyl_gfl
   in
@@ -1339,7 +1339,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
               (* Inherit modalities from the boxed version. Note that these
                   are affected by the mutability of the boxed label, even
                   though the unboxed version is always immutable. *)
-            ld_sort = Some Jkind.Sort.Const.void;
+            ld_sort = None;
             ld_type = ld.ld_type;
             ld_loc = ld.ld_loc;
             ld_attributes = List.filter keep_attribute ld.ld_attributes;
