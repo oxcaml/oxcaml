@@ -592,25 +592,39 @@ module type S =
 (* "value" is special and usually a default.
    It is not a default inside "val poly_". *)
 module type S = sig
-  val poly_ baz5 : ('a : value) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+  val poly_ baz6 : ('a : value) 'b. 'a -> #('a * 'b) -> #('a * 'b)
 end
 [%%expect {|
 module type S =
   sig
-    val baz5 :
+    val baz6 :
       layout_ l. ('a : value) ('b : l). 'a -> #('a * 'b) -> #('a * 'b)
   end
 |}]
 
 (* "value_or_null" should be printed *)
 module type S = sig
-  val poly_ baz6 : ('a : value_or_null) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+  val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b) -> #('a * 'b)
 end
 [%%expect {|
 module type S =
   sig
-    val baz6 :
+    val baz7 :
       layout_ l.
         ('a : value_or_null) ('b : l). 'a -> #('a * 'b) -> #('a * 'b)
+  end
+|}]
+
+(* "'c is a value and not layout-polymorphic" *)
+module type S = sig
+  val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz8 :
+      layout_ l l0.
+        ('a : l) ('b : l0) ('c : value).
+          'a -> 'b -> 'c list -> #('a * 'b * 'c)
   end
 |}]
