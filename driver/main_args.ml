@@ -496,6 +496,12 @@ let mk_o f =
 let mk_open f =
   "-open", Arg.String f, "<module>  Opens the module <module> before typing"
 
+let mk_open_cmi f =
+  "-open-cmi", Arg.String f,
+  "<module>  Like -open, but loads <module> directly from a [.cmi] file on\n\
+  \    the include path (visible or hidden) and ignores any module of the\n\
+  \    same name already in scope. Processed before -open."
+
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
 
@@ -1140,6 +1146,7 @@ module type Common_options = sig
   val _no_auto_include_otherlibs : unit -> unit
   val _nocwd : unit -> unit
   val _open : string -> unit
+  val _open_cmi : string -> unit
   val _ppx : string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
@@ -1519,6 +1526,7 @@ struct
     mk_o F._o;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_output_complete_exe F._output_complete_exe;
@@ -1638,6 +1646,7 @@ struct
     mk_nocwd F._nocwd;
     mk_nopervasives F._nopervasives;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -1796,6 +1805,7 @@ struct
     mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_p F._p;
@@ -1969,6 +1979,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_o3 F._o3;
     mk_o4 F._o4;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -2111,6 +2122,7 @@ struct
     mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_pack_byt F._pack;
     mk_parameter F._parameter;
@@ -2239,6 +2251,7 @@ struct
     mk_no_auto_include_otherlibs F._no_auto_include_otherlibs;
     mk_nocwd F._nocwd;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2357,6 +2370,7 @@ module Default = struct
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
     let _open s = open_modules := (s :: (!open_modules))
+    let _open_cmi s = open_cmi_modules := (s :: (!open_cmi_modules))
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching

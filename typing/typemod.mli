@@ -89,6 +89,7 @@ val package_units:
 val initial_env:
   loc:Location.t ->
   initially_opened_module:string option ->
+  open_cmi_implicit_modules:string list ->
   open_implicit_modules:string list -> Env.t
 
 module Sig_component_kind : sig

@@ -502,11 +502,8 @@ val add_signature_lazy: Subst.Lazy.signature_item list -> t -> t
 
 (* Insertion of all fields of a signature, relative to the given path.
    Used to implement open. Returns None if the path refers to a functor,
-   not a structure.
-   [allow_hidden] permits resolving the path to a module reachable only
-   via [-H] / [-H-manifest]; intended for command-line [-open] flags. *)
+   not a structure. *)
 val open_signature:
-    ?allow_hidden:bool ->
     used_slot:bool ref ->
     loc:Location.t -> toplevel:bool ->
     Asttypes.override_flag -> Longident.t Location.loc ->
@@ -515,6 +512,12 @@ val open_signature:
 val open_signature_by_path: Path.t -> t -> t
 
 val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
+
+(* Like [open_pers_signature], but loads the named module directly from a
+   [.cmi] file on the include path (visible or hidden) and ignores any
+   in-scope module with the same name. Raises [Not_found] if the cmi cannot
+   be loaded or is not a structure. Used to implement [-open-cmi]. *)
+val open_pers_signature_cmi: string -> t -> Path.t * mode_with_locks * t
 
 val remove_last_open: Path.t -> t -> t option
 

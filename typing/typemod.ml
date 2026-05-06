@@ -358,22 +358,20 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
 
 (* Compute the environment after opening a module *)
 
-let type_open_
-    ?(allow_hidden=false) ?(used_slot=ref false) ?(toplevel=false)
-    ovf env loc lid =
-  Env.open_signature ~allow_hidden ~loc ~used_slot ~toplevel ovf lid env
+let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
+  Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
 
 let initial_env ~loc ~initially_opened_module
-    ~open_implicit_modules =
+    ~open_cmi_implicit_modules ~open_implicit_modules =
   let env = Lazy.force Env.initial in
-  let open_module ~allow_hidden env m =
+  let open_module env m =
     let open Asttypes in
     let lexbuf = Lexing.from_string m in
     let txt =
       Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
       Parse.simple_module_path lexbuf
     in
-    let _, _, env = type_open_ ~allow_hidden Override env loc {txt;loc} in
+    let _, _, env = type_open_ Override env loc {txt;loc} in
     env
   in
   let add_units env units =
@@ -410,7 +408,7 @@ let initial_env ~loc ~initially_opened_module
           | Some (units_containing_m, other_units) ->
               (add_units env units_containing_m, other_units)
         in
-        (open_module ~allow_hidden:false env m, units)
+        (open_module env m, units)
   in
   let env = List.fold_left add_units env units in
   (* Adding [basenames] after [initially_opened_module] check, since the
@@ -419,10 +417,16 @@ let initial_env ~loc ~initially_opened_module
   let units_from_filenames =
     Env.persistent_structures_of_basenames basenames in
   let env = add_units env units_from_filenames in
-  (* Command-line [-open] is allowed to reach modules behind [-H] /
-     [-H-manifest]; the [initially_opened_module] open above (e.g. [Stdlib])
-     keeps the default. *)
-  List.fold_left (open_module ~allow_hidden:true) env open_implicit_modules
+  (* Process [-open-cmi] before [-open] so that the latter can refer to
+     modules brought into scope by the former. *)
+  let env =
+    List.fold_left
+      (fun env m ->
+         let _, _, env = Env.open_pers_signature_cmi m env in
+         env)
+      env open_cmi_implicit_modules
+  in
+  List.fold_left open_module env open_implicit_modules
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, _, newenv) =
