@@ -789,7 +789,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
     | Record_unboxed_product ->
       let lbl_layout l =
         let sort = unboxed_label_sort l record_sorts in
-        if l.lbl_pos == lbl.lbl_pos then
+        if l.lbl_pos = lbl.lbl_pos then
           (* This is the field being projected, so give it a precise value kind
              (by using the known type of the expression) *)
           layout e.exp_env l.lbl_loc sort e.exp_type
