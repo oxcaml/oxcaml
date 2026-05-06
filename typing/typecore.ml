@@ -1733,24 +1733,24 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
     match representative_label.lbl_repres with
     | Some rep -> Fixed, rep
     | None ->
-        let lbls_and_ty_args =
-          Array.map2
-            (fun lbl (_vars, ty_arg) ->
-               (lbl |> Types.label_declaration_of_label_description),
-               ty_arg)
-            representative_label.lbl_all
-            vars_and_ty_args
-        in
-        match
-          Typedecl.update_record_representation env loc form
-            (lbls_and_ty_args |> Array.to_list)
-        with
-        | Ok (sorts, rep) ->
-            let sorts = sorts |> Array.of_list in
-            Variable sorts, rep
-        | Error (Unrepresentable_field name) ->
-            raise (Error (loc, env,
-                          Indeterminate_record_layout(containing_type, name)))
+      let lbls_and_ty_args =
+        Array.map2
+          (fun lbl (_vars, ty_arg) ->
+             (lbl |> Types.label_declaration_of_label_description),
+             ty_arg)
+          representative_label.lbl_all
+          vars_and_ty_args
+      in
+      match
+        Typedecl.update_record_representation env loc form
+          (lbls_and_ty_args |> Array.to_list)
+      with
+      | Ok (sorts, rep) ->
+          let sorts = sorts |> Array.of_list in
+          Variable sorts, rep
+      | Error (Unrepresentable_field name) ->
+          raise (Error (loc, env,
+                        Indeterminate_record_layout(containing_type, name)))
   in
   sorts, rep
 
@@ -9058,6 +9058,10 @@ and type_label_projection
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
       unify_exp env record ty_res;
+      (* CR-soon rtjoa: merge this type of check with
+         [Typedecl.check_representable]. It should also be done within
+         [update_labels] - this will allow sort variables to be created for
+         other places that use [update_labels], such as for block indices *)
       begin match type_sort ~why:Field_projection ~fixed:false env ty_arg with
       | Ok _ -> ()
       | Error err ->
