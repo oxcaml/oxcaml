@@ -1285,8 +1285,8 @@ let is_bound_to_runtime_parameter id =
 
 let parameters () = Persistent_env.parameters !persistent_env
 
-let read_pers_mod modname cmi =
-  Persistent_env.read !persistent_env modname cmi
+let read_pers_mod ?visibility modname cmi =
+  Persistent_env.read ?visibility !persistent_env modname cmi
 
 let find_pers_mod ~allow_hidden name ~allow_excess_args =
   Persistent_env.find ~allow_hidden !persistent_env read_sign_of_cmi name
@@ -4282,7 +4282,11 @@ let open_pers_signature_cmi filename env =
     |> Compilation_unit.Name.to_string
   in
   let global_name = Global_module.Name.create_no_args modname in
-  let _sign : Subst.Lazy.signature = read_pers_mod global_name artifact in
+  (* Register as hidden so that direct user-code references to the module
+     are still reported as unbound; only transitive lookups can reach it. *)
+  let _sign =
+    read_pers_mod ~visibility:Load_path.Hidden global_name artifact
+  in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
   in

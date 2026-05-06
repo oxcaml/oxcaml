@@ -400,13 +400,13 @@ let acknowledge_import penv ~check modname pers_sig =
   Hashtbl.add imports modname (Found import);
   import
 
-let read_import penv ~check modname cmi =
+let read_import penv ~check
+    ?(visibility = Load_path.Visible { cmx_guaranteed = false }) modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
   let cmi = read_cmi_lazy filename in
   let pers_sig =
-    { Persistent_signature.filename; cmi;
-      visibility = Visible { cmx_guaranteed = false } }
+    { Persistent_signature.filename; cmi; visibility }
   in
   acknowledge_import penv ~check modname pers_sig
 
@@ -704,9 +704,9 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
       let import = find_import ~allow_hidden penv ~check unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
-let read_pers_name penv check name filename =
+let read_pers_name penv check ?visibility name filename =
   let unit_name = CU.Name.of_head_of_global_name name in
-  let import = read_import penv ~check unit_name filename in
+  let import = read_import penv ~check ?visibility unit_name filename in
   acknowledge_pers_name penv check name import
 
 let normalize_global_name penv modname =
@@ -862,9 +862,9 @@ let acknowledge_pers_struct penv modname pers_name val_of_pers_sig =
     Hashtbl.add persistent_structures modname { ps with ps_canonical = false };
   ps
 
-let read_pers_struct penv check modname cmi =
+let read_pers_struct penv check ?visibility modname cmi =
   let pers_name =
-    read_pers_name penv check modname cmi ~allow_excess_args:false
+    read_pers_name penv check ?visibility modname cmi ~allow_excess_args:false
   in
   pers_name.pn_sign
 
@@ -956,8 +956,8 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
 
-let read penv modname a =
-  read_pers_struct penv true modname a
+let read ?visibility penv modname a =
+  read_pers_struct penv true ?visibility modname a
 
 let find ~allow_hidden penv f name ~allow_excess_args =
   (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
