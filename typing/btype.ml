@@ -2091,10 +2091,11 @@ module Jkind0 = struct
            through the product, by one step, never loses any information. *)
         |> mark_best
 
-      let product_of_any ~why arity sa =
+      let product_of_any ~why arity =
         let layout =
           Jkind_types.Layout.product
-            (List.init arity (fun _ -> Jkind_types.Layout.Any sa))
+            (List.init arity (fun _ ->
+               Jkind_types.Layout.Any Jkind_types.Scannable_axes.max))
         in
         let desc : _ jkind_desc =
           { base = Layout layout;

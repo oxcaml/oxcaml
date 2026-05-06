@@ -681,7 +681,6 @@ module Jkind0 : sig
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
         int ->
-        Jkind_types.Scannable_axes.t ->
         jkind_l
     end
 
