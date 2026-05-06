@@ -301,8 +301,8 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
 
   let is_call_predecessor (pred : Block.t) (target : Block.t) =
     match[@warning "-fragile-match"] pred.terminator with
-    | Invalid { continuation = Some continuation; _ } | Call { continuation; _ }
-      ->
+    | Invalid { continuation = Some continuation; _ }
+    | Call { op = Func _ | Prim (External _); continuation; _ } ->
       Block.equal continuation target
     | _ -> false
 

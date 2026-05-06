@@ -623,10 +623,11 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             worklist := (succ, start_stack) :: !worklist
           in
           Terminator.non_trap_successors block.terminator
-          |> List.iter (add_pred end_stack);
+          |> List.iter (fun succ -> add_pred end_stack succ);
           (* On entry to a trap handler, the runtime has popped the topmost
              handler off the trap stack. *)
-          trap_successor block |> Option.iter (add_pred (List.tl end_stack))
+          trap_successor block
+          |> Option.iter (fun succ -> add_pred (List.tl end_stack) succ)
         end
       done;
       let reachable_blocks =
