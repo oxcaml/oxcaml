@@ -283,16 +283,12 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
     for (uint32_t k = 0; k < n; k++) {
       uint32_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
-      /* REVIEW(codex): This currently treats any registered code fragment as
-       * unloadable, but the code fragment table also contains non-unloadable
-       * code (e.g. the main program, Dynlink). Calling
-       * [caml_visit_code_block_for_entry] on such a [cp] will dereference an
-       * undefined [entry - 1] word and can crash. This should be gated on
-       * membership in a registered unloadable unit, not just fragment lookup.
-       * If [caml_find_unloadable_unit_by_pc] is used here, please consider the
-       * cost (it currently locks + scans units) since this path runs during
-       * stack scanning. */
-      if (caml_find_code_fragment_by_pc((char *)cp) != NULL) {
+      /* The code fragment table contains non-unloadable code too (main
+       * program, Dynlink). Dereferencing the [entry - 1] back-pointer word is
+       * only valid for unloadable entries, so require membership in an
+       * unloadable unit. */
+      if (caml_find_code_fragment_by_pc((char *)cp) != NULL
+          && caml_find_unloadable_unit_by_pc((char *)cp) != NULL) {
         caml_visit_code_block_for_entry(f, fdata, cp);
       }
     }
@@ -303,8 +299,9 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
     for (uint16_t k = 0; k < n; k++) {
       uint16_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
-      /* REVIEW(codex): See long-format case above; same concern. */
-      if (caml_find_code_fragment_by_pc((char *)cp) != NULL) {
+      /* See long-format case above. */
+      if (caml_find_code_fragment_by_pc((char *)cp) != NULL
+          && caml_find_unloadable_unit_by_pc((char *)cp) != NULL) {
         caml_visit_code_block_for_entry(f, fdata, cp);
       }
     }
