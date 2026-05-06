@@ -1202,7 +1202,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (* [~lower] is not precise here, but it doesn't need to be *)
       ( Amodevar
           (Amorphvar
-             (fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs obj, C.id, Id)),
+             ( fresh ~lower:a ~lower_hint:a_hint ~vlower:(VarHashtbl.copy mvs)
+                 obj,
+               C.id,
+               Id )),
         true )
 
   let newvar_below (type a l) (obj : a C.obj) (m : (a, l * allowed) mode) =
