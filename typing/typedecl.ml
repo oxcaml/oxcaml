@@ -1121,6 +1121,7 @@ let transl_declaration env sdecl (id, uid) =
               Jkind.of_new_sort ~why:Old_style_unboxed_type
                 ~level:(Ctype.get_current_level ())
             else
+              (* See Note [Record_dummy] in [typing/types.mli] *)
               Record_dummy { represent_as_float_array },
               Jkind.for_non_float ~why:Boxed_record
           in
@@ -1256,8 +1257,8 @@ let transl_declaration env sdecl (id, uid) =
    1. In the temporary environment computed by [enter_type], all types get an
       unboxed version.
 
-   2. After translating declarations, [derive_unboxed_versions] gives the
-      all [Record_dummy { represent_as_float_array = false }] records unboxed
+   2. After translating declarations, [derive_unboxed_versions] gives all
+      [Record_dummy { represent_as_float_array = false }] records unboxed
       versions.
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:

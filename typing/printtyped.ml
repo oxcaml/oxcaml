@@ -257,7 +257,6 @@ let record_representation i ppf = let open Types in function
   | Record_dummy { represent_as_float_array = false } ->
     line i ppf "Record_dummy\n"
 
-
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
     line i ppf "Record_unboxed_product\n"
