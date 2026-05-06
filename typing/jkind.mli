@@ -358,10 +358,7 @@ module Builtin : sig
       products generally should. This is useful when creating an initial jkind
       in Typedecl. *)
   val product_of_any :
-    why:History.product_creation_reason ->
-    int ->
-    Scannable_axes.t ->
-    Types.jkind_l
+    why:History.product_creation_reason -> int -> Types.jkind_l
 end
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and
