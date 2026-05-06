@@ -498,10 +498,8 @@ let mk_open f =
 
 let mk_open_cmi f =
   "-open-cmi", Arg.String f,
-  "<file.cmi>  Like -open, but reads the module signature directly from\n\
-  \    <file.cmi> rather than looking up a module name on the include path,\n\
-  \    and ignores any in-scope module with the same name. Processed before\n\
-  \    -open."
+  "<file.cmi>  Same as -open, but reads the signature from <file.cmi>\n\
+  \    rather than looking up a module on the include path"
 
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
