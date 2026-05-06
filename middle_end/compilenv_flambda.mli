@@ -14,7 +14,8 @@
 
 (** Flambda2-specific compilation environment operations.
 
-    Provides typed access to export info stored opaquely in [Compilenv]. *)
+    Provides typed access to export info stored opaquely in
+    [Compilenv]. *)
 
 type unit_infos =
   (Lambda.main_module_block_format,
@@ -32,11 +33,13 @@ val get_unit_export_info :
 
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.t -> unit
 
+val current_export_info :
+  unit -> Flambda2_cmx.Flambda_cmx_format.t option
+        (** The export info of the current unit being compiled,
+            deserialised. *)
+
 val read_unit_info : string -> unit_infos * Digest.t
 
 val write_unit_info : unit_infos -> string -> unit
 
 val cache_unit_info : unit_infos -> unit
-
-val unpack_export_info :
-  Obj.t -> Flambda2_cmx.Flambda_cmx_format.t

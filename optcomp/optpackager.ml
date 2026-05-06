@@ -183,14 +183,12 @@ end) : S = struct
         members []
     in
     let ui = Compilenv.current_unit_infos () in
-    let current_export_info =
-      Option.map Compilenv_flambda.unpack_export_info ui.ui_export_info
-    in
     let ui_export_info =
       List.fold_left
         (fun acc info ->
           Flambda2_cmx.Flambda_cmx_format.merge info.ui_export_info acc)
-        current_export_info units
+        (Compilenv_flambda.current_export_info ())
+        units
     in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter
