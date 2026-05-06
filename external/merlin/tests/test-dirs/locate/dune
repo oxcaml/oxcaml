@@ -1,0 +1,35 @@
+(cram
+ (applies_to looping-substitution mutually-recursive partial-cmt includes
+   issue802 issue845 issue1848 issue1199 issue1524 sig-substs l-413-features
+   module-aliases locate-constrs without-implem without-sig module-decl-aliases
+   in-implicit-trans-dep distinguish-files)
+ (enabled_if
+  (<> %{os_type} Win32)))
+
+(cram
+ (applies_to issue1424 module-aliases in-generated-file)
+ (enabled_if
+  (and
+   (<> %{architecture} i386)
+   (<> %{os_type} Win32))))
+
+(cram
+ (applies_to :whole_subtree)
+ (alias all-locate-tests))
+
+(cram
+ (applies_to in-implicit-trans-dep)
+ (enabled_if (>= %{read:version/dune.txt} "3.16")))
+
+(subdir
+ version
+ (rule (action (with-stdout-to dune.txt (run dune --version)))))
+
+; Jane Street disabled tests -- they use dune.
+; Revisit when dune can run the flambda-backend compiler.
+(cram
+  (enabled_if false)
+  (applies_to
+    in-implicit-trans-dep
+    in-generated-file
+    distinguish-files))
