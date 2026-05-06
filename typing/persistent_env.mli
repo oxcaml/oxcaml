@@ -104,7 +104,9 @@ type 'a sig_reader =
   -> flags:Cmi_format.pers_flags list
   -> 'a
 
-val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
+val read :
+     ?visibility:Load_path.visibility
+  -> 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.persistent_signature
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
