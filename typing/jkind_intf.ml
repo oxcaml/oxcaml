@@ -66,6 +66,11 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Rigidvar of var
+          (** A rigid sort variable that cannot be unified. Returned by
+              [default_to_scannable_and_get] for rigidvars (which arise
+              transiently during [transl_type_scheme_lpoly] before being
+              promoted to genvars). *)
 
     val equal : t -> t -> bool
 
@@ -249,6 +254,13 @@ module type Sort = sig
   (** Returns [true] iff the variable was created by {!new_genvar} or
       {!new_genvar_for_cmi}. *)
   val is_genvar : var -> bool
+
+  (** Create a rigid sort variable that cannot be unified. *)
+  val new_rigidvar : unit -> var
+
+  (** Promote a rigid sort variable to a generic sort variable. Must only be
+      called on rigid variables with no contents. *)
+  val promote_rigidvar_to_genvar : var -> unit
 
   val reset_cmi_sort_id : unit -> unit
 

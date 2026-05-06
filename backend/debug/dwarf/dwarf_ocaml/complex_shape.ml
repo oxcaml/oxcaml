@@ -228,6 +228,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Void -> Product [||])
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
+  | Rigidvar _ -> Misc.fatal_error "layout_to_types_layout: Rigidvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
 
 let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
@@ -405,6 +406,7 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     | Void -> void)
   | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_unknown_shape: Genvar"
+  | Rigidvar _ -> Misc.fatal_error "layout_to_unknown_shape: Rigidvar"
 
 let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     (type_layout : Layout.t option) : t =
@@ -505,6 +507,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
     | (Some None | None), Some (Genvar _) ->
       Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar"
+    | (Some None | None), Some (Rigidvar _) ->
+      Misc.fatal_error "type_shape_to_complex_shape_exn: Rigidvar"
     | (Some None | None), None -> raise Layout_missing)
   | Alias sh, type_layout ->
     type_shape_to_complex_shape_exn ~cache ~rec_env sh type_layout
@@ -740,6 +744,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
   | _, Some (Genvar _) ->
     Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar"
+  | _, Some (Rigidvar _) ->
+    Misc.fatal_error "type_shape_to_complex_shape_exn: Rigidvar"
   | ( ( Var _ | Error _ | Proj _ | Abs _ | Comp_unit _ | Struct _ | Mutrec _
       | Constr _ | App _ | Proj_decl _ ),
       _ ) ->

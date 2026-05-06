@@ -116,7 +116,7 @@ let maybe_pointer_type env ty =
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
 let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
-  | Any _ | Univar _ | Genvar _ -> false
+  | Any _ | Univar _ | Genvar _ | Rigidvar _ -> false
   | Base _ -> true
   | Product sorts ->
     List.for_all layout_is_representable sorts
@@ -284,6 +284,7 @@ let classify ~classify_product env ty layout : _ classification =
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
+  | Rigidvar _ -> Misc.fatal_error "classify: Rigidvar"
 
 let rec scannable_product_array_kind elt_ty_for_error loc layouts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
@@ -308,6 +309,8 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
   | Genvar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
+  | Rigidvar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Rigidvar"
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
   match sorts with
@@ -343,6 +346,8 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
   | Genvar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
+  | Rigidvar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Rigidvar"
 
 let array_kind_of_elt env loc ty =
   let ty = scrape_ty env ty in
@@ -498,6 +503,7 @@ let value_kind_of_scannable_jkind env jkind =
          | Product _
          | Univar _
          | Genvar _
+         | Rigidvar _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),
@@ -1152,6 +1158,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
   | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
+  | Rigidvar _ -> Misc.fatal_error "layout: unexpected rigidvar"
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1176,6 +1183,7 @@ let layout env loc sort ty =
                                                    Some ty)))
       | Univar _ -> assert false
       | Genvar _ -> assert false
+      | Rigidvar _ -> assert false
     )
 
 let layout_of_sort loc sort =
@@ -1199,6 +1207,7 @@ let layout_of_sort loc sort =
                            (Jkind.Sort.of_const const, Stable, None)))
     | Univar _ -> assert false
     | Genvar _ -> assert false
+    | Rigidvar _ -> assert false
     )
 
 let layout_of_non_void_sort c =

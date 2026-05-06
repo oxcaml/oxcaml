@@ -149,6 +149,10 @@ module Layout : sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Rigidvar of Sort.var
+          (** A rigid sort variable. Returned by [default_to_scannable_and_get]
+              for rigidvars, which arise transiently during
+              [transl_type_scheme_lpoly]. *)
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
