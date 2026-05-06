@@ -330,18 +330,42 @@ let make_reload : type a. (a, definition_kind) make_operation =
       ~arg ~res:[| new_reg |] ()
 
 (* Inserts the reloads in a block, as late as possible (i.e. immediately before
-   the register is first read), to reduce live ranges. *)
+   the register is first read), to reduce live ranges. Rematerialized loads are
+   pre-inserted at the head of the block; the regular first-use iteration then
+   runs for the [Reload] entries, and naturally places the reload of any
+   register used as an argument by a rematerialized load before its consumer.
+   This ordering relies on [RewriteAsRematerialize] forbidding
+   Rematerialize-on-Rematerialize within a single block, so the relative order
+   of pre-inserted rematerialized instructions does not matter. *)
 let insert_reloads_in_block :
     State.t ->
     instr_id:InstructionId.sequence ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
     Cfg.basic_block ->
-    Instruction.t DLL.cell option ->
     definition_kind Reg.Map.t ->
     unit =
- fun state ~instr_id ~block_subst ~stack_subst block cell
-     live_at_definition_point ->
+ fun state ~instr_id ~block_subst ~stack_subst block live_at_definition_point ->
+  let remats, reloads =
+    Reg.Map.partition
+      (fun _reg (kind : definition_kind) ->
+        match kind with Rematerialize _ -> true | Reload -> false)
+      live_at_definition_point
+  in
+  let copy_for_remat =
+    match DLL.hd block.body with
+    | None -> dummy_instr_of_terminator block.terminator
+    | Some hd -> hd
+  in
+  Reg.Map.iter
+    (fun old_reg kind ->
+      let new_reg = Substitution.apply_reg block_subst old_reg in
+      let remat =
+        make_reload state ~instr_id ~stack_subst ~block_subst ~old_reg ~new_reg
+          ~copy:copy_for_remat ~kind
+      in
+      DLL.add_begin block.body remat)
+    remats;
   insert_spills_or_reloads_in_block state ~instr_id
     ~make_spill_or_reload:make_reload
     ~insert:(fun cell instr _reg ->
@@ -356,8 +380,8 @@ let insert_reloads_in_block :
     ~add_default:(fun list instr _reg ->
       (* Same reasoning as for insert above *)
       DLL.add_end list instr)
-    ~move_cell:DLL.next ~block_subst ~stack_subst block cell
-    (Reg.Map.to_seq live_at_definition_point)
+    ~move_cell:DLL.next ~block_subst ~stack_subst block (DLL.hd_cell block.body)
+    (Reg.Map.to_seq reloads)
 
 (* Inserts reloads in all blocks. *)
 let insert_reloads :
@@ -374,7 +398,7 @@ let insert_reloads :
       let instr_id = (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id in
       let block_subst = Substitution.for_label substs label in
       insert_reloads_in_block state ~instr_id ~block_subst ~stack_subst block
-        (DLL.hd_cell block.body) live_at_definition_point)
+        live_at_definition_point)
     (State.definitions_at_beginning state);
   if debug then dedent ()
 

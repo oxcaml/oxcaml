@@ -13,6 +13,19 @@ let split_more_destruction_points : bool Lazy.t =
 let split_around_loops : bool Lazy.t =
   bool_of_param "SPLIT_AROUND_LOOPS" ~default:true
 
+(* CR-soon xclerc for xclerc: this flag is off by default until the regalloc
+   validator is taught about rematerialized immutable loads. Today
+   `Regalloc_validate.verify_basic` only accepts a newly-inserted basic
+   instruction if it is `Op Move` (phi moves) or one of `Op (Spill | Reload)`,
+   and the equation-transfer in `Regalloc_validate.basic` only handles those
+   shapes (via `rename_location`/`rename_register`). To enable rematerialization
+   in production both call sites need to recognize a copy of an immutable,
+   non-atomic, single-result load and thread the appropriate equations through,
+   so the validator can confirm that the rematerialized result holds the same
+   value as the original load's result. *)
+let split_rematerialize : bool Lazy.t =
+  bool_of_param "SPLIT_REMATERIALIZE" ~default:false
+
 let log_function = lazy (make_log_function ~label:"split")
 
 let indent () = (Lazy.force log_function).indent ()
@@ -199,3 +212,33 @@ module Uses = struct
             incr_set acc instr.res ~in_loop ~source);
         acc)
 end
+
+let all_at_most_once_in : Uses.t -> Reg.Set.t -> Reg.t array -> bool =
+ fun uses available regs ->
+  Array.for_all regs ~f:(fun (reg : Reg.t) ->
+      Reg.Set.mem reg available
+      &&
+      match Reg.Tbl.find_opt uses reg with
+      | None | Some Uses.Maybe_more_than_once -> false
+      | Some (Uses.At_most_once _) -> true)
+
+(* CR-soon xclerc for xclerc: this function would benefit from some refactoring
+   once the design has settled (e.g. share the move-chasing logic, generalize
+   the arg-availability check, lift the depth-1 cap on the move chain, etc.). *)
+let try_rematerialize :
+    Uses.t -> available:Reg.Set.t -> Reg.t -> Instruction.t option =
+ fun uses ~available reg ->
+  match Reg.Tbl.find_opt uses reg with
+  | None | Some Uses.Maybe_more_than_once -> None
+  | Some (Uses.At_most_once { source = Other }) -> None
+  | Some (Uses.At_most_once { source = Load load }) ->
+    if all_at_most_once_in uses available load.arg then Some load else None
+  | Some (Uses.At_most_once { source = Move arg }) -> (
+    match Reg.Tbl.find_opt uses arg with
+    | None
+    | Some Uses.Maybe_more_than_once
+    | Some (Uses.At_most_once { source = Other })
+    | Some (Uses.At_most_once { source = Move _ }) ->
+      None
+    | Some (Uses.At_most_once { source = Load load }) ->
+      if all_at_most_once_in uses available load.arg then Some load else None)

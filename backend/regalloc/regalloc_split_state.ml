@@ -616,6 +616,82 @@ end = struct
     res
 end
 
+(* Converts the unqualified `definitions_at_beginning` (a set of registers) to a
+   qualified one (a map from register to `definition_kind`), turning entries
+   into `Rematerialize` when possible and `Reload` otherwise. A register can be
+   rematerialized as a copy of an immutable load (cf. [try_rematerialize]). To
+   avoid having to topologically order the inserted rematerialized instructions,
+   we forbid Rematerialize-on-Rematerialize within a single block: a candidate
+   is demoted to `Reload` if any of its load arguments is itself a candidate at
+   the same block. *)
+module RewriteAsRematerialize : sig
+  val optimize :
+    Cfg_with_infos.t ->
+    uses:Uses.t ->
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    definition_kind Reg.Map.t Label.Map.t
+end = struct
+  let optimize cfg_with_infos ~uses ~definitions_at_beginning =
+    if debug
+    then (
+      log "RewriteAsRematerialize.optimize";
+      indent ());
+    let enabled = Lazy.force split_rematerialize in
+    let result =
+      Label.Map.mapi
+        (fun (label : Label.t) (regs : Reg.Set.t) ->
+          let candidates =
+            ref
+              (if not enabled
+               then Reg.Map.empty
+               else
+                 let available = live_at_block_beginning cfg_with_infos label in
+                 Reg.Set.fold
+                   (fun reg acc ->
+                     match try_rematerialize uses ~available reg with
+                     | None -> acc
+                     | Some load -> Reg.Map.add reg load acc)
+                   regs Reg.Map.empty)
+          in
+          let changed = ref true in
+          while !changed do
+            changed := false;
+            candidates
+              := Reg.Map.filter
+                   (fun _reg (load : Instruction.t) ->
+                     let keep =
+                       Array.for_all load.arg ~f:(fun (arg : Reg.t) ->
+                           not (Reg.Map.mem arg !candidates))
+                     in
+                     if not keep then changed := true;
+                     keep)
+                   !candidates
+          done;
+          if debug
+          then (
+            log "block %a" Label.format label;
+            indent ();
+            Reg.Map.iter
+              (fun reg (load : Instruction.t) ->
+                log "remat %a from instruction %a" Printreg.reg reg
+                  InstructionId.format load.id)
+              !candidates;
+            dedent ());
+          Reg.Set.fold
+            (fun (reg : Reg.t) acc ->
+              let kind : definition_kind =
+                match Reg.Map.find_opt reg !candidates with
+                | Some load -> Rematerialize load
+                | None -> Reload
+              in
+              Reg.Map.add reg kind acc)
+            regs Reg.Map.empty)
+        definitions_at_beginning
+    in
+    if debug then dedent ();
+    result
+end
+
 let add_destruction_point_at_end :
     Cfg_with_infos.t ->
     Cfg.basic_block ->
@@ -853,12 +929,8 @@ let make cfg_with_infos =
   in
   let stack_slots = Regalloc_stack_slots.make () in
   let definitions_at_beginning =
-    Label.Map.map
-      (fun regs ->
-        Reg.Set.fold
-          (fun reg acc -> Reg.Map.add reg Reload acc)
-          regs Reg.Map.empty)
-      definitions_at_beginning
+    RewriteAsRematerialize.optimize cfg_with_infos ~uses
+      ~definitions_at_beginning
   in
   { destructions_at_end;
     definitions_at_beginning;

@@ -6,6 +6,8 @@ val split_more_destruction_points : bool Lazy.t
 
 val split_around_loops : bool Lazy.t
 
+val split_rematerialize : bool Lazy.t
+
 val indent : unit -> unit
 
 val dedent : unit -> unit
@@ -58,3 +60,12 @@ module Uses : sig
 
   val compute : Cfg_with_infos.t -> set Reg.Tbl.t
 end
+
+(** [try_rematerialize uses ~available reg] returns [Some ld] if [reg] can be
+    rematerialized as a copy of the immutable load [ld]: [reg] must be set at
+    most once, that single set must be the load (possibly via a move chain of
+    length one), and all of the load's arguments must themselves be set at most
+    once and be members of [available]. The [available] set is the set of
+    registers expected to hold a usable value at the rematerialization point. *)
+val try_rematerialize :
+  Uses.t -> available:Reg.Set.t -> Reg.t -> Regalloc_utils.Instruction.t option
