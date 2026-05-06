@@ -2387,7 +2387,16 @@ let update_record_kind (type rep) env loc (form : rep record_form)
   in
   sorts, rep
 
-let update_record_representation env loc form lbls_and_types =
+let update_record_representation
+      (type rep) ~why env loc (form : rep Types.record_form) lbls_and_types =
+  let kloc : jkind_sort_loc =
+    match form with
+    | Legacy -> Record { unboxed = false }
+    | Unboxed_product -> Record_unboxed_product
+  in
+  List.iter
+    (fun (_lbl, ld_type) -> check_representable ~why env loc kloc ld_type)
+    lbls_and_types;
   let sorts, rep =
     let warn =
       (* Only warn during initial typechecking rather than when updating at
