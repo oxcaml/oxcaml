@@ -224,6 +224,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
     match function_type with
     | None ->
       (* No rec info available, prevent inlining to avoid problems *)
+      if Flambda_features.debug_flambda2 ()
+      then Format.eprintf "no rec info :( @.";
       Do_not_inline { erase_attribute = false }
     | Some function_type -> (
       let decision =
@@ -447,7 +449,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       (Warnings.Inlining_impossible
          Inlining_helpers.(
            inlined_attribute_on_partial_application_msg Unrolled))
-  | Default_inlined | Hint_inlined -> ());
+  | Default_inlined | Hint_inlined | Forward_inlined -> ());
   let num_non_unarized_params = Flambda_arity.num_params param_arity in
   let num_non_unarized_args = Flambda_arity.num_params args_arity in
   assert (num_non_unarized_params > num_non_unarized_args);
@@ -952,7 +954,9 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     ~call =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
-  | Some _, (Hint_inlined | Unroll _ | Default_inlined | Always_inlined _) ->
+  | ( Some _,
+      ( Hint_inlined | Forward_inlined | Unroll _ | Default_inlined
+      | Always_inlined _ ) ) ->
     Misc.fatal_errorf
       "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
        always be marked as [Never_inline]:@ %a"
@@ -1247,6 +1251,17 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~from_env:(DE.get_inlining_state (DA.denv dacc))
         ~from_metadata:(Apply.inlining_state apply)
     in
+    let inlined =
+      let[@local] inlined_from_apply () = Apply.inlined apply in
+      match Apply.inlined apply with
+      | Never_inlined | Default_inlined | Unroll _ | Always_inlined _
+      | Hint_inlined ->
+        inlined_from_apply ()
+      | Forward_inlined -> (
+        match DE.forward_inlined (DA.denv dacc) with
+        | None -> inlined_from_apply ()
+        | Some inlined_from_env -> inlined_from_env)
+    in
     let apply =
       Apply.create ~callee:simplified_callee
         ~continuation:(Apply.continuation apply)
@@ -1255,8 +1270,8 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~return_arity:(Apply.return_arity apply)
         ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.alloc_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
-        ~inlined:(Apply.inlined apply) ~inlining_state
-        ~probe:(Apply.probe apply) ~position:(Apply.position apply)
+        ~inlined ~inlining_state ~probe:(Apply.probe apply)
+        ~position:(Apply.position apply)
         ~relative_history:
           (Inlining_history.Relative.concat
              ~earlier:(DE.relative_history (DA.denv dacc))
