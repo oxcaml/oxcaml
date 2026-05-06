@@ -153,15 +153,20 @@ module type Tree = sig
 
   val branch1 : ('a, branch) tree -> ('a, non_empty) tree
 
+  (* A view on a given internal node, corresponding to which of [leaf], or
+     [branch] constructed it. Passing the fields back in as arguments will
+     construct an identical tree. *)
+  (* Note: this needs to be in the same order as the definition of the [Leaf]
+     and [Branch] constructors in [Set0] and [Map0] in order for the code to be
+     correctly optimized. *)
   type 'a tree_descr =
     | Leaf of ('a, leaf) tree
     | Branch of ('a, branch) tree
 
   val tree_descr : ('a, non_empty) tree -> 'a tree_descr
 
-  (* A view on a given node, corresponding to which of [empty], [leaf], or
-     [branch] constructed it. Passing the fields back in as arguments will
-     construct an identical tree. *)
+  (* A view on the toplevel data structure, either [empty], or a non-empty
+     internal node. *)
   type 'a descr =
     | Empty
     | Non_empty of ('a, non_empty) tree
@@ -223,6 +228,8 @@ module type Tree = sig
 end
 
 module Set0 = struct
+  (* Note: the [Leaf] and [Branch] constructors need to be in the same order as
+     [tree_descr] in order for [tree_descr] below to be correctly optimized. *)
   type (_, _) tree =
     | Empty : (unit, empty) tree
     | Leaf : key -> (unit, [< non_empty > `Leaf]) tree
@@ -351,6 +358,8 @@ end
 module _ : Tree = Set0
 
 module Map0 = struct
+  (* Note: the [Leaf] and [Branch] constructors need to be in the same order as
+     [tree_descr] in order for [tree_descr] below to be correctly optimized. *)
   type (+!_, _) tree =
     | Empty : ('a, empty) tree
     | Leaf : key * 'a -> ('a, [< non_empty > `Leaf]) tree
@@ -998,7 +1007,8 @@ end = struct
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
 
-  let union f t0 t1 = toplevel_union (union_tree f) t0 t1
+  let union f t0 t1 =
+    toplevel_union (fun[@inline] t0 t1 -> union_tree f t0 t1) t0 t1
 
   (* [_sharing] functions are guaranteed to share with their first argument
      only.
@@ -1021,7 +1031,8 @@ end = struct
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
 
-  let union_sharing f t0 t1 = toplevel_union (union_sharing_tree f) t0 t1
+  let union_sharing f t0 t1 =
+    toplevel_union (fun[@inline] t0 t1 -> union_sharing_tree f t0 t1) t0 t1
 
   let rec union_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1035,7 +1046,8 @@ end = struct
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
 
-  let union_shared f t0 t1 = toplevel_union (union_shared_tree f) t0 t1
+  let union_shared f t0 t1 =
+    toplevel_union (fun[@inline] t0 t1 -> union_shared_tree f t0 t1) t0 t1
 
   let rec union_total_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1047,7 +1059,8 @@ end = struct
       (fun[@inline] k t t' -> Some (f k t t'))
       t0 t1
 
-  let union_total f t0 t1 = toplevel_union (union_total_tree f) t0 t1
+  let union_total f t0 t1 =
+    toplevel_union (fun[@inline] t0 t1 -> union_total_tree f t0 t1) t0 t1
 
   let rec union_total_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1062,7 +1075,7 @@ end = struct
       t0 t1
 
   let union_total_shared f t0 t1 =
-    toplevel_union (union_total_shared_tree f) t0 t1
+    toplevel_union (fun[@inline] t0 t1 -> union_total_shared_tree f t0 t1) t0 t1
 
   let rec union_left_biased_tree t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1109,7 +1122,8 @@ end = struct
       match descr t1 with Empty -> t0 | Non_empty t1' -> nonempty_diff t0' t1')
   [@@inline always]
 
-  let diff f t0 t1 = toplevel_diff (diff_tree f) t0 t1
+  let diff f t0 t1 =
+    toplevel_diff (fun[@inline] t0 t1 -> diff_tree f t0 t1) t0 t1
 
   let rec diff_sharing_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1121,7 +1135,8 @@ end = struct
       (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
 
-  let diff_sharing f t0 t1 = toplevel_diff (diff_sharing_tree f) t0 t1
+  let diff_sharing f t0 t1 =
+    toplevel_diff (fun[@inline] t0 t1 -> diff_sharing_tree f t0 t1) t0 t1
 
   let rec diff_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1133,7 +1148,8 @@ end = struct
       (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
 
-  let diff_shared f t0 t1 = toplevel_diff (diff_shared_tree f) t0 t1
+  let diff_shared f t0 t1 =
+    toplevel_diff (fun[@inline] t0 t1 -> diff_shared_tree f t0 t1) t0 t1
 
   (* CR mshinwell: rename to subset_domain and inter_domain? *)
 
