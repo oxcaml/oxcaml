@@ -61,11 +61,17 @@ module Uses : sig
   val compute : Cfg_with_infos.t -> set Reg.Tbl.t
 end
 
-(** [try_rematerialize uses ~available reg] returns [Some ld] if [reg] can be
-    rematerialized as a copy of the immutable load [ld]: [reg] must be set at
-    most once, that single set must be the load (possibly via a move chain of
-    length one), and all of the load's arguments must themselves be set at most
-    once and be members of [available]. The [available] set is the set of
-    registers expected to hold a usable value at the rematerialization point. *)
+(** [at_most_once_in uses available reg] is [true] iff [reg] is set at most once
+    and is a member of [available]. *)
+val at_most_once_in : Uses.t -> Reg.Set.t -> Reg.t -> bool
+
+(** [try_rematerialize uses ~is_arg_ok reg] returns [Some ld] if [reg] can be
+    rematerialized as a copy of the immutable load [ld]. The chain
+    [reg <- move ... <- move <- load] is followed of arbitrary length; every
+    register on the chain must be set at most once. The load is accepted iff
+    [is_arg_ok] holds for every one of its arguments. *)
 val try_rematerialize :
-  Uses.t -> available:Reg.Set.t -> Reg.t -> Regalloc_utils.Instruction.t option
+  Uses.t ->
+  is_arg_ok:(Reg.t -> bool) ->
+  Reg.t ->
+  Regalloc_utils.Instruction.t option

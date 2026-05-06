@@ -208,32 +208,30 @@ module Uses = struct
         acc)
 end
 
-let all_at_most_once_in : Uses.t -> Reg.Set.t -> Reg.t array -> bool =
- fun uses available regs ->
-  Array.for_all regs ~f:(fun (reg : Reg.t) ->
-      Reg.Set.mem reg available
-      &&
-      match Reg.Tbl.find_opt uses reg with
-      | None | Some Uses.Maybe_more_than_once -> false
-      | Some (Uses.At_most_once _) -> true)
-
-(* CR-soon xclerc for xclerc: this function would benefit from some refactoring
-   once the design has settled (e.g. share the move-chasing logic, generalize
-   the arg-availability check, lift the depth-1 cap on the move chain, etc.). *)
-let try_rematerialize :
-    Uses.t -> available:Reg.Set.t -> Reg.t -> Instruction.t option =
- fun uses ~available reg ->
+let at_most_once_in : Uses.t -> Reg.Set.t -> Reg.t -> bool =
+ fun uses available reg ->
+  Reg.Set.mem reg available
+  &&
   match Reg.Tbl.find_opt uses reg with
-  | None | Some Uses.Maybe_more_than_once -> None
-  | Some (Uses.At_most_once { source = Other }) -> None
-  | Some (Uses.At_most_once { source = Load load }) ->
-    if all_at_most_once_in uses available load.arg then Some load else None
-  | Some (Uses.At_most_once { source = Move arg }) -> (
-    match Reg.Tbl.find_opt uses arg with
+  | None | Some Uses.Maybe_more_than_once -> false
+  | Some (Uses.At_most_once _) -> true
+
+let try_rematerialize :
+    Uses.t -> is_arg_ok:(Reg.t -> bool) -> Reg.t -> Instruction.t option =
+ fun uses ~is_arg_ok reg ->
+  (* Walk the at-most-once-set-by chain of [reg]: through any number of moves,
+     stopping at the load that ultimately produces the value. The chain is
+     guaranteed to be acyclic and finite because every visited register is
+     [At_most_once] (set exactly once, outside any loop), so no register can
+     appear twice as a target in the chain. *)
+  let rec chase reg =
+    match Reg.Tbl.find_opt uses reg with
     | None
     | Some Uses.Maybe_more_than_once
-    | Some (Uses.At_most_once { source = Other })
-    | Some (Uses.At_most_once { source = Move _ }) ->
+    | Some (Uses.At_most_once { source = Other }) ->
       None
+    | Some (Uses.At_most_once { source = Move arg }) -> chase arg
     | Some (Uses.At_most_once { source = Load load }) ->
-      if all_at_most_once_in uses available load.arg then Some load else None)
+      if Array.for_all load.arg ~f:is_arg_ok then Some load else None
+  in
+  chase reg

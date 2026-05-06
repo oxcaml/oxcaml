@@ -646,9 +646,10 @@ end = struct
                then Reg.Map.empty
                else
                  let available = live_at_block_beginning cfg_with_infos label in
+                 let is_arg_ok = at_most_once_in uses available in
                  Reg.Set.fold
                    (fun reg acc ->
-                     match try_rematerialize uses ~available reg with
+                     match try_rematerialize uses ~is_arg_ok reg with
                      | None -> acc
                      | Some load -> Reg.Map.add reg load acc)
                    regs Reg.Map.empty)
