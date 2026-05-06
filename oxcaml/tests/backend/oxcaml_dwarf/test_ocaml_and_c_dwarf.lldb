@@ -32,4 +32,8 @@
 (lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_callback_inner
 (lldb) c
 (lldb) frames f_callback_inner caml_start_program f_callback
+(lldb) script print("=== Testing OCaml/C boundary - fiber (caml_runstack) ===")
+(lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_fiber_inner
+(lldb) c
+(lldb) frames f_fiber_inner caml_runstack f_fiber
 (lldb) quit

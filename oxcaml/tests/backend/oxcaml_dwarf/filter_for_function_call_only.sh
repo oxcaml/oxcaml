@@ -26,6 +26,7 @@ sed \
   -e 's| at [a-zA-Z0-9_/.-]*\.c:[0-9]*:[0-9]*.*$||g' \
   -e 's| at [a-zA-Z0-9_/.-]*\.h:[0-9]*:[0-9]*$||g' \
   -e 's|caml_start_program + [0-9]*|caml_start_program|g' \
+  -e 's|caml_runstack + [0-9]*|caml_runstack|g' \
   -e "s|inlined block 0x[0-9a-f]* doesn't have a range that contains file address 0x[0-9a-f]*|inlined block <HEX> doesn't have a range that contains file address <HEX>|g" \
   -e 's|caml_c_call + [0-9]*|caml_c_call + N|g' \
   -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_[0-9]\+_code|\1_XXX_XXX_code|g' \
