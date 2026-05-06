@@ -2487,13 +2487,9 @@ let sort_option_of_jkind env (t : jkind_l) : sort option =
       | None -> None
       | Some sorts -> Some (Sort.Product sorts))
   in
-  let layout =
-    match extract_layout env t with
-    | Ok l -> l
-    | Error _ ->
-      Misc.fatal_error "Jkind.sort_of_jkind: unable to expand jkind abbrev"
-  in
-  sort_of_layout layout
+  match extract_layout env t with
+  | Ok layout -> sort_of_layout layout
+  | Error _ -> None
 
 let sort_of_jkind env (t : jkind_l) : sort =
   match sort_option_of_jkind env t with

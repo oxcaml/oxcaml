@@ -578,8 +578,8 @@ val generalize : current_level:int -> 'd Types.jkind -> unit
     jkinds - raises on Any. *)
 val sort_of_jkind : Env.t -> Types.jkind_l -> sort
 
-(** Returns the sort corresponding to the jkind, unless the layout is Any or a
-    product containing Any. *)
+(** Returns the sort corresponding to the jkind, unless the layout is Any, a
+    product containing Any, or abstract. *)
 val sort_option_of_jkind : Env.t -> Types.jkind_l -> sort option
 
 (** Gets the layout of a jkind; returns [None] if the layout is still unknown,
