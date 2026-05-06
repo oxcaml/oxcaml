@@ -46,6 +46,7 @@ module type Common_options = sig
   val _no_auto_include_otherlibs : unit -> unit
   val _nocwd : unit -> unit
   val _open : string -> unit
+  val _open_cmi : string -> unit
   val _ppx : string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit

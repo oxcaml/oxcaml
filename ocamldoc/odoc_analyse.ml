@@ -46,6 +46,7 @@ let initial_env () =
     ln @ List.rev !Clflags.open_modules in
   Typemod.initial_env
     ~loc:(Location.in_file "ocamldoc command line")
+    ~open_cmi_implicit_modules:(List.rev !Clflags.open_cmi_modules)
     ~open_implicit_modules
     ~initially_opened_module
 
