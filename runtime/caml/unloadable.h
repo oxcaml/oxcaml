@@ -113,6 +113,11 @@ CAMLextern void caml_register_unloadable_unit(struct caml_unloadable_unit *u);
  * Does not free the [unit] memory or the buffer-backed arrays it points at;
  * those are the loader's responsibility (the loader [munmap]s the text and
  * data buffers after this returns). */
+/* REVIEW(claude): this entry point has no in-tree callers
+   (caml_unloadable_check_and_unload_dead inlines all its steps). It is also
+   a foot-gun: it claims to require STW in its comment but does not enforce
+   it, and would race the unload pass if a caller used it. Either delete it,
+   or add an assertion-style check / restrict its visibility. */
 CAMLextern void caml_unregister_unloadable_unit(struct caml_unloadable_unit *u);
 
 /* Iterate over all currently-registered unloadable units, calling [f] on
@@ -233,6 +238,15 @@ Caml_inline void caml_darken_unloadable_code_blocks_in_closure(
       caml_darken_code_block_for_entry(state, Field(closure, code_offset));
     }
     if (Is_last_closinfo(closinfo)) break;
+    /* REVIEW(claude): the [+ 1] here assumes there's always an infix
+       header between two function slots in a multi-function closure
+       prefix. That matches Slot_offsets.Layout's emission for
+       Function_slot ... Infix_header ... Function_slot. If the
+       front-end ever emits two adjacent function slots without an
+       infix header (or emits a different prefix layout), this walk
+       miscounts. Worth a hard assert in DEBUG that
+       [Tag_val(Field(closure, slot_start - 1) - X)] is Infix_tag (or
+       similar) before stepping. */
     slot_start += slot_size + 1; /* skip past the infix header */
   }
 }
@@ -264,6 +278,16 @@ Caml_inline void caml_visit_code_block_for_entry(
  * works in mark, oldify, and compactor scans uniformly. */
 #include "frame_descriptors.h"
 #include "codefrag.h"
+/* REVIEW(claude): correctness depends on every value that ever reaches a
+   [Code_pointer]-typed slot being a function-entry PC (so [*((value*)cp - 1)]
+   is the back-pointer to the [Code_block]). The compiler enforces this only
+   by convention — [Code_pointer] machtype is not arithmetic-safe and any path
+   that produces a code pointer via something other than a closure Field-0
+   load or a static [Csymbol_address] of a function entry will silently break
+   here (we'd dereference random text). It would be safer to look up the code
+   fragment first and use [cf->code_start - 1] as the back-pointer slot rather
+   than trusting [cp - 1]; or at minimum to assert in DEBUG that the
+   fragment's code_start matches [cp]. */
 Caml_inline void caml_visit_frame_code_ptr_slots(
     scanning_action f, void *fdata, frame_descr *d, char *sp, value *regs) {
   unsigned char *p = frame_end_of_live_ofs(d);

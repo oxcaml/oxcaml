@@ -48,6 +48,22 @@ let emit_code_block_for ~all_code (code : Code.t) res =
       |> Code_id.Set.filter (dep_is_unloadable all_code)
       |> Code_id.Set.elements
     in
+    (* REVIEW(claude): contrast with [code_id_deps], which is filtered
+       by [dep_is_unloadable], [symbol_deps] is unfiltered — so cross-CU
+       references (e.g. caml_int_ops, stdlib lifted constants) become
+       fields of every unloadable Code_block. caml_darken on a black
+       (NOT_MARKABLE) cross-CU block is a no-op so this is sound, but it
+       bloats every Code_block by the symbol-reference fan-out and adds
+       work to the mark scan. Same-CU [Local] symbols are also a no-op
+       darken (black header) but consume a slot too. Worth filtering to
+       same-CU Globals plus same-CU Locals' Global ancestors (per B.1).
+       The [Local]/[Global] selection below also doesn't quite match
+       what the linker expects: a Symbol whose [Symbol.is_local] field
+       (if any) says Local but whose CU is the current one will still be
+       emitted with [sym_global = Local], regardless of what to_cmm_static
+       decided when emitting the definition. If those ever disagree
+       (e.g. via lifted/inlined constants) the resulting reference is
+       inconsistent. *)
     let symbol_deps =
       Name_occurrences.symbols free_names |> Symbol.Set.elements
     in
@@ -84,6 +100,20 @@ let emit_code_block_for ~all_code (code : Code.t) res =
     C.suppress_unloadable_data_block_tracking := prev;
     R.add_archive_data_items res data_items
 
+(* REVIEW(claude): the entry function's [Code_block] has zero
+   dependency fields, even though the entry calls top-level functions
+   in the unit and references the unit's static data. The intent is
+   that the entry is only on-stack during initialisation (so F.2 keeps
+   its Code_block alive while running), and after [Eval.eval] returns
+   nothing reaches the entry's Code_block. That's correct for the
+   module-initialiser case here. But it does mean: if a major GC fires
+   *during* eval'd initialisation and walks the running entry, the
+   entry's Code_block is darkened but the rest of the unit is not
+   marked through the Code_block fields — only through whatever the
+   stack/closures already point at. As long as every same-CU function
+   the entry transitively calls is itself reachable via stack frames
+   when the entry is on-stack, this is fine. Add a sanity-checking
+   test (e.g. [unload_signal_gc] at extreme recursion depth). *)
 let emit_entry_code_block ~(entry_sym : Cmm.symbol) res =
   if not !Clflags.unit_is_unloadable
   then res

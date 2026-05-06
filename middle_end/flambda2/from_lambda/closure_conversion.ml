@@ -2886,6 +2886,19 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:(Function_decl.cold decl)
+      (* REVIEW(claude): the [is_unloadable] bit is sourced from a
+         global mutable flag at three call sites in this module
+         ([make_unboxed_function_wrapper], here, and [close_functions])
+         and again from [!Clflags.unit_is_unloadable] in
+         [simplify_apply_expr.ml] for the partial-app stub. If a future
+         change ever runs simplification of one CU's code while
+         compiling another (e.g. cross-CU inlining post-load), the flag
+         reflects the host CU but the function originally belongs to a
+         different CU. The current design assumes a function's
+         [is_unloadable] follows the CU it was *defined in*. Worth
+         either threading the bit through [Code_metadata.create] from a
+         per-CU input, or asserting that the global flag is stable
+         across the whole compile. *)
       ~is_unloadable:!Clflags.unit_is_unloadable
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
