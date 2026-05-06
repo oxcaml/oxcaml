@@ -1516,7 +1516,7 @@ CFI_STARTPROC
         movq    %r10, 0(%r11)
         movq    %r11, Caml_state(exn_handler)
     /* Switch to the new stack */
-    1:  movq    %r11, %rsp
+        movq    %r11, %rsp
         FLUSH_DYNAMIC_CACHE(%r11)
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
