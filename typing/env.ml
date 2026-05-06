@@ -3601,15 +3601,14 @@ type _ load =
   | Don't_load : unit load
 
 let lookup_global_name_module_no_locks
-      (type a) (load : a load) ?(allow_hidden=false)
-      ~errors ~use ~loc name env =
+      (type a) (load : a load) ~errors ~use ~loc name env =
   let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
-      check_pers_mod ~allow_hidden ~loc name;
+      check_pers_mod ~allow_hidden:false ~loc name;
       path, (() : a)
   | Load -> begin
-      match find_pers_mod ~allow_hidden name ~allow_excess_args:false with
+      match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
       | mda ->
           use_module ~use ~loc path mda;
           path, (mda : a)
@@ -3620,8 +3619,7 @@ let lookup_global_name_module_no_locks
           may_lookup_error errors loc env (Error_from_persistent_env err)
     end
 
-let lookup_ident_module
-      (type a) (load : a load) ?(allow_hidden=false) ~errors ~use ~loc s env =
+let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use ~stage:env.stage s env.modules with
     | path, locks, data -> begin
@@ -3630,11 +3628,6 @@ let lookup_ident_module
           path (Lident s) stage_locks;
         path, locks, data
     end
-    | exception Not_found when allow_hidden ->
-        (* [Typemod.initial_env] only seeds visible basenames, so a hidden
-           module may not be in [env.modules]. Treat it as [Mod_persistent]
-           and let the branch below call [find_pers_mod ~allow_hidden:true]. *)
-        Pident (Ident.create_persistent s), [], Mod_persistent
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
   in
@@ -3656,8 +3649,7 @@ let lookup_ident_module
          instance arguments *)
       let name = Global_module.Name.create_no_args s in
       let path, a =
-        lookup_global_name_module_no_locks
-          load ~allow_hidden ~errors ~use ~loc name env
+        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
       in
       let mode =
         match load with
@@ -3929,12 +3921,11 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
            ((cda.cda_description, locks), use_fn))
         cstrs
 
-let rec lookup_module_components
-    ?(allow_hidden=false) ~errors ~use ~loc lid env =
+let rec lookup_module_components ~errors ~use ~loc lid env =
   match lid with
   | Lident s ->
       let path, (_, locks), data =
-        lookup_ident_module Load ~allow_hidden ~errors ~use ~loc s env
+        lookup_ident_module Load ~errors ~use ~loc s env
       in
       path, (data.mda_mode, locks), data.mda_components
   | Ldot(l, s) ->
@@ -3946,10 +3937,9 @@ let rec lookup_module_components
         !components_of_functor_appl' ~loc ~f_path ~f_comp ~arg env in
       Papply (f_path, arg), fcomp_res_mode_with_locks, comps
 
-and lookup_structure_components
-    ?(allow_hidden=false) ~errors ~use ~loc ?(reason = Project) lid env =
+and lookup_structure_components ~errors ~use ~loc ?(reason = Project) lid env =
   let path, mode_with_locks, comps =
-    lookup_module_components ~allow_hidden ~errors ~use ~loc lid env
+    lookup_module_components ~errors ~use ~loc lid env
   in
   match get_components_res comps with
   | Ok (Structure_comps comps) -> path, mode_with_locks, comps
@@ -4230,10 +4220,9 @@ let open_signature_by_path path env0 =
   let comps = find_structure_components path env0 in
   add_components None path env0 comps locks_empty
 
-let open_signature ?(allow_hidden=false) ~errors ~loc slot lid env0 =
+let open_signature ~errors ~loc slot lid env0 =
   let (root, mode_with_locks, comps) =
-    lookup_structure_components
-      ~allow_hidden ~errors ~use:true ~loc ~reason:Open lid env0
+    lookup_structure_components ~errors ~use:true ~loc ~reason:Open lid env0
   in
   let _, locks = mode_with_locks in
   root, mode_with_locks, add_components slot root env0 comps locks
@@ -4282,8 +4271,24 @@ let remove_last_open root env0 =
 let open_pers_signature name env =
   open_signature ~errors:false ~loc:Location.none None (Lident name) env
 
+(* Open a persistent signature loaded directly from a [.cmi] file, ignoring
+   any module of the same name in scope and looking on both visible and
+   hidden include paths. Raises [Not_found] if the cmi cannot be loaded as a
+   structure. Used to implement the [-open-cmi] command-line flag. *)
+let open_pers_signature_cmi name env =
+  let global_name = Global_module.Name.create_no_args name in
+  let mda =
+    find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
+  in
+  let path = Pident (Ident.create_global global_name) in
+  use_module ~use:true ~loc:Location.none path mda;
+  match get_components_res mda.mda_components with
+  | Ok (Structure_comps comps) ->
+      let env = add_components None path env comps [] in
+      path, (mda.mda_mode, []), env
+  | Ok (Functor_comps _) | Error _ -> raise Not_found
+
 let open_signature
-    ?(allow_hidden=false)
     ~used_slot
     ~loc ~toplevel
     ovf lid env =
@@ -4329,11 +4334,9 @@ let open_signature
       end;
       used := true
     in
-    open_signature
-      ~allow_hidden ~errors:true ~loc:lid.loc (Some slot) lid.txt env
+    open_signature ~errors:true ~loc:lid.loc (Some slot) lid.txt env
   end
-  else
-    open_signature ~allow_hidden ~errors:true ~loc:lid.loc None lid.txt env
+  else open_signature ~errors:true ~loc:lid.loc None lid.txt env
 
 (* General forms of the lookup functions *)
 
