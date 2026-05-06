@@ -824,7 +824,7 @@ module Sort = struct
         v :: vars, v'
       | Some s ->
         let vars, result = default_to_fresh_layouts_and_get vars s in
-        set r (Some result);
+        set_to_compress r (Some result);
         (* path compression *)
         vars, result)
 
