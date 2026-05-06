@@ -244,11 +244,6 @@ let variant_representation i ppf = let open Types in function
 let mixed_block_element i ppf mixed_block_element =
   line i ppf "%s\n" (Types.mixed_block_element_to_string mixed_block_element)
 
-let record_dummy_representation ppf = let open Types in function
-  | Record_dummy_other -> fprintf ppf "Record_dummy_other"
-  | Record_dummy_unboxed -> fprintf ppf "Record_dummy_unboxed"
-  | Record_dummy_ufloat -> fprintf ppf "Record_dummy_ufloat"
-
 let record_representation i ppf = let open Types in function
   | Record_unboxed ->
     line i ppf "Record_unboxed\n"
@@ -261,8 +256,11 @@ let record_representation i ppf = let open Types in function
   | Record_mixed shape ->
     line i ppf "Record_mixed\n";
     array (i+1) mixed_block_element ppf shape
-  | Record_dummy d ->
-    line i ppf "Record_dummy %a\n" record_dummy_representation d
+  | Record_dummy { represent_as_float_array = true } ->
+    line i ppf "Record_dummy [@@represent_as_float_array]\n"
+  | Record_dummy { represent_as_float_array = false } ->
+    line i ppf "Record_dummy\n"
+
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->

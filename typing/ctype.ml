@@ -8407,7 +8407,7 @@ let check_decl_jkind env decl jkind =
        above CRs. *)
     | Type_record (
         [{ ld_type = inner_ty; ld_modalities = modality }],
-        Some (Record_unboxed | Record_dummy Record_dummy_unboxed), None), _
+        Some Record_unboxed, None), _
     | Type_record_unboxed_product ([{ ld_type = inner_ty;
                                       ld_modalities = modality }], _, None), _
     | Type_variant (

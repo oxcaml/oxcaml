@@ -501,11 +501,6 @@ and mixed_product_shape = mixed_block_element array
 
 and module_representation = Jkind_types.Sort.t array
 
-and record_dummy_representation =
-  | Record_dummy_other
-  | Record_dummy_unboxed
-  | Record_dummy_ufloat
-
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
@@ -513,7 +508,7 @@ and record_representation =
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
-  | Record_dummy of record_dummy_representation
+  | Record_dummy of { represent_as_float_array : bool }
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -961,13 +956,6 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
       false
 
-let equal_record_dummy_representation d1 d2 = match d1, d2 with
-  | Record_dummy_other, Record_dummy_other -> true
-  | Record_dummy_unboxed, Record_dummy_unboxed -> true
-  | Record_dummy_ufloat, Record_dummy_ufloat -> true
-  | (Record_dummy_other | Record_dummy_unboxed | Record_dummy_ufloat), _ ->
-    false
-
 let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
@@ -986,8 +974,9 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       true
   | Record_mixed mx1, Record_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | Record_dummy d1, Record_dummy d2 ->
-      equal_record_dummy_representation d1 d2
+  | Record_dummy { represent_as_float_array = a },
+    Record_dummy { represent_as_float_array = b } ->
+      Bool.equal a b
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
     | Record_ufloat | Record_mixed _ | Record_dummy _), _ ->
       false
@@ -1086,7 +1075,7 @@ let find_unboxed_type decl =
   match decl.type_kind with
     Type_record
       ([{ld_type = arg; ld_modalities = ms; _}],
-       Some (Record_unboxed | Record_dummy Record_dummy_unboxed), _)
+       Some Record_unboxed, _)
   | Type_record
       ([{ld_type = arg; ld_modalities = ms; _ }],
        Some (Record_inlined (_, _, Variant_unboxed)), _)

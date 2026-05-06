@@ -1116,13 +1116,10 @@ let transl_declaration env sdecl (id, uid) =
           in
           let rep, jkind =
             if unbox then
-              Record_dummy Record_dummy_unboxed,
+              Record_unboxed,
               Jkind.Builtin.any ~why:Old_style_unboxed_type
-            else if represent_as_float_array then
-              Record_dummy Record_dummy_ufloat,
-              Jkind.for_non_float ~why:Boxed_record
             else
-              Record_dummy Record_dummy_other,
+              Record_dummy { represent_as_float_array },
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', Some rep, None), jkind
@@ -1259,9 +1256,10 @@ let transl_declaration env sdecl (id, uid) =
       unboxed version.
 
    2. After translating declarations, [derive_unboxed_versions] gives the
-      all [Record_dummy Record_dummy_other] records unboxed versions.
+      all [Record_dummy { represent_as_float_array = false }] records unboxed
+      versions.
 
-   3. But not all of these records will end up with unboxed versions:
+   3. But not all of these [Record_dummy]s will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
       records don't have unboxed versions. These unboxed versions are removed in
       [remove_unboxed_versions].
@@ -1298,8 +1296,8 @@ let record_has_float_boxed = function
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed -> true
-  | Record_dummy Record_dummy_other -> true
-  | Record_dummy (Record_dummy_ufloat | Record_dummy_unboxed) -> false
+  | Record_dummy { represent_as_float_array } ->
+    not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -2037,7 +2035,7 @@ let compute_record_repr
     loc reprs lbls ~warn ~refining_block_with_any
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
-    ~record_dummy_representation
+    ~represent_as_float_array
   =
   let mixed_record () =
     let shape =
@@ -2143,13 +2141,10 @@ let compute_record_repr
   | ~values:false, ~floats:false, ~atomic_floats:false,
     ~float64s:true, ~non_float64_unboxed_fields:false,
     ~voids:false, ~first_any:None, .. ->
-    (match record_dummy_representation with
-     | Record_dummy_ufloat ->
-       (* This is only the case if it got the [@@represent_as_float_array]
-          attribute *)
-       Ok Record_ufloat
-     | Record_dummy_other -> mixed_record ()
-     | Record_dummy_unboxed -> assert false)
+    if represent_as_float_array then
+      Ok Record_ufloat
+    else
+      mixed_record ()
   (* Records with atomic float fields cannot use flat representation *)
   | ~atomic_floats:true, ~first_any:None, .. ->
     if warn && floats && not values
@@ -2238,7 +2233,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       lbls (rep : rep) ~warn :
     _ * (rep, _) Result.t * _ =
   match form, lbls, rep with
-  | Legacy, [(lbl, ld_type)], Record_dummy Record_dummy_unboxed ->
+  | Legacy, [(lbl, ld_type)], Record_unboxed ->
     let jkind =
       Ctype.type_jkind env ld_type |>
       Jkind.apply_modality_l lbl.Types.ld_modalities
@@ -2289,27 +2284,19 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       let refining_block_with_any = false in
       match form with
       | Legacy ->
-        let record_dummy_representation =
+        let represent_as_float_array =
           match rep with
-          | Record_dummy record_dummy_representation ->
-            record_dummy_representation
+          | Record_dummy { represent_as_float_array } ->
+            represent_as_float_array
           | _ -> assert false (* outer match *)
         in
         let rep =
-          compute_record_repr loc reprs lbls ~record_dummy_representation ~warn
+          compute_record_repr loc reprs lbls ~represent_as_float_array ~warn
             ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
             ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
         in
-        let record_floatu =
-          rep = Ok Record_ufloat
-        in
-        let marked_ufloat = record_dummy_representation = Record_dummy_ufloat in
-        let ufloat = rep = Ok Record_ufloat in
-        if marked_ufloat && not ufloat then
+        if represent_as_float_array && rep <> Ok Record_ufloat then
           raise (Error (loc, Bad_represent_as_float_array_attribute));
-        if not marked_ufloat && ufloat then
-          Misc.fatal_error
-            "got floatu record without [@@represent_as_float_array]";
         rep
       | Unboxed_product ->
         (match first_any with
@@ -2347,7 +2334,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     | Legacy ->
       let rep =
         compute_record_repr loc reprs lbls
-          ~record_dummy_representation:Record_dummy_other ~warn
+          ~represent_as_float_array:false ~warn
           ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
@@ -2533,16 +2520,15 @@ let rec update_decl_jkind env dpath decl =
         type_jkind;
         type_ikind = Types.ikinds_todo reason
       }
-    | Type_record (lbls, old_rep, umc) ->
-      let old_rep =
-        match old_rep with
-        | Some (Record_dummy _ as old_rep) -> old_rep
-        | None -> Misc.fatal_error "none"
-        | Some _ -> Misc.fatal_error "some"
+    | Type_record (lbls, rep, umc) ->
+      let rep =
+        match rep with
+        | Some (Record_dummy _ | Record_unboxed as rep) -> rep
+        | _ -> Misc.fatal_error "not created by transl_declaration"
       in
       let sorts, rep, type_jkind =
         let lbls = List.map (fun lbl -> lbl, lbl.Types.ld_type) lbls in
-        compute_record_kind env decl.type_loc Legacy lbls old_rep ~warn:true
+        compute_record_kind env decl.type_loc Legacy lbls rep ~warn:true
       in
       let lbls =
         List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts

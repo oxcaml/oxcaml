@@ -924,12 +924,6 @@ and type_origin =
 
 and module_representation = Jkind_types.Sort.t array
 
-and record_dummy_representation =
-  | Record_dummy_other
-    (* boxed, mixed, or variable (none) *)
-  | Record_dummy_unboxed
-  | Record_dummy_ufloat
-
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
@@ -946,7 +940,7 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
-  | Record_dummy of record_dummy_representation
+  | Record_dummy of { represent_as_float_array : bool }
   (* We typecheck type declarations before updating their kinds, yet some record
      representations are kind-dependent. In particular, we don't choose between
      [Record_boxed], [Record_float], [Record_ufloat], and [Record_mixed] until
