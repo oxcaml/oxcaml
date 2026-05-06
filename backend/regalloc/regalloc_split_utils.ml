@@ -133,7 +133,7 @@ type definition_kind =
 
 module Uses = struct
   type source =
-    | Load of Cfg.basic Cfg.instruction
+    | Load of Instruction.t
     | Move of Reg.t
     | Other
 

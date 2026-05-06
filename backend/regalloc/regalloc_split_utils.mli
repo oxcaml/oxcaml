@@ -42,7 +42,7 @@ type definition_kind =
 
 module Uses : sig
   type source =
-    | Load of Cfg.basic Cfg.instruction
+    | Load of Regalloc_utils.Instruction.t
     | Move of Reg.t
     | Other
 
