@@ -225,6 +225,14 @@ Error: Invalid [@or_null] declaration:
        GADT constructors are not supported with [@@or_null].
 |}]
 
+type ('a : any) widened_bad_jkind =
+  | A
+  | B of 'a
+[@@or_null]
+[%%expect{|
+type ('a : value_maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
+|}]
+
 type ('a : value_or_null) widened_bad_jkind =
   | A
   | B of 'a
