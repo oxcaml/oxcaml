@@ -630,6 +630,8 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
         } ])
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
+  | Rigidvar _ ->
+    Misc.fatal_error "unarize_const_sort_for_extern_repr: Rigidvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
 let unarize_extern_repr ~machine_width alloc_mode
@@ -648,6 +650,8 @@ let unarize_extern_repr ~machine_width alloc_mode
     Misc.fatal_error "unarize_extern_repr: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "unarize_extern_repr: unexpected genvar"
+  | Same_as_ocaml_repr (Rigidvar _) ->
+    Misc.fatal_error "unarize_extern_repr: unexpected rigidvar"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
   | Unboxed_float Boxed_float64 ->

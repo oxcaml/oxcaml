@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layout_poly_alpha";
+ flags = "-extension layout_poly_alpha -extension layouts_alpha";
  expect;
 *)
 
@@ -83,18 +83,18 @@ Error: Module type declarations do not match:
 
 (* the layout variables are rigid and cannot be constrained *)
 module type T = sig
-  val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
+  val bar : layout_ x y. ('a : x) ('b : y). 'a list -> unit
 end
 [%%expect{|
-Line 2, characters 45-47:
-2 |   val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
-                                                 ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is the abstract kind x
+Line 2, characters 44-46:
+2 |   val bar : layout_ x y. ('a : x) ('b : y). 'a list -> unit
+                                                ^^
+Error: This type "('a : x)" should be an instance of type "('b : value_or_null)"
+       The layout of 'a is '_representable_layout_1
          because of the annotation on the universal variable 'a.
-       But the layout of "'a" must overlap with
+       But the layout of 'a must overlap with
            value maybe_separable maybe_null
-         because it's the type of a tuple element.
+         because the type argument of list has layout value_or_null.
 |}]
 
 (* CR-someday zqian: some of the following inclusion check might succeed in the future
@@ -467,4 +467,12 @@ module F :
       val bar :
         layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
     end
+|}]
+
+(* Layout variable in product annotation *)
+module type S = sig
+  val foo : layout_ l. ('a : l & l). 'a -> 'a
+end
+[%%expect{|
+module type S = sig val foo : layout_ l. ('a : l & l). 'a -> 'a end
 |}]

@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layout_poly_alpha";
+ flags = "-extension layout_poly_alpha -extension layouts_alpha";
  expect;
 *)
 
@@ -653,4 +653,31 @@ Warning 26 [unused-var]: unused variable f.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
+|}]
+
+(* CR-soon zqian: The identity function should satisfy layout_ l. ('a : l & l). 'a
+   -> 'a, but the inclusion check in includemod.ml doesn't yet recognize that
+   ('a : l). 'a -> 'a subsumes ('a : l & l). 'a -> 'a. *)
+module _ : sig
+  val foo : layout_ l. ('a : l & l). 'a -> 'a
+end = struct
+  let poly_ foo x = x
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let poly_ foo x = x
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : layout_ l. ('a : l). 'a -> 'a end
+       is not included in
+         sig val foo : layout_ l. ('a : l & l). 'a -> 'a end
+       Values do not match:
+         val foo : layout_ l. ('a : l). 'a -> 'a
+       is not included in
+         val foo : layout_ l. ('a : l & l). 'a -> 'a
+       The layout parameter at position 1 in the first
+       is instantiated with an unconstrained layout variable,
+       which is not supported yet.
 |}]

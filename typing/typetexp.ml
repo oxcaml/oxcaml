@@ -1647,10 +1647,15 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
     let env', ident_var_pairs =
       List.fold_left (fun (env, pairs) var ->
         let name = var.txt in
-        let decl = new_local_jkind ~loc:var.loc () in
+        let v = Jkind_types.Sort.new_rigidvar () in
+        let manifest : jkind_const_desc_lr =
+          { base = Layout (Jkind_types.Layout.Const.Genvar v);
+            mod_bounds = Btype.Jkind0.Mod_bounds.max;
+            with_bounds = No_with_bounds }
+        in
+        let decl = new_local_jkind ~loc:var.loc ~manifest () in
         let scope = create_scope () in
         let id, env' = Env.enter_jkind ~scope name decl env in
-        let v = Jkind_types.Sort.new_genvar () in
         (env', (id, v) :: pairs))
       (env, []) vars
     in
@@ -1688,6 +1693,9 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
     in
     let ety = Subst.type_expr Subst.identity ty in
     replace ety;
+    List.iter
+      (fun (_, v) -> Jkind_types.Sort.promote_rigidvar_to_genvar v)
+      ident_var_pairs;
     let ctyp =
       { ctyp_desc = Ttyp_newlayout (vars, cty);
         ctyp_type = ty;

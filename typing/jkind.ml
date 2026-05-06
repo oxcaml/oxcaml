@@ -125,6 +125,7 @@ module Layout = struct
         Product (List.map (fun s -> of_sort_const s sa) consts)
       | Univar uv -> Univar uv
       | Genvar v -> Genvar v
+      | Rigidvar v -> Rigidvar v
 
     (* if so, scannable axis annotations should not trigger a warning *)
     let is_scannable_or_any = function
@@ -137,6 +138,7 @@ module Layout = struct
       | Product _ -> false
       | Univar _ -> false
       | Genvar _ -> false
+      | Rigidvar _ -> false
 
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
@@ -150,7 +152,9 @@ module Layout = struct
            [Sort.equal_univar_univar] is not available from this module. *)
         uv1 == uv2
       | Genvar v1, Genvar v2 -> v1 == v2
-      | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
+      | Rigidvar v1, Rigidvar v2 -> v1 == v2
+      | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Rigidvar _), _ ->
+        false
 
     (* Returns [None] if the root has no meaningful scannable axes. *)
     let get_root_scannable_axes t =
@@ -160,6 +164,7 @@ module Layout = struct
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
+      | Rigidvar _ -> None
 
     let set_root_scannable_axes t sa =
       match t with
@@ -168,6 +173,7 @@ module Layout = struct
       | Product _ -> t
       | Univar _ -> t
       | Genvar _ -> t
+      | Rigidvar _ -> t
 
     let to_string t ~include_redundant_scannable_axes =
       let rec to_string nested (t : t) =
@@ -189,6 +195,7 @@ module Layout = struct
         | Univar { name = Some n } -> n
         | Univar { name = None } -> "_"
         | Genvar v -> Sort.to_string_genvar v
+        | Rigidvar v -> Sort.to_string_genvar v
       in
       to_string false t
 
@@ -200,7 +207,7 @@ module Layout = struct
       equal component t
       ||
       match t with
-      | Base _ | Any _ | Univar _ | Genvar _ -> false
+      | Base _ | Any _ | Univar _ | Genvar _ | Rigidvar _ -> false
       | Product ts -> List.exists (has_component ~component) ts
 
     module Debug_printers = struct
@@ -2090,6 +2097,7 @@ module Const = struct
         Stable
       | Univar _ -> Alpha
       | Genvar _ -> Alpha
+      | Rigidvar _ -> Alpha
       | Product layouts ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))

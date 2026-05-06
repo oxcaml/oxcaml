@@ -289,6 +289,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
+      | Rigidvar _ -> Print_as "<rigidvar>"
 
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
       if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"

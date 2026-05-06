@@ -161,6 +161,7 @@ module Sort = struct
       | Product of t list
       | Univar of univar
       | Genvar of var
+      | Rigidvar of var
 
     let rec equal c1 c2 =
       match c1, c2 with
@@ -168,7 +169,8 @@ module Sort = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
-      | (Base _ | Product _ | Univar _ | Genvar _), _ -> false
+      | Rigidvar v1, Rigidvar v2 -> v1.id = v2.id
+      | (Base _ | Product _ | Univar _ | Genvar _ | Rigidvar _), _ -> false
 
     let format ppf c =
       let module Fmt = Format_doc in
@@ -180,6 +182,7 @@ module Sort = struct
         | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
         | Univar { name = None } -> Fmt.fprintf ppf "_"
         | Genvar v -> Fmt.fprintf ppf "%s" (to_string_genvar v)
+        | Rigidvar v -> Fmt.fprintf ppf "%s" (to_string_genvar v)
       in
       pp_element ~nested:false ppf c
 
@@ -191,6 +194,7 @@ module Sort = struct
         false
       | Univar _ -> Misc.fatal_error "Sort.Const.all_void: Univar"
       | Genvar _ -> Misc.fatal_error "Sort.Const.all_void: Genvar"
+      | Rigidvar _ -> Misc.fatal_error "Sort.Const.all_void: Rigidvar"
       | Product ts -> List.for_all all_void ts
 
     let scannable = Base Scannable
@@ -246,6 +250,7 @@ module Sort = struct
           | Univar { name = Some n } -> Format.fprintf ppf "Univar '%s" n
           | Univar { name = None } -> Format.fprintf ppf "Univar '_"
           | Genvar v -> Format.fprintf ppf "Genvar %d" v.id
+          | Rigidvar v -> Format.fprintf ppf "Rigidvar %d" v.id
         in
         pp_element ~nested:false ppf c
     end
@@ -474,6 +479,7 @@ module Sort = struct
         | Product cs -> Product (List.map of_const cs)
         | Univar uv -> Univar uv
         | Genvar v -> Var v
+        | Rigidvar v -> Var v
     end
 
     module T_option = struct
@@ -526,6 +532,7 @@ module Sort = struct
             (Misc.Stdlib.List.map_option of_const cs)
         | Univar uv -> Some (Univar uv)
         | Genvar v -> Some (Var v)
+        | Rigidvar v -> Some (Var v)
     end
 
     module Const = struct
@@ -603,6 +610,10 @@ module Sort = struct
     { contents = None; level = level_generic; id = !last_var_cmi_id }
 
   let new_rigidvar () = new_var_unsafe ~level:level_rigid
+
+  let promote_rigidvar_to_genvar v =
+    assert (is_rigidvar v);
+    v.level <- level_generic
 
   let instance_map : (var * var) list ref = ref []
 
@@ -744,10 +755,7 @@ module Sort = struct
   and var_default_to_scannable_and_get r : Const.t =
     match r.contents with
     | None when is_genvar r -> Genvar r
-    | None when is_rigidvar r ->
-      Misc.fatal_error
-        "Jkind_types.var_default_to_scannable_and_get: cannot default rigid \
-         variables"
+    | None when is_rigidvar r -> Rigidvar r
     | None ->
       set r Static.T_option.scannable;
       Static.Const.scannable
@@ -968,6 +976,7 @@ module Layout = struct
       | Product of t list
       | Univar of Sort.univar
       | Genvar of Sort.var
+      | Rigidvar of Sort.var
 
     let max = Any Scannable_axes.max
 
@@ -980,7 +989,9 @@ module Layout = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
-      | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
+      | Rigidvar v1, Rigidvar v2 -> v1.id = v2.id
+      | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Rigidvar _), _ ->
+        false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
@@ -991,6 +1002,7 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
       | Univar uv -> Some (Sort.Const.Univar uv)
       | Genvar v -> Some (Sort.Const.Genvar v)
+      | Rigidvar v -> Some (Sort.Const.Rigidvar v)
 
     module Static = struct
       let scannable_non_null_non_pointer =
@@ -1163,6 +1175,7 @@ module Layout = struct
     | Product cs -> Product (List.map of_const cs)
     | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
     | Genvar v -> Sort (Sort.Var v, Scannable_axes.max)
+    | Rigidvar v -> Sort (Sort.Var v, Scannable_axes.max)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
