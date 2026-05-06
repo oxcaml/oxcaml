@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - system: x86_64-linux
-            os: warp-ubuntu-latest-x64-32x
+            os: ${{ github.repository == 'oxcaml/oxcaml' && 'warp-ubuntu-latest-x64-32x' || 'ubuntu-latest' }}
     steps:
       - name: Checkout the OxCaml repo
         uses: actions/checkout@master
