@@ -651,7 +651,18 @@ end = struct
                    (fun reg acc ->
                      match try_rematerialize uses ~is_arg_ok reg with
                      | None -> acc
-                     | Some load -> Reg.Map.add reg load acc)
+                     | Some load ->
+                       (* Only rematerialize a (potentially multi-result) load
+                          when all of its result registers also need to be
+                          redefined at this block. Otherwise the rematerialized
+                          load would assign fresh registers to the unwanted
+                          result slots, growing the register count without
+                          buying anything. *)
+                       if
+                         Array.for_all load.res ~f:(fun (r : Reg.t) ->
+                             Reg.Set.mem r regs)
+                       then Reg.Map.add reg load acc
+                       else acc)
                    regs Reg.Map.empty)
           in
           let changed = ref true in

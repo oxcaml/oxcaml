@@ -190,13 +190,14 @@ module Uses = struct
                      { memory_chunk = _;
                        addressing_mode = _;
                        mutability = Immutable;
-                       (* CR-soon xclerc for xclerc: check whether an aotmic
+                       (* CR-soon xclerc for xclerc: check whether an atomic
                           load could be rematerialized. *)
                        is_atomic = false
-                     })
-              (* CR-soon xclerc for xclerc: lift the condition on the length of
-                 `instr.res`. *)
-                when Array.length instr.res = 1 ->
+                     }) ->
+                (* Multi-result loads are accepted: the rematerialization
+                   analysis (cf. [RewriteAsRematerialize]) will only emit a copy
+                   when *all* of the load's result registers need to be
+                   redefined at the same site, so no result slot is wasted. *)
                 Load instr
               | Op Move
                 when Cmm.equal_machtype_component instr.arg.(0).typ
