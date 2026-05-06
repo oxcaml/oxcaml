@@ -3,9 +3,10 @@ import {
   checkString,
   interfaceString,
   ready,
+  readyForOptions,
   runString,
   utopString,
-} from "./backend.js?v=20260427-worker-blob";
+} from "./backend.js?v=20260506-ppx-driver";
 import {
   EditorState,
   RangeSetBuilder,
@@ -2226,6 +2227,7 @@ window.OxCamlPlayground = {
   processOxcamlTags,
   interfaceString,
   ready,
+  readyForOptions,
   runString,
   utopString,
 };
