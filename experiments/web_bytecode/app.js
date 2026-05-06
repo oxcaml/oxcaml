@@ -57,6 +57,8 @@ const statusEl = document.getElementById("status");
 const statusTextEl = statusEl?.querySelector(".status-text") ?? null;
 const samplePickerEl = document.getElementById("sample-picker");
 const resetButtonEl = document.getElementById("reset-source");
+const shareButtonEl = document.getElementById("share-link");
+const shareStatusEl = document.getElementById("share-status");
 const fullUi = Boolean(
   editorHostEl &&
   outputLabelEl &&
@@ -76,6 +78,7 @@ let editorMarkers = [];
 let editorView = null;
 let suppressEditorChanges = false;
 let bootStatusActive = false;
+let shareStatusTimer = null;
 const ready = backendReady;
 
 const setDiagnosticsEffect = StateEffect.define();
@@ -159,6 +162,75 @@ function clearStoredSourcesForRequest() {
 }
 
 clearStoredSourcesForRequest();
+
+function encodeBase64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+function decodeBase64Url(text) {
+  if (!/^[A-Za-z0-9_-]*$/.test(text) || text.length % 4 === 1) {
+    throw new Error("Invalid shared code encoding");
+  }
+  const base64 = text.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function encodeSharedCode(code) {
+  return encodeBase64Url(new TextEncoder().encode(code));
+}
+
+function decodeSharedCode(encoded) {
+  return new TextDecoder().decode(decodeBase64Url(encoded));
+}
+
+function sharedParamsFromHash() {
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const params = new URLSearchParams(hash);
+  if (params.get("share") !== "1") {
+    return null;
+  }
+  return params;
+}
+
+function sharedStateFromHash() {
+  const params = sharedParamsFromHash();
+  if (!params) {
+    return null;
+  }
+  const sampleId = params.get("sample");
+  const encodedCode = params.get("code64");
+  if (encodedCode) {
+    return {
+      code: decodeSharedCode(encodedCode),
+      filename: params.get("filename") || "snippet.ml",
+    };
+  }
+  if (sampleId) {
+    const sample = getSampleById(sampleId);
+    return sample ? { sample } : null;
+  }
+  return null;
+}
+
+function clearShareHash() {
+  if (!sharedParamsFromHash()) {
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.hash = "";
+  window.history.replaceState(null, "", url);
+}
 
 const oxcamlIdentifierNames = new Set(["local_", "stack_", "exclave_"]);
 const packageModuleNames = new Set(["Base", "Core", "Stdlib_stable"]);
@@ -775,6 +847,7 @@ function createEditor() {
           currentRevision += 1;
           editorMarkers = [];
           persistCurrentSource();
+          clearShareHash();
           schedulePipeline();
         }),
       ],
@@ -1323,7 +1396,12 @@ function currentSourceRevision() {
   return currentRevision;
 }
 
-function setSource(source, filename, sampleId = null) {
+function setSource(
+  source,
+  filename,
+  sampleId = null,
+  { restoreStoredSource = true } = {},
+) {
   if (!fullUi) {
     return;
   }
@@ -1333,7 +1411,9 @@ function setSource(source, filename, sampleId = null) {
   currentStorageKey = storageKeyForSource(source);
   currentRevision += 1;
   clearEditorMarkers();
-  replaceEditorSource(readStoredSource(currentStorageKey) ?? source);
+  replaceEditorSource(
+    restoreStoredSource ? readStoredSource(currentStorageKey) ?? source : source,
+  );
   if (samplePickerEl.value !== (sampleId || "")) {
     samplePickerEl.value = sampleId || "";
   }
@@ -1455,6 +1535,107 @@ function populateSamples() {
     .join("");
 }
 
+function currentShareUrl() {
+  const params = new URLSearchParams();
+  const source = sourceText();
+  params.set("share", "1");
+  params.set("v", "1");
+  if (currentSampleId && source === currentOriginalSource) {
+    params.set("sample", currentSampleId);
+  } else {
+    params.set("filename", currentFilename || "snippet.ml");
+    params.set("code64", encodeSharedCode(source));
+  }
+
+  const url = new URL(window.location.href);
+  url.hash = params.toString();
+  return url;
+}
+
+function setShareStatus(text, { sticky = false } = {}) {
+  if (!shareStatusEl) {
+    return;
+  }
+  if (shareStatusTimer !== null) {
+    window.clearTimeout(shareStatusTimer);
+    shareStatusTimer = null;
+  }
+  shareStatusEl.textContent = text;
+  if (!sticky && text) {
+    shareStatusTimer = window.setTimeout(() => {
+      shareStatusEl.textContent = "";
+      shareStatusTimer = null;
+    }, 2800);
+  }
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall back to the legacy copy path below.
+    }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  textarea.style.left = "-1000px";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) {
+    throw new Error("Copy command failed");
+  }
+}
+
+async function shareCurrentSource() {
+  const url = currentShareUrl();
+  window.history.replaceState(null, "", url);
+  try {
+    await copyText(url.toString());
+    setShareStatus(
+      url.toString().length > 8000 ? "Copied long link" : "Copied link",
+    );
+  } catch {
+    setShareStatus("Link in address bar");
+  }
+}
+
+function loadSharedStateFromHash() {
+  let sharedState = null;
+  try {
+    sharedState = sharedStateFromHash();
+  } catch (error) {
+    console.warn("Failed to load shared playground state", error);
+    setShareStatus("Bad share link", { sticky: true });
+    return false;
+  }
+  if (!sharedState) {
+    return false;
+  }
+  clearPendingWork();
+  if (sharedState.sample) {
+    setSource(
+      sharedState.sample.source,
+      sharedState.sample.filename,
+      sharedState.sample.id,
+    );
+  } else {
+    setSource(
+      sharedState.code,
+      sharedState.filename,
+      null,
+      { restoreStoredSource: false },
+    );
+  }
+  return true;
+}
+
 addBackendStatusListener(({ state, text }) => {
   if (!fullUi) {
     return;
@@ -1476,10 +1657,20 @@ if (fullUi) {
     if (!sample) {
       return;
     }
+    clearShareHash();
     setSource(sample.source, sample.filename, sample.id);
   });
 
   resetButtonEl?.addEventListener("click", resetCurrentSource);
+  shareButtonEl?.addEventListener("click", () => {
+    void shareCurrentSource();
+  });
+
+  window.addEventListener("hashchange", () => {
+    if (loadSharedStateFromHash()) {
+      setShareStatus("");
+    }
+  });
 
   outputEl?.addEventListener("click", (event) => {
     const target = event.target instanceof Element
@@ -1516,7 +1707,8 @@ if (fullUi) {
 
   populateSamples();
   renderEmptyOutput();
-  if (defaultSample) {
+  const loadedSharedState = loadSharedStateFromHash();
+  if (!loadedSharedState && defaultSample) {
     setSource(defaultSample.source, defaultSample.filename, defaultSample.id);
   }
 
