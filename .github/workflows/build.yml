@@ -249,12 +249,19 @@ jobs:
 
       - name: Install clang (Linux)
         if: runner.os == 'Linux' && matrix.cc == 'clang'
-        run: sudo apt-get install -y clang
+        run: |
+          if ! sudo apt-get install -y clang; then
+            sudo apt-get update -y
+            sudo apt-get install -y clang
+          fi
 
       - name: Install musl (Linux)
         if: runner.os == 'Linux' && matrix.cc == 'musl-gcc'
         run: |
-          sudo apt-get install -y musl musl-tools
+          if ! sudo apt-get install -y musl musl-tools; then
+            sudo apt-get update -y
+            sudo apt-get install -y musl musl-tools
+          fi
           # Install musl-compatible kernel headers
           mkdir musl-kernel
           filename='v4.19.88-1.tar.gz'
@@ -266,8 +273,10 @@ jobs:
       - name: Install gdb (Linux)
         if: runner.os == 'Linux' && contains(matrix.config, '--enable-runtime5') && matrix.cc != 'musl-gcc'
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y gdb
+          if ! sudo apt-get install -y gdb; then
+            sudo apt-get update -y
+            sudo apt-get install -y gdb
+          fi
 
       - name: Install autoconf and bash and parallel (macOS)
         if: runner.os == 'macOS'
