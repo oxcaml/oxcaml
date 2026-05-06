@@ -1148,7 +1148,11 @@ function runShortcutLabel() {
 }
 
 function runButtonText(mode) {
-  return `${runActionLabel(mode)} (${runShortcutLabel()})`;
+  return runActionLabel(mode);
+}
+
+function runButtonTooltip(mode) {
+  return `${runShortcutLabel()} to ${runActionLabel(mode).toLowerCase()}`;
 }
 
 function runTriggerIsManual(editor) {
@@ -1367,9 +1371,36 @@ function injectStyles() {
     }
 
     .oxcaml-embed__run {
+      position: relative;
       background: var(--_oxcaml-accent);
       border-color: color-mix(in srgb, var(--_oxcaml-accent), #000 16%);
       color: #fff;
+    }
+
+    .oxcaml-embed__run::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      right: 0;
+      top: calc(100% + 0.32rem);
+      z-index: 20;
+      min-width: max-content;
+      max-width: 14rem;
+      border: 1px solid var(--_oxcaml-border);
+      border-radius: 5px;
+      background: var(--_oxcaml-tooltip-bg);
+      color: var(--_oxcaml-tooltip-ink);
+      box-shadow: 0 8px 24px rgba(19, 31, 47, 0.16);
+      font: 650 0.66rem/1.25 var(--_oxcaml-font-family);
+      opacity: 0;
+      padding: 0.28rem 0.42rem;
+      pointer-events: none;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .oxcaml-embed__run:hover::after,
+    .oxcaml-embed__run:focus-visible::after {
+      opacity: 1;
     }
 
     .oxcaml-embed__run:hover,
@@ -2066,7 +2097,11 @@ function mountEditor(element, options, { copyAttributes, placeRoot }) {
   };
   editor.root.dataset.runTrigger = runTrigger;
   editor.runButtonEl.textContent = runButtonText(mode);
-  editor.runButtonEl.title = `${runActionLabel(mode)} source (${runShortcutLabel()})`;
+  editor.runButtonEl.dataset.tooltip = runButtonTooltip(mode);
+  editor.runButtonEl.setAttribute(
+    "aria-label",
+    `${runActionLabel(mode)} source (${runShortcutLabel()})`,
+  );
   editor.runButtonEl.hidden = !runTriggerIsManual(editor);
 
   placeRoot(editor.root);

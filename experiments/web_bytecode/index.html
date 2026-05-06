@@ -254,6 +254,40 @@
         min-width: 0;
       }
 
+      .share-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .share-button {
+        height: 32px;
+        border: 1px solid rgba(19, 31, 47, 0.14);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--panel-ink);
+        cursor: pointer;
+        font: 650 0.78rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        padding: 0 11px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      }
+
+      .share-button:hover,
+      .share-button:focus-visible {
+        border-color: rgba(194, 78, 42, 0.42);
+        color: var(--accent-strong);
+        outline: none;
+      }
+
+      .share-status {
+        max-width: 13rem;
+        color: var(--muted);
+        font: 500 0.78rem/1.2 "Avenir Next", "Segoe UI", sans-serif;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
 
       .layout {
         display: grid;
@@ -636,6 +670,45 @@
           min-height: 46vh;
         }
       }
+
+      @media (max-width: 640px) {
+        h1 {
+          font-size: 2rem;
+        }
+
+        .surface-head {
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .editor-head {
+          padding-right: 18px;
+        }
+
+        .header-tools {
+          width: 100%;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .picker {
+          flex: 1 1 0;
+          min-width: 0;
+        }
+
+        select {
+          width: 100%;
+        }
+
+        .share-wrap {
+          flex: 0 0 auto;
+        }
+
+        .share-status {
+          max-width: 8rem;
+        }
+      }
     </style>
   </head>
   <body>
@@ -652,6 +725,16 @@
                   <select id="sample-picker" aria-label="Sample">
                     <option value="">Sample</option>
                 </select>
+              </div>
+              <div class="share-wrap">
+                <button
+                  id="share-link"
+                  class="share-button"
+                  type="button">Share</button>
+                <span
+                  id="share-status"
+                  class="share-status"
+                  aria-live="polite"></span>
               </div>
             </div>
           </div>
