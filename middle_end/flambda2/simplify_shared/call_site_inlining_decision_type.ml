@@ -34,6 +34,7 @@ type t =
   | Max_inlining_depth_exceeded
   | Recursion_depth_exceeded
   | Never_inlined_attribute
+  | Forward_inlined_attribute_but_nothing_to_forward
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
@@ -71,6 +72,8 @@ let [@ocamlformat "disable"] rec print ppf t =
     Format.fprintf ppf "Recursion_depth_exceeded"
   | Never_inlined_attribute ->
     Format.fprintf ppf "Never_inlined_attribute"
+  | Forward_inlined_attribute_but_nothing_to_forward ->
+    Format.fprintf ppf "Forward_inlined_attribute_but_nothing_to_forward"
   | Attribute_always ->
     Format.fprintf ppf "Attribute_always"
   | Replay_history_says_must_inline t' ->
@@ -139,6 +142,8 @@ let rec can_inline (t : t) : can_inline =
     (* If there's an [@unrolled] attribute on this, then we'll ignore the
        attribute when we stop unrolling, which is fine *)
     Do_not_inline { erase_attribute_if_ignored = true }
+  | Forward_inlined_attribute_but_nothing_to_forward ->
+    Do_not_inline { erase_attribute_if_ignored = false }
   | Begin_unrolling unroll_to ->
     Inline { unroll_to = Some unroll_to; was_inline_always = false }
   | Continue_unrolling ->
@@ -186,6 +191,10 @@ let rec report_reason fmt t =
     Format.fprintf fmt "the@ maximum@ recursion@ depth@ has@ been@ exceeded"
   | Never_inlined_attribute ->
     Format.fprintf fmt "the@ call@ has@ an@ attribute@ forbidding@ inlining"
+  | Forward_inlined_attribute_but_nothing_to_forward ->
+    Format.pp_print_text fmt
+      "the call has an attribute requesting the same inlining decision as the \
+       parent function, which was not inlined"
   | Attribute_always ->
     Format.fprintf fmt "the@ call@ has@ an@ [@@inline always]@ attribute"
   | Replay_history_says_must_inline t' ->
