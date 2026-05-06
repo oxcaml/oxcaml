@@ -227,12 +227,12 @@ Caml_inline void caml_darken_unloadable_code_blocks_in_closure(
     /* REVIEW(claude): the [+ 1] here assumes there's always an infix
        header between two function slots in a multi-function closure
        prefix. That matches Slot_offsets.Layout's emission for
-       Function_slot { ... } | Infix_header | Function_slot { ... }.
-       If the front-end ever emits two adjacent function slots without
-       an infix header (or emits a different prefix layout), this walk
+       Function_slot ... Infix_header ... Function_slot. If the
+       front-end ever emits two adjacent function slots without an
+       infix header (or emits a different prefix layout), this walk
        miscounts. Worth a hard assert in DEBUG that
        [Tag_val(Field(closure, slot_start - 1) - X)] is Infix_tag (or
-       similar) before stepping. *)
+       similar) before stepping. */
     slot_start += slot_size + 1; /* skip past the infix header */
   }
 }
