@@ -2103,6 +2103,98 @@ let compute_record_repr
     [@warning "+9"] ->
     Misc.fatal_error "Typedecl.compute_record_repr: empty record"
 
+(* For tracking what types appear in record blocks. All product layouts
+   count only as a [non_float64_unboxed_field], even if it's a
+   [float64 & float64] or [void & void].
+*)
+type element_repr_summary =
+  {  mutable values : bool; (* includes immediates. *)
+     mutable floats: bool;
+     (* For purposes of this record, [floats] tracks whether any field
+        has layout value and is known to be a float.
+     *)
+     mutable atomic_floats : bool;
+     mutable atomic_fields : bool;
+     mutable float64s : bool;
+     mutable non_float64_unboxed_fields : bool;
+     (* Includes product containing void *)
+     mutable voids : bool;
+  }
+
+let compute_repr_summary env lbls jkinds =
+  let reprs =
+    List.map2
+      (fun lbl jkind ->
+          Element_repr.classify env lbl.Types.ld_type jkind,
+          lbl.Types.ld_type )
+      lbls jkinds
+  in
+  let repr_summary =
+    { values = false; floats = false; atomic_floats = false;
+      atomic_fields = false; float64s = false;
+      non_float64_unboxed_fields = false; voids = false;
+    }
+  in
+  List.iter2
+    (fun ((repr : Element_repr.t), _) lbl ->
+        if Types.is_atomic lbl.Types.ld_mutable
+        then repr_summary.atomic_fields <- true;
+        match repr with
+        | Float_element ->
+            repr_summary.floats <- true;
+            (* Check if this float field is atomic *)
+            if Types.is_atomic lbl.Types.ld_mutable
+            then repr_summary.atomic_floats <- true;
+        | Unboxed_element Float64 -> repr_summary.float64s <- true
+        | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
+                          | Vec128 | Vec256 | Vec512 | Word
+                          | Untagged_immediate | Product _ ) ->
+            repr_summary.non_float64_unboxed_fields <- true
+        | Value_element _ -> repr_summary.values <- true
+        | Void ->
+            repr_summary.voids <- true)
+    reprs lbls;
+  reprs, repr_summary
+
+(* Given a record with a temporary representation from [transl_declaration]
+   computes the updated labels and updated rep *)
+let compute_record_kind env loc lbls rep =
+  match lbls, rep with
+  | [Types.{ld_type} as lbl], Record_unboxed ->
+    let jkind =
+      Ctype.type_jkind env ld_type |>
+      Jkind.apply_modality_l lbl.ld_modalities
+    in
+    (* This next line is guaranteed to be OK because of a call to
+        [check_representable] *)
+    let sort = Jkind.sort_of_jkind env jkind in
+    let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
+    [{lbl with ld_sort}], Record_unboxed, jkind
+  | _, Record_dummy { represent_as_float_array } ->
+    let lbls, jkinds = update_label_sorts env loc lbls in
+    let reprs, repr_summary = compute_repr_summary env lbls jkinds in
+    let jkind = Jkind.for_boxed_record lbls in
+    let { values; floats; atomic_floats; float64s;
+          non_float64_unboxed_fields; atomic_fields; voids } =
+      repr_summary
+    in
+    let rep =
+      compute_record_repr
+        loc reprs lbls
+        ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
+        ~atomic_fields ~voids
+        ~represent_as_float_array
+    in
+    if represent_as_float_array && rep <> Record_ufloat then
+      raise (Error (loc, Bad_represent_as_float_array_attribute));
+    lbls, rep, jkind
+  | _, ( Record_boxed | Record_inlined _ | Record_float | Record_ufloat
+        | Record_mixed _)
+  | ([] | (_ :: _)), Record_unboxed ->
+    (* These are never created by [transl_declaration]. *)
+    Misc.fatal_error
+      "Typedecl.compute_record_kind: unexpected record representation"
+
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
@@ -2120,94 +2212,6 @@ let rec update_decl_jkind env dpath decl =
       decl.type_unboxed_version
   in
   let decl = { decl with type_unboxed_version } in
-  let open struct
-    (* For tracking what types appear in record blocks. All product layouts
-       count only as a [non_float64_unboxed_field], even if it's a
-       [float64 & float64] or [void & void].
-    *)
-    type element_repr_summary =
-      {  mutable values : bool; (* includes immediates. *)
-         mutable floats: bool;
-         (* For purposes of this record, [floats] tracks whether any field
-            has layout value and is known to be a float.
-         *)
-         mutable atomic_floats : bool;
-         mutable atomic_fields : bool;
-         mutable float64s : bool;
-         mutable non_float64_unboxed_fields : bool;
-         (* Includes product containing void *)
-         mutable voids : bool;
-      }
-  end in
-  (* returns updated labels, updated rep, and updated jkind *)
-  let update_record_kind loc lbls rep =
-    match lbls, rep with
-    | [Types.{ld_type} as lbl], Record_unboxed ->
-      let jkind =
-        Ctype.type_jkind env ld_type |>
-        Jkind.apply_modality_l lbl.ld_modalities
-      in
-      (* This next line is guaranteed to be OK because of a call to
-         [check_representable] *)
-      let sort = Jkind.sort_of_jkind env jkind in
-      let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
-      [{lbl with ld_sort}], Record_unboxed, jkind
-    | _, Record_dummy { represent_as_float_array } ->
-      let lbls, jkinds = update_label_sorts env loc lbls in
-      let jkind = Jkind.for_boxed_record lbls in
-      let reprs =
-        List.map2
-          (fun lbl jkind ->
-             Element_repr.classify env lbl.Types.ld_type jkind,
-             lbl.Types.ld_type )
-          lbls jkinds
-      in
-      let repr_summary =
-        { values = false; floats = false; atomic_floats = false;
-          atomic_fields = false; float64s = false;
-          non_float64_unboxed_fields = false; voids = false;
-        }
-      in
-      List.iter2
-        (fun ((repr : Element_repr.t), _) lbl ->
-           if Types.is_atomic lbl.Types.ld_mutable
-           then repr_summary.atomic_fields <- true;
-           match repr with
-           | Float_element ->
-               repr_summary.floats <- true;
-               (* Check if this float field is atomic *)
-               if Types.is_atomic lbl.Types.ld_mutable
-               then repr_summary.atomic_floats <- true;
-           | Unboxed_element Float64 -> repr_summary.float64s <- true
-           | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                             | Vec128 | Vec256 | Vec512 | Word
-                             | Untagged_immediate | Product _ ) ->
-               repr_summary.non_float64_unboxed_fields <- true
-           | Value_element _ -> repr_summary.values <- true
-           | Void ->
-               repr_summary.voids <- true)
-        reprs lbls;
-      let { values; floats; atomic_floats; float64s;
-            non_float64_unboxed_fields; atomic_fields; voids } =
-        repr_summary
-      in
-      let rep =
-        compute_record_repr
-          loc reprs lbls
-          ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
-          ~atomic_fields ~voids
-          ~represent_as_float_array
-      in
-      if represent_as_float_array && rep <> Record_ufloat then
-        raise (Error (loc, Bad_represent_as_float_array_attribute));
-      lbls, rep, jkind
-    | _, ( Record_boxed | Record_inlined _ | Record_float | Record_ufloat
-         | Record_mixed _)
-    | ([] | (_ :: _)), Record_unboxed ->
-      (* These are never created by [transl_declaration]. *)
-      Misc.fatal_error
-        "Typedecl.update_record_kind: unexpected record representation"
-  in
   (* returns updated constructors, updated rep, and updated jkind *)
   let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
@@ -2335,7 +2339,9 @@ let rec update_decl_jkind env dpath decl =
         type_ikind = Types.ikinds_todo reason
       }
     | Type_record (lbls, rep, umc) ->
-      let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
+      let lbls, rep, type_jkind =
+        compute_record_kind env decl.type_loc lbls rep
+      in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
