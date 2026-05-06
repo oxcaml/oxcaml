@@ -21,7 +21,10 @@ let run_string ~browser ~filename ~source =
         Fun.protect
           (fun () ->
             let cmo_path =
-              Browser_switch_common.compile_source_file ~source_path ~output_prefix
+              Browser_switch_common.compile_source_file
+                ~filename
+                ~source_path
+                ~output_prefix
             in
             if browser
             then (
@@ -63,6 +66,13 @@ let capture_toplevel_output f =
   Browser_switch_common.flush_formatter ppf;
   Buffer.contents buffer
 
+let preprocess_toplevel_phrase ppf phrase =
+  let phrase = Toploop.preprocess_phrase ppf phrase in
+  match phrase with
+  | Parsetree.Ptop_def structure ->
+    Parsetree.Ptop_def (Browser_switch_common.expand_structure_with_ppx structure)
+  | phrase -> phrase
+
 let utop_string ~browser ~filename ~source =
   let environment =
     if browser then Browser_switch_common.Browser
@@ -80,7 +90,7 @@ let utop_string ~browser ~filename ~source =
       List.for_all
         (fun phrase ->
           Warnings.reset_fatal ();
-          let phrase = Toploop.preprocess_phrase ppf phrase in
+          let phrase = preprocess_toplevel_phrase ppf phrase in
           Env.reset_cache_toplevel ();
           Toploop.execute_phrase true ppf phrase)
         phrases

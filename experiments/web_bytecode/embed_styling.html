@@ -322,6 +322,52 @@ let () =
   print_endline (greeting "OxCaml")
           </oxcaml>
 
+          <h3>Use PPX String Interpolation</h3>
+          <p>
+            The static playground includes <code>ppx_string</code>, so
+            examples can use <code>[%string "..."]</code> for interpolation.
+          </p>
+
+          <pre><code>&lt;oxcaml&gt;
+open Base
+
+let greeting name =
+  [%string "Hello, %{name} from ppx_string"]
+
+let () =
+  Stdlib.print_endline (greeting "OxCaml")
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml>
+open Base
+
+let greeting name =
+  [%string "Hello, %{name} from ppx_string"]
+
+let () =
+  Stdlib.print_endline (greeting "OxCaml")
+          </oxcaml>
+
+          <h3>Use Jane PPXs When Needed</h3>
+          <p>
+            The static playground includes the Jane PPX set, so examples can
+            use extensions such as <code>[%here]</code> directly.
+          </p>
+
+          <pre><code>&lt;oxcaml&gt;
+let loc = [%here]
+
+let () =
+  Printf.printf "line %d\n" loc.pos_lnum
+&lt;/oxcaml&gt;</code></pre>
+
+          <oxcaml>
+let loc = [%here]
+
+let () =
+  Printf.printf "line %d\n" loc.pos_lnum
+          </oxcaml>
+
           <h3>Use Toplevel Phrases</h3>
           <p>
             Add <code>utop</code> for examples that should behave like
@@ -738,8 +784,8 @@ let () =
               <tr><td><code>--oxcaml-output-font-size</code></td><td>Transcript font size.</td></tr>
               <tr><td><code>--oxcaml-output-min-height</code></td><td>Minimum output panel height.</td></tr>
               <tr><td><code>--oxcaml-html-output-height</code></td><td>Height of rendered HTML/SVG output if a program emits HTML markers.</td></tr>
-              <tr><td><code>--oxcaml-tooltip-bg</code></td><td>Diagnostic tooltip background.</td></tr>
-              <tr><td><code>--oxcaml-tooltip-ink</code></td><td>Diagnostic tooltip text.</td></tr>
+              <tr><td><code>--oxcaml-tooltip-bg</code></td><td>Diagnostic and shortcut tooltip background.</td></tr>
+              <tr><td><code>--oxcaml-tooltip-ink</code></td><td>Diagnostic and shortcut tooltip text.</td></tr>
               <tr><td><code>--oxcaml-stream</code></td><td>Plain stdout/stderr output.</td></tr>
               <tr><td><code>--oxcaml-code</code></td><td>Diagnostic source-code lines.</td></tr>
               <tr><td><code>--oxcaml-detail</code></td><td>Diagnostic details and trace lines.</td></tr>
@@ -761,6 +807,40 @@ let () =
               <tr><td><code>--oxcaml-error</code></td><td>Error status, exception output, and caret diagnostics.</td></tr>
             </tbody>
           </table>
+
+          <h3>Manual Buttons And Shortcut Tooltips</h3>
+          <p>
+            Manual widgets render the run/check button in
+            <code>.oxcaml-embed__run</code>, the reset button in
+            <code>.oxcaml-embed__reset</code>, and the immediate keyboard
+            shortcut tooltip on <code>.oxcaml-embed__run::after</code>. The
+            tooltip text is generated from the button's
+            <code>data-tooltip</code> attribute.
+          </p>
+
+          <pre><code>.oxcaml-embed.manual-controls-example {
+  --oxcaml-accent: #2563eb;
+  --oxcaml-tooltip-bg: #111827;
+  --oxcaml-tooltip-ink: #f8fafc;
+}
+
+.oxcaml-embed.manual-controls-example .oxcaml-embed__run,
+.oxcaml-embed.manual-controls-example .oxcaml-embed__reset {
+  border-radius: 999px;
+  box-shadow: none;
+  font-size: 0.68rem;
+  padding: 0.28rem 0.55rem;
+}
+
+.oxcaml-embed.manual-controls-example .oxcaml-embed__run::after {
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+}</code></pre>
+
+          <oxcaml class="manual-controls-example" check data-oxcaml-run-trigger="manual">
+let square x = x * x
+          </oxcaml>
         </section>
 
         <section id="syntax-tokens">
@@ -812,6 +892,7 @@ let () =
               <tr><td><code>.oxcaml-embed__status</code></td><td>Status label.</td></tr>
               <tr><td><code>.oxcaml-embed__controls</code></td><td>Top-right button group.</td></tr>
               <tr><td><code>.oxcaml-embed__run</code></td><td>Manual run/check button.</td></tr>
+              <tr><td><code>.oxcaml-embed__run::after</code></td><td>Manual run/check shortcut tooltip.</td></tr>
               <tr><td><code>.oxcaml-embed__reset</code></td><td>Reset button shown after user edits.</td></tr>
             </tbody>
           </table>

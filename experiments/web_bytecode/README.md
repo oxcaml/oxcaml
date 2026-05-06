@@ -42,12 +42,17 @@ Required packages in that switch:
 - `stdlib_stable`
 - `base`
 - `core`
+- `ppx_jane`
+- `ppx_deriving`
 
 From the repo root:
 
 ```sh
 ./experiments/web_bytecode/build_browser_switch.sh
 ```
+
+The browser compiler links `ppx_jane`, so embed examples can use the Jane PPX
+set without opting into a separate backend.
 
 The script refuses to build with a non-OxCaml compiler. That is intentional:
 the browser artifact must be compiled with an `ocamlc` exposing
