@@ -940,7 +940,8 @@ and record_representation =
      is tagged such that polymorphic operations will not work.
   *)
   | Record_dummy of { represent_as_float_array : bool }
-  (* We typecheck type declarations before updating their kinds, yet some record
+  (* Note [Record_dummy]:
+     We typecheck type declarations before updating their kinds, yet some record
      representations are kind-dependent. In particular, we don't choose between
      [Record_boxed], [Record_float], [Record_ufloat], and [Record_mixed] until
      type declaration jkinds are updated in [update_decls_jkind].
