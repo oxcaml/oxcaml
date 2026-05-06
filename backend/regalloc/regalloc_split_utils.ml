@@ -114,7 +114,9 @@ let destruction_point_at_end : Cfg.basic_block -> destruction_kind option =
     then Some Destruction_on_all_paths
     else Some Destruction_only_on_exceptional_path)
 
-type definition_kind = Reload
+type definition_kind =
+  | Reload
+  | Rematerialize of Instruction.t
 
 module Uses = struct
   type source =

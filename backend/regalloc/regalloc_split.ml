@@ -83,12 +83,15 @@ let rec compute_substitution_tree :
     | None -> bindings
     | Some renames ->
       Reg.Map.fold
-        (fun old_reg Reload bindings ->
-          let slots = State.stack_slots state in
-          let (_ : int) = Regalloc_stack_slots.get_or_create slots old_reg in
+        (fun old_reg kind bindings ->
           let new_reg = Reg.create_with_typ_and_name old_reg in
-          Regalloc_stack_slots.use_same_slot_or_fatal slots new_reg
-            ~existing:old_reg;
+          (match kind with
+          | Reload ->
+            let slots = State.stack_slots state in
+            let (_ : int) = Regalloc_stack_slots.get_or_create slots old_reg in
+            Regalloc_stack_slots.use_same_slot_or_fatal slots new_reg
+              ~existing:old_reg
+          | Rematerialize _ -> ());
           if debug
           then log "renaming %a to %a" Printreg.reg old_reg Printreg.reg new_reg;
           Reg.Tbl.replace subst old_reg new_reg;
@@ -136,6 +139,7 @@ type ('a, 'b) make_operation =
   State.t ->
   instr_id:InstructionId.sequence ->
   stack_subst:Substitution.t ->
+  block_subst:Substitution.t ->
   old_reg:Reg.t ->
   new_reg:Reg.t ->
   copy:'a Cfg.instruction ->
@@ -147,7 +151,8 @@ type ('a, 'b) make_operation =
    information from `copy`, and populating `stack_subst` with a mapping from
    `old_reg` to its stack slot. *)
 let make_spill : type a. (a, unit) make_operation =
- fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ~kind:() ->
+ fun state ~instr_id ~stack_subst ~block_subst:_ ~old_reg ~new_reg ~copy
+     ~kind:() ->
   let stack_reg =
     match Reg.Tbl.find_opt stack_subst old_reg with
     | Some stack_reg -> stack_reg
@@ -208,8 +213,8 @@ let rec insert_spills_or_reloads_in_block :
         (fun (old_reg, kind) ->
           let new_reg = Substitution.apply_reg block_subst old_reg in
           let spill_or_reload =
-            make_spill_or_reload state ~instr_id ~stack_subst ~old_reg ~new_reg
-              ~copy:copy_default
+            make_spill_or_reload state ~instr_id ~stack_subst ~block_subst
+              ~old_reg ~new_reg ~copy:copy_default
           in
           add_default block.body (spill_or_reload ~kind) new_reg)
         live_at_interesting_point
@@ -222,8 +227,8 @@ let rec insert_spills_or_reloads_in_block :
             if occur_check instr new_reg
             then (
               let spill_or_reload =
-                make_spill_or_reload state ~instr_id ~stack_subst ~old_reg
-                  ~new_reg ~copy:instr
+                make_spill_or_reload state ~instr_id ~stack_subst ~block_subst
+                  ~old_reg ~new_reg ~copy:instr
               in
               insert cell (spill_or_reload ~kind) new_reg;
               false)
@@ -290,24 +295,39 @@ let insert_spills :
    information from `copy`, and getting the stack slot from `stack_subst` if
    `old_reg` is mapped. *)
 let make_reload : type a. (a, definition_kind) make_operation =
- fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ~kind:Reload ->
-  let stack_reg : Reg.t =
-    match Reg.Tbl.find_opt stack_subst old_reg with
-    | Some stack_reg -> stack_reg
-    | None ->
-      let slots = State.stack_slots state in
-      let slot = Regalloc_stack_slots.get_or_create slots old_reg in
-      let stack = Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg in
-      Regalloc_stack_slots.use_same_slot_or_fatal slots stack ~existing:old_reg;
-      Regalloc_stack_slots.use_same_slot_or_fatal slots stack ~existing:new_reg;
-      Reg.set_loc stack Reg.(Stack (Local slot));
-      stack
-  in
-  if debug
-  then log "reload %a -> %a" Printreg.reg stack_reg Printreg.reg new_reg;
-  Move.make_instr Move.Load
-    ~id:(InstructionId.get_and_incr instr_id)
-    ~copy ~from:stack_reg ~to_:new_reg
+ fun state ~instr_id ~stack_subst ~block_subst ~old_reg ~new_reg ~copy ~kind ->
+  match kind with
+  | Reload ->
+    let stack_reg : Reg.t =
+      match Reg.Tbl.find_opt stack_subst old_reg with
+      | Some stack_reg -> stack_reg
+      | None ->
+        let slots = State.stack_slots state in
+        let slot = Regalloc_stack_slots.get_or_create slots old_reg in
+        let stack =
+          Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg
+        in
+        Regalloc_stack_slots.use_same_slot_or_fatal slots stack
+          ~existing:old_reg;
+        Regalloc_stack_slots.use_same_slot_or_fatal slots stack
+          ~existing:new_reg;
+        Reg.set_loc stack Reg.(Stack (Local slot));
+        stack
+    in
+    if debug
+    then log "reload %a -> %a" Printreg.reg stack_reg Printreg.reg new_reg;
+    Move.make_instr Move.Load
+      ~id:(InstructionId.get_and_incr instr_id)
+      ~copy ~from:stack_reg ~to_:new_reg
+  | Rematerialize load ->
+    let arg = Substitution.apply_array block_subst load.arg in
+    if debug
+    then
+      log "remat %a -> %a (from %a)" Printreg.reg old_reg Printreg.reg new_reg
+        Printreg.regs arg;
+    Cfg.make_instruction_from_copy copy ~desc:load.desc
+      ~id:(InstructionId.get_and_incr instr_id)
+      ~arg ~res:[| new_reg |] ()
 
 (* Inserts the reloads in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. *)
