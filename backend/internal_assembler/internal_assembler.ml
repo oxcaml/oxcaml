@@ -175,7 +175,7 @@ let assemble_one_section ~name instructions =
   in
   align,
   X86_binary_emitter.assemble_section X64
-    { X86_binary_emitter.sec_name = X86_proc.Section_name.to_string name;
+    { X86_binary_emitter.sec_name = name;
       sec_instrs = DLL.to_array instructions
     }
 
