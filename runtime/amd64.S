@@ -1469,15 +1469,23 @@ CFI_STARTPROC
         FLUSH_DYNAMIC_CACHE(%r11)
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
-        .cfi_escape DW_CFA_def_cfa_expression, 3+3+2, \
-          DW_OP_breg + DW_REG_rsp,                    \
-            16 /* exn */ +                            \
-            8 /* gc_regs slot (unused) */ +           \
-            8 /* C_STACK_SP for DWARF (unused) */ +   \
-            16 * Stack_padding_word +                  \
-            Handler_parent, DW_OP_deref,              \
-          DW_OP_plus_uconst, Stack_sp, DW_OP_deref,   \
+#define DWARF_BREG_OFFSET                       \
+  (16 /* exn */ +                               \
+   8 /* gc_regs slot (unused) */ +              \
+   8 /* C_STACK_SP for DWARF (unused) */ +      \
+   16 * Stack_padding_word +                    \
+   Handler_parent)
+        .ifge DWARF_BREG_OFFSET - 8192
+        .error "DWARF_BREG_OFFSET out of range for 2-byte SLEB128"
+        .endif
+        .cfi_escape DW_CFA_def_cfa_expression, 4+3+2,           \
+          DW_OP_breg + DW_REG_rsp,                              \
+            (DWARF_BREG_OFFSET & 0x7f) | 0x80, /* SLEB128 byte 0 */ \
+            (DWARF_BREG_OFFSET >> 7) & 0x7f,   /* SLEB128 byte 1 */ \
+            DW_OP_deref,                                        \
+          DW_OP_plus_uconst, Stack_sp, DW_OP_deref,             \
           DW_OP_plus_uconst, RETADDR_ENTRY_SIZE
+#undef DWARF_BREG_OFFSET
 #endif
         movq    %rdi, %rax /* first argument */
         CHECK_STACK_ALIGNMENT;
