@@ -31,10 +31,6 @@ module Make (B : Ssa.Graph_builder) = struct
 
   let ( let* ) x f = match x with Never_returns -> Never_returns | Ok x -> f x
 
-  (* The result of emitting an expression: just the produced values. The
-     [unfinished_block ref] passed through emission is mutated in place; on
-     [Never_returns] its contents are no longer meaningful and the caller must
-     re-bind it (typically via [B.start_block]) before emitting again. *)
   type result = B.Instruction.t array or_never_returns
 
   type env =
@@ -171,16 +167,14 @@ module Make (B : Ssa.Graph_builder) = struct
           | Arbitrary | Raise -> false))
     in
     if may_defer_evaluation && Sel.is_simple_expr exp
-    then Some (exp, env)
+    then Ok (exp, env)
     else
-      match emit env c exp ~tail:false with
-      | Never_returns -> None
-      | Ok r ->
-        if Array.length r = 0
-        then Some (Cmm.Ctuple [], env)
-        else
-          let id = V.create_local "bind" in
-          Some (Cmm.Cvar id, { env with vars = V.Map.add id r env.vars })
+      let* r = emit env c exp ~tail:false in
+      if Array.length r = 0
+      then Ok (Cmm.Ctuple [], env)
+      else
+        let id = V.create_local "bind" in
+        Ok (Cmm.Cvar id, { env with vars = V.Map.add id r env.vars })
 
   and emit_parts_list env c exp_list =
     let module EC = SU.Effect_and_coeffect in
@@ -193,16 +187,13 @@ module Make (B : Ssa.Graph_builder) = struct
     in
     List.fold_left
       (fun acc (exp, effects_after) ->
-        match acc with
-        | None -> None
-        | Some (result, env) -> (
-          match emit_parts env c ~effects_after exp with
-          | None -> None
-          | Some (exp_result, env) -> Some (exp_result :: result, env)))
-      (Some ([], env))
+        let* result, env = acc in
+        let* exp_result, env = emit_parts env c ~effects_after exp in
+        Ok (exp_result :: result, env))
+      (Ok ([], env))
       exp_list_right_to_left
 
-  and emit_tuple_not_flattened env c exp_list : _ or_never_returns =
+  and emit_tuple env c exp_list : result =
     let rec emit_list = function
       | [] -> Ok []
       | exp :: rem -> (
@@ -211,10 +202,7 @@ module Make (B : Ssa.Graph_builder) = struct
         | Never_returns -> Never_returns
         | Ok loc_exp -> Ok (loc_exp :: loc_rem))
     in
-    emit_list exp_list
-
-  and emit_tuple env c exp_list : result =
-    let* l = emit_tuple_not_flattened env c exp_list in
+    let* l = emit_list exp_list in
     Ok (Array.concat l)
 
   and emit_stores env c dbg (args : Cmm.expression list) regs_addr =
@@ -334,21 +322,18 @@ module Make (B : Ssa.Graph_builder) = struct
         Ok (emit_op_res c (SU.make_const_symbol n) Cmm.typ_int [||])
       | Cvar v -> Ok (env_find v env)
       | Ctuple [] -> Ok [||]
-      | Ctuple exp_list -> (
-        match emit_parts_list env c exp_list with
-        | None -> Never_returns
-        | Some (simple_list, ext_env) -> emit_tuple ext_env c simple_list)
+      | Ctuple exp_list ->
+        let* simple_list, ext_env = emit_parts_list env c exp_list in
+        emit_tuple ext_env c simple_list
       | Cop (Craise k, args, dbg) ->
         let* r = emit_tuple env c args in
         B.finish_block c ~dbg (Raise { raise_kind = k; args = r });
         Never_returns
-      | Cop (Copaque, args, dbg) -> (
-        match emit_parts_list env c args with
-        | None -> Never_returns
-        | Some (simple_args, env) ->
-          let* rs = emit_tuple env c simple_args in
-          let typ = Array.map B.Instruction.arg_type rs in
-          Ok (emit_op_res c ~dbg Opaque typ rs))
+      | Cop (Copaque, args, dbg) ->
+        let* simple_args, env = emit_parts_list env c args in
+        let* rs = emit_tuple env c simple_args in
+        let typ = Array.map B.Instruction.arg_type rs in
+        Ok (emit_op_res c ~dbg Opaque typ rs)
       | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) ->
         let* loc_exp = emit env c arg ~tail:false in
         let flat_size a =
@@ -449,49 +434,47 @@ module Make (B : Ssa.Graph_builder) = struct
         new_op
 
   and emit_expr_op env c op args dbg : result =
-    match emit_parts_list env c args with
-    | None -> Never_returns
-    | Some (simple_args, env) -> (
-      let ty = SU.oper_result_type op in
-      let new_op, new_args =
-        Sel.select_operation op simple_args dbg ~label_after:Label.none
+    let* simple_args, env = emit_parts_list env c args in
+    let ty = SU.oper_result_type op in
+    let new_op, new_args =
+      Sel.select_operation op simple_args dbg ~label_after:Label.none
+    in
+    match new_op with
+    | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
+      let bytes =
+        List.fold_left
+          (fun acc arg -> acc + size_of_cmm_expr env arg)
+          0 new_args
       in
+      let alloc_words = (bytes + Arch.size_addr - 1) / Arch.size_addr in
+      let op =
+        Operation.Alloc
+          { bytes = alloc_words * Arch.size_addr;
+            dbginfo = [{ placeholder with alloc_words; alloc_dbg = dbg }];
+            mode
+          }
+      in
+      let rd = B.emit_op c ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
+      emit_stores env c dbg new_args rd;
+      Ok [| rd |]
+    | _ -> (
+      let* arg_instrs = emit_tuple env c new_args in
       match new_op with
-      | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
-        let bytes =
-          List.fold_left
-            (fun acc arg -> acc + size_of_cmm_expr env arg)
-            0 new_args
+      | Terminator term ->
+        let nontail =
+          match[@warning "-4"] op with
+          | Cmm.Capply { region; _ } -> (
+            match (region : Lambda.region_close) with
+            | Rc_normal -> false
+            | Rc_nontail -> true
+            | Rc_close_at_apply -> assert false (* desugared in Flambda2 *))
+          | _ -> true
         in
-        let alloc_words = (bytes + Arch.size_addr - 1) / Arch.size_addr in
-        let op =
-          Operation.Alloc
-            { bytes = alloc_words * Arch.size_addr;
-              dbginfo = [{ placeholder with alloc_words; alloc_dbg = dbg }];
-              mode
-            }
-        in
-        let rd = B.emit_op c ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
-        emit_stores env c dbg new_args rd;
-        Ok [| rd |]
-      | _ -> (
-        let* arg_instrs = emit_tuple env c new_args in
-        match new_op with
-        | Terminator term ->
-          let nontail =
-            match[@warning "-4"] op with
-            | Cmm.Capply { region; _ } -> (
-              match (region : Lambda.region_close) with
-              | Rc_normal -> false
-              | Rc_nontail -> true
-              | Rc_close_at_apply -> assert false (* desugared in Flambda2 *))
-            | _ -> true
-          in
-          emit_call env c ~ty ~nontail term arg_instrs dbg
-        | Basic (Op op) -> Ok (emit_op_res c ~dbg op ty arg_instrs)
-        | Basic basic ->
-          Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Cfg.dump_basic
-            basic))
+        emit_call env c ~ty ~nontail term arg_instrs dbg
+      | Basic (Op op) -> Ok (emit_op_res c ~dbg op ty arg_instrs)
+      | Basic basic ->
+        Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Cfg.dump_basic
+          basic)
 
   and emit_ifthenelse env c ~tail econd eif eelse : result =
     let cond, earg = Sel.select_condition econd in
@@ -503,7 +486,7 @@ module Make (B : Ssa.Graph_builder) = struct
     let r_then = emit env then_c eif ~tail in
     let else_c = B.start_block else_block in
     let r_else = emit env else_c eelse ~tail in
-    join_branches c (r_then, then_c) (r_else, else_c)
+    join c [| r_then, then_c; r_else, else_c |]
 
   and emit_switch env c ~tail esel index ecases : result =
     let* rsel = emit env c esel ~tail:false in
@@ -527,38 +510,35 @@ module Make (B : Ssa.Graph_builder) = struct
           emit env case_c case_expr ~tail, case_c)
         ecases
     in
-    join_array c case_results
+    join c case_results
 
   and emit_catch env c ~tail handlers body : result =
     (* Create one block per handler up front to also support mutually recursive
        handlers. All handlers are emitted unconditionally, the SSA graph builder
        will drop unreachable blocks. *)
-    let env, handler_blocks =
+    let static_exceptions, handler_blocks =
       List.fold_left_map
-        (fun env Cmm.{ label = nfail; params; _ } ->
-          let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
+        (fun static_exceptions Cmm.{ label = nfail; params; _ } ->
+          let types =
+            params |> List.map (fun (_id, ty) -> ty) |> Array.concat
+          in
           let new_block = B.new_block ~params:types in
           let block_params = B.Block.params new_block.block in
           let pos = ref 0 in
-          List.iter
-            (fun (id, ty) ->
+          params
+          |> List.iter (fun (id, ty) ->
               let n = Array.length ty in
               let name = V.name (VP.var id) in
               for i = 0 to n - 1 do
                 (block_params.(!pos + i) : Ssa_intf.block_param).name
                   <- Some name
               done;
-              pos := !pos + n)
-            params;
-          let env =
-            { env with
-              static_exceptions =
-                Static_label.Map.add nfail new_block.block env.static_exceptions
-            }
-          in
-          env, new_block)
-        env handlers
+              pos := !pos + n);
+          ( Static_label.Map.add nfail new_block.block static_exceptions,
+            new_block ))
+        env.static_exceptions handlers
     in
+    let env = { env with static_exceptions } in
     let r_body = emit env c body ~tail in
     let translate_handler (handler : Cmm.static_handler)
         (handler_block : B.new_block_result) =
@@ -589,7 +569,7 @@ module Make (B : Ssa.Graph_builder) = struct
       emit handler_env c handler.body ~tail, c
     in
     let handler_results = List.map2 translate_handler handlers handler_blocks in
-    join_array c (Array.of_list ((r_body, c) :: handler_results))
+    join c (Array.of_list ((r_body, c) :: handler_results))
 
   and find_handler env handler_id : B.Block.t =
     try Static_label.Map.find handler_id env.static_exceptions
@@ -608,51 +588,24 @@ module Make (B : Ssa.Graph_builder) = struct
             Pop_trap { handler = Some (find_handler env handler_id) }))
 
   and emit_expr_exit env c (lbl : Cmm.exit_label) args traps : result =
-    match emit_parts_list env c args with
-    | None -> Never_returns
-    | Some (simple_list, ext_env) -> (
-      match lbl with
-      | Lbl nfail ->
-        let* src = emit_tuple ext_env c simple_list in
-        let handler = find_handler env nfail in
-        emit_trap_actions env c traps;
-        B.finish_block c ~dbg:Debuginfo.none
-          (Goto { goto = handler; args = src });
-        Never_returns
-      | Return_lbl ->
-        let* src = emit_tuple ext_env c simple_list in
-        emit_trap_actions env c traps;
-        B.finish_block c ~dbg:Debuginfo.none (Return { args = src });
-        Never_returns)
-
-  (* Join two branches into a fresh block. After this call [c] points at the
-     joined block (or is unchanged if both branches did not return). *)
-  and join_branches c (r1, c1) (r2, c2) : result =
-    match r1, r2 with
-    | Never_returns, Never_returns -> Never_returns
-    | Ok r, Never_returns ->
-      B.move_cursor c ~new_pos:c1;
-      Ok r
-    | Never_returns, Ok r ->
-      B.move_cursor c ~new_pos:c2;
-      Ok r
-    | Ok r1_instrs, Ok r2_instrs ->
-      assert (Array.length r1_instrs = Array.length r2_instrs);
-      let join_types = Array.map B.Instruction.arg_type r1_instrs in
-      let { B.block = join_block; params = join_params } =
-        B.new_block ~params:join_types
-      in
-      B.finish_block c1 ~dbg:Debuginfo.none
-        (Goto { goto = join_block; args = r1_instrs });
-      B.finish_block c2 ~dbg:Debuginfo.none
-        (Goto { goto = join_block; args = r2_instrs });
-      B.move_cursor c ~new_pos:(B.start_block join_block);
-      Ok join_params
+    let* simple_list, ext_env = emit_parts_list env c args in
+    match lbl with
+    | Lbl nfail ->
+      let* src = emit_tuple ext_env c simple_list in
+      let handler = find_handler env nfail in
+      emit_trap_actions env c traps;
+      B.finish_block c ~dbg:Debuginfo.none (Goto { goto = handler; args = src });
+      Never_returns
+    | Return_lbl ->
+      let* src = emit_tuple ext_env c simple_list in
+      emit_trap_actions env c traps;
+      B.finish_block c ~dbg:Debuginfo.none (Return { args = src });
+      Never_returns
 
   (* Join a set of branches (each with its own end-cursor) into a fresh block.
      [c] is left pointing at the joined block, or unchanged if every branch did
      not return. *)
-  and join_array c (results : (result * B.cursor) array) : result =
+  and join c (results : (result * B.cursor) array) : result =
     let join_info = ref None in
     Array.iter
       (fun (r, _) ->
