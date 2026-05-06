@@ -52,6 +52,7 @@ let cleanup_if_exists path =
 let cleanup_build_artifacts ~source_path ~output_prefix =
   List.iter cleanup_if_exists
     [ source_path;
+      source_path ^ ".ppx.ast";
       output_prefix ^ ".cmo";
       output_prefix ^ ".cmi";
       output_prefix ^ ".cmt";
@@ -92,7 +93,27 @@ let write_source_file ~source_path ~source =
     (fun () -> output_string oc source)
     ~finally:(fun () -> close_out_noerr oc)
 
-let compile_source_file ~source_path ~output_prefix =
+let read_file path =
+  let ic = open_in_bin path in
+  Fun.protect
+    (fun () ->
+      let length = in_channel_length ic in
+      really_input_string ic length)
+    ~finally:(fun () -> close_in_noerr ic)
+
+let expand_structure_with_ppx ast =
+  Ppxlib_ast.Selected_ast.Of_ocaml.copy_structure ast
+  |> Ppxlib.Driver.map_structure
+  |> Ppxlib_ast.Selected_ast.To_ocaml.copy_structure
+
+let parse_and_expand_source ~filename ~source =
+  let lexbuf = Lexing.from_string source in
+  Location.input_name := filename;
+  Location.input_lexbuf := Some lexbuf;
+  Location.init lexbuf filename;
+  Parse.implementation lexbuf |> expand_structure_with_ppx
+
+let compile_parsed_file ~source_path ~output_prefix =
   let saved_dont_write_files = !Clflags.dont_write_files in
   Fun.protect
     (fun () ->
@@ -104,6 +125,13 @@ let compile_source_file ~source_path ~output_prefix =
         ~keep_symbol_tables:false;
       output_prefix ^ ".cmo")
     ~finally:(fun () -> Clflags.dont_write_files := saved_dont_write_files)
+
+let compile_source_file ~filename ~source_path ~output_prefix =
+  let source = read_file source_path in
+  let ast_path = source_path ^ ".ppx.ast" in
+  let ast = parse_and_expand_source ~filename ~source in
+  Pparse.write_ast Pparse.Structure ast_path ast;
+  compile_parsed_file ~source_path:ast_path ~output_prefix
 
 let prepare_lexbuf ~filename source =
   let lexbuf = Lexing.from_string source in
@@ -129,6 +157,8 @@ let reset_flags environment =
      | Browser -> browser_include_dirs);
   Clflags.hidden_include_dirs := [];
   Clflags.open_modules := [];
+  Clflags.preprocessor := None;
+  Clflags.all_ppx := [];
   Clflags.use_threads := false
 
 let prepare_compiler environment ~filename =

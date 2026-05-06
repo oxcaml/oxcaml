@@ -7,7 +7,7 @@ let directBackendPromise = null;
 let workerFailed = false;
 
 const backendWorkerUrl = new URL(
-  "./backend_worker.js?v=20260427-worker-blob",
+  "./backend_worker.js?v=20260506-ppx-driver",
   import.meta.url,
 ).href;
 
@@ -147,7 +147,7 @@ function getBackendWorker() {
 
 async function directBackend() {
   if (!directBackendPromise) {
-    directBackendPromise = import("./backend_direct.js?v=20260427-worker-blob");
+    directBackendPromise = import("./backend_direct.js?v=20260506-ppx-driver");
   }
   return directBackendPromise;
 }
@@ -174,21 +174,35 @@ function callWorker(methodName, args) {
   });
 }
 
-export const ready = callWorker("ready", []);
+export async function readyForOptions(options = {}) {
+  return callWorker("ready", []);
+}
 
-export async function checkString(filename, source) {
+export const ready = {
+  then(resolve, reject) {
+    return readyForOptions().then(resolve, reject);
+  },
+  catch(reject) {
+    return readyForOptions().catch(reject);
+  },
+  finally(onFinally) {
+    return readyForOptions().finally(onFinally);
+  },
+};
+
+export async function checkString(filename, source, options = {}) {
   return callWorker("checkString", [filename, source]);
 }
 
-export async function interfaceString(filename, source) {
+export async function interfaceString(filename, source, options = {}) {
   return callWorker("interfaceString", [filename, source]);
 }
 
-export async function runString(filename, source) {
+export async function runString(filename, source, options = {}) {
   return callWorker("runString", [filename, source]);
 }
 
-export async function utopString(filename, source) {
+export async function utopString(filename, source, options = {}) {
   return callWorker("utopString", [filename, source]);
 }
 
@@ -206,6 +220,7 @@ if (typeof window !== "undefined") {
   window.webBytecode = {
     checkString,
     interfaceString,
+    readyForOptions,
     runString,
     utopString,
     checkFile,

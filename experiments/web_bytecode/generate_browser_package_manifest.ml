@@ -1,4 +1,19 @@
-let package_roots = [ "stdlib_stable"; "base"; "core"; "parallel"; "threads" ]
+let default_package_roots =
+  [ "stdlib_stable"; "base"; "core"; "parallel"; "threads"; "ppx_jane" ]
+
+let split_package_roots text =
+  text
+  |> String.split_on_char ','
+  |> List.concat_map (String.split_on_char ' ')
+  |> List.map String.trim
+  |> List.filter (fun pkg -> not (String.equal pkg ""))
+
+let package_roots =
+  match Sys.getenv_opt "OXBROWSER_PACKAGE_ROOTS" with
+  | None -> default_package_roots
+  | Some roots ->
+    let roots = split_package_roots roots in
+    if roots = [] then default_package_roots else roots
 
 let linked_packages =
   [ "compiler-libs"

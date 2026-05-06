@@ -43,6 +43,7 @@ fi
 
 require_file "$script_dir/index.html"
 require_file "$script_dir/embed_demo.html"
+require_file "$script_dir/embed_styling.html"
 require_file "$script_dir/app.js"
 require_file "$script_dir/backend.js"
 require_file "$script_dir/backend_direct.js"
@@ -63,6 +64,7 @@ fi
 mkdir -p "$stage_dir/build"
 cp "$script_dir/index.html" "$stage_dir/index.html"
 cp "$script_dir/embed_demo.html" "$stage_dir/embed_demo.html"
+cp "$script_dir/embed_styling.html" "$stage_dir/embed_styling.html"
 cp "$script_dir/app.js" "$stage_dir/app.js"
 cp "$script_dir/backend.js" "$stage_dir/backend.js"
 cp "$script_dir/backend_direct.js" "$stage_dir/backend_direct.js"

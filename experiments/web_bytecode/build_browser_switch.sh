@@ -50,11 +50,32 @@ require_package() {
   fi
 }
 
+package_closure_csv() {
+  local package_name=$1
+  run_tool ocamlfind query -recursive -predicates byte -format '%p' "$package_name" |
+    tr ' \n' ',' |
+    sed 's/,$//'
+}
+
 require_dir "$release_opam_root" "OPAM root"
 require_dir "$release_opam_root/$release_opam_switch" "OPAM switch"
 
 missing_packages=()
-for package_name in findlib js_of_ocaml js_of_ocaml-toplevel stdlib_stable base core parallel threads; do
+for package_name in \
+  findlib \
+  js_of_ocaml \
+  js_of_ocaml-toplevel \
+  stdlib_stable \
+  base \
+  core \
+  parallel \
+  threads \
+  ppxlib \
+  ppxlib.ast \
+  ppx_jane \
+  ppx_deriving \
+  ppx_module_timer.runtime
+do
   require_package "$package_name"
 done
 
@@ -62,6 +83,8 @@ if [ "${#missing_packages[@]}" -gt 0 ]; then
   printf 'build_browser_switch.sh: missing required packages in %s/%s:\n' \
     "$release_opam_root" "$release_opam_switch" >&2
   printf '  %s\n' "${missing_packages[@]}" >&2
+  printf '\nInstall them with:\n  OPAMROOT=%q OPAMSWITCH=%q opam install -y %s\n' \
+    "$release_opam_root" "$release_opam_switch" "${missing_packages[*]}" >&2
   exit 1
 fi
 
@@ -97,74 +120,37 @@ fi
 
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
-js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel"
+common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast"
 install_lib_root=$(run_tool ocamlc -where)
 package_lib_root=$(dirname "$(run_tool ocamlfind query base)")
 js_of_ocaml_compiler_dir="$(run_tool ocamlfind query js_of_ocaml-compiler)"
 
 copy_cmis_from_dir() {
   local dir=$1
-  find "$dir" -maxdepth 1 -type f -name '*.cmi' -exec cp -f {} "$tmpdir/cmis/" \;
+  local output_dir=$2
+  find "$dir" -maxdepth 1 -type f -name '*.cmi' -exec cp -f {} "$output_dir/" \;
 }
 
-copy_cmis_from_dir "$install_lib_root"
+copy_cmis_from_dir "$install_lib_root" "$tmpdir/cmis"
 compilerlibs_dir="$(run_tool ocamlfind query compiler-libs 2>/dev/null || true)"
 if [ -n "$compilerlibs_dir" ] && [ -d "$compilerlibs_dir" ]; then
-  copy_cmis_from_dir "$compilerlibs_dir"
+  copy_cmis_from_dir "$compilerlibs_dir" "$tmpdir/cmis"
 fi
 if [ -d "$js_of_ocaml_compiler_dir/runtime" ]; then
-  copy_cmis_from_dir "$js_of_ocaml_compiler_dir/runtime"
+  copy_cmis_from_dir "$js_of_ocaml_compiler_dir/runtime" "$tmpdir/cmis"
 fi
 
 run_tool ocamlfind ocamlc -g -package findlib -linkpkg \
   "$experiment_dir/generate_browser_package_manifest.ml" \
   -o "$tmpdir/generate_browser_package_manifest.byte"
 
-run_tool ocamlrun "$tmpdir/generate_browser_package_manifest.byte" \
-  "$install_lib_root" \
-  "$package_lib_root" \
-  "$tmpdir/browser_switch_package_manifest.ml" \
-  "$tmpdir/browser_packages.map" \
-  "$tmpdir/browser_package_runtimes.list"
-
 compile() {
-  local source=$1
-  local output=$2
-  shift 2
-  run_tool ocamlfind ocamlc -g -package "$js_packages" "$@" -c "$source" -o "$output"
+  local packages=$1
+  local source=$2
+  local output=$3
+  shift 3
+  run_tool ocamlfind ocamlc -g -package "$packages" "$@" -c "$source" -o "$output"
 }
-
-compile "$tmpdir/browser_switch_package_manifest.ml" \
-  "$tmpdir/browser_switch_package_manifest.cmo"
-
-compile "$experiment_dir/browser_switch_common.ml" \
-  "$tmpdir/browser_switch_common.cmo" \
-  -I "$tmpdir"
-
-compile "$experiment_dir/browser_switch_check.ml" \
-  "$tmpdir/browser_switch_check.cmo" \
-  -I "$tmpdir"
-
-compile "$experiment_dir/browser_switch_interface.ml" \
-  "$tmpdir/browser_switch_interface.cmo" \
-  -I "$tmpdir"
-
-compile "$experiment_dir/browser_switch_run.ml" \
-  "$tmpdir/browser_switch_run.cmo" \
-  -I "$tmpdir"
-
-compile "$experiment_dir/browser_switch_js.ml" \
-  "$tmpdir/browser_switch_js.cmo" \
-  -I "$tmpdir"
-
-run_tool ocamlfind ocamlc -g -no-check-prims -linkall -package "$js_packages" -linkpkg \
-  "$tmpdir/browser_switch_package_manifest.cmo" \
-  "$tmpdir/browser_switch_common.cmo" \
-  "$tmpdir/browser_switch_check.cmo" \
-  "$tmpdir/browser_switch_interface.cmo" \
-  "$tmpdir/browser_switch_run.cmo" \
-  "$tmpdir/browser_switch_js.cmo" \
-  -o "$build_dir/web_bytecode_js.bc"
 
 standard_runtime_js_files=()
 while IFS= read -r runtime_file; do
@@ -173,6 +159,51 @@ while IFS= read -r runtime_file; do
     *) standard_runtime_js_files+=("$runtime_file") ;;
   esac
 done < <(find "$js_of_ocaml_compiler_dir" -maxdepth 1 -type f -name '*.js' | sort)
+
+jane_runtime_packages="$(package_closure_csv ppx_jane)"
+package_roots="stdlib_stable base core parallel threads ${jane_runtime_packages//,/ }"
+link_packages="$common_js_packages,ppx_jane,$jane_runtime_packages"
+
+OXBROWSER_PACKAGE_ROOTS="$package_roots" \
+  run_tool ocamlrun "$tmpdir/generate_browser_package_manifest.byte" \
+  "$install_lib_root" \
+  "$package_lib_root" \
+  "$tmpdir/browser_switch_package_manifest.ml" \
+  "$tmpdir/browser_packages.map" \
+  "$tmpdir/browser_package_runtimes.list"
+
+compile "$common_js_packages" "$tmpdir/browser_switch_package_manifest.ml" \
+  "$tmpdir/browser_switch_package_manifest.cmo"
+
+compile "$common_js_packages" "$experiment_dir/browser_switch_common.ml" \
+  "$tmpdir/browser_switch_common.cmo" \
+  -I "$tmpdir"
+
+compile "$common_js_packages" "$experiment_dir/browser_switch_check.ml" \
+  "$tmpdir/browser_switch_check.cmo" \
+  -I "$tmpdir"
+
+compile "$common_js_packages" "$experiment_dir/browser_switch_interface.ml" \
+  "$tmpdir/browser_switch_interface.cmo" \
+  -I "$tmpdir"
+
+compile "$common_js_packages" "$experiment_dir/browser_switch_run.ml" \
+  "$tmpdir/browser_switch_run.cmo" \
+  -I "$tmpdir"
+
+compile "$common_js_packages" "$experiment_dir/browser_switch_js.ml" \
+  "$tmpdir/browser_switch_js.cmo" \
+  -I "$tmpdir"
+
+run_tool ocamlfind ocamlc -g -no-check-prims -linkall -predicates ppx_driver \
+  -package "$link_packages" -linkpkg \
+  "$tmpdir/browser_switch_package_manifest.cmo" \
+  "$tmpdir/browser_switch_common.cmo" \
+  "$tmpdir/browser_switch_check.cmo" \
+  "$tmpdir/browser_switch_interface.cmo" \
+  "$tmpdir/browser_switch_run.cmo" \
+  "$tmpdir/browser_switch_js.cmo" \
+  -o "$build_dir/web_bytecode_js.bc"
 
 browser_runtime_files=()
 if [ -s "$tmpdir/browser_package_runtimes.list" ]; then
@@ -202,9 +233,11 @@ js_of_ocaml_args+=(
 
 run_tool "$js_of_ocaml_bin" "${js_of_ocaml_args[@]}"
 
-rm -f "$build_dir/browser_fs.js" "$build_dir/browser_fs_manifest.json" \
-  "$build_dir/browser_fs_bundle.json.gz"
-rm -rf "$build_dir/browser_fs"
+rm -f "$build_dir/browser_fs_manifest.json" \
+  "$build_dir/web_bytecode_jane_js.bc" \
+  "$build_dir/web_bytecode_jane_js.bc.js" \
+  "$build_dir/browser_fs_jane_manifest.json"
+rm -rf "$build_dir/browser_fs" "$build_dir/browser_fs_jane"
 
 find "$tmpdir/cmis" -maxdepth 1 -type f -name '*.cmi' | sort | while read -r file; do
   base=$(basename "$file")

@@ -8,7 +8,10 @@ let interface_string ~browser ~filename ~source =
       (try
          Browser_switch_common.prepare_compiler environment ~filename;
          let lexbuf = Browser_switch_common.prepare_lexbuf ~filename source in
-         let ast = Parse.implementation lexbuf in
+         let ast =
+           Parse.implementation lexbuf
+           |> Browser_switch_common.expand_structure_with_ppx
+         in
          let compilation_unit = Browser_switch_common.compilation_unit filename in
          let unit_info =
            Unit_info.make_dummy ~input_name:filename compilation_unit

@@ -12,7 +12,7 @@ import {
   runFile as backendRunFile,
   runString as backendRunString,
   utopString as backendUtopString,
-} from "./backend.js?v=20260427-worker-blob";
+} from "./backend.js?v=20260506-ppx-driver";
 import {
   EditorState,
   RangeSetBuilder,

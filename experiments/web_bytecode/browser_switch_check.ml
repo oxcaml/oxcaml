@@ -13,7 +13,10 @@ let check_string ~browser ~filename ~source =
         Fun.protect
           (fun () ->
             ignore
-              (Browser_switch_common.compile_source_file ~source_path ~output_prefix);
+              (Browser_switch_common.compile_source_file
+                 ~filename
+                 ~source_path
+                 ~output_prefix);
             true)
           ~finally:(fun () ->
             Browser_switch_common.cleanup_build_artifacts ~source_path ~output_prefix)))
