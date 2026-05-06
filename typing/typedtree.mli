@@ -1585,8 +1585,19 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
+(** Compute the sort of a label. Returns [None] when we can't determine the sort
+    for a representable record based off of the label alone, namely for a
+    [Record_unboxed]. In that case, the label has the same sort as the whole
+    record. *)
 val label_sort:
-    _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t
+  'rep Types.record_form -> 'rep Types.gen_label_description -> record_sorts
+  ->
+  [ `Sort of Jkind.Sort.Const.t | `Same_as_record_sort ]
 
-val label_all_sorts:
-    _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t array
+(** Computes the sort of a label. Becuase the sepcial case above doesn't apply
+    to unboxed records, this doesn't return an option. *)
+val unboxed_label_sort :
+  Types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t
+
+val unboxed_label_all_sorts:
+  Types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t array

@@ -1707,32 +1707,24 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
 
-let label_sort label record_sorts =
-  match record_sorts with
-  | Variable sorts -> sorts.(label.lbl_pos)
-  | Fixed ->
-      begin match label.lbl_sort with
-      | Some sort -> sort
-      | None ->
-          Misc.fatal_errorf "no sort for label %s in fixed-sort record"
-            label.lbl_name
-      end
+let label_sort (type rep)
+      (record_form : rep record_form)
+      (label : rep gen_label_description) record_sorts =
+  match record_form, label.lbl_repres with
+  | Legacy, Some Record_unboxed -> `Same_as_record_sort
+  | _ ->
+    begin match record_sorts, label.lbl_sort with
+    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
+    | Fixed, Some sort -> `Sort sort
+    | Fixed, None ->
+      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
+        label.lbl_name
+    end
 
-let label_all_sorts label record_sorts =
-  match record_sorts with
-  | Variable sorts -> sorts
-  | Fixed ->
-      let lbl_sorts = Array.map (fun lbl -> lbl.lbl_sort) label.lbl_all in
-      begin match Misc.Stdlib.Array.all_somes lbl_sorts with
-      | Some sorts -> sorts
-      | None ->
-          begin match
-            Array.find_opt (fun lbl -> Option.is_none lbl.lbl_sort)
-              label.lbl_all
-          with
-          | None -> assert false
-          | Some lbl ->
-              Misc.fatal_errorf "no sort for label %s in fixed-sort record"
-                lbl.lbl_name
-          end
-      end
+let unboxed_label_sort label record_sorts =
+  match label_sort Unboxed_product label record_sorts with
+  | `Same_as_record_sort -> assert false
+  | `Sort s -> s
+
+let unboxed_label_all_sorts label record_sorts =
+  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all

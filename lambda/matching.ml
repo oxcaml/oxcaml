@@ -2394,9 +2394,9 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        match lbl.lbl_repres with
-        | Some Record_unboxed -> sort
-        | _ -> label_sort lbl all_sorts
+        match label_sort Legacy lbl all_sorts with
+        | `Sort s -> s
+        | `Same_as_record_sort -> sort
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -2465,7 +2465,7 @@ let get_expr_args_record_unboxed_product ~scopes head
   in
   let lbl_layouts =
     Array.map (fun lbl ->
-      Typeopt.layout_of_sort lbl.lbl_loc (label_sort lbl all_sorts)
+      Typeopt.layout_of_sort lbl.lbl_loc (unboxed_label_sort lbl all_sorts)
     ) all_labels
     |> Array.to_list
   in
@@ -2487,7 +2487,7 @@ let get_expr_args_record_unboxed_product ~scopes head
         else
           Alias
       in
-      let lbl_sort = label_sort lbl all_sorts in
+      let lbl_sort = unboxed_label_sort lbl all_sorts in
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       (access, str, lbl_sort, layout) :: make_args (pos + 1)
   in

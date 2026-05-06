@@ -3148,10 +3148,9 @@ and type_pat_aux
         in
         let alloc_mode = simple_pat_mode mode in
         let ty_sort =
-          match record_form, label.lbl_repres with
-          | Legacy, Some Record_unboxed ->
-            record_sort
-          | _ -> label_sort label sorts |> Jkind.Sort.of_const
+          match label_sort record_form label sorts with
+          | `Sort s -> Jkind.Sort.of_const s
+          | `Same_as_record_sort -> record_sort
         in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
       in
