@@ -42,66 +42,58 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     type usage_count = int
 
     module rec Block : sig
-      type predecessors = Block.Set.t
-
-      type terminator = Terminator.t
-
       type dominator_info =
         { depth : int;
-          dominator : t
+          dominator : Block.t
         }
 
       and t =
         { id : Block_id.t;
           is_function_start : bool;
-          params : Ssa_intf.block_param array;
-          mutable predecessors : predecessors;
+          params : block_param array;
+          mutable predecessors : Block.Set.t;
           mutable body : Instruction.t array;
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
           mutable param_usage_counts : usage_count array;
-          mutable block_end_trap_stack : t list
+          mutable block_end_trap_stack : Block.t list
         }
 
-      val id : t -> Block_id.t
+      val id : Block.t -> Block_id.t
 
-      val is_function_start : t -> bool
+      val is_function_start : Block.t -> bool
 
-      val params : t -> Ssa_intf.block_param array
+      val params : Block.t -> block_param array
 
-      val equal : t -> t -> bool
+      val equal : Block.t -> Block.t -> bool
 
-      val compare : t -> t -> int
+      val compare : Block.t -> Block.t -> int
 
-      val hash : t -> int
+      val hash : Block.t -> int
 
-      module Map : Map.S with type key = t
+      module Map : Map.S with type key = Block.t
 
-      module Set : Set.S with type elt = t
+      module Set : Set.S with type elt = Block.t
 
-      module Tbl : Hashtbl.S with type key = t
+      module Tbl : Hashtbl.S with type key = Block.t
     end = struct
-      type predecessors = Block.Set.t
-
-      type terminator = Terminator.t
-
       type dominator_info =
         { depth : int;
-          dominator : t
+          dominator : Block.t
         }
 
       and t =
         { id : Block_id.t;
           is_function_start : bool;
-          params : Ssa_intf.block_param array;
-          mutable predecessors : predecessors;
+          params : block_param array;
+          mutable predecessors : Block.Set.t;
           mutable body : Instruction.t array;
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
           mutable param_usage_counts : usage_count array;
-          mutable block_end_trap_stack : t list
+          mutable block_end_trap_stack : Block.t list
         }
 
       let id b = b.id
@@ -117,7 +109,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       let hash b = Block_id.hash b.id
 
       module Self = struct
-        type nonrec t = t
+        type t = Block.t
 
         let equal = equal
 
@@ -149,7 +141,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
       and op_data =
         { id : Instruction_id.t;
-          op : op;
+          op : Operation.t;
           typ : Cmm.machtype;
           args : Instruction.t array;
           dbg : Debuginfo.t;
@@ -167,18 +159,22 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           src : Instruction.t
         }
 
-      val equal : t -> t -> bool
+      val equal : Instruction.t -> Instruction.t -> bool
 
       val make_op :
-        op:op -> typ:Cmm.machtype -> args:t array -> dbg:Debuginfo.t -> t
+        op:op ->
+        typ:Cmm.machtype ->
+        args:t array ->
+        dbg:Debuginfo.t ->
+        Instruction.t
 
-      val set_name : t -> string -> unit
+      val set_name : Instruction.t -> string -> unit
 
-      val make_block_param : Block.t -> int -> t
+      val make_block_param : Block.t -> int -> Instruction.t
 
-      val make_proj : index:int -> t -> t
+      val make_proj : index:int -> Instruction.t -> Instruction.t
 
-      val arg_type : t -> Cmm.machtype_component
+      val arg_type : Instruction.t -> Cmm.machtype_component
     end = struct
       type t =
         | Op of op_data
@@ -215,13 +211,13 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           src : Instruction.t
         }
 
-      let equal (a : t) (b : t) =
+      let equal (a : Instruction.t) (b : Instruction.t) =
         match[@warning "-4"] a, b with
         | Op a, Op b -> Instruction_id.equal a.id b.id
         | _ -> a == b
 
-      let arg_type (i : t) : Cmm.machtype_component =
-        match i with
+      let arg_type (instr : Instruction.t) : Cmm.machtype_component =
+        match instr with
         | Op { typ = [| t |]; _ } -> t
         | Op { typ; _ } ->
           Misc.fatal_errorf
@@ -244,8 +240,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             name = None
           }
 
-      let set_name (i : t) name =
-        match[@warning "-4"] i with
+      let set_name (instr : Instruction.t) name =
+        match[@warning "-4"] instr with
         | Op r -> r.name <- Some name
         | Block_param { block; index } -> block.params.(index).name <- Some name
         | _ -> ()
@@ -311,6 +307,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
               args : Instruction.t array;
               continuation : Block.t option
             }
+
+      val non_trap_successors : Terminator.t -> Block.t list
     end = struct
       type t =
         | Goto of
@@ -351,6 +349,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
               args : Instruction.t array;
               continuation : Block.t option
             }
+
+      (* The terminator is missing the trap successors, which are derived from
+         [block_end_trap_stack]. *)
+      let non_trap_successors (t : Terminator.t) : Block.t list =
+        match t with
+        | Return _ | Tailcall_func _ | Raise _ -> []
+        | Goto { goto; _ } -> [goto]
+        | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
+        | Switch { targets; _ } -> Array.to_list targets
+        | Tailcall_self { destination; _ } -> [destination]
+        | Call { continuation; _ } -> [continuation]
+        | Invalid { continuation; _ } -> (
+          match continuation with Some l -> [l] | None -> [])
     end
 
     (* === Builder state === *)
@@ -509,19 +520,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     let params_machtype (blk : Block.t) : Cmm.machtype =
       Array.map (fun (p : Ssa_intf.block_param) -> p.typ) blk.params
 
-    (* The terminator is missing the trap successors, which are derived from
-       [block_end_trap_stack]. *)
-    let non_trap_successors (t : Terminator.t) : Block.t list =
-      match t with
-      | Return _ | Tailcall_func _ | Raise _ -> []
-      | Goto { goto; _ } -> [goto]
-      | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
-      | Switch { targets; _ } -> Array.to_list targets
-      | Tailcall_self { destination; _ } -> [destination]
-      | Call { continuation; _ } -> [continuation]
-      | Invalid { continuation; _ } -> (
-        match continuation with Some l -> [l] | None -> [])
-
     (* The implicit trap successor of [blk]: the topmost handler in
        [block_end_trap_stack], if the terminator can raise. *)
     let trap_successor (blk : Block.t) : Block.t option =
@@ -538,7 +536,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       else None
 
     let successors (blk : Block.t) : Block.t list =
-      let structural = non_trap_successors blk.terminator in
+      let structural = Terminator.non_trap_successors blk.terminator in
       match trap_successor blk with
       | None -> structural
       | Some h -> structural @ [h]
@@ -611,26 +609,24 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       let visited = Block.Tbl.create 64 in
       let worklist = ref [entry, []] in
       while not (List.is_empty !worklist) do
-        let blk, start_stack = List.hd !worklist in
+        let block, start_stack = List.hd !worklist in
         worklist := List.tl !worklist;
-        if not (Block.Tbl.mem visited blk)
+        if not (Block.Tbl.mem visited block)
         then begin
-          Block.Tbl.add visited blk ();
-          let end_stack = apply_body_trap_effects ~blk start_stack blk.body in
-          blk.block_end_trap_stack <- end_stack;
-          let push_succ (succ : Block.t) start_stack =
-            succ.predecessors <- Block.Set.add blk succ.predecessors;
+          Block.Tbl.add visited block ();
+          let end_stack =
+            apply_body_trap_effects ~blk:block start_stack block.body
+          in
+          block.block_end_trap_stack <- end_stack;
+          let add_pred start_stack (succ : Block.t) =
+            succ.predecessors <- Block.Set.add block succ.predecessors;
             worklist := (succ, start_stack) :: !worklist
           in
-          List.iter
-            (fun succ -> push_succ succ end_stack)
-            (non_trap_successors blk.terminator);
-          match trap_successor blk with
-          | None -> ()
-          | Some h ->
-            (* On entry to a trap handler, the runtime has popped the topmost
-               handler off the trap stack. *)
-            push_succ h (List.tl end_stack)
+          Terminator.non_trap_successors block.terminator
+          |> List.iter (add_pred end_stack);
+          (* On entry to a trap handler, the runtime has popped the topmost
+             handler off the trap stack. *)
+          trap_successor block |> Option.iter (add_pred (List.tl end_stack))
         end
       done;
       let reachable_blocks =

@@ -64,10 +64,6 @@ module type Finished_graph = sig
   type usage_count = int
 
   module rec Block : sig
-    type predecessors = Block.Set.t
-
-    type terminator = Terminator.t
-
     type dominator_info = private
       { depth : int;
         dominator : t
@@ -77,7 +73,7 @@ module type Finished_graph = sig
       { id : Block_id.t;
         is_function_start : bool;
         params : block_param array;
-        mutable predecessors : predecessors;
+        mutable predecessors : Block.Set.t;
         mutable body : Instruction.t array;
         mutable terminator : Terminator.t;
         mutable terminator_dbg : Debuginfo.t;
@@ -141,6 +137,7 @@ module type Finished_graph = sig
         dbg : Debuginfo.t;
         mutable usage_count : usage_count;
         mutable name : string option
+            (** Optional human-readable name, irrelevant for the semantics. *)
       }
 
     and block_param_data = private
@@ -180,6 +177,9 @@ module type Finished_graph = sig
           { raise_kind : Lambda.raise_kind;
             args : Instruction.t array
           }
+          (** Raise to the topmost handler in the enclosing block's
+              [block_end_trap_stack]; if that stack is empty, the exception
+              escapes the function. *)
       | Tailcall_self of
           { destination : Block.t;
             args : Instruction.t array
@@ -194,12 +194,16 @@ module type Finished_graph = sig
             continuation : Block.t;
             may_raise : bool;
             nontail : bool
+                (** If [true], this call must not be tail-call optimized even if
+                    its continuation is a trivial [Return]. *)
           }
       | Invalid of
           { message : string;
             args : Instruction.t array;
             continuation : Block.t option
           }
+
+    val non_trap_successors : t -> Block.t list
   end
 
   val function_info : function_info
@@ -292,7 +296,7 @@ module type Graph_builder = sig
         dbg : Debuginfo.t;
         mutable usage_count : usage_count;
         mutable name : string option
-            (** Optional human-readable hint for the result. *)
+            (** Optional human-readable name, irrelevant for the semantics. *)
       }
 
     and block_param_data = private
@@ -378,6 +382,8 @@ module type Graph_builder = sig
             args : Instruction.t array;
             continuation : Block.t option
           }
+
+    val non_trap_successors : t -> Block.t list
   end
 
   type cursor
@@ -418,14 +424,10 @@ module type Graph_builder = sig
   val finish : unit -> (module Finished_graph)
 end
 
-type call_op_alias = call_op
-
-type function_info_alias = function_info
-
 module type Intf = sig
-  type call_op = call_op_alias
+  type nonrec call_op = call_op
 
-  type function_info = function_info_alias
+  type nonrec function_info = function_info
 
   module type Graph_builder = Graph_builder
 
