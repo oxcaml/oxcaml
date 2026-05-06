@@ -504,8 +504,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     (* === Predecessors / dominators === *)
 
-    let predecessors (blk : Block.t) : Block.t list =
-      Block.Set.elements blk.predecessors
+    let predecessors (blk : Block.t) : Block.Set.t = blk.predecessors
 
     let params_machtype (blk : Block.t) : Cmm.machtype =
       Array.map (fun (p : Ssa_intf.block_param) -> p.typ) blk.params

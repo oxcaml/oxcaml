@@ -36,7 +36,7 @@ module Make (S : Ssa.Finished_graph) = struct
            pb)
         stack
     in
-    match S.predecessors bl with
+    match S.predecessors bl |> S.Block.Set.elements with
     | [] -> ()
     | first_pred :: rest ->
       let expected = trap_stack_at_entry_from first_pred in

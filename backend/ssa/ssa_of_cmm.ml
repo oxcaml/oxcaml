@@ -24,18 +24,20 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 module Sel = Cfg_selectgen.Make (Cfg_selection)
 
-module Make (B : Ssa.Graph_builder) = struct
+module Make (Builder : Ssa.Graph_builder) = struct
+  open Builder
+
   type 'a or_never_returns =
     | Ok of 'a
     | Never_returns
 
   let ( let* ) x f = match x with Never_returns -> Never_returns | Ok x -> f x
 
-  type result = B.Instruction.t array or_never_returns
+  type result = Instruction.t array or_never_returns
 
   type env =
-    { vars : B.Instruction.t array V.Map.t;
-      static_exceptions : B.Block.t Static_label.Map.t
+    { vars : Instruction.t array V.Map.t;
+      static_exceptions : Block.t Static_label.Map.t
     }
 
   let env_find v env =
@@ -45,23 +47,22 @@ module Make (B : Ssa.Graph_builder) = struct
   let env_add v instrs env =
     { env with vars = V.Map.add (VP.var v) instrs env.vars }
 
-  let emit_op_res c ?(dbg = Debuginfo.none) op typ args : B.Instruction.t array
-      =
-    let i = B.emit_op c ~op ~dbg ~typ ~args in
+  let emit_op_res c ?(dbg = Debuginfo.none) op typ args : Instruction.t array =
+    let i = emit_op c ~op ~dbg ~typ ~args in
     if Array.length typ = 1
     then [| i |]
     else
       Array.init (Array.length typ) (fun index ->
-          B.Instruction.make_proj ~index i)
+          Instruction.make_proj ~index i)
 
   let bind_let env c v r1 =
     let env = env_add v r1 env in
     let name = V.name (VP.var v) in
-    Array.iter (fun i -> B.Instruction.set_name i name) r1;
+    Array.iter (fun i -> Instruction.set_name i name) r1;
     let provenance = VP.provenance v in
     if Option.is_some provenance
     then
-      B.emit_instruction c
+      emit_instruction c
         (Name_for_debugger
            { ident = VP.var v; provenance; which_parameter = None; regs = r1 });
     env
@@ -88,7 +89,7 @@ module Make (B : Ssa.Graph_builder) = struct
       | Cvar id ->
         let instrs = V.Map.find id env.vars in
         Array.fold_left
-          (fun acc i -> acc + SU.size_component (B.Instruction.arg_type i))
+          (fun acc i -> acc + SU.size_component (Instruction.arg_type i))
           0 instrs
       | Ctuple el -> List.fold_left (fun acc e -> acc + size e) 0 el
       | Cop (op, _, _) ->
@@ -102,9 +103,9 @@ module Make (B : Ssa.Graph_builder) = struct
 
   let emit_branch c (test : Operation.test) rarg ~true_block ~false_block =
     let make_cond op args =
-      B.emit_op c ~op ~dbg:Debuginfo.none ~typ:Cmm.typ_int ~args
+      emit_op c ~op ~dbg:Debuginfo.none ~typ:Cmm.typ_int ~args
     in
-    let is_comparison (v : B.Instruction.t) =
+    let is_comparison (v : Instruction.t) =
       match v with
       | Op
           { op =
@@ -122,7 +123,7 @@ module Make (B : Ssa.Graph_builder) = struct
       then make_cond (Intop_imm (Icomp Cne, 0)) [| v |]
       else v
     in
-    let term : B.Terminator.t =
+    let term : Terminator.t =
       match test with
       | Itruetest ->
         let cond = wrap_truth_test rarg.(0) in
@@ -146,7 +147,7 @@ module Make (B : Ssa.Graph_builder) = struct
         let cond = make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |] in
         Branch { cond; ifso = false_block; ifnot = true_block }
     in
-    B.finish_block c ~dbg:Debuginfo.none term
+    finish_block c ~dbg:Debuginfo.none term
 
   let rec emit_parts env c ~effects_after exp =
     let module EC = SU.Effect_and_coeffect in
@@ -213,13 +214,13 @@ module Make (B : Ssa.Graph_builder) = struct
     let base = ref regs_addr in
     let reset_addressing () =
       let tmp =
-        B.emit_op c
+        emit_op c
           ~op:(SU.make_const_int (Nativeint.of_int !byte_offset))
           ~dbg ~typ:Cmm.typ_int ~args:[||]
       in
       assert (!byte_offset > 0);
       let new_base =
-        B.emit_op c ~op:(Operation.Intop Iadd) ~dbg ~typ:Cmm.typ_addr
+        emit_op c ~op:(Operation.Intop Iadd) ~dbg ~typ:Cmm.typ_addr
           ~args:[| !base; tmp |]
       in
       base := new_base;
@@ -257,20 +258,19 @@ module Make (B : Ssa.Graph_builder) = struct
         match operation_replacing_store with
         | None ->
           Array.iter
-            (fun (r : B.Instruction.t) ->
-              let chunk = chunk_of_component (B.Instruction.arg_type r) in
+            (fun (r : Instruction.t) ->
+              let chunk = chunk_of_component (Instruction.arg_type r) in
               ignore
-                (B.emit_op c
+                (emit_op c
                    ~op:(Operation.Store (chunk, !addressing_mode, false))
                    ~dbg ~typ:[||] ~args:[| r; !base |]
-                  : B.Instruction.t);
-              advance (Select_utils.size_component (B.Instruction.arg_type r)))
+                  : Instruction.t);
+              advance (Select_utils.size_component (Instruction.arg_type r)))
             regs
         | Some op ->
           ignore
-            (B.emit_op c ~op ~dbg ~typ:[||]
-               ~args:(Array.append regs [| !base |])
-              : B.Instruction.t);
+            (emit_op c ~op ~dbg ~typ:[||] ~args:(Array.append regs [| !base |])
+              : Instruction.t);
           advance (size_of_cmm_expr env original_arg))
       | Never_returns ->
         Misc.fatal_error "Ssa_of_cmm.emit_stores: never_returns"
@@ -327,12 +327,12 @@ module Make (B : Ssa.Graph_builder) = struct
         emit_tuple ext_env c simple_list
       | Cop (Craise k, args, dbg) ->
         let* r = emit_tuple env c args in
-        B.finish_block c ~dbg (Raise { raise_kind = k; args = r });
+        finish_block c ~dbg (Raise { raise_kind = k; args = r });
         Never_returns
       | Cop (Copaque, args, dbg) ->
         let* simple_args, env = emit_parts_list env c args in
         let* rs = emit_tuple env c simple_args in
-        let typ = Array.map B.Instruction.arg_type rs in
+        let typ = Array.map Instruction.arg_type rs in
         Ok (emit_op_res c ~dbg Opaque typ rs)
       | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) ->
         let* loc_exp = emit env c arg ~tail:false in
@@ -353,7 +353,7 @@ module Make (B : Ssa.Graph_builder) = struct
     match r with
     | Never_returns -> Never_returns
     | Ok r ->
-      B.finish_block c ~dbg:Debuginfo.none (Return { args = r });
+      finish_block c ~dbg:Debuginfo.none (Return { args = r });
       Never_returns
 
   and emit_invalid env c message symbol =
@@ -361,15 +361,15 @@ module Make (B : Ssa.Graph_builder) = struct
     let* arg_instrs = emit_tuple env c [arg_expr] in
     if !SU.current_function_is_check_enabled
     then (
-      let { B.block = cont_block; params = cont_params } =
-        B.new_block ~params:Cmm.typ_int
+      let { block = cont_block; params = cont_params } =
+        new_block ~params:Cmm.typ_int
       in
-      B.finish_block c ~dbg:Debuginfo.none
+      finish_block c ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = Some cont_block });
-      B.move_cursor c ~new_pos:(B.start_block cont_block);
+      move_cursor c ~new_pos:(start_block cont_block);
       Ok cont_params)
     else (
-      B.finish_block c ~dbg:Debuginfo.none
+      finish_block c ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = None });
       Never_returns)
 
@@ -382,10 +382,8 @@ module Make (B : Ssa.Graph_builder) = struct
     in
     match new_op with
     | Call { op = call_op; _ } ->
-      let { B.block = cont_block; params = cont_params } =
-        B.new_block ~params:ty
-      in
-      B.finish_block c ~dbg
+      let { block = cont_block; params = cont_params } = new_block ~params:ty in
+      finish_block c ~dbg
         (Call
            { op = Func call_op;
              args = arg_instrs;
@@ -393,13 +391,13 @@ module Make (B : Ssa.Graph_builder) = struct
              may_raise = Cfg.can_raise_terminator new_op;
              nontail
            });
-      B.move_cursor c ~new_pos:(B.start_block cont_block);
+      move_cursor c ~new_pos:(start_block cont_block);
       Ok cont_params
     | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
-      let { B.block = cont_block; params = cont_params } =
-        B.new_block ~params:ty_res
+      let { block = cont_block; params = cont_params } =
+        new_block ~params:ty_res
       in
-      B.finish_block c ~dbg
+      finish_block c ~dbg
         (Call
            { op = Prim (External ext_call);
              args = arg_instrs;
@@ -407,13 +405,11 @@ module Make (B : Ssa.Graph_builder) = struct
              may_raise = Cfg.can_raise_terminator new_op;
              nontail
            });
-      B.move_cursor c ~new_pos:(B.start_block cont_block);
+      move_cursor c ~new_pos:(start_block cont_block);
       Ok cont_params
     | Prim { op = Probe _ as probe_op; _ } ->
-      let { B.block = cont_block; params = cont_params } =
-        B.new_block ~params:ty
-      in
-      B.finish_block c ~dbg
+      let { block = cont_block; params = cont_params } = new_block ~params:ty in
+      finish_block c ~dbg
         (Call
            { op = Prim probe_op;
              args = arg_instrs;
@@ -421,7 +417,7 @@ module Make (B : Ssa.Graph_builder) = struct
              may_raise = Cfg.can_raise_terminator new_op;
              nontail
            });
-      B.move_cursor c ~new_pos:(B.start_block cont_block);
+      move_cursor c ~new_pos:(start_block cont_block);
       Ok cont_params
     | Call_no_return _ ->
       Misc.fatal_errorf
@@ -454,7 +450,7 @@ module Make (B : Ssa.Graph_builder) = struct
             mode
           }
       in
-      let rd = B.emit_op c ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
+      let rd = emit_op c ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
       emit_stores env c dbg new_args rd;
       Ok [| rd |]
     | _ -> (
@@ -479,12 +475,12 @@ module Make (B : Ssa.Graph_builder) = struct
   and emit_ifthenelse env c ~tail econd eif eelse : result =
     let cond, earg = Sel.select_condition econd in
     let* rarg = emit env c earg ~tail:false in
-    let { B.block = then_block; _ } = B.new_block ~params:[||] in
-    let { B.block = else_block; _ } = B.new_block ~params:[||] in
+    let { block = then_block; _ } = new_block ~params:[||] in
+    let { block = else_block; _ } = new_block ~params:[||] in
     emit_branch c cond rarg ~true_block:then_block ~false_block:else_block;
-    let then_c = B.start_block then_block in
+    let then_c = start_block then_block in
     let r_then = emit env then_c eif ~tail in
-    let else_c = B.start_block else_block in
+    let else_c = start_block else_block in
     let r_else = emit env else_c eelse ~tail in
     join c [| r_then, then_c; r_else, else_c |]
 
@@ -493,7 +489,7 @@ module Make (B : Ssa.Graph_builder) = struct
     let case_blocks =
       Array.map
         (fun (_case_expr, _dbg) ->
-          let { B.block; _ } = B.new_block ~params:[||] in
+          let { block; _ } = new_block ~params:[||] in
           block)
         ecases
     in
@@ -502,11 +498,11 @@ module Make (B : Ssa.Graph_builder) = struct
       assert (Array.length rsel = 1);
       rsel.(0)
     in
-    B.finish_block c ~dbg:Debuginfo.none (Switch { index; targets });
+    finish_block c ~dbg:Debuginfo.none (Switch { index; targets });
     let case_results =
       Array.mapi
         (fun i (case_expr, _dbg) ->
-          let case_c = B.start_block case_blocks.(i) in
+          let case_c = start_block case_blocks.(i) in
           emit env case_c case_expr ~tail, case_c)
         ecases
     in
@@ -522,8 +518,8 @@ module Make (B : Ssa.Graph_builder) = struct
           let types =
             params |> List.map (fun (_id, ty) -> ty) |> Array.concat
           in
-          let new_block = B.new_block ~params:types in
-          let block_params = B.Block.params new_block.block in
+          let new_block = new_block ~params:types in
+          let block_params = Block.params new_block.block in
           let pos = ref 0 in
           params
           |> List.iter (fun (id, ty) ->
@@ -541,7 +537,7 @@ module Make (B : Ssa.Graph_builder) = struct
     let env = { env with static_exceptions } in
     let r_body = emit env c body ~tail in
     let translate_handler (handler : Cmm.static_handler)
-        (handler_block : B.new_block_result) =
+        (handler_block : new_block_result) =
       let handler_env =
         let param_idx = ref 0 in
         List.fold_left
@@ -555,14 +551,14 @@ module Make (B : Ssa.Graph_builder) = struct
             env_add id proj_instrs env)
           env handler.params
       in
-      let c = B.start_block handler_block.block in
+      let c = start_block handler_block.block in
       List.iter
         (fun (id, _ty) ->
           let provenance = VP.provenance id in
           if Option.is_some provenance
           then
             let regs = V.Map.find (VP.var id) handler_env.vars in
-            B.emit_instruction c
+            emit_instruction c
               (Name_for_debugger
                  { ident = VP.var id; provenance; which_parameter = None; regs }))
         handler.params;
@@ -571,7 +567,7 @@ module Make (B : Ssa.Graph_builder) = struct
     let handler_results = List.map2 translate_handler handlers handler_blocks in
     join c (Array.of_list ((r_body, c) :: handler_results))
 
-  and find_handler env handler_id : B.Block.t =
+  and find_handler env handler_id : Block.t =
     try Static_label.Map.find handler_id env.static_exceptions
     with Not_found ->
       Misc.fatal_errorf "Ssa_of_cmm: unbound trap handler %a"
@@ -580,7 +576,7 @@ module Make (B : Ssa.Graph_builder) = struct
   and emit_trap_actions env c traps =
     traps
     |> List.iter (fun (trap : Cmm.trap_action) ->
-        B.emit_instruction c
+        emit_instruction c
           (match trap with
           | Push handler_id ->
             Push_trap { handler = Some (find_handler env handler_id) }
@@ -594,25 +590,25 @@ module Make (B : Ssa.Graph_builder) = struct
       let* src = emit_tuple ext_env c simple_list in
       let handler = find_handler env nfail in
       emit_trap_actions env c traps;
-      B.finish_block c ~dbg:Debuginfo.none (Goto { goto = handler; args = src });
+      finish_block c ~dbg:Debuginfo.none (Goto { goto = handler; args = src });
       Never_returns
     | Return_lbl ->
       let* src = emit_tuple ext_env c simple_list in
       emit_trap_actions env c traps;
-      B.finish_block c ~dbg:Debuginfo.none (Return { args = src });
+      finish_block c ~dbg:Debuginfo.none (Return { args = src });
       Never_returns
 
   (* Join a set of branches (each with its own end-cursor) into a fresh block.
      [c] is left pointing at the joined block, or unchanged if every branch did
      not return. *)
-  and join c (results : (result * B.cursor) array) : result =
+  and join c (results : (result * cursor) array) : result =
     let join_info = ref None in
     Array.iter
       (fun (r, _) ->
         match r with
         | Never_returns -> ()
         | Ok instrs -> (
-          let types = Array.map B.Instruction.arg_type instrs in
+          let types = Array.map Instruction.arg_type instrs in
           match !join_info with
           | None -> join_info := Some types
           | Some prev ->
@@ -627,18 +623,18 @@ module Make (B : Ssa.Graph_builder) = struct
     match !join_info with
     | None -> Never_returns
     | Some join_types ->
-      let { B.block = join_block; params = join_params } =
-        B.new_block ~params:join_types
+      let { block = join_block; params = join_params } =
+        new_block ~params:join_types
       in
       Array.iter
         (fun (r, c_branch) ->
           match r with
           | Never_returns -> ()
           | Ok instrs ->
-            B.finish_block c_branch ~dbg:Debuginfo.none
+            finish_block c_branch ~dbg:Debuginfo.none
               (Goto { goto = join_block; args = instrs }))
         results;
-      B.move_cursor c ~new_pos:(B.start_block join_block);
+      move_cursor c ~new_pos:(start_block join_block);
       Ok join_params
 end
 
@@ -659,24 +655,26 @@ let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
         fun_ret_type = f.fun_ret_type
       }
     in
-    let module B = (val Ssa.make_builder fi : Ssa.Graph_builder) in
-    let module C = Make (B) in
+    let module Builder = (val Ssa.make_builder fi : Ssa.Graph_builder) in
+    let module M = Make (Builder) in
     let env =
-      { C.vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
+      { M.vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
     in
     let env, _offset =
       List.fold_left
         (fun (env, offset) (id, ty) ->
           let n = Array.length ty in
           let projs =
-            Array.init n (fun i -> Array.get B.entry_params (offset + i))
+            Array.init n (fun i -> Array.get Builder.entry_params (offset + i))
           in
-          C.env_add id projs env, offset + n)
+          M.env_add id projs env, offset + n)
         (env, 0) f.fun_args
     in
-    let r = C.emit env (B.start_block B.entry) f.fun_body ~tail:true in
+    let r =
+      M.emit env (Builder.start_block Builder.entry) f.fun_body ~tail:true
+    in
     assert (match r with Never_returns -> true | Ok _ -> false);
-    let result = B.finish () in
+    let result = Builder.finish () in
     Ssa_validate.validate result;
     result
   with exn ->

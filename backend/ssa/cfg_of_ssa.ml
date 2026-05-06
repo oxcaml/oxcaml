@@ -21,8 +21,8 @@
       continuation's block param regs at the start of the continuation.
 
     Trap stack: {!Ssa.finish} populates each block's [block_end_trap_stack]; we
-    use it to (a) decide which blocks are exception predecessors (their [Raise]
-    / may-raise [Call] branches to the topmost handler), and (b) emit [Poptrap]
+    use it to (a) decide which blocks are trap predecessors (their [Raise] /
+    may-raise [Call] branches to the topmost handler), and (b) emit [Poptrap]
     instructions before [Return] terminators so the runtime trap stack is empty
     on function exit.
 
@@ -46,54 +46,39 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 let instr_seq = Sub_cfg.instr_id
 
-module Make (S : Ssa.Finished_graph) = struct
+module Make (Ssa_graph : Ssa.Finished_graph) = struct
+  open Ssa_graph
+
   type env =
-    { op_regs : Reg.t array S.Instruction_id.Tbl.t;
-      block_params_regs : Reg.t array S.Block.Tbl.t;
-      block_labels : Label.t S.Block.Tbl.t;
-      call_result_locs : Reg.t array S.Block.Tbl.t;
-      call_stack_ofs : int S.Block.Tbl.t;
-      trap_handlers : unit S.Block.Tbl.t;
-          (** Blocks referenced as a handler from [Push_trap]/[Pop_trap]. These
-              need an exn-bucket move at their entry. *)
-      use_count_adjustments : int S.Instruction_id.Tbl.t;
-          (** Per-Op adjustments applied to [op_data.usage_count] to decide
-              which Ops to emit. The combination [usage_count + adjustment]
-              determines liveness; an Op with adjusted count [<= 0] is skipped.
-              Populated before block conversion to (a) decrement Ops consumed by
-              fused branch terminators and (b) bump naturally unused Ops to keep
-              them in the CFG when [keep_unused_ops] is set. *)
+    { op_regs : Reg.t array Instruction_id.Tbl.t;
+      block_params_regs : Reg.t array Block.Tbl.t;
+      block_labels : Label.t Block.Tbl.t;
+      call_result_locs : Reg.t array Block.Tbl.t;
+      call_stack_ofs : int Block.Tbl.t;
+      use_count_adjustments : int Instruction_id.Tbl.t;
+          (* Per-Op adjustments applied to [op_data.usage_count] to decide which
+             Ops to emit. The combination [usage_count + adjustment] determines
+             liveness; an Op with adjusted count [<= 0] is skipped. Populated
+             before block conversion to (a) decrement Ops consumed by fused
+             branch terminators and (b) bump naturally unused Ops to keep them
+             in the CFG when [keep_unused_ops] is set. *)
       mutable invalid_handler_label : Label.t option
-          (** Lazily-allocated label for the shared "invalid handler" block
-              emitted for [Push_trap]/[Pop_trap] with [handler = None]. *)
+          (* Lazily-allocated label for the shared "invalid handler" block
+             emitted for [Push_trap]/[Pop_trap] with [handler = None]. *)
     }
 
   let create_env () =
-    { op_regs = S.Instruction_id.Tbl.create 256;
-      block_params_regs = S.Block.Tbl.create 64;
-      block_labels = S.Block.Tbl.create 64;
-      call_result_locs = S.Block.Tbl.create 16;
-      call_stack_ofs = S.Block.Tbl.create 16;
-      trap_handlers = S.Block.Tbl.create 16;
-      use_count_adjustments = S.Instruction_id.Tbl.create 16;
+    { op_regs = Instruction_id.Tbl.create 256;
+      block_params_regs = Block.Tbl.create 64;
+      block_labels = Block.Tbl.create 64;
+      call_result_locs = Block.Tbl.create 16;
+      call_stack_ofs = Block.Tbl.create 16;
+      use_count_adjustments = Instruction_id.Tbl.create 16;
       invalid_handler_label = None
     }
 
-  let collect_trap_handlers (env : env) =
-    List.iter
-      (fun (block : S.Block.t) ->
-        Array.iter
-          (fun (i : S.Instruction.t) ->
-            match[@warning "-4"] i with
-            | Push_trap { handler = Some handler }
-            | Pop_trap { handler = Some handler } ->
-              S.Block.Tbl.replace env.trap_handlers handler ()
-            | _ -> ())
-          block.body)
-      S.blocks
-
-  let label_of env (blk : S.Block.t) =
-    try S.Block.Tbl.find env.block_labels blk
+  let label_of env (blk : Block.t) =
+    try Block.Tbl.find env.block_labels blk
     with Not_found ->
       Misc.fatal_errorf "Cfg_of_ssa.label_of: block %d not in block_labels"
         (blk.id :> int)
@@ -106,20 +91,20 @@ module Make (S : Ssa.Finished_graph) = struct
       env.invalid_handler_label <- Some l;
       l
 
-  let handler_label env (handler : S.Block.t option) =
-    (* A [Push_trap]/[Pop_trap] can reference a handler block that has become
-       unreachable; such handlers are filtered out by [Builder.finish] and don't
-       appear in [env.block_labels]. We treat them like [handler = None] and
-       route through the shared invalid-handler stub. *)
+  (** A [Push_trap]/[Pop_trap] can reference a handler block that has become
+      unreachable; such handlers are filtered out by [Builder.finish] and don't
+      appear in [env.block_labels]. We treat them like [handler = None] and
+      route through the shared invalid-handler stub. *)
+  let handler_label env (handler : Block.t option) =
     match handler with
-    | Some h when S.Block.Tbl.mem env.block_labels h -> label_of env h
+    | Some h when Block.Tbl.mem env.block_labels h -> label_of env h
     | _ -> invalid_handler_label env
 
-  let get_reg env (i : S.Instruction.t) : Reg.t =
+  let get_reg env (i : Instruction.t) : Reg.t =
     match i with
     | Op { id; _ } ->
       let regs =
-        try S.Instruction_id.Tbl.find env.op_regs id
+        try Instruction_id.Tbl.find env.op_regs id
         with Not_found ->
           Misc.fatal_errorf "Cfg_of_ssa.get_reg: no regs for Op v%d" (id :> int)
       in
@@ -127,7 +112,7 @@ module Make (S : Ssa.Finished_graph) = struct
       regs.(0)
     | Block_param { block; index; _ } -> (
       try
-        let regs = S.Block.Tbl.find env.block_params_regs block in
+        let regs = Block.Tbl.find env.block_params_regs block in
         regs.(index)
       with Not_found ->
         Misc.fatal_errorf "Cfg_of_ssa: no regs for Block_param %d.%d"
@@ -135,7 +120,7 @@ module Make (S : Ssa.Finished_graph) = struct
           index)
     | Proj { index; src = Op { id; _ } } ->
       let regs =
-        try S.Instruction_id.Tbl.find env.op_regs id
+        try Instruction_id.Tbl.find env.op_regs id
         with Not_found ->
           Misc.fatal_errorf "Cfg_of_ssa.get_reg: no regs for Op v%d (Proj)"
             (id :> int)
@@ -145,8 +130,8 @@ module Make (S : Ssa.Finished_graph) = struct
     | Proj _ ->
       Misc.fatal_error "Cfg_of_ssa.get_reg: unexpected instruction"
 
-  let get_block_params_regs env (block : S.Block.t) =
-    try S.Block.Tbl.find env.block_params_regs block
+  let get_block_params_regs env (block : Block.t) =
+    try Block.Tbl.find env.block_params_regs block
     with Not_found ->
       Misc.fatal_errorf "Cfg_of_ssa: no regs for block params of %d"
         (block.id :> int)
@@ -173,10 +158,10 @@ module Make (S : Ssa.Finished_graph) = struct
             (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
       src dst
 
-  (* Build the shared dummy handler referenced by [Push_trap]/[Pop_trap] with
-     [handler = None]. This mirrors [cfg_selectgen]'s [unreachable_handler]
-     (load from address 0 followed by a [Raise_notrace]) so it can be
-     cfg_compared with the baseline. *)
+  (** Build the shared dummy handler referenced by [Push_trap]/[Pop_trap] with
+      [handler = None]. This mirrors [cfg_selectgen]'s [unreachable_handler]
+      (load from address 0 followed by a [Raise_notrace]) so it can be
+      cfg_compared with the baseline. *)
   let make_invalid_handler_block ~label : Cfg.basic_block =
     let body = DLL.make_empty () in
     (* Trap handler entry: copy [Proc.loc_exn_bucket] into a virtual reg, as
@@ -218,10 +203,10 @@ module Make (S : Ssa.Finished_graph) = struct
       cold = true
     }
 
-  (* A Branch condition that can be folded into the CFG test terminator,
-     consuming the Op's args directly. *)
-  let fuse_comparison (cond : S.Instruction.t) ~true_label ~false_label :
-      (Cfg.terminator * S.Instruction.t array) option =
+  (** A Branch condition that can be folded into the CFG test terminator,
+      consuming the comparison's args directly. *)
+  let fuse_comparison (cond : Instruction.t) ~true_label ~false_label :
+      (Cfg.terminator * Instruction.t array) option =
     match cond with
     | Op { op = Intop_imm (Icomp Cne, 0); args; _ } ->
       Some (Cfg.Truth_test { ifso = true_label; ifnot = false_label }, args)
@@ -261,25 +246,9 @@ module Make (S : Ssa.Finished_graph) = struct
       DLL.add_end body main;
       main
 
-  let is_exception_predecessor (pred : S.Block.t) (target : S.Block.t) =
-    match S.trap_successor pred with
-    | Some h -> S.Block.equal h target
-    | None -> false
-
-  let is_call_predecessor (pred : S.Block.t) (target : S.Block.t) =
-    (* [Probe] uses the [Call] constructor but has no return value to receive in
-       its continuation, so [cfg_of_ssa] doesn't register the continuation in
-       [env.call_result_locs]. We mirror that here so the predicate stays
-       consistent with [is_call_continuation]. *)
-    match[@warning "-fragile-match"] pred.terminator with
-    | Invalid { continuation = Some continuation; _ }
-    | Call { op = Func _ | Prim (External _); continuation; _ } ->
-      S.Block.equal continuation target
-    | _ -> false
-
-  (* For a call op, return the args to actually pass on the stack/regs (which
-     skips the function-pointer arg for [Indirect]), the matching hard-reg
-     locations, and the stack offset. *)
+  (** For a call op, return the args to actually pass on the stack/regs (which
+      skips the function-pointer arg for [Indirect]), the matching hard-reg
+      locations, and the stack offset. *)
   let args_and_locations (call_op : Cfg_intf.S.func_call_operation) virt_args =
     let rarg =
       match call_op with
@@ -295,65 +264,99 @@ module Make (S : Ssa.Finished_graph) = struct
     | Indirect _ -> Array.append [| virt_args.(0) |] loc_arg
     | Direct _ -> loc_arg
 
-  let convert_block (env : env) (block : S.Block.t) : Cfg.basic_block =
-    let body = DLL.make_empty () in
-    let is_trap_handler = S.Block.Tbl.mem env.trap_handlers block in
-    let is_call_continuation =
-      S.Block.Tbl.find_opt env.call_result_locs block |> Option.is_some
+  (** Move [virt_args] into the locations dictated by
+      [Proc.loc_external_arguments ty_args], extending the stack as needed and
+      using the per-arg move sequence produced by
+      [Cfg_selection.insert_move_extcall_arg]. Returns the flattened locations,
+      the stack offset, and the stack alignment. *)
+  let move_to_extcall_arg_locs body (ty_args : Cmm.exttype list) virt_args dbg :
+      Reg.t array * int * Cmm.stack_align =
+    let ty_args =
+      if List.is_empty ty_args
+      then List.init (Array.length virt_args) (fun _ -> Cmm.XInt)
+      else ty_args
     in
-    (* A trap handler block must only be reached via a [Raise] handler or a
-       [Call]/[Prim] trap continuation. The runtime supplies the exn bucket on
-       those edges; a normal-path predecessor would not, leaving the handler's
-       first param undefined. Similarly, call continuation blocks must only be
-       reached via a call. *)
-    List.iter
-      (fun (pred : S.Block.t) ->
-        if
-          not (Bool.equal (is_exception_predecessor pred block) is_trap_handler)
-        then
-          Misc.fatal_errorf
-            "Cfg_of_ssa: %strap-handler block %d has predecessor %d reaching \
-             it via a %strap edge"
-            (if is_trap_handler then "" else "non-")
-            (block.id :> int)
-            (pred.id :> int)
-            (if is_exception_predecessor pred block then "" else "non-");
-        if
-          not (Bool.equal (is_call_predecessor pred block) is_call_continuation)
-        then
-          Misc.fatal_errorf
-            "Cfg_of_ssa: %scall continuation block %d has predecessor %d \
-             reaching it via a %s edge"
-            (if is_call_continuation then "" else "non ")
-            (block.id :> int)
-            (pred.id :> int)
-            (if is_call_predecessor pred block then "call" else "non-call"))
-      (S.predecessors block);
-    (match S.Block.Tbl.find_opt env.call_result_locs block with
-    | Some loc_res ->
-      (* A call continuation must be reached only from the single Call/Prim that
-         defined its [loc_res] — multiple predecessors would mean different
-         calls' return registers feeding into the same block. *)
-      (match[@warning "-fragile-match"] S.predecessors block with
-      | [_] -> ()
-      | preds ->
-        Misc.fatal_errorf
-          "Cfg_of_ssa: call-continuation block %d has %d predecessors \
-           (expected exactly 1)"
-          (block.id :> int)
-          (List.length preds));
+    let locs, stack_ofs, stack_align = Proc.loc_external_arguments ty_args in
+    let ty_args_arr = Array.of_list ty_args in
+    if stack_ofs <> 0
+    then
+      DLL.add_end body
+        (make_cfg_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
+           Debuginfo.none);
+    Array.iteri
+      (fun i arg ->
+        let src = [| arg |] in
+        let dst = locs.(i) in
+        match Cfg_selection.insert_move_extcall_arg ty_args_arr.(i) src dst with
+        | Rewritten (basic, src, dst) ->
+          DLL.add_end body (make_cfg_instr basic src dst dbg)
+        | Use_default -> emit_moves body ~src ~dst)
+      virt_args;
+    Array.concat (Array.to_list locs), stack_ofs, stack_align
+
+  let is_trap_predecessor (pred : Block.t) (target : Block.t) =
+    match trap_successor pred with
+    | Some h -> Block.equal h target
+    | None -> false
+
+  let is_call_predecessor (pred : Block.t) (target : Block.t) =
+    match[@warning "-fragile-match"] pred.terminator with
+    | Invalid { continuation = Some continuation; _ } | Call { continuation; _ }
+      ->
+      Block.equal continuation target
+    | _ -> false
+
+  (** The incoming ABI for trap handlers is different. Thus, we require ALL
+      predecessors to be trap predecessors. We could relax this in the future by
+      inserting a merge block to join the non-trap predecessors. *)
+  let is_trap_handler (block : Block.t) =
+    let any_exn =
+      Block.Set.exists (fun p -> is_trap_predecessor p block) block.predecessors
+    in
+    let all_exn =
+      Block.Set.for_all
+        (fun p -> is_trap_predecessor p block)
+        block.predecessors
+    in
+    if any_exn && not all_exn
+    then
+      Misc.fatal_errorf
+        "Cfg_of_ssa: block %d mixes trap and non-trap predecessors."
+        (block.id :> int);
+    any_exn
+
+  (** A call continuation must be reached via a single call/prim predecessor:
+      the runtime puts the call's return values in fixed locations. We could
+      relax this in the future by automatically splitting the edges. *)
+  let is_call_continuation (block : Block.t) =
+    let result =
+      Block.Set.exists (fun p -> is_call_predecessor p block) block.predecessors
+    in
+    if result && Block.Set.cardinal block.predecessors != 1
+    then
+      Misc.fatal_errorf
+        "Cfg_of_ssa: block %d has a call predecessor alongside other \
+         predecessors."
+        (block.id :> int);
+    result
+
+  let convert_block (env : env) (block : Block.t) : Cfg.basic_block =
+    let body = DLL.make_empty () in
+    if is_call_continuation block
+    then begin
+      let loc_res = Block.Tbl.find env.call_result_locs block in
       let virt_res = get_block_params_regs env block in
       emit_moves body ~src:loc_res ~dst:virt_res;
       let stack_ofs =
-        S.Block.Tbl.find_opt env.call_stack_ofs block |> Option.value ~default:0
+        Block.Tbl.find_opt env.call_stack_ofs block |> Option.value ~default:0
       in
       if stack_ofs <> 0
       then
         DLL.add_end body
           (make_cfg_instr (Cfg.Op (Stackoffset (-stack_ofs))) [||] [||]
              Debuginfo.none)
-    | None -> ());
-    if is_trap_handler
+    end;
+    if is_trap_handler block
     then begin
       let virt_res = get_block_params_regs env block in
       let exn_bucket = [| Proc.loc_exn_bucket |] in
@@ -361,13 +364,13 @@ module Make (S : Ssa.Finished_graph) = struct
       emit_moves body ~src:exn_bucket ~dst:first_param
     end;
     Array.iter
-      (fun (i : S.Instruction.t) ->
+      (fun (i : Instruction.t) ->
         match i with
         | Op { id; op; args; dbg; typ; usage_count } ->
           let regs = Reg.createv typ in
-          S.Instruction_id.Tbl.replace env.op_regs id regs;
+          Instruction_id.Tbl.replace env.op_regs id regs;
           let adjustment =
-            S.Instruction_id.Tbl.find_opt env.use_count_adjustments id
+            Instruction_id.Tbl.find_opt env.use_count_adjustments id
             |> Option.value ~default:0
           in
           if usage_count + adjustment > 0
@@ -443,7 +446,7 @@ module Make (S : Ssa.Finished_graph) = struct
            exit, so the runtime trap stack is empty when the function
            returns. *)
         List.iter
-          (fun (h : S.Block.t) ->
+          (fun (h : Block.t) ->
             DLL.add_end body
               (make_cfg_instr
                  (Cfg.Poptrap { lbl_handler = label_of env h })
@@ -452,12 +455,14 @@ module Make (S : Ssa.Finished_graph) = struct
         let arg = Array.map (get_reg env) args in
         let loc_res = Proc.loc_results_return (Reg.typv arg) in
         emit_moves body ~src:arg ~dst:loc_res;
+        DLL.add_end body
+          (make_cfg_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
         make_cfg_instr Cfg.Return loc_res [||] dbg
       | Raise { raise_kind; args } ->
         let exn_val = Array.map (get_reg env) args in
         let exn_bucket = [| Proc.loc_exn_bucket |] in
         let extra_dst =
-          match S.trap_successor block with
+          match trap_successor block with
           | Some hb ->
             let handler_regs = get_block_params_regs env hb in
             if Array.length handler_regs > 1
@@ -505,48 +510,19 @@ module Make (S : Ssa.Finished_graph) = struct
               (make_cfg_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
                  Debuginfo.none);
           emit_moves body ~src:rarg ~dst:loc_arg;
-          S.Block.Tbl.replace env.call_result_locs continuation loc_res;
-          S.Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
+          Block.Tbl.replace env.call_result_locs continuation loc_res;
+          Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
           make_cfg_instr
             (Cfg.Call { op = call_op; label_after = label_of env continuation })
             (call_arg_for_terminator call_op virt_args loc_arg)
             loc_res dbg
         | Prim (External ({ ty_args; _ } as ext)) ->
-          let ty_args =
-            if ty_args = []
-            then Array.to_list (Array.map (fun _ -> Cmm.XInt) virt_args)
-            else ty_args
+          let loc_arg, stack_ofs, stack_align =
+            move_to_extcall_arg_locs body ty_args virt_args dbg
           in
-          let locs, stack_ofs, stack_align =
-            Proc.loc_external_arguments ty_args
-          in
-          let loc_arg = Array.concat (Array.to_list locs) in
           let loc_res = Proc.loc_external_results (Reg.typv virt_res) in
-          if stack_ofs <> 0
-          then
-            DLL.add_end body
-              (make_cfg_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
-                 Debuginfo.none);
-          let ty_args_arr = Array.of_list ty_args in
-          Array.iteri
-            (fun i arg ->
-              let src = [| arg |] in
-              let dst = locs.(i) in
-              if Array.length dst = 1
-              then
-                let ty_arg = ty_args_arr.(i) in
-                match Cfg_selection.insert_move_extcall_arg ty_arg src dst with
-                | Rewritten (basic, src, dst) ->
-                  DLL.add_end body (make_cfg_instr basic src dst dbg)
-                | Use_default -> emit_moves body ~src ~dst
-              else
-                DLL.add_end body
-                  (make_cfg_instr (Cfg.Op Move) [| arg |]
-                     [| dst.(0) |]
-                     Debuginfo.none))
-            virt_args;
-          S.Block.Tbl.replace env.call_result_locs continuation loc_res;
-          S.Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
+          Block.Tbl.replace env.call_result_locs continuation loc_res;
+          Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
           make_cfg_instr
             (Cfg.Prim
                { op = External { ext with stack_ofs; stack_align };
@@ -559,28 +535,16 @@ module Make (S : Ssa.Finished_graph) = struct
             virt_args virt_res dbg)
       | Invalid { message; args; continuation } ->
         let virt_args = Array.map (get_reg env) args in
-        let ty_args = [Cmm.XInt] in
-        let locs, stack_ofs, stack_align =
-          Proc.loc_external_arguments ty_args
+        let loc_arg, stack_ofs, stack_align =
+          move_to_extcall_arg_locs body [Cmm.XInt] virt_args dbg
         in
-        let loc_arg = Array.concat (Array.to_list locs) in
-        Array.iteri
-          (fun i arg ->
-            if Array.length locs.(i) = 1
-            then emit_moves body ~src:[| arg |] ~dst:locs.(i)
-            else
-              DLL.add_end body
-                (make_cfg_instr (Cfg.Op Move) [| arg |]
-                   [| locs.(i).(0) |]
-                   Debuginfo.none))
-          virt_args;
         let label_after, loc_res =
           match continuation with
           | Some cont_block ->
             let virt_res = get_block_params_regs env cont_block in
             let loc_res = Proc.loc_external_results (Reg.typv virt_res) in
-            S.Block.Tbl.replace env.call_result_locs cont_block loc_res;
-            S.Block.Tbl.replace env.call_stack_ofs cont_block stack_ofs;
+            Block.Tbl.replace env.call_result_locs cont_block loc_res;
+            Block.Tbl.replace env.call_stack_ofs cont_block stack_ofs;
             Some (label_of env cont_block), loc_res
           | None -> None, [||]
         in
@@ -596,204 +560,230 @@ module Make (S : Ssa.Finished_graph) = struct
       stack_offset = Cfg.invalid_stack_offset;
       exn = None;
       can_raise;
-      is_trap_handler;
+      is_trap_handler = is_trap_handler block;
       cold = false
     }
 
-  (* Decrement [usage_count] of comparisons that will be folded into branch
-     terminators, and increment their inputs to compensate. The branch
-     terminator consumes the comparison's args directly, so the comparison
-     itself is no longer needed (provided no other consumer references it), and
-     its args must be kept alive across the (now-implicit) drop. *)
-  let bump_adjustment env id delta =
+  let adjust_use_count env id delta =
     let cur =
-      S.Instruction_id.Tbl.find_opt env.use_count_adjustments id
+      Instruction_id.Tbl.find_opt env.use_count_adjustments id
       |> Option.value ~default:0
     in
-    S.Instruction_id.Tbl.replace env.use_count_adjustments id (cur + delta)
+    Instruction_id.Tbl.replace env.use_count_adjustments id (cur + delta)
 
+  (** Decrement use counts of comparisons that will be folded into branch
+      terminators, and increment their inputs to compensate. The branch
+      terminator consumes the comparison's args directly, so the comparison
+      itself is no longer needed (provided no other consumer references it), and
+      its args must be kept alive across the (now-implicit) drop. *)
   let collect_fusion_adjustments env =
-    let rec bump_arg (i : S.Instruction.t) =
+    let rec bump_arg (i : Instruction.t) =
       match i with
-      | Op { id; _ } -> bump_adjustment env id 1
+      | Op { id; _ } -> adjust_use_count env id 1
       | Proj { src; _ } -> bump_arg src
       | Block_param _ | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _
       | Name_for_debugger _ ->
         ()
     in
     List.iter
-      (fun (block : S.Block.t) ->
+      (fun (block : Block.t) ->
         match[@warning "-fragile-match"] block.terminator with
         | Branch { cond; _ } ->
           fuse_comparison cond ~true_label:Label.none ~false_label:Label.none
           |> Option.iter (fun (_, args) ->
               (match[@warning "-fragile-match"] cond with
-              | Op { id; _ } -> bump_adjustment env id (-1)
+              | Op { id; _ } -> adjust_use_count env id (-1)
               | _ -> ());
               Array.iter bump_arg args)
         | _ -> ())
-      S.blocks
+      blocks
 
-  (* Bump every Op with [usage_count = 0] up by 1. This disables dead-code
-     elimination for naturally-unused Ops, matching the non-SSA pipeline's
-     behaviour (and keeping cfg_compare happy). Ops decremented by
-     [collect_fusion_adjustments] are unaffected: their original [usage_count]
-     is non-zero (they are consumed by the branch's [cond]). *)
-  let collect_unused_op_bumps env =
+  (** Bump every Op with [usage_count = 0] up by 1. This disables dead-code
+      elimination for unused Ops, matching the non-SSA pipeline's behaviour (and
+      keeping cfg_compare happy). *)
+  let keep_unused_ops_alive env =
     List.iter
-      (fun (block : S.Block.t) ->
+      (fun (block : Block.t) ->
         Array.iter
-          (fun (instr : S.Instruction.t) ->
+          (fun (instr : Instruction.t) ->
             match instr with
-            | Op r when r.usage_count = 0 -> bump_adjustment env r.id 1
+            | Op r when r.usage_count = 0 -> adjust_use_count env r.id 1
             | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
             | Stack_check _ | Name_for_debugger _ ->
               ())
           block.body)
-      S.blocks
+      blocks
 
-  let convert ~keep_unused_ops ~future_funcnames : Cfg_with_layout.t =
-    (* Reset the instruction-id counter so this conversion starts from 0,
-       matching what [Cfg_selectgen.emit_fundecl] does. *)
-    Sub_cfg.reset_instr_id ();
-    let env = create_env () in
-    if keep_unused_ops then collect_unused_op_bumps env;
-    collect_fusion_adjustments env;
-    collect_trap_handlers env;
-    S.blocks
-    |> List.iter (fun (block : S.Block.t) ->
-        let label = Label.new_label () in
-        S.Block.Tbl.replace env.block_labels block label;
-        S.Block.Tbl.replace env.block_params_regs block
-          (Reg.createv (S.params_machtype block)));
-    let fun_arg_regs = get_block_params_regs env S.entry in
-    let loc_arg = Proc.loc_parameters (Reg.typv fun_arg_regs) in
-    let prologue_poll_instr_id = ref None in
-    let cfg =
-      Cfg.create ~fun_name:S.function_info.fun_name ~fun_args:loc_arg
-        ~fun_codegen_options:
-          (Cfg.of_cmm_codegen_option S.function_info.fun_codegen_options)
-        ~fun_dbg:S.function_info.fun_dbg ~fun_contains_calls:true
-        ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
-        ~fun_poll:S.function_info.fun_poll ~next_instruction_id:instr_seq
-        ~fun_ret_type:S.function_info.fun_ret_type
-        ~allowed_to_be_irreducible:false
-    in
-    let layout = DLL.make_empty () in
-    (* For each fun-arg with provenance, build a [Name_for_debugger] CFG instr
-       referencing the corresponding slice of [loc_arg]. *)
-    let param_naming_instrs () =
-      let acc = ref [] in
-      let idx = ref 0 in
-      List.iteri
-        (fun param_index (var, ty) ->
-          let provenance = Backend_var.With_provenance.provenance var in
-          let ident = Backend_var.With_provenance.var var in
-          let n = Array.length ty in
-          let regs = Array.init n (fun i -> loc_arg.(!idx + i)) in
-          idx := !idx + n;
-          if Option.is_some provenance
-          then
-            acc
-              := make_cfg_instr
-                   (Cfg.Op
-                      (Name_for_debugger
-                         { ident;
-                           provenance;
-                           which_parameter = Some param_index;
-                           regs
-                         }))
-                   [||] [||] Debuginfo.none
-                 :: !acc)
-        S.function_info.fun_args_names;
-      List.rev !acc
-    in
-    let entry_body = DLL.make_empty () in
-    List.iter (DLL.add_end entry_body) (param_naming_instrs ());
-    let entry_label = label_of env S.entry in
-    let entry_block =
-      { Cfg.start = Cfg.entry_label cfg;
-        body = entry_body;
-        terminator =
-          make_cfg_instr (Cfg.Always entry_label) [||] [||] Debuginfo.none;
-        predecessors = Label.Set.empty;
-        stack_offset = Cfg.invalid_stack_offset;
-        exn = None;
-        can_raise = false;
-        is_trap_handler = false;
-        cold = false
-      }
-    in
-    Cfg.add_block_exn cfg entry_block;
-    DLL.add_end layout entry_block.start;
+  let allocate_block_labels_and_param_regs env =
     List.iter
-      (fun (ssa_block : S.Block.t) ->
-        let label = label_of env ssa_block in
+      (fun (block : Block.t) ->
+        Block.Tbl.replace env.block_labels block (Label.new_label ());
+        Block.Tbl.replace env.block_params_regs block
+          (Reg.createv (params_machtype block)))
+      blocks
+
+  let param_naming_instrs ~loc_arg =
+    let idx = ref 0 in
+    let param_index = ref (-1) in
+    function_info.fun_args_names
+    |> List.filter_map (fun (var, ty) ->
+        param_index := !param_index + 1;
+        let provenance = Backend_var.With_provenance.provenance var in
+        let ident = Backend_var.With_provenance.var var in
+        let n = Array.length ty in
+        let regs = Array.init n (fun i -> loc_arg.(!idx + i)) in
+        idx := !idx + n;
+        if Option.is_some provenance
+        then
+          Some
+            (make_cfg_instr
+               (Cfg.Op
+                  (Name_for_debugger
+                     { ident;
+                       provenance;
+                       which_parameter = Some !param_index;
+                       regs
+                     }))
+               [||] [||] Debuginfo.none)
+        else None)
+
+  (** Build the CFG-level entry block at [Cfg.entry_label cfg]. Note that this
+      is a separate block inserted before the one corresponding to [entry]. *)
+  let make_entry_block cfg ~ssa_entry_label ~loc_arg : Cfg.basic_block =
+    let body = DLL.make_empty () in
+    param_naming_instrs ~loc_arg |> List.iter (DLL.add_end body);
+    { Cfg.start = Cfg.entry_label cfg;
+      body;
+      terminator =
+        make_cfg_instr (Cfg.Always ssa_entry_label) [||] [||] Debuginfo.none;
+      predecessors = Label.Set.empty;
+      stack_offset = Cfg.invalid_stack_offset;
+      exn = None;
+      can_raise = false;
+      is_trap_handler = false;
+      cold = false
+    }
+
+  (** Prepend the function-entry prologue to [entry]'s CFG block: param
+      [Name_for_debugger]s, moves from ABI param locations into the entry's
+      virtual param regs, then an optimistic [Poll] (whose id is returned so
+      {!drop_optimistic_prologue_poll} can later remove it if unneeded). The
+      moves and namings are added with [add_begin] in reverse order so they end
+      up in their natural left-to-right order. *)
+  let prepend_entry_prologue (cfg_block : Cfg.basic_block) ~loc_arg
+      ~fun_arg_regs : InstructionId.t =
+    let poll_instr = make_cfg_instr (Cfg.Op Poll) [||] [||] Debuginfo.none in
+    DLL.add_begin cfg_block.body poll_instr;
+    let loc_arg_rev = Array.to_list loc_arg |> List.rev in
+    let fun_arg_regs_rev = Array.to_list fun_arg_regs |> List.rev in
+    List.iter2
+      (fun s d ->
+        if not (Reg.same s d)
+        then
+          DLL.add_begin cfg_block.body
+            (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
+      loc_arg_rev fun_arg_regs_rev;
+    List.rev (param_naming_instrs ~loc_arg)
+    |> List.iter (DLL.add_begin cfg_block.body);
+    poll_instr.id
+
+  (** Convert each SSA block to a CFG block and append it to [cfg] and [layout].
+  *)
+  let convert_and_emit_blocks cfg layout env ~loc_arg ~fun_arg_regs :
+      InstructionId.t =
+    let prologue_poll_instr_id = ref None in
+    List.iter
+      (fun (ssa_block : Block.t) ->
         let cfg_block = convert_block env ssa_block in
         cfg_block.can_raise
           <- Cfg.can_raise_terminator cfg_block.terminator.desc;
-        if S.Block.equal ssa_block S.entry
-        then begin
-          let poll_instr =
-            make_cfg_instr (Cfg.Op Poll) [||] [||] Debuginfo.none
-          in
-          prologue_poll_instr_id := Some poll_instr.id;
-          DLL.add_begin cfg_block.body poll_instr;
-          (* Reverse so [add_begin] in order produces forward [Move]s. *)
-          let move_pairs =
-            ( Array.to_list loc_arg |> List.rev,
-              Array.to_list fun_arg_regs |> List.rev )
-          in
-          List.iter2
-            (fun s d ->
-              if not (Reg.same s d)
-              then
-                DLL.add_begin cfg_block.body
-                  (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
-            (fst move_pairs) (snd move_pairs);
-          List.iter
-            (DLL.add_begin cfg_block.body)
-            (List.rev (param_naming_instrs ()))
-        end;
-        if Cfg.is_return_terminator cfg_block.terminator.desc
+        if Block.equal ssa_block entry
         then
-          DLL.add_end cfg_block.body
-            (make_cfg_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
+          prologue_poll_instr_id
+            := Some (prepend_entry_prologue cfg_block ~loc_arg ~fun_arg_regs);
         Cfg.add_block_exn cfg cfg_block;
-        DLL.add_end layout label)
-      S.blocks;
-    (* If any [Push_trap]/[Pop_trap] was missing a handler block, emit the
-       shared invalid handler block now. *)
+        DLL.add_end layout cfg_block.start)
+      blocks;
+    match !prologue_poll_instr_id with
+    | Some id -> id
+    | None ->
+      Misc.fatal_error
+        "Cfg_of_ssa: function-entry block was not visited by \
+         convert_and_emit_blocks"
+
+  (** If any [Push_trap]/[Pop_trap] referenced a missing handler, emit the lazy
+      shared invalid-handler stub. The label is allocated lazily by
+      {!handler_label}, so we only emit the stub when at least one such
+      reference existed. *)
+  let emit_invalid_handler_if_needed cfg layout env =
     Option.iter
       (fun lbl ->
         Cfg.add_block_exn cfg (make_invalid_handler_block ~label:lbl);
         DLL.add_end layout lbl)
-      env.invalid_handler_label;
-    Select_utils.Stack_offset_and_exn.update_cfg cfg;
-    Cfg.register_predecessors_for_all_blocks cfg;
-    Option.iter
-      (fun poll_id ->
-        if
-          not
-            (Cfg_polling.requires_prologue_poll ~future_funcnames
-               ~fun_name:S.function_info.fun_name
-               ~optimistic_prologue_poll_instr_id:poll_id cfg)
-        then
-          let ssa_entry = Cfg.get_block_exn cfg (label_of env S.entry) in
-          DLL.filter_left ssa_entry.body
-            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-              not (InstructionId.equal instr.id poll_id)))
-      !prologue_poll_instr_id;
-    let cfg_with_layout = Cfg_with_layout.create cfg ~layout in
-    let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
+      env.invalid_handler_label
+
+  (** Remove the optimistic prologue [Poll] inserted by
+      {!prepend_entry_prologue} unless [Cfg_polling] determines it is required
+      for safe-point coverage. *)
+  let drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id
+      ~future_funcnames =
+    if
+      not
+        (Cfg_polling.requires_prologue_poll ~future_funcnames
+           ~fun_name:function_info.fun_name
+           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
+    then
+      let entry = Cfg.get_block_exn cfg (label_of env entry) in
+      DLL.filter_left entry.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+          not (InstructionId.equal instr.id prologue_poll_instr_id))
+
+  let compute_fun_contains_calls cfg_with_layout : Cfg_with_layout.t =
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     let fun_contains_calls =
       Label.Tbl.fold
         (fun _label block acc -> acc || Cfg.basic_block_contains_calls block)
         cfg.blocks false
     in
-    let cfg = { cfg with fun_contains_calls } in
-    Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    Cfg_with_layout.create
+      { cfg with fun_contains_calls }
+      ~layout:(Cfg_with_layout.layout cfg_with_layout)
+
+  let convert ~keep_unused_ops ~future_funcnames : Cfg_with_layout.t =
+    (* Start instruction ids at 0, matching [Cfg_selectgen.emit_fundecl]. *)
+    Sub_cfg.reset_instr_id ();
+    let env = create_env () in
+    if keep_unused_ops then keep_unused_ops_alive env;
+    collect_fusion_adjustments env;
+    allocate_block_labels_and_param_regs env;
+    let fun_arg_regs = get_block_params_regs env entry in
+    let loc_arg = Proc.loc_parameters (Reg.typv fun_arg_regs) in
+    let cfg =
+      Cfg.create ~fun_name:function_info.fun_name ~fun_args:loc_arg
+        ~fun_codegen_options:
+          (Cfg.of_cmm_codegen_option function_info.fun_codegen_options)
+        ~fun_dbg:function_info.fun_dbg ~fun_contains_calls:true
+        ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+        ~fun_poll:function_info.fun_poll ~next_instruction_id:instr_seq
+        ~fun_ret_type:function_info.fun_ret_type
+        ~allowed_to_be_irreducible:false
+    in
+    let layout = DLL.make_empty () in
+    let entry_block =
+      make_entry_block cfg ~ssa_entry_label:(label_of env entry) ~loc_arg
+    in
+    Cfg.add_block_exn cfg entry_block;
+    DLL.add_end layout entry_block.start;
+    let prologue_poll_instr_id =
+      convert_and_emit_blocks cfg layout env ~loc_arg ~fun_arg_regs
+    in
+    emit_invalid_handler_if_needed cfg layout env;
+    Select_utils.Stack_offset_and_exn.update_cfg cfg;
+    Cfg.register_predecessors_for_all_blocks cfg;
+    drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id
+      ~future_funcnames;
+    let cfg_with_layout = Cfg_with_layout.create cfg ~layout in
+    let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
+    compute_fun_contains_calls cfg_with_layout
 end
 
 let convert ~keep_unused_ops ~future_funcnames (m : (module Ssa.Finished_graph))
