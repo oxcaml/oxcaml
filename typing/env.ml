@@ -4271,10 +4271,6 @@ let remove_last_open root env0 =
 let open_pers_signature name env =
   open_signature ~errors:false ~loc:Location.none None (Lident name) env
 
-(* Open a persistent signature loaded directly from a [.cmi] file, ignoring
-   any module of the same name in scope and looking on both visible and
-   hidden include paths. Raises [Not_found] if the cmi cannot be loaded as a
-   structure. Used to implement the [-open-cmi] command-line flag. *)
 let open_pers_signature_cmi name env =
   let global_name = Global_module.Name.create_no_args name in
   let mda =
