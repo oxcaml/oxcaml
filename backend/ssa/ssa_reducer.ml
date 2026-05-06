@@ -34,25 +34,23 @@
 module type Context = sig
   module In : Ssa.Finished_graph
 
-  module Out : Ssa.Graph_builder
+  include Ssa.Graph_builder
 
-  val emit_instruction : Out.cursor -> Out.Instruction.t -> Out.Instruction.t
+  val emit_instruction : cursor -> Instruction.t -> Instruction.t
 
   val emit_op :
-    Out.cursor ->
-    op:Out.op ->
+    cursor ->
+    op:op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
-    args:Out.Instruction.t array ->
-    Out.Instruction.t
+    args:Instruction.t array ->
+    Instruction.t
 
-  val finish_block : Out.cursor -> dbg:Debuginfo.t -> Out.Terminator.t -> unit
+  val map_arg : In.Instruction.t -> Instruction.t
 
-  val new_block : params:Cmm.machtype -> Out.new_block_result
+  val map_block : In.Block.t -> Block.t
 
-  val map_arg : In.Instruction.t -> Out.Instruction.t
-
-  val map_block : In.Block.t -> Out.Block.t
+  val finish : unit
 end
 
 type 'a result =
@@ -62,18 +60,18 @@ type 'a result =
 module type Reducer = functor (C : Context) -> sig
   val analyze : unit -> unit
 
-  val visit_block : C.In.Block.t -> C.Out.cursor -> unit result
+  val visit_block : C.In.Block.t -> C.cursor -> unit result
 
   val visit_instruction :
-    C.In.Block.t -> instr_index:int -> C.Out.cursor -> unit result
+    C.In.Block.t -> instr_index:int -> C.cursor -> unit result
 
-  val visit_terminator : C.In.Block.t -> C.Out.cursor -> unit result
+  val visit_terminator : C.In.Block.t -> C.cursor -> unit result
 
   val rewrite_instruction :
-    C.Out.cursor -> C.Out.Instruction.t -> C.Out.Instruction.t result
+    C.cursor -> C.Instruction.t -> C.Instruction.t result
 
   val rewrite_terminator :
-    C.Out.cursor -> dbg:Debuginfo.t -> C.Out.Terminator.t -> unit result
+    C.cursor -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
 end
 
 module Default : Reducer =
@@ -83,19 +81,18 @@ functor
   struct
     let analyze () = ()
 
-    let visit_block (_ : C.In.Block.t) (_ : C.Out.cursor) = Unchanged
+    let visit_block (_ : C.In.Block.t) (_ : C.cursor) = Unchanged
 
     let visit_instruction (_ : C.In.Block.t) ~instr_index:(_ : int)
-        (_ : C.Out.cursor) =
+        (_ : C.cursor) =
       Unchanged
 
-    let visit_terminator (_ : C.In.Block.t) (_ : C.Out.cursor) = Unchanged
+    let visit_terminator (_ : C.In.Block.t) (_ : C.cursor) = Unchanged
 
-    let rewrite_instruction (_ : C.Out.cursor) (_ : C.Out.Instruction.t) =
-      Unchanged
+    let rewrite_instruction (_ : C.cursor) (_ : C.Instruction.t) = Unchanged
 
-    let rewrite_terminator (_ : C.Out.cursor) ~dbg:(_ : Debuginfo.t)
-        (_ : C.Out.Terminator.t) =
+    let rewrite_terminator (_ : C.cursor) ~dbg:(_ : Debuginfo.t)
+        (_ : C.Terminator.t) =
       Unchanged
   end
 
@@ -108,18 +105,18 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
       module type S = sig
         val analyze : unit -> unit
 
-        val visit_block : C.In.Block.t -> C.Out.cursor -> unit result
+        val visit_block : C.In.Block.t -> C.cursor -> unit result
 
         val visit_instruction :
-          C.In.Block.t -> instr_index:int -> C.Out.cursor -> unit result
+          C.In.Block.t -> instr_index:int -> C.cursor -> unit result
 
-        val visit_terminator : C.In.Block.t -> C.Out.cursor -> unit result
+        val visit_terminator : C.In.Block.t -> C.cursor -> unit result
 
         val rewrite_instruction :
-          C.Out.cursor -> C.Out.Instruction.t -> C.Out.Instruction.t result
+          C.cursor -> C.Instruction.t -> C.Instruction.t result
 
         val rewrite_terminator :
-          C.Out.cursor -> dbg:Debuginfo.t -> C.Out.Terminator.t -> unit result
+          C.cursor -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
       end
 
       let children : (module S) list =
@@ -188,8 +185,7 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
 let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     (input : (module Ssa.Finished_graph)) : (module Ssa.Finished_graph) =
   let module In = (val input : Ssa.Finished_graph) in
-  let module Out =
-    (val Ssa.make_builder In.function_info : Ssa.Standalone_graph_builder)
+  let module Out = (val Ssa.make_builder In.function_info : Ssa.Graph_builder)
   in
   (* Map each input block to its output counterpart. *)
   let block_map : Out.Block.t In.Block.Tbl.t = In.Block.Tbl.create 64 in
@@ -208,7 +204,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   let compute_kept (blk : In.Block.t) : int array =
     let n = Array.length blk.params in
     let any_non_goto_pred =
-      In.Block_set.exists
+      In.Block.Set.exists
         (fun (pred : In.Block.t) ->
           match[@warning "-fragile-match"] pred.terminator with
           | Goto _ -> false
@@ -339,30 +335,29 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   in
   let module M = struct
     module rec Ctx : sig
-      include Context with module In = In and module Out = Out
+      include Context with module In = In and type cursor = Out.cursor
 
-      val visit_instruction :
-        In.Block.t -> instr_index:int -> Out.cursor -> unit
+      val visit_instruction : In.Block.t -> instr_index:int -> cursor -> unit
 
-      val visit_terminator : In.Block.t -> Out.cursor -> unit
+      val visit_terminator : In.Block.t -> cursor -> unit
     end = struct
       module In = In
-      module Out = Out
+      include Out
 
-      let emit_instruction b i =
-        match Red.rewrite_instruction b i with
-        | Unchanged -> Out.emit_instruction b i
+      let emit_instruction c i =
+        match Red.rewrite_instruction c i with
+        | Unchanged ->
+          Out.emit_instruction c i;
+          i
         | Replaced i' -> i'
 
-      let emit_op b ~op ~dbg ~typ ~args =
-        emit_instruction b (Out.Instruction.make_op ~op ~typ ~args ~dbg)
+      let emit_op c ~op ~dbg ~typ ~args =
+        emit_instruction c (Out.Instruction.make_op ~op ~typ ~args ~dbg)
 
-      let finish_block b ~dbg term =
-        match Red.rewrite_terminator b ~dbg term with
-        | Unchanged -> Out.finish_block b ~dbg term
+      let finish_block c ~dbg term =
+        match Red.rewrite_terminator c ~dbg term with
+        | Unchanged -> Out.finish_block c ~dbg term
         | Replaced () -> ()
-
-      let new_block = Out.new_block
 
       let map_arg = map_arg_impl
 
@@ -414,6 +409,8 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         | Unchanged ->
           let term = rewrite_terminator_impl blk.terminator in
           finish_block b ~dbg:blk.terminator_dbg term
+
+      let finish = ()
     end
 
     and Red : sig

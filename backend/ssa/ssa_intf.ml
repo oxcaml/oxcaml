@@ -28,12 +28,6 @@
       ([predecessors], [successors], [dominates], [common_dominator]) become
       available.
 
-    {!Standalone_graph_builder} is [Graph_builder] plus a
-    [finish : unit -> (module Finished_graph)] operation; it is what
-    {!Ssa.make_builder} returns. The [Graph_builder] view alone (without
-    [finish]) is what [Ssa_reducer]'s [Out] sees, so a reducer can build into
-    the output graph but can't itself finalise it.
-
     Within one graph instance, [Block.t] is the same record at runtime under
     both views; the views just expose different subsets of its fields and
     different graph-level helpers. *)
@@ -60,6 +54,177 @@ type function_info =
     fun_ret_type : Cmm.machtype
   }
 
+module type Finished_graph = sig
+  module Instruction_id : Oxcaml_utils.Id_counter.S
+
+  module Block_id : Oxcaml_utils.Id_counter.S
+
+  type op = Operation.t
+
+  type usage_count = int
+
+  module rec Block : sig
+    type predecessors = Block.Set.t
+
+    type terminator = Terminator.t
+
+    type dominator_info = private
+      { depth : int;
+        dominator : t
+      }
+
+    and t = private
+      { id : Block_id.t;
+        is_function_start : bool;
+        params : block_param array;
+        mutable predecessors : predecessors;
+        mutable body : Instruction.t array;
+        mutable terminator : Terminator.t;
+        mutable terminator_dbg : Debuginfo.t;
+        mutable dominator_info : dominator_info;
+        mutable param_usage_counts : usage_count array;
+            (** Per-parameter usage counts, symmetric with [Op]'s [usage_count].
+                A param with count 0 is "dead": no arg passed via an
+                unconditional jump ([Goto]/[Raise]/[Tailcall_self]) to this
+                param need be kept alive. *)
+        mutable block_end_trap_stack : t list
+            (** Trap stack at the end of the block (after applying the body's
+                [Push_trap]/[Pop_trap] effects to the stack inherited from
+                predecessors), innermost handler first. Computed by
+                {!Ssa.finish} and used to resolve trap successors of the
+                terminator: a [Call] with [may_raise = true] (or any [Raise])
+                branches to [List.hd block_end_trap_stack] when the stack is
+                non-empty. *)
+      }
+
+    val equal : t -> t -> bool
+
+    val compare : t -> t -> int
+
+    val hash : t -> int
+
+    module Map : Map.S with type key = t
+
+    module Set : Set.S with type elt = Block.t
+
+    module Tbl : Hashtbl.S with type key = t
+  end
+
+  and Instruction : sig
+    type t =
+      | Op of op_data
+      | Block_param of block_param_data
+      | Proj of proj_data
+      | Tuple of Instruction.t array
+          (** A multi-value bundle. Only appears transiently, e.g. as the
+              representative an [Ssa_reducer] reducer nominates for a
+              multi-output instruction. Projections out of a [Tuple]
+              short-circuit via {!proj}, so a well-formed graph never contains a
+              [Tuple] in an arg or block body. *)
+      | Push_trap of { handler : Block.t option }
+          (** [handler = None] means "no handler block exists"; CFG lowering
+              provides a shared dummy invalid block. *)
+      | Pop_trap of { handler : Block.t option }
+      | Stack_check of { max_frame_size_bytes : int }
+      | Name_for_debugger of
+          { ident : Ident.t;
+            provenance : Backend_var.Provenance.t option;
+            which_parameter : int option;
+            regs : Instruction.t array
+          }
+
+    and op_data = private
+      { id : Instruction_id.t;
+        op : op;
+        typ : Cmm.machtype;
+        args : Instruction.t array;
+        dbg : Debuginfo.t;
+        mutable usage_count : usage_count;
+        mutable name : string option
+      }
+
+    and block_param_data = private
+      { block : Block.t;
+        index : int
+      }
+
+    and proj_data = private
+      { index : int;
+        src : Instruction.t
+      }
+
+    val equal : t -> t -> bool
+
+    (** The type of an instruction when used as an argument; see
+        {!Graph_builder} for details. *)
+    val arg_type : t -> Cmm.machtype_component
+  end
+
+  and Terminator : sig
+    type t =
+      | Goto of
+          { goto : Block.t;
+            args : Instruction.t array
+          }
+      | Branch of
+          { cond : Instruction.t;
+            ifso : Block.t;
+            ifnot : Block.t
+          }
+      | Switch of
+          { index : Instruction.t;
+            targets : Block.t array
+          }
+      | Return of { args : Instruction.t array }
+      | Raise of
+          { raise_kind : Lambda.raise_kind;
+            args : Instruction.t array
+          }
+      | Tailcall_self of
+          { destination : Block.t;
+            args : Instruction.t array
+          }
+      | Tailcall_func of
+          { op : Cfg_intf.S.func_call_operation;
+            args : Instruction.t array
+          }
+      | Call of
+          { op : call_op;
+            args : Instruction.t array;
+            continuation : Block.t;
+            may_raise : bool;
+            nontail : bool
+          }
+      | Invalid of
+          { message : string;
+            args : Instruction.t array;
+            continuation : Block.t option
+          }
+  end
+
+  val function_info : function_info
+
+  val entry : Block.t
+
+  val blocks : Block.t list
+
+  val predecessors : Block.t -> Block.t list
+
+  (** Project just the machtype out of a block's [params] array. *)
+  val params_machtype : Block.t -> Cmm.machtype
+
+  (** All successors of a block, including [trap_successor]. *)
+  val successors : Block.t -> Block.t list
+
+  (** The implicit trap successor of [blk]: the topmost handler in
+      [block_end_trap_stack], if the terminator can raise. *)
+  val trap_successor : Block.t -> Block.t option
+
+  val dominates : Block.t -> Block.t -> bool
+
+  val common_dominator : Block.t -> Block.t -> Block.t
+end
+
 module type Graph_builder = sig
   module Instruction_id : Oxcaml_utils.Id_counter.S
 
@@ -73,8 +238,8 @@ module type Graph_builder = sig
 
   module rec Block : sig
     (** [Block.t] is opaque during construction: callers can hash, compare and
-        consult the visible accessors, but the fields are deliberately
-        inaccessible because they are not yet meaningful. *)
+        consult the visible accessors, but the fields are kept inaccessible
+        because they are not yet meaningful. *)
     type t
 
     val id : t -> Block_id.t
@@ -94,10 +259,6 @@ module type Graph_builder = sig
     module Set : Set.S with type elt = Block.t
 
     module Tbl : Hashtbl.S with type key = t
-  end
-
-  and Block_set : sig
-    include Set.S with type elt = Block.t
   end
 
   and Instruction : sig
@@ -228,12 +389,7 @@ module type Graph_builder = sig
       block, only one of the two cursors can be finished with [finish_block].*)
   val move_cursor : cursor -> new_pos:cursor -> unit
 
-  (** Emit [i] and return the instruction that was actually added. For the
-      canonical builder this is just [i]; for chained builders used in
-      [Ssa_reducer], the chain may rewrite the instruction and return the
-      rewritten version, so callers that intend to reference the emission must
-      use the returned value. *)
-  val emit_instruction : cursor -> Instruction.t -> Instruction.t
+  val emit_instruction : cursor -> Instruction.t -> unit
 
   val emit_op :
     cursor ->
@@ -258,185 +414,6 @@ module type Graph_builder = sig
 
   (** [Block_param] instructions referring to [entry]'s parameters, in order. *)
   val entry_params : Instruction.t array
-end
-
-module type Finished_graph = sig
-  module Instruction_id : Oxcaml_utils.Id_counter.S
-
-  module Block_id : Oxcaml_utils.Id_counter.S
-
-  type op = Operation.t
-
-  type usage_count = int
-
-  module rec Block : sig
-    type predecessors = Block_set.t
-
-    type terminator = Terminator.t
-
-    type dominator_info = private
-      { depth : int;
-        dominator : t
-      }
-
-    and t = private
-      { id : Block_id.t;
-        is_function_start : bool;
-        params : block_param array;
-        mutable predecessors : predecessors;
-        mutable body : Instruction.t array;
-        mutable terminator : Terminator.t;
-        mutable terminator_dbg : Debuginfo.t;
-        mutable dominator_info : dominator_info;
-        mutable param_usage_counts : usage_count array;
-            (** Per-parameter usage counts, symmetric with [Op]'s [usage_count].
-                A param with count 0 is "dead": no arg passed via an
-                unconditional jump ([Goto]/[Raise]/[Tailcall_self]) to this
-                param need be kept alive. *)
-        mutable block_end_trap_stack : t list
-            (** Trap stack at the end of the block (after applying the body's
-                [Push_trap]/[Pop_trap] effects to the stack inherited from
-                predecessors), innermost handler first. Computed by
-                {!Ssa.finish} and used to resolve trap successors of the
-                terminator: a [Call] with [may_raise = true] (or any [Raise])
-                branches to [List.hd block_end_trap_stack] when the stack is
-                non-empty. *)
-      }
-
-    val equal : t -> t -> bool
-
-    val compare : t -> t -> int
-
-    val hash : t -> int
-
-    module Map : Map.S with type key = t
-
-    module Set : Set.S with type elt = Block.t
-
-    module Tbl : Hashtbl.S with type key = t
-  end
-
-  and Block_set : sig
-    include Set.S with type elt = Block.t
-  end
-
-  and Instruction : sig
-    type t =
-      | Op of op_data
-      | Block_param of block_param_data
-      | Proj of proj_data
-      | Tuple of Instruction.t array
-          (** A multi-value bundle. Only appears transiently, e.g. as the
-              representative an [Ssa_reducer] reducer nominates for a
-              multi-output instruction. Projections out of a [Tuple]
-              short-circuit via {!proj}, so a well-formed graph never contains a
-              [Tuple] in an arg or block body. *)
-      | Push_trap of { handler : Block.t option }
-          (** [handler = None] means "no handler block exists"; CFG lowering
-              provides a shared dummy invalid block. *)
-      | Pop_trap of { handler : Block.t option }
-      | Stack_check of { max_frame_size_bytes : int }
-      | Name_for_debugger of
-          { ident : Ident.t;
-            provenance : Backend_var.Provenance.t option;
-            which_parameter : int option;
-            regs : Instruction.t array
-          }
-
-    and op_data = private
-      { id : Instruction_id.t;
-        op : op;
-        typ : Cmm.machtype;
-        args : Instruction.t array;
-        dbg : Debuginfo.t;
-        mutable usage_count : usage_count;
-        mutable name : string option
-      }
-
-    and block_param_data = private
-      { block : Block.t;
-        index : int
-      }
-
-    and proj_data = private
-      { index : int;
-        src : Instruction.t
-      }
-
-    val equal : t -> t -> bool
-
-    (** The type of an instruction when used as an argument; see
-        {!Graph_builder} for details. *)
-    val arg_type : t -> Cmm.machtype_component
-  end
-
-  and Terminator : sig
-    type t =
-      | Goto of
-          { goto : Block.t;
-            args : Instruction.t array
-          }
-      | Branch of
-          { cond : Instruction.t;
-            ifso : Block.t;
-            ifnot : Block.t
-          }
-      | Switch of
-          { index : Instruction.t;
-            targets : Block.t array
-          }
-      | Return of { args : Instruction.t array }
-      | Raise of
-          { raise_kind : Lambda.raise_kind;
-            args : Instruction.t array
-          }
-      | Tailcall_self of
-          { destination : Block.t;
-            args : Instruction.t array
-          }
-      | Tailcall_func of
-          { op : Cfg_intf.S.func_call_operation;
-            args : Instruction.t array
-          }
-      | Call of
-          { op : call_op;
-            args : Instruction.t array;
-            continuation : Block.t;
-            may_raise : bool;
-            nontail : bool
-          }
-      | Invalid of
-          { message : string;
-            args : Instruction.t array;
-            continuation : Block.t option
-          }
-  end
-
-  val function_info : function_info
-
-  val entry : Block.t
-
-  val blocks : Block.t list
-
-  val predecessors : Block.t -> Block.t list
-
-  (** Project just the machtype out of a block's [params] array. *)
-  val params_machtype : Block.t -> Cmm.machtype
-
-  (** All successors of a block, including [trap_successor]. *)
-  val successors : Block.t -> Block.t list
-
-  (** The implicit trap successor of [blk]: the topmost handler in
-      [block_end_trap_stack], if the terminator can raise. *)
-  val trap_successor : Block.t -> Block.t option
-
-  val dominates : Block.t -> Block.t -> bool
-
-  val common_dominator : Block.t -> Block.t -> Block.t
-end
-
-module type Standalone_graph_builder = sig
-  include Graph_builder
 
   val finish : unit -> (module Finished_graph)
 end
@@ -454,7 +431,5 @@ module type Intf = sig
 
   module type Finished_graph = Finished_graph
 
-  module type Standalone_graph_builder = Standalone_graph_builder
-
-  val make_builder : function_info -> (module Standalone_graph_builder)
+  val make_builder : function_info -> (module Graph_builder)
 end

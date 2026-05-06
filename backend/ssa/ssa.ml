@@ -2,7 +2,7 @@
 
 (** SSA graph implementation; signatures are in {!Ssa_intf}.
 
-    A single underlying module satisfies both [Standalone_graph_builder] and
+    A single underlying module satisfies both [Graph_builder] and
     [Finished_graph]. During construction the abstract types in [Graph_builder]
     hide use counts, predecessors and dominator info; at [finish] time the same
     module is repackaged with the [Finished_graph] view that exposes them.
@@ -32,8 +32,7 @@
 
 include Ssa_intf
 
-let make_builder (function_info : function_info) :
-    (module Standalone_graph_builder) =
+let make_builder (function_info : function_info) : (module Graph_builder) =
   let module M = struct
     module Instruction_id = Oxcaml_utils.Id_counter.Make ()
     module Block_id = Oxcaml_utils.Id_counter.Make ()
@@ -43,7 +42,7 @@ let make_builder (function_info : function_info) :
     type usage_count = int
 
     module rec Block : sig
-      type predecessors = Block_set.t
+      type predecessors = Block.Set.t
 
       type terminator = Terminator.t
 
@@ -83,7 +82,7 @@ let make_builder (function_info : function_info) :
 
       module Tbl : Hashtbl.S with type key = t
     end = struct
-      type predecessors = Block_set.t
+      type predecessors = Block.Set.t
 
       type terminator = Terminator.t
 
@@ -131,8 +130,6 @@ let make_builder (function_info : function_info) :
       module Set = Set.Make (Self)
       module Tbl = Hashtbl.Make (Self)
     end
-
-    and Block_set : (Set.S with type elt = Block.t) = Block.Set
 
     and Instruction : sig
       type t =
@@ -386,7 +383,7 @@ let make_builder (function_info : function_info) :
       { id = Block_id.create ();
         is_function_start = false;
         params = [||];
-        predecessors = Block_set.empty;
+        predecessors = Block.Set.empty;
         body = [||];
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
@@ -399,7 +396,7 @@ let make_builder (function_info : function_info) :
       { id = Block_id.create ();
         is_function_start;
         params;
-        predecessors = Block_set.empty;
+        predecessors = Block.Set.empty;
         body = [||];
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
@@ -446,7 +443,7 @@ let make_builder (function_info : function_info) :
       c.block <- new_pos.block;
       c.instrs_rev <- new_pos.instrs_rev
 
-    let emit_instruction (c : cursor) (i : Instruction.t) : Instruction.t =
+    let emit_instruction (c : cursor) (i : Instruction.t) =
       (match i with
       | Instruction.Block_param _ | Instruction.Proj _ | Instruction.Tuple _ ->
         Misc.fatal_errorf
@@ -460,11 +457,12 @@ let make_builder (function_info : function_info) :
       | Instruction.Op _ | Instruction.Push_trap _ | Instruction.Pop_trap _
       | Instruction.Stack_check _ | Instruction.Name_for_debugger _ ->
         ());
-      c.instrs_rev <- i :: c.instrs_rev;
-      i
+      c.instrs_rev <- i :: c.instrs_rev
 
     let emit_op (c : cursor) ~op ~dbg ~typ ~args : Instruction.t =
-      emit_instruction c (Instruction.make_op ~op ~typ ~args ~dbg)
+      let instr = Instruction.make_op ~op ~typ ~args ~dbg in
+      emit_instruction c instr;
+      instr
 
     let check_args_arity ~term_name ~args ~expected =
       if Array.length args <> Array.length expected
@@ -507,7 +505,7 @@ let make_builder (function_info : function_info) :
     (* === Predecessors / dominators === *)
 
     let predecessors (blk : Block.t) : Block.t list =
-      Block_set.elements blk.predecessors
+      Block.Set.elements blk.predecessors
 
     let params_machtype (blk : Block.t) : Cmm.machtype =
       Array.map (fun (p : Ssa_intf.block_param) -> p.typ) blk.params
@@ -622,7 +620,7 @@ let make_builder (function_info : function_info) :
           let end_stack = apply_body_trap_effects ~blk start_stack blk.body in
           blk.block_end_trap_stack <- end_stack;
           let push_succ (succ : Block.t) start_stack =
-            succ.predecessors <- Block_set.add blk succ.predecessors;
+            succ.predecessors <- Block.Set.add blk succ.predecessors;
             worklist := (succ, start_stack) :: !worklist
           in
           List.iter
@@ -663,7 +661,7 @@ let make_builder (function_info : function_info) :
             if not (Block.equal blk entry)
             then begin
               let new_idom =
-                Block_set.fold
+                Block.Set.fold
                   (fun pred acc ->
                     if has_idom pred
                     then
@@ -718,7 +716,7 @@ let make_builder (function_info : function_info) :
           counts.(index) <- old + 1;
           if old = 0
           then
-            Block_set.iter
+            Block.Set.iter
               (fun (pred : Block.t) ->
                 match block_param_arg pred.terminator index with
                 | Some arg -> increment_use arg
@@ -802,7 +800,6 @@ let make_builder (function_info : function_info) :
         type usage_count = int
 
         module Block = Block
-        module Block_set = Block_set
         module Instruction = Instruction
         module Terminator = Terminator
 
@@ -827,4 +824,4 @@ let make_builder (function_info : function_info) :
       let result = (module Finished : Finished_graph) in
       result
   end in
-  (module M : Standalone_graph_builder)
+  (module M : Graph_builder)
