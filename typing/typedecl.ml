@@ -2275,8 +2275,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
                   match Jkind.extract_layout env jkind with
                   | Ok layout -> layout
                   | Error _ ->
-                      (* XXX This means we couldn't expand the jkind. Safe to
-                        swallow this? *)
                       Jkind.Layout.Any Jkind_types.Scannable_axes.max
                 in
                 lbl, ty, layout)
