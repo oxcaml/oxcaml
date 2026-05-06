@@ -519,7 +519,7 @@ end
 Line 2, characters 18-61:
 2 |   val poly_ bar : layout_ x. ('b : x). 'a -> 'b -> #('a * 'b)
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "layout_" keyword is not support inside layout-polymorphic
+Error: The "layout_" keyword is not supported inside layout-polymorphic
        value descriptions introduced using "val poly_".
 |}]
 

@@ -1971,7 +1971,7 @@ let report_error_doc env ppf =
          annotations@]"
   | Val_poly_and_layout ->
       fprintf ppf
-        "@[The %a keyword is not support inside layout-polymorphic@ \
+        "@[The %a keyword is not supported inside layout-polymorphic@ \
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
