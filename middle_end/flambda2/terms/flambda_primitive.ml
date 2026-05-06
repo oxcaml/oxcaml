@@ -1251,7 +1251,14 @@ type unary_primitive =
    for CSE, since we deal with projections through types. *)
 let unary_primitive_eligible_for_cse p ~arg =
   match p with
-  | Block_load _ -> false
+  | Block_load { mut; _ } -> (
+    match (mut : Mutability.t) with
+    | Mutable ->
+      (* Immutable block loads are dealt with via projection types. Mutable
+         block loads can be CSEd subject to invalidation around program points
+         that may cause coeffects to be observed differently. *)
+      true
+    | Immutable | Immutable_unique -> false)
   | Duplicate_array _ -> false
   | Duplicate_block { kind = _ } -> false
   | Is_int _ | Is_null | Get_tag | Get_header -> true
@@ -1833,7 +1840,15 @@ type binary_primitive =
 
 let binary_primitive_eligible_for_cse p =
   match p with
-  | Array_load _ | Block_set _ -> false
+  | Array_load (_, _, mut) -> (
+    match (mut : Mutability.t) with
+    | Mutable ->
+      (* Immutable array loads are dealt with via projection types. Mutable
+         array loads can be CSEd subject to invalidation around program points
+         that may cause coeffects to be observed differently. *)
+      true
+    | Immutable | Immutable_unique -> false)
+  | Block_set _ -> false
   | String_or_bigstring_load _ -> false (* CR mshinwell: review *)
   | Bigarray_load _ -> false
   | Bigarray_get_alignment _ -> true
@@ -2952,8 +2967,16 @@ end = struct
       | Only_generative_effects Immutable, No_coeffects, _, _ ->
         (* Allow constructions of immutable blocks to be shared. *)
         true
-      | ( ( No_effects
-          | Only_generative_effects (Immutable | Immutable_unique | Mutable)
+      | ( (No_effects | Only_generative_effects Immutable),
+          Has_coeffects,
+          _,
+          _ ) ->
+        (* Allow CSE for primitives that have coeffects but no (non-generative)
+           effects. Such CSE equations must be discarded across program points
+           that may cause coeffects to be observed differently (e.g. function
+           calls, or evaluation of effectful primitives). *)
+        true
+      | ( ( Only_generative_effects (Immutable_unique | Mutable)
           | Arbitrary_effects ),
           (No_coeffects | Has_coeffects),
           _,

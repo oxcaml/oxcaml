@@ -167,6 +167,9 @@ val comparison_results : t -> Comparison_result.t Variable.Map.t
 
 val with_cse : t -> Common_subexpression_elimination.t -> t
 
+(** Discard all CSE equations on primitives that have coeffects. *)
+val clear_cse_equations_on_coeffectful_primitives : t -> t
+
 module Disable_inlining_reason : sig
   type t =
     | Stub

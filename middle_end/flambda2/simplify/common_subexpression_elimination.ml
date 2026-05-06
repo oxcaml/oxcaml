@@ -41,6 +41,14 @@ module T0 : sig
   val add : t -> EP.t -> bound_to:Simple.t -> Scope.t -> t
 
   val find : t -> EP.t -> Simple.t option
+
+  val clear_equations_on_coeffectful_primitives : t -> t
+
+  (** Drop any equation from [t] that is not present in every [t] in
+      [must_be_in]. Used by the join to ensure that a CSE equation present at
+      the fork point is only propagated to the join point if it has not been
+      killed (e.g. by a non-inlined function call) on any path to the join. *)
+  val keep_only_equations_present_in_all : t -> must_be_in:t list -> t
 end = struct
   type t =
     { by_scope : Simple.t EP.Map.t Scope.Map.t;
@@ -71,6 +79,33 @@ end = struct
     | _bound_to -> t
 
   let find t prim = EP.Map.find_opt prim t.combined
+
+  let primitive_has_coeffects prim =
+    match P.effects_and_coeffects (EP.to_primitive prim) with
+    | _, Has_coeffects, _, _ -> true
+    | _, No_coeffects, _, _ -> false
+
+  let clear_equations_on_coeffectful_primitives { by_scope; combined } =
+    let keep prim _bound_to = not (primitive_has_coeffects prim) in
+    let by_scope =
+      Scope.Map.map (fun level -> EP.Map.filter keep level) by_scope
+    in
+    let combined = EP.Map.filter keep combined in
+    { by_scope; combined }
+
+  let keep_only_equations_present_in_all { by_scope; combined } ~must_be_in =
+    let keep prim bound_to =
+      List.for_all must_be_in
+        ~f:(fun other ->
+          match EP.Map.find_opt prim other.combined with
+          | None -> false
+          | Some other_bound_to -> Simple.equal bound_to other_bound_to)
+    in
+    let combined = EP.Map.filter keep combined in
+    let by_scope =
+      Scope.Map.map (fun level -> EP.Map.filter keep level) by_scope
+    in
+    { by_scope; combined }
 end
 
 include T0
@@ -461,6 +496,21 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
 let join ~typing_env_at_fork ~cse_at_fork ~use_info ~get_typing_env
     ~get_rewrite_id ~get_cse ~params =
   let scope_at_fork = TE.current_scope typing_env_at_fork in
+  (* Drop from [cse_at_fork] any equation that does not survive on every path
+     to the join point (e.g. because of a non-inlined function call or an
+     effectful primitive). Without this, an equation present at the fork would
+     be propagated to the join point even though it has been killed. *)
+  let full_cse_at_each_use = List.map use_info ~f:get_cse in
+  let cse_at_fork_combined_size =
+    EP.Map.cardinal cse_at_fork.combined
+  in
+  let cse_at_fork =
+    keep_only_equations_present_in_all cse_at_fork
+      ~must_be_in:full_cse_at_each_use
+  in
+  let cse_at_fork_was_filtered =
+    EP.Map.cardinal cse_at_fork.combined < cse_at_fork_combined_size
+  in
   let no_equations = ref false in
   let cse_at_each_use =
     List.map use_info ~f:(fun use ->
@@ -471,8 +521,27 @@ let join ~typing_env_at_fork ~cse_at_fork ~use_info ~get_typing_env
         if EP.Map.is_empty cse_between_fork_and_use then no_equations := true;
         get_typing_env use, get_rewrite_id use, cse_between_fork_and_use)
   in
-  if !no_equations
-  then None
-  else
-    join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
-      ~scope_at_fork
+  let result =
+    if !no_equations
+    then None
+    else
+      join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
+        ~scope_at_fork
+  in
+  match result with
+  | Some _ -> result
+  | None ->
+    if cse_at_fork_was_filtered
+    then
+      (* [join0] didn't return a result, but [cse_at_fork] was filtered to
+         remove equations that were killed on some path to the join point.
+         We must propagate the filtered [cse_at_fork] as the join point's CSE
+         state, otherwise the caller will fall back to the unfiltered
+         [env_at_fork.cse] and the killed equations will reappear. *)
+      Some
+        { Join_result.cse_at_join_point = cse_at_fork;
+          extra_params = EPA.empty;
+          env_extension = TEE.empty;
+          extra_allowed_names = Name_occurrences.empty
+        }
+    else None

@@ -419,6 +419,15 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
         denv, None, previous_extra_params_and_args
     in
     let handler_env = DE.with_join_analysis join_analysis handler_env in
+    (* For recursive continuations, the handler body may execute arbitrary
+       effectful operations (including those reached via the recursive call)
+       that we have not yet seen.  Drop CSE equations whose left-hand side has
+       coeffects to avoid using stale values from before the loop. *)
+    let handler_env =
+      if is_recursive
+      then DE.clear_cse_equations_on_coeffectful_primitives handler_env
+      else handler_env
+    in
     let escapes =
       List.exists
         (fun (_, _, (cont_use_kind : Continuation_use_kind.t)) ->

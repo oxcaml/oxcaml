@@ -38,6 +38,13 @@ val add : t -> P.Eligible_for_cse.t -> bound_to:Simple.t -> Scope.t -> t
 
 val find : t -> P.Eligible_for_cse.t -> Simple.t option
 
+(** Discard all CSE equations whose left-hand side is a primitive that has
+    coeffects. This should be called at program points where coeffects might be
+    observed differently across the relevant primitive's prior occurrence and
+    its later (potentially CSEd) occurrence (e.g. across a function call, or
+    across a primitive that has arbitrary effects). *)
+val clear_equations_on_coeffectful_primitives : t -> t
+
 module Join_result : sig
   type nonrec t = private
     { cse_at_join_point : t;
