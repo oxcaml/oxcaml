@@ -132,6 +132,8 @@ let eval (expr : 'a expr) =
   Clflags.dlcode := false;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
+  Clflags.transparent_modules := true;
+  ignore (Warnings.parse_options false "-49" : Warnings.alert option);
   (* TODO: Set a bunch of flags to match the initial compile (like
      nopervasives) *)
   Location.reset ();

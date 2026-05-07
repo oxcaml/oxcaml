@@ -41,25 +41,29 @@ let cmi_bundle ~quoted_globals =
   let rec loop cmis missing_globals =
     match missing_globals with
     | [] -> cmis
-    | global :: missing_globals ->
+    | (global, is_alias) :: missing_globals -> (
       if CU.Name.Map.mem global cmis || CU.Name.equal global no_such_module
       then loop cmis missing_globals
       else
-        let path =
-          try Load_path.find_normalized (CU.Name.to_string global ^ ".cmi")
-          with Not_found -> raise (Error (Missing_intf_for_quote global))
-        in
-        let cmi = Cmi_format.read_cmi path in
-        let missing_globals =
-          Array.fold_left
-            (fun missing_globals import ->
-              Import_info.name import :: missing_globals)
-            missing_globals cmi.cmi_crcs
-        in
-        let new_cmis = CU.Name.Map.add global cmi cmis in
-        loop new_cmis missing_globals
+        match Load_path.find_normalized (CU.Name.to_string global ^ ".cmi") with
+        | exception Not_found when is_alias -> loop cmis missing_globals
+        | exception Not_found -> raise (Error (Missing_intf_for_quote global))
+        | path ->
+          let cmi = Cmi_format.read_cmi path in
+          let missing_globals =
+            Array.fold_left
+              (fun missing_globals import ->
+                let is_alias = Option.is_none (Import_info.crc import) in
+                (Import_info.name import, is_alias) :: missing_globals)
+              missing_globals cmi.cmi_crcs
+          in
+          let new_cmis = CU.Name.Map.add global cmi cmis in
+          loop new_cmis missing_globals)
   in
-  loop CU.Name.Map.empty (CU.Name.Set.elements quoted_globals)
+  let initial =
+    List.map (fun g -> g, false) (CU.Name.Set.elements quoted_globals)
+  in
+  loop CU.Name.Map.empty initial
 
 (* We can't populate this during scan_file because a cmxa contains less
    information than a cmx. *)
@@ -67,27 +71,29 @@ let cmx_bundle ~quoted_globals =
   let rec loop cmxs missing_globals =
     match missing_globals with
     | [] -> cmxs
-    | global :: missing_globals ->
-      if CU.Name.Map.mem global cmxs || CU.Name.equal global no_such_module
+    | (global, is_alias) :: missing_globals -> (
+      if CU.Name.Map.mem global cmxs
       then loop cmxs missing_globals
       else
-        let path =
-          try Load_path.find_normalized (CU.Name.to_string global ^ ".cmx")
-          with Not_found -> raise (Error (Missing_impl_for_quote global))
-        in
-        let unit_info, _crc = Compilenv.read_unit_info path in
-        let missing_globals =
-          List.fold_left
-            (fun missing_globals import ->
-              Import_info.name import :: missing_globals)
-            missing_globals unit_info.ui_imports_cmx
-        in
-        let new_cmxs = CU.Name.Map.add global unit_info cmxs in
-        loop new_cmxs missing_globals
+        match Load_path.find_normalized (CU.Name.to_string global ^ ".cmx") with
+        | exception Not_found when is_alias -> loop cmxs missing_globals
+        | exception Not_found -> raise (Error (Missing_impl_for_quote global))
+        | path ->
+          let unit_info, _crc = Compilenv.read_unit_info path in
+          let missing_globals =
+            List.fold_left
+              (fun missing_globals import ->
+                let is_alias = Option.is_none (Import_info.crc import) in
+                (Import_info.name import, is_alias) :: missing_globals)
+              missing_globals unit_info.ui_imports_cmx
+          in
+          let new_cmxs = CU.Name.Map.add global unit_info cmxs in
+          loop new_cmxs missing_globals)
   in
-  let unit_infos =
-    loop CU.Name.Map.empty (CU.Name.Set.elements quoted_globals)
+  let initial =
+    List.map (fun g -> g, false) (CU.Name.Set.elements quoted_globals)
   in
+  let unit_infos = loop CU.Name.Map.empty initial in
   ListLabels.map (CU.Name.Map.data unit_infos)
     ~f:(fun (info : Cmx_format.unit_infos) ->
       let raw_export_info, sections =
