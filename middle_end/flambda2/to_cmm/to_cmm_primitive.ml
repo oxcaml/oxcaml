@@ -1251,8 +1251,39 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
-let binary_primitive env dbg f (_x_simple : Simple.t option)
-    (_y_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression) =
+(* Compute the address used by [Read_offset] / [Write_offset]: [x] is the base
+   address (constant zero indicates an out-of-heap pointer; anything else
+   produces a derived heap pointer) and [y] is the byte offset. [y_simple] is
+   the original [Simple.t] from which [y] was translated, when known; it is used
+   to look through pure delayed let-bindings in [env] to expose any additive
+   structure in [y]. We then try to reassociate [x + (x' + ...) --> (x + x') +
+   ...], so the backend CSE can factor out an addition that is likely to be the
+   same across repeated [Read_offset]/[Write_offset]s. *)
+let address_for_offset_prim env dbg (x : Cmm.expression) (y : Cmm.expression)
+    (y_simple : Simple.t option) =
+  let ptr_out_of_heap =
+    match[@ocaml.warning "-fragile-match"] x with
+    | Cconst_int (0, _) | Cconst_natint (0n, _) -> true
+    | _ -> false
+  in
+  let addition_fn =
+    (* This will permit more CSE if out of heap. *)
+    if ptr_out_of_heap then C.add_int else C.add_int_addr
+  in
+  let y =
+    match Option.bind y_simple Simple.must_be_var with
+    | Some (y_var, _coercion) -> (
+      match Env.find_pure_bound_cmm_expr env y_var with
+      | Some cmm -> cmm
+      | None -> y)
+    | None -> y
+  in
+  match[@ocaml.warning "-fragile-match"] y with
+  | Cop (Caddi, [x'; y'], dbg) -> addition_fn (addition_fn x x' dbg) y' dbg
+  | _ -> addition_fn x y dbg
+
+let binary_primitive env dbg f _x_simple (y_simple : Simple.t option)
+    (x : Cmm.expression) (y : Cmm.expression) =
   match (f : P.binary_primitive) with
   | Block_set { kind; init; field } ->
     block_set ~dbg kind init ~field ~block:x ~new_value:y
@@ -1285,13 +1316,12 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
   | Read_offset (kind, mut) ->
-    let addr = C.add_int x y dbg in
+    let addr = address_for_offset_prim env dbg x y y_simple in
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
-let ternary_primitive _env dbg f (_x_simple : Simple.t option)
-    (_y_simple : Simple.t option) (_z_simple : Simple.t option)
-    (x : Cmm.expression) (y : Cmm.expression) (z : Cmm.expression) =
+let ternary_primitive env dbg f _x_simple (y_simple : Simple.t option) _z_simple
+    (x : Cmm.expression) (y : Cmm.expression) z =
   match (f : P.ternary_primitive) with
   | Array_set (array_kind, array_set_kind) ->
     array_set ~dbg array_kind array_set_kind ~arr:x ~index:y ~new_value:z
@@ -1344,7 +1374,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
       else
-        let addr = C.add_int x y dbg in
+        let addr = address_for_offset_prim env dbg x y y_simple in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
