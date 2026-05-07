@@ -41,7 +41,7 @@ let camlinternalQuote =
      with
     | exception Not_found ->
       fatal_errorf "Module CamlinternalQuote unavailable."
-    | path, _, env -> path, env)
+    | path, env -> path, env)
 
 let use modname field =
   lazy

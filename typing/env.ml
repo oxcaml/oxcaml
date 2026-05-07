@@ -4269,7 +4269,10 @@ let remove_last_open root env0 =
 (* Open a signature from a file *)
 
 let open_pers_signature name env =
-  open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  let path, _, env =
+    open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  in
+  path, env
 
 let open_pers_signature_cmi filename env =
   let artifact =
