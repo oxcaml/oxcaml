@@ -57,6 +57,8 @@ val command_line_options : (string * Arg.spec * string) list
 
 type sym_global = Global | Local
 
+val arch_to_cmm_global : sym_global -> Cmm.is_global
+
 type addressing_mode =
     Ibased of string * sym_global * int (* symbol + displ *)
   | Iindexed of int                     (* reg + displ *)
