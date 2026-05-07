@@ -379,7 +379,7 @@ let initial_env ~loc ~initially_opened_module
   let env =
     List.fold_left
       (fun env m ->
-         let _, _, env = Env.open_pers_signature_cmi m env in
+         let _, env = Env.open_pers_signature_cmi m env in
          env)
       env open_cmi_implicit_modules
   in
