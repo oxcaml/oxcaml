@@ -1010,9 +1010,20 @@ module Rewriter = struct
                         closures_entry function_slot
                     in
                     Or_unknown.map function_type ~f:(fun function_type ->
-                        Expr.Function_type.create
-                          (Function_type.code_id function_type)
-                          ~rec_info:(Expr.var v)))
+                        let code_id = Function_type.code_id function_type in
+                        if
+                          not
+                            (PTA.has_use db (Code_id_or_name.code_id code_id)
+                            || not
+                                 (Compilation_unit.is_current
+                                    (Code_id.get_compilation_unit code_id)))
+                        then
+                          Misc.fatal_errorf
+                            "Code id %a is not used but would end up in types \
+                             because function slot %a is used"
+                            Code_id.print code_id Function_slot.print
+                            function_slot;
+                        Expr.Function_type.create code_id ~rec_info:(Expr.var v)))
                 function_slots
             in
             let expr =
@@ -1060,9 +1071,20 @@ module Rewriter = struct
                         closures_entry function_slot
                     in
                     Or_unknown.map function_type ~f:(fun function_type ->
-                        Expr.Function_type.create
-                          (Function_type.code_id function_type)
-                          ~rec_info:(Expr.var v))
+                        let code_id = Function_type.code_id function_type in
+                        if
+                          not
+                            (PTA.has_use db (Code_id_or_name.code_id code_id)
+                            || not
+                                 (Compilation_unit.is_current
+                                    (Code_id.get_compilation_unit code_id)))
+                        then
+                          Misc.fatal_errorf
+                            "Code id %a is not used but would end up in types \
+                             because function slot %a is used"
+                            Code_id.print code_id Function_slot.print
+                            function_slot;
+                        Expr.Function_type.create code_id ~rec_info:(Expr.var v))
                 in
                 Function_slot.Map.add new_function_slot r m)
               (usages_of_function_slots_for_set_of_closures db set_of_closures)
