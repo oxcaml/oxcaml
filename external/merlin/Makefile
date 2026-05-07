@@ -10,7 +10,7 @@ export RUNTIME_DIR
 
 .DEFAULT_GOAL := build
 
-.PHONY: build test parent-install
+.PHONY: build test test-promote parent-install
 
 parent-install:
 	$(MAKE) -C $(PARENT) install
@@ -23,10 +23,12 @@ build:
 MERLIN_TEST_OCAML_PATH ?= $(PARENT)/_install
 export MERLIN_TEST_OCAML_PATH
 ifeq ($(origin MERLIN_TEST_OCAML_PATH),file)
-test: parent-install
+test test-promote: parent-install
 endif
 
-test:
+test-promote: PROMOTE := --auto-promote
+
+test test-promote:
 # We want to make sure that dune re-runs the tests in the compiler changes. But
 # the _install directory lives outside the dune boot workspace, so dune doesn't
 # track whether it changes. So we hash the contents of the directory and make
@@ -38,7 +40,7 @@ test:
 	    | sort | sha256sum | awk '{print $$1}'); \
 	export MERLIN_TEST_OCAML_VERSION="$$version"; \
 	if [ -z "$(strip $(ARGS))" ]; then \
-	    dune build $(DUNE_OPTS) @runtest; \
+	    dune build $(DUNE_OPTS) @runtest $(PROMOTE); \
 	else \
-	    dune build $(DUNE_OPTS) $(ARGS); \
+	    dune build $(DUNE_OPTS) $(ARGS) $(PROMOTE); \
 	fi
