@@ -304,11 +304,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val poly_ f : 'a 'b. 'a -> 'b end
        is not included in
-         sig val poly_ f : 'a 'b. 'a -> 'b end
+         sig val poly_ f : 'b 'a. 'a -> 'b end
        Values do not match:
          val poly_ f : 'a 'b. 'a -> 'b
        is not included in
-         val poly_ f : 'a 'b. 'a -> 'b
+         val poly_ f : 'b 'a. 'a -> 'b
        The layout parameter at position 1 in the first
        corresponds to the parameter at position 2 in the second,
        which is not supported yet.
@@ -496,8 +496,7 @@ module type S = sig
   val poly_ ordering : 'a 'b. 'b -> 'a
 end
 [%%expect {|
-module type S =
-  sig val ordering : layout_ l l0. ('b : l0) ('a : l). 'b -> 'a end
+module type S = sig val poly_ ordering : 'a 'b. 'b -> 'a end
 |}]
 
 
@@ -539,7 +538,7 @@ end
 module type S =
   sig
     val poly_ baz1 :
-      'a ('b : immediate) 'c. 'a -> #('b * 'c) -> #('a * 'b * 'c)
+      'a 'c ('b : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
@@ -550,7 +549,7 @@ end
 module type S =
   sig
     val poly_ baz2 :
-      ('a : immediate) 'b 'c. 'a -> #('b * 'c) -> #('a * 'b * 'c)
+      'b 'c ('a : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
@@ -561,7 +560,7 @@ end
 module type S =
   sig
     val poly_ baz3 :
-      'b ('a : immediate) 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+      'b 'c ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
   end
 |}]
 
@@ -572,7 +571,7 @@ end
 module type S =
   sig
     val poly_ baz4 :
-      'b ('a : immediate) 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+      'b 'c ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
   end
 |}]
 
@@ -583,7 +582,7 @@ end
 module type S =
   sig
     val poly_ baz5 :
-      'b ('a : immediate) 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+      'b 'c ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
   end
 |}]
 
@@ -594,7 +593,7 @@ module type S = sig
 end
 [%%expect {|
 module type S =
-  sig val poly_ baz6 : ('a : value) 'b. 'a -> #('a * 'b) -> #('a * 'b) end
+  sig val poly_ baz6 : 'b ('a : value). 'a -> #('a * 'b) -> #('a * 'b) end
 |}]
 
 (* "value_or_null" should be printed *)
@@ -604,7 +603,7 @@ end
 [%%expect {|
 module type S =
   sig
-    val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+    val poly_ baz7 : 'b ('a : value_or_null). 'a -> #('a * 'b) -> #('a * 'b)
   end
 |}]
 

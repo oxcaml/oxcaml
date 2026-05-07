@@ -2420,6 +2420,82 @@ let extension_only_constructor id ppf ext =
       ocstr_return_type = ret;
     }
 
+(* We print [val poly_] when the following conditions are met:
+   1. each layout var in [qsvs] appears exactly once in [qtvs] kinds
+   2. no kind in [qtvs] contains a layout var from [qsvs] in a non-immediate
+   way (say, in a product).
+   If these conditions are met, we output an [Otyp_poly] with all generic
+   type variable explicitly printed as a type scheme, where
+   jkind-unconstrained variables are layout-polymorphic. Consequently, we need
+   to print all other jkind annotations, including [value].
+   Otherwise, we output the [layout_] representation.
+   CR-soon layouts aivaskovic:
+   We aspire to eventually remove the layout-polymorphic type variables which
+   currently appear unconstrained. This means that, instead of:
+     [val poly_ : 'a 'b ('c : value). 'a -> 'b -> 'c -> #('a * 'b * 'c)]
+   we would print:
+     [val poly_ : ('c : value). 'a -> 'b -> 'c -> #('a * 'b * 'c)]
+*)
+let val_poly_and_type in_layout_poly qsvs qtvs ty =
+  let rec out_jkind_const_has_genvar = function
+    | Ojkind_const_genvar _ -> true
+    | Ojkind_const_product ks -> List.exists out_jkind_const_has_genvar ks
+    | Ojkind_const_mod (Some k, _) -> out_jkind_const_has_genvar k
+    | Ojkind_const_mod (None, _) -> false
+    | Ojkind_const_with (k, _, _) -> out_jkind_const_has_genvar k
+    | Ojkind_const_default
+    | Ojkind_const_abbreviation _
+    | Ojkind_const_kind_of _ -> false
+  in
+  let rec out_jkind_has_genvar = function
+    | Ojkind_const k -> out_jkind_const_has_genvar k
+    | Ojkind_var _ -> false
+    | Ojkind_product ks -> List.exists out_jkind_has_genvar ks
+  in
+  let (genvar_qtvs, non_genvar_qtvs) =
+    List.partition
+      (fun (_, jkind) -> match jkind with
+         | Some (Ojkind_const (Ojkind_const_genvar _)) -> true
+         | _ -> false)
+      qtvs
+  in
+  let qtvs_top_genvars =
+    List.filter_map
+      (fun (_, jkind) -> match jkind with
+         | Some (Ojkind_const (Ojkind_const_genvar v)) -> Some v
+         | _ -> None)
+      genvar_qtvs
+  in
+  let oval_poly =
+    in_layout_poly &&
+    List.sort String.compare qtvs_top_genvars = List.sort String.compare qsvs &&
+    List.for_all
+      (fun (_, jkind) ->
+         match jkind with
+         | None -> true
+         | Some jk -> not (out_jkind_has_genvar jk))
+      non_genvar_qtvs
+  in
+  let oval_type =
+    if oval_poly then
+      let ordered_genvar_qtvs =
+        List.filter_map
+          (fun v ->
+             match List.find_opt
+                     (fun (_, jkind) -> match jkind with
+                        | Some (Ojkind_const (Ojkind_const_genvar v')) -> v = v'
+                        | _ -> false)
+                     genvar_qtvs
+             with
+             | Some (name, _) -> Some (name, None)
+             | None -> None)
+          qsvs
+      in
+      Otyp_poly(ordered_genvar_qtvs @ non_genvar_qtvs, ty)
+    else Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty))
+  in
+  oval_poly, oval_type
+
 (* Print a value declaration *)
 
 let tree_of_value_description id decl =
@@ -2478,67 +2554,7 @@ let tree_of_value_description id decl =
              ]
        }]
   in
-  (* We print [val poly_] in when the following conditions are met:
-     1. each layout var in [qsvs] appears exactly once in [qtvs] kinds
-     2. no kind in [qtvs] contains a layout var from [qsvs] in a non-immediate
-     way (say, in a product).
-     If these conditions are met, we output an [Otyp_poly] with all generic
-     type variable explicitly printed as a type scheme, where
-     jkind-unconstrained variables are layout-polymorphic. Consequently, we need
-     to print all other jkind annotations, including [value].
-     Otherwise, we output the [layout_] representation.
-     CR-soon layouts aivaskovic:
-     We aspire to eventually remove the layout-polymorphic type variables which
-     currently appear unconstrained. This means that, instead of:
-       [val poly_ : 'a 'b ('c : value). 'a -> 'b -> 'c -> #('a * 'b * 'c)]
-     we would print:
-       [val poly_ : ('c : value). 'a -> 'b -> 'c -> #('a * 'b * 'c)]
-  *)
-  let rec out_jkind_const_has_genvar = function
-    | Ojkind_const_genvar _ -> true
-    | Ojkind_const_product ks -> List.exists out_jkind_const_has_genvar ks
-    | Ojkind_const_mod (Some k, _) -> out_jkind_const_has_genvar k
-    | Ojkind_const_mod (None, _) -> false
-    | Ojkind_const_with (k, _, _) -> out_jkind_const_has_genvar k
-    | Ojkind_const_default
-    | Ojkind_const_abbreviation _
-    | Ojkind_const_kind_of _ -> false
-  in
-  let rec out_jkind_has_genvar = function
-    | Ojkind_const k -> out_jkind_const_has_genvar k
-    | Ojkind_var _ -> false
-    | Ojkind_product ks -> List.exists out_jkind_has_genvar ks
-  in
-  let qtvs_top_genvars =
-    List.filter_map
-      (fun (_, jkind) -> match jkind with
-         | Some (Ojkind_const (Ojkind_const_genvar v)) -> Some v
-         | Some _ | None -> None)
-      qtvs
-  in
-  let oval_poly =
-    in_layout_poly &&
-    List.sort String.compare qtvs_top_genvars = List.sort String.compare qsvs &&
-    List.for_all
-      (fun (_, jkind) ->
-         match jkind with
-         | None -> true
-         | Some (Ojkind_const (Ojkind_const_genvar _)) -> true
-         | Some jk -> not (out_jkind_has_genvar jk))
-      qtvs
-  in
-  let oval_type =
-    if oval_poly then
-      let qtvs =
-        List.map
-          (fun ((v, jkind) as qtv) -> match jkind with
-             | Some (Ojkind_const (Ojkind_const_genvar _)) ->
-               (v, None)
-             | Some _ | None -> qtv)
-          qtvs
-      in Otyp_poly(qtvs, ty)
-    else Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty))
-  in
+  let oval_poly, oval_type = val_poly_and_type in_layout_poly qsvs qtvs ty in
   let vd =
     { oval_name = id;
       oval_type;
