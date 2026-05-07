@@ -28,15 +28,13 @@ type +'a t = Node : 'a ('b : immutable_data). ('a, 'b) unpacked -> 'a t [@@unbox
 (* (1) %array_length -> Translprim.specialize_primitive (Parraylength). *)
 let _01_array_length (children : 'a t array) = Array.length children
 [%%expect{|
-Uncaught exception: File "typing/typeopt.ml", line 265, characters 6-12: Assertion failed
-
+val _01_array_length : 'a t array -> int = <fun>
 |}]
 
 (* (2) %array_unsafe_get -> Translprim.specialize_primitive (Parrayrefu). *)
 let _02_array_get (children : 'a t array) = children.(0)
 [%%expect{|
-Uncaught exception: File "typing/typeopt.ml", line 265, characters 6-12: Assertion failed
-
+val _02_array_get : 'a t array -> 'a t = <fun>
 |}]
 
 (* (3) Just naming the array as a parameter -> Translcore.transl_curried_function
@@ -44,8 +42,7 @@ Uncaught exception: File "typing/typeopt.ml", line 265, characters 6-12: Asserti
        array_kind_of_elt -> classify. *)
 let _03_param_layout (children : 'a t array) = ignore children
 [%%expect{|
-Uncaught exception: File "typing/typeopt.ml", line 265, characters 6-12: Assertion failed
-
+val _03_param_layout : 'a t array -> unit = <fun>
 |}]
 
 (* (4) Passing the array to a higher-order function -> Translcore.layout_exp
@@ -53,6 +50,5 @@ Uncaught exception: File "typing/typeopt.ml", line 265, characters 6-12: Asserti
        classify path as (3). *)
 let _04_array_arg_layout (children : 'a t array) = Array.iter ignore children
 [%%expect{|
-Uncaught exception: File "typing/typeopt.ml", line 265, characters 6-12: Assertion failed
-
+val _04_array_arg_layout : 'a t array -> unit = <fun>
 |}]
