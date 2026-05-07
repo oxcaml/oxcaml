@@ -45,7 +45,7 @@ let $camlSymbol_projections6__immstring10 = "FOO" in
             -> k * k1
             : [ 0 of [ 0 of val |1 of val ] * imm tagged ] =
       let foo_2 =
-        %project_value_slot.[`h`].[`foo_1`] ($camlSymbol_projections6__h_4)
+        %project_value_slot.[h].[foo_1] ($camlSymbol_projections6__h_4)
       in
       (let prim = %int_comp.lt (z, 0) in
        switch prim
@@ -81,7 +81,7 @@ let $camlSymbol_projections6__immstring10 = "FOO" in
             -> k * k1
             : [ 0 of [ 0 of val |1 of val ] * imm tagged ] =
       let foo_2 =
-        %project_value_slot.[`g`].[`foo_2`] ($camlSymbol_projections6__g_5)
+        %project_value_slot.[g].[foo_2] ($camlSymbol_projections6__g_5)
       in
       (let prim = %int_comp.lt (y, 0) in
        switch prim

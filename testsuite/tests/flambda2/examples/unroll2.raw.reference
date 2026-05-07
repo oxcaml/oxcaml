@@ -27,7 +27,7 @@ let $camlUnroll2__first_const = Block 0 () in
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let foo = %project_value_slot.[`bar`].[`foo`] (my_closure) in
+   let foo = %project_value_slot.[bar].[foo] (my_closure) in
    apply direct(foo_0) unroll(2) foo (x) -> k1 * k2
  in
  let foo = closure foo_0 @foo in

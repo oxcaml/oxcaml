@@ -10,21 +10,21 @@ in
       -> k1 * error)
    where k1 (region_return : val) =
      let `unit` = %end_region (`region`) in
-     ((let prim = %bigarray_lenght.[`1`] (region_return) in
+     ((let prim = %bigarray_length.[`1`] (region_return) in
        let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
        let prim_2 = %int_comp.`nativeint`.unsigned.lt (1n, prim_1) in
        switch prim_2
          | 0 -> k1
          | 1 -> k2)
         where k2 =
-          ((let prim = %bigarray_lenght.[`2`] (region_return) in
+          ((let prim = %bigarray_length.[`2`] (region_return) in
             let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
             let prim_2 = %int_comp.`nativeint`.unsigned.lt (1n, prim_1) in
             switch prim_2
               | 0 -> k1
               | 1 -> k2)
              where k2 =
-               let prim = %bigarray_lenght.[`2`] (region_return) in
+               let prim = %bigarray_length.[`2`] (region_return) in
                let prim_1 = %tag_imm (prim) in
                let prim_2 = %int_barith.add (prim_1, 1) in
                let prim_3 =
@@ -32,7 +32,7 @@ in
                in
                let i = %tag_imm (prim_3) in
                let stdout =
-                 %project_value_slot.[`print_int`].[`stdout`]
+                 %project_value_slot.[print_int].[stdout]
                    ($Stdlib.camlStdlib__print_int_136)
                in
                (apply ccall inlining_state(depth(20))

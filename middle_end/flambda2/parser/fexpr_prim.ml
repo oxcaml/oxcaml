@@ -534,7 +534,7 @@ let block_load =
 
 let bigarray_length =
   D.(
-    unary "%bigarray_lenght" ~params:(positional int) (fun _ dimension ->
+    unary "%bigarray_length" ~params:(positional int) (fun _ dimension ->
         P.Bigarray_length { dimension }))
 
 let array_length =
