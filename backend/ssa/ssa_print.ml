@@ -2,16 +2,10 @@
 
 (** Pretty-printer for {!Ssa.Finished_graph} instances.
 
-    Format conventions:
-    - Op result names are [v<id>] (or [<name>/v<id>] when the op carries a name
-      from a Cmm let-binding), block ids are [B<id>], block params are
-      [B<id>.<index>].
-    - References to ops use the result name, references to block params use the
-      [B<id>.<index>] form, projections render as nested [v<i>.<index>].
-    - Each block prints its header (id, kind, typed params, label hint, idom,
-      depth, predecessors), then its body one instruction per line, then its
-      terminator with the implicit {!Ssa.trap_successor} appended as
-      [trap_successor=B<id>] when applicable. *)
+    Op result names are [v<id>] (or [<name>/v<id>] when the op carries a name),
+    block ids are [B<id>]. References to ops use the result name, or
+    [v<i>.<index>] when with projection, references to block params use
+    [B<id>.<index>]. *)
 
 module Make (S : Ssa.Finished_graph) = struct
   let print_block_id ppf (b : S.Block.t) =
@@ -56,7 +50,7 @@ module Make (S : Ssa.Finished_graph) = struct
       Format.fprintf ppf "stack_check %d" max_frame_size_bytes
     | Name_for_debugger { ident; _ } ->
       Format.fprintf ppf "name_for_debugger %a" Ident.print ident
-    | Block_param _ | Tuple _ | Proj _ -> assert false
+    | Block_param _ | Tuple _ | Proj _ -> Misc.fatal_error "Unexpected body instruction in Ssa_print"
 
   and print_instr_ref ppf (i : S.Instruction.t) =
     match i with
@@ -66,7 +60,7 @@ module Make (S : Ssa.Finished_graph) = struct
       Format.fprintf ppf "%d.%a" index print_instr_ref src
     | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
     | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
-      assert false
+      Misc.fatal_error "Unexpected instruction reference in Ssa_print"
 
   and print_args ppf args =
     Array.iteri

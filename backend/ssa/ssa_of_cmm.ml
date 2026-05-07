@@ -463,7 +463,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
             match (region : Lambda.region_close) with
             | Rc_normal -> false
             | Rc_nontail -> true
-            | Rc_close_at_apply -> assert false (* desugared in Flambda2 *))
+            | Rc_close_at_apply -> Misc.fatal_error "Rc_close_at_apply should have been lowered by Flambda2")
           | _ -> true
         in
         emit_call env c ~ty ~nontail term arg_instrs dbg

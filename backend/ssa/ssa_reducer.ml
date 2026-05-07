@@ -290,7 +290,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     | Proj { index; src } -> Out.Instruction.make_proj ~index (map_arg_impl src)
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
       ->
-      assert false
+      Misc.fatal_error "Unexpected instruction in Ssa_reducer map_arg_impl"
   in
   let map_args (args : In.Instruction.t array) : Out.Instruction.t array =
     Array.map map_arg_impl args
@@ -396,7 +396,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
                 ->
                 Name_for_debugger
                   { ident; provenance; which_parameter; regs = map_args regs }
-              | Block_param _ | Proj _ | Tuple _ -> assert false
+              | Block_param _ | Proj _ | Tuple _ -> Misc.fatal_error "reducer found imp"
             in
             let new_i = emit_instruction b rewritten in
             match[@warning "-fragile-match"] i with
