@@ -372,9 +372,6 @@ let is_pure = function
   | Pause -> false
   | Alloc _ -> false
 
-let is_removable_when_unused op =
-  match[@warning "-fragile-match"] op with Alloc _ -> true | _ -> is_pure op
-
 (* The next 2 functions are copied almost as is from asmcomp/printmach.ml
    because there is no interface to call them. Eventually this won't be needed
    when we change cfg to have its own types rather than referring back to mach
