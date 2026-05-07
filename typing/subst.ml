@@ -84,14 +84,21 @@ type t = safe subst
 exception Module_type_path_substituted_away of Path.t * Types.module_type
 
 module Ikind_substitution = struct
-  type lookup_result =
+  type type_lookup_result =
     | Lookup_identity
     | Lookup_path of Path.t
     | Lookup_type_fun of type_expr list * type_expr
 
+  type jkind_lookup_result =
+    | Lookup_jkind_identity
+    | Lookup_jkind_path of Path.t
+    | Lookup_jkind_const of jkind_const_desc_lr
+
   let substitute_decl_ikind_with_lookup :
-      (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref =
-    ref (fun ~lookup:_ ikind_entry -> ikind_entry)
+      (lookup_type:(Path.t -> type_lookup_result) ->
+       lookup_jkind:(Path.t -> jkind_lookup_result) ->
+       type_ikind -> type_ikind) ref =
+    ref (fun ~lookup_type:_ ~lookup_jkind:_ ikind_entry -> ikind_entry)
 end
 
 let identity =
@@ -866,7 +873,8 @@ let rec type_declaration' copy_scope s decl =
     type_ikind = (
       (* Preserve constructor ikinds via [s.types] (path rename or identity-env
          inlined type functions), avoiding Env. *)
-      let lookup (path : Path.t) : Ikind_substitution.lookup_result =
+      let lookup_type (path : Path.t) :
+          Ikind_substitution.type_lookup_result =
         match Path.Map.find_opt path s.types with
         | Some (Path p) -> Lookup_path p
         | Some (Type_function { params; body }) ->
@@ -880,8 +888,19 @@ let rec type_declaration' copy_scope s decl =
           then Lookup_identity
           else Lookup_path path')
       in
+      let lookup_jkind (path : Path.t) :
+          Ikind_substitution.jkind_lookup_result =
+        match Path.Map.find_opt path s.jkinds with
+        | Some (Jkind_path p) -> Lookup_jkind_path p
+        | Some (Jkind_const jk) -> Lookup_jkind_const jk
+        | None ->
+          let path' = jkind_path s path in
+          if Path.same path path'
+          then Lookup_jkind_identity
+          else Lookup_jkind_path path'
+      in
       !Ikind_substitution.substitute_decl_ikind_with_lookup
-        ~lookup decl.type_ikind
+        ~lookup_type ~lookup_jkind decl.type_ikind
     );
     type_private = decl.type_private;
     type_variance = decl.type_variance;
