@@ -6,9 +6,9 @@ title: Intro
 
 # Introduction to Uniqueness
 
-See also the full feature [reference](../reference) and [common
-pitfalls](../pitfalls).  In this document, we use the new [syntax for
-modes](../../modes/syntax).
+See also the full feature [reference](../reference), [common
+pitfalls](../pitfalls), and [borrowing](../borrow). In this document, we use
+the new [syntax for modes](../../modes/syntax).
 
 The `unique` mode designates values that have only a single reference pointing
 to them. If an operation takes a `unique` argument, it will consume the only
