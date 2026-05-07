@@ -742,7 +742,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           Array.iter
             (fun (i : Instruction.t) ->
               match i with
-              | Op r when not (Operation.is_removable_when_unused r.op) ->
+              | Op r when not (Operation.is_pure r.op) ->
                 increment_use i
               | Name_for_debugger { regs; _ } -> Array.iter increment_use regs
               | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
