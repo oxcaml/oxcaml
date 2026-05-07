@@ -274,3 +274,8 @@ function caml_int_as_pointer(i) {
 function caml_is_null(o) {
   return o === null;
 }
+
+//Provides: caml_is_immediate
+function caml_is_immediate(o) {
+  return o === null || typeof o === "number";
+}

@@ -1,4 +1,10 @@
 (* TEST
+ flambda2;
+ {
+   native;
+ } {
+   bytecode;
+ }
 *)
 
 let x = Null

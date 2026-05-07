@@ -517,6 +517,14 @@
         (then (ref.i31 (i32.const 1)))
         (else (ref.i31 (i32.const 0)))))
 
+   (func (export "caml_is_immediate") (param $x (ref eq)) (result (ref eq))
+      (if (result (ref eq))
+         (i32.or
+            (ref.eq (local.get $x) (global.get $null))
+            (ref.test (ref i31) (local.get $x)))
+         (then (ref.i31 (i32.const 1)))
+         (else (ref.i31 (i32.const 0)))))
+
    (data $int_as_pointer_not_implemented "caml_int_as_pointer is not supported")
 
    (func (export "caml_int_as_pointer") (param $x (ref eq)) (result (ref eq))
