@@ -75,6 +75,11 @@ type 'format unit_infos_gen =
     mutable ui_requires_metaprogramming: bool;
                                           (* Requires metaprogramming libs *)
     mutable ui_external_symbols: string list; (* Set of external symbols *)
+    mutable ui_static_data:
+      Slambdaeval.value Slambdaeval.Or_missing.t;
+                                          (* Compile-time (comptime) value of
+                                             the unit's main module block, as
+                                             produced by [Slambda.eval]. *)
   }
 
 type unit_infos = Lambda.main_module_block_format unit_infos_gen
@@ -97,6 +102,8 @@ type unit_infos_raw =
                                       this record *)
     uir_sections_length: int;      (* Byte length of all sections *)
     uir_external_symbols: string array;
+    uir_static_data:
+      Slambdaeval.value Slambdaeval.Or_missing.t;
   }
 
 (* Each .a library has a matching .cmxa file that provides the following

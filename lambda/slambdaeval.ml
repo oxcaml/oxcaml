@@ -99,6 +99,42 @@ end = struct
 end
 
 include Types
+module Fmt = Format_doc
+
+let rec print_value ppf v =
+  match v with
+  | SLVhalves { slv_comptime; slv_runtime } ->
+    (* Mirror the [SLhalves] printer in [Printlambda]:
+       {c = <comptime>; r = ⟪ <runtime> ⟫}. *)
+    Fmt.fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]" print_value_or_missing
+      slv_comptime
+      (Fmt.deprecated Printlambda.lambda)
+      slv_runtime
+  | SLVlayout layout ->
+    Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
+  | SLVrecord fields ->
+    let print_fields ppf =
+      Array.iter
+        (fun field -> Fmt.fprintf ppf "%a;@ " print_value_or_missing field)
+        fields
+    in
+    Fmt.fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
+  | SLVclosure { clo_params; clo_body; clo_env = _ } ->
+    let print_params ppf =
+      Array.iter
+        (fun id ->
+          Fmt.fprintf ppf "%a@ " (Fmt.deprecated Slambdaident.print) id)
+        clo_params
+    in
+    Fmt.fprintf ppf "@[<2>(closure ⟨env⟩@ @[<2>%t->@]@ %a)@]" print_params
+      (Fmt.deprecated Printlambda.slambda)
+      clo_body
+
+and print_value_or_missing ppf = function
+  | Or_missing.Missing -> Fmt.fprintf ppf "(missing)"
+  | Or_missing.Present v -> print_value ppf v
+
+let print = print_value_or_missing
 
 type ctx = { cu_static_data : Compilation_unit.t -> value Or_missing.t }
 
