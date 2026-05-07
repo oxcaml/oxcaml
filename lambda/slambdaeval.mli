@@ -46,4 +46,5 @@ and value =
   | SLVrecord of value Or_missing.t array
   | SLVclosure of closure
 
-val eval : slambda -> halves
+val eval :
+  cu_static_data:(Compilation_unit.t -> value Or_missing.t) -> slambda -> halves

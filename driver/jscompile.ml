@@ -46,6 +46,11 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          program.code
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval
+              ~cu_static_data:(fun cu ->
+                Misc.fatal_errorf
+                  "Slambda eval: cross-module evaluation not implemented (unit \
+                   %s)"
+                  (Compilation_unit.full_path_as_string cu))
               (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
          |> fun { Slambda.slv_comptime = _; slv_runtime } ->
          (* CR layout poly: Drop the comptime part until top-level modules can
