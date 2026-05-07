@@ -6,7 +6,7 @@ import {
   readyForOptions,
   runString,
   utopString,
-} from "./backend.js?v=20260506-ppx-driver";
+} from "./backend.js?v=20260507-webkit-worker-fallback";
 import {
   EditorState,
   RangeSetBuilder,
