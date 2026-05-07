@@ -813,58 +813,6 @@ end = struct
   (* CR-someday bclement (and lmaurer): We could turn this into a functor over
      three [Tree] instances and get arbitrary combinations of taking and
      returning sets and maps. *)
-  let[@inline always] pattern_match_pair t0 t1 ~join ~leaf
-      ~(branch : ?t00:_ -> ?t01:_ -> ?t10:_ -> ?t11:_ -> prefix_and_bit -> _) =
-    match tree_descr t0, tree_descr t1 with
-    (* Leaf/Leaf cases *)
-    | Leaf l0, Leaf l1 ->
-      let i0, i1 = leaf_key l0, leaf_key l1 in
-      if i0 = i1
-      then (leaf [@inlined hint]) i0 (leaf_datum l0) (leaf_datum l1)
-      else (join [@inlined hint]) i0 i1
-    (* Leaf/Branch cases *)
-    | Leaf l0, Branch b1 ->
-      let i = leaf_key l0 in
-      let prefix_and_bit = branch_prefix_and_bit b1 in
-      let prefix, bit = unpack prefix_and_bit in
-      if match_prefix i prefix bit
-      then
-        let t10, t11 = branch0 b1, branch1 b1 in
-        if zero_bit i bit
-        then (branch [@inlined hint]) prefix_and_bit ~t00:t0 ~t10 ~t11
-        else (branch [@inlined hint]) prefix_and_bit ~t01:t0 ~t10 ~t11
-      else (join [@inlined hint]) i prefix
-    | Branch b0, Leaf l1 ->
-      let i = leaf_key l1 in
-      let prefix_and_bit = branch_prefix_and_bit b0 in
-      let prefix, bit = unpack prefix_and_bit in
-      if match_prefix i prefix bit
-      then
-        let t00, t01 = branch0 b0, branch1 b0 in
-        if zero_bit i bit
-        then (branch [@inlined hint]) prefix_and_bit ~t00 ~t01 ~t10:t1
-        else (branch [@inlined hint]) prefix_and_bit ~t00 ~t01 ~t11:t1
-      else (join [@inlined hint]) prefix i
-    (* Branch/Branch case *)
-    | Branch b0, Branch b1 ->
-      let prefix_and_bit0, t00, t01 = branch_descr b0 in
-      let prefix_and_bit1, t10, t11 = branch_descr b1 in
-      if prefix_and_bit0 = prefix_and_bit1
-      then (branch [@inlined hint]) prefix_and_bit0 ~t00 ~t01 ~t10 ~t11
-      else
-        let prefix0, bit0 = unpack prefix_and_bit0 in
-        let prefix1, bit1 = unpack prefix_and_bit1 in
-        if includes_prefix prefix0 bit0 prefix1 bit1
-        then
-          if zero_bit prefix1 bit0
-          then (branch [@inlined hint]) prefix_and_bit0 ~t00 ~t01 ~t10:t1
-          else (branch [@inlined hint]) prefix_and_bit0 ~t00 ~t01 ~t11:t1
-        else if includes_prefix prefix1 bit1 prefix0 bit0
-        then
-          if zero_bit prefix0 bit1
-          then (branch [@inlined hint]) prefix_and_bit1 ~t00:t0 ~t10 ~t11
-          else (branch [@inlined hint]) prefix_and_bit1 ~t01:t0 ~t10 ~t11
-        else (join [@inlined hint]) prefix0 prefix1
 
   (* The following [phys_eq_XXX] helpers are used by [pattern_match_pair_merge]
      below to exploit physical equality.
@@ -932,13 +880,92 @@ end = struct
       ~both_sides iv combine t0 t1 =
     match (phys_eq_shortcut [@inlined hint]) iv t0 t1 with
     | Some t' -> t'
-    | None ->
-      pattern_match_pair t0 t1
-        ~leaf:(fun i d0 d1 ->
+    | None -> (
+      let[@local] join prefix0 prefix1 =
+        join_descr iv ~empty ~of_tree prefix0
+          ((only_left [@inlined hint]) t0)
+          prefix1
+          ((only_right [@inlined hint]) t1)
+      in
+      let[@local] rebuild_branch prefix_and_bit t0' t1' =
+        of_tree (branch_non_empty prefix_and_bit t0' t1')
+      in
+      let[@local] rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11 =
+        match
+          (phys_eq_check_branch_right [@inlined hint]) ~orig_t:t1 ~orig_t0:t10
+            ~orig_t1:t11 t0' t1'
+        with
+        | Some t' -> of_tree t'
+        | None -> rebuild_branch prefix_and_bit t0' t1'
+      in
+      let[@local] rebuild_branch_share_left prefix_and_bit t0' t1' ~t00 ~t01 =
+        match
+          (phys_eq_check_branch_left [@inlined hint]) ~orig_t:t0 ~orig_t0:t00
+            ~orig_t1:t01 t0' t1'
+        with
+        | Some t' -> of_tree t'
+        | None -> rebuild_branch prefix_and_bit t0' t1'
+      in
+      let[@local] rebuild_branch_share_both prefix_and_bit t0' t1' ~t00 ~t01
+          ~t10 ~t11 =
+        match
+          (phys_eq_check_branch_left [@inlined hint]) ~orig_t:t0 ~orig_t0:t00
+            ~orig_t1:t01 t0' t1'
+        with
+        | Some t' -> of_tree t'
+        | None -> rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11
+      in
+      let[@local] branch_left_only0 prefix_and_bit ~t10 ~t11 =
+        let t0' = (both_sides [@inlined hint]) t0 t10 in
+        let t1' = (only_right [@inlined hint]) t11 in
+        match t0', t1' with
+        | Empty, Empty -> empty iv
+        | Empty, Non_empty t1' -> of_tree t1'
+        | Non_empty t0', Empty -> of_tree t0'
+        | Non_empty t0', Non_empty t1' ->
+          rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11
+      in
+      let[@local] branch_left_only1 prefix_and_bit ~t10 ~t11 =
+        let t0' = (only_right [@inlined hint]) t10 in
+        let t1' = (both_sides [@inlined hint]) t0 t11 in
+        match t0', t1' with
+        | Empty, Empty -> empty iv
+        | Empty, Non_empty t1' -> of_tree t1'
+        | Non_empty t0', Empty -> of_tree t0'
+        | Non_empty t0', Non_empty t1' ->
+          rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11
+      in
+      let[@local] branch_right_only0 prefix_and_bit ~t00 ~t01 =
+        let t0' = (both_sides [@inlined hint]) t00 t1 in
+        let t1' = (only_left [@inlined hint]) t01 in
+        match t0', t1' with
+        | Empty, Empty -> empty iv
+        | Empty, Non_empty t1' -> of_tree t1'
+        | Non_empty t0', Empty -> of_tree t0'
+        | Non_empty t0', Non_empty t1' ->
+          rebuild_branch_share_left prefix_and_bit t0' t1' ~t00 ~t01
+      in
+      let[@local] branch_right_only1 prefix_and_bit ~t00 ~t01 =
+        let t0' = (only_left [@inlined hint]) t00 in
+        let t1' = (both_sides [@inlined hint]) t01 t1 in
+        match t0', t1' with
+        | Empty, Empty -> empty iv
+        | Empty, Non_empty t1' -> of_tree t1'
+        | Non_empty t0', Empty -> of_tree t0'
+        | Non_empty t0', Non_empty t1' ->
+          rebuild_branch_share_left prefix_and_bit t0' t1' ~t00 ~t01
+      in
+      match tree_descr t0, tree_descr t1 with
+      (* Leaf/Leaf cases *)
+      | Leaf l0, Leaf l1 ->
+        let i0, i1 = leaf_key l0, leaf_key l1 in
+        if i0 = i1
+        then
+          let d0, d1 = leaf_datum l0, leaf_datum l1 in
           (* NB: [combine] does not have an [@inlined hint] annotation because
              it is expected that this is the merge function passed from the user
              (e.g. argument of [merge] or [union]). *)
-          match combine i d0 d1 with
+          match combine i0 d0 d1 with
           | None -> empty iv
           | Some d -> (
             match
@@ -951,57 +978,60 @@ end = struct
                   d
               with
               | Some t' -> of_tree t'
-              | None -> of_tree (leaf iv i d))))
-        ~join:(fun prefix0 prefix1 ->
-          join_descr iv ~empty ~of_tree prefix0
-            ((only_left [@inlined hint]) t0)
-            prefix1
-            ((only_right [@inlined hint]) t1))
-        ~branch:(fun ?t00 ?t01 ?t10 ?t11 prefix_and_bit ->
-          (* We expect all of the constructors for the arguments to be
-             statically known here, so the matches below should get simplified
-             to a single path depending on context. *)
-          let both_sides' t0 t1 =
-            match t0, t1 with
-            | None, None -> assert false
-            | Some t0, None -> (only_left [@inlined hint]) t0
-            | None, Some t1 -> (only_right [@inlined hint]) t1
-            | Some t0, Some t1 -> (both_sides [@inlined hint]) t0 t1
-              [@@inline always]
-          in
-          let t0' = both_sides' t00 t10 in
-          let t1' = both_sides' t01 t11 in
+              | None -> of_tree (leaf iv i0 d)))
+        else join i0 i1
+      (* Leaf/Branch cases *)
+      | Leaf l0, Branch b1 ->
+        let i = leaf_key l0 in
+        let prefix_and_bit = branch_prefix_and_bit b1 in
+        let prefix, bit = unpack prefix_and_bit in
+        if match_prefix i prefix bit
+        then
+          let t10, t11 = branch0 b1, branch1 b1 in
+          if zero_bit i bit
+          then branch_left_only0 prefix_and_bit ~t10 ~t11
+          else branch_left_only1 prefix_and_bit ~t10 ~t11
+        else join i prefix
+      | Branch b0, Leaf l1 ->
+        let i = leaf_key l1 in
+        let prefix_and_bit = branch_prefix_and_bit b0 in
+        let prefix, bit = unpack prefix_and_bit in
+        if match_prefix i prefix bit
+        then
+          let t00, t01 = branch0 b0, branch1 b0 in
+          if zero_bit i bit
+          then branch_right_only0 prefix_and_bit ~t00 ~t01
+          else branch_right_only1 prefix_and_bit ~t00 ~t01
+        else join prefix i
+      (* Branch/Branch case *)
+      | Branch b0, Branch b1 ->
+        let prefix_and_bit0, t00, t01 = branch_descr b0 in
+        let prefix_and_bit1, t10, t11 = branch_descr b1 in
+        if prefix_and_bit0 = prefix_and_bit1
+        then
+          let t0' = (both_sides [@inlined hint]) t00 t10 in
+          let t1' = (both_sides [@inlined hint]) t01 t11 in
           match t0', t1' with
           | Empty, Empty -> empty iv
           | Empty, Non_empty t1' -> of_tree t1'
           | Non_empty t0', Empty -> of_tree t0'
           | Non_empty t0', Non_empty t1' ->
-            let[@local] branch () =
-              of_tree (branch_non_empty prefix_and_bit t0' t1')
-            in
-            let[@local] branch1 () =
-              match t10, t11 with
-              | None, _ | _, None -> branch ()
-              | Some t10, Some t11 -> (
-                match
-                  (phys_eq_check_branch_right [@inlined hint]) ~orig_t:t1
-                    ~orig_t0:t10 ~orig_t1:t11 t0' t1'
-                with
-                | Some t' -> of_tree t'
-                | None -> branch ())
-            in
-            let[@local] branch0 () =
-              match t00, t01 with
-              | None, _ | _, None -> branch1 ()
-              | Some t00, Some t01 -> (
-                match
-                  (phys_eq_check_branch_left [@inlined hint]) ~orig_t:t0
-                    ~orig_t0:t00 ~orig_t1:t01 t0' t1'
-                with
-                | Some t' -> of_tree t'
-                | None -> branch1 ())
-            in
-            branch0 ())
+            rebuild_branch_share_both prefix_and_bit0 t0' t1' ~t00 ~t01 ~t10
+              ~t11
+        else
+          let prefix0, bit0 = unpack prefix_and_bit0 in
+          let prefix1, bit1 = unpack prefix_and_bit1 in
+          if includes_prefix prefix0 bit0 prefix1 bit1
+          then
+            if zero_bit prefix1 bit0
+            then branch_right_only0 prefix_and_bit0 ~t00 ~t01
+            else branch_right_only1 prefix_and_bit0 ~t00 ~t01
+          else if includes_prefix prefix1 bit1 prefix0 bit0
+          then
+            if zero_bit prefix0 bit1
+            then branch_left_only0 prefix_and_bit1 ~t10 ~t11
+            else branch_left_only1 prefix_and_bit1 ~t10 ~t11
+          else join prefix0 prefix1)
 
   let pattern_match_pair_merge_total ~only_left ~only_right =
     pattern_match_pair_merge
