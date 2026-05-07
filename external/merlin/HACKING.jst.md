@@ -42,6 +42,10 @@ Note that we are currently only running a subset of the Merlin testsuite, as com
 See the comments in various dune files under `tests/` for the specific reasons
 we have disabled specific tests for.
 
+# Promoting tests
+
+`make test-promote` is the same as `make test`, except that it will also pass `--auto-promote` to dune, which will cause the tests to be promoted.
+
 # Writing tests
 
 Merlin's tests are cram tests. To add a new test, do either of the following:
