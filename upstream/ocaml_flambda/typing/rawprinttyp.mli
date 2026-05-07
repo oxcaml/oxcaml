@@ -2,9 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*        Xavier Leroy, Collège de France and Inria project Cambium       *)
+(*  Jacques Garrigue, Graduate School of Mathematics, Nagoya University   *)
 (*                                                                        *)
-(*   Copyright 2023 Institut National de Recherche en Informatique et     *)
+(*   Copyright 2003 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
@@ -13,19 +13,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-external zstd_initialize: unit -> bool = "caml_zstd_initialize"
+(** This module provides function(s) for printing the internal representation of
+    type expressions. It is targetted at internal use when debbuging the
+    compiler itself. *)
 
-let compression_supported = zstd_initialize ()
-
-type [@warning "-unused-constructor"] extern_flags =
-    No_sharing                          (** Don't preserve sharing *)
-  | Closures                            (** Send function closures *)
-  | Compat_32                           (** Ensure 32-bit compatibility *)
-  | Compression                         (** Optional compression *)
-
-external to_channel: out_channel -> 'a -> extern_flags list -> unit
-                   = "caml_output_value"
-
-let output_value ch v = to_channel ch v [Compression]
-
-let input_value = Stdlib.input_value
+val type_expr: Format.formatter -> Types.type_expr -> unit
+val row_field: Format.formatter -> Types.row_field -> unit
+val row_desc: Format.formatter -> Types.row_desc -> unit

@@ -43,5 +43,3 @@ type link_mode =
    `link_mode` is `Dll`, but that didn't seem to work.  Understand why. *)
 val call_linker:
   ?native_toplevel:bool -> link_mode -> string -> string list -> string -> int
-
-val linker_is_flexlink : bool

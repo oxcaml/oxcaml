@@ -17,6 +17,70 @@
 
 open Types
 
+type abstract_type_constr = [
+  | `Int
+  | `Char
+  | `String
+  | `Bytes
+  | `Float
+  | `Continuation
+  | `Array
+  | `Nativeint
+  | `Int32
+  | `Int64
+  | `Lazy_t
+  | `Extension_constructor
+  | `Floatarray
+  | `Iarray
+  | `Atomic_loc
+  | `Lexing_position
+  | `Code
+  | `Float32
+  | `Int8
+  | `Int16
+]
+type abstract_non_value_type_constr = [
+  | `Idx_imm
+  | `Idx_mut
+  | `Int8x16
+  | `Int16x8
+  | `Int32x4
+  | `Int64x2
+  | `Float16x8
+  | `Float32x4
+  | `Float64x2
+  | `Int8x32
+  | `Int16x16
+  | `Int32x8
+  | `Int64x4
+  | `Float16x16
+  | `Float32x8
+  | `Float64x4
+  | `Int8x64
+  | `Int16x32
+  | `Int32x16
+  | `Int64x8
+  | `Float16x32
+  | `Float32x16
+  | `Float64x8
+]
+type data_type_constr = [
+  | `Bool
+  | `Unit
+  | `Exn
+  | `Eff
+  | `List
+  | `Option
+  | `Or_null
+]
+type type_constr = [
+  | abstract_type_constr
+  | abstract_non_value_type_constr
+  | data_type_constr
+]
+
+val find_type_constr : Path.t -> type_constr option
+
 val type_int: type_expr
 val type_char: type_expr
 val type_string: type_expr
@@ -26,6 +90,8 @@ val type_float32: type_expr
 val type_bool: type_expr
 val type_unit: type_expr
 val type_exn: type_expr
+val type_eff: type_expr -> type_expr
+val type_continuation: type_expr -> type_expr -> type_expr
 val type_array: type_expr -> type_expr
 val type_iarray: type_expr -> type_expr
 val type_list: type_expr -> type_expr
@@ -110,6 +176,7 @@ val path_float32: Path.t
 val path_bool: Path.t
 val path_unit: Path.t
 val path_exn: Path.t
+val path_eff: Path.t
 val path_array: Path.t
 val path_iarray: Path.t
 val path_list: Path.t
@@ -122,6 +189,7 @@ val path_int64: Path.t
 val path_lazy_t: Path.t
 val path_extension_constructor: Path.t
 val path_floatarray: Path.t
+val path_continuation: Path.t
 val path_lexing_position: Path.t
 val path_code: Path.t
 val path_eval: Path.t

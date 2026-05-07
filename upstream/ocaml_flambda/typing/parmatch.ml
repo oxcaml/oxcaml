@@ -18,6 +18,7 @@
 open Misc
 open Asttypes
 open Types
+open Data_types
 open Typedtree
 
 type error = Float32_match
@@ -348,8 +349,8 @@ let records_args l1 l2 =
 module Compat
     (Constr:sig
       val equal :
-          Types.constructor_description ->
-            Types.constructor_description ->
+          Data_types.constructor_description ->
+            Data_types.constructor_description ->
               bool
     end) = struct
 
@@ -412,12 +413,13 @@ module Compat
         Option.equal String.equal p_label q_label
         && compat p q && unboxed_tuple_compat labeled_ps labeled_qs
     | _,_    -> false
+
 end
 
 module SyntacticCompat =
   Compat
     (struct
-      let equal c1 c2 =  Types.equal_tag c1.cstr_tag c2.cstr_tag
+      let equal = Data_types.equal_constr
     end)
 
 let compat =  SyntacticCompat.compat
@@ -452,7 +454,7 @@ let simple_match d h =
   let open Patterns.Head in
   match d.pat_desc, h.pat_desc with
   | Construct c1, Construct c2 ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag
+      Data_types.equal_constr c1 c2
   | Variant { tag = t1; _ }, Variant { tag = t2 } ->
       t1 = t2
   | Constant c1, Constant c2 -> const_compare c1 c2 = 0
@@ -613,13 +615,11 @@ let rec read_args xs r = match xs,r with
 | _,_ ->
     fatal_error "Parmatch.read_args"
 
-let do_set_args ~erase_mutable q r = match q with
-| {pat_desc = Tpat_tuple omegas} ->
-    let args,rest = read_args (List.map snd omegas) r in
-    make_pat
-      (Tpat_tuple
-        (List.map2 (fun (lbl, _) arg -> lbl, arg) omegas args))
-      q.pat_type q.pat_env::rest
+let set_args q r = match q with
+| {pat_desc = Tpat_tuple lbls_omegas} ->
+    let lbls, omegas = List.split lbls_omegas in
+    let args, rest = read_args omegas r in
+    make_pat (Tpat_tuple (List.combine lbls args)) q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_unboxed_tuple omegas} ->
     let args,rest =
       read_args (List.map (fun (_, pat, _) -> pat) omegas) r
@@ -627,33 +627,18 @@ let do_set_args ~erase_mutable q r = match q with
     make_pat
       (Tpat_unboxed_tuple
         (List.map2 (fun (lbl, _, sort) arg -> lbl, arg, sort) omegas args))
-      q.pat_type q.pat_env::rest
+      q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_record (omegas,closed)} ->
     let args,rest = read_args omegas r in
-    make_pat
-      (Tpat_record
-         (List.map2 (fun (lid, lbl,_) arg ->
-           if erase_mutable && Types.is_mutable lbl.lbl_mut
-           then
-             lid, lbl, omega
-           else
-             lid, lbl, arg)
-            omegas args, closed))
-      q.pat_type q.pat_env::
-    rest
+    let args =
+      List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
+    make_pat (Tpat_record (args, closed)) q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_record_unboxed_product (omegas,closed)} ->
     let args,rest = read_args omegas r in
-    make_pat
-      (Tpat_record_unboxed_product
-         (List.map2 (fun (lid, lbl,_) arg ->
-           if Types.is_mutable lbl.lbl_mut then
-             fatal_error
-               "Parmatch.do_set_args: unboxed record labels are never mutable"
-           else
-             lid, lbl, arg)
-            omegas args, closed))
-      q.pat_type q.pat_env::
-    rest
+    let args =
+      List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
+    make_pat (Tpat_record_unboxed_product (args, closed))
+      q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_construct (lid, c, omegas, _)} ->
     let args,rest = read_args omegas r in
     make_pat
@@ -678,18 +663,13 @@ let do_set_args ~erase_mutable q r = match q with
     end
 | {pat_desc = Tpat_array (am, arg_sort, omegas)} ->
     let args,rest = read_args omegas r in
-    let args = if erase_mutable then omegas else args in
     make_pat
-      (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env::
-    rest
+      (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env :: rest
 | {pat_desc=Tpat_constant _|Tpat_any|Tpat_unboxed_unit|Tpat_unboxed_bool _} ->
     q::r (* case any is used in matching.ml *)
 | {pat_desc =
      (Tpat_var _ | Tpat_fun_layout _ | Tpat_alias _ | Tpat_or _); _} ->
     fatal_error "Parmatch.set_args"
-
-let set_args q r = do_set_args ~erase_mutable:false q r
-and set_args_erase_mutable q r = do_set_args ~erase_mutable:true q r
 
 (* Given a matrix of non-empty rows
    p1 :: r1...
@@ -1501,8 +1481,8 @@ let print_pat pat =
         Printf.sprintf "(%s)" (String.concat "," (List.map string_of_pat list))
       | Tpat_variant (_, _, _) -> "variant"
       | Tpat_record (_, _) -> "record"
-      | Tpat_array _ -> "array"
-      | Tpat_immutable_array _ -> "immutable array"
+      | Tpat_array (Mutable, _) -> "array"
+      | Tpat_array (Immutable, _) -> "immutable array"
   in
   Printf.fprintf stderr "PAT[%s]\n%!" (string_of_pat pat)
 *)
@@ -1935,7 +1915,7 @@ let rec le_pat p q =
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
   | Tpat_construct(_,c1,ps,_), Tpat_construct(_,c2,qs,_) ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag && le_pats ps qs
+      Data_types.equal_constr c1 c2 && le_pats ps qs
   | Tpat_variant(l1,Some p1,_), Tpat_variant(l2,Some p2,_) ->
       (l1 = l2 && le_pat p1 p2)
   | Tpat_variant(l1,None,_r1), Tpat_variant(l2,None,_) ->
@@ -2009,7 +1989,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     let r = lub p q in
     make_pat (Tpat_lazy r) p.pat_type p.pat_env
 | Tpat_construct (lid,c1,ps1,_), Tpat_construct (_,c2,ps2,_)
-      when  Types.equal_tag c1.cstr_tag c2.cstr_tag  ->
+      when Data_types.equal_constr c1 c2 ->
         let rs = lubs ps1 ps2 in
         make_pat (Tpat_construct (lid, c1, rs, None))
           p.pat_type p.pat_env
@@ -2022,8 +2002,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
               when l1 = l2 -> p
 | Tpat_record (l1,closed),Tpat_record (l2,_) ->
     let rs = record_lubs l1 l2 in
-    make_pat (Tpat_record (rs, closed))
-      p.pat_type p.pat_env
+    make_pat (Tpat_record (rs, closed)) p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
       when am1 = am2 && List.length ps = List.length qs ->
         let rs = lubs ps qs in
@@ -2161,27 +2140,27 @@ let do_check_partial ~pred loc casel pss = match pss with
     match counter_examples () with
     | Seq.Nil -> Total
     | Seq.Cons (v, _rest) ->
-      if Warnings.is_active (Warnings.Partial_match "") then begin
-        let errmsg =
-          try
-            let buf = Buffer.create 16 in
-            let fmt = Format.formatter_of_buffer buf in
-            Format.fprintf fmt "%a@?" Printpat.Compat.pretty_pat v;
+      if Warnings.is_active (Warnings.Partial_match Format_doc.Doc.empty) then
+        begin
+          let errmsg =
+            let doc = ref Format_doc.Doc.empty in
+            let fmt = Format_doc.formatter doc in
+            Format_doc.fprintf fmt "@[<v>%a"
+              (Misc.Style.as_inline_code Printpat.top_pretty) v;
             if do_match (initial_only_guarded casel) [v] then
-              Buffer.add_string buf
-                "\n(However, some guarded clause may match this value.)";
+              Format_doc.fprintf fmt
+                "@,(However, some guarded clause may match this value.)";
             if contains_extension v then
-              Buffer.add_string buf
-                "\nMatching over values of extensible variant types \
-                   (the *extension* above)\n\
-              must include a wild card pattern in order to be exhaustive."
+              Format_doc.fprintf fmt
+                "@,@[Matching over values of extensible variant types \
+                 (the *extension* above)@,\
+                 must include a wild card pattern@ in order to be exhaustive.@]"
             ;
-            Buffer.contents buf
-          with _ ->
-            ""
-        in
-        Location.prerr_warning loc (Warnings.Partial_match errmsg)
-      end;
+            Format_doc.fprintf fmt "@]";
+            !doc
+          in
+          Location.prerr_warning loc (Warnings.Partial_match errmsg)
+        end;
       Partial
 
 (*****************)

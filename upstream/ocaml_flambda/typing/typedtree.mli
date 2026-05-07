@@ -246,7 +246,8 @@ and 'k pattern_desc =
         (** #() *)
   | Tpat_unboxed_bool : bool -> value pattern_desc
         (** #false, #true *)
-  | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
+  | Tpat_tuple :
+      (string option * value general_pattern) list -> value pattern_desc
         (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
             (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
             Any mix, e.g. (L1:P1, P2)      [(Some L1,P1); ...; (None,P2)])
@@ -263,7 +264,7 @@ and 'k pattern_desc =
             Invariant: n >= 2
          *)
   | Tpat_construct :
-      Longident.t loc * Types.constructor_description *
+      Longident.t loc * Data_types.constructor_description *
         value general_pattern list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
@@ -287,17 +288,22 @@ and 'k pattern_desc =
             See {!Types.row_desc} for an explanation of the last parameter.
          *)
   | Tpat_record :
-      (Longident.t loc * Types.label_description * value general_pattern) list *
-        closed_flag ->
-      value pattern_desc
+      (Longident.t loc
+       * Data_types.label_description
+       * value general_pattern
+      ) list
+      * closed_flag
+      -> value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
 
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
-      (Longident.t loc * Types.unboxed_label_description * value general_pattern) list *
-        closed_flag ->
+      (Longident.t loc
+       * Data_types.unboxed_label_description
+       * value general_pattern) list
+      * closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -305,7 +311,8 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_array :
-      Types.mutability * Jkind.sort * value general_pattern list -> value pattern_desc
+      Types.mutability * Jkind.sort * value general_pattern list ->
+      value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
@@ -454,7 +461,7 @@ and expression_desc =
       (** fun P0 P1 -> function p1 -> e1 | p2 -> e2  (body = Tfunction_cases _)
           fun P0 P1 -> E                             (body = Tfunction_body _)
           This construct has the same arity as the originating
-          {{!Parsetree.Pexp_function}[Pexp_function]}.
+          {{!Parsetree.expression_desc.Pexp_function}[Pexp_function]}.
           Arity determines when side-effects for effectful parameters are run
           (e.g. optional argument defaults, matching against lazy patterns).
           Parameters' effects are run left-to-right when an n-ary function is
@@ -475,22 +482,29 @@ and expression_desc =
             The resulting typedtree for the application is:
             Texp_apply (Texp_ident "f/1037",
                         [(Nolabel, Omitted _);
-                         (Labelled "y", Some (Texp_constant Const_int 3))
+                         (Labelled "y", Arg (Texp_constant Const_int 3))
                         ])
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
-  | Texp_match of expression * Jkind.sort * computation case list * partial
+  | Texp_match of
+      expression * Jkind.sort * computation case list * value case list *
+      partial
         (** match E0 with
             | P1 -> E1
             | P2 | exception P3 -> E2
             | exception P4 -> E3
+            | effect P4 k -> E4
 
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
-                              (exception P4, E3)], _)]
+                              (exception P4, E3)], [(P4, E4)], _)]
          *)
-  | Texp_try of expression * value case list
-        (** try E with P1 -> E1 | ... | PN -> EN *)
+  | Texp_try of expression * value case list * value case list
+        (** try E with
+          | P1 -> E1
+          | effect P2 k -> E2
+          [Texp_try (E, [(P1, E1)], [(P2, E2)])]
+        *)
   | Texp_unboxed_unit
         (** #() *)
   | Texp_unboxed_bool of bool
@@ -514,7 +528,7 @@ and expression_desc =
                 when [el] is [(Some L1, E1, s1); (None, E2, s2)]
           *)
   | Texp_construct of
-      Longident.t loc * Types.constructor_description *
+      Longident.t loc * Data_types.constructor_description *
       expression list * alloc_mode option
         (** C                []
             C E              [E]
@@ -530,7 +544,7 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
-      fields : ( Types.label_description * record_label_definition ) array;
+      fields : ( Data_types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
@@ -550,7 +564,9 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record_unboxed_product of {
-      fields : ( Types.unboxed_label_description * record_label_definition ) array;
+      fields :
+        ( Data_types.unboxed_label_description
+          * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -566,20 +582,20 @@ and expression_desc =
                 extended_expression = Some E0 }
           *)
   | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * Types.label_description *
+      expression * Jkind.sort * Longident.t loc * Data_types.label_description *
       alloc_mode
   | Texp_field of expression * Jkind.sort * Longident.t loc *
-      Types.label_description * texp_field_boxing * Unique_barrier.t
+      Data_types.label_description * texp_field_boxing * Unique_barrier.t
     (** - The sort is the sort of the whole record (which may be non-value if
           the record is @@unboxed).
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
   | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
-        unique_use
+      expression * Jkind.sort * Longident.t loc *
+      Data_types.unboxed_label_description * unique_use
   | Texp_setfield of
       expression * Mode.Locality.l * Longident.t loc *
-      Types.label_description * expression
+      Data_types.label_description * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
@@ -644,9 +660,22 @@ and expression_desc =
   | Texp_quotation of expression
   | Texp_antiquotation of expression
 
+and meth =
+    Tmeth_name of string
+  | Tmeth_val of Ident.t
+  | Tmeth_ancestor of Ident.t * Path.t
+
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }
   | Final_arg
+
+and 'k case =
+    {
+     c_lhs: 'k general_pattern;
+     c_cont: Ident.t option;
+     c_guard: expression option;
+     c_rhs: expression;
+    }
 
 and function_param =
   {
@@ -721,17 +750,13 @@ and ident_kind =
   | Id_value
   | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
 
-and meth =
-    Tmeth_name of string
-  | Tmeth_val of Ident.t
-  | Tmeth_ancestor of Ident.t * Path.t
-
 and block_access =
-  | Baccess_field of Longident.t loc * Types.label_description
+  | Baccess_field of Longident.t loc * Data_types.label_description
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * Data_types.unboxed_label_description
 
 and comprehension =
   {
@@ -769,13 +794,6 @@ and comprehension_iterator =
       { pattern  : pattern
       ; sequence : expression }
 
-and 'k case =
-    {
-     c_lhs: 'k general_pattern;
-     c_guard: expression option;
-     c_rhs: expression;
-    }
-
 and record_label_definition =
   | Kept of Types.type_expr * Types.mutability * unique_use
   | Overridden of Longident.t loc * expression
@@ -799,14 +817,14 @@ and ('a, 'b) arg_or_omitted =
   | Arg of 'a (* an argument actually passed to a function *)
   | Omitted of 'b (* an argument not passed due to partial application *)
 
+and apply_arg = (expression * Jkind.sort, omitted_parameter) arg_or_omitted
+
 and omitted_parameter =
   { mode_closure : Mode.Alloc.r;
     mode_arg : Mode.Alloc.l;
     mode_ret : Mode.Alloc.l;
     sort_arg : Jkind.sort;
     sort_ret : Jkind.sort }
-
-and apply_arg = (expression * Jkind.sort, omitted_parameter) arg_or_omitted
 
 and apply_position =
   | Tail          (* must be tail-call optimised *)
@@ -992,6 +1010,9 @@ and module_coercion =
         struct module Sub = Some_alias end
       ]}
       Only occurs inside a [Tcoerce_structure] coercion. *)
+  | Tcoerce_invalid
+  (** This coercion is only constructed by the recursive module consistency
+      check, whose result is discarded. It's a bug if it shows up anywhere. *)
 
 and module_type =
   { mty_desc: module_type_desc;
@@ -1175,10 +1196,10 @@ and core_type_desc =
           argument ([lbl:[%call_pos] -> ...]). *)
 
 and package_type = {
-  pack_path : Path.t;
-  pack_fields : (Longident.t loc * core_type) list;
-  pack_type : Types.module_type;
-  pack_txt : Longident.t loc;
+  tpt_path : Path.t;
+  tpt_cstrs : (Longident.t loc * core_type) list;
+  tpt_type : Types.module_type;
+  tpt_txt : Longident.t loc;
 }
 
 and row_field = {
@@ -1493,12 +1514,6 @@ val pat_bound_idents_full:
 val split_pattern:
   computation general_pattern -> pattern option * pattern option
 
-(** Returns a format document if the expression reads nicely as the subject of a
-    sentence in a error message. *)
-val nominal_exp_doc :
-  Longident.t Format_doc.printer -> expression
-  -> Format_doc.t option
-
 (** Calculates the syntactic arity of a function based on its parameters and body. *)
 val function_arity : function_param list -> function_body -> int
 
@@ -1515,3 +1530,6 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 (** Fold over the antiquotations in an expression. This function defines the
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
+
+val map_apply_arg:
+  ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
