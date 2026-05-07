@@ -43,7 +43,31 @@ type t = Warnings.loc = {
   loc_start: Lexing.position;
   loc_end: Lexing.position;
   loc_ghost: bool;
-}
+  }
+(** [t] represents a range of characters in the source code.
+
+    loc_ghost=false whenever the AST described by the location can be parsed
+    from the location. In all other cases, loc_ghost must be true. Most
+    locations produced by the parser have loc_ghost=false.
+    When loc_ghost=true, the location is usually a best effort approximation.
+
+    This info is used by tools like merlin that want to relate source code with
+    parsetrees or later asts. ocamlprof skips instrumentation of ghost nodes.
+
+    Example: in `let f x = x`, we have:
+    - a structure item at location "let f x = x"
+    - a pattern "f" at location "f"
+    - an expression "fun x -> x" at location "x = x" with loc_ghost=true
+    - a pattern "x" at location "x"
+    - an expression "x" at location "x"
+    In this case, every node has loc_ghost=false, except the node "fun x -> x",
+    since [Parser.expression (Lexing.from_string "x = x")] would fail to parse.
+    By contrast, in `let f = fun x -> x`, every node has loc_ghost=false.
+
+    Line directives can modify the filenames and line numbers arbitrarily,
+    which is orthogonal to loc_ghost, which describes the range of characters
+    from loc_start.pos_cnum to loc_end.pos_cnum in the parsed string.
+ *)
 
 (** Note on the use of Lexing.position in this module.
    If [pos_fname = ""], then use [!input_name] instead.
@@ -250,7 +274,12 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   source : error_source;
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+=======
+  footnote: Format_doc.t option
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 }
 
 (* Exposed for Merlin *)
@@ -382,12 +411,39 @@ val deprecated_script_alert: string -> unit
 type error = report
 (** An [error] is a [report] which [report_kind] must be [Report_error]. *)
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val error: ?loc:t -> ?sub:msg list -> ?source:error_source -> string -> error
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+val error: ?loc:t -> ?sub:msg list -> string -> error
+=======
+type delayed_msg = unit -> Format_doc.t option
 
+val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg -> string -> error
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val errorf: ?loc:t -> ?sub:msg list -> ?source:error_source ->
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+val errorf: ?loc:t -> ?sub:msg list ->
+=======
+val errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   ('a, Format_doc.formatter, unit, error) format4 -> 'a
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val error_of_printer: ?loc:t -> ?sub:msg list -> ?source:error_source ->
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+val error_of_printer: ?loc:t -> ?sub:msg list ->
+=======
+val aligned_error_hint:
+  ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format_doc.formatter, unit, Format_doc.t option ->  error) format4 -> 'a
+(** [aligned_error_hint ?loc ?sub ?footnote fmt ... aligned_hint] produces an
+    error report where the potential [aligned_hint] message has been aligned
+    with the main error message before being added to the list of submessages.*)
+
+val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
 val error_of_printer_file: ?source:error_source -> (Format_doc.formatter -> 'a -> unit) -> 'a -> error
@@ -413,7 +469,13 @@ exception Already_displayed_error
 (** Raising [Already_displayed_error] signals an error which has already been
    printed. The exception will be caught, but nothing will be printed *)
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val raise_errorf: ?loc:t -> ?sub:msg list -> ?source:error_source ->
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+val raise_errorf: ?loc:t -> ?sub:msg list ->
+=======
+val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
 
 val report_exception: formatter -> exn -> unit

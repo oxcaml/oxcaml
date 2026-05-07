@@ -458,9 +458,17 @@ let scrape env mty =
   | _ -> mty
 
 let () =
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   Printtyp.expand_module_type := expand ;
   Env.scrape_alias := scrape_alias_lazy ;
   Env.scrape_lazy := scrape_lazy
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  Printtyp.expand_module_type := expand ;
+  Env.scrape_alias := scrape_alias_lazy
+=======
+  Out_type.expand_module_type := expand ;
+  Env.scrape_alias := scrape_alias_lazy
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let find_type_of_module ~strengthen ~aliasable env path =
   if strengthen then
@@ -548,14 +556,7 @@ and nondep_sig_item env va ids = function
       let pres, mty = nondep_mty_with_presence env va ids pres md.md_type in
       Sig_module(id, pres, {md with md_type = mty}, rs, vis)
   | Sig_modtype(id, d, vis) ->
-      begin try
-        Sig_modtype(id, nondep_modtype_decl env ids d, vis)
-      with Ctype.Nondep_cannot_erase _ as exn ->
-        match va with
-          Co -> Sig_modtype(id, {mtd_type=None; mtd_loc=Location.none;
-                                 mtd_attributes=[]; mtd_uid = d.mtd_uid}, vis)
-        | _  -> raise exn
-      end
+      Sig_modtype(id, nondep_modtype_decl env ids d, vis)
   | Sig_class(id, d, rs, vis) ->
       Sig_class(id, Ctype.nondep_class_declaration env ids d, rs, vis)
   | Sig_class_type(id, d, rs, vis) ->

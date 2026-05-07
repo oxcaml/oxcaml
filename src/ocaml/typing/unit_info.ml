@@ -18,6 +18,9 @@ type modname = string
 type filename = string
 type file_prefix = string
 
+type error = Invalid_encoding of string
+exception Error of error
+
 type t = {
   original_source_file: filename;
   raw_source_file: filename;
@@ -42,34 +45,40 @@ let basename_chop_extensions basename  =
     String.sub basename 0 pos
   with Not_found -> basename
 
-let modulize s = String.capitalize_ascii s
+let strict_modulize s =
+  match Misc.Utf8_lexeme.capitalize s with
+  | Ok x -> x
+  | Error _ -> raise (Error (Invalid_encoding s))
 
-(* We re-export the [Misc] definition *)
-let normalize = Misc.normalized_unit_filename
+let modulize s = match Misc.Utf8_lexeme.capitalize s with Ok x | Error x -> x
 
-let modname_from_source source_file =
-  source_file |> Filename.basename |> basename_chop_extensions |> modulize
+(* We re-export the [Misc] definition, and ignore encoding errors under the
+   assumption that we should focus our effort on not *producing* badly encoded
+   module names *)
+let normalize x = match Misc.normalized_unit_filename x with
+  | Ok x | Error x -> x
 
-let compilation_unit_from_source ~for_pack_prefix source_file =
+let stem source_file =
+  source_file |> Filename.basename |> basename_chop_extensions
+
+let strict_modname_from_source source_file =
+  source_file |> stem |> strict_modulize
+
+let lax_modname_from_source source_file =
+  source_file |> stem |> modulize
+
+let compilation_unit_from_source ~strict ~for_pack_prefix source_file =
+  let modname_from_source =
+    if strict then strict_modname_from_source
+    else lax_modname_from_source
+  in
   let modname =
     modname_from_source source_file |> Compilation_unit.Name.of_string
   in
   Compilation_unit.create for_pack_prefix modname
 
-let start_char = function
-  | 'A' .. 'Z' -> true
-  | _ -> false
-
-let is_identchar_latin1 = function
-  | 'A'..'Z' | 'a'..'z' | '_' | '\192'..'\214' | '\216'..'\246'
-  | '\248'..'\255' | '\'' | '0'..'9' -> true
-  | _ -> false
-
 (* Check validity of module name *)
-let is_unit_name name =
-  String.length name > 0
-  && start_char name.[0]
-  && String.for_all is_identchar_latin1 name
+let is_unit_name name = Misc.Utf8_lexeme.is_valid_identifier name
 
 let check_unit_name file =
   let name = modname file |> Compilation_unit.name_as_string in
@@ -78,7 +87,9 @@ let check_unit_name file =
       (Warnings.Bad_module_name name)
 
 let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
-  let modname = compilation_unit_from_source ~for_pack_prefix prefix in
+  let modname =
+    compilation_unit_from_source ~strict:true ~for_pack_prefix prefix
+  in
   let p =
     {
       modname;
@@ -124,9 +135,13 @@ module Artifact = struct
   let prefix x = Filename.remove_extension (filename x)
 
   let from_filename ~for_pack_prefix filename =
-    let modname = compilation_unit_from_source ~for_pack_prefix filename in
-
-    { modname; filename; original_source_file = None; raw_source_file = None }
+    let modname =
+      compilation_unit_from_source ~strict:false ~for_pack_prefix filename
+    in
+    { modname;
+      filename;
+      original_source_file = None;
+      raw_source_file = None }
 
 end
 
@@ -190,7 +205,22 @@ let find_normalized_cmi f =
     original_source_file = Some f.original_source_file;
     raw_source_file = Some f.raw_source_file;
   }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 
 (* Merlin-only *)
 
 let modify_kind t ~f = { t with kind = f t.kind }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+=======
+
+let report_error = function
+  | Invalid_encoding name ->
+      Location.errorf "Invalid encoding of output name: %s." name
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error err -> Some (report_error err)
+      | _ -> None
+    )
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9

@@ -56,11 +56,31 @@ type preprocessor = (Lexing.lexbuf -> Parser_raw.token) -> Lexing.lexbuf -> Pars
 
 type state = {
   keywords: keywords;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   mutable buffer: Buffer.t;
   mutable string_start_loc: Location.t;
   mutable comment_start_loc: Location.t list;
   mutable preprocessor: preprocessor option;
 }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  | Unterminated_string_in_comment of Location.t * Location.t
+  | Empty_character_literal
+  | Keyword_as_label of string
+  | Invalid_literal of string
+  | Invalid_directive of string * string option
+=======
+  | Unterminated_string_in_comment of Location.t * Location.t
+  | Empty_character_literal
+  | Keyword_as_label of string
+  | Capitalized_label of string
+  | Invalid_literal of string
+  | Invalid_directive of string * string option
+  | Invalid_encoding of string
+  | Invalid_char_in_ident of Uchar.t
+  | Non_lowercase_delimiter of string
+  | Capitalized_raw_identifier of string
+  | Unknown_keyword of string
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let make ?preprocessor keywords = {
   keywords;
@@ -80,6 +100,7 @@ let rec catch m f = match m with
 
 (* The table of keywords *)
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 let keyword_table : keywords =
   create_hashtable 149 [
     "and", AND;
@@ -126,7 +147,111 @@ let keyword_table : keywords =
     "open", OPEN;
     "or", OR;
     "overwrite_", OVERWRITE;
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+let keyword_table =
+  create_hashtable 149 [
+    "and", AND;
+    "as", AS;
+    "assert", ASSERT;
+    "begin", BEGIN;
+    "class", CLASS;
+    "constraint", CONSTRAINT;
+    "do", DO;
+    "done", DONE;
+    "downto", DOWNTO;
+    "else", ELSE;
+    "end", END;
+    "exception", EXCEPTION;
+    "exclave_", EXCLAVE;
+    "external", EXTERNAL;
+    "false", FALSE;
+    "for", FOR;
+    "fun", FUN;
+    "function", FUNCTION;
+    "functor", FUNCTOR;
+    "global_", GLOBAL;
+    "if", IF;
+    "in", IN;
+    "include", INCLUDE;
+    "inherit", INHERIT;
+    "initializer", INITIALIZER;
+    "kind_", KIND;
+    "kind_of_", KIND_OF;
+    "layout_", LAYOUT;
+    "lazy", LAZY;
+    "let", LET;
+    "local_", LOCAL;
+    "match", MATCH;
+    "method", METHOD;
+    "mod", MOD;
+    "module", MODULE;
+    "mutable", MUTABLE;
+    "new", NEW;
+    "nonrec", NONREC;
+    "object", OBJECT;
+    "of", OF;
+    "once_", ONCE;
+    "open", OPEN;
+    "or", OR;
+    "overwrite_", OVERWRITE;
+=======
+let all_keywords =
+  let v5_3 = Some (5,3) in
+  let v1_0 = Some (1,0) in
+  let v1_6 = Some (1,6) in
+  let v4_2 = Some (4,2) in
+  let always = None in
+  let oxcaml = None in
+  [
+    "and", AND, always;
+    "as", AS, always;
+    "assert", ASSERT, v1_6;
+    "begin", BEGIN, always;
+    "borrow_", BORROW, oxcaml;
+    "class", CLASS, v1_0;
+    "constraint", CONSTRAINT, v1_0;
+    "do", DO, always;
+    "done", DONE, always;
+    "downto", DOWNTO, always;
+    "effect", EFFECT, v5_3;
+    "else", ELSE, always;
+    "end", END, always;
+    "exception", EXCEPTION, always;
+    "exclave_", EXCLAVE, oxcaml;
+    "external", EXTERNAL, always;
+    "false", FALSE, always;
+    "for", FOR, always;
+    "fun", FUN, always;
+    "function", FUNCTION, always;
+    "functor", FUNCTOR, always;
+    "global_", GLOBAL, oxcaml;
+    "if", IF, always;
+    "in", IN, always;
+    "include", INCLUDE, always;
+    "inherit", INHERIT, v1_0;
+    "initializer", INITIALIZER, v1_0;
+    "kind_", KIND, oxcaml;
+    "kind_of_", KIND_OF, oxcaml;
+    "layout_", LAYOUT, oxcaml;
+    "lazy", LAZY, v1_6;
+    "let", LET, always;
+    "local_", LOCAL, oxcaml;
+    "match", MATCH, always;
+    "method", METHOD, v1_0;
+    "mod", MOD, always;
+    "module", MODULE, always;
+    "mutable", MUTABLE, always;
+    "new", NEW, v1_0;
+    "nonrec", NONREC, v4_2;
+    "object", OBJECT, v1_0;
+    "of", OF, always;
+    "once_", ONCE, oxcaml;
+    "open", OPEN, always;
+    "or", OR, always;
+    "overwrite_", OVERWRITE, oxcaml;
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 (*  "parser", PARSER; *)
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     "poly_", POLY;
     "private", PRIVATE;
     "rec", REC;
@@ -153,15 +278,85 @@ let keyword_table : keywords =
     "lsl", INFIXOP4("lsl");
     "lsr", INFIXOP4("lsr");
     "asr", INFIXOP4("asr");
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+    "poly_", POLY;
+    "private", PRIVATE;
+    "rec", REC;
+    "repr_", REPR;
+    "sig", SIG;
+    "stack_", STACK;
+    "borrow_", BORROW;
+    "struct", STRUCT;
+    "then", THEN;
+    "to", TO;
+    "true", TRUE;
+    "try", TRY;
+    "type", TYPE;
+    "unique_", UNIQUE;
+    "val", VAL;
+    "virtual", VIRTUAL;
+    "when", WHEN;
+    "while", WHILE;
+    "with", WITH;
+
+    "lor", INFIXOP3("lor"); (* Should be INFIXOP2 *)
+    "lxor", INFIXOP3("lxor"); (* Should be INFIXOP2 *)
+    "land", INFIXOP3("land");
+    "lsl", INFIXOP4("lsl");
+    "lsr", INFIXOP4("lsr");
+    "asr", INFIXOP4("asr")
+=======
+    "poly_", POLY, oxcaml;
+    "private", PRIVATE, v1_0;
+    "rec", REC, always;
+    "repr_", REPR, oxcaml;
+    "sig", SIG, always;
+    "stack_", STACK, oxcaml;
+    "struct", STRUCT, always;
+    "then", THEN, always;
+    "to", TO, always;
+    "true", TRUE, always;
+    "try", TRY, always;
+    "type", TYPE, always;
+    "unique_", UNIQUE, oxcaml;
+    "val", VAL, always;
+    "virtual", VIRTUAL, v1_0;
+    "when", WHEN, always;
+    "while", WHILE, always;
+    "with", WITH, always;
+
+    "lor", INFIXOP3("lor"), always; (* Should be INFIXOP2 *)
+    "lxor", INFIXOP3("lxor"), always; (* Should be INFIXOP2 *)
+    "land", INFIXOP3("land"), always;
+    "lsl", INFIXOP4("lsl"), always;
+    "lsr", INFIXOP4("lsr"), always;
+    "asr", INFIXOP4("asr"), always
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ]
 
 let keywords l = create_hashtable 11 l
 
-let lookup_keyword name =
-  match Hashtbl.find keyword_table name with
-  | kw -> kw
-  | exception Not_found ->
-     LIDENT name
+
+let keyword_table = Hashtbl.create 149
+
+let populate_keywords (version,keywords) =
+  let greater (x:(int*int) option) (y:(int*int) option) =
+    match x, y with
+    | None, _ | _, None -> true
+    | Some x, Some y -> x >= y
+  in
+  let tbl = keyword_table in
+  Hashtbl.clear tbl;
+  let add_keyword (name, token, since) =
+    if greater version since then Hashtbl.replace tbl name (Some token)
+  in
+  List.iter add_keyword all_keywords;
+  List.iter (fun name ->
+    match List.find (fun (n,_,_) -> n = name) all_keywords with
+    | (_,tok,_) -> Hashtbl.replace tbl name (Some tok)
+    | exception Not_found -> Hashtbl.replace tbl name None
+    ) keywords
+
 
 (* To buffer string literals *)
 
@@ -444,16 +639,74 @@ let keyword_or state s default =
       with Not_found -> try Hashtbl.find keyword_table s
   with Not_found -> default
 
+let validate_encoding lexbuf raw_name =
+  match Utf8_lexeme.normalize raw_name with
+  | Error _ -> error lexbuf (Invalid_encoding raw_name)
+  | Ok name -> name
+
+let ident_for_extended lexbuf raw_name =
+  let name = validate_encoding lexbuf raw_name in
+  match Utf8_lexeme.validate_identifier name with
+  | Utf8_lexeme.Valid -> name
+  | Utf8_lexeme.Invalid_character u -> error lexbuf (Invalid_char_in_ident u)
+  | Utf8_lexeme.Invalid_beginning _ ->
+  assert false (* excluded by the regexps *)
+
+let validate_delim lexbuf raw_name =
+  let name = validate_encoding lexbuf raw_name in
+  if Utf8_lexeme.is_lowercase name then name
+  else error lexbuf (Non_lowercase_delimiter name)
+
+let validate_ext lexbuf name =
+    let name = validate_encoding lexbuf name in
+    match Utf8_lexeme.validate_identifier ~with_dot:true name with
+    | Utf8_lexeme.Valid -> name
+    | Utf8_lexeme.Invalid_character u -> error lexbuf (Invalid_char_in_ident u)
+    | Utf8_lexeme.Invalid_beginning _ ->
+    assert false (* excluded by the regexps *)
+
+let lax_delim raw_name =
+  match Utf8_lexeme.normalize raw_name with
+  | Error _ -> None
+  | Ok name ->
+     if Utf8_lexeme.is_lowercase name then Some name
+     else None
+
 let is_keyword name =
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   match lookup_keyword name with
   | LIDENT _ -> false
   | _ -> true
 let () = Lexer.is_keyword_ref := is_keyword
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  match lookup_keyword name with
+  | LIDENT _ -> false
+  | _ -> true
+=======
+  Hashtbl.mem keyword_table name
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 let check_label_name lexbuf name =
   if is_keyword name
   then fail lexbuf (Keyword_as_label name)
   else return name
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+let check_label_name lexbuf name =
+  if is_keyword name then error lexbuf (Keyword_as_label name)
+=======
+let find_keyword lexbuf name =
+  match Hashtbl.find keyword_table name with
+  | Some x -> x
+  | None -> error lexbuf (Unknown_keyword name)
+  | exception Not_found -> LIDENT name
+
+let check_label_name ?(raw_escape=false) lexbuf name =
+  if Utf8_lexeme.is_capitalized name then
+    error lexbuf (Capitalized_label name);
+  if not raw_escape && is_keyword name then
+    error lexbuf (Keyword_as_label name)
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 (* Update the current location with file name and line number. *)
 
@@ -470,12 +723,27 @@ let update_loc lexbuf _file line absolute chars =
     pos_bol = pos.pos_cnum - chars;
   }
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 (* Warn about Latin-1 characters used in idents *)
 
 let warn_latin1 lexbuf =
   Location.deprecated (Location.curr lexbuf)
     "ISO-Latin1 characters in identifiers"
 ;;
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+(* Warn about Latin-1 characters used in idents *)
+
+let warn_latin1 lexbuf =
+  Location.deprecated
+    (Location.curr lexbuf)
+    "ISO-Latin1 characters in identifiers"
+
+let handle_docstrings = ref true
+let comment_list = ref []
+=======
+let handle_docstrings = ref true
+let comment_list = ref []
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let float ~maybe_hash lit modifier =
   match maybe_hash with
@@ -539,11 +807,24 @@ let prepare_error loc = function
       let msg = "Illegal empty character literal ''" in
       let sub =
         [Location.msg
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
            "Hint: Did you mean ' ' or a type variable 'a?"] in
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+           "@{<hint>Hint@}: Did you mean ' ' or a type variable 'a?"] in
+=======
+           "@{<hint>Hint@}: Did you mean %a or a type variable %a?"
+           Style.inline_code "' '"
+           Style.inline_code "'a"
+        ] in
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       Location.error ~loc ~sub msg
   | Keyword_as_label kwd ->
       Location.errorf ~loc
         "%a is a keyword, it cannot be used as label name" Style.inline_code kwd
+  | Capitalized_label lbl ->
+      Location.errorf ~loc
+        "%a cannot be used as label name, \
+         it must start with a lowercase letter" Style.inline_code lbl
   | Invalid_literal s ->
       Location.errorf ~loc "Invalid literal %s" s
   | Invalid_directive (dir, explanation) ->
@@ -551,6 +832,25 @@ let prepare_error loc = function
         (fun ppf -> match explanation with
            | None -> ()
            | Some expl -> fprintf ppf ": %s" expl)
+  | Invalid_encoding s ->
+    Location.errorf ~loc "Invalid encoding of identifier %s." s
+  | Invalid_char_in_ident u ->
+      Location.errorf ~loc "Invalid character U+%04X in identifier"
+         (Uchar.to_int u)
+  | Capitalized_raw_identifier lbl ->
+      Location.errorf ~loc
+        "%a cannot be used as a raw identifier, \
+         it must start with a lowercase letter" Style.inline_code lbl
+  | Non_lowercase_delimiter name ->
+      Location.errorf ~loc
+        "%a cannot be used as a quoted string delimiter,@ \
+         it must contain only lowercase letters."
+         Style.inline_code name
+  | Unknown_keyword name ->
+      Location.errorf ~loc
+      "%a has been defined as an additional keyword.@ \
+       This version of OCaml does not support this keyword."
+      Style.inline_code name
 
 let () =
   Location.register_error_of_exn
@@ -567,11 +867,32 @@ let newline = ('\013'* '\010')
 let blank = [' ' '\009' '\012']
 let lowercase = ['a'-'z' '_']
 let uppercase = ['A'-'Z']
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 let identchar = ['A'-'Z' 'a'-'z' '_' '\'' '0'-'9' '\128'-'\255']
 let lowercase_latin1 = ['a'-'z' '\223'-'\246' '\248'-'\255' '_']
 let uppercase_latin1 = ['A'-'Z' '\192'-'\214' '\216'-'\222']
 let identchar_latin1 = identchar
   (*['A'-'Z' 'a'-'z' '_' '\192'-'\214' '\216'-'\246' '\248'-'\255' '\'' '0'-'9']*)
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+let identchar = ['A'-'Z' 'a'-'z' '_' '\'' '0'-'9']
+let lowercase_latin1 = ['a'-'z' '\223'-'\246' '\248'-'\255' '_']
+let uppercase_latin1 = ['A'-'Z' '\192'-'\214' '\216'-'\222']
+let identchar_latin1 =
+  ['A'-'Z' 'a'-'z' '_' '\192'-'\214' '\216'-'\246' '\248'-'\255' '\'' '0'-'9']
+(* This should be kept in sync with the [is_identchar] function in [env.ml] *)
+
+=======
+let identstart = lowercase | uppercase
+let identchar = ['A'-'Z' 'a'-'z' '_' '\'' '0'-'9']
+let utf8 = ['\192'-'\255'] ['\128'-'\191']*
+let identstart_ext = identstart | utf8
+let identchar_ext = identchar | utf8
+let delim_ext = (lowercase | uppercase | utf8)*
+(* ascii uppercase letters in quoted string delimiters ({delim||delim}) are
+   rejected by the delimiter validation function, we accept them temporarily to
+   have the same error message for ascii and non-ascii uppercase letters *)
+
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 let symbolchar =
   ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '?' '@' '^' '|' '~']
 let symbolcharnopercent =
@@ -583,8 +904,8 @@ let symbolchar_or_hash =
 let kwdopchar =
   ['$' '&' '*' '+' '-' '/' '<' '=' '>' '@' '^' '|']
 
-let ident = (lowercase | uppercase) identchar*
-let extattrident = ident ('.' ident)*
+let ident_ext = identstart_ext  identchar_ext*
+let extattrident = ident_ext ('.' ident_ext)*
 
 let decimal_literal =
   ['0'-'9'] ['0'-'9' '_']*
@@ -643,6 +964,7 @@ rule token state = parse
   | ".~"
       { fail lexbuf
           (Reserved_sequence (".~", Some "is reserved for use in MetaOCaml")) }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       *)
   | "~" raw_ident_escape (lowercase identchar * as name) ':'
       { return (LABEL name) }
@@ -651,32 +973,89 @@ rule token state = parse
   | "~" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf;
         return (LABEL name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  | "~" raw_ident_escape (lowercase identchar * as name) ':'
+      { LABEL name }
+  | "~" (lowercase identchar * as name) ':'
+      { check_label_name lexbuf name;
+        LABEL name }
+  | "~" (lowercase_latin1 identchar_latin1 * as name) ':'
+      { warn_latin1 lexbuf;
+        LABEL name }
+=======
+  | "~" (identstart identchar * as name) ':'
+      { check_label_name lexbuf name;
+        LABEL name }
+  | "~" (raw_ident_escape? as escape) (ident_ext as raw_name) ':'
+      { let name = ident_for_extended lexbuf raw_name in
+        check_label_name ~raw_escape:(escape<>"") lexbuf name;
+        LABEL name }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | "?"
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       { return QUESTION }
   | "?" raw_ident_escape (lowercase identchar * as name) ':'
       { return (OPTLABEL name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { QUESTION }
+  | "?" raw_ident_escape (lowercase identchar * as name) ':'
+      { OPTLABEL name }
+=======
+      { QUESTION }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | "?" (lowercase identchar * as name) ':'
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       { oPTLABEL (check_label_name lexbuf name) }
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf; return (OPTLABEL name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { check_label_name lexbuf name;
+        OPTLABEL name }
+  | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
+      { warn_latin1 lexbuf;
+        OPTLABEL name }
+=======
+      { check_label_name lexbuf name;
+        OPTLABEL name }
+  | "?" (raw_ident_escape? as escape) (ident_ext as raw_name) ':'
+      { let name = ident_for_extended lexbuf raw_name in
+        check_label_name ~raw_escape:(escape<>"") lexbuf name;
+        OPTLABEL name
+      }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
   | (lowercase identchar * as name) ('#' symbolchar_or_hash+ as hashop)
       (* See Note [Lexing hack for hash operators] *)
       { enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         return (try Hashtbl.find state.keywords name
               with Not_found ->
               lookup_keyword name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        lookup_keyword name }
+=======
+        find_keyword lexbuf name }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | (lowercase identchar * as name) '#'
       (* See Note [Lexing hack for float#] *)
       { enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         return (try Hashtbl.find state.keywords name
               with Not_found ->
               lookup_keyword name) }
   | raw_ident_escape (lowercase identchar * as name)
     { return (LIDENT name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        lookup_keyword name }
+  | raw_ident_escape (lowercase identchar * as name)
+      { LIDENT name }
+=======
+        find_keyword lexbuf name }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | lowercase identchar * as name
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     { return (try Hashtbl.find state.keywords name
               with Not_found ->
               lookup_keyword name) }
@@ -696,7 +1075,29 @@ rule token state = parse
         return (LIDENT name) }
   | lowercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; return (LIDENT name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { lookup_keyword name }
+  (* Lowercase latin1 identifiers are split into 3 cases, and the order matters
+     (longest to shortest).
+  *)
+  | (lowercase_latin1 identchar_latin1 * as name)
+      ('#' symbolchar_or_hash+ as hashop)
+      (* See Note [Lexing hack for hash operators] *)
+      { warn_latin1 lexbuf;
+        enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
+        LIDENT name }
+  | (lowercase_latin1 identchar_latin1 * as name) '#'
+      (* See Note [Lexing hack for float#] *)
+      { warn_latin1 lexbuf;
+        enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
+        LIDENT name }
+  | lowercase_latin1 identchar_latin1 * as name
+      { warn_latin1 lexbuf; LIDENT name }
+=======
+      { find_keyword lexbuf name }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | uppercase identchar * as name
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     { (* Capitalized keywords for OUnit *)
       return (try Hashtbl.find state.keywords name
               with Not_found ->
@@ -705,6 +1106,24 @@ rule token state = parse
                 UIDENT name) }
   | uppercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; return (UIDENT name) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { UIDENT name } (* No capitalized keywords *)
+  | uppercase_latin1 identchar_latin1 * as name
+      { warn_latin1 lexbuf; UIDENT name }
+=======
+      { UIDENT name } (* No capitalized keywords *)
+  | (raw_ident_escape? as escape) (ident_ext as raw_name)
+      { let name = ident_for_extended lexbuf raw_name in
+        if Utf8_lexeme.is_capitalized name then begin
+            if escape="" then UIDENT name
+            else
+              (* we don't have capitalized keywords, and thus no needs for
+                 capitalized raw identifiers. *)
+              error lexbuf (Capitalized_raw_identifier name)
+        end else
+          LIDENT name
+      } (* No non-ascii keywords *)
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   (* This matches either an integer literal or a directive. If the text "#2"
      appears at the beginning of a line that lexes as a directive, then it
      should be treated as a directive and not an unboxed int. This is acceptable
@@ -729,6 +1148,7 @@ rule token state = parse
   | '#'? (float_literal | hex_float_literal | int_literal) identchar+ as invalid
       { fail lexbuf (Invalid_literal invalid) }
   | "\""
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       { wrap_string_lexer string state lexbuf >>= fun (str, loc) ->
         return (STRING (str, loc, None)) }
   | "\'\'"
@@ -739,25 +1159,100 @@ rule token state = parse
         >>= fun (str, loc) ->
         return (STRING (str, loc, Some delim)) }
   | "{%" (extattrident as id) "|"
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { let s, loc = wrap_string_lexer string lexbuf in
+        STRING (s, loc, None) }
+  | "{" (lowercase* as delim) "|"
+      { let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
+        STRING (s, loc, Some delim) }
+  | "{%" (extattrident as id) "|"
+=======
+      { let s, loc = wrap_string_lexer string lexbuf in
+        STRING (s, loc, None) }
+  | "{" (delim_ext as raw_name) '|'
+      { let delim = validate_delim lexbuf raw_name in
+        let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
+        STRING (s, loc, Some delim)
+       }
+  | "{%" (extattrident as raw_id) "|"
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       { let orig_loc = Location.curr lexbuf in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         wrap_string_lexer (quoted_string "") state lexbuf
         >>= fun (str, loc) ->
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        let s, loc = wrap_string_lexer (quoted_string "") lexbuf in
+=======
+        let id = validate_ext lexbuf raw_id in
+        let s, loc = wrap_string_lexer (quoted_string "") lexbuf in
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         let idloc = compute_quoted_string_idloc orig_loc 2 id in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         return (QUOTED_STRING_EXPR (id, idloc, str, loc, Some "")) }
   | "{%" (extattrident as id) blank+ (lowercase* as delim) "|"
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        QUOTED_STRING_EXPR (id, idloc, s, loc, Some "") }
+  | "{%" (extattrident as id) blank+ (lowercase* as delim) "|"
+=======
+        QUOTED_STRING_EXPR (id, idloc, s, loc, Some "") }
+  | "{%" (extattrident as raw_id) blank+ (delim_ext as raw_delim) "|"
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       { let orig_loc = Location.curr lexbuf in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         wrap_string_lexer (quoted_string delim) state lexbuf
         >>= fun (str, loc) ->
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
+=======
+        let id = validate_ext lexbuf raw_id in
+        let delim = validate_delim lexbuf raw_delim in
+        let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         let idloc = compute_quoted_string_idloc orig_loc 2 id in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         return (QUOTED_STRING_EXPR (id, idloc, str, loc, Some delim)) }
   | "{%%" (extattrident as id) "|"
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        QUOTED_STRING_EXPR (id, idloc, s, loc, Some delim) }
+  | "{%%" (extattrident as id) "|"
+=======
+        QUOTED_STRING_EXPR (id, idloc, s, loc, Some delim) }
+  | "{%%" (extattrident as raw_id) "|"
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       { let orig_loc = Location.curr lexbuf in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         wrap_string_lexer (quoted_string "") state lexbuf
         >>= fun (str, loc) ->
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        let s, loc = wrap_string_lexer (quoted_string "") lexbuf in
+=======
+        let id = validate_ext lexbuf raw_id in
+        let s, loc = wrap_string_lexer (quoted_string "") lexbuf in
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         let idloc = compute_quoted_string_idloc orig_loc 3 id in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         return (QUOTED_STRING_ITEM (id, idloc, str, loc, Some "")) }
   | "{%%" (extattrident as id) blank+ (lowercase* as delim) "|"
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        QUOTED_STRING_ITEM (id, idloc, s, loc, Some "") }
+  | "{%%" (extattrident as id) blank+ (lowercase* as delim) "|"
+=======
+        QUOTED_STRING_ITEM (id, idloc, s, loc, Some "") }
+  | "{%%" (extattrident as raw_id) blank+ (delim_ext as raw_delim) "|"
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       { let orig_loc = Location.curr lexbuf in
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
+        let idloc = compute_quoted_string_idloc orig_loc 3 id in
+        QUOTED_STRING_ITEM (id, idloc, s, loc, Some delim) }
+=======
+        let id = validate_ext lexbuf raw_id in
+        let delim = validate_delim lexbuf raw_delim in
+        let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
+        let idloc = compute_quoted_string_idloc orig_loc 3 id in
+        QUOTED_STRING_ITEM (id, idloc, s, loc, Some delim) }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         wrap_string_lexer (quoted_string delim) state lexbuf
         >>= fun (str, loc) ->
         let idloc = compute_quoted_string_idloc orig_loc 3 id in
@@ -1023,10 +1518,32 @@ and comment state = parse
       state.string_start_loc <- Location.none;
       Buffer.add_string buffer (String.escaped (Buffer.contents state.buffer));
       state.buffer <- buffer;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       Buffer.add_char state.buffer '\"';
       comment state lexbuf }
   | "{" ('%' '%'? extattrident blank*)? (lowercase* as delim) "|"
       {
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        is_in_string := false;
+        store_string_char '\"';
+        comment lexbuf }
+  | "{" ('%' '%'? extattrident blank*)? (lowercase* as delim) "|"
+      {
+        string_start_loc := Location.curr lexbuf;
+        store_lexeme lexbuf;
+        is_in_string := true;
+=======
+        is_in_string := false;
+        store_string_char '\"';
+        comment lexbuf }
+  | "{" ('%' '%'? extattrident blank*)? (delim_ext as raw_delim) "|"
+      { match lax_delim raw_delim with
+        | None -> store_lexeme lexbuf; comment lexbuf
+        | Some delim ->
+        string_start_loc := Location.curr lexbuf;
+        store_lexeme lexbuf;
+        is_in_string := true;
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         state.string_start_loc <- Location.curr lexbuf;
         Buffer.add_string state.buffer (Lexing.lexeme lexbuf);
         (catch (quoted_string delim state lexbuf) (fun e l -> match e with
@@ -1151,9 +1668,38 @@ and quoted_string delim state = parse
         else (Buffer.add_string state.buffer (Lexing.lexeme lexbuf);
               quoted_string delim state lexbuf)
       }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  | ident
+      { store_lexeme lexbuf; comment lexbuf }
+=======
+  | ident_ext
+      { store_lexeme lexbuf; comment lexbuf }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | _
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       { Buffer.add_char state.buffer (Lexing.lexeme_char lexbuf 0);
         quoted_string delim state lexbuf }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  | eof
+      { is_in_string := false;
+        error_loc !string_start_loc Unterminated_string }
+  | "|" (lowercase* as edelim) "}"
+      {
+        if delim = edelim then lexbuf.lex_start_p
+        else (store_lexeme lexbuf; quoted_string delim lexbuf)
+      }
+=======
+  | eof
+      { is_in_string := false;
+        error_loc !string_start_loc Unterminated_string }
+  | "|" (ident_ext? as raw_edelim) "}"
+      {
+        let edelim = validate_encoding lexbuf raw_edelim in
+        if delim = edelim then lexbuf.lex_start_p
+        else (store_lexeme lexbuf; quoted_string delim lexbuf)
+      }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 and skip_sharp_bang state = parse
   | "#!" [^ '\n']* '\n' [^ '\n']* "\n!#\n"
@@ -1176,6 +1722,19 @@ and skip_sharp_bang state = parse
         lexbuf.lex_curr_p <- end_pos;
         return token
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+  let init () =
+    is_in_string := false;
+    comment_start_loc := [];
+    comment_list := [];
+=======
+  let init ?(keyword_edition=None,[]) () =
+    populate_keywords keyword_edition;
+    is_in_string := false;
+    comment_start_loc := [];
+    comment_list := [];
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   let rec token_without_comments state lexbuf =
     token state lexbuf >>= function
     | COMMENT _ ->

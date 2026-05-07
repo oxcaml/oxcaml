@@ -62,6 +62,7 @@ let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
 let mkstr ~loc d = Str.mk ~loc:(make_loc loc) d
 let mkclass ~loc ?attrs d = Cl.mk ~loc:(make_loc loc) ?attrs d
 let mkcty ~loc ?attrs d = Cty.mk ~loc:(make_loc loc) ?attrs d
+let mkconst ~loc c = Const.mk ~loc:(make_loc loc) c
 
 let pstr_typext (te, ext) =
   (Pstr_typext te, ext)
@@ -94,6 +95,8 @@ let mkcf ~loc ?attrs ?docs d =
 let mkrhs rhs loc = mkloc rhs (make_loc loc)
 let ghrhs rhs loc = mkloc rhs (ghost_loc loc)
 
+let ldot lid lid_loc name loc = Ldot (mkrhs lid lid_loc, mkrhs name loc)
+
 let push_loc x acc =
   if x.Location.loc_ghost
   then acc
@@ -105,7 +108,7 @@ let reloc_pat ~loc x =
 let reloc_exp ~loc x =
   { x with pexp_loc = make_loc loc;
            pexp_loc_stack = push_loc x.pexp_loc x.pexp_loc_stack }
-let reloc_typ ~loc x =
+let _reloc_typ ~loc x =
   { x with ptyp_loc = make_loc loc;
            ptyp_loc_stack = push_loc x.ptyp_loc x.ptyp_loc_stack }
 
@@ -118,9 +121,24 @@ let mkoperator =
 let mkpatvar ~loc ?attrs name =
   mkpat ~loc ?attrs (Ppat_var (mkrhs name loc))
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 (* See commentary about ghost locations at the declaration of Location.t *)
 let ghexp ~loc ?attrs d = Exp.mk ~loc:(ghost_loc loc) ?attrs d
 let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+(* See commentary about ghost locations at the declaration of Location.t *)
+let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
+let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
+=======
+(*
+  See ./location.mli for when to use a ghost location or not.
+
+  Every grammar rule that generates an element with a location must
+  make at most one non-ghost element, the topmost one.
+*)
+let ghexp ~loc ?attrs d = Exp.mk ~loc:(ghost_loc loc) ?attrs d
+let ghpat ~loc ?attrs d = Pat.mk ~loc:(ghost_loc loc) ?attrs d
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
 let ghloc ~loc d = { txt = d; loc = ghost_loc loc }
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
@@ -137,11 +155,14 @@ let neg_string f =
   then String.sub f 1 (String.length f - 1)
   else "-" ^ f
 
-let mkuminus ~oploc name arg =
+(* Pre-apply the special [-], [-.], [+] and [+.] prefix operators into
+   constants if possible, otherwise turn them into the corresponding prefix
+   operators [~-], [~-.], etc.. *)
+let mkuminus ~sloc ~oploc name arg =
   let result =
     match arg.pexp_desc with
     | Pexp_constant const -> begin
-        match name, const with
+        match name, const.pconst_desc with
         | "-", Pconst_integer (n, m) ->
            Some (Pconst_integer (neg_string n, m))
         | "-", Pconst_unboxed_integer (n, m) ->
@@ -155,16 +176,22 @@ let mkuminus ~oploc name arg =
     | _ -> None
   in
   match result with
-  | Some desc -> Pexp_constant desc, arg.pexp_attributes
+  | Some desc -> Pexp_constant (mkconst ~loc:sloc desc), arg.pexp_attributes
   | None ->
       Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
 
-let mkuplus ~oploc name arg =
+let mkuplus ~sloc ~oploc name arg =
   let desc = arg.pexp_desc in
   match name, desc with
-  | "+", Pexp_constant (Pconst_integer _ | Pconst_unboxed_integer _)
-  | ("+" | "+."), Pexp_constant (Pconst_float _ | Pconst_unboxed_float _) ->
-     desc, arg.pexp_attributes
+  | "+",
+    Pexp_constant
+      {pconst_desc = (Pconst_integer _ | Pconst_unboxed_integer _) as desc;
+       pconst_loc=_}
+  | ("+" | "+."),
+    Pexp_constant
+      {pconst_desc = (Pconst_float _ | Pconst_unboxed_float _) as desc;
+       pconst_loc=_} ->
+     Pexp_constant (mkconst ~loc:sloc desc), arg.pexp_attributes
   | _ ->
      Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
 
@@ -267,7 +294,9 @@ let rec mktailexp nilloc = let open Location in function
   | e1 :: el ->
       let exp_el, el_loc = mktailexp nilloc el in
       let loc = (e1.pexp_loc.loc_start, snd el_loc) in
-      let arg = ghexp ~loc (Pexp_tuple [None, e1; None, ghexp ~loc:el_loc exp_el]) in
+      let arg =
+        ghexp ~loc (Pexp_tuple [None, e1; None, ghexp ~loc:el_loc exp_el])
+      in
       ghexp_cons_desc loc arg, loc
 
 let rec mktailpat nilloc = let open Location in function
@@ -277,7 +306,10 @@ let rec mktailpat nilloc = let open Location in function
   | p1 :: pl ->
       let pat_pl, el_loc = mktailpat nilloc pl in
       let loc = (p1.ppat_loc.loc_start, snd el_loc) in
-      let arg = ghpat ~loc (Ppat_tuple ([None, p1; None, ghpat ~loc:el_loc pat_pl], Closed)) in
+      let arg =
+        ghpat ~loc
+          (Ppat_tuple ([None, p1; None, ghpat ~loc:el_loc pat_pl], Closed))
+      in
       ghpat_cons_desc loc arg, loc
 
 let mkstrexp e attrs =
@@ -388,7 +420,13 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
   | Pcoerce(t1, t2)  ->
      match modes with
      | [] ->
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       let mk = if ghost then ghexp else mkexp in
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      let mk = if ghost then ghexp else mkexp ?attrs:None in
+=======
+      let mk = if ghost then ghexp ?attrs:None else mkexp ?attrs:None in
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ :: _ ->
       not_expecting loc "mode annotations";
@@ -455,9 +493,9 @@ type ('dot,'index) array_family = {
 
 let bigarray_untuplify exp =
   match exp.pexp_desc with
-  | Pexp_tuple explist when
-        List.for_all (function None, _ -> true | _ -> false) explist ->
-    List.map (fun (_, e) -> e) explist
+  | Pexp_tuple explist
+       when List.for_all (fun (l, _) -> Option.is_none l) explist ->
+     List.map snd explist
   | _ -> [exp]
 
 (* Immutable array indexing is a regular operator, so it doesn't need a special
@@ -476,8 +514,8 @@ let builtin_arraylike_name loc _ ~assign paren_kind n =
          | Two -> "Array2"
          | Three -> "Array3"
          | Many -> "Genarray" in
-       Ldot(Lident "Bigarray", submodule_name) in
-   ghloc ~loc (Ldot(prefix,opname))
+       Ldot(mknoloc (Lident "Bigarray"), mknoloc submodule_name) in
+   ghloc ~loc (Ldot(mknoloc prefix, mknoloc opname))
 
 let builtin_arraylike_index loc paren_kind index = match paren_kind with
     | Paren | Bracket -> One, [Nolabel, index]
@@ -507,7 +545,7 @@ let user_indexing_operator_name loc (prefix,ext) ~assign paren_kind n =
     String.concat "" ["."; ext; left; mid; right; assign] in
   let lid = match prefix with
     | None -> Lident name
-    | Some p -> Ldot(p,name) in
+    | Some p -> Ldot(mknoloc p,mknoloc name) in
   ghloc ~loc lid
 
 let user_index loc _ index =
@@ -538,9 +576,9 @@ let indexop_unclosed_error loc_s s loc_e =
   unclosed left loc_s right loc_e
   *)
 
-let lapply ~loc p1 p2 =
+let lapply ~loc p1 loc_p1 p2 loc_p2 =
   if !Clflags.applicative_functors
-  then Lapply(p1, p2)
+  then Lapply(mkrhs p1 loc_p1, mkrhs p2 loc_p2)
   else raise (Syntaxerr.Error(
                   Syntaxerr.Applicative_path (make_loc loc)))
 
@@ -583,33 +621,28 @@ let wrap_type_annotation ~loc ?(typloc=loc) ~modes newtypes core_type body =
   let inner_type = Typ.varify_constructors (List.map fst newtypes) core_type in
   (exp, ghtyp ~loc:typloc (Ptyp_poly (newtypes, inner_type)))
 
-let wrap_exp_attrs ~loc body (ext, attrs) =
-  let ghexp = ghexp ~loc in
+let pexp_extension ~id e = Pexp_extension (id, PStr [mkstrexp e []])
+
+let mkexp_attrs ~loc desc (ext, attrs) =
   (* todo: keep exact location for the entire attribute *)
-  let body = {body with pexp_attributes = attrs @ body.pexp_attributes} in
   match ext with
-  | None -> body
-  | Some id -> ghexp(Pexp_extension (id, PStr [mkstrexp body []]))
+  | None -> mkexp ~loc ~attrs desc
+  | Some id ->
+     mkexp ~loc (pexp_extension ~id (ghexp ~loc ~attrs desc))
 
-let mkexp_attrs ~loc d ext_attrs =
-  wrap_exp_attrs ~loc (mkexp ~loc d) ext_attrs
-
-let wrap_typ_attrs ~loc typ (ext, attrs) =
+let mktyp_attrs ~loc desc (ext, attrs) =
   (* todo: keep exact location for the entire attribute *)
-  let typ = {typ with ptyp_attributes = attrs @ typ.ptyp_attributes} in
   match ext with
-  | None -> typ
-  | Some id -> ghtyp ~loc (Ptyp_extension (id, PTyp typ))
+  | None -> mktyp ~loc ~attrs desc
+  | Some id ->
+     mktyp ~loc (Ptyp_extension (id, PTyp (ghtyp ~loc ~attrs desc)))
 
-let wrap_pat_attrs ~loc pat (ext, attrs) =
+let mkpat_attrs ~loc desc (ext, attrs) =
   (* todo: keep exact location for the entire attribute *)
-  let pat = {pat with ppat_attributes = attrs @ pat.ppat_attributes} in
   match ext with
-  | None -> pat
-  | Some id -> ghpat ~loc (Ppat_extension (id, PPat (pat, None)))
-
-let mkpat_attrs ~loc d attrs =
-  wrap_pat_attrs ~loc (mkpat ~loc d) attrs
+  | None -> mkpat ~loc ~attrs desc
+  | Some id ->
+     mkpat ~loc (Ppat_extension (id, PPat (ghpat ~loc ~attrs desc, None)))
 
 let wrap_class_attrs ~loc:_ body attrs =
   {body with pcl_attributes = attrs @ body.pcl_attributes}
@@ -618,27 +651,24 @@ let wrap_mod_attrs ~loc:_ attrs body =
 let wrap_mty_attrs ~loc:_ attrs body =
   {body with pmty_attributes = attrs @ body.pmty_attributes}
 
-let wrap_str_ext ~loc body ext =
-  match ext with
-  | None -> body
-  | Some id -> ghstr ~loc (Pstr_extension ((id, PStr [body]), []))
-
 let wrap_mkstr_ext ~loc (item, ext) =
-  wrap_str_ext ~loc (mkstr ~loc item) ext
-
-let wrap_sig_ext ~loc body ext =
   match ext with
-  | None -> body
-  | Some id ->
-      ghsig ~loc (Psig_extension ((id, PSig {psg_items=[body];
-        psg_modalities=[]; psg_loc=make_loc loc}), []))
+  | None -> mkstr ~loc item
+  | Some id -> mkstr ~loc (Pstr_extension ((id, PStr [ghstr ~loc item]), []))
 
 let wrap_mksig_ext ~loc (item, ext) =
-  wrap_sig_ext ~loc (mksig ~loc item) ext
+  match ext with
+  | None -> mksig ~loc item
+  | Some id ->
+     let psig =
+       {psg_items=[ghsig ~loc item]; psg_modalities=[]; psg_loc=make_loc loc}
+     in
+     mksig ~loc (Psig_extension ((id, PSig psig), []))
 
 let mk_quotedext ~loc (id, idloc, str, strloc, delim) =
   let exp_id = mkloc id idloc in
-  let e = ghexp ~loc (Pexp_constant (Pconst_string (str, strloc, delim))) in
+  let const = Const.mk ~loc:strloc (Pconst_string (str, strloc, delim)) in
+  let e = ghexp ~loc (Pexp_constant const) in
   (exp_id, PStr [mkstrexp e []])
 
 let text_str pos = Str.text (rhs_text pos)
@@ -813,9 +843,9 @@ let all_params_as_newtypes =
     | Pparam_newtype _ -> true
     | Pparam_val _ -> false
   in
-  let as_newtype { pparam_desc; _ } =
+  let as_newtype { pparam_desc; pparam_loc } =
     match pparam_desc with
-    | Pparam_newtype (x, jkind) -> Some (x, jkind)
+    | Pparam_newtype (x, jkind) -> Some (x, jkind, pparam_loc)
     | Pparam_val _ -> None
   in
   fun params ->
@@ -830,7 +860,7 @@ let empty_body_constraint =
    [Pexp_newtype(a, Pexp_newtype(b, Pexp_newtype(c, Pexp_constraint(e, t))))]
    rather than a [Pexp_function].
 *)
-let mkghost_newtype_function_body newtypes body_constraint body ~loc =
+let mkghost_newtype_function_body newtypes body_constraint body =
   let wrapped_body =
     let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
       body_constraint
@@ -840,24 +870,30 @@ let mkghost_newtype_function_body newtypes body_constraint body ~loc =
     let loc = loc_start, loc_end in
     mkexp_opt_type_constraint_with_modes ~ghost:true ~loc ~modes body ret_type_constraint
   in
-  mk_newtypes ~loc newtypes wrapped_body
+  let expr =
+    List.fold_right
+      (fun (newtype, jkind, newtype_loc) e ->
+         (* Mints a ghost location that approximates the newtype's "extent" as
+            being from the start of the newtype param until the end of the
+            function body.
+         *)
+         let loc = (newtype_loc.Location.loc_start, body.pexp_loc.loc_end) in
+         ghexp (Pexp_newtype (newtype, jkind, e)) ~loc)
+      newtypes
+      wrapped_body
+  in
+  expr.pexp_desc
 
-let mkfunction ~loc ~attrs params body_constraint body =
+let mkfunction params body_constraint body =
   match body with
-  | Pfunction_cases _ ->
-      mkexp_attrs (Pexp_function (params, body_constraint, body)) attrs ~loc
+  | Pfunction_cases _ -> Pexp_function (params, body_constraint, body)
   | Pfunction_body body_exp -> begin
     (* If all the params are newtypes, then we don't create a function node;
        we create nested newtype nodes. *)
       match all_params_as_newtypes params with
-      | None ->
-          mkexp_attrs (Pexp_function (params, body_constraint, body)) attrs ~loc
+      | None -> Pexp_function (params, body_constraint, body)
       | Some newtypes ->
-          wrap_exp_attrs
-            ~loc
-            (mkghost_newtype_function_body newtypes body_constraint body_exp
-                ~loc)
-            attrs
+          mkghost_newtype_function_body newtypes body_constraint body_exp
     end
 
 let mk_functor_typ args mty_mm =
@@ -1040,6 +1076,23 @@ let merloc startpos ?endpos x =
   let default_loc = ref Location.none
 
   let default_expr () =
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+%token DOTDOT                 ".."
+%token DOTHASH                ".#"
+%token DOWNTO                 "downto"
+%token ELSE                   "else"
+%token END                    "end"
+%token EOF                    ""
+=======
+%token DOTDOT                 ".."
+%token DOTHASH                ".#"
+%token DOWNTO                 "downto"
+%token EFFECT                 "effect"
+%token ELSE                   "else"
+%token END                    "end"
+%token EOF                    ""
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
     Exp.mk ~loc:!default_loc Pexp_hole
 
   let default_pattern () = Pat.any ~loc:!default_loc ()
@@ -1233,6 +1286,11 @@ let merloc startpos ?endpos x =
 %token DOTTILDE [@cost 1] [@symbol ".~"]
 %token GREATERDOT [@cost 1] [@symbol ">."]
 
+(* see the [metaocaml_expr] comment *)
+%token METAOCAML_ESCAPE       ".~"
+%token METAOCAML_BRACKET_OPEN   ".<"
+%token METAOCAML_BRACKET_CLOSE  ">."
+
 /* Precedences and associativities.
 
 Tokens and rules have precedences.  A reduce/reduce conflict is resolved
@@ -1297,11 +1355,15 @@ The precedences must be listed from low to high.
 %nonassoc below_DOT
 %nonassoc DOT DOTHASH DOTOP
 /* Finally, the first tokens of simple_expr are above everything else. */
-%nonassoc BACKQUOTE BANG BEGIN CHAR HASH_CHAR FALSE FLOAT HASH_FLOAT
-          INT HASH_INT OBJECT
-          LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
-          LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
+%nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT INT OBJECT
+          LBRACE LBRACELESS LBRACKET LBRACKETBAR LIDENT LPAREN
+          NEW PREFIXOP STRING TRUE UIDENT
+          LBRACKETPERCENT QUOTED_STRING_EXPR
+          METAOCAML_BRACKET_OPEN METAOCAML_ESCAPE
+          /* OxCaml additions: */
+          HASH_CHAR HASH_FLOAT HASH_INT
+          LBRACKETCOLON LESSLBRACKET DOLLAR
+          HASHLBRACE HASHLPAREN UNDERSCORE
           HASHFALSE HASHTRUE
           DOTLESS DOTTILDE GREATERDOT
 
@@ -1959,13 +2021,12 @@ structure [@recovery []]:
         { let (ext, l) = $1 in (Pstr_class l, ext) }
     | class_type_declarations
         { let (ext, l) = $1 in (Pstr_class_type l, ext) }
+    | include_statement(module_expr)
+        { let incl, ext = $1 in
+          (Pstr_include incl, ext)
+        }
     )
     { $1 }
-  | include_statement(module_expr)
-      { let incl, ext = $1 in
-        let item = mkstr ~loc:$sloc (Pstr_include incl) in
-        wrap_str_ext ~loc:$sloc item ext
-      }
 ;
 
 (* A single module binding. *)
@@ -2264,13 +2325,12 @@ signature_item:
         { let (ext, l) = $1 in (Psig_class l, ext) }
     | class_type_declarations
         { let (ext, l) = $1 in (Psig_class_type l, ext) }
+    | include_statement(module_type) modalities = optional_atat_modalities_expr
+        { let incl, ext = $1 in
+          Psig_include (incl, modalities), ext
+        }
     )
     { $1 }
-  | include_statement(module_type) modalities = optional_atat_modalities_expr
-      { let incl, ext = $1 in
-        let item = mksig ~loc:$sloc (Psig_include (incl, modalities)) in
-        wrap_sig_ext ~loc:$sloc item ext
-      }
 
 (* A module declaration. *)
 %inline module_declaration:
@@ -2659,8 +2719,8 @@ class_signature:
 class_self_type:
     LPAREN core_type RPAREN
       { $2 }
-  | mktyp((* empty *) { Ptyp_any None })
-      { $1 }
+  | (* empty *)
+      { ghtyp ~loc:$sloc (Ptyp_any None) }
 ;
 %inline class_sig_fields:
   flatten(text_csig(class_sig_field)*)
@@ -2802,8 +2862,10 @@ class_type_declarations:
            typechecking. For standalone function cases, we want the compiler to
            respect, e.g., [@inline] attributes.
          *)
-        mkfunction [] empty_body_constraint (Pfunction_cases (cases, loc, [])) ~attrs:$2
-          ~loc:$sloc
+        let desc =
+          mkfunction [] empty_body_constraint (Pfunction_cases (cases, loc, []))
+        in
+        mkexp_attrs ~loc:$sloc desc $2
       }
     )
     { $1 }
@@ -2824,9 +2886,7 @@ fun_seq_expr:
     { Pexp_sequence($1, $3) })
     { $1 }
   | fun_expr SEMI PERCENT attr_id seq_expr
-    { let seq = mkexp ~loc:$sloc (Pexp_sequence ($1, $5)) in
-      let payload = PStr [mkstrexp seq []] in
-      mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
+    { mkexp_attrs ~loc:$sloc (Pexp_sequence ($1, $5)) (Some $4, []) }
 ;
 seq_expr:
   | or_function(fun_seq_expr) { $1 }
@@ -2967,7 +3027,7 @@ fun_:
   | maybe_stack (
     FUN ext_attributes fun_params body_constraint = optional_atomic_constraint_
       MINUSGREATER fun_body
-    {  mkfunction $3 body_constraint $6 ~loc:$sloc ~attrs:$2 }
+    { mkexp_attrs ~loc:$sloc (mkfunction $3 body_constraint $6) $2 }
     ) { $1 }
 
 %public fun_expr [@recovery default_expr ()]:
@@ -2990,7 +3050,13 @@ fun_:
         mkexp ~loc:$sloc (Pexp_letop{ let_; ands; body}) }
   | fun_expr COLONCOLON expr
       { mkexp_cons ~loc:$sloc $loc($2)
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
           (ghexp ~loc:$sloc (Pexp_tuple[None, $1; None, (merloc $endpos($2) $3)])) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+          (ghexp ~loc:$sloc (Pexp_tuple[None, $1;None, $3])) }
+=======
+          (ghexp ~loc:$sloc (Pexp_tuple[None,$1;None,$3])) }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | mkrhs(label) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
@@ -3049,10 +3115,10 @@ fun_:
   | LAZY ext_attributes simple_expr %prec below_HASH
       { Pexp_lazy $3, $2 }
   | subtractive expr %prec prec_unary_minus
-      { let desc, attrs = mkuminus ~oploc:$loc($1) $1 $2 in
+      { let desc, attrs = mkuminus ~sloc:$sloc ~oploc:$loc($1) $1 $2 in
         desc, (None, attrs) }
   | additive expr %prec prec_unary_plus
-      { let desc, attrs = mkuplus ~oploc:$loc($1) $1 $2 in
+      { let desc, attrs = mkuplus ~sloc:$sloc ~oploc:$loc($1) $1 $2 in
         desc, (None, attrs) }
 ;
 %inline expr_:
@@ -3119,7 +3185,12 @@ spliceable_expr:
 (*
   | indexop_error (DOT, seq_expr) { $1 }
   | indexop_error (qualified_dotop, expr_semi_list) { $1 }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 *)
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+=======
+  | metaocaml_expr { $1 }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | simple_expr_attrs
     { let desc, attrs = $1 in
       mkexp_attrs ~loc:$sloc desc attrs }
@@ -3150,10 +3221,20 @@ spliceable_expr:
   | NEW ext_attributes mkrhs(class_longident)
       { Pexp_new($3), $2 }
   | LPAREN MODULE ext_attributes module_expr RPAREN
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       { Pexp_pack $4, $3 }
   | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
       { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, []), $3 }
   (*
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { Pexp_pack $4, $3 }
+  | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
+      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, []), $3 }
+=======
+      { Pexp_pack ($4, None), $3 }
+  | LPAREN MODULE ext_attributes module_expr COLON package_type_ RPAREN
+      { Pexp_pack ($4, Some $6), $3 }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   *)
@@ -3262,7 +3343,26 @@ block_access:
   (*
   | DOT ident _p=LPAREN seq_expr _e=error
     { indexop_unclosed_error $loc(_p) Paren $loc(_e) }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   *)
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+=======
+
+(* We include this parsing rule from the BER-MetaOCaml patchset
+   (see https://okmij.org/ftp/ML/MetaOCaml.html)
+   even though the lexer does *not* include any lexing rule
+   for the METAOCAML_* tokens, so they
+   will never be produced by the upstream compiler.
+
+   The intention of this dead parsing rule is purely to ease the
+   future maintenance work on MetaOCaml.
+*)
+%inline metaocaml_expr:
+  | METAOCAML_ESCAPE e = simple_expr
+    { mkexp ~loc:$sloc (pexp_extension ~id:(mknoloc "metaocaml.escape") e) }
+  | METAOCAML_BRACKET_OPEN e = seq_expr METAOCAML_BRACKET_CLOSE
+    { mkexp ~loc:$sloc (pexp_extension ~id:(mknoloc "metaocaml.bracket") e) }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 
 %inline simple_expr_:
@@ -3363,10 +3463,10 @@ block_access:
       { unclosed "[" $loc($3) "]" $loc($5) }
   *)
   | od=open_dot_declaration DOT LPAREN MODULE ext_attributes module_expr COLON
-    package_type RPAREN
+    ptyp = package_type_ RPAREN
       { let modexp =
           mkexp_attrs ~loc:($startpos($3), $endpos)
-            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
+            (Pexp_pack ($6, Some ptyp)) $5 in
         Pexp_open(od, modexp) }
   (*
   | mod_longident DOT
@@ -3565,9 +3665,7 @@ strict_binding_modes:
           in
           {mode_annotations; ret_type_constraint ; ret_mode_annotations }
         in
-        let exp = mkfunction $1 constraint_ $4 ~loc:$sloc ~attrs:(None, []) in
-        { exp with pexp_loc = { exp.pexp_loc with loc_ghost = true } }
-
+        ghexp ~loc:$sloc (mkfunction $1 constraint_ $4)
     }
 ;
 %inline strict_binding:
@@ -3581,9 +3679,9 @@ fun_body:
         | None -> Pfunction_cases ($3, make_loc $sloc, attrs)
         | Some _ ->
           (* function%foo extension nodes interrupt the arity *)
-          let cases = Pfunction_cases ($3, make_loc $sloc, []) in
-          let function_ = mkfunction [] empty_body_constraint cases ~loc:$sloc ~attrs:$2 in
-          Pfunction_body function_
+            let cases = Pfunction_cases ($3, make_loc $sloc, []) in
+            let function_ = mkfunction [] empty_body_constraint cases in
+            Pfunction_body (mkexp_attrs ~loc:$sloc function_ $2)
       }
   | fun_seq_expr
       { Pfunction_body $1 }
@@ -3637,7 +3735,7 @@ fun_params:
   | nonempty_concat(fun_param_as_list) { $1 }
 ;
 
-(* Parsing labeled tuple expressions
+(* Parsing labeled tuple expressions:
 
    The grammar we want to parse is something like:
 
@@ -3679,8 +3777,8 @@ fun_params:
        Some label, mkexpvar ~loc label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
       { Some label,
-        mkexp_type_constraint_with_modes
-          ~loc:($startpos($2), $endpos) ~modes:[] (mkexpvar ~loc:$loc(label) label) c }
+        mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos)
+          ~modes:[] (mkexpvar ~loc:$loc(label) label) c }
 ;
 reversed_labeled_tuple_body:
   (* > 2 elements *)
@@ -3706,8 +3804,8 @@ reversed_labeled_tuple_body:
   COMMA
   x2 = labeled_tuple_element
   { let x1 =
-      mkexp_type_constraint_with_modes
-        ~loc:($startpos($2), $endpos) ~modes:[] (mkexpvar ~loc:$loc(l1) l1) c
+      mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos)
+        ~modes:[] (mkexpvar ~loc:$loc(l1) l1) c
     in
     [ x2; Some l1, x1] }
 ;
@@ -3830,6 +3928,8 @@ pattern [@recovery default_pattern ()]:
       { $1 }
   | EXCEPTION ext_attributes pattern %prec prec_constr_appl
       { mkpat_attrs ~loc:$sloc (Ppat_exception $3) $2}
+  | EFFECT pattern_gen COMMA simple_pattern
+      { mkpat ~loc:$sloc (Ppat_effect($2,$4)) }
 ;
 
 pattern_no_exn:
@@ -3840,8 +3940,7 @@ pattern_no_exn:
 %inline pattern_(self):
   | self COLONCOLON pattern
       { mkpat_cons ~loc:$sloc $loc($2)
-          (ghpat ~loc:$sloc (Ppat_tuple ([None, $1;None, $3], Closed)))
-      }
+          (ghpat ~loc:$sloc (Ppat_tuple ([None, $1; None, $3], Closed))) }
   | self attribute
       { Pat.attr $1 $2 }
   | pattern_gen
@@ -3849,6 +3948,22 @@ pattern_no_exn:
   | mkpat(
       self AS mkrhs(val_ident)
         { Ppat_alias($1, $3) }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+    | self AS error
+        { expecting $loc($3) "identifier" }
+    | self COLONCOLON error
+        { expecting $loc($3) "pattern" }
+    | self BAR pattern
+=======
+    | self AS error
+        { expecting $loc($3) "identifier" }
+    | labeled_tuple_pattern(self)
+        { $1 }
+    | self COLONCOLON error
+        { expecting $loc($3) "pattern" }
+    | self BAR pattern
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
     (*| self AS error
         { expecting $loc($3) "identifier" } *)
     (*| self COLONCOLON error
@@ -3858,12 +3973,9 @@ pattern_no_exn:
     (*| self BAR error
         { expecting $loc($3) "pattern" } *)
   ) { $1 }
-  | reversed_labeled_tuple_pattern(self)
-      { let closed, pats = $1 in
-        mkpat ~loc:$sloc (Ppat_tuple (List.rev pats, closed))
-      }
 ;
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 (* Parsing labeled tuple patterns
 
    Here we play essentially the same game we did for expressions - see the
@@ -3921,6 +4033,66 @@ reversed_labeled_tuple_pattern(self):
   | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
       { Open, [ $1 ] }
 
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+(* Parsing labeled tuple patterns
+
+   Here we play essentially the same game we did for expressions - see the
+   comment beginning "Parsing labeled tuple expressions".
+
+   One difference is that we would need to manually inline the definition of
+   individual elements in two places: Once in the base case for lists 2 or more
+   elements, and once in the special case for open patterns with just one
+   element (e.g., [~x, ..]).  Rather than manually inlining
+   [labeled_tuple_pat_element] twice, we simply define it twice: once with the
+   [%prec] annotations needed for its occurrences in tail position, and once
+   without them suitable for use in other locations.
+*)
+%inline labeled_tuple_pat_element(self):
+  | self { None, $1 }
+  | LABEL simple_pattern %prec COMMA
+      { Some $1, $2 }
+  | TILDE label = LIDENT
+      { let loc = $loc(label) in
+        Some label, mkpatvar ~loc label }
+  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
+      { let lbl_loc = $loc(label) in
+        let pat_loc = $startpos($2), $endpos in
+        let pat = mkpatvar ~loc:lbl_loc label in
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+
+(* If changing this, don't forget to change its copy just above. *)
+%inline labeled_tuple_pat_element_noprec(self):
+  | self { None, $1 }
+  | LABEL simple_pattern
+      { Some $1, $2 }
+  | TILDE label = LIDENT
+      { let loc = $loc(label) in
+        Some label, mkpatvar ~loc label }
+  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
+      { let lbl_loc = $loc(label) in
+        let pat_loc = $startpos($2), $endpos in
+        let pat = mkpatvar ~loc:lbl_loc label in
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+
+labeled_tuple_pat_element_list(self):
+  | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
+      { $3 :: $1 }
+  | labeled_tuple_pat_element_noprec(self) COMMA labeled_tuple_pat_element(self)
+      { [ $3; $1 ] }
+  | self COMMA error
+      { expecting $loc($3) "pattern" }
+;
+
+reversed_labeled_tuple_pattern(self):
+  | labeled_tuple_pat_element_list(self) %prec below_COMMA
+      { Closed, $1 }
+  | labeled_tuple_pat_element_list(self) COMMA DOTDOT
+      { Open, $1 }
+  | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
+      { Open, [ $1 ] }
+
+=======
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 pattern_gen:
     simple_pattern
       { $1 }
@@ -3940,6 +4112,7 @@ pattern_gen:
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
+
 simple_pattern:
     mkpat(mkrhs(val_ident) %prec below_EQUAL
       { Ppat_var ($1) })
@@ -4041,6 +4214,68 @@ simple_delimited_pattern:
           Ppat_unboxed_tuple (List.rev fields, closed) }
   ) { $1 }
 
+(* Parsing labeled tuple patterns:
+
+   Here we play essentially the same game we did for expressions - see the
+   comment beginning "Parsing labeled tuple expressions".
+
+   One difference is that we would need to manually inline the definition of
+   individual elements in two places: Once in the base case for lists 2 or more
+   elements, and once in the special case for open patterns with just one
+   element (e.g., [~x, ..]).  Rather than manually inlining
+   [labeled_tuple_pat_element] twice, we simply define it twice: once with the
+   [%prec] annotations needed for its occurrences in tail position, and once
+   without them suitable for use in other locations.
+*)
+%inline labeled_tuple_pat_element(self):
+  | self { None, $1 }
+  | LABEL simple_pattern %prec COMMA
+      { Some $1, $2 }
+  | TILDE label = LIDENT
+      { let loc = $loc(label) in
+        Some label, mkpatvar ~loc label }
+  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
+      { let lbl_loc = $loc(label) in
+        let pat_loc = $startpos($2), $endpos in
+        let pat = mkpatvar ~loc:lbl_loc label in
+        Some label,
+        mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+;
+(* If changing this, don't forget to change its copy just above. *)
+%inline labeled_tuple_pat_element_noprec(self):
+  | self { None, $1 }
+  | LABEL simple_pattern
+      { Some $1, $2 }
+  | TILDE label = LIDENT
+      { let loc = $loc(label) in
+        Some label, mkpatvar ~loc label }
+  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
+      { let lbl_loc = $loc(label) in
+        let pat_loc = $startpos($2), $endpos in
+        let pat = mkpatvar ~loc:lbl_loc label in
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+;
+labeled_tuple_pat_element_list(self):
+  | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
+      { $3 :: $1 }
+  | labeled_tuple_pat_element_noprec(self) COMMA labeled_tuple_pat_element(self)
+      { [ $3; $1 ] }
+  | self COMMA error
+      { expecting $loc($3) "pattern" }
+;
+reversed_labeled_tuple_pattern(self):
+  | labeled_tuple_pat_element_list(self) %prec below_COMMA
+      { Closed, $1 }
+  | labeled_tuple_pat_element_list(self) COMMA DOTDOT
+      { Open, $1 }
+  | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
+      { Open, [ $1 ] }
+;
+labeled_tuple_pattern(self):
+  | reversed_labeled_tuple_pattern(self)
+      { let closed, pat = $1 in
+        Ppat_tuple(List.rev pat, closed) }
+;
 %inline pattern_semi_list:
   ps = separated_or_terminated_nonempty_list(SEMI, pattern)
     { ps }
@@ -4378,13 +4613,31 @@ type_variance:
   | INFIXOP2
       { if $1 = "+!" then Covariant, Injective else
         if $1 = "-!" then Contravariant, Injective else
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         (expecting $loc($1) "type_variance";
          NoVariance, NoInjectivity) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        expecting $loc($1) "type_variance" }
+=======
+        if $1 = "+-" then Bivariant, NoInjectivity else
+        if $1 = "-+" then Bivariant, NoInjectivity else
+        if $1 = "+-!" then Bivariant, Injective else
+        if $1 = "-+!" then Bivariant, Injective else
+        expecting $loc($1) "type_variance" }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | PREFIXOP
       { if $1 = "!+" then Covariant, Injective else
         if $1 = "!-" then Contravariant, Injective else
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
         (expecting $loc($1) "type_variance";
          NoVariance, NoInjectivity) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+        expecting $loc($1) "type_variance" }
+=======
+        if $1 = "!+-" then Bivariant, Injective else
+        if $1 = "!-+" then Bivariant, Injective else
+        expecting $loc($1) "type_variance" }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 
 (* A sequence of constructor declarations is either a single BAR, which
@@ -4535,7 +4788,8 @@ label_declaration_semi:
   attrs2 = post_item_attributes
     { let docs = symbol_docs $sloc in
       let attrs = attrs1 @ attrs2 in
-      Te.mk tid cs ~params ~priv ~attrs ~docs,
+      let loc = make_loc $sloc in
+      Te.mk tid cs ~params ~priv ~attrs ~docs ~loc,
       ext }
 ;
 %inline extension_constructor(opening):
@@ -4793,18 +5047,16 @@ strict_function_or_labeled_tuple_type:
             maybe_curry_typ codomain codomain_loc, arg_modes, ret_modes) }
     )
     { $1 }
-  (* These next three cases are for labled tuples - see comment on [tuple_type]
+  (* The next three cases are for labled tuples - see comment on [tuple_type]
      below.
 
-     The first two cases are present just to resolve a shift reduce conflict
-     in a module type [S with t := x:t1 * t2 -> ...] which might be the
-     beginning of
+     The first two cases are present just to resolve a shift/reduce conflict in a
+     module type [S with t := x:t1 * t2 -> ...] which might be the beginning of
        [S with t := x:t1 * t2 -> S']    or    [S with t := x:t1 * t2 -> t3]
-     They are the same as the previous two cases, but with [arg_label] replaced
-     with the more specific [LIDENT COLON] and [param_type] replaced with the
-     more specific [proper_tuple_type].  Apparently, this is sufficient for
-     menhir to be able to delay a decision about which of the above module type
-     cases we are in.  *)
+     They are the same as the previous two cases, but with [arg_label] specialized
+     to [LIDENT COLON] and the domain type specialized to [proper_tuple_type].
+     Apparently, this is sufficient for menhir to be able to delay a decision
+     about which of the above module type cases we are in.  *)
   | mktyp(
       label = LIDENT COLON
       tuple_with_modes = with_optional_mode_expr(proper_tuple_type)
@@ -4959,9 +5211,9 @@ optional_atat_modalities_expr:
 
    However, the special case of labeled tuples where the first element has a
    label is not parsed as a proper_tuple_type, but rather as a case of
-   strict_function_or_labled_tuple_type above.  This helps in dealing with
-   ambiguities around [x:t1 * t2 -> t3] which must continue to parse as a
-   function with one labeled argument even in the presense of labled tuples.
+   strict_function_or_labeled_tuple_type above.  This resolves ambiguities
+   around [x:t1 * t2 -> t3] which must continue to parse as a function with one
+   labeled argument even in the presence of labled tuples.
 *)
 tuple_type:
   | ty = atomic_type
@@ -4969,16 +5221,14 @@ tuple_type:
       { ty }
   | proper_tuple_type %prec below_FUNCTOR
     { let ty, ltys = $1 in
-      mktyp ~loc:$sloc (Ptyp_tuple ((None, ty) :: ltys))
-    }
+      mktyp ~loc:$sloc (Ptyp_tuple ((None, ty) :: ltys)) }
 ;
-
 %inline proper_tuple_type:
   | ty = atomic_type
     STAR
     ltys = separated_nonempty_llist(STAR, labeled_tuple_typ_element)
       { ty, ltys }
-
+;
 (* In the case of an unboxed tuple, we don't need the nonsense above because
    the [#( ... )] disambiguates.  However, we still must write out
    the first element explicitly because [labeled_tuple_typ_element] is
@@ -4994,13 +5244,13 @@ tuple_type:
     STAR
     ltys = separated_nonempty_llist(STAR, labeled_tuple_typ_element)
     { (Some label, ty1) :: ltys }
-
+;
 %inline labeled_tuple_typ_element :
   | atomic_type %prec STAR
      { None, $1 }
   | label = LIDENT COLON ty = atomic_type %prec STAR
      { Some label, ty }
-
+;
 (* Atomic types are the most basic level in the syntax of types.
    Atomic types include:
    - types between parentheses:           (int -> int)
@@ -5036,8 +5286,8 @@ tuple_type:
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
       { type_ }
-  | LPAREN MODULE attrs = ext_attributes package_type = package_type RPAREN
-      { wrap_typ_attrs ~loc:$sloc (reloc_typ ~loc:$sloc package_type) attrs }
+  | LPAREN MODULE ext_attrs = ext_attributes package_type = package_type_ RPAREN
+      { mktyp_attrs ~loc:$sloc (Ptyp_package package_type) ext_attrs }
   | mktyp(
       LBRACKET field = tag_field RBRACKET
         { Ptyp_variant([ field ], Closed, None) }
@@ -5166,10 +5416,12 @@ atomic_type:
   | UNDERSCORE COLON jkind=jkind_annotation
     { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
 
-%inline package_type: module_type
+%inline package_type_: module_type
       { let (lid, cstrs, attrs) = package_type_of_module_type $1 in
-        let descr = Ptyp_package (lid, cstrs) in
-        mktyp ~loc:$sloc ~attrs descr }
+        Typ.package_type ~loc:(make_loc $sloc) ~attrs lid cstrs }
+
+%inline package_type: package_type_
+      { mktyp ~loc:$sloc (Ptyp_package $1) }
 ;
 %inline row_field_list:
   separated_nonempty_llist(BAR, row_field)
@@ -5247,16 +5499,19 @@ meth_list:
 /* Constants */
 
 value_constant:
-  | INT               { let (n, m) = $1 in Pconst_integer (n, m) }
-  | CHAR              { Pconst_char $1 }
+  | INT               { let (n, m) = $1 in
+                        mkconst ~loc:$sloc (Pconst_integer (n, m)) }
+  | CHAR              { mkconst ~loc:$sloc (Pconst_char $1) }
   | STRING            { let (s, strloc, d) = $1 in
-                        Pconst_string (s, strloc, d) }
-  | FLOAT             { let (f, m) = $1 in Pconst_float (f, m) }
+                        mkconst ~loc:$sloc (Pconst_string (s, strloc, d)) }
+  | FLOAT             { let (f, m) = $1 in
+                        mkconst ~loc:$sloc (Pconst_float (f, m)) }
 ;
 unboxed_constant:
-  | HASH_INT          { unboxed_int $sloc $sloc Positive $1 }
-  | HASH_FLOAT        { unboxed_float Positive $1 }
-  | HASH_CHAR         { Pconst_untagged_char $1 }
+  | HASH_INT          { mkconst ~loc:$sloc
+                          (unboxed_int $sloc $sloc Positive $1) }
+  | HASH_FLOAT        { mkconst ~loc:$sloc (unboxed_float Positive $1) }
+  | HASH_CHAR         { mkconst ~loc:$sloc (Pconst_untagged_char $1) }
 ;
 constant:
     value_constant    { $1 }
@@ -5264,18 +5519,24 @@ constant:
 ;
 signed_value_constant:
     value_constant    { $1 }
-  | MINUS INT         { let (n, m) = $2 in Pconst_integer("-" ^ n, m) }
-  | MINUS FLOAT       { let (f, m) = $2 in Pconst_float("-" ^ f, m) }
-  | PLUS INT          { let (n, m) = $2 in Pconst_integer (n, m) }
-  | PLUS FLOAT        { let (f, m) = $2 in Pconst_float(f, m) }
+  | MINUS INT         { let (n, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_integer("-" ^ n, m)) }
+  | MINUS FLOAT       { let (f, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_float("-" ^ f, m)) }
+  | PLUS INT          { let (n, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_integer (n, m)) }
+  | PLUS FLOAT        { let (f, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_float(f, m)) }
 ;
 signed_constant:
     signed_value_constant { $1 }
   | unboxed_constant      { $1 }
-  | MINUS HASH_INT        { unboxed_int $sloc $loc($2) Negative $2 }
-  | MINUS HASH_FLOAT      { unboxed_float Negative $2 }
-  | PLUS HASH_INT         { unboxed_int $sloc $loc($2) Positive $2 }
-  | PLUS HASH_FLOAT       { unboxed_float Positive $2 }
+  | MINUS HASH_INT        { mkconst ~loc:$sloc
+                              (unboxed_int $sloc $loc($2) Negative $2) }
+  | MINUS HASH_FLOAT      { mkconst ~loc:$sloc (unboxed_float Negative $2) }
+  | PLUS HASH_INT         { mkconst ~loc:$sloc
+                              (unboxed_int $sloc $loc($2) Positive $2) }
+  | PLUS HASH_FLOAT       { mkconst ~loc:$sloc (unboxed_float Positive $2) }
 ;
 
 /* Identifiers and long identifiers */
@@ -5359,14 +5620,34 @@ constr_ident:
   | constr_extra_nonprefix_ident                { $1 }
 ;
 constr_longident:
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     mod_longident       %prec below_DOT         { $1 } /* A.B.x vs (A).B.x */
   | mod_longident DOT constr_extra_ident        { Ldot($1,$3) }
   | constr_extra_ident                          { Lident $1 }
   | constr_extra_nonprefix_ident                { Lident $1 }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+    mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
+  | mod_longident DOT constr_extra_ident { Ldot($1,$3) }
+  | constr_extra_ident                   { Lident $1 }
+  | constr_extra_nonprefix_ident         { Lident $1 }
+=======
+    mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
+  | mod_longident DOT constr_extra_ident { ldot $1 $loc($1) $3 $loc($3) }
+  | constr_extra_ident                   { Lident $1 }
+  | constr_extra_nonprefix_ident         { Lident $1 }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 mk_longident(prefix,final):
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   | final             { Lident $1 }
   | prefix DOT final  { Ldot($1,$3) }
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+   | final            { Lident $1 }
+   | prefix DOT final { Ldot($1,$3) }
+=======
+   | final            { Lident $1 }
+   | prefix DOT final { ldot $1 $loc($1) $3 $loc($3) }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 val_longident:
     mk_longident(mod_longident, val_ident) { $1 }
@@ -5393,8 +5674,14 @@ mod_longident:
 mod_ext_longident:
     mk_longident(mod_ext_longident, UIDENT) { $1 }
   | mod_ext_longident LPAREN mod_ext_longident RPAREN
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       { lapply ~loc:$sloc $1 $3 }
   (*
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+      { lapply ~loc:$sloc $1 $3 }
+=======
+      { lapply ~loc:$sloc $1 $loc($1) $3 $loc($3) }
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | mod_ext_longident LPAREN error
       { expecting $loc($3) "module path" }
   *)
@@ -5571,6 +5858,7 @@ single_attr_id:
   | DO { "do" }
   | DONE { "done" }
   | DOWNTO { "downto" }
+  | EFFECT { "effect" }
   | ELSE { "else" }
   | END { "end" }
   | EXCEPTION { "exception" }

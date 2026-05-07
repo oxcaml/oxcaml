@@ -32,6 +32,7 @@ let mark_used t = Attribute_table.remove unused_attrs t
 *)
 let attr_order a1 a2 = Location.compare a1.loc a2.loc
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 let compiler_stops_before_attributes_consumed () =
   let stops_before_lambda =
     (* Clflags.stop_after is not a flag that Merlin consumes, so default to the None
@@ -45,6 +46,17 @@ let compiler_stops_before_attributes_consumed () =
   in
   stops_before_lambda || !Clflags.print_types
 
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+let compiler_stops_before_attributes_consumed () =
+  let stops_before_lambda =
+    match !Clflags.stop_after with
+    | None -> false
+    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+  in
+  stops_before_lambda || !Clflags.print_types
+
+=======
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 let unchecked_zero_alloc_attributes = Attribute_table.create 1
 let mark_zero_alloc_attribute_checked txt loc =
   Attribute_table.remove unchecked_zero_alloc_attributes { txt; loc }
@@ -66,6 +78,14 @@ let warn_unchecked_zero_alloc_attribute () =
     Location.prerr_warning sloc.loc (Warnings.Unchecked_zero_alloc_attribute))
     keys;
   Warnings.restore w_old
+
+let compiler_stops_before_attributes_consumed () =
+  let stops_before_lambda =
+    match !Clflags.stop_after with
+    | None -> false
+    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+  in
+  stops_before_lambda || !Clflags.print_types
 
 let warn_unused () =
   let keys = List.of_seq (Attribute_table.to_seq_keys unused_attrs) in
@@ -165,11 +185,13 @@ let ident_of_payload = function
      Some id
   | _ -> None
 
-let string_of_cst = function
+let string_of_cst const =
+  match const.pconst_desc with
   | Pconst_string(s, _, _) -> Some s
   | _ -> None
 
-let int_of_cst = function
+let int_of_cst const =
+  match const.pconst_desc with
   | Pconst_integer(i, None) -> Some (int_of_string i)
   | _ -> None
 
@@ -195,7 +217,8 @@ let error_of_extension ext =
            (({txt = ("ocaml.error"|"error"); loc}, p), _)} ->
         begin match p with
         | PStr([{pstr_desc=Pstr_eval
-                     ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_))}, _)}
+                     ({pexp_desc=Pexp_constant
+                           {pconst_desc=Pconst_string(msg, _, _); _}}, _)}
                ]) ->
             Location.msg ~loc "%a" Format_doc.pp_print_text msg
         | _ ->
@@ -215,7 +238,8 @@ let error_of_extension ext =
       begin match p with
       | PStr [] -> raise Location.Already_displayed_error
       | PStr({pstr_desc=Pstr_eval
-                  ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_))}, _)}::
+                  ({pexp_desc=Pexp_constant
+                      {pconst_desc=Pconst_string(msg, _, _)}}, _)}::
              inner) ->
           let sub = List.map (submessage_from loc txt) inner in
           Location.error_of_printer ~loc ~sub Format_doc.pp_print_text msg
@@ -268,7 +292,8 @@ let kind_and_message = function
          Pstr_eval
            ({pexp_desc=Pexp_apply
                  ({pexp_desc=Pexp_ident{txt=Longident.Lident id}},
-                  [Nolabel,{pexp_desc=Pexp_constant (Pconst_string(s,_,_))}])
+                  [Nolabel,{pexp_desc=Pexp_constant
+                                {pconst_desc=Pconst_string(s,_,_); _}}])
             },_)}] ->
       Some (id, s)
   | PStr[
@@ -382,7 +407,7 @@ let warning_attribute ?(ppwarning = true) =
   let process_alert loc name = function
     | PStr[{pstr_desc=
               Pstr_eval(
-                {pexp_desc=Pexp_constant(Pconst_string(s,_,_))},
+                {pexp_desc=Pexp_constant {pconst_desc=Pconst_string(s,_,_); _}},
                 _)
            }] ->
         begin
@@ -419,7 +444,7 @@ let warning_attribute ?(ppwarning = true) =
       begin match attr_payload with
       | PStr [{ pstr_desc=
                   Pstr_eval({pexp_desc=Pexp_constant
-                                         (Pconst_string (s, _, _))},_);
+                                 {pconst_desc=Pconst_string (s, _, _); _}},_);
                 pstr_loc }] ->
         (mark_used attr_name;
          Location.prerr_warning pstr_loc (Warnings.Preprocessor s))
@@ -521,6 +546,7 @@ let explicit_arity attrs = has_attribute "explicit_arity" attrs
 let has_unboxed attrs = has_attribute "unboxed" attrs
 
 let has_boxed attrs = has_attribute "boxed" attrs
+let has_atomic attrs = has_attribute "atomic" attrs
 
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
@@ -839,7 +865,9 @@ let get_optional_payload get_from_exp =
 let get_int_from_exp =
   let open Parsetree in
   function
-    | { pexp_desc = Pexp_constant (Pconst_integer(s, None)) } ->
+    | { pexp_desc =
+          Pexp_constant {pconst_desc=Pconst_integer(s, None); _}
+      } ->
         begin match Misc.Int_literal_converter.int s with
         | n -> Result.Ok n
         | exception (Failure _) -> Result.Error ()
@@ -879,8 +907,12 @@ let get_id_or_constant_from_exp =
   let open Parsetree in
   function
   | { pexp_desc = Pexp_ident { txt = Longident.Lident id } } -> Result.Ok (Ident, id)
-  | { pexp_desc = Pexp_constant (Pconst_integer (s,None)) } -> Result.Ok (Const_int, s)
-  | { pexp_desc = Pexp_constant (Pconst_string (s,_loc,_so)) } -> Result.Ok (Const_string, s)
+  | { pexp_desc =
+        Pexp_constant {pconst_desc=Pconst_integer (s,None); _}
+    } -> Result.Ok (Const_int, s)
+  | { pexp_desc =
+        Pexp_constant {pconst_desc=Pconst_string (s,_loc,_so); _}
+    } -> Result.Ok (Const_string, s)
   | _ -> Result.Error ()
 
 let get_ids_and_constants_from_exp exp =
@@ -1172,7 +1204,10 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
                 ({ pexp_desc =
                       (Pexp_apply
                         ({ pexp_desc=
-                              (Pexp_constant (Pconst_string(name,_,None)));
+                              (Pexp_constant
+                                {pconst_desc=
+                                  Pconst_string(name,_,None);
+                                 _});
                             pexp_loc = name_loc;
                             _ }
                         , args))
@@ -1198,6 +1233,7 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 
 let has_atomic attrs = has_attribute "atomic" attrs
 
@@ -1206,3 +1242,8 @@ let has_atomic attrs = has_attribute "atomic" attrs
 let merlin_punned_let = "merlin.punned-let"
 
 let merlin_punned_record_pattern = "merlin.punned-record-pattern"
+||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
+
+let has_atomic attrs = has_attribute "atomic" attrs
+=======
+>>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
