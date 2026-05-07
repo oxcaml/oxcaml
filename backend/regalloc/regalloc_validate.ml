@@ -544,6 +544,21 @@ end = struct
            (InstructionId.to_string id))
       ~reg_arr:old_instr.res ~loc_arr:instr.res
 
+  (* Follow the description's successor chain starting at [old_successor_id],
+     skipping ids whose corresponding description-instruction was validly
+     deleted by [Cfg_deadcode] (i.e. not present in [seen_ids] and with a pure
+     [desc]). The returned id is the first one that is either still present in
+     the post-allocation CFG, or that is not in the description at all (e.g. the
+     block's terminator). *)
+  let rec effective_successor_id ~seen_ids t old_successor_id =
+    if Hashtbl.mem seen_ids old_successor_id
+    then old_successor_id
+    else
+      match Hashtbl.find_opt t.instructions old_successor_id with
+      | Some info when Cfg.is_pure_basic info.instr.Instruction.desc ->
+        effective_successor_id ~seen_ids t info.successor_id
+      | _ -> old_successor_id
+
   let verify_basic ~seen_ids ~successor_id t instr =
     let id = instr.id in
     add_instr_id ~seen_ids
@@ -553,14 +568,17 @@ end = struct
     with
     (* The instruction was present before. *)
     | Some { instr = old_instr; successor_id = old_successor_id }, false ->
-      if not (InstructionId.equal old_successor_id successor_id)
+      let effective_old_successor_id =
+        effective_successor_id ~seen_ids t old_successor_id
+      in
+      if not (InstructionId.equal effective_old_successor_id successor_id)
       then
         Regalloc_utils.fatal
           "The instruction's no. %a successor id has changed. Before \
            allocation: %a. After allocation (ignoring instructions added by \
            allocation): %a."
-          InstructionId.format id InstructionId.format old_successor_id
-          InstructionId.format successor_id;
+          InstructionId.format id InstructionId.format
+          effective_old_successor_id InstructionId.format successor_id;
       (match instr.desc, old_instr.desc with
       | Op (Name_for_debugger _), Op (Name_for_debugger _) ->
         (* IRC uses `Reg.interf` to represent the adjacency lists for the
@@ -781,12 +799,25 @@ end = struct
         ignore (first_instruction_id : InstructionId.t))
       (Cfg_with_layout.cfg cfg).Cfg.blocks;
     Hashtbl.iter
-      (fun id _ ->
+      (fun id (info : basic_info) ->
         if not (Hashtbl.mem seen_ids id)
         then
-          Regalloc_utils.fatal
-            "Instruction no. %a was deleted by register allocator"
-            InstructionId.format id)
+          (* [Cfg_deadcode] runs at the end of the split pass and removes any
+             pure basic instruction whose result becomes dead (e.g. because a
+             rematerialization rerouted all of its uses, possibly cascading to
+             upstream pure instructions whose results were only consumed by the
+             deleted ones). We mirror its rule here: deletion is accepted iff
+             the description's [desc] is [Cfg.is_pure_basic], matching the
+             predicate [Cfg_deadcode] itself uses (cf.
+             [Cfg_deadcode.remove_deadcode]). The equation system stays
+             consistent because no surviving instruction in the post-allocation
+             CFG references the deleted instruction's result registers, so no
+             equation involving them is ever added or expected to be removed. *)
+          if not (Cfg.is_pure_basic info.instr.Instruction.desc)
+          then
+            Regalloc_utils.fatal
+              "Instruction no. %a was deleted by register allocator"
+              InstructionId.format id)
       t.instructions;
     Hashtbl.iter
       (fun id _ ->
