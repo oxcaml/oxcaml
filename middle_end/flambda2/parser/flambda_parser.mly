@@ -118,6 +118,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_APPLY [@symbol "apply"]
 %token KWD_ARRAY [@symbol "array"]
 %token KWD_AVAILABLE [@symbol "available"]
+%token KWD_BOTTOM [@symbol "bottom"]
 %token KWD_BOXED [@symbol "boxed"]
 %token KWD_CCALL  [@symbol "ccall"]
 %token KWD_MCALL  [@symbol "mcall"]
@@ -186,6 +187,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_TOPLEVEL [@symbol "toplevel"]
 %token KWD_TUPLED [@symbol "tupled"]
 %token KWD_UNIT   [@symbol "unit"]
+%token KWD_UNKNOWN [@symbol "unknown"]
 %token KWD_UNREACHABLE [@symbol "unreachable"]
 %token KWD_UNROLL [@symbol "unroll"]
 %token KWD_VAL    [@symbol "val"]
@@ -509,7 +511,13 @@ nonconst_ctor:
 ;
 return_arity:
   | { None }
-  | COLON k = kinds_with_subkinds { Some k }
+  | COLON; ra = result_arity { Some ra }
+;
+
+result_arity:
+  | k = kinds_with_subkinds { (Arity k : result_arity) }
+  | KWD_UNKNOWN { Unknown_arity }
+  | KWD_BOTTOM { Bottom_arity }
 ;
 
 /* expr is staged so that let and where play nicely together. In particular, in
@@ -935,7 +943,7 @@ const:
   | s = ioption(simple) { s, None }
   | LPAREN;
       s = simple; COLON; params_arity = blank_or(kinds_with_subkinds);
-      MINUSGREATER; ret_arity = kinds_with_subkinds;
+      MINUSGREATER; ret_arity = result_arity;
     RPAREN
     { Some s, Some ({ params_arity; ret_arity } : function_arities) }
 ;

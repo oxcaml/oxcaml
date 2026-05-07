@@ -46,8 +46,7 @@ val wrap_inlined_body_for_exn_extra_args :
   'acc ->
   extra_args:(Simple.t * Flambda_kind.With_subkind.t) list ->
   apply_exn_continuation:Exn_continuation.t ->
-  apply_return_continuation:Flambda.Apply.Result_continuation.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  apply_return:Flambda.Apply.Return.t ->
   make_inlined_body:
     ('acc ->
     apply_exn_continuation:Continuation.t ->

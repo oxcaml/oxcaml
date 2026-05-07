@@ -826,20 +826,31 @@ let reaper_produce_invalid_when_never_returns =
   Sys.getenv_opt "REAPER_INVALIDS" <> None
 
 let make_apply_wrapper env
-    (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
-    apply_continuation return_decisions =
-  match (apply_continuation : Apply_expr.Result_continuation.t) with
-  | Never_returns ->
-    let apply = make_apply ~continuation:Never_returns in
+    (make_apply : return:Apply_expr.Return.t -> Apply_expr.t) ~arity
+    (apply_return : Apply_expr.Return.t) return_decisions =
+  match apply_return with
+  | Never_returns { arity = original_arity } ->
+    let arity =
+      match original_arity with
+      | Ok _ -> Result_arity.ok arity
+      | Unknown | Bottom -> original_arity
+    in
+    let apply = make_apply ~return:(Never_returns { arity }) in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
-  | Return return_cont -> (
+  | Tail_forwards_to_caller _ ->
+    let apply = make_apply ~return:apply_return in
+    RE.from_expr ~expr:(Expr.create_apply apply)
+      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
+  | Returns_to { cont = return_cont; arity = _ } -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
     let return_cont_wrapper = Continuation.rename return_cont in
-    let apply = make_apply ~continuation:(Return return_cont_wrapper) in
+    let apply =
+      make_apply ~return:(Returns_to { cont = return_cont_wrapper; arity })
+    in
     let rev_args_or_invalid =
       List.fold_left2
         (fun (rev_args_or_invalid : _ Or_invalid.t) apply_decision func_decision
@@ -929,7 +940,9 @@ let make_apply_wrapper env
            can only happen because the uses of [g] do not match those of [f],
            which would be the case if a loop of tail calls between them
            existed. *)
-        let apply = make_apply ~continuation:(Return return_cont) in
+        let apply =
+          make_apply ~return:(Returns_to { cont = return_cont; arity })
+        in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
           ~code_size:(Code_size.apply apply)
@@ -991,7 +1004,9 @@ let make_apply_wrapper env
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
-        let apply = make_apply ~continuation:Never_returns in
+        let apply =
+          make_apply ~return:(Never_returns { arity = Result_arity.ok arity })
+        in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
           ~code_size:(Code_size.apply apply))
@@ -1241,7 +1256,9 @@ let rebuild_apply env apply =
             List.map keep_or_poison args_and_keep
         in
         let args_arity = Apply.args_arity apply in
-        let return_arity = Apply.return_arity apply in
+        let return_arity =
+          Result_arity.to_arity_with_placeholder (Apply.return_arity apply)
+        in
         let make_apply =
           Apply.create
           (* Note here that callee is rewritten with [rewrite_simple_opt], which
@@ -1249,7 +1266,7 @@ let rebuild_apply env apply =
              value would then be further used in a later simplify pass to refine
              the call kind and produce an invalid. *)
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
-            exn_continuation ~args ~args_arity ~return_arity ~call_kind
+            exn_continuation ~args ~args_arity ~call_kind
             ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
@@ -1262,8 +1279,8 @@ let rebuild_apply env apply =
               Keep (Variable.create "function_return" (KS.kind kind), kind))
             (Flambda_arity.unarized_components return_arity)
         in
-        make_apply_wrapper env make_apply (Apply.continuation apply)
-          func_decisions)
+        make_apply_wrapper env make_apply ~arity:return_arity
+          (Apply.return apply) func_decisions)
     | Changing_calling_convention code_id ->
       (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
          code_id Apply.print apply; *)
@@ -1383,15 +1400,15 @@ let rebuild_apply env apply =
       in
       let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
       let args = List.map fst (List.flatten args) in
-      let make_apply ~continuation =
-        Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
-          ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
-          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+      let make_apply ~return =
+        Apply.create ~callee ~return exn_continuation ~args ~args_arity
+          ~call_kind ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
+          ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
           ~relative_history:(Apply.relative_history apply)
       in
-      make_apply_wrapper env make_apply (Apply.continuation apply)
+      make_apply_wrapper env make_apply ~arity:return_arity (Apply.return apply)
         return_decisions
 
 let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
@@ -2290,7 +2307,9 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
     let code_metadata =
       Code_metadata.with_is_tupled false
-        (Code_metadata.with_result_arity result_arity code_metadata)
+        (Code_metadata.with_result_arity
+           (Result_arity.ok result_arity)
+           code_metadata)
     in
     let params_decision =
       List.map2
@@ -2524,7 +2543,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         let metadata = get_code_metadata code_id in
         let result_kinds =
           Flambda_arity.unarized_components
-            (Code_metadata.result_arity metadata)
+            (Result_arity.to_arity_with_placeholder
+               (Code_metadata.result_arity metadata))
         in
         if cannot_change_calling_convention
         then

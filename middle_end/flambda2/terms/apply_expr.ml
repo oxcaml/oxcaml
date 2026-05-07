@@ -19,40 +19,79 @@ module Result_continuation = struct
     | Return of Continuation.t
     | Never_returns
 
-  include Container_types.Make (struct
-    type nonrec t = t
+  let [@ocamlformat "disable"] print fmt = function
+    | Return k -> Continuation.print fmt k
+    | Never_returns -> Format.fprintf fmt "∅"
+end
 
-    let compare h1 h2 =
-      match h1, h2 with
-      | Return k1, Return k2 -> Continuation.compare k1 k2
-      | Never_returns, Never_returns -> 0
-      | Return _, Never_returns -> 1
-      | Never_returns, Return _ -> -1
+module Return = struct
+  type t =
+    | Returns_to of
+        { cont : Continuation.t;
+          arity : [`Unarized] Flambda_arity.t
+        }
+    | Tail_forwards_to_caller of Continuation.t
+    | Never_returns of { arity : Result_arity.t }
 
-    let equal h1 h2 = compare h1 h2 = 0
-
-    let hash = function
-      | Return k -> Continuation.hash k
-      | Never_returns as h -> Hashtbl.hash h
-
-    let [@ocamlformat "disable"] print fmt = function
-      | Return k -> Continuation.print fmt k
-      | Never_returns -> Format.fprintf fmt "∅"
-  end)
+  let equal t1 t2 =
+    match t1, t2 with
+    | ( Returns_to { cont = cont1; arity = arity1 },
+        Returns_to { cont = cont2; arity = arity2 } ) ->
+      Continuation.equal cont1 cont2 && Flambda_arity.equal_exact arity1 arity2
+    | Tail_forwards_to_caller cont1, Tail_forwards_to_caller cont2 ->
+      Continuation.equal cont1 cont2
+    | Never_returns { arity = arity1 }, Never_returns { arity = arity2 } ->
+      Result_arity.equal_exact arity1 arity2
+    | Returns_to _, (Tail_forwards_to_caller _ | Never_returns _)
+    | Tail_forwards_to_caller _, (Returns_to _ | Never_returns _)
+    | Never_returns _, (Returns_to _ | Tail_forwards_to_caller _) ->
+      false
 
   let free_names = function
-    | Return k -> Name_occurrences.singleton_continuation k
-    | Never_returns -> Name_occurrences.empty
+    | Returns_to { cont; arity = _ } | Tail_forwards_to_caller cont ->
+      Name_occurrences.singleton_continuation cont
+    | Never_returns _ -> Name_occurrences.empty
 
   let apply_renaming t renaming =
     match t with
-    | Return k -> Return (Renaming.apply_continuation renaming k)
-    | Never_returns -> Never_returns
+    | Returns_to { cont; arity } ->
+      let cont' = Renaming.apply_continuation renaming cont in
+      if cont == cont' then t else Returns_to { cont = cont'; arity }
+    | Tail_forwards_to_caller cont ->
+      let cont' = Renaming.apply_continuation renaming cont in
+      if cont == cont' then t else Tail_forwards_to_caller cont'
+    | Never_returns _ -> t
 
-  let ids_for_export t =
+  let ids_for_export = function
+    | Returns_to { cont; arity = _ } | Tail_forwards_to_caller cont ->
+      Ids_for_export.singleton_continuation cont
+    | Never_returns _ -> Ids_for_export.empty
+
+  let create (continuation : Result_continuation.t) (arity : Result_arity.t) =
+    match continuation, arity with
+    | Return cont, Ok arity -> Returns_to { cont; arity }
+    | Return cont, Unknown -> Tail_forwards_to_caller cont
+    | Return _, Bottom -> Never_returns { arity = Bottom }
+    | Never_returns, ((Ok _ | Unknown | Bottom) as arity) ->
+      Never_returns { arity }
+
+  let continuation t : Result_continuation.t =
     match t with
-    | Return k -> Ids_for_export.singleton_continuation k
-    | Never_returns -> Ids_for_export.empty
+    | Returns_to { cont; arity = _ } | Tail_forwards_to_caller cont ->
+      Return cont
+    | Never_returns _ -> Never_returns
+
+  let arity t : Result_arity.t =
+    match t with
+    | Returns_to { cont = _; arity } -> Ok arity
+    | Tail_forwards_to_caller _ -> Unknown
+    | Never_returns { arity } -> arity
+
+  let with_continuation t cont =
+    match t with
+    | Returns_to { cont = _; arity } -> Returns_to { cont; arity }
+    | Tail_forwards_to_caller _ -> Tail_forwards_to_caller cont
+    | Never_returns _ -> t
 end
 
 module Position = struct
@@ -70,11 +109,10 @@ end
 
 type t =
   { callee : Simple.t option;
-    continuation : Result_continuation.t;
+    return : Return.t;
     exn_continuation : Exn_continuation.t;
     args : Simple.t list;
     args_arity : [`Complex] Flambda_arity.t;
-    return_arity : [`Unarized] Flambda_arity.t;
     call_kind : Call_kind.t;
     return_mode : Alloc_mode.For_applications.t;
     dbg : Debuginfo.t;
@@ -91,8 +129,8 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
       Inlining_history.Relative.print relative_history
 
 let [@ocamlformat "disable"] print_normal ppf
-    { callee; continuation; exn_continuation; args; args_arity;
-      return_arity; call_kind; return_mode; dbg; inlined; inlining_state; probe;
+    { callee; return; exn_continuation; args; args_arity;
+      call_kind; return_mode; dbg; inlined; inlining_state; probe;
       position; relative_history } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(%a\u{3008}%a\u{3009}\u{300a}%a\u{300b}\
@@ -109,11 +147,11 @@ let [@ocamlformat "disable"] print_normal ppf
       @[<hov 1>(position@ %a)@]\
       )@]"
     (Misc.Stdlib.Option.print Simple.print) callee
-    Result_continuation.print continuation
+    Result_continuation.print (Return.continuation return)
     Exn_continuation.print exn_continuation
     Simple.List.print args
     Flambda_arity.print args_arity
-    Flambda_arity.print return_arity
+    Result_arity.print (Return.arity return)
     Call_kind.print call_kind
     Alloc_mode.For_applications.print return_mode
     Flambda_colours.debuginfo
@@ -130,8 +168,8 @@ let [@ocamlformat "disable"] print_normal ppf
     position
 
 let [@ocamlformat "disable"] print_effect ppf
-    { callee = _; continuation; exn_continuation; args = _; args_arity = _;
-      return_arity = _; call_kind; return_mode; dbg; inlined = _; inlining_state = _;
+    { callee = _; return; exn_continuation; args = _; args_arity = _;
+      call_kind; return_mode; dbg; inlined = _; inlining_state = _;
       probe = _; position; relative_history = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%a@]@ \
@@ -142,7 +180,7 @@ let [@ocamlformat "disable"] print_effect ppf
       )@]"
     Call_kind.print call_kind
     Alloc_mode.For_applications.print return_mode
-    Result_continuation.print continuation
+    Result_continuation.print (Return.continuation return)
     Exn_continuation.print exn_continuation
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
@@ -160,11 +198,10 @@ let print ppf t =
 
 let invariant
     ({ callee;
-       continuation = _;
+       return;
        exn_continuation = _;
        args;
        args_arity;
-       return_arity;
        call_kind;
        return_mode = _;
        dbg = _;
@@ -192,13 +229,19 @@ let invariant
         "For [C_call] applications the callee must be directly specified as a \
          [Symbol]:@ %a"
         print t);
-    match Flambda_arity.unarized_components return_arity with
-    | [] | [_] | [_; _] ->
-      (* CR xclerc: we currently support only pairs as unboxed return values. *)
-      ()
-    | _ :: _ :: _ ->
-      Misc.fatal_errorf "Illegal return arity for C call:@ %a"
-        Flambda_arity.print return_arity)
+    match Return.arity return with
+    | Ok arity -> (
+      match Flambda_arity.unarized_components arity with
+      | [] | [_] | [_; _] ->
+        (* CR xclerc: we currently support only pairs as unboxed return
+           values. *)
+        ()
+      | _ :: _ :: _ ->
+        Misc.fatal_errorf "Illegal return arity for C call:@ %a"
+          Flambda_arity.print arity)
+    | Unknown | Bottom ->
+      Misc.fatal_errorf "Illegal unknown/bottom return arity for C call:@ %a"
+        print t)
   | Effect _ -> (
     match callee, args with
     | None, [] -> ()
@@ -212,16 +255,15 @@ let invariant
     Misc.fatal_errorf
       "Length of argument and arity lists disagree in [Apply]:@ %a" print t
 
-let create ~callee ~continuation exn_continuation ~args ~args_arity
-    ~return_arity ~(call_kind : Call_kind.t) ~return_mode dbg ~inlined
-    ~inlining_state ~probe ~position ~relative_history =
+let create ~callee ~return exn_continuation ~args ~args_arity
+    ~(call_kind : Call_kind.t) ~return_mode dbg ~inlined ~inlining_state ~probe
+    ~position ~relative_history =
   let t =
     { callee;
-      continuation;
+      return;
       exn_continuation;
       args;
       args_arity;
-      return_arity;
       call_kind;
       return_mode;
       dbg;
@@ -237,7 +279,9 @@ let create ~callee ~continuation exn_continuation ~args ~args_arity
 
 let callee t = t.callee
 
-let continuation t = t.continuation
+let return t = t.return
+
+let continuation t = Return.continuation t.return
 
 let exn_continuation t = t.exn_continuation
 
@@ -259,11 +303,10 @@ let position t = t.position
 
 let free_names_without_exn_continuation
     { callee;
-      continuation;
+      return;
       exn_continuation = _;
       args;
       args_arity = _;
-      return_arity = _;
       call_kind;
       return_mode;
       dbg = _;
@@ -277,18 +320,17 @@ let free_names_without_exn_continuation
     [ (match callee with
       | None -> Name_occurrences.empty
       | Some callee -> Simple.free_names callee);
-      Result_continuation.free_names continuation;
+      Return.free_names return;
       Simple.List.free_names args;
       Call_kind.free_names call_kind;
       Alloc_mode.For_applications.free_names return_mode ]
 
 let free_names_except_callee
     { callee = _;
-      continuation;
+      return;
       exn_continuation;
       args;
       args_arity = _;
-      return_arity = _;
       call_kind;
       return_mode;
       dbg = _;
@@ -299,7 +341,7 @@ let free_names_except_callee
       relative_history = _
     } =
   Name_occurrences.union_list
-    [ Result_continuation.free_names continuation;
+    [ Return.free_names return;
       Exn_continuation.free_names exn_continuation;
       Simple.List.free_names args;
       Call_kind.free_names call_kind;
@@ -314,11 +356,10 @@ let free_names t =
 
 let apply_renaming
     ({ callee;
-       continuation;
+       return;
        exn_continuation;
        args;
        args_arity;
-       return_arity;
        call_kind;
        return_mode;
        dbg;
@@ -328,9 +369,7 @@ let apply_renaming
        position;
        relative_history
      } as t) renaming =
-  let continuation' =
-    Result_continuation.apply_renaming continuation renaming
-  in
+  let return' = Return.apply_renaming return renaming in
   let exn_continuation' =
     Exn_continuation.apply_renaming exn_continuation renaming
   in
@@ -347,18 +386,17 @@ let apply_renaming
     Alloc_mode.For_applications.apply_renaming return_mode renaming
   in
   if
-    continuation == continuation'
+    return == return'
     && exn_continuation == exn_continuation'
     && callee == callee' && args == args' && call_kind == call_kind'
     && return_mode == return_mode'
   then t
   else
     { callee = callee';
-      continuation = continuation';
+      return = return';
       exn_continuation = exn_continuation';
       args = args';
       args_arity;
-      return_arity;
       call_kind = call_kind';
       return_mode = return_mode';
       dbg;
@@ -371,11 +409,10 @@ let apply_renaming
 
 let ids_for_export
     { callee;
-      continuation;
+      return;
       exn_continuation;
       args;
       args_arity = _;
-      return_arity = _;
       call_kind;
       return_mode;
       dbg = _;
@@ -397,9 +434,7 @@ let ids_for_export
   in
   let call_kind_ids = Call_kind.ids_for_export call_kind in
   let alloc_mode_ids = Alloc_mode.For_applications.ids_for_export return_mode in
-  let result_continuation_ids =
-    Result_continuation.ids_for_export continuation
-  in
+  let result_continuation_ids = Return.ids_for_export return in
   let exn_continuation_ids = Exn_continuation.ids_for_export exn_continuation in
   Ids_for_export.union
     (Ids_for_export.union callee_and_args_ids
@@ -408,10 +443,15 @@ let ids_for_export
 
 let erase_callee t = { t with callee = None }
 
-let with_continuation t continuation = { t with continuation }
+let with_return t return =
+  let t = { t with return } in
+  invariant t;
+  t
 
-let with_continuations t continuation exn_continuation =
-  { t with continuation; exn_continuation }
+let with_return_and_exn_continuation t return exn_continuation =
+  let t = { t with return; exn_continuation } in
+  invariant t;
+  t
 
 let with_exn_continuation t exn_continuation = { t with exn_continuation }
 
@@ -427,10 +467,12 @@ let inlining_arguments t = inlining_state t |> Inlining_state.arguments
 let probe t = t.probe
 
 let returns t =
-  match continuation t with Return _ -> true | Never_returns -> false
+  match t.return with
+  | Returns_to _ | Tail_forwards_to_caller _ -> true
+  | Never_returns _ -> false
 
 let args_arity t = t.args_arity
 
-let return_arity t = t.return_arity
+let return_arity t = Return.arity t.return
 
 let with_inlined_attribute t inlined = { t with inlined }

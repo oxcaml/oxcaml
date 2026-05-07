@@ -35,6 +35,7 @@ let keyword_table =
     "apply", KWD_APPLY;
     "array", KWD_ARRAY;
     "available", KWD_AVAILABLE;
+    "bottom", KWD_BOTTOM;
     "boxed", KWD_BOXED;
     "ccall", KWD_CCALL;
     "mcall", KWD_MCALL;
@@ -103,6 +104,7 @@ let keyword_table =
     "toplevel", KWD_TOPLEVEL;
     "tupled", KWD_TUPLED;
     "unit", KWD_UNIT;
+    "unknown", KWD_UNKNOWN;
     "unreachable", KWD_UNREACHABLE;
     "unroll", KWD_UNROLL;
     "val", KWD_VAL;

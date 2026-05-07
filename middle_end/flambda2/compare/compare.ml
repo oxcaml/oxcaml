@@ -435,7 +435,7 @@ and subst_cont_handler env cont_handler =
 
 and subst_apply env apply =
   let callee = Option.map (subst_simple env) (Apply_expr.callee apply) in
-  let continuation = Apply_expr.continuation apply in
+  let return = Apply_expr.return apply in
   let exn_continuation = Apply_expr.exn_continuation apply in
   let args = List.map (subst_simple env) (Apply_expr.args apply) in
   let call_kind = subst_call_kind env (Apply_expr.call_kind apply) in
@@ -446,10 +446,9 @@ and subst_apply env apply =
   let relative_history = Apply_expr.relative_history apply in
   let position = Apply_expr.position apply in
   let args_arity = Apply_expr.args_arity apply in
-  let return_arity = Apply_expr.return_arity apply in
-  Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
+  Apply_expr.create ~callee ~return exn_continuation ~args ~call_kind
     ~return_mode dbg ~inlined ~inlining_state ~probe:None ~position
-    ~relative_history ~args_arity ~return_arity
+    ~relative_history ~args_arity
   |> Expr.create_apply
 
 and subst_apply_cont env apply_cont =
@@ -1019,9 +1018,7 @@ let inlining_states_equal is1 is2 : bool =
 
 let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
   let atomic_things_equal =
-    Apply.Result_continuation.equal
-      (Apply.continuation apply1)
-      (Apply.continuation apply2)
+    Apply.Return.equal (Apply.return apply1) (Apply.return apply2)
     && Exn_continuation.equal
          (Apply.exn_continuation apply1)
          (Apply.exn_continuation apply2)
@@ -1032,9 +1029,6 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Apply.Position.equal (Apply.position apply1) (Apply.position apply2)
     && Flambda_arity.equal_exact (Apply.args_arity apply1)
          (Apply.args_arity apply2)
-    && Flambda_arity.equal_exact
-         (Apply.return_arity apply1)
-         (Apply.return_arity apply2)
     && Alloc_mode.For_applications.compare (Apply.return_mode apply1)
          (Apply.return_mode apply2)
        = 0
@@ -1058,8 +1052,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
   else
     Different
       { approximant =
-          Apply.create ~callee:callee1'
-            ~continuation:(Apply.continuation apply1)
+          Apply.create ~callee:callee1' ~return:(Apply.return apply1)
             (Apply.exn_continuation apply1)
             ~args:args1' ~call_kind:call_kind1'
             ~return_mode:(Apply.return_mode apply1) (Apply.dbg apply1)
@@ -1068,7 +1061,6 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             ~probe:None ~position:(Apply.position apply1)
             ~relative_history:(Apply_expr.relative_history apply1)
             ~args_arity:(Apply_expr.args_arity apply1)
-            ~return_arity:(Apply_expr.return_arity apply1)
           |> Expr.create_apply
       }
 
@@ -1262,7 +1254,7 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
        ~cond:
          (Flambda_arity.equal_exact (Code.params_arity code1)
             (Code.params_arity code2)
-         && Flambda_arity.equal_exact (Code.result_arity code1)
+         && Result_arity.equal_exact (Code.result_arity code1)
               (Code.result_arity code2)
          && Bool.equal (Code.stub code1) (Code.stub code2)
          && Inline_attribute.equal (Code.inline code1) (Code.inline code2)

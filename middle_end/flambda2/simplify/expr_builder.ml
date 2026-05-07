@@ -779,6 +779,8 @@ let rewrite_fixed_arity_apply uacc ~use_id arity apply =
             (Apply.exn_continuation apply)
         in
         let apply =
-          Apply.with_continuations apply (Return return_cont) exn_cont
+          Apply.with_return_and_exn_continuation apply
+            (Apply.Return.with_continuation (Apply.return apply) return_cont)
+            exn_cont
         in
         make_apply apply)

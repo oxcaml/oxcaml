@@ -99,6 +99,12 @@ let value_kind_with_subkind_opt :
 let arity a =
   Flambda_arity.create_singletons (List.map value_kind_with_subkind a)
 
+let result_arity (a : Fexpr.result_arity) : Result_arity.t =
+  match a with
+  | Arity a -> Result_arity.ok (arity a)
+  | Unknown_arity -> Or_unknown_or_bottom.Unknown
+  | Bottom_arity -> Or_unknown_or_bottom.Bottom
+
 let const (c : Fexpr.const) : Reg_width_const.t =
   match c with
   | Tagged_immediate i -> Reg_width_const.tagged_immediate (i |> immediate)
@@ -692,11 +698,13 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               params_and_body.params
             |> Flambda_arity.create_singletons
         in
-        let result_arity =
+        let code_result_arity : Result_arity.t =
           match ret_arity with
           | None ->
-            Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
-          | Some ar -> arity ar
+            Result_arity.ok
+              (Flambda_arity.create_singletons
+                 [Flambda_kind.With_subkind.any_value])
+          | Some ar -> result_arity ar
         in
         let ( _params,
               params_and_body,
@@ -754,7 +762,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           (* CR sspies: In the future, consider propagating these debug UIDs. *)
           let return_continuation, env =
             fresh_cont env ret_cont ~sort:Return
-              ~arity:(Flambda_arity.cardinal_unarized result_arity)
+              ~arity:
+                (Flambda_arity.cardinal_unarized
+                   (Result_arity.to_arity_with_placeholder code_result_arity))
           in
           let exn_continuation, env = fresh_exn_cont env exn_cont ~arity:1 in
           let acc = Acc.push_closure_info acc ~code_id in
@@ -807,7 +817,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~first_complex_local_param:
               (First_complex_local_param.Index
                  (Flambda_arity.num_params params_arity))
-            ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
+            ~result_arity:code_result_arity ~result_types:Unknown ~result_mode
+            ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
             ~is_a_functor:false ~is_opaque:false ~recursive
@@ -859,18 +870,20 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           Flambda_arity.create_singletons
             (List.map (fun _ -> Flambda_kind.With_subkind.any_value) args)
         in
-        let return_arity =
+        let return_arity : Result_arity.t =
           match arities with
           | None ->
-            Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
-          | Some { ret_arity; _ } -> arity ret_arity
+            Result_arity.ok
+              (Flambda_arity.create_singletons
+                 [Flambda_kind.With_subkind.any_value])
+          | Some { ret_arity; _ } -> result_arity ret_arity
         in
         Call_kind.direct_function_call code_id, params_arity, return_arity
       | Function Indirect -> (
         match arities with
         | Some { params_arity = Some params_arity; ret_arity } ->
           let params_arity = arity params_arity in
-          let return_arity = arity ret_arity in
+          let return_arity = result_arity ret_arity in
           ( Call_kind.indirect_function_call_known_arity ~code_ids:Unknown,
             params_arity,
             return_arity )
@@ -884,7 +897,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let return_arity =
             (* CR mshinwell: This needs fixing to cope with the fact that the
                arities have moved onto [Apply_expr] *)
-            Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+            Result_arity.ok
+              (Flambda_arity.create_singletons
+                 [Flambda_kind.With_subkind.any_value])
           in
           ( Call_kind.indirect_function_call_unknown_arity,
             params_arity,
@@ -893,7 +908,12 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         match arities with
         | Some { params_arity = Some params_arity; ret_arity } ->
           let params_arity = arity params_arity in
-          let return_arity = arity ret_arity in
+          let return_arity : Result_arity.t =
+            match ret_arity with
+            | Arity a -> Result_arity.ok (arity a)
+            | Unknown_arity | Bottom_arity ->
+              Misc.fatal_error "C calls must have a concrete return arity"
+          in
           ( Call_kind.c_call ~needs_caml_c_call ~is_c_builtin:false
               ~effects:Arbitrary_effects ~coeffects:Has_coeffects,
             params_arity,
@@ -910,7 +930,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         let return_arity =
           (* CR mshinwell: This needs fixing to cope with the fact that the
              arities have moved onto [Apply_expr] *)
-          Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+          Result_arity.ok
+            (Flambda_arity.create_singletons
+               [Flambda_kind.With_subkind.any_value])
         in
         ( Call_kind.method_call kind ~obj:(simple env obj),
           params_arity,
@@ -940,13 +962,20 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       in
       find_exn_cont env c ea
     in
+    let return : Flambda.Apply.Return.t =
+      match continuation with
+      | Return cont ->
+        Flambda.Apply.Return.create
+          (Flambda.Apply.Result_continuation.Return cont) return_arity
+      | Never_returns -> Never_returns { arity = return_arity }
+    in
     let apply =
       Flambda.Apply.create
         ~callee:(Option.map (simple env) func)
-        ~continuation exn_continuation
+        ~return exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
-        ~inlined ~inlining_state ~probe:None ~position:Normal
+        ~args_arity ~call_kind ~return_mode Debuginfo.none ~inlined
+        ~inlining_state ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply

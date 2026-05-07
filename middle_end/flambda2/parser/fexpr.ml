@@ -270,9 +270,14 @@ type call_kind =
       }
   | C_call of { alloc : bool }
 
+type result_arity =
+  | Arity of arity
+  | Unknown_arity
+  | Bottom_arity
+
 type function_arities =
   { params_arity : arity option;
-    ret_arity : arity
+    ret_arity : result_arity
   }
 
 type inline_attribute = Inline_attribute.t =
@@ -407,7 +412,7 @@ and code =
   { id : code_id;
     newer_version_of : code_id option;
     param_arity : arity option;
-    ret_arity : arity option;
+    ret_arity : result_arity option;
     recursive : is_recursive;
     inline : inline_attribute option;
     params_and_body : params_and_body;

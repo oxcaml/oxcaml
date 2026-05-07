@@ -556,9 +556,9 @@ let check_arity arity args =
 let extended_machtype_of_return_arity arity =
   match Flambda_arity.unarized_components arity with
   | [] ->
-    (* Functions that never return have arity 0. In that case, we use the most
-       restrictive machtype to ensure that the return value of the function is
-       not used. *)
+    (* A concrete ([Ok]) arity with no components, e.g. a function returning an
+       empty unboxed product. Use the most restrictive machtype to ensure that
+       the (nonexistent) return value is not used. *)
     Extended_machtype.typ_void
   | [k] ->
     (* Regular functions with a single return value *)
