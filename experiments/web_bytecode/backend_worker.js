@@ -1,4 +1,4 @@
-const backendPromise = import("./backend_direct.js?v=20260506-ppx-driver").then((backend) => {
+const backendPromise = import("./backend_direct.js?v=20260507-webkit-worker-fallback").then((backend) => {
   backend.addBackendStatusListener(({ state, text }) => {
     globalThis.postMessage({ type: "status", state, text });
   });

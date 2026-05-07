@@ -1,5 +1,5 @@
 (function () {
-  const assetVersion = "20260506-ppx-driver";
+  const assetVersion = "20260507-webkit-worker-fallback";
   const script = document.currentScript;
   const moduleUrl = script?.dataset.moduleSrc
     ? new URL(script.dataset.moduleSrc, script.src || document.baseURI).href
