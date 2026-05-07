@@ -36,13 +36,12 @@ test test-promote:
 # the _install directory lives outside the dune boot workspace, so dune doesn't
 # track whether it changes. So we hash the contents of the directory and make
 # the tests, stick the hash in MERLIN_TEST_OCAML_VERSION, and make the tests
-# depend on MERLIN_TEST_OCAML_VERSION. This seems to sometimes cause us to
-# unnecessarily re-run the tests, but it's better than not re-running them when
-# we should.
+# depend on MERLIN_TEST_OCAML_VERSION.
 	@if [ -n "$(SKIP_BUILD_MSG)" ]; then echo "$(SKIP_BUILD_MSG)"; fi; \
 	version=$$(find "$$MERLIN_TEST_OCAML_PATH" -type f -exec sha256sum {} + \
 	    | sort | sha256sum | awk '{print $$1}'); \
 	export MERLIN_TEST_OCAML_VERSION="$$version"; \
+	echo "$$MERLIN_TEST_OCAML_VERSION"; \
 	if [ -z "$(strip $(ARGS))" ]; then \
 	    dune build $(DUNE_OPTS) @runtest $(PROMOTE); \
 	else \
