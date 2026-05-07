@@ -7,7 +7,7 @@ let directBackendPromise = null;
 let workerFailed = false;
 
 const backendWorkerUrl = new URL(
-  "./backend_worker.js?v=20260506-ppx-driver",
+  "./backend_worker.js?v=20260507-webkit-worker-fallback",
   import.meta.url,
 ).href;
 
@@ -123,6 +123,13 @@ function getBackendWorker() {
     if (!pending) {
       return;
     }
+    if (!data.ok && pending.methodName === "ready") {
+      workerFailed = true;
+      backendWorker?.terminate();
+      backendWorker = null;
+      retryPendingRequestsDirect();
+      return;
+    }
     pendingRequests.delete(data.id);
     if (data.ok) {
       pending.resolve(data.value);
@@ -147,7 +154,7 @@ function getBackendWorker() {
 
 async function directBackend() {
   if (!directBackendPromise) {
-    directBackendPromise = import("./backend_direct.js?v=20260506-ppx-driver");
+    directBackendPromise = import("./backend_direct.js?v=20260507-webkit-worker-fallback");
   }
   return directBackendPromise;
 }
