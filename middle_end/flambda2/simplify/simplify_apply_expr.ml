@@ -1126,7 +1126,12 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
       let callee's_code_or_metadata =
-        DE.find_code_exn denv callee's_code_id_from_type
+        try DE.find_code_exn denv callee's_code_id_from_type
+        with Not_found ->
+          Misc.fatal_errorf
+            "Could not find code id %a (from the type of the callee) for \
+             call:@ %a"
+            Code_id.print callee's_code_id_from_type Apply.print apply
       in
       let callee's_code_metadata =
         Code_or_metadata.code_metadata callee's_code_or_metadata
