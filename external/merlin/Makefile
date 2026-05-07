@@ -38,7 +38,7 @@ test:
 	    | sort | sha256sum | awk '{print $$1}'); \
 	export MERLIN_TEST_OCAML_VERSION="$$version"; \
 	if [ -z "$(strip $(ARGS))" ]; then \
-	    dune runtest $(DUNE_OPTS); \
+	    dune build $(DUNE_OPTS) @runtest; \
 	else \
 	    dune build $(DUNE_OPTS) $(ARGS); \
 	fi
