@@ -35,22 +35,15 @@ module Make (S : Ssa.Finished_graph) = struct
         Format.fprintf ppf "%a = %s(%a)" print_op_id od formatted_op print_args
           args
     | Push_trap { handler } ->
-      Format.fprintf ppf "push_trap %a"
-        (Format.pp_print_option
-           ~none:(fun ppf () -> Format.pp_print_string ppf "<invalid>")
-           print_block_id)
-        handler
+      Format.fprintf ppf "push_trap %a" print_block_id handler
     | Pop_trap { handler } ->
-      Format.fprintf ppf "pop_trap %a"
-        (Format.pp_print_option
-           ~none:(fun ppf () -> Format.pp_print_string ppf "<invalid>")
-           print_block_id)
-        handler
+      Format.fprintf ppf "pop_trap %a" print_block_id handler
     | Stack_check { max_frame_size_bytes } ->
       Format.fprintf ppf "stack_check %d" max_frame_size_bytes
     | Name_for_debugger { ident; _ } ->
       Format.fprintf ppf "name_for_debugger %a" Ident.print ident
-    | Block_param _ | Tuple _ | Proj _ -> Misc.fatal_error "Unexpected body instruction in Ssa_print"
+    | Block_param _ | Tuple _ | Proj _ ->
+      Misc.fatal_error "Unexpected body instruction in Ssa_print"
 
   and print_instr_ref ppf (i : S.Instruction.t) =
     match i with

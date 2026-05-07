@@ -129,8 +129,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         | Block_param of block_param_data
         | Proj of proj_data
         | Tuple of Instruction.t array
-        | Push_trap of { handler : Block.t option }
-        | Pop_trap of { handler : Block.t option }
+        | Push_trap of { handler : Block.t }
+        | Pop_trap of { handler : Block.t }
         | Stack_check of { max_frame_size_bytes : int }
         | Name_for_debugger of
             { ident : Ident.t;
@@ -181,8 +181,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         | Block_param of block_param_data
         | Proj of proj_data
         | Tuple of Instruction.t array
-        | Push_trap of { handler : Block.t option }
-        | Pop_trap of { handler : Block.t option }
+        | Push_trap of { handler : Block.t }
+        | Pop_trap of { handler : Block.t }
         | Stack_check of { max_frame_size_bytes : int }
         | Name_for_debugger of
             { ident : Ident.t;
@@ -570,15 +570,15 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     (* === Compute metadata: predecessors, traps, dominators, use counts === *)
 
     (* Apply the [Push_trap]/[Pop_trap] effects of [body] to [start_stack]. Each
-       [Pop_trap { handler = Some h }] must find [h] at the top of the current
+       [Pop_trap { handler = h }] must find [h] at the top of the current
        stack. *)
     let apply_body_trap_effects ~(blk : Block.t) (start_stack : Block.t list)
         (body : Instruction.t array) : Block.t list =
       Array.fold_left
         (fun (stack : Block.t list) (instr : Instruction.t) ->
           match instr with
-          | Push_trap { handler = Some h } -> h :: stack
-          | Pop_trap { handler = Some h } -> (
+          | Push_trap { handler = h } -> h :: stack
+          | Pop_trap { handler = h } -> (
             match stack with
             | [] ->
               Misc.fatal_errorf
@@ -595,8 +595,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
                   (h.id :> int)
                   (top.id :> int);
               rest)
-          | Push_trap { handler = None }
-          | Pop_trap { handler = None }
           | Op _ | Block_param _ | Proj _ | Tuple _ | Stack_check _
           | Name_for_debugger _ ->
             stack)
@@ -746,7 +744,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
               | Op r when not (Operation.is_pure r.op) -> increment_use i
               | Name_for_debugger { regs; _ } -> Array.iter increment_use regs
               | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
-              | Block_param _ | Proj _ | Tuple _ -> Misc.fatal_error "impossible body instruction")
+              | Block_param _ | Proj _ | Tuple _ ->
+                Misc.fatal_error "impossible body instruction")
             blk.body;
           increment_uses_in_terminator blk.terminator)
         reachable_blocks;

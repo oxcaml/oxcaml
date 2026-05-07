@@ -463,7 +463,9 @@ module Make (Builder : Ssa.Graph_builder) = struct
             match (region : Lambda.region_close) with
             | Rc_normal -> false
             | Rc_nontail -> true
-            | Rc_close_at_apply -> Misc.fatal_error "Rc_close_at_apply should have been lowered by Flambda2")
+            | Rc_close_at_apply ->
+              Misc.fatal_error
+                "Rc_close_at_apply should have been lowered by Flambda2")
           | _ -> true
         in
         emit_call env c ~ty ~nontail term arg_instrs dbg
@@ -579,9 +581,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
         emit_instruction c
           (match trap with
           | Push handler_id ->
-            Push_trap { handler = Some (find_handler env handler_id) }
-          | Pop handler_id ->
-            Pop_trap { handler = Some (find_handler env handler_id) }))
+            Push_trap { handler = find_handler env handler_id }
+          | Pop handler_id -> Pop_trap { handler = find_handler env handler_id }))
 
   and emit_expr_exit env c (lbl : Cmm.exit_label) args traps : result =
     let* simple_list, ext_env = emit_parts_list env c args in
