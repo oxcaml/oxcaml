@@ -36,11 +36,13 @@
     use count of the comparison [Op] so [fuse_comparison] can splice it directly
     into the CFG test terminator without leaving the now-dead Op in the body.
 
-    Invalid handler stub: [Push_trap] / [Pop_trap] referencing a [None] handler
-    (e.g. an unreachable trap-handler block dropped by [Builder.finish]) routes
-    through a single shared invalid-handler block emitted lazily at the end of
-    the conversion. The stub mirrors what [cfg_selectgen]'s
-    [unreachable_handler] emits. *)
+    Unreachable trap handlers: [Push_trap] / [Pop_trap] referencing a handler
+    block that was dropped (because it became unreachable) are skipped during
+    lowering rather than routed through a stub. The matching push/pop pair both
+    target the same handler, so they are dropped together and trap-stack balance
+    is preserved. [Cfg_compare] knows to ignore [Pushtrap]/[Poptrap] whose
+    target has no predecessors so the baseline pipeline (which keeps unreachable
+    handlers as segfault stubs) still matches. *)
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
@@ -55,16 +57,13 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       block_labels : Label.t Block.Tbl.t;
       call_result_locs : Reg.t array Block.Tbl.t;
       call_stack_ofs : int Block.Tbl.t;
-      use_count_adjustments : int Instruction_id.Tbl.t;
+      use_count_adjustments : int Instruction_id.Tbl.t
           (* Per-Op adjustments applied to [op_data.usage_count] to decide which
              Ops to emit. The combination [usage_count + adjustment] determines
              liveness; an Op with adjusted count [<= 0] is skipped. Populated
              before block conversion to (a) decrement Ops consumed by fused
              branch terminators and (b) bump naturally unused Ops to keep them
              in the CFG when [keep_unused_ops] is set. *)
-      mutable invalid_handler_label : Label.t option
-          (* Lazily-allocated label for the shared "invalid handler" block
-             emitted for [Push_trap]/[Pop_trap] with [handler = None]. *)
     }
 
   let create_env () =
@@ -73,8 +72,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       block_labels = Block.Tbl.create 64;
       call_result_locs = Block.Tbl.create 16;
       call_stack_ofs = Block.Tbl.create 16;
-      use_count_adjustments = Instruction_id.Tbl.create 16;
-      invalid_handler_label = None
+      use_count_adjustments = Instruction_id.Tbl.create 16
     }
 
   let label_of env (blk : Block.t) =
@@ -82,23 +80,6 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     with Not_found ->
       Misc.fatal_errorf "Cfg_of_ssa.label_of: block %d not in block_labels"
         (blk.id :> int)
-
-  let invalid_handler_label env =
-    match env.invalid_handler_label with
-    | Some l -> l
-    | None ->
-      let l = Label.new_label () in
-      env.invalid_handler_label <- Some l;
-      l
-
-  (** A [Push_trap]/[Pop_trap] can reference a handler block that has become
-      unreachable; such handlers are filtered out by [Builder.finish] and don't
-      appear in [env.block_labels]. We treat them like [handler = None] and
-      route through the shared invalid-handler stub. *)
-  let handler_label env (handler : Block.t option) =
-    match handler with
-    | Some h when Block.Tbl.mem env.block_labels h -> label_of env h
-    | _ -> invalid_handler_label env
 
   let get_reg env (i : Instruction.t) : Reg.t =
     match i with
@@ -157,51 +138,6 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
           DLL.add_end body
             (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
       src dst
-
-  (** Build the shared dummy handler referenced by [Push_trap]/[Pop_trap] with
-      [handler = None]. This mirrors [cfg_selectgen]'s [unreachable_handler]
-      (load from address 0 followed by a [Raise_notrace]) so it can be
-      cfg_compared with the baseline. *)
-  let make_invalid_handler_block ~label : Cfg.basic_block =
-    let body = DLL.make_empty () in
-    (* Trap handler entry: copy [Proc.loc_exn_bucket] into a virtual reg, as
-       would be done for a regular exn handler's first parameter. *)
-    let exn_bucket_virt = Reg.createv Cmm.typ_val in
-    emit_moves body ~src:[| Proc.loc_exn_bucket |] ~dst:exn_bucket_virt;
-    (* Segfault: load from the constant address [0]. *)
-    let zero_reg = Reg.createv Cmm.typ_int in
-    DLL.add_end body
-      (make_cfg_instr (Cfg.Op (Const_int 0n)) [||] zero_reg Debuginfo.none);
-    let load_res = Reg.createv Cmm.typ_int in
-    DLL.add_end body
-      (make_cfg_instr
-         (Cfg.Op
-            (Load
-               { memory_chunk = Word_int;
-                 addressing_mode = Arch.identity_addressing;
-                 mutability = Mutable;
-                 is_atomic = false
-               }))
-         zero_reg load_res Debuginfo.none);
-    (* Dummy raise of [1]. *)
-    let one_reg = Reg.createv Cmm.typ_int in
-    DLL.add_end body
-      (make_cfg_instr (Cfg.Op (Const_int 1n)) [||] one_reg Debuginfo.none);
-    emit_moves body ~src:one_reg ~dst:[| Proc.loc_exn_bucket |];
-    let terminator =
-      make_cfg_instr (Cfg.Raise Lambda.Raise_notrace) [| Proc.loc_exn_bucket |]
-        [||] Debuginfo.none
-    in
-    { Cfg.start = label;
-      body;
-      terminator;
-      predecessors = Label.Set.empty;
-      stack_offset = Cfg.invalid_stack_offset;
-      exn = None;
-      can_raise = true;
-      is_trap_handler = true;
-      cold = true
-    }
 
   (** A Branch condition that can be folded into the CFG test terminator,
       consuming the comparison's args directly. *)
@@ -384,15 +320,18 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
           Misc.fatal_error
             "Cfg_of_ssa: virtual instruction (Block_param/Proj/Tuple) must not \
              appear in a block body"
+        | (Push_trap { handler } | Pop_trap { handler })
+          when Block.Set.is_empty handler.predecessors ->
+          ()
         | Push_trap { handler } ->
           DLL.add_end body
             (make_cfg_instr
-               (Cfg.Pushtrap { lbl_handler = handler_label env handler })
+               (Cfg.Pushtrap { lbl_handler = label_of env handler })
                [||] [||] Debuginfo.none)
         | Pop_trap { handler } ->
           DLL.add_end body
             (make_cfg_instr
-               (Cfg.Poptrap { lbl_handler = handler_label env handler })
+               (Cfg.Poptrap { lbl_handler = label_of env handler })
                [||] [||] Debuginfo.none)
         | Stack_check { max_frame_size_bytes } ->
           DLL.add_end body
@@ -711,17 +650,6 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
         "Cfg_of_ssa: function-entry block was not visited by \
          convert_and_emit_blocks"
 
-  (** If any [Push_trap]/[Pop_trap] referenced a missing handler, emit the lazy
-      shared invalid-handler stub. The label is allocated lazily by
-      {!handler_label}, so we only emit the stub when at least one such
-      reference existed. *)
-  let emit_invalid_handler_if_needed cfg layout env =
-    Option.iter
-      (fun lbl ->
-        Cfg.add_block_exn cfg (make_invalid_handler_block ~label:lbl);
-        DLL.add_end layout lbl)
-      env.invalid_handler_label
-
   (** Remove the optimistic prologue [Poll] inserted by
       {!prepend_entry_prologue} unless [Cfg_polling] determines it is required
       for safe-point coverage. *)
@@ -776,7 +704,6 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     let prologue_poll_instr_id =
       convert_and_emit_blocks cfg layout env ~loc_arg ~fun_arg_regs
     in
-    emit_invalid_handler_if_needed cfg layout env;
     Select_utils.Stack_offset_and_exn.update_cfg cfg;
     Cfg.register_predecessors_for_all_blocks cfg;
     drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id

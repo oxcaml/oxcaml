@@ -117,10 +117,8 @@ module type Finished_graph = sig
               multi-output instruction. Projections out of a [Tuple]
               short-circuit via {!proj}, so a well-formed graph never contains a
               [Tuple] in an arg or block body. *)
-      | Push_trap of { handler : Block.t option }
-          (** [handler = None] means the handler block became unreachable; CFG
-              lowering provides a shared dummy invalid block. *)
-      | Pop_trap of { handler : Block.t option }
+      | Push_trap of { handler : Block.t }
+      | Pop_trap of { handler : Block.t }
       | Stack_check of { max_frame_size_bytes : int }
       | Name_for_debugger of
           { ident : Ident.t;
@@ -276,10 +274,8 @@ module type Graph_builder = sig
               multi-output instruction. Projections out of a [Tuple]
               short-circuit via {!proj}, so a well-formed graph never contains a
               [Tuple] in an arg or block body. *)
-      | Push_trap of { handler : Block.t option }
-          (** [handler = None] means the handler block became unreachable; CFG
-              lowering provides a shared dummy invalid block. *)
-      | Pop_trap of { handler : Block.t option }
+      | Push_trap of { handler : Block.t }
+      | Pop_trap of { handler : Block.t }
       | Stack_check of { max_frame_size_bytes : int }
       | Name_for_debugger of
           { ident : Ident.t;
