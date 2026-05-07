@@ -1889,7 +1889,12 @@ module Const = struct
                layout matches and the modal bounds are all max *)
             Option.get out_jkind_verbose)
       in
-      let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
+      let base =
+        match jkind.base with
+        | Layout (Genvar _) -> Outcometree.Ojkind_const_genvar base
+        | Layout _ | Kconstr _ ->
+          Outcometree.Ojkind_const_abbreviation (base, scannable_axes)
+      in
       (* Add on [mod] bounds, if there are any *)
       let base =
         if modal_bounds = []

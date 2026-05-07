@@ -1719,10 +1719,7 @@ module type S_poly = sig
 end
 [%%expect{|
 module type S_poly =
-  sig
-    val f : layout_ l. ('a : l). 'a -> 'a
-    val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
-  end
+  sig val poly_ f : 'a. 'a -> 'a val poly_ g : 'a 'b. 'a -> 'b -> 'a end
 |}]
 
 let poly_ f : 'a. 'a -> 'a = fun x -> x
@@ -1775,5 +1772,5 @@ module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+module type S = sig val poly_ f : 'a 'b. 'a -> 'b end
 |}]
