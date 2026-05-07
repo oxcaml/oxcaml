@@ -276,6 +276,8 @@ module type Heyting = sig
 
   include Lattice
 
+  val compare_total : t -> t -> int
+
   (** [imply c] is the right adjoint of [meet c]; That is, for any [a] and [b],
       [meet c a <= b] iff [a <= imply c b] *)
   val imply : t -> t -> t
@@ -285,6 +287,8 @@ module type CoHeyting = sig
   (** Extend the [Lattice] interface with operations of co-Heyting algebras *)
 
   include Lattice
+
+  val compare_total : t -> t -> int
 
   (** [subtract _ c] is the left adjoint of [join c]. That is, for any [a] and
       [b], [subtract a c <= b] iff [a <= join c b] *)
@@ -302,6 +306,8 @@ module Lattices = struct
     let le a b = L.ord a <= L.ord b
 
     let equal a b = L.ord a = L.ord b
+
+    let compare_total a b = Int.compare (L.ord a) (L.ord b)
 
     let join a b = if L.ord a > L.ord b then a else b
 
@@ -381,6 +387,8 @@ module Lattices = struct
     let max = L.max
 
     let equal a b = a = b
+
+    let compare_total a b = Int.compare (l_to_int a) (l_to_int b)
 
     let join a b = l_of_int (l_to_int a lor l_to_int b)
 
@@ -763,6 +771,20 @@ module Lattices = struct
       && Visibility.equal visibility1 visibility2
       && Staticity.equal staticity1 staticity2
 
+    let compare_total m1 m2 =
+      let c = Uniqueness.compare_total m1.uniqueness m2.uniqueness in
+      if c <> 0
+      then c
+      else
+        let c = Contention.compare_total m1.contention m2.contention in
+        if c <> 0
+        then c
+        else
+          let c = Visibility.compare_total m1.visibility m2.visibility in
+          if c <> 0
+          then c
+          else Staticity.compare_total m1.staticity m2.staticity
+
     let join m1 m2 =
       let uniqueness = Uniqueness.join m1.uniqueness m2.uniqueness in
       let contention = Contention.join m1.contention m2.contention in
@@ -881,6 +903,28 @@ module Lattices = struct
       && Yielding.equal yielding1 yielding2
       && Statefulness.equal statefulness1 statefulness2
 
+    let compare_total m1 m2 =
+      let c = Areality.compare_total m1.areality m2.areality in
+      if c <> 0
+      then c
+      else
+        let c = Linearity.compare_total m1.linearity m2.linearity in
+        if c <> 0
+        then c
+        else
+          let c = Portability.compare_total m1.portability m2.portability in
+          if c <> 0
+          then c
+          else
+            let c = Forkable.compare_total m1.forkable m2.forkable in
+            if c <> 0
+            then c
+            else
+              let c = Yielding.compare_total m1.yielding m2.yielding in
+              if c <> 0
+              then c
+              else Statefulness.compare_total m1.statefulness m2.statefulness
+
     let join m1 m2 =
       let areality = Areality.join m1.areality m2.areality in
       let linearity = Linearity.join m1.linearity m2.linearity in
@@ -926,6 +970,8 @@ module Lattices = struct
     let[@inline] le a b = L.le b a
 
     let equal = L.equal
+
+    let compare_total = L.compare_total
 
     let join = L.meet
 
@@ -1061,13 +1107,27 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
 
-  let compare : type a. a obj -> a -> a -> (a, a) Misc.comparison =
-   fun obj c1 c2 ->
-    if le obj c1 c2
-    then
-      begin if le obj c2 c1 then Equal else Less_than
-      end
-    else Greater_than
+  let compare_total : type a. a obj -> a -> a -> (a, a) Misc.comparison =
+   fun obj a b ->
+    let c =
+      match obj with
+      | Locality -> Locality.compare_total a b
+      | Regionality -> Regionality.compare_total a b
+      | Uniqueness_op -> Uniqueness_op.compare_total a b
+      | Contention_op -> Contention_op.compare_total a b
+      | Visibility_op -> Visibility_op.compare_total a b
+      | Linearity -> Linearity.compare_total a b
+      | Portability -> Portability.compare_total a b
+      | Forkable -> Forkable.compare_total a b
+      | Yielding -> Yielding.compare_total a b
+      | Statefulness -> Statefulness.compare_total a b
+      | Staticity_op -> Staticity_op.compare_total a b
+      | Monadic_op -> Monadic_op.compare_total a b
+      | Comonadic_with_locality -> Comonadic_with_locality.compare_total a b
+      | Comonadic_with_regionality ->
+        Comonadic_with_regionality.compare_total a b
+    in
+    if c < 0 then Less_than else if c > 0 then Greater_than else Equal
 
   let equal : type a. a obj -> a -> a -> bool =
    fun obj a b ->
@@ -1557,10 +1617,10 @@ module Lattices_mono = struct
       | Equal -> Equal)
     | Min_with _, _ -> Less_than
     | _, Min_with _ -> Greater_than
-    | Meet_const c1, Meet_const c2 -> compare dst c1 c2
+    | Meet_const c1, Meet_const c2 -> compare_total dst c1 c2
     | Meet_const _, _ -> Less_than
     | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 -> compare dst c1 c2
+    | Imply_const c1, Imply_const c2 -> compare_total dst c1 c2
     | Imply_const _, _ -> Less_than
     | _, Imply_const _ -> Greater_than
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal

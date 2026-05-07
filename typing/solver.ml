@@ -760,18 +760,20 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        (Amorphvar (v1, f1, _f1_hint) as mv1) ->
     (* To align l0/l1, r0/r1; The existing disallow_left/right] is for [mode],
        not [morphvar]. *)
-    Morphvar.(
-      disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
-    ||
-    match C.compare_morph dst f0 f1 with
-    | Less_than | Greater_than -> false
-    | Equal -> v0 == v1
+    if v0.id <> v1.id
+    then false
+    else if
+      Morphvar.(
+        disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
+    then true
+    else
+      match C.compare_morph dst f0 f1 with
+      | Less_than | Greater_than -> false
+      | Equal -> true
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
-    if C.le dst (mupper dst mv) (mlower dst mu)
-    then Ok ()
-    else if eq_morphvar dst mv mu
+    if eq_morphvar dst mv mu || C.le dst (mupper dst mv) (mlower dst mu)
     then Ok ()
     else
       let muupper = mupper dst mu in
