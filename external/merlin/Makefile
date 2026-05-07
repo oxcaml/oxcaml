@@ -24,6 +24,9 @@ MERLIN_TEST_OCAML_PATH ?= $(PARENT)/_install
 export MERLIN_TEST_OCAML_PATH
 ifeq ($(origin MERLIN_TEST_OCAML_PATH),file)
 test test-promote: parent-install
+else
+test test-promote: SKIP_BUILD_MSG := \
+  Skipping building the compiler since MERLIN_TEST_OCAML_PATH was set
 endif
 
 test-promote: PROMOTE := --auto-promote
@@ -36,7 +39,8 @@ test test-promote:
 # depend on MERLIN_TEST_OCAML_VERSION. This seems to sometimes cause us to
 # unnecessarily re-run the tests, but it's better than not re-running them when
 # we should.
-	@version=$$(find "$$MERLIN_TEST_OCAML_PATH" -type f -exec sha256sum {} + \
+	@if [ -n "$(SKIP_BUILD_MSG)" ]; then echo "$(SKIP_BUILD_MSG)"; fi; \
+	version=$$(find "$$MERLIN_TEST_OCAML_PATH" -type f -exec sha256sum {} + \
 	    | sort | sha256sum | awk '{print $$1}'); \
 	export MERLIN_TEST_OCAML_VERSION="$$version"; \
 	if [ -z "$(strip $(ARGS))" ]; then \
