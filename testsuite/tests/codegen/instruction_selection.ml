@@ -102,15 +102,11 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $41, %rbx
-  setl  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
-  movq  %rbx, %rax
+  cmpq  $41, %rax
+  jge   .L0
   ret
 .L0:
   movl  $1, %eax
@@ -125,14 +121,11 @@ let repeat_comparisons r _f =
   if a && b then 1 else 2
 [%%expect_asm X86_64{|
 repeat_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $11, %rbx
-  setg  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
+  cmpq  $11, %rax
+  jle   .L0
   movl  $3, %eax
   ret
 .L0:

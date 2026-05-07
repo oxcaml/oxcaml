@@ -102,12 +102,11 @@ search:
   movq  %rbx, %rax
   jmp   .L4
 .L1:
-  movq  (%rbx), %rax
+  movq  (%rbx), %rdx
   xorl  %esi, %esi
-  cmpq  %rax, %rdi
+  cmpq  %rdx, %rdi
   setl  %sil
-  testq %rsi, %rsi
-  je    .L2
+  jge   .L2
   movq  8(%rbx), %rax
   testq %rsi, %rsi
   jne   .L3
