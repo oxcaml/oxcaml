@@ -6,10 +6,7 @@ DUNE_OPTS := --workspace=$(PARENT)/duneconf/boot.ws
 # parent's workspace.
 include $(PARENT)/Makefile.config
 
-MERLIN_TEST_OCAML_PATH ?= $(PARENT)/_install
-
 export RUNTIME_DIR
-export MERLIN_TEST_OCAML_PATH
 
 .DEFAULT_GOAL := build
 
@@ -21,7 +18,15 @@ parent-install:
 build:
 	dune build $(DUNE_OPTS) $(ARGS)
 
+# If the caller didn't point us at an installed compiler, build and install
+# the parent ourselves before running the tests.
+MERLIN_TEST_OCAML_PATH ?= $(PARENT)/_install
+export MERLIN_TEST_OCAML_PATH
+ifeq ($(origin MERLIN_TEST_OCAML_PATH),file)
 test: parent-install
+endif
+
+test:
 # We want to make sure that dune re-runs the tests in the compiler changes. But
 # the _install directory lives outside the dune boot workspace, so dune doesn't
 # track whether it changes. So we hash the contents of the directory and make
