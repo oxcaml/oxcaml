@@ -173,7 +173,8 @@ Error: The value "r" is "local"
          because it is used in an expression (at lines 3-10, characters 2-19).
 |}]
 
-(* A [match] body currently inherits an enclosing local return expectation. *)
+(* A [match] body uses legacy modes instead of inheriting an enclosing local
+   return expectation. *)
 let match_body_enclosing_local_return () =
   exclave_
   match
@@ -183,11 +184,14 @@ let match_body_enclosing_local_return () =
   | r -> r
   | effect Need_ref, k -> continue k (ref 0)
 [%%expect {|
-val match_body_enclosing_local_return : unit -> int ref @ local = <fun>
+Line 5, characters 4-5:
+5 |     r
+        ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
-(* A [match] value clause currently inherits an enclosing local return
-   expectation. *)
+(* A [match] value clause uses legacy modes instead of inheriting an enclosing
+   local return expectation. *)
 let match_value_clause_enclosing_local_return () =
   exclave_
   match perform Need_ref with
@@ -196,12 +200,14 @@ let match_value_clause_enclosing_local_return () =
       r
   | effect Need_ref, k -> continue k (ref 1)
 [%%expect {|
-val match_value_clause_enclosing_local_return : unit -> int ref @ local =
-  <fun>
+Line 6, characters 6-7:
+6 |       r
+          ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
-(* A [match] effect clause currently inherits an enclosing local return
-   expectation. *)
+(* A [match] effect clause uses legacy modes instead of inheriting an enclosing
+   local return expectation. *)
 let match_effect_clause_enclosing_local_return () =
   exclave_
   match perform Need_unit with
@@ -210,11 +216,14 @@ let match_effect_clause_enclosing_local_return () =
       let (r @ local) = ref 2 in
       r
 [%%expect {|
-val match_effect_clause_enclosing_local_return : unit -> int ref @ local =
-  <fun>
+Line 7, characters 6-7:
+7 |       r
+          ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
-(* A [try] body currently inherits an enclosing local return expectation. *)
+(* A [try] body uses legacy modes instead of inheriting an enclosing local
+   return expectation. *)
 let try_body_enclosing_local_return () =
   exclave_
   try
@@ -223,11 +232,14 @@ let try_body_enclosing_local_return () =
   with
   | effect Need_ref, k -> continue k (ref 4)
 [%%expect {|
-val try_body_enclosing_local_return : unit -> int ref @ local = <fun>
+Line 5, characters 4-5:
+5 |     r
+        ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
-(* A [try] exception clause currently inherits an enclosing local return
-   expectation. *)
+(* A [try] exception clause uses legacy modes instead of inheriting an
+   enclosing local return expectation. *)
 let try_exception_clause_enclosing_local_return () =
   exclave_
   try raise Exit with
@@ -236,12 +248,14 @@ let try_exception_clause_enclosing_local_return () =
       r
   | effect Need_ref, k -> continue k (ref 6)
 [%%expect {|
-val try_exception_clause_enclosing_local_return : unit -> int ref @ local =
-  <fun>
+Line 6, characters 6-7:
+6 |       r
+          ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
-(* A [try] effect clause currently inherits an enclosing local return
-   expectation. *)
+(* A [try] effect clause uses legacy modes instead of inheriting an enclosing
+   local return expectation. *)
 let try_effect_clause_enclosing_local_return () =
   exclave_
   try
@@ -252,8 +266,10 @@ let try_effect_clause_enclosing_local_return () =
       let (r @ local) = ref 7 in
       r
 [%%expect {|
-val try_effect_clause_enclosing_local_return : unit -> int ref @ local =
-  <fun>
+Line 9, characters 6-7:
+9 |       r
+          ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Can allocate local values inside a [match] body. *)

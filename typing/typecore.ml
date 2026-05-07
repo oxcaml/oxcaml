@@ -6741,20 +6741,21 @@ and type_expect_
       in
       if val_caselist = [] && eff_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
-      let arg_pat_mode, arg_expected_mode =
-        match cases_tuple_arity caselist with
-        | Not_local_tuple | Maybe_local_tuple ->
-          let mode = Value.newvar () in
-          simple_pat_mode mode, mode_default mode
-        | Local_tuple locs ->
-          let modes = List.map (fun loc -> Value.newvar (), loc) locs in
-          let modes_pat = List.map fst modes in
-          let mode = Value.newvar () in
-          tuple_pat_mode mode modes_pat, mode_tuple mode modes
-      in
-      let handler_env, arg_expected_mode, rhs_mode =
+      let handler_env, arg_pat_mode, arg_expected_mode, rhs_mode =
         match eff_caselist with
-        | [] -> env, arg_expected_mode, expected_mode
+        | [] ->
+          let arg_pat_mode, arg_expected_mode =
+            match cases_tuple_arity caselist with
+            | Not_local_tuple | Maybe_local_tuple ->
+              let mode = Value.newvar () in
+              simple_pat_mode mode, mode_default mode
+            | Local_tuple locs ->
+              let modes = List.map (fun loc -> Value.newvar (), loc) locs in
+              let modes_pat = List.map fst modes in
+              let mode = Value.newvar () in
+              tuple_pat_mode mode modes_pat, mode_tuple mode modes
+          in
+          env, arg_pat_mode, arg_expected_mode, expected_mode
         | _ :: _ ->
           (* In [match f () with | effect ...], [f ()] is the handled
              computation. It is compiled into the generated handler body
@@ -6765,14 +6766,16 @@ and type_expect_
               Value.Comonadic.Const.legacy env
           in
           handler_env,
-          mode_effect_handler_body arg_expected_mode,
-          mode_effect_handler_body expected_mode
+          simple_pat_mode Value.legacy,
+          mode_effect_handler_body mode_legacy,
+          mode_effect_handler_body mode_legacy
       in
       let arg, sort =
         with_local_level_generalize begin fun () ->
           let expected_ty, sort = new_rep_var ~why:Match () in
           let arg =
-            type_expect handler_env arg_expected_mode sarg (mk_expected expected_ty)
+            type_expect handler_env arg_expected_mode sarg
+              (mk_expected expected_ty)
           in
           arg, sort
         end ~before_generalize:(fun (arg, _) ->
@@ -6823,8 +6826,8 @@ and type_expect_
               Value.Comonadic.Const.legacy env
           in
           handler_env,
-          mode_effect_handler_body (mode_trywith expected_mode),
-          mode_effect_handler_body expected_mode
+          mode_effect_handler_body mode_legacy,
+          mode_effect_handler_body mode_legacy
       in
       let body =
         type_expect handler_env body_mode sbody ty_expected_explained
