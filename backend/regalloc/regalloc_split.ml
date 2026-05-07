@@ -322,16 +322,26 @@ let make_reload : type a. (a, definition_kind) make_operation =
   | Rematerialize source ->
     (* The rematerialization source can be a [Load], [Const], or [Intop_imm]
        (cf. [Regalloc_split_utils.Uses.source]); its [desc] is preserved
-       verbatim. We use the post-substitution names of the source's arguments
-       and results. For a multi-result source, all of the result registers are
-       defined by this single rematerialized instruction; their substitution
-       mappings were established by [compute_substitution_tree] (since
-       [RewriteAsRematerialize] only emits [Rematerialize] when all of the
-       source's result registers need to be redefined at this block). The
-       [old_reg]/[new_reg] pair is just one of those, used here for the log
-       message. *)
+       verbatim. The result handling depends on arity:
+
+       - Single-result source: emit with [res = [|new_reg|]]. This directly
+       assigns the source's value to the consumer's renamed register and
+       transparently bypasses any [Move] chain that [try_rematerialize] followed
+       (sound because [Move] preserves bits, and the chain's intermediate moves
+       have matching machtypes by construction in [Uses.classify_source]).
+
+       - Multi-result source: emit with [res = apply_array block_subst
+       source.res]. All of the result registers are defined by this single
+       rematerialized instruction; their substitution mappings were established
+       by [compute_substitution_tree] (since [RewriteAsRematerialize] only emits
+       a multi-result [Rematerialize] when all of [source.res] need to be
+       redefined at this block, and [reg] is directly in [source.res]). *)
     let arg = Substitution.apply_array block_subst source.arg in
-    let res = Substitution.apply_array block_subst source.res in
+    let res =
+      if Array.length source.res = 1
+      then [| new_reg |]
+      else Substitution.apply_array block_subst source.res
+    in
     if debug
     then
       log "remat %a -> %a (from %a)" Printreg.reg old_reg Printreg.regs res

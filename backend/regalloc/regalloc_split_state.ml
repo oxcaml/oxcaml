@@ -651,18 +651,37 @@ end = struct
                    (fun reg acc ->
                      match try_rematerialize uses ~is_arg_ok reg with
                      | None -> acc
-                     | Some load ->
-                       (* Only rematerialize a (potentially multi-result) load
-                          when all of its result registers also need to be
-                          redefined at this block. Otherwise the rematerialized
-                          load would assign fresh registers to the unwanted
-                          result slots, growing the register count without
-                          buying anything. *)
-                       if
-                         Array.for_all load.res ~f:(fun (r : Reg.t) ->
-                             Reg.Set.mem r regs)
-                       then Reg.Map.add reg load acc
-                       else acc)
+                     | Some source ->
+                       let single_result = Array.length source.res = 1 in
+                       let ok =
+                         if single_result
+                         then
+                           (* Single-result source: always safe. Note that [reg]
+                              might not equal [source.res.(0)] when
+                              [try_rematerialize] followed a [Move] chain, but
+                              the rematerialized instruction is emitted with
+                              [res = [|new_reg|]] (cf. [make_reload]), so the
+                              load's original result register is never
+                              materialized at this site and therefore does not
+                              need to be in [regs]. *)
+                           true
+                         else
+                           (* Multi-result source: the rematerialized
+                              instruction will redefine *all* of its result
+                              registers (with [apply_array block_subst
+                              source.res]). To avoid wasting fresh registers on
+                              dead result slots we require every result to be in
+                              [regs]. We also forbid [Move]-chain entry ([reg]
+                              not directly in [source.res]) because in that case
+                              [reg]'s renamed register is not among the emitted
+                              result names, and we would have to additionally
+                              emit a move from one of the result names to
+                              [new_reg]. *)
+                           Array.exists source.res ~f:(Reg.same reg)
+                           && Array.for_all source.res ~f:(fun (r : Reg.t) ->
+                               Reg.Set.mem r regs)
+                       in
+                       if ok then Reg.Map.add reg source acc else acc)
                    regs Reg.Map.empty)
           in
           let changed = ref true in
