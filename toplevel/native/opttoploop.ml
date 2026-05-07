@@ -336,11 +336,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval
-      ~cu_static_data:(fun cu ->
-        Misc.fatal_errorf
-          "Slambda eval: cross-module evaluation not implemented (unit %s)"
-          (Compilation_unit.full_path_as_string cu))
+    Slambda.eval ~cu_static_data:Compilenv.get_static_data
       (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;

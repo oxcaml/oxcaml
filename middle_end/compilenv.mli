@@ -44,6 +44,12 @@ val get_unit_export_info
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 
+val get_static_data :
+  Compilation_unit.t -> Slambdaeval.value Slambdaeval.Or_missing.t
+        (* Means of getting the comptime (static) value found in the .cmx
+           file of the given unit. Returns [Missing] if the .cmx file cannot
+           be located. *)
+
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
 val need_apply_fun:
@@ -66,12 +72,15 @@ val read_unit_info: string -> unit_infos * Digest.t
         (* Read infos and MD5 from a [.cmx] file. *)
 val write_unit_info: unit_infos -> string -> unit
         (* Save the given infos in the given file *)
-val build_unit_info: main_module_block_format:Lambda.main_module_block_format ->
+val build_unit_info:
+  main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
+  static_data:Slambdaeval.value Slambdaeval.Or_missing.t ->
   unit_infos
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
+  static_data:Slambdaeval.value Slambdaeval.Or_missing.t ->
   unit
         (* Save the infos for the current unit in the given file *)
 val cache_unit_info: unit_infos -> unit

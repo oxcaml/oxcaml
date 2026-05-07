@@ -134,6 +134,7 @@ let read_unit_info filename =
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+      ui_static_data = uir.uir_static_data;
       ui_file_sections = sections;
     }
     in
@@ -232,6 +233,28 @@ let cache_unit_info ui =
   Infos_table.add global_infos_table
     (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
 
+let get_static_data comp_unit =
+  assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
+  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
+  then
+    Misc.fatal_errorf
+      "Compilenv.get_static_data: requested static data of the current unit \
+       (%s); the current unit's static data is not available until after its \
+       slambda eval finishes"
+      (CU.full_path_as_string comp_unit)
+  else begin
+    let name = CU.to_global_name_without_prefix comp_unit in
+    match Infos_table.find_opt global_infos_table name with
+    | Some (Some ui) -> ui.ui_static_data
+    | Some None -> Slambdaeval.Or_missing.Missing
+    | None ->
+      (* Trigger a load + cache via the existing machinery, then re-look-up. *)
+      let _ : _ option = get_unit_export_info comp_unit in
+      (match Infos_table.find_opt global_infos_table name with
+       | Some (Some ui) -> ui.ui_static_data
+       | Some None | None -> Slambdaeval.Or_missing.Missing)
+  end
+
 (* Exporting cross-module information *)
 
 let set_export_info export_info =
@@ -303,6 +326,7 @@ let write_unit_info info filename =
     uir_section_toc = toc;
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
+    uir_static_data = info.ui_static_data;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -312,7 +336,7 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let build_unit_info ~main_module_block_format ~arg_descr =
+let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
@@ -333,13 +357,16 @@ let build_unit_info ~main_module_block_format ~arg_descr =
     ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
     ui_force_link = current_unit.uib_force_link;
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
+    ui_external_symbols = current_unit.uib_external_symbols;
+    ui_static_data = static_data;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
-    ui_external_symbols = current_unit.uib_external_symbols;
   }
 
-let save_unit_info filename ~main_module_block_format ~arg_descr =
-  let current_unit = build_unit_info ~main_module_block_format ~arg_descr in
+let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
+  let current_unit =
+    build_unit_info ~main_module_block_format ~arg_descr ~static_data
+  in
   write_unit_info current_unit filename
 
 let new_const_symbol () =
