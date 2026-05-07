@@ -100,6 +100,8 @@ end
 
 include Types
 
+type ctx = { cu_static_data : Compilation_unit.t -> value Or_missing.t }
+
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
 type _ value_type =
@@ -146,28 +148,28 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam env slam : value Or_missing.t =
+let rec eval_slam ctx env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam env sval_comptime in
-    let slv_runtime = eval_lam env sval_runtime in
+    let slv_comptime = eval_slam ctx env sval_comptime in
+    let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout layout)
-  | SLglobal _ -> errf "cross-module eval not implemented"
+  | SLglobal cu -> ctx.cu_static_data cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
-    let value = eval_slam env slet_value in
+    let value = eval_slam ctx env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam env_body slet_body
+    eval_slam ctx env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
-    let values = Array.map (eval_slam env) (Array.of_list slams) in
+    let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
     Present (SLVrecord values)
   | SLfield (slam, i) ->
-    let* fields = eval_slam env slam |>> expect Trecord in
+    let* fields = eval_slam ctx env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam env slam |>> expect Thalves in
+    let* halves = eval_slam ctx env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
     Present
@@ -175,21 +177,21 @@ let rec eval_slam env slam : value Or_missing.t =
          { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
   | SLinstantiate { sapp_func; sapp_arguments } ->
     let closure =
-      eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
+      eval_slam ctx env sapp_func |> expect_not_missing |> expect Tclosure
     in
-    let eval_arg arg = eval_slam env arg |> expect_not_missing in
+    let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_arguments in
     let { clo_params; clo_body; clo_env } = closure in
     let env_body =
       Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
     in
-    eval_slam env_body clo_body
+    eval_slam ctx env_body clo_body
 
 and eval_var env id = Env.find env id
 
-and eval_lam env lam = Lambda.map (eval_lam_shallow env) lam
+and eval_lam ctx env lam = Lambda.map (eval_lam_shallow ctx env) lam
 
-and eval_lam_shallow env lam =
+and eval_lam_shallow ctx env lam =
   match lam with
   | Lconst old_const ->
     let new_const = eval_structured_const env old_const in
@@ -289,7 +291,9 @@ and eval_lam_shallow env lam =
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
   | Lsplice (_loc, slam) ->
-    let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
+    let halves =
+      eval_slam ctx env slam |> expect_not_missing |> expect Thalves
+    in
     halves.slv_runtime
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
@@ -582,13 +586,14 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lsplice _ -> raise Found_a_splice);
   Lambda.iter_head_constructor assert_no_splices lam
 
-let do_eval slam =
-  eval_slam Env.empty slam |> expect_not_missing
+let do_eval ctx slam =
+  eval_slam ctx Env.empty slam
+  |> expect_not_missing
   |> expect Thalves ~reason:"toplevel module"
 
-let eval slam =
+let eval ~cu_static_data slam =
   Profile.record_call "static_eval" (fun () ->
-      let halves = do_eval slam in
+      let halves = do_eval { cu_static_data } slam in
       (try assert_no_splices halves.slv_runtime
        with Found_a_splice ->
          Misc.fatal_error

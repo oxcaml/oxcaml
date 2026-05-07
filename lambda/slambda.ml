@@ -30,11 +30,12 @@ type value_halves = Slambdaeval.halves =
     slv_runtime : Lambda.lambda
   }
 
-let eval inspect_slambda template_lam =
+let eval ~cu_static_data inspect_slambda template_lam =
   Profile.record_call "slambda_eval" (fun () ->
       let halves =
         Slambda_fracture.fracture template_lam
-        |> inspect_slambda |> Slambdaeval.eval
+        |> inspect_slambda
+        |> Slambdaeval.eval ~cu_static_data
       in
       (* CR layout poly: We can keep this check in the future if
          [is_enabled Layout_poly] is replaced with whether template_lam contains

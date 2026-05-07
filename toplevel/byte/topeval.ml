@@ -73,7 +73,12 @@ let load_lambda ppf tlam =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+    Slambda.eval
+      ~cu_static_data:(fun cu ->
+        Misc.fatal_errorf
+          "Slambda eval: cross-module evaluation not implemented (unit %s)"
+          (Compilation_unit.full_path_as_string cu))
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam = Simplif.simplify_lambda_for_bytecode rawlam in

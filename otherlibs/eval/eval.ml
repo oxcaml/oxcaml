@@ -208,7 +208,12 @@ let eval (expr : 'a expr) =
      }] *)
   let lambda =
     let { Slambda.slv_comptime = _; slv_runtime = raw_lambda } =
-      Slambda.eval Fun.id tlambda_program.code
+      Slambda.eval
+        ~cu_static_data:(fun cu ->
+          Misc.fatal_errorf
+            "Slambda eval: cross-module evaluation not implemented (unit %s)"
+            (Compilation_unit.full_path_as_string cu))
+        Fun.id tlambda_program.code
     in
     Simplif.simplify_lambda
       ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
