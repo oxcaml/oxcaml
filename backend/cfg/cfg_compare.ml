@@ -14,9 +14,9 @@
       instructions, and from block-level [exn] pointers. As blocks are paired up
       the framework checks that their bodies match instruction-by-instruction
       (modulo Move skipping), that their terminators have the same shape, and
-      that block-level metadata (is_trap_handler, can_raise, cold, stack_offset)
-      agrees. Unreachable trap handlers (no predecessors on both sides) are
-      skipped — their bodies may differ harmlessly between [Cfg_of_ssa]'s
+      that block-level metadata (is_trap_handler, can_raise, cold) agrees.
+      Unreachable trap handlers (no predecessors on both sides) are skipped —
+      their bodies may differ harmlessly between [Cfg_of_ssa]'s
       [make_invalid_handler_bloc] and [Cfg_selectgen]'s [unreachable_handler] or
       a remaining input block.
 
@@ -160,11 +160,26 @@ let basic_desc_match ~map_label (old_d : Cfg.basic) (new_d : Cfg.basic) =
     true
   | _ -> Cfg.equal_basic old_d new_d
 
-let compare_body ~ppf_m ~map_label ~ol ~nl old_body new_body =
-  let advance_skipping_moves cell =
+let compare_body ~ppf_m ~map_label ~old_cfg_t ~new_cfg_t ~ol ~nl old_body
+    new_body =
+  (* A [Pushtrap]/[Poptrap] whose target has no predecessors is unreachable as a
+     trap handler at runtime. The legacy pipeline keeps a [Cfg_selectgen]
+     [unreachable_handler] block as the target while [Cfg_of_ssa] drops the trap
+     op entirely; we treat both shapes as equivalent by skipping the op on
+     either side when its target has no predecessors. *)
+  let is_skippable_trap cfg (i : Cfg.basic Cfg.instruction) =
+    match i.desc with
+    | Pushtrap { lbl_handler } | Poptrap { lbl_handler } ->
+      let target = Cfg.get_block_exn cfg lbl_handler in
+      Label.Set.is_empty target.predecessors
+    | _ -> false
+  in
+  let advance cfg cell =
     let rec loop c =
       match c with
-      | Some c when is_move (DLL.value c) -> loop (DLL.next c)
+      | Some c when is_move (DLL.value c) || is_skippable_trap cfg (DLL.value c)
+        ->
+        loop (DLL.next c)
       | _ -> c
     in
     loop cell
@@ -193,13 +208,11 @@ let compare_body ~ppf_m ~map_label ~ol ~nl old_body new_body =
           Label.format ol InstructionId.print oi.id Label.format nl
           InstructionId.print ni.id Cfg.dump_basic oi.desc
           Debuginfo.print_compact oi.dbg Debuginfo.print_compact ni.dbg;
-      loop
-        (advance_skipping_moves (DLL.next oc))
-        (advance_skipping_moves (DLL.next nc))
+      loop (advance old_cfg_t (DLL.next oc)) (advance new_cfg_t (DLL.next nc))
   in
   loop
-    (advance_skipping_moves (DLL.hd_cell old_body))
-    (advance_skipping_moves (DLL.hd_cell new_body))
+    (advance old_cfg_t (DLL.hd_cell old_body))
+    (advance new_cfg_t (DLL.hd_cell new_body))
 
 let terminator_structure_match ~map_label (old_t : Cfg.terminator)
     (new_t : Cfg.terminator) =
@@ -331,11 +344,10 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
         then
           Format.fprintf ppf_m "cold mismatch at old=%a(%b) new=%a(%b)@."
             Label.format ol ob.cold Label.format nl nb.cold;
-        if not (Int.equal ob.stack_offset nb.stack_offset)
-        then
-          Format.fprintf ppf_m
-            "stack_offset mismatch at old=%a(%d) new=%a(%d)@." Label.format ol
-            ob.stack_offset Label.format nl nb.stack_offset;
+        (* [stack_offset] is intentionally not compared: the legacy pipeline
+           keeps unreachable trap handlers as [Pushtrap]/[Poptrap] pairs while
+           [Cfg_of_ssa] drops them, so the trap-stack-derived component of
+           [stack_offset] can legitimately differ. *)
         if
           Label.Set.is_empty ob.predecessors
           && Label.Set.is_empty nb.predecessors
@@ -352,7 +364,8 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
             Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
               Label.format ol Label.format nl);
           (* Compare body structure, debuginfo, and map labels *)
-          compare_body ~ppf_m ~map_label ~ol ~nl ob.body nb.body;
+          compare_body ~ppf_m ~map_label ~old_cfg_t ~new_cfg_t ~ol ~nl ob.body
+            nb.body;
           (* Compare terminator structure and map labels *)
           if
             not
@@ -606,11 +619,9 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
     (* Phase 2: register equivalence *)
     verify_register_equivalence ~ppf_m ~old_cfg_t:old_cfg ~new_cfg_t:new_cfg
       ~new_to_old;
-    (* Check CFG metadata *)
-    if not (Bool.equal old_cfg.fun_contains_calls new_cfg.fun_contains_calls)
-    then
-      Format.fprintf ppf_m "fun_contains_calls mismatch: old=%b new=%b@."
-        old_cfg.fun_contains_calls new_cfg.fun_contains_calls;
+    (* Check CFG metadata. [fun_contains_calls] is intentionally not compared:
+       dropping unreachable trap-handler blocks (which contain a [Raise]) can
+       legitimately change whether the function appears to contain calls. *)
     if not (String.equal old_cfg.fun_name new_cfg.fun_name)
     then
       Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg.fun_name

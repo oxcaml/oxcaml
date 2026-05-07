@@ -23,9 +23,9 @@
       from the input to the output via [map_arg] and [map_block].
     - Block params with [usage_count = 0] are dropped from both the block
       parameter list and from [Goto]s.
-    - [Push_trap] / [Pop_trap] handlers are replaced by [None] if the handler
-      block has become unreachable. CFG lowering routes those through a shared
-      invalid handler.
+    - [Push_trap] / [Pop_trap] whose handler block has become unreachable are
+      dropped entirely. The matching push/pop pair both reference the same
+      handler, so they are dropped together and trap-stack balance is preserved.
     - Other terminators are reconstructed with their args mapped through.
 
     [keep_unused_ops] disables the dead-Op skip and the dead-param drop, so the
@@ -247,7 +247,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         In.Block.Tbl.replace block_map blk new_out
       end)
     In.blocks;
-  let map_block_impl (old : In.Block.t) : Out.Block.t =
+  let map_block (old : In.Block.t) : Out.Block.t =
     In.Block.Tbl.find block_map old
   in
   (* Select from [args] the entries at positions whose target params were kept.
@@ -272,20 +272,11 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       assert (!found >= 0);
       !found
   in
-  (* Look up a handler reference for [Push_trap]/[Pop_trap]. If the old handler
-     block was dropped (e.g., an unreachable trap handler filtered by
-     [Builder.finish]), the reference becomes [None], to be resolved at CFG
-     conversion time as the shared invalid handler. *)
-  let map_handler (old : In.Block.t option) : Out.Block.t option =
-    match old with
-    | None -> None
-    | Some blk -> In.Block.Tbl.find_opt block_map blk
-  in
   let rec map_arg_impl (i : In.Instruction.t) : Out.Instruction.t =
     match i with
     | Op { id; _ } -> In.Instruction_id.Tbl.find op_map id
     | Block_param { block; index } ->
-      Out.Instruction.make_block_param (map_block_impl block)
+      Out.Instruction.make_block_param (map_block block)
         (remap_param_index block index)
     | Proj { index; src } -> Out.Instruction.make_proj ~index (map_arg_impl src)
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
@@ -299,22 +290,20 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     match t with
     | Goto { goto; args } ->
       let mapped_args = Array.map map_arg_impl (filter_in_args_for goto args) in
-      Goto { goto = map_block_impl goto; args = mapped_args }
+      Goto { goto = map_block goto; args = mapped_args }
     | Branch { cond; ifso; ifnot } ->
       Branch
         { cond = map_arg_impl cond;
-          ifso = map_block_impl ifso;
-          ifnot = map_block_impl ifnot
+          ifso = map_block ifso;
+          ifnot = map_block ifnot
         }
     | Switch { index; targets } ->
       Switch
-        { index = map_arg_impl index;
-          targets = Array.map map_block_impl targets
-        }
+        { index = map_arg_impl index; targets = Array.map map_block targets }
     | Return { args } -> Return { args = map_args args }
     | Raise { raise_kind; args } -> Raise { raise_kind; args = map_args args }
     | Tailcall_self { destination; args } ->
-      let destination = map_block_impl destination in
+      let destination = map_block destination in
       assert (Array.length args = Array.length (Out.Block.params destination));
       Tailcall_self { destination; args = map_args args }
     | Tailcall_func { op; args } -> Tailcall_func { op; args = map_args args }
@@ -322,7 +311,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       Call
         { op;
           args = map_args args;
-          continuation = map_block_impl continuation;
+          continuation = map_block continuation;
           may_raise;
           nontail
         }
@@ -330,7 +319,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       Invalid
         { message;
           args = map_args args;
-          continuation = Option.map map_block_impl continuation
+          continuation = Option.map map_block continuation
         }
   in
   let module M = struct
@@ -361,7 +350,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
 
       let map_arg = map_arg_impl
 
-      let map_block = map_block_impl
+      let map_block = map_block
 
       let visit_instruction (blk : In.Block.t) ~instr_index b =
         match Red.visit_instruction blk ~instr_index b with
@@ -377,6 +366,9 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
              is structurally faithful to the input — used before [Cfg_compare]
              so it can match the baseline pipeline. *)
           | Op { usage_count = 0; _ } when not keep_unused_ops -> ()
+          | (Push_trap { handler } | Pop_trap { handler })
+            when In.Block.Set.is_empty handler.predecessors ->
+            ()
           | _ -> (
             let rewritten : Out.Instruction.t =
               match i with
@@ -387,16 +379,15 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
                 Option.iter (Out.Instruction.set_name new_op) name;
                 new_op
               | Push_trap { handler } ->
-                Push_trap { handler = map_handler handler }
-              | Pop_trap { handler } ->
-                Pop_trap { handler = map_handler handler }
+                Push_trap { handler = map_block handler }
+              | Pop_trap { handler } -> Pop_trap { handler = map_block handler }
               | Stack_check { max_frame_size_bytes } ->
                 Stack_check { max_frame_size_bytes }
               | Name_for_debugger { ident; provenance; which_parameter; regs }
                 ->
                 Name_for_debugger
                   { ident; provenance; which_parameter; regs = map_args regs }
-              | Block_param _ | Proj _ | Tuple _ -> Misc.fatal_error "reducer found imp"
+              | Block_param _ | Proj _ | Tuple _ -> assert false
             in
             let new_i = emit_instruction b rewritten in
             match[@warning "-fragile-match"] i with
