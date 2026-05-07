@@ -55,7 +55,7 @@ let $camlTests11__first_const_0 = Block 0 () in
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
    let bar = %project_value_slot.[map_foo].[bar] (my_closure) in
-   apply &my_alloc_region seq (0) -> k3 * k2
+   apply &my_alloc_region (seq : _ -> [ 0 | 0 of val * val ]) (0) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
          let Pisint = %tag_imm (prim) in
@@ -87,7 +87,7 @@ let $camlTests11__first_const_0 = Block 0 () in
                      -> k3 * k2
                where k3 (staticcatch_result : val) =
                  ((let Pfield = %block_load.[`0`] (`*match*`) in
-                   apply &my_alloc_region f (Pfield) -> k3 * k2)
+                   apply &my_alloc_region (f : _ -> val) (Pfield) -> k3 * k2)
                     where k3 (apply_result : val) =
                       let Pmakeblock =
                         %block.[`0`].my_alloc_region

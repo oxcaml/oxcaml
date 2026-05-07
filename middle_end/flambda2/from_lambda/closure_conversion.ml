@@ -478,8 +478,7 @@ module Inlining = struct
       ~body
 
   let wrap_inlined_body_for_exn_extra_args acc ~extra_args
-      ~apply_exn_continuation ~apply_return_continuation ~result_arity
-      ~make_inlined_body =
+      ~apply_exn_continuation ~apply_return ~make_inlined_body =
     let apply_cont_create acc ~trap_action cont ~args ~dbg =
       let acc, apply_cont =
         Apply_cont_with_acc.create acc ~trap_action cont ~args ~dbg
@@ -492,8 +491,8 @@ module Inlining = struct
         ~body ~is_exn_handler ~is_cold
     in
     Inlining_helpers.wrap_inlined_body_for_exn_extra_args acc ~extra_args
-      ~apply_exn_continuation ~apply_return_continuation ~result_arity
-      ~make_inlined_body ~apply_cont_create ~let_cont_create
+      ~apply_exn_continuation ~apply_return ~make_inlined_body
+      ~apply_cont_create ~let_cont_create
 
   let inline acc ~apply ~apply_depth ~func_desc:code =
     let apply_dbg = Apply.dbg apply in
@@ -548,8 +547,8 @@ module Inlining = struct
             ~apply_return_continuation
         | extra_args ->
           wrap_inlined_body_for_exn_extra_args acc ~extra_args
-            ~apply_exn_continuation ~apply_return_continuation
-            ~result_arity:(Code.result_arity code) ~make_inlined_body)
+            ~apply_exn_continuation ~apply_return:(Apply.return apply)
+            ~make_inlined_body)
 end
 
 type unarized_extern_repr =
@@ -895,8 +894,9 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       let callee = Simple.symbol call_symbol in
       let apply =
         Apply.create ~callee:(Some callee)
-          ~continuation:(Return return_continuation) exn_continuation ~args
-          ~args_arity:param_arity ~return_arity ~call_kind
+          ~return:
+            (Returns_to { cont = return_continuation; arity = return_arity })
+          exn_continuation ~args ~args_arity:param_arity ~call_kind
           ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
@@ -1127,12 +1127,15 @@ let close_effect_primitive acc env ~dbg exn_continuation
   in
   let close call_kind =
     let apply acc =
-      Apply_expr.create ~callee:None ~continuation:(Return continuation)
-        exn_continuation ~args:[] ~args_arity:Flambda_arity.nullary
-        ~return_arity:
-          (Flambda_arity.create_singletons
-             [Flambda_kind.With_subkind.any_value])
-        ~call_kind
+      Apply_expr.create ~callee:None
+        ~return:
+          (Returns_to
+             { cont = continuation;
+               arity =
+                 Flambda_arity.create_singletons
+                   [Flambda_kind.With_subkind.any_value]
+             })
+        exn_continuation ~args:[] ~args_arity:Flambda_arity.nullary ~call_kind
         ~return_mode:
           (Alloc_mode.For_applications.not_alloc_stack
              ~alloc_region:current_alloc_region)
@@ -1848,8 +1851,11 @@ let close_exact_or_unknown_apply acc env
             (* See comment about when this check can be done, in
                simplify_apply_expr.ml *)
             not
-              (Flambda_arity.equal_ignoring_subkinds return_arity
-                 result_arity_from_code
+              ((match return_arity, result_arity_from_code with
+                 | Or_unknown_or_bottom.Ok return_arity, Ok result_arity ->
+                   Flambda_arity.equal_ignoring_subkinds return_arity
+                     result_arity
+                 | _, _ -> true)
               && Misc.Stdlib.List.equal
                    (Misc.Stdlib.List.equal K.With_subkind.equal_ignoring_subkind)
                    (Flambda_arity.unarize_per_parameter args_arity)
@@ -1864,8 +1870,8 @@ let close_exact_or_unknown_apply acc env
                  return (%a)):@ %a@ code metadata:@ %a"
                 Ident.print func Flambda_arity.print
                 (Code_metadata.params_arity meta)
-                Flambda_arity.print result_arity_from_code Flambda_arity.print
-                args_arity Flambda_arity.print return_arity
+                Result_arity.print result_arity_from_code Flambda_arity.print
+                args_arity Result_arity.print return_arity
                 Debuginfo.print_compact dbg Code_metadata.print meta
             else acc, Call_kind.direct_function_call code_id, false, true
           else
@@ -1904,12 +1910,12 @@ let close_exact_or_unknown_apply acc env
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
+    let return = Apply.Return.create (Return continuation) return_arity in
     let apply =
       Apply.create
         ~callee:(if can_erase_callee then None else Some callee)
-        ~continuation:(Return continuation) apply_exn_continuation ~args
-        ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
-        ~inlined:inlined_call
+        ~return apply_exn_continuation ~args ~args_arity ~call_kind
+        ~return_mode:mode dbg ~inlined:inlined_call
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -2250,6 +2256,13 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
         let acc, body = body acc in
         acc, body, return, return_continuation
       | Some local_param_region ->
+        let return_arity =
+          match (return : Result_arity.t) with
+          | Ok arity -> arity
+          | Unknown | Bottom ->
+            Misc.fatal_error
+              "Parameter region wrapper requires concrete return arity"
+        in
         (* We need to close the region we used for the unboxed parameter before
            returning from the function, so we need a return wrapper. *)
         let outer_return_continuation =
@@ -2265,7 +2278,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      (Flambda_kind.With_subkind.kind kind)
                  in
                  Bound_parameter.create var kind Flambda_debug_uid.none)
-               (Flambda_arity.unarized_components return))
+               (Flambda_arity.unarized_components return_arity))
         in
         let handler acc =
           let acc, apply_cont =
@@ -2295,6 +2308,14 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
         in
         acc, unboxed_body, return, outer_return_continuation)
     | Some (k, _) ->
+      let return =
+        match (return : Result_arity.t) with
+        | Ok arity -> arity
+        | Unknown | Bottom ->
+          Misc.fatal_errorf
+            "Cannot unbox the result of %a, whose result arity is %a"
+            Function_slot.print function_slot Result_arity.print return
+      in
       let vars_with_kinds = variables_for_unboxing "result" k in
       let unboxed_return_continuation =
         Continuation.create ~sort:Return ~name:"unboxed_return" ()
@@ -2361,8 +2382,9 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       in
       ( acc,
         unboxed_body,
-        Flambda_arity.create_singletons
-          (List.map (fun (_, _, kind) -> kind) vars_with_kinds),
+        Result_arity.ok
+          (Flambda_arity.create_singletons
+             (List.map (fun (_, _, kind) -> kind) vars_with_kinds)),
         unboxed_return_continuation )
   in
   let acc, unboxed_body =
@@ -2499,9 +2521,9 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     let main_application =
       Apply_expr.create
         ~callee:(Some (Simple.var main_closure))
-        ~continuation:(Return cont)
+        ~return:(Apply_expr.Return.create (Return cont) result_arity_main_code)
         (Exn_continuation.create ~exn_handler:exn_continuation ~extra_args:[])
-        ~args ~args_arity ~return_arity:result_arity_main_code
+        ~args ~args_arity
         ~call_kind:(Call_kind.direct_function_call main_code_id)
         ~return_mode:
           (Alloc_mode.For_applications.from_lambda
@@ -2540,6 +2562,14 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     body_wrapper body free_names_of_body
   in
   let make_return_wrapper box_result =
+    let concrete_result_arity_main_code =
+      match (result_arity_main_code : Result_arity.t) with
+      | Ok arity -> arity
+      | Unknown | Bottom ->
+        Misc.fatal_errorf
+          "Cannot box the result of %a, whose result arity is %a" Code_id.print
+          main_code_id Result_arity.print result_arity_main_code
+    in
     let cont = Continuation.create () in
     let body, free_names_of_body = make_body cont in
     let handler, free_names_of_handler =
@@ -2553,7 +2583,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
-             (Flambda_arity.unarized_components result_arity_main_code))
+             (Flambda_arity.unarized_components concrete_result_arity_main_code))
       in
       let handler, free_names_of_handler =
         let boxed_return = Variable.create "boxed_return" K.value in
@@ -3353,10 +3383,15 @@ let close_functions acc external_env ~current_alloc_region ~current_region
   in
   if can_be_lifted
   then
-    let symbols_with_approx =
-      Function_slot.Lmap.mapi
-        (fun function_slot _ ->
-          let sym = Function_slot.Map.find function_slot symbol_map in
+    let acc, symbols_with_approx =
+      Function_slot.Lmap.fold_left_map
+        (fun acc function_slot _ ->
+          let acc, sym =
+            match Function_slot.Map.find_opt function_slot symbol_map with
+            | Some sym -> acc, sym
+            | None ->
+              acc, manufacture_symbol (Function_slot.to_string function_slot)
+          in
           let approx =
             match Function_slot.Map.find function_slot approximations with
             | Value_approximation.Closure_approximation
@@ -3366,8 +3401,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             | _ -> assert false
             (* see above *)
           in
-          sym, approx)
-        funs
+          acc, (sym, approx))
+        acc funs
     in
     let symbols = Function_slot.Lmap.map fst symbols_with_approx in
     let acc = Acc.add_lifted_set_of_closures ~symbols ~set_of_closures acc in
@@ -3439,10 +3474,12 @@ let close_let_rec acc env ~function_declarations
     let acc, env =
       Function_slot.Lmap.fold
         (fun function_slot (symbol, approx) (acc, env) ->
-          let ident = Function_slot.Map.find function_slot ident_map in
           let env =
-            Env.add_simple_to_substitute env ident (Simple.symbol symbol)
-              K.With_subkind.any_value
+            match Function_slot.Map.find_opt function_slot ident_map with
+            | None -> env
+            | Some ident ->
+              Env.add_simple_to_substitute env ident (Simple.symbol symbol)
+                K.With_subkind.any_value
           in
           Acc.add_symbol_approximation acc symbol approx, env)
         symbols (acc, env)
@@ -3577,6 +3614,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         exn_continuation;
         inlined = Lambda.Default_inlined;
         mode = result_mode;
+        region_close = Rc_normal;
         return_arity = result_arity;
         region = my_region;
         ghost_region = my_ghost_region;
@@ -3616,7 +3654,12 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     else Lambda.alloc_local, 0
   in
   (* This can happen in a dead GADT match case. *)
-  if not (Flambda_arity.is_one_param_of_kind_value apply.IR.return_arity)
+  if
+    not
+      (match apply.IR.return_arity with
+      | Or_unknown_or_bottom.Ok arity ->
+        Flambda_arity.is_one_param_of_kind_value arity
+      | Unknown | Bottom -> false)
   then
     ( acc,
       Expr.create_invalid
@@ -3681,6 +3724,17 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       Some (over_app_region, over_app_ghost_region, Continuation.create ())
     | Not_alloc_stack, Not_alloc_stack | Maybe_alloc_stack, _ -> None
   in
+  let over_application_result_arity () =
+    (* Giving the over-application's result its own region means materializing
+       that result, which needs a concrete arity. *)
+    match apply.return_arity with
+    | Ok arity -> arity
+    | Unknown | Bottom ->
+      Misc.fatal_errorf
+        "Cannot compile an over-application with a local result unless the \
+         result arity is concrete:@ %a"
+        Result_arity.print apply.return_arity
+  in
   let apply_alloc_region = fst (Env.find_var env apply.alloc_region) in
   let apply_region, apply_ghost_region =
     match needs_region with
@@ -3708,16 +3762,17 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         ~current_alloc_region:apply_alloc_region ~current_region:apply_region
         ~current_ghost_region:apply_ghost_region
     in
-    let continuation =
+    let return : Apply.Return.t =
       match needs_region with
-      | None -> apply_return_continuation
-      | Some (_, _, cont) -> Apply.Result_continuation.Return cont
+      | None -> Apply.Return.create apply_return_continuation apply.return_arity
+      | Some (_, _, cont) ->
+        Returns_to { cont; arity = over_application_result_arity () }
     in
     let over_application =
       Apply.create
         ~callee:(Some (Simple.var returned_func))
-        ~continuation apply_exn_continuation ~args:remaining
-        ~args_arity:remaining_arity ~return_arity:apply.return_arity
+        ~return apply_exn_continuation ~args:remaining
+        ~args_arity:remaining_arity
         ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
         apply_dbg ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
@@ -3737,7 +3792,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components apply.return_arity)
+          (Flambda_arity.unarized_components (over_application_result_arity ()))
       in
       let handler acc =
         let acc, call_return_continuation =
@@ -3815,7 +3870,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         missing_arity : [`Complex] Flambda_arity.t;
         missing_param_modes : Alloc_mode.For_types.t list;
-        result_arity : [`Unarized] Flambda_arity.t
+        result_arity : Result_arity.t
       }
   | Over_app of
       { full : IR.simple list;
@@ -3942,7 +3997,12 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
         ~arity:params_arity ~first_complex_local_param ~result_mode
     | Over_app { full; provided_arity; remaining; remaining_arity; result_mode }
       ->
-      if not (Flambda_arity.is_one_param_of_kind_value result_arity)
+      if
+        not
+          (match result_arity with
+          | Or_unknown_or_bottom.Ok arity ->
+            Flambda_arity.is_one_param_of_kind_value arity
+          | Unknown | Bottom -> true)
       then
         ( acc,
           Expr.create_invalid
@@ -3964,8 +4024,9 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
               continuation = apply_continuation;
               mode = result_mode;
               return_arity =
-                Flambda_arity.create_singletons
-                  [Flambda_kind.With_subkind.any_value]
+                Result_arity.ok
+                  (Flambda_arity.create_singletons
+                     [Flambda_kind.With_subkind.any_value])
             }
             (Some approx) ~replace_region
         in

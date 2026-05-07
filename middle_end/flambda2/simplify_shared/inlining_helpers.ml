@@ -73,8 +73,7 @@ let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
   apply_renaming body renaming
 
 let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
-    ~apply_return_continuation ~result_arity ~make_inlined_body
-    ~apply_cont_create ~let_cont_create =
+    ~apply_return ~make_inlined_body ~apply_cont_create ~let_cont_create =
   (* We need to add a wrapper for the exception handler so that exceptions
    * coming from the inlined body are raised with the correct extra arguments:
    *
@@ -89,11 +88,15 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
      this rewriting during the normal traversal of the inlined body. *)
   let wrapper = Continuation.create () in
   let body_with_pop acc =
-    match (apply_return_continuation : RC.t) with
-    | Never_returns ->
+    match (apply_return : Apply.Return.t) with
+    | Never_returns _ ->
       make_inlined_body acc ~apply_exn_continuation:wrapper
-        ~apply_return_continuation
-    | Return apply_return_continuation ->
+        ~apply_return_continuation:RC.Never_returns
+    | Tail_forwards_to_caller _ ->
+      Misc.fatal_error
+        "Cannot inline at an unknown-result call site whose inlined body \
+         returns with exception extra arguments"
+    | Returns_to { cont = apply_return_continuation; arity } ->
       let pop_wrapper_cont = Continuation.create () in
       let body acc =
         make_inlined_body acc ~apply_exn_continuation:wrapper
@@ -108,7 +111,7 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
             in
             let wrapper_return_duid = Flambda_debug_uid.none in
             Bound_parameter.create wrapper_return k wrapper_return_duid)
-          (Flambda_arity.unarized_components result_arity)
+          (Flambda_arity.unarized_components arity)
       in
       let trap_action =
         Trap_action.Pop { exn_handler = wrapper; raise_kind = None }

@@ -35,7 +35,9 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
                 let Parrayrefs_1 = %box_num.`float`.my_alloc_region (prim_3)
                 in
                 (apply &my_alloc_region
-                   cmp (Parrayrefs_1, Parrayrefs) -> k4 * k1
+                   (cmp : _ -> imm tagged)
+                     (Parrayrefs_1, Parrayrefs)
+                     -> k4 * k1
                    where k4 (return_val0 : imm tagged) =
                      let prim_4 = %int_comp.lt (return_val0, 0) in
                      switch prim_4

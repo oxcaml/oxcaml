@@ -30,7 +30,8 @@ let code loopify(never) size(59) newer_version_of(f_2)
       let Pfield = %block_load.[`1`] ($Value_slot_b.camlValue_slot_b) in
       cont k2 (Pfield)
     where k2 (g : val) =
-      (apply &my_alloc_region inlined(always) g (3) -> k2 * k1
+      (apply &my_alloc_region inlined(always)
+         (g : _ -> [ 0 of imm tagged * imm tagged ]) (3) -> k2 * k1
          where k2 (`*match*` : [ 0 of imm tagged * imm tagged ]) =
            let x = %block_load.[`0`] (`*match*`) in
            ((let prim = %phys_eq (x, 0) in

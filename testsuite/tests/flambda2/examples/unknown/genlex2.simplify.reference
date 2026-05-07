@@ -28,7 +28,7 @@ apply ccall noalloc
           let try_ghost_region = %begin_try_ghost_region () in
           (cont k5 push(k3)
              where k5 =
-               (apply &my_alloc_region g (0) -> k5 * k3
+               (apply &my_alloc_region (g : _ -> val) (0) -> k5 * k3
                   where k5 (param : val) =
                     cont k4)
              where k4 =

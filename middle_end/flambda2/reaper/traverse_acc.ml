@@ -26,7 +26,7 @@ module Env = Traverse_env
 
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
-    result_arity : [`Unarized] Flambda_arity.t;
+    result_arity : Result_arity.t;
     code_metadata : Code_metadata.t;
     params : Variable.t list;
     my_closure : Variable.t;
@@ -55,6 +55,10 @@ type t =
   { mutable code_deps : code_dep Code_id.Map.t;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
+    mutable normal_return_fields : Field.Set.t;
+    mutable unknown_result_call_witnesses : Code_id_or_name.t list;
+    mutable unknown_result_apply_witnesses :
+      (Code_id_or_name.t * Code_id.t option) list;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
     mutable fixed_arity_conts : Continuation.Set.t;
@@ -70,6 +74,9 @@ let create () =
   { code_deps = Code_id.Map.empty;
     code = Code_id.Map.empty;
     apply_deps = [];
+    normal_return_fields = Field.Set.empty;
+    unknown_result_call_witnesses = [];
+    unknown_result_apply_witnesses = [];
     set_of_closures_deps = [];
     deps = Graph.create ();
     fixed_arity_conts = Continuation.Set.empty;
@@ -112,10 +119,21 @@ let add_alias_vars t ~to_ ~from =
 
 let add_use_dep t ~to_ ~from = Graph.add_use_dep t.deps ~to_ ~from
 
+let record_normal_return_field t field =
+  match Field.view field with
+  | Return_of_call (Normal _) ->
+    t.normal_return_fields <- Field.Set.add field t.normal_return_fields
+  | Return_of_call Exn
+  | Block _ | Value_slot _ | Function_slot _ | Call_witness _ | Is_int | Get_tag
+  | Boxed_number _ | Code_id_of_call_witness ->
+    ()
+
 let add_accessor_dep t ~to_ relation ~base =
+  record_normal_return_field t relation;
   Graph.add_accessor_dep t.deps ~to_ relation ~base
 
 let add_constructor_dep t ~base relation ~from =
+  record_normal_return_field t relation;
   Graph.add_constructor_dep t.deps ~base relation ~from
 
 let add_argument_dep t ~from relation ~base =
@@ -162,6 +180,20 @@ let cond_alias t ~(denv : Env.t) ~from ~to_ =
   | None -> add_alias t ~from ~to_
   | Some code_id ->
     add_propagate_dep t ~if_used:(Code_id_or_name.code_id code_id) ~from ~to_
+
+let add_unknown_result_call_witness t witness =
+  t.unknown_result_call_witnesses <- witness :: t.unknown_result_call_witnesses
+
+let record_unknown_result_apply t ~denv apply witness =
+  match Apply_expr.return apply with
+  | Never_returns _ -> ()
+  | Returns_to { cont; arity = _ } | Tail_forwards_to_caller cont -> (
+    match Env.find_cont denv cont with
+    | Normal _ -> ()
+    | Unknown_return ->
+      t.unknown_result_apply_witnesses
+        <- (witness, Env.current_code_id denv)
+           :: t.unknown_result_apply_witnesses)
 
 let fixed_arity_continuation t k =
   t.fixed_arity_conts <- Continuation.Set.add k t.fixed_arity_conts
@@ -263,6 +295,7 @@ let make_known_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   let witness =
     Code_id_or_name.var (Variable.create "known_arity_apply" K.rec_info)
   in
+  record_unknown_result_apply t ~denv apply witness;
   List.iteri
     (fun i v ->
       add_argument_dep t ~base:witness (Cofield.param i)
@@ -416,6 +449,7 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
       add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
       match rest with
       | [] ->
+        record_unknown_result_apply t ~denv apply witness;
         List.iteri
           (fun i v ->
             add_accessor_dep t ~base:witness
@@ -488,6 +522,27 @@ let add_set_of_closures t set_of_closures =
   t.all_sets_of_closures <- set_of_closures :: t.all_sets_of_closures
 
 let deps t ~all_constants =
+  List.iter
+    (fun witness ->
+      Field.Set.iter
+        (fun field ->
+          add_constructor_dep t ~base:witness field
+            ~from:(Code_id_or_name.name all_constants))
+        t.normal_return_fields)
+    t.unknown_result_call_witnesses;
+  List.iter
+    (fun (witness, containing_code_id) ->
+      let result =
+        Code_id_or_name.var (Variable.create "unknown_return_usage" K.rec_info)
+      in
+      Field.Set.iter
+        (fun field -> add_accessor_dep t ~base:witness field ~to_:result)
+        t.normal_return_fields;
+      match containing_code_id with
+      | None -> add_any_usage t result
+      | Some code_id ->
+        add_use_dep t ~to_:(Code_id_or_name.code_id code_id) ~from:result)
+    t.unknown_result_apply_witnesses;
   List.iter
     (fun { function_containing_apply_expr;
            apply_code_id;

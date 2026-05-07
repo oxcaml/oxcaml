@@ -58,7 +58,7 @@ and code rec loopify(never) size(75) newer_version_of(map_foo_4)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 | 0 of val * val ] =
-  apply &my_alloc_region seq (0) -> k2 * k1
+  apply &my_alloc_region (seq : _ -> [ 0 | 0 of val * val ]) (0) -> k2 * k1
     where k2 (`*match*` : [ 0 | 0 of val * val ]) =
       let prim = %is_int (`*match*`) in
       (switch prim
@@ -91,11 +91,13 @@ and code rec loopify(never) size(75) newer_version_of(map_foo_4)
                  in
                  cont k2 (`fn[tests12.ml:25,2--70]`))
               where k2 (g : val) =
-                (apply &my_alloc_region inlined(always) g (0) -> k2 * k1
+                (apply &my_alloc_region inlined(always)
+                   (g : _ -> [ 0 | 0 of val * val ]) (0) -> k2 * k1
                    where k2 (g_result : [ 0 | 0 of val * val ]) =
                      let Popaque = %opaque (g_result) in
                      ((let Pfield = %block_load.[`0`] (`*match*`) in
-                       apply &my_alloc_region f (Pfield) -> k2 * k1)
+                       apply &my_alloc_region
+                         (f : _ -> val) (Pfield) -> k2 * k1)
                         where k2 (apply_result : val) =
                           let Pmakeblock =
                             %block.[`0`].my_alloc_region (apply_result, g)

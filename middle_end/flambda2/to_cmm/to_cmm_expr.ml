@@ -261,7 +261,13 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let args_arity =
     Apply.args_arity apply |> Flambda_arity.unarize_per_parameter
   in
-  let return_arity = Apply.return_arity apply in
+  let return_arity =
+    match Apply.return_arity apply with
+    | Ok arity -> arity
+    | Unknown | Bottom ->
+      Misc.fatal_errorf "Cannot compile apply with result arity %a to Cmm:@ %a"
+        Result_arity.print (Apply.return_arity apply) Apply.print apply
+  in
   let args_ty =
     List.map
       (fun kinds -> List.map C.extended_machtype_of_kind kinds |> Array.concat)
@@ -556,8 +562,15 @@ let translate_apply env res apply =
     let exn_var = Backend_var.create_local "*exn*" in
     let result_var = Backend_var.create_local "*res*" in
     let result_type =
-      Apply.return_arity apply |> C.extended_machtype_of_return_arity
-      |> C.Extended_machtype.to_machtype
+      match Apply.return_arity apply with
+      | Ok arity ->
+        C.extended_machtype_of_return_arity arity
+        |> C.Extended_machtype.to_machtype
+      | Unknown | Bottom ->
+        Misc.fatal_errorf
+          "Cannot compile call with result arity %a and exception continuation \
+           extra arguments to Cmm:@ %a"
+          Result_arity.print (Apply.return_arity apply) Apply.print apply
     in
     let pop_handler_params =
       [Backend_var.With_provenance.create result_var, result_type]
@@ -1088,7 +1101,8 @@ and apply_expr env res apply =
     | Return { param_types } ->
       (* Case 1 *)
       let apply_result_arity =
-        Flambda_arity.unarized_components (Apply.return_arity apply)
+        Flambda_arity.unarized_components
+          (Result_arity.to_arity_with_placeholder (Apply.return_arity apply))
       in
       if List.compare_lengths apply_result_arity param_types = 0
       then

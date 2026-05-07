@@ -13,7 +13,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type cont_kind = Normal of Variable.t list
+type cont_kind =
+  | Normal of Variable.t list
+  | Unknown_return
 
 type should_preserve_direct_calls =
   | Yes

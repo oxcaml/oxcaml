@@ -36,6 +36,14 @@ let must_be_singleton_simple simples =
       (Format.pp_print_list ~pp_sep:Format.pp_print_space IR.print_simple)
       simples
 
+let concrete_result_arity_of_layout (layout : L.layout) ~machine_width :
+    Result_arity.t =
+  Result_arity.ok
+    (Flambda_arity.unarize_t
+       (Flambda_arity.create
+          [ Flambda_arity.Component_for_creation.from_lambda layout
+              ~machine_width ]))
+
 let print_compact_location ppf (loc : Location.t) =
   if String.equal loc.loc_start.pos_fname "//toplevel//"
   then ()
@@ -359,7 +367,15 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
       CC.close_apply acc ccenv { apply with continuation; region; ghost_region }
     | _ :: _ ->
       let wrapper_cont = Continuation.create () in
-      let return_kinds = Flambda_arity.unarized_components apply.return_arity in
+      let return_kinds =
+        match apply.return_arity with
+        | Ok arity -> Flambda_arity.unarized_components arity
+        | Unknown | Bottom ->
+          Misc.fatal_errorf
+            "Cannot compile a call with result arity %a whose return \
+             continuation takes extra arguments"
+            Result_arity.print apply.return_arity
+      in
       let return_value_components =
         List.mapi
           (fun i _ -> Ident.create_local (Printf.sprintf "return_val%d" i))
@@ -916,11 +932,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         alloc_region = current_alloc_region;
                         args_arity = Flambda_arity.create args_arity;
                         return_arity =
-                          Flambda_arity.unarize_t
-                            (Flambda_arity.create
-                               [ Flambda_arity.Component_for_creation.from_lambda
-                                   layout ~machine_width:(Acc.machine_width acc)
-                               ])
+                          concrete_result_arity_of_layout layout
+                            ~machine_width:(Acc.machine_width acc)
                       }
                     in
                     wrap_return_continuation acc env ccenv apply))
@@ -1277,10 +1290,8 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               alloc_region = Env.current_alloc_region env;
               args_arity = Flambda_arity.create args_arity;
               return_arity =
-                Flambda_arity.unarize_t
-                  (Flambda_arity.create
-                     [ Flambda_arity.Component_for_creation.from_lambda
-                         ap_return ~machine_width:(Acc.machine_width acc) ])
+                concrete_result_arity_of_layout ap_return
+                  ~machine_width:(Acc.machine_width acc)
             }
           in
           wrap_return_continuation acc env ccenv apply)
@@ -1504,9 +1515,10 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~is_always_immediate:false Flambda_kind.value
       in
       let return_unboxing =
-        match unboxing_kind return, attr.unbox_return with
-        | Some kind, Some mode -> Some (kind, mode)
-        | _, _ -> None
+        match attr.unbox_return with
+        | None -> None
+        | Some mode ->
+          Option.map (fun kind -> kind, mode) (unboxing_kind return)
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param
@@ -1537,12 +1549,24 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                param.attributes.unbox_param && Lambda.is_local_mode param.mode)
              params
       in
-      Unboxed_calling_convention
-        { params_unboxing;
-          return_unboxing;
-          unboxed_function_slot;
-          needs_region_wrapper
-        }
+      (* Closing the parameter region requires a concrete return arity. *)
+      if
+        needs_region_wrapper
+        &&
+        match return with
+        | Ptop | Pbottom -> true
+        | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+        | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ ->
+          false
+        | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+      then Normal_calling_convention
+      else
+        Unboxed_calling_convention
+          { params_unboxing;
+            return_unboxing;
+            unboxed_function_slot;
+            needs_region_wrapper
+          }
   in
   let body_cont =
     match calling_convention with
@@ -1627,10 +1651,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let unboxed_products = !unboxed_products in
   let removed_params = Ident.Map.keys unboxed_products in
   let return =
-    Flambda_arity.unarize_t
-      (Flambda_arity.create
-         [ Flambda_arity.Component_for_creation.from_lambda return
-             ~machine_width:(Env.machine_width env) ])
+    concrete_result_arity_of_layout return
+      ~machine_width:(Env.machine_width env)
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)

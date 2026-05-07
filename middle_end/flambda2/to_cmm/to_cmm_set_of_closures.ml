@@ -56,8 +56,14 @@ let get_func_decl_params_arity t code_id =
       (Flambda_arity.unarize_per_parameter (Code_metadata.params_arity info))
   in
   let result_machtype =
-    C.extended_machtype_of_return_arity (Code_metadata.result_arity info)
-    |> C.Extended_machtype.change_tagged_int_to_val
+    match Code_metadata.result_arity info with
+    | Ok arity ->
+      C.extended_machtype_of_return_arity arity
+      |> C.Extended_machtype.change_tagged_int_to_val
+    | Unknown | Bottom ->
+      Misc.fatal_errorf "Cannot compile %a, whose result arity is %a, to Cmm"
+        Code_id.print code_id Result_arity.print
+        (Code_metadata.result_arity info)
   in
   let kind : Lambda.function_kind =
     if Code_metadata.is_tupled info
@@ -489,7 +495,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
      trap action is attached to one of its calls *)
   let return_continuation_arity =
     List.map To_cmm_shared.machtype_of_kind
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarized_components
+         (Result_arity.to_arity_with_placeholder result_arity))
   in
   let env =
     Env.enter_function_body env ~return_continuation ~return_continuation_arity
@@ -570,9 +577,14 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
   in
   let fun_ret_type =
-    Env.get_code_metadata env code_id
-    |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
-    |> C.Extended_machtype.to_machtype
+    match Code_metadata.result_arity (Env.get_code_metadata env code_id) with
+    | Ok arity ->
+      C.extended_machtype_of_return_arity arity
+      |> C.Extended_machtype.to_machtype
+    | Unknown | Bottom ->
+      Misc.fatal_errorf "Cannot compile %a, whose result arity is %a, to Cmm"
+        Code_id.print code_id Result_arity.print
+        (Code_metadata.result_arity (Env.get_code_metadata env code_id))
   in
   ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
     res )

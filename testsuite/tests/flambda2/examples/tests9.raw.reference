@@ -137,7 +137,8 @@
             let h2 = %block_load.[`0`] (l2) in
             let t1 = %block_load.[`1`] (l1) in
             let h1 = %block_load.[`0`] (l1) in
-            (apply &my_alloc_region cmp (h1, h2) -> k5 * k2
+            (apply &my_alloc_region
+               (cmp : _ -> imm tagged) (h1, h2) -> k5 * k2
                where k5 (c : imm tagged) =
                  ((let prim = %phys_eq (c, 0) in
                    let eq = %tag_imm (prim) in
@@ -241,7 +242,8 @@
             let h2 = %block_load.[`0`] (l2) in
             let t1 = %block_load.[`1`] (l1) in
             let h1 = %block_load.[`0`] (l1) in
-            (apply &my_alloc_region cmp (h1, h2) -> k5 * k2
+            (apply &my_alloc_region
+               (cmp : _ -> imm tagged) (h1, h2) -> k5 * k2
                where k5 (c : imm tagged) =
                  ((let prim = %phys_eq (c, 0) in
                    let eq = %tag_imm (prim) in
@@ -355,7 +357,8 @@
                where k5 =
                  let x2 = %block_load.[`0`] (`*match*`) in
                  let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k5 * k2
+                 (apply &my_alloc_region
+                    (cmp : _ -> imm tagged) (x1, x2) -> k5 * k2
                     where k5 (c : imm tagged) =
                       ((let prim = %phys_eq (c, 0) in
                         let eq = %tag_imm (prim) in
@@ -451,7 +454,8 @@
                            let x3 = %block_load.[`0`] (`*match*_1`) in
                            let x2 = %block_load.[`0`] (`*match*`) in
                            let x1 = %block_load.[`0`] (l) in
-                           (apply &my_alloc_region cmp (x1, x2) -> k4 * k2
+                           (apply &my_alloc_region
+                              (cmp : _ -> imm tagged) (x1, x2) -> k4 * k2
                               where k4 (c : imm tagged) =
                                 ((let prim = %phys_eq (c, 0) in
                                   let eq = %tag_imm (prim) in
@@ -478,7 +482,9 @@
                                            cont k6)
                                         where k6 =
                                           (apply &my_alloc_region
-                                             cmp (x1, x3) -> k6 * k2
+                                             (cmp : _ -> imm tagged)
+                                               (x1, x3)
+                                               -> k6 * k2
                                              where k6 (c_1 : imm tagged) =
                                                ((let prim = %phys_eq (c_1, 0)
                                                  in
@@ -514,7 +520,10 @@
                                                        where k8 =
                                                          (apply
                                                                  &my_alloc_region
-                                                            cmp
+                                                            (cmp
+                                                             : _ ->
+                                                               imm tagged
+                                                             )
                                                               (x2, x3)
                                                               -> k8 * k2
                                                             where k8
@@ -649,7 +658,9 @@
                                                     cont k1 (Pmakeblock_1)))
                                         where k5 =
                                           (apply &my_alloc_region
-                                             cmp (x2, x3) -> k5 * k2
+                                             (cmp : _ -> imm tagged)
+                                               (x2, x3)
+                                               -> k5 * k2
                                              where k5 (c_1 : imm tagged) =
                                                ((let prim = %phys_eq (c_1, 0)
                                                  in
@@ -685,7 +696,10 @@
                                                        where k7 =
                                                          (apply
                                                                  &my_alloc_region
-                                                            cmp
+                                                            (cmp
+                                                             : _ ->
+                                                               imm tagged
+                                                             )
                                                               (x1, x3)
                                                               -> k7 * k2
                                                             where k7
@@ -820,7 +834,9 @@
                                                     cont k1 (Pmakeblock_1))))
                                    where k4 =
                                      (apply &my_alloc_region
-                                        cmp (x2, x3) -> k4 * k2
+                                        (cmp : _ -> imm tagged)
+                                          (x2, x3)
+                                          -> k4 * k2
                                         where k4 (c_1 : imm tagged) =
                                           ((let prim = %phys_eq (c_1, 0) in
                                             let eq = %tag_imm (prim) in
@@ -952,7 +968,8 @@
                where k5 =
                  let x2 = %block_load.[`0`] (`*match*`) in
                  let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k5 * k2
+                 (apply &my_alloc_region
+                    (cmp : _ -> imm tagged) (x1, x2) -> k5 * k2
                     where k5 (c : imm tagged) =
                       ((let prim = %phys_eq (c, 0) in
                         let eq = %tag_imm (prim) in
@@ -1048,7 +1065,8 @@
                            let x3 = %block_load.[`0`] (`*match*_1`) in
                            let x2 = %block_load.[`0`] (`*match*`) in
                            let x1 = %block_load.[`0`] (l) in
-                           (apply &my_alloc_region cmp (x1, x2) -> k4 * k2
+                           (apply &my_alloc_region
+                              (cmp : _ -> imm tagged) (x1, x2) -> k4 * k2
                               where k4 (c : imm tagged) =
                                 ((let prim = %phys_eq (c, 0) in
                                   let eq = %tag_imm (prim) in
@@ -1076,7 +1094,9 @@
                                            cont k6)
                                         where k6 =
                                           (apply &my_alloc_region
-                                             cmp (x1, x3) -> k6 * k2
+                                             (cmp : _ -> imm tagged)
+                                               (x1, x3)
+                                               -> k6 * k2
                                              where k6 (c_1 : imm tagged) =
                                                ((let prim = %phys_eq (c_1, 0)
                                                  in
@@ -1112,7 +1132,10 @@
                                                        where k8 =
                                                          (apply
                                                                  &my_alloc_region
-                                                            cmp
+                                                            (cmp
+                                                             : _ ->
+                                                               imm tagged
+                                                             )
                                                               (x2, x3)
                                                               -> k8 * k2
                                                             where k8
@@ -1247,7 +1270,9 @@
                                                     cont k1 (Pmakeblock_1)))
                                         where k5 =
                                           (apply &my_alloc_region
-                                             cmp (x2, x3) -> k5 * k2
+                                             (cmp : _ -> imm tagged)
+                                               (x2, x3)
+                                               -> k5 * k2
                                              where k5 (c_1 : imm tagged) =
                                                ((let prim = %phys_eq (c_1, 0)
                                                  in
@@ -1283,7 +1308,10 @@
                                                        where k7 =
                                                          (apply
                                                                  &my_alloc_region
-                                                            cmp
+                                                            (cmp
+                                                             : _ ->
+                                                               imm tagged
+                                                             )
                                                               (x1, x3)
                                                               -> k7 * k2
                                                             where k7
@@ -1418,7 +1446,9 @@
                                                     cont k1 (Pmakeblock_1))))
                                    where k4 =
                                      (apply &my_alloc_region
-                                        cmp (x2, x3) -> k4 * k2
+                                        (cmp : _ -> imm tagged)
+                                          (x2, x3)
+                                          -> k4 * k2
                                         where k4 (c_1 : imm tagged) =
                                           ((let prim = %phys_eq (c_1, 0) in
                                             let eq = %tag_imm (prim) in
@@ -1606,7 +1636,8 @@
                where k4 =
                  let x2 = %block_load.[`0`] (`*match*`) in
                  let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k4 * k2
+                 (apply &my_alloc_region
+                    (cmp : _ -> imm tagged) (x1, x2) -> k4 * k2
                     where k4 (c : imm tagged) =
                       ((let prim = %int_comp.lt (c, 0) in
                         let int_lessthan = %tag_imm (prim) in

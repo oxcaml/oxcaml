@@ -74,7 +74,7 @@ type calling_convention_change =
   | Changing_calling_convention of
       { my_closure_decision : my_closure_param_decision;
         params_decisions : param_decision list;
-        return_decisions : param_decision list
+        return_decisions : param_decision list Or_unknown_or_bottom.t
       }
 
 type code_changes

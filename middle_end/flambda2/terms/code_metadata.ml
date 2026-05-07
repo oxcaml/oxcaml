@@ -23,7 +23,7 @@ type t =
     (* Note: first_complex_local_param cannot be computed from param_modes,
        because it might be 0 if the closure itself has to be allocated locally,
        for instance as a result of a partial application. *)
-    result_arity : [`Unarized] Flambda_arity.t;
+    result_arity : Result_arity.t;
     result_types : Result_types.t Or_unknown_or_bottom.t;
     result_mode : Lambda.return_mode;
     stub : bool;
@@ -143,7 +143,7 @@ type 'a create_type =
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:Result_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
   result_mode:Lambda.return_mode ->
   stub:bool ->
@@ -371,12 +371,12 @@ let [@ocamlformat "disable"] print ppf
     else Flambda_colours.none)
     Flambda_colours.pop
     First_complex_local_param.print first_complex_local_param
-    (if Flambda_arity.is_one_param_of_kind_value result_arity
+    (if Result_arity.is_singleton_value result_arity
     then Flambda_colours.elide
     else Flambda_colours.none)
     Flambda_colours.pop
-    Flambda_arity.print result_arity
-    (if Flambda_arity.is_one_param_of_kind_value result_arity
+    Result_arity.print result_arity
+    (if Result_arity.is_singleton_value result_arity
     then Flambda_colours.elide
     else Flambda_colours.none)
     Flambda_colours.pop
@@ -611,7 +611,7 @@ let approx_equal
   && List.equal Alloc_mode.For_types.equal param_modes1 param_modes2
   && First_complex_local_param.equal first_complex_local_param1
        first_complex_local_param2
-  && Flambda_arity.equal_ignoring_subkinds result_arity1 result_arity2
+  && Result_arity.equal_ignoring_subkinds result_arity1 result_arity2
   && Lambda.eq_return_mode result_mode1 result_mode2
   && Bool.equal stub1 stub2
   && Inline_attribute.equal inline1 inline2

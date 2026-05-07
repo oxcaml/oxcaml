@@ -84,7 +84,7 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     ~bind_params ~bind_depth ~apply_renaming:Expr.apply_renaming
 
 let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
-    ~apply_return_continuation ~result_arity ~make_inlined_body =
+    ~apply_return ~make_inlined_body =
   let apply_cont_create () ~trap_action cont ~args ~dbg =
     Apply_cont.create ~trap_action cont ~args ~dbg |> Expr.create_apply_cont
   in
@@ -98,8 +98,8 @@ let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
       ~free_names_of_body:Unknown
   in
   Inlining_helpers.wrap_inlined_body_for_exn_extra_args () ~extra_args
-    ~apply_exn_continuation ~apply_return_continuation ~result_arity
-    ~make_inlined_body ~apply_cont_create ~let_cont_create
+    ~apply_exn_continuation ~apply_return ~make_inlined_body ~apply_cont_create
+    ~let_cont_create
 
 let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   let callee = Apply.callee apply in
@@ -175,7 +175,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
               ~apply_return_continuation
           | extra_args ->
             wrap_inlined_body_for_exn_extra_args ~extra_args
-              ~apply_exn_continuation ~apply_return_continuation
-              ~result_arity:(Code.result_arity code) ~make_inlined_body
+              ~apply_exn_continuation ~apply_return:(Apply.return apply)
+              ~make_inlined_body
         in
         DA.with_denv dacc denv, expr)

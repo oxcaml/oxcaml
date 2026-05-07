@@ -52,7 +52,8 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
         let Pfield_1 = %block_load.[`0`] (Pfield) in
         let Popaque = %opaque (0) in
         let Pobj_magic = %opaque (Popaque) in
-        apply &my_alloc_region Pobj_magic (Pfield_1) -> k3 * k1
+        apply &my_alloc_region
+          (Pobj_magic : _ -> [ 0 |1 ]) (Pfield_1) -> k3 * k1
           where k3 (param : [ 0 |1 ]) =
             let unboxed_field = %untag_imm (param) in
             cont k2 (unboxed_field))

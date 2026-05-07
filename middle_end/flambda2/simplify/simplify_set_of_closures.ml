@@ -223,9 +223,18 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   in
   let my_closure_duid = Flambda_debug_uid.none in
   let my_depth_duid = Flambda_debug_uid.none in
+  let return_arity =
+    match Code.result_arity code with
+    | Ok arity -> arity
+    | Unknown | Bottom ->
+      Misc.fatal_errorf
+        "Cannot simplify the body of %a, whose result arity is %a:@ %a"
+        Code_id.print (Code.code_id code) Result_arity.print
+        (Code.result_arity code) Code.print code
+  in
   match
     C.simplify_function_body context dacc body ~return_continuation
-      ~exn_continuation ~return_arity:(Code.result_arity code)
+      ~exn_continuation ~return_arity
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
@@ -397,6 +406,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~from_metadata:(Code.inlining_arguments code)
   in
   let result_arity = Code.result_arity code in
+  let result_arity_for_body =
+    Result_arity.to_arity_with_placeholder result_arity
+  in
   let return_cont_params =
     List.mapi
       (fun i kind_with_subkind ->
@@ -407,7 +419,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarized_components result_arity_for_body)
     |> Bound_parameters.create
   in
   let { params;

@@ -34,7 +34,8 @@ apply direct(init_mod_4 &toplevel)
              where k2 =
                ((let Pfield = %block_load.[`0`] (t) in
                  let Pfield_1 = %block_load.[`0`] (X) in
-                 apply &my_alloc_region Pfield_1 (Pfield) -> k2 * k1)
+                 apply &my_alloc_region
+                   (Pfield_1 : _ -> val) (Pfield) -> k2 * k1)
                   where k2 (apply_result : val) =
                     let Pmakeblock =
                       %block.[`0`].my_alloc_region (apply_result)
@@ -73,7 +74,7 @@ apply direct(init_mod_4 &toplevel)
              let M_1 = %project_value_slot.[foo_1].[M] ($camlFunctors__foo_8)
              in
              let Pfield = %block_load.[`0`] (M_1) in
-             apply &my_alloc_region Pfield (42, t) -> k1 * k2
+             apply &my_alloc_region (Pfield : _ -> val) (42, t) -> k1 * k2
              with { M = M }
            in
            let $camlFunctors__Pmakeblock_9 = Block 0 ($camlFunctors__foo_8)

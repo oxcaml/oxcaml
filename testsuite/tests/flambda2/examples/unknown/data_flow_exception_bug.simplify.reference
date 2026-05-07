@@ -29,7 +29,8 @@ let code loopify(never) size(20) newer_version_of(stuff_1)
      where k4 =
        let r_unboxed0 = 0 in
        let Popaque = %opaque ($camlData_flow_exception_bug__do_stuff_3) in
-       (apply &my_alloc_region Popaque (env) -> k4 * k3
+       (apply &my_alloc_region
+          (Popaque : _ -> [ 0 | 0 of val ]) (env) -> k4 * k3
           where k4 (return_val0 : [ 0 | 0 of val ]) =
             cont k2 pop(k3) (return_val0))
      where k3 exn (`exn` : val) =

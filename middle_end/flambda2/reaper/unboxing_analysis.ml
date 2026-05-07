@@ -546,7 +546,7 @@ type calling_convention_change =
   | Changing_calling_convention of
       { my_closure_decision : my_closure_param_decision;
         params_decisions : param_decision list;
-        return_decisions : param_decision list
+        return_decisions : param_decision list Or_unknown_or_bottom.t
       }
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
@@ -961,23 +961,26 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                 Code_metadata.with_is_my_closure_used false code_metadata )
           in
           let return_decisions =
-            List.map2
-              (fun v kind ->
-                match get_unboxed_fields (Code_id_or_name.var v) with
-                | None ->
-                  let kind = rewrite_kind_with_subkind (Name.var v) kind in
-                  (* CR-someday ncourant: make it possible to delete function
-                     returns. Why is this not done now? The comment previously
-                     said that we "need the mapping between code ids of
-                     functions and their return continuations", but I don't see
-                     why unboxing would work and not deletion. *)
-                  if true || is_var_used v then Keep (v, kind) else Delete
-                | Some fields -> Unbox fields)
-              code_dep.return
-              (Flambda_arity.unarized_components code_dep.result_arity)
+            Or_unknown_or_bottom.map code_dep.result_arity
+              ~f:(fun result_arity ->
+                List.map2
+                  (fun v kind ->
+                    match get_unboxed_fields (Code_id_or_name.var v) with
+                    | None ->
+                      let kind = rewrite_kind_with_subkind (Name.var v) kind in
+                      (* CR-someday ncourant: make it possible to delete
+                         function returns. Why is this not done now? The comment
+                         previously said that we "need the mapping between code
+                         ids of functions and their return continuations", but I
+                         don't see why unboxing would work and not deletion. *)
+                      if true || is_var_used v then Keep (v, kind) else Delete
+                    | Some fields -> Unbox fields)
+                  code_dep.return
+                  (Flambda_arity.unarized_components result_arity))
           in
           let result_arity =
-            Flambda_arity.unarize_t (arity_of_decisions return_decisions)
+            Or_unknown_or_bottom.map return_decisions ~f:(fun decisions ->
+                Flambda_arity.unarize_t (arity_of_decisions decisions))
           in
           let code_metadata =
             Code_metadata.with_is_tupled false
@@ -1045,19 +1048,25 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                     { my_closure_decision = _;
                       params_decisions;
                       return_decisions
-                    } ->
+                    } -> (
                   ( List.map2
                       (fun p decision ->
                         match decision with
                         | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
                         | Delete -> p, Points_to_analysis.Delete)
                       code_dep.params params_decisions,
-                    List.map2
-                      (fun p decision ->
-                        match decision with
-                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                        | Delete -> p, Points_to_analysis.Delete)
-                      code_dep.return return_decisions )
+                    match return_decisions with
+                    | Unknown | Bottom ->
+                      List.map
+                        (fun p -> p, Points_to_analysis.Keep)
+                        code_dep.return
+                    | Ok return_decisions ->
+                      List.map2
+                        (fun p decision ->
+                          match decision with
+                          | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                          | Delete -> p, Points_to_analysis.Delete)
+                        code_dep.return return_decisions ))
               in
               rewrite_result_types ~my_closure:code_dep.my_closure
                 ~params:params_vars_and_keep ~results:results_vars_and_keep

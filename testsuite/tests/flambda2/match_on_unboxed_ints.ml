@@ -146,9 +146,11 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_6)
               | 0 -> k4
               | 1 -> k (0)
               where k4 =
-                apply &my_alloc_region opaque_fun2_1 (0) -> k * k1)
+                apply &my_alloc_region
+                  (opaque_fun2_1 : _ -> imm tagged) (0) -> k * k1)
          where k3 =
-           apply &my_alloc_region opaque_fun1_1 (0) -> k * k1)
+           apply &my_alloc_region
+             (opaque_fun1_1 : _ -> imm tagged) (0) -> k * k1)
     where k2 =
       let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
       (switch prim_1
@@ -160,9 +162,11 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_6)
               | 0 -> k3
               | 1 -> k (0)
               where k3 =
-                apply &my_alloc_region opaque_fun4_1 (0) -> k * k1)
+                apply &my_alloc_region
+                  (opaque_fun4_1 : _ -> imm tagged) (0) -> k * k1)
          where k2 =
-           apply &my_alloc_region opaque_fun3_1 (0) -> k * k1)
+           apply &my_alloc_region
+             (opaque_fun3_1 : _ -> imm tagged) (0) -> k * k1)
   with {
     opaque_fun1 = opaque_fun1;
     opaque_fun2 = opaque_fun2;
@@ -223,13 +227,17 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
           | 2 -> k4
           | 3 -> k5)
          where k5 =
-           apply &my_alloc_region opaque_fun4_1 (0) -> k * k1
+           apply &my_alloc_region
+             (opaque_fun4_1 : _ -> imm tagged) (0) -> k * k1
          where k4 =
-           apply &my_alloc_region opaque_fun3_1 (0) -> k * k1
+           apply &my_alloc_region
+             (opaque_fun3_1 : _ -> imm tagged) (0) -> k * k1
          where k3 =
-           apply &my_alloc_region opaque_fun2_1 (0) -> k * k1
+           apply &my_alloc_region
+             (opaque_fun2_1 : _ -> imm tagged) (0) -> k * k1
          where k2 =
-           apply &my_alloc_region opaque_fun1_1 (0) -> k * k1)
+           apply &my_alloc_region
+             (opaque_fun1_1 : _ -> imm tagged) (0) -> k * k1)
   with {
     opaque_fun1 = opaque_fun1;
     opaque_fun2 = opaque_fun2;

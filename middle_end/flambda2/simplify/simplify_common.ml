@@ -154,22 +154,22 @@ let split_direct_over_application apply ~callee's_code_id
       | Maybe_alloc_stack _ -> None, apply_alloc_mode)
   in
   let perform_over_application =
-    let continuation =
+    let return : Apply.Return.t =
       (* If there is no need for a new region, then the second (over)
          application jumps directly to the return continuation of the original
          [Apply]. Otherwise it will need to go through [cont], which we define
          below, so that the [End_region] marker for the new region can be
          inserted. *)
       match needs_region with
-      | None -> Apply.continuation apply
-      | Some (_, _, cont) -> Apply.Result_continuation.Return cont
+      | None -> Apply.return apply
+      | Some (_, _, cont) ->
+        Apply.Return.create (Return cont) (Apply.return_arity apply)
     in
     Apply.create
       ~callee:(Some (Simple.var func_var))
-      ~continuation
+      ~return
       (Apply.exn_continuation apply)
       ~args:remaining_args ~args_arity:remaining_arity
-      ~return_arity:(Apply.return_arity apply)
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
       ~return_mode:outer_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)
@@ -191,6 +191,21 @@ let split_direct_over_application apply ~callee's_code_id
          any more local allocations here. (Missing the [End_region]s on the
          exceptional return path is fine, c.f. the usual compilation of [try ...
          with] -- see [Closure_conversion].) *)
+      let result_arity =
+        (* Giving the over-application's result its own region means
+           materializing that result. A bottom result is never materialized, so
+           the placeholder arity suffices; an unknown result cannot be
+           materialized at all. *)
+        match Apply.return_arity apply with
+        | Ok arity -> arity
+        | Bottom -> Result_arity.any_value_placeholder
+        | Unknown ->
+          Misc.fatal_errorf
+            "Over-application of a function whose result mode is \
+             [Maybe_alloc_stack] requires materializing the over-application's \
+             result, which has no concrete arity:@ %a"
+            Apply.print apply
+      in
       let over_application_results =
         List.mapi
           (fun i kind ->
@@ -199,20 +214,21 @@ let split_direct_over_application apply ~callee's_code_id
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components (Apply.return_arity apply))
+          (Flambda_arity.unarized_components result_arity)
       in
       let call_return_continuation, call_return_continuation_free_names =
-        match Apply.continuation apply with
-        | Return return_cont ->
+        match Apply.return apply with
+        | Returns_to { cont = return_cont; arity = _ } ->
           let apply_cont =
             Apply_cont.create return_cont
               ~args:(List.map BP.simple over_application_results)
               ~dbg:(Apply.dbg apply)
           in
           Expr.create_apply_cont apply_cont, Apply_cont.free_names apply_cont
-        | Never_returns ->
-          (* The whole overapplication never returns, so this point is
-             unreachable. *)
+        | Tail_forwards_to_caller _ | Never_returns _ ->
+          (* An unknown-result over-application was rejected when computing
+             [result_arity] above, and a bottom-result over-application never
+             returns, so this point is unreachable. *)
           Expr.create_invalid (Over_application_never_returns apply), NO.empty
       in
       let handler_expr =
@@ -259,7 +275,12 @@ let split_direct_over_application apply ~callee's_code_id
   in
   let after_full_application = Continuation.create () in
   let full_apply_result_arity =
-    Code_metadata.result_arity callee's_code_metadata
+    (* The result of the full application is immediately applied to the
+       remaining arguments, so for this instantiation it must be a function,
+       i.e. a single boxed value, even when the callee's declared result arity
+       is unknown or bottom. *)
+    Result_arity.to_arity_with_placeholder
+      (Code_metadata.result_arity callee's_code_metadata)
   in
   let after_full_application_handler =
     if not (Flambda_arity.is_one_param_of_kind_value full_apply_result_arity)
@@ -289,10 +310,11 @@ let split_direct_over_application apply ~callee's_code_id
   in
   let full_apply =
     Apply.create ~callee:(Apply.callee apply)
-      ~continuation:(Return after_full_application)
+      ~return:
+        (Apply.Return.create (Return after_full_application)
+           (Code_metadata.result_arity callee's_code_metadata))
       (Apply.exn_continuation apply)
       ~args:first_args ~args_arity:callee's_params_arity
-      ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
       ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)

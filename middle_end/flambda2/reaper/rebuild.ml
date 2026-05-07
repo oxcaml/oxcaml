@@ -63,6 +63,7 @@ type env =
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
+    unknown_return_continuation : Continuation.t option;
     types_rewrite_context : Types_rewriter.rewrite_context
   }
 
@@ -745,6 +746,11 @@ let rebuild_named_default_case env (named : Named.t) =
       Static_const_group.print sc
   | Rec_info r -> Named.create_rec_info r, Code_size.zero
 
+let is_unknown_return_continuation env cont =
+  match env.unknown_return_continuation with
+  | None -> false
+  | Some return_continuation -> Continuation.equal cont return_continuation
+
 let rewrite_apply_cont_expr env ac =
   let cont = Apply_cont_expr.continuation ac in
   let args = Apply_cont_expr.args ac in
@@ -759,42 +765,60 @@ let rewrite_apply_cont_expr env ac =
   then None
   else
     let args =
-      let args_to_keep = Continuation.Map.find cont env.cont_params_to_keep in
-      try get_args env args_to_keep args
-      with Misc.Fatal_error ->
-        let bt = Printexc.get_raw_backtrace () in
-        Format.eprintf
-          "\n\
-           %tContext is:%t rewriting apply_cont for continuation %a with@ \
-           original args @[(%a)@],@ params to keep @[(%a)@]\n"
-          Flambda_colours.error Flambda_colours.pop Continuation.print cont
-          (Format.pp_print_list ~pp_sep:Format.pp_print_space Simple.print)
-          args
-          (Format.pp_print_list ~pp_sep:Format.pp_print_space
-             Unboxing_analysis.print_param_decision)
-          args_to_keep;
-        Printexc.raise_with_backtrace Misc.Fatal_error bt
+      if is_unknown_return_continuation env cont
+      then List.map (rewrite_simple env) args
+      else
+        let args_to_keep = Continuation.Map.find cont env.cont_params_to_keep in
+        try get_args env args_to_keep args
+        with Misc.Fatal_error ->
+          let bt = Printexc.get_raw_backtrace () in
+          Format.eprintf
+            "\n\
+             %tContext is:%t rewriting apply_cont for continuation %a with@ \
+             original args @[(%a)@],@ params to keep @[(%a)@]\n"
+            Flambda_colours.error Flambda_colours.pop Continuation.print cont
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space Simple.print)
+            args
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               Unboxing_analysis.print_param_decision)
+            args_to_keep;
+          Printexc.raise_with_backtrace Misc.Fatal_error bt
     in
     Some (Apply_cont_expr.with_continuation_and_args ac cont ~args)
 
 let reaper_produce_invalid_when_never_returns =
   Sys.getenv_opt "REAPER_INVALIDS" <> None
 
+let make_apply_without_wrapper make_apply ~(return : Apply_expr.Return.t) =
+  let apply = make_apply ~return in
+  RE.from_expr ~expr:(Expr.create_apply apply)
+    ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
+
 let make_apply_wrapper env
-    (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
-    apply_continuation return_decisions =
-  match (apply_continuation : Apply_expr.Result_continuation.t) with
-  | Never_returns ->
-    let apply = make_apply ~continuation:Never_returns in
-    RE.from_expr ~expr:(Expr.create_apply apply)
-      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
-  | Return return_cont -> (
+    (make_apply : return:Apply_expr.Return.t -> Apply_expr.t) ~arity
+    (apply_return : Apply_expr.Return.t) return_decisions =
+  match apply_return with
+  | Never_returns { arity = original_arity } ->
+    let arity =
+      match original_arity with
+      | Ok _ -> Result_arity.ok arity
+      | Unknown | Bottom -> original_arity
+    in
+    make_apply_without_wrapper make_apply ~return:(Never_returns { arity })
+  | Tail_forwards_to_caller _ ->
+    make_apply_without_wrapper make_apply ~return:apply_return
+  | Returns_to { cont; arity = _ } when is_unknown_return_continuation env cont
+    ->
+    make_apply_without_wrapper make_apply ~return:(Returns_to { cont; arity })
+  | Returns_to { cont = return_cont; arity = _ } -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
     let return_cont_wrapper = Continuation.rename return_cont in
-    let apply = make_apply ~continuation:(Return return_cont_wrapper) in
+    let apply =
+      make_apply ~return:(Returns_to { cont = return_cont_wrapper; arity })
+    in
     let rev_args_or_invalid =
       List.fold_left2
         (fun (rev_args_or_invalid : _ Or_invalid.t) apply_decision func_decision
@@ -888,7 +912,9 @@ let make_apply_wrapper env
            can only happen because the uses of [g] do not match those of [f],
            which would be the case if a loop of tail calls between them
            existed. *)
-        let apply = make_apply ~continuation:(Return return_cont) in
+        let apply =
+          make_apply ~return:(Returns_to { cont = return_cont; arity })
+        in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
           ~code_size:(Code_size.apply apply)
@@ -950,10 +976,30 @@ let make_apply_wrapper env
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
-        let apply = make_apply ~continuation:Never_returns in
+        let apply =
+          make_apply ~return:(Never_returns { arity = Result_arity.ok arity })
+        in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
           ~code_size:(Code_size.apply apply))
+
+let make_apply_preserving_return_arity env make_apply
+    (return : Apply_expr.Return.t) =
+  match return with
+  | Tail_forwards_to_caller _ | Never_returns _ ->
+    make_apply_without_wrapper make_apply ~return
+  | Returns_to { cont; arity } ->
+    if is_unknown_return_continuation env cont
+    then make_apply_without_wrapper make_apply ~return
+    else
+      let return_decisions =
+        List.map
+          (fun kind ->
+            Unboxing_analysis.Keep
+              (Variable.create "function_return" (KS.kind kind), kind))
+          (Flambda_arity.unarized_components arity)
+      in
+      make_apply_wrapper env make_apply ~arity return return_decisions
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -1196,7 +1242,6 @@ let rebuild_apply env apply =
             List.map keep_or_poison args_and_keep
         in
         let args_arity = Apply.args_arity apply in
-        let return_arity = Apply.return_arity apply in
         let make_apply =
           Apply.create
           (* Note here that callee is rewritten with [rewrite_simple_opt], which
@@ -1204,24 +1249,16 @@ let rebuild_apply env apply =
              value would then be further used in a later simplify pass to refine
              the call kind and produce an invalid. *)
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
-            exn_continuation ~args ~args_arity ~return_arity ~call_kind
+            exn_continuation ~args ~args_arity ~call_kind
             ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
             ~relative_history:(Apply.relative_history apply)
         in
-        let func_decisions =
-          List.map
-            (fun kind ->
-              Unboxing_analysis.Keep
-                (Variable.create "function_return" (KS.kind kind), kind))
-            (Flambda_arity.unarized_components return_arity)
-        in
-        make_apply_wrapper env make_apply (Apply.continuation apply)
-          func_decisions)
+        make_apply_preserving_return_arity env make_apply (Apply.return apply))
     | Changing_calling_convention
-        { my_closure_decision; params_decisions; return_decisions } ->
+        { my_closure_decision; params_decisions; return_decisions } -> (
       (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
          code_id Apply.print apply; *)
       let original_callee = Apply.callee apply in
@@ -1325,21 +1362,25 @@ let rebuild_apply env apply =
         in
         Flambda_arity.create (List.map components_for args)
       in
-      let return_arity =
-        Flambda_arity.unarize_t
-          (Unboxing_analysis.arity_of_decisions return_decisions)
-      in
       let args = List.map fst (List.flatten args) in
-      let make_apply ~continuation =
-        Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
-          ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
-          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+      let make_apply ~return =
+        Apply.create ~callee ~return exn_continuation ~args ~args_arity
+          ~call_kind ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
+          ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
           ~relative_history:(Apply.relative_history apply)
       in
-      make_apply_wrapper env make_apply (Apply.continuation apply)
-        return_decisions
+      match return_decisions with
+      | Unknown | Bottom ->
+        make_apply_preserving_return_arity env make_apply (Apply.return apply)
+      | Ok return_decisions ->
+        let return_arity =
+          Flambda_arity.unarize_t
+            (Unboxing_analysis.arity_of_decisions return_decisions)
+        in
+        make_apply_wrapper env make_apply ~arity:return_arity
+          (Apply.return apply) return_decisions)
 
 let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
     ~hole =
@@ -2114,6 +2155,12 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       } =
     params_and_body
   in
+  let unknown_return_continuation =
+    match Code_metadata.result_arity code_metadata with
+    | Unknown -> Some return_continuation
+    | Ok _ | Bottom -> None
+  in
+  let env = { env with unknown_return_continuation } in
   let code_id = Code_metadata.code_id code_metadata in
   let updating_calling_convention =
     Unboxing_analysis.get_calling_convention_change env.code_changes code_id
@@ -2360,6 +2407,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;
+      unknown_return_continuation = None;
       types_rewrite_context
     }
   in

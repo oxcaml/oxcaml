@@ -4,7 +4,8 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    let f = %project_value_slot.[aux].[f] (my_closure) in
    let next = %project_value_slot.[aux].[next] (my_closure) in
-   apply &my_alloc_region inlined(hint) next (s) -> k3 * k2
+   apply &my_alloc_region inlined(hint)
+     (next : _ -> [ 0 | 0 of val * val ]) (s) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
          let Pisint = %tag_imm (prim) in
@@ -51,7 +52,8 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
      %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[next_1]
        (my_closure)
    in
-   apply &my_alloc_region inlined(hint) next (s) -> k3 * k2
+   apply &my_alloc_region inlined(hint)
+     (next : _ -> [ 0 | 0 of val * val ]) (s) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
          let Pisint = %tag_imm (prim) in
@@ -64,7 +66,7 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
           where k3 =
             let Pfield = %block_load.[`1`] (`*match*`) in
             ((let Pfield_1 = %block_load.[`0`] (`*match*`) in
-              apply &my_alloc_region f (Pfield_1) -> k3 * k2)
+              apply &my_alloc_region (f : _ -> val) (Pfield_1) -> k3 * k2)
                where k3 (apply_result : val) =
                  let Pmakeblock =
                    %block.[`0`].my_alloc_region (apply_result, Pfield)
@@ -100,7 +102,8 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    let f = %project_value_slot.[aux_1].[f_2] (my_closure) in
    let next = %project_value_slot.[aux_1].[next_2] (my_closure) in
-   apply &my_alloc_region inlined(hint) next (s) -> k3 * k2
+   apply &my_alloc_region inlined(hint)
+     (next : _ -> [ 0 | 0 of val * val ]) (s) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
          let Pisint = %tag_imm (prim) in
@@ -113,7 +116,7 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
           where k3 =
             let s' = %block_load.[`1`] (`*match*`) in
             let x = %block_load.[`0`] (`*match*`) in
-            (apply &my_alloc_region f (x) -> k5 * k2
+            (apply &my_alloc_region (f : _ -> [ 0 |1 ]) (x) -> k5 * k2
                where k5 (apply_result : [ 0 |1 ]) =
                  ((let untagged = %untag_imm (apply_result) in
                    switch untagged
