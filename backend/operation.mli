@@ -185,11 +185,6 @@ type t =
 
 val is_pure : t -> bool
 
-(** Operations that are not pure in the [is_pure] sense but whose observable
-    effect is subsumed by their result: when the result is unused, the op itself
-    can be deleted. *)
-val is_removable_when_unused : t -> bool
-
 val dump : Format.formatter -> t -> unit
 
 val equal : t -> t -> bool

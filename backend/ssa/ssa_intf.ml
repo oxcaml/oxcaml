@@ -66,7 +66,7 @@ module type Finished_graph = sig
   module rec Block : sig
     type dominator_info = private
       { depth : int;
-        dominator : t
+        dominator : Block.t
       }
 
     and t = private
@@ -83,7 +83,7 @@ module type Finished_graph = sig
                 A param with count 0 is "dead": no arg passed via an
                 unconditional jump ([Goto]/[Raise]/[Tailcall_self]) to this
                 param need be kept alive. *)
-        mutable block_end_trap_stack : t list
+        mutable block_end_trap_stack : Block.t list
             (** Trap stack at the end of the block (after applying the body's
                 [Push_trap]/[Pop_trap] effects to the stack inherited from
                 predecessors), innermost handler first. Computed by
@@ -93,17 +93,17 @@ module type Finished_graph = sig
                 non-empty. *)
       }
 
-    val equal : t -> t -> bool
+    val equal : Block.t -> Block.t -> bool
 
-    val compare : t -> t -> int
+    val compare : Block.t -> Block.t -> int
 
-    val hash : t -> int
+    val hash : Block.t -> int
 
-    module Map : Map.S with type key = t
+    module Map : Map.S with type key = Block.t
 
     module Set : Set.S with type elt = Block.t
 
-    module Tbl : Hashtbl.S with type key = t
+    module Tbl : Hashtbl.S with type key = Block.t
   end
 
   and Instruction : sig
@@ -118,8 +118,8 @@ module type Finished_graph = sig
               short-circuit via {!proj}, so a well-formed graph never contains a
               [Tuple] in an arg or block body. *)
       | Push_trap of { handler : Block.t option }
-          (** [handler = None] means "no handler block exists"; CFG lowering
-              provides a shared dummy invalid block. *)
+          (** [handler = None] means the handler block became unreachable; CFG
+              lowering provides a shared dummy invalid block. *)
       | Pop_trap of { handler : Block.t option }
       | Stack_check of { max_frame_size_bytes : int }
       | Name_for_debugger of
@@ -150,11 +150,11 @@ module type Finished_graph = sig
         src : Instruction.t
       }
 
-    val equal : t -> t -> bool
+    val equal : Instruction.t -> Instruction.t -> bool
 
     (** The type of an instruction when used as an argument; see
         {!Graph_builder} for details. *)
-    val arg_type : t -> Cmm.machtype_component
+    val arg_type : Instruction.t -> Cmm.machtype_component
   end
 
   and Terminator : sig
@@ -203,7 +203,7 @@ module type Finished_graph = sig
             continuation : Block.t option
           }
 
-    val non_trap_successors : t -> Block.t list
+    val non_trap_successors : Terminator.t -> Block.t list
   end
 
   val function_info : function_info
@@ -246,23 +246,23 @@ module type Graph_builder = sig
         because they are not yet meaningful. *)
     type t
 
-    val id : t -> Block_id.t
+    val id : Block.t -> Block_id.t
 
-    val is_function_start : t -> bool
+    val is_function_start : Block.t -> bool
 
-    val params : t -> block_param array
+    val params : Block.t -> block_param array
 
-    val equal : t -> t -> bool
+    val equal : Block.t -> Block.t -> bool
 
-    val compare : t -> t -> int
+    val compare : Block.t -> Block.t -> int
 
-    val hash : t -> int
+    val hash : Block.t -> int
 
-    module Map : Map.S with type key = t
+    module Map : Map.S with type key = Block.t
 
     module Set : Set.S with type elt = Block.t
 
-    module Tbl : Hashtbl.S with type key = t
+    module Tbl : Hashtbl.S with type key = Block.t
   end
 
   and Instruction : sig
@@ -277,8 +277,8 @@ module type Graph_builder = sig
               short-circuit via {!proj}, so a well-formed graph never contains a
               [Tuple] in an arg or block body. *)
       | Push_trap of { handler : Block.t option }
-          (** [handler = None] means "no handler block exists"; CFG lowering
-              provides a shared dummy invalid block. *)
+          (** [handler = None] means the handler block became unreachable; CFG
+              lowering provides a shared dummy invalid block. *)
       | Pop_trap of { handler : Block.t option }
       | Stack_check of { max_frame_size_bytes : int }
       | Name_for_debugger of
@@ -309,32 +309,36 @@ module type Graph_builder = sig
         src : Instruction.t
       }
 
-    val equal : t -> t -> bool
+    val equal : Instruction.t -> Instruction.t -> bool
 
     (** Smart constructor for [Op] instructions. Allocates a fresh
         [Instruction_id.t]. Use this rather than constructing [Op] directly,
         since [op_data] is private. *)
     val make_op :
-      op:op -> typ:Cmm.machtype -> args:t array -> dbg:Debuginfo.t -> t
+      op:op ->
+      typ:Cmm.machtype ->
+      args:Instruction.t array ->
+      dbg:Debuginfo.t ->
+      Instruction.t
 
     (** Set the [name] hint on an [Op]. No-op for non-[Op] instructions. *)
-    val set_name : t -> string -> unit
+    val set_name : Instruction.t -> string -> unit
 
     (** Smart constructor for [Block_param]. [index] is bounds-checked against
         [block]'s param array. The component type is not stored; reach for it
         via [block.params.(index)] when needed. *)
-    val make_block_param : Block.t -> int -> t
+    val make_block_param : Block.t -> int -> Instruction.t
 
     (** Smart constructor for [Proj] that short-circuits projections out of a
         [Tuple]: [make_proj ~index (Tuple elems)] returns [elems.(index)]
         directly. This is the only supported way to consume a [Tuple]. *)
-    val make_proj : index:int -> t -> t
+    val make_proj : index:int -> Instruction.t -> Instruction.t
 
     (** The type of an instruction when used as an argument: a single
         [Cmm.machtype_component]. Fatals on [Op] with multi-component result
         (must be projected first), [Tuple], or non-value instructions
         ([Push_trap]/[Pop_trap]/[Stack_check]/[Name_for_debugger]). *)
-    val arg_type : t -> Cmm.machtype_component
+    val arg_type : Instruction.t -> Cmm.machtype_component
   end
 
   module Terminator : sig
