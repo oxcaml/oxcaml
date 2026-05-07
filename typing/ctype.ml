@@ -3191,16 +3191,30 @@ let constrain_type_jkind ~fixed env ty jkind =
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel unwrapped_tys =
              let num_components = List.length unwrapped_tys in
-             let recur jkinds =
+             let recur ty's_jkinds jkinds =
+               let has_any_layout jkind =
+                 match Jkind.extract_layout env jkind with
+                 | Ok (Any _) -> true
+                 | _ -> false
+               in
                let results =
-                 (* CR rtjoa: why do we re-estimate instead of using ty's_jkinds
-                    now? *)
-                 List.map2
-                   (fun unwrapped_ty jkind ->
+                 Misc.Stdlib.List.map3
+                   (fun unwrapped_ty ty's_jkind jkind ->
                       let jkind = apply_jkind_wrapping_r jkind ~unwrapped_ty in
-                      estimate_jkind_and_loop ~fuel ~expanded:false env
-                        unwrapped_ty.ty jkind)
-                   unwrapped_tys jkinds
+                      if has_any_layout ty's_jkind
+                      then
+                        (* The parent is a variable-repr unboxed record:
+                           [ty's_jkind] is the imprecise [any] from
+                           [product_of_any]. Re-estimate the field's type to
+                           recover precision; otherwise [loop]'s recursive
+                           [product] call would decompose [any] and bail. See
+                           [typing-layouts/any_in_unboxed_record.ml]. *)
+                        estimate_jkind_and_loop ~fuel ~expanded:false env
+                          unwrapped_ty.ty jkind
+                      else
+                        loop ~fuel ~expanded:false env unwrapped_ty.ty
+                          ty's_jkind jkind)
+                   unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
                then Ok ()
@@ -3252,14 +3266,14 @@ let constrain_type_jkind ~fixed env ty jkind =
              | Some ty's_jkinds, Some jkinds
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->
-               recur jkinds
+               recur ty's_jkinds jkinds
              | Some ty's_jkinds, None
                   when Jkind.has_layout_any env jkind
                     && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)
-               recur (List.init num_components (fun _ -> jkind))
+               recur ty's_jkinds (List.init num_components (fun _ -> jkind))
              | _ ->
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.
