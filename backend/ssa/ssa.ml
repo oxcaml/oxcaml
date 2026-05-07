@@ -141,7 +141,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
       and op_data =
         { id : Instruction_id.t;
-          op : Operation.t;
+          op : op;
           typ : Cmm.machtype;
           args : Instruction.t array;
           dbg : Debuginfo.t;
@@ -583,15 +583,17 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             | [] ->
               Misc.fatal_errorf
                 "Ssa.finish: block B%d pops handler B%d off an empty trap stack"
-                (Block_id.hash blk.id) (Block_id.hash h.id)
+                (blk.id :> int)
+                (h.id :> int)
             | top :: rest ->
               if not (Block.equal top h)
               then
                 Misc.fatal_errorf
                   "Ssa.finish: block B%d pops handler B%d but top of trap \
                    stack is B%d"
-                  (Block_id.hash blk.id) (Block_id.hash h.id)
-                  (Block_id.hash top.id);
+                  (blk.id :> int)
+                  (h.id :> int)
+                  (top.id :> int);
               rest)
           | Push_trap { handler = None }
           | Pop_trap { handler = None }
@@ -633,18 +635,17 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       let reachable_blocks =
         List.filter (fun blk -> Block.Tbl.mem visited blk) finished_blocks
       in
-      finished_blocks |> List.iter (Block.Tbl.remove visited);
-      visited
-      |> Block.Tbl.iter (fun unfinished ->
+      let unfinished_blocks =
+        Block.Set.diff
+          (Block.Tbl.to_seq_keys visited |> Block.Set.of_seq)
+          (Block.Set.of_list finished_blocks)
+      in
+      unfinished_blocks
+      |> Block.Set.iter (fun unfinished ->
           Misc.fatal_errorf "Ssa.finish: reachable block B%d was never finished"
-            (Block_id.hash unfinished.id));
+            (unfinished.id :> int));
       reachable_blocks
 
-    (* Cooper-Harvey-Kennedy "Simple, Fast Dominance Algorithm". [intersect]
-       walks two fingers up the partially-constructed dominator tree using DFS
-       post-order numbers (immutable) rather than depth (which can be stale
-       during iteration). Reachable blocks are processed in reverse post-order
-       until a fixpoint is reached. *)
     let compute_dominators ~(entry : Block.t) ~(reachable_blocks : Block.t list)
         : unit =
       entry.dominator_info <- { depth = 0; dominator = entry };
@@ -742,11 +743,10 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           Array.iter
             (fun (i : Instruction.t) ->
               match i with
-              | Op r when not (Operation.is_pure r.op) ->
-                increment_use i
+              | Op r when not (Operation.is_pure r.op) -> increment_use i
               | Name_for_debugger { regs; _ } -> Array.iter increment_use regs
               | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
-              | Block_param _ | Proj _ | Tuple _ -> assert false)
+              | Block_param _ | Proj _ | Tuple _ -> Misc.fatal_error "impossible body instruction")
             blk.body;
           increment_uses_in_terminator blk.terminator)
         reachable_blocks;
