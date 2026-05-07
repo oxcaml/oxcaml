@@ -461,7 +461,7 @@ and apply_expr ~env ~res e =
     else
       let addr = To_jsir_env.get_continuation_exn env cont in
       let arity =
-        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
+        Flambda_arity.cardinal_unarized (Apply_expr.return_arity_exn e)
       in
       let return_vars, res =
         match arity with

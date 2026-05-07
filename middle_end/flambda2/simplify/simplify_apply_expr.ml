@@ -40,9 +40,10 @@ let record_free_names_of_apply_as_used0 apply ~use_id ~exn_cont_use_id data_flow
     | Return k, Some use_id -> Some (use_id, k)
     | Never_returns, Some _ | Return _, None -> assert false
   in
+  let result_arity = Apply.return_arity_exn apply in
   Flow.Acc.add_apply_conts
     ~exn_cont:(exn_cont_use_id, exn_cont)
-    ~result_cont ~result_arity:(Apply.return_arity apply) data_flow
+    ~result_cont ~result_arity data_flow
 
 let record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply =
   DA.map_flow_acc dacc
@@ -873,7 +874,9 @@ let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
          Unused_because_function_unknown)
   in
   let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
+    EB.rewrite_fixed_arity_apply uacc ~use_id
+      (Apply.return_arity_exn apply)
+      apply
   in
   after_rebuild expr uacc
 
@@ -897,7 +900,11 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
           (Non_inlinable { escaping = true })
           ~env_at_use
           ~arg_types:
-            (T.unknown_types_from_arity (Apply.return_arity apply)
+            (T.unknown_types_from_arity
+               (Result_arity.to_arity_exn (Apply.return_arity apply)
+                  ~message:
+                    "Unknown- or bottom-result arity on application of unknown \
+                     function")
                ~alloc_mode:
                  (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
@@ -1026,8 +1033,15 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       let provided_num_args = Flambda_arity.num_params args_arity in
       let num_params = Flambda_arity.num_params params_arity in
       let result_arity_of_application = Apply.return_arity apply in
+      let concrete_result_arity () =
+        Result_arity.to_arity_exn result_arity
+          ~message:
+            "Cannot simplify full or over application with unknown- or \
+             bottom-result arity"
+      in
       if provided_num_args = num_params
       then
+        let result_arity = concrete_result_arity () in
         if
           (* This check can only be performed for exact applications:
 
@@ -1040,15 +1054,18 @@ let simplify_direct_function_call ~simplify_expr dacc apply
              present on the application expression, so all we can do is check
              that the function being overapplied returns kind Value. *)
           not
-            (Flambda_arity.equal_ignoring_subkinds result_arity
-               result_arity_of_application)
+            (match result_arity_of_application with
+            | Or_unknown_or_bottom.Ok result_arity_of_application ->
+              Flambda_arity.equal_ignoring_subkinds result_arity
+                result_arity_of_application
+            | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> true)
         then
           if Flambda_features.kind_checks ()
           then
             Misc.fatal_errorf
               "Wrong return arity for direct OCaml function call@ (expected \
                %a, found %a):@ %a"
-              Flambda_arity.print result_arity Flambda_arity.print
+              Flambda_arity.print result_arity Result_arity.print
               result_arity_of_application Apply.print apply
           else
             replace_apply_by_invalid dacc ~down_to_up
@@ -1059,6 +1076,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
             ~down_to_up ~coming_from_indirect ~callee's_code_metadata
       else if provided_num_args > num_params
       then (
+        let result_arity = concrete_result_arity () in
         (* See comment above. *)
         if
           Flambda_features.kind_checks ()
@@ -1072,12 +1090,18 @@ let simplify_direct_function_call ~simplify_expr dacc apply
           ~coming_from_indirect ~callee's_code_id ~callee's_code_metadata)
       else if provided_num_args > 0 && provided_num_args < num_params
       then (
-        (* See comment above. *)
+        (* See comment above. A partial application has arrow type, so its
+           result arity is always a single value; in particular it can never be
+           unknown or bottom. *)
         if
           Flambda_features.kind_checks ()
           && not
-               (Flambda_arity.is_one_param_of_kind_value
-                  result_arity_of_application)
+               (match result_arity_of_application with
+               | Or_unknown_or_bottom.Ok result_arity_of_application ->
+                 Flambda_arity.is_one_param_of_kind_value
+                   result_arity_of_application
+               | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+                 false)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for partially-applied OCaml \
@@ -1149,7 +1173,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         in
         simplify_direct_full_application ~simplify_expr dacc apply None
           ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
-          ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
+          ~result_arity:(Code_metadata.result_arity_exn callee's_code_metadata)
           ~result_types:(Code_metadata.result_types callee's_code_metadata)
           ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata)
     | Indirect_known_arity _ | Indirect_unknown_arity ->
@@ -1272,7 +1296,9 @@ let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
       apply
   in
   let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
+    EB.rewrite_fixed_arity_apply uacc ~use_id
+      (Apply.return_arity_exn apply)
+      apply
   in
   after_rebuild expr uacc
 
@@ -1296,7 +1322,9 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       (Non_inlinable { escaping = true })
       ~env_at_use:denv
       ~arg_types:
-        (T.unknown_types_from_arity (Apply.return_arity apply)
+        (T.unknown_types_from_arity
+           (Result_arity.to_arity_exn (Apply.return_arity apply)
+              ~message:"Unknown- or bottom-result arity on method call")
            ~alloc_mode:
              (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
            ~machine_width:(DE.machine_width denv))
@@ -1323,7 +1351,7 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
 let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     =
   fail_if_probe apply;
-  let return_arity = Apply.return_arity apply in
+  let return_arity = Apply.return_arity_exn apply in
   let callee_kind = T.kind callee_ty in
   if not (K.is_value callee_kind)
   then
@@ -1428,7 +1456,9 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
           (Non_inlinable { escaping = true })
           ~env_at_use:denv
           ~arg_types:
-            (T.unknown_types_from_arity (Apply.return_arity apply)
+            (T.unknown_types_from_arity
+               (Result_arity.to_arity_exn (Apply.return_arity apply)
+                  ~message:"Unknown- or bottom-result arity on effect operation")
                ~alloc_mode:
                  (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))

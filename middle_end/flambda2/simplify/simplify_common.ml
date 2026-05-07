@@ -199,7 +199,7 @@ let split_direct_over_application apply ~callee's_code_id
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components (Apply.return_arity apply))
+          (Apply.return_arity_unarized_components_or_empty apply)
       in
       let call_return_continuation, call_return_continuation_free_names =
         match Apply.continuation apply with
@@ -259,7 +259,14 @@ let split_direct_over_application apply ~callee's_code_id
   in
   let after_full_application = Continuation.create () in
   let full_apply_result_arity =
-    Code_metadata.result_arity callee's_code_metadata
+    (* The result of the full application is immediately applied to the
+       remaining arguments, so for this instantiation it must be a function,
+       i.e. a single boxed value, even when the callee's declared result arity
+       is unknown. *)
+    match Code_metadata.result_arity callee's_code_metadata with
+    | Or_unknown_or_bottom.Ok result_arity -> result_arity
+    | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+      Flambda_arity.create_singletons [K.With_subkind.any_value]
   in
   let after_full_application_handler =
     if not (Flambda_arity.is_one_param_of_kind_value full_apply_result_arity)

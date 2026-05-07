@@ -434,7 +434,11 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         Option.map (Env.find_code_id_exn env) (Code.newer_version_of code)
       in
       let param_arity = Some (complex_arity (Code.params_arity code)) in
-      let ret_arity = Code.result_arity code |> arity_opt in
+      let ret_arity =
+        match Code.result_arity code with
+        | Or_unknown_or_bottom.Ok arity -> arity_opt arity
+        | Unknown | Bottom -> None
+      in
       let recursive = recursive_flag (Code.recursive code) in
       let inline =
         if Flambda2_terms.Inline_attribute.is_default (Code.inline code)
@@ -661,23 +665,34 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   let return_arity = Apply_expr.return_arity app in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
-    | Function { function_call = Indirect_known_arity _ } ->
-      let params_arity = Some (complex_arity param_arity) in
-      let ret_arity = arity return_arity in
-      Some { params_arity; ret_arity }
-    | Function { function_call = Direct _ } ->
-      if is_default_arity return_arity
-      then None
-      else
-        let params_arity =
-          (* Parameter arity is never specified for a direct call *)
-          None
-        in
-        let ret_arity = arity return_arity in
+    | Function { function_call = Indirect_known_arity _ } -> (
+      match return_arity with
+      | Or_unknown_or_bottom.Ok a ->
+        let params_arity = Some (complex_arity param_arity) in
+        let ret_arity = arity a in
         Some { params_arity; ret_arity }
+      | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> None)
+    | Function { function_call = Direct _ } -> (
+      match return_arity with
+      | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> None
+      | Or_unknown_or_bottom.Ok a ->
+        if is_default_arity a
+        then None
+        else
+          let params_arity =
+            (* Parameter arity is never specified for a direct call *)
+            None
+          in
+          Some { params_arity; ret_arity = arity a })
     | C_call _ ->
       let params_arity = Some (complex_arity param_arity) in
-      let ret_arity = arity return_arity in
+      let ret_arity =
+        match return_arity with
+        | Or_unknown_or_bottom.Ok a -> arity a
+        | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+          Misc.fatal_errorf "Unexpected unknown-result C call:@ %a"
+            Apply_expr.print app
+      in
       Some { params_arity; ret_arity }
     | Function { function_call = Indirect_unknown_arity } -> None
     | Method _ ->

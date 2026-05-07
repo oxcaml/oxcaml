@@ -282,7 +282,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     aux args args_arity
   in
-  let return_ty = C.extended_machtype_of_return_arity return_arity in
+  let return_ty =
+    C.extended_machtype_of_return_arity
+      (Result_arity.to_arity_exn return_arity
+         ~message:"Cannot compile unknown- or bottom-result apply to Cmm")
+  in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -375,6 +379,10 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all )
   | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
+    let return_arity =
+      Result_arity.to_arity_exn return_arity
+        ~message:"Cannot compile unknown- or bottom-result C call to Cmm"
+    in
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
       ~coeffects
@@ -556,8 +564,8 @@ let translate_apply env res apply =
     let exn_var = Backend_var.create_local "*exn*" in
     let result_var = Backend_var.create_local "*res*" in
     let result_type =
-      Apply.return_arity apply |> C.extended_machtype_of_return_arity
-      |> C.Extended_machtype.to_machtype
+      Apply.return_arity_exn apply
+      |> C.extended_machtype_of_return_arity |> C.Extended_machtype.to_machtype
     in
     let pop_handler_params =
       [Backend_var.With_provenance.create result_var, result_type]
@@ -1088,7 +1096,7 @@ and apply_expr env res apply =
     | Return { param_types } ->
       (* Case 1 *)
       let apply_result_arity =
-        Flambda_arity.unarized_components (Apply.return_arity apply)
+        Apply.return_arity_unarized_components_or_empty apply
       in
       if List.compare_lengths apply_result_arity param_types = 0
       then

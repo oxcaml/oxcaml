@@ -807,7 +807,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~first_complex_local_param:
               (First_complex_local_param.Index
                  (Flambda_arity.num_params params_arity))
-            ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
+            ~result_arity:(Result_arity.ok result_arity)
+            ~result_types:Unknown ~result_mode ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
             ~is_a_functor:false ~is_opaque:false ~recursive
@@ -945,8 +946,10 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~callee:(Option.map (simple env) func)
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
-        ~inlined ~inlining_state ~probe:None ~position:Normal
+        ~args_arity
+        ~return_arity:(Result_arity.ok return_arity)
+        ~call_kind ~return_mode Debuginfo.none ~inlined ~inlining_state
+        ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply

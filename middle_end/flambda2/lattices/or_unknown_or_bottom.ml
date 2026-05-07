@@ -39,6 +39,17 @@ let equal eq_contents t1 t2 =
   | Bottom, Bottom -> true
   | (Unknown | Ok _ | Bottom), _ -> false
 
+let ok_exn t ~message =
+  match t with
+  | Ok contents -> contents
+  | Unknown | Bottom -> Misc.fatal_error message
+
+let value_map t ~unknown ~bottom ~f =
+  match t with
+  | Ok contents -> f contents
+  | Unknown -> unknown
+  | Bottom -> bottom
+
 let bind t ~f =
   match t with
   | Unknown -> Unknown

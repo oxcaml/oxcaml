@@ -74,7 +74,7 @@ type t =
     exn_continuation : Exn_continuation.t;
     args : Simple.t list;
     args_arity : [`Complex] Flambda_arity.t;
-    return_arity : [`Unarized] Flambda_arity.t;
+    return_arity : Result_arity.t;
     call_kind : Call_kind.t;
     return_mode : Alloc_mode.For_applications.t;
     dbg : Debuginfo.t;
@@ -113,7 +113,7 @@ let [@ocamlformat "disable"] print_normal ppf
     Exn_continuation.print exn_continuation
     Simple.List.print args
     Flambda_arity.print args_arity
-    Flambda_arity.print return_arity
+    Result_arity.print return_arity
     Call_kind.print call_kind
     Alloc_mode.For_applications.print return_mode
     Flambda_colours.debuginfo
@@ -192,13 +192,19 @@ let invariant
         "For [C_call] applications the callee must be directly specified as a \
          [Symbol]:@ %a"
         print t);
-    match Flambda_arity.unarized_components return_arity with
-    | [] | [_] | [_; _] ->
-      (* CR xclerc: we currently support only pairs as unboxed return values. *)
-      ()
-    | _ :: _ :: _ ->
-      Misc.fatal_errorf "Illegal return arity for C call:@ %a"
-        Flambda_arity.print return_arity)
+    match return_arity with
+    | Or_unknown_or_bottom.Ok arity -> (
+      match Flambda_arity.unarized_components arity with
+      | [] | [_] | [_; _] ->
+        (* CR xclerc: we currently support only pairs as unboxed return
+           values. *)
+        ()
+      | _ :: _ :: _ ->
+        Misc.fatal_errorf "Illegal return arity for C call:@ %a"
+          Flambda_arity.print arity)
+    | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+      Misc.fatal_errorf "Illegal unknown/bottom return arity for C call:@ %a"
+        print t)
   | Effect _ -> (
     match callee, args with
     | None, [] -> ()
@@ -432,5 +438,12 @@ let returns t =
 let args_arity t = t.args_arity
 
 let return_arity t = t.return_arity
+
+let return_arity_exn t =
+  Result_arity.to_arity_exn t.return_arity
+    ~message:"Expected concrete return arity in [Apply_expr]"
+
+let return_arity_unarized_components_or_empty t =
+  Result_arity.unarized_components_or_empty t.return_arity
 
 let with_inlined_attribute t inlined = { t with inlined }

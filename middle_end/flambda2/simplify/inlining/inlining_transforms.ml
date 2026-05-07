@@ -176,6 +176,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
           | extra_args ->
             wrap_inlined_body_for_exn_extra_args ~extra_args
               ~apply_exn_continuation ~apply_return_continuation
-              ~result_arity:(Code.result_arity code) ~make_inlined_body
+              ~result_arity:(Code.result_arity_exn code)
+              ~make_inlined_body
         in
         DA.with_denv dacc denv, expr)

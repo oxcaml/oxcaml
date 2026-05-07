@@ -1032,7 +1032,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Apply.Position.equal (Apply.position apply1) (Apply.position apply2)
     && Flambda_arity.equal_exact (Apply.args_arity apply1)
          (Apply.args_arity apply2)
-    && Flambda_arity.equal_exact
+    && Result_arity.equal_exact
          (Apply.return_arity apply1)
          (Apply.return_arity apply2)
     && Alloc_mode.For_applications.compare (Apply.return_mode apply1)
@@ -1262,7 +1262,7 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
        ~cond:
          (Flambda_arity.equal_exact (Code.params_arity code1)
             (Code.params_arity code2)
-         && Flambda_arity.equal_exact (Code.result_arity code1)
+         && Result_arity.equal_exact (Code.result_arity code1)
               (Code.result_arity code2)
          && Bool.equal (Code.stub code1) (Code.stub code2)
          && Inline_attribute.equal (Code.inline code1) (Code.inline code2)

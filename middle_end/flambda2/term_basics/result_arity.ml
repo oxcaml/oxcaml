@@ -2,11 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*                       Pierre Chambart, OCamlPro                        *)
 (*           Mark Shinwell and Leo White, Jane Street Europe              *)
 (*                                                                        *)
-(*   Copyright 2018 OCamlPro SAS                                          *)
-(*   Copyright 2018 Jane Street Group LLC                                 *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -14,27 +12,26 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type 'a t =
-  | Unknown
-  | Ok of 'a
-  | Bottom
+type t = [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t
 
-val print : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+let ok arity : t = Ok arity
 
-val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+let print ppf t = Or_unknown_or_bottom.print Flambda_arity.print ppf t
 
-val ok_exn : 'a t -> message:string -> 'a
+let equal_exact t1 t2 =
+  Or_unknown_or_bottom.equal Flambda_arity.equal_exact t1 t2
 
-val value_map : 'a t -> unknown:'b -> bottom:'b -> f:('a -> 'b) -> 'b
+let equal_ignoring_subkinds t1 t2 =
+  Or_unknown_or_bottom.equal Flambda_arity.equal_ignoring_subkinds t1 t2
 
-val bind : 'a t -> f:('a -> 'b t) -> 'b t
+let to_arity_exn ?message t =
+  let message =
+    match message with
+    | Some message -> message
+    | None -> "Expected a concrete result arity, not [Unknown] or [Bottom]"
+  in
+  Or_unknown_or_bottom.ok_exn t ~message
 
-val map : 'a t -> f:('a -> 'b) -> 'b t
-
-val map_sharing : 'a t -> f:('a -> 'a) -> 'a t
-
-module Let_syntax : sig
-  val ( let<>* ) : 'a t -> ('a -> 'b t) -> 'b t
-
-  val ( let<>+ ) : 'a t -> ('a -> 'b) -> 'b t
-end
+let unarized_components_or_empty t =
+  Or_unknown_or_bottom.value_map t ~unknown:[] ~bottom:[]
+    ~f:Flambda_arity.unarized_components

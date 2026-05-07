@@ -557,7 +557,8 @@ module Inlining = struct
         | extra_args ->
           wrap_inlined_body_for_exn_extra_args acc ~extra_args
             ~apply_exn_continuation ~apply_return_continuation
-            ~result_arity:(Code.result_arity code) ~make_inlined_body)
+            ~result_arity:(Code.result_arity_exn code)
+            ~make_inlined_body)
 end
 
 type unarized_extern_repr =
@@ -894,6 +895,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         ~op:Unboxed_float64_as_unboxed_int64
     | _ ->
       let callee = Simple.symbol call_symbol in
+      let return_arity = Result_arity.ok return_arity in
       let apply =
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
@@ -1131,8 +1133,9 @@ let close_effect_primitive acc env ~dbg exn_continuation
       Apply_expr.create ~callee:None ~continuation:(Return continuation)
         exn_continuation ~args:[] ~args_arity:Flambda_arity.nullary
         ~return_arity:
-          (Flambda_arity.create_singletons
-             [Flambda_kind.With_subkind.any_value])
+          (Result_arity.ok
+             (Flambda_arity.create_singletons
+                [Flambda_kind.With_subkind.any_value]))
         ~call_kind
         ~return_mode:
           (Alloc_mode.For_applications.not_alloc_stack
@@ -1849,14 +1852,17 @@ let close_exact_or_unknown_apply acc env
                simplify_apply_expr.ml *)
             Flambda_features.kind_checks ()
             && not
-                 (Flambda_arity.equal_ignoring_subkinds return_arity
-                    result_arity_from_code)
+                 (match return_arity, result_arity_from_code with
+                 | Or_unknown_or_bottom.Ok return_arity, Ok result_arity ->
+                   Flambda_arity.equal_ignoring_subkinds return_arity
+                     result_arity
+                 | _, _ -> true)
           then
             Misc.fatal_errorf
               "Wrong return arity for direct OCaml function call to %a@ \
                (expected %a, found %a):@ %a@ code metadata:@ %a"
-              Ident.print func Flambda_arity.print result_arity_from_code
-              Flambda_arity.print return_arity Debuginfo.print_compact dbg
+              Ident.print func Result_arity.print result_arity_from_code
+              Result_arity.print return_arity Debuginfo.print_compact dbg
               Code_metadata.print meta;
           let can_erase_callee =
             Flambda_features.classic_mode ()
@@ -2293,7 +2299,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
     main_code_param_modes,
     false,
     First_complex_local_param.Never_partially_applied,
-    result_arity_main_code,
+    Result_arity.ok result_arity_main_code,
     unboxed_return_continuation,
     my_unboxed_closure )
 
@@ -2310,6 +2316,11 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   (* The outside caller gave us the function slot and code ID meant for the
      boxed function, which will be a wrapper. So in this branch everything
      starting with 'main_' refers to the version with unboxed return/params. *)
+  let concrete_result_arity_main_code =
+    Result_arity.to_arity_exn result_arity_main_code
+      ~message:
+        "Cannot make wrapper for unknown- or bottom-result unboxed function"
+  in
   let main_function_slot = unboxed_function_slot in
   let main_name = Function_slot.name unboxed_function_slot in
   let main_closure = Variable.create main_name K.value in
@@ -2448,7 +2459,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
-             (Flambda_arity.unarized_components result_arity_main_code))
+             (Flambda_arity.unarized_components concrete_result_arity_main_code))
       in
       let handler, free_names_of_handler =
         let boxed_return = Variable.create "boxed_return" K.value in
@@ -2865,10 +2876,16 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         my_closure )
     | Unboxed_calling_convention
         (unboxed_params, unboxed_return, unboxed_function_slot) ->
+      let concrete_return =
+        Result_arity.to_arity_exn return
+          ~message:
+            "Cannot build unboxed wrapper for unknown- or bottom-result \
+             function"
+      in
       compute_body_of_unboxed_function acc my_region alloc_region my_closure
         ~unarized_params params_arity ~unarized_param_modes function_slot
-        compute_body return return_continuation unboxed_params unboxed_return
-        unboxed_function_slot
+        compute_body concrete_return return_continuation unboxed_params
+        unboxed_return unboxed_function_slot
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
@@ -3618,7 +3635,11 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components apply.return_arity)
+          (Flambda_arity.unarized_components
+             (Result_arity.to_arity_exn apply.return_arity
+                ~message:
+                  "Cannot compile unknown- or bottom-result over-application \
+                   with a local result"))
       in
       let handler acc =
         let acc, call_return_continuation =
@@ -3696,7 +3717,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         missing_arity : [`Complex] Flambda_arity.t;
         missing_param_modes : Alloc_mode.For_types.t list;
-        result_arity : [`Unarized] Flambda_arity.t
+        result_arity : Result_arity.t
       }
   | Over_app of
       { full : IR.simple list;
@@ -3837,8 +3858,9 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
             continuation = apply_continuation;
             mode = result_mode;
             return_arity =
-              Flambda_arity.create_singletons
-                [Flambda_kind.With_subkind.any_value]
+              Result_arity.ok
+                (Flambda_arity.create_singletons
+                   [Flambda_kind.With_subkind.any_value])
           }
           (Some approx) ~replace_region
       in

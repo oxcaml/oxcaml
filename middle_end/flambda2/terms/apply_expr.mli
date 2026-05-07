@@ -52,7 +52,7 @@ val create :
   Exn_continuation.t ->
   args:Simple.t list ->
   args_arity:[`Complex] Flambda_arity.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:Result_arity.t ->
   call_kind:Call_kind.t ->
   return_mode:Alloc_mode.For_applications.t ->
   Debuginfo.t ->
@@ -79,8 +79,14 @@ val args : t -> Simple.t list
 (** The arity of the arguments being applied. *)
 val args_arity : t -> [`Complex] Flambda_arity.t
 
-(** The arity of the result(s) of the application. *)
-val return_arity : t -> [`Unarized] Flambda_arity.t
+(** The arity of the result(s) of the application. See [Result_arity] for the
+    [Unknown]/[Bottom] semantics and consumer policies. *)
+val return_arity : t -> Result_arity.t
+
+val return_arity_exn : t -> [`Unarized] Flambda_arity.t
+
+val return_arity_unarized_components_or_empty :
+  t -> Flambda_kind.With_subkind.t list
 
 (** Information about what kind of call is involved (direct function call,
     method call, etc). *)

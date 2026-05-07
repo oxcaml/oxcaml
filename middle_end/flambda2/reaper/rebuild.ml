@@ -1260,7 +1260,7 @@ let rebuild_apply env apply =
           List.map
             (fun kind ->
               Keep (Variable.create "function_return" (KS.kind kind), kind))
-            (Flambda_arity.unarized_components return_arity)
+            (Result_arity.unarized_components_or_empty return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
           func_decisions)
@@ -1381,7 +1381,9 @@ let rebuild_apply env apply =
       let return_decisions =
         Code_id.Map.find code_id env.function_return_decision
       in
-      let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
+      let return_arity =
+        Result_arity.ok (Flambda_arity.unarize_t (get_arity return_decisions))
+      in
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
@@ -2290,7 +2292,9 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
     let code_metadata =
       Code_metadata.with_is_tupled false
-        (Code_metadata.with_result_arity result_arity code_metadata)
+        (Code_metadata.with_result_arity
+           (Result_arity.ok result_arity)
+           code_metadata)
     in
     let params_decision =
       List.map2
@@ -2523,8 +2527,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         in
         let metadata = get_code_metadata code_id in
         let result_kinds =
-          Flambda_arity.unarized_components
-            (Code_metadata.result_arity metadata)
+          Code_metadata.result_arity_unarized_components_or_empty metadata
         in
         if cannot_change_calling_convention
         then
