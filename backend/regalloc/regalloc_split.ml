@@ -346,9 +346,21 @@ let make_reload : type a. (a, definition_kind) make_operation =
     then
       log "remat %a -> %a (from %a)" Printreg.reg old_reg Printreg.regs res
         Printreg.regs arg;
-    Cfg.make_instruction_from_copy copy ~desc:source.desc
-      ~id:(InstructionId.get_and_incr instr_id)
-      ~arg ~res ()
+    let id = InstructionId.get_and_incr instr_id in
+    (* Record the pre-split (description-style) shape of this rematerialized
+       instruction with the validator, so that its equation transfer uses the
+       same abstract register stamps as the description-based equations in the
+       equation set. For single-result sources we record [old_reg] as the result
+       (which is the consumer being rematerialized — possibly different from
+       [source.res.(0)] when [try_rematerialize] followed a [Move] chain); for
+       multi-result sources, [reg] is directly in [source.res] (cf.
+       [RewriteAsRematerialize]) so we record [source.res] as-is. *)
+    let recorded_res =
+      if Array.length source.res = 1 then [| old_reg |] else source.res
+    in
+    Regalloc_validate.record_rematerialization ~id ~desc:source.desc
+      ~arg:source.arg ~res:recorded_res;
+    Cfg.make_instruction_from_copy copy ~desc:source.desc ~id ~arg ~res ()
 
 (* Inserts the reloads in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. Rematerialized loads are

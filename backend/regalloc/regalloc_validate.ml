@@ -327,6 +327,25 @@ end
 let is_rematerialized_shape (instr : basic Cfg.instruction) =
   Regalloc_split_utils.is_rematerializable_shape instr.desc
 
+(* Side-table populated by [Regalloc_split] for each rematerialized basic
+   instruction it emits. The validator's equation transfer uses the pre-split
+   (description-style) abstract registers stored here so its [reg_instr] matches
+   the abstract registers used by the description-based equations in the
+   equation set; without this, the transfer would use the fresh post-split
+   stamps from the post-allocation CFG and the "0-or-2 sides" invariant of
+   [remove_result] would trip on equations keyed by the description's stamps. *)
+let rematerializations : (InstructionId.t, basic Instruction.t) Hashtbl.t =
+  Hashtbl.create 64
+
+let clear_rematerializations () = Hashtbl.clear rematerializations
+
+let record_rematerialization ~id ~desc ~arg ~res =
+  Hashtbl.replace rematerializations id
+    { Instruction.desc;
+      arg = Array.map Register.create arg;
+      res = Array.map Register.create res
+    }
+
 module Description : sig
   (** A snapshot of the [desc], [arg] and [res] fields of all instructions in
       the CFG and [fun_args] of the CFG. It is used by the validator to record
@@ -481,6 +500,9 @@ end = struct
     t
 
   let create cfg =
+    (* Discard any rematerialization records left from a previous function;
+       split will repopulate the table for this one. *)
+    clear_rematerializations ();
     match !Oxcaml_flags.regalloc_validate with
     | false -> None
     | true -> Some (do_create cfg)
@@ -1238,23 +1260,26 @@ module Transfer (Desc_val : Description_value) :
            constant, safe [Intop_imm], ...). Unlike [Op (Spill | Reload | Move)]
            (which transport an existing value between locations and are handled
            by [rename_location]), this instruction recomputes a fresh value
-           (memory read, constant materialization, or pure arithmetic). However,
-           its [arg]/[res] arrays still carry the abstract registers that were
-           assigned during split (only the [loc] field gets overwritten by the
-           allocator), so we can synthesize a [reg_instr] directly from the
-           post-allocation instruction and reuse the generic equation transfer.
-           The result registers are fresh — created by
-           [compute_substitution_tree] for this rematerialization — so they do
-           not collide with any abstract register from the pre-allocation
-           description, and the equations stay self-consistent for all
-           downstream uses, which refer to the same fresh registers. The
-           instruction's [desc] is preserved verbatim, so [destroyed_at_basic]
-           returns the same destroyed locations as for the original. *)
-        let reg_instr : basic Instruction.t =
-          { Instruction.desc = instr.desc;
-            arg = Array.map Register.create instr.arg;
-            res = Array.map Register.create instr.res
-          }
+           (memory read, constant materialization, or pure arithmetic). The
+           split pass calls [record_rematerialization] to register the pre-split
+           (description-style) [reg_instr] for this instruction; we look it up
+           here so the equation transfer uses the same abstract register stamps
+           as the description-based equations already in the equation set.
+           Synthesizing [reg_instr] from the post-allocation instruction's
+           [Reg.t] values directly would use the *fresh* post-split stamps from
+           [compute_substitution_tree], not the description's stamps, and
+           [remove_result]'s "0-or-2 sides" invariant would trip on equations
+           keyed by the description's stamps. The instruction's [desc] is
+           preserved verbatim by split, so [destroyed_at_basic] returns the same
+           destroyed locations as for the original. *)
+        let reg_instr =
+          match Hashtbl.find_opt rematerializations instr.id with
+          | Some reg_instr -> reg_instr
+          | None ->
+            Regalloc_utils.fatal
+              "Rematerialized instruction no. %a was not registered with \
+               [Regalloc_validate.record_rematerialization]"
+              InstructionId.format instr.id
         in
         append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
           ~reg_instr ~loc_instr:instr

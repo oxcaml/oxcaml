@@ -196,20 +196,33 @@ module Uses = struct
      [Load]/[Const]/[Intop_imm] mirror [is_rematerializable_shape] (which is
      re-used by the validator). [Move] is classified separately because it is
      not itself a rematerialization source, but rather a step on the chain that
-     [try_rematerialize] follows back to the actual source. *)
+     [try_rematerialize] follows back to the actual source.
+
+     For rematerialization sources we duplicate the [arg] and [res] arrays of
+     the captured instruction. The split pass later mutates the original arrays
+     in-place (cf. [Regalloc_substitution.apply_array_in_place]) when it renames
+     registers across destruction points; without these copies, downstream
+     consumers (notably the validator-side recording in
+     [Regalloc_validate.record_rematerialization]) would observe
+     post-substitution names and disagree with the description-based equations,
+     which use the pre-split (description) names. *)
+  let snapshot_arrays (instr : Cfg.basic Cfg.instruction) : Instruction.t =
+    { instr with arg = Array.copy instr.arg; res = Array.copy instr.res }
+
   let classify_source (instr : Cfg.basic Cfg.instruction) : source =
     match[@ocaml.warning "-fragile-match"] instr.desc with
-    | Op (Load { mutability = Immutable; is_atomic = false; _ }) -> Load instr
+    | Op (Load { mutability = Immutable; is_atomic = false; _ }) ->
+      Load (snapshot_arrays instr)
     | Op
         ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
         | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ) ->
-      Const instr
+      Const (snapshot_arrays instr)
     | Op
         (Intop_imm
            ( ( Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
              | Ipopcnt | Iclz | Ictz ),
              _ )) ->
-      Intop_imm instr
+      Intop_imm (snapshot_arrays instr)
     | Op Move
       when Cmm.equal_machtype_component instr.arg.(0).typ instr.res.(0).typ ->
       Move instr.arg.(0)
