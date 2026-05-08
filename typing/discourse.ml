@@ -168,6 +168,7 @@ let rec add_path_to_discourse ?(for_open = false) env discourse kind lid path =
                   match md.md_type with
                   | Mty_alias path' ->
                     let lid = ldot id in
+                    let path' = Env.normalize_module_path None env path' in
                     Path.Map.update path'
                       (function
                         | None -> Some (Lid_set.singleton lid)
