@@ -101,11 +101,8 @@ end
 include Types
 module Fmt = Format_doc
 
-let rec print_value ppf v =
-  match v with
+let rec print_value ppf = function
   | SLVhalves { slv_comptime; slv_runtime } ->
-    (* Mirror the [SLhalves] printer in [Printlambda]:
-       {c = <comptime>; r = ⟪ <runtime> ⟫}. *)
     Fmt.fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]" print_value_or_missing
       slv_comptime
       (Fmt.deprecated Printlambda.lambda)

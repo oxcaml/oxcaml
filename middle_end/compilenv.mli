@@ -41,14 +41,12 @@ val get_global_export_info : Compilation_unit.t
 val get_unit_export_info
   : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
-val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
-        (* Set the export information for the current unit. *)
-
 val get_static_data :
   Compilation_unit.t -> Slambdaeval.value Slambdaeval.Or_missing.t
-        (* Means of getting the comptime (static) value found in the .cmx
-           file of the given unit. Returns [Missing] if the .cmx file cannot
-           be located. *)
+        (* Returns [Missing] if the .cmx file cannot be located. *)
+
+val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
+        (* Set the export information for the current unit. *)
 
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit

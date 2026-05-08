@@ -74,10 +74,9 @@ let load_lambda ppf tlam =
        comptime part in a separate table so we can use it in later expressions.
     *)
     Slambda.eval
-      ~cu_static_data:(fun cu ->
-        Misc.fatal_errorf
-          "Slambda eval: cross-module evaluation not implemented (unit %s)"
-          (Compilation_unit.full_path_as_string cu))
+      ~cu_static_data:(fun _ ->
+        Misc.fatal_errorf_doc
+          "Cross-module static evaluation not implemented in the toplevel")
       (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;

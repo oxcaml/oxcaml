@@ -49,8 +49,4 @@ and value =
 val eval :
   cu_static_data:(Compilation_unit.t -> value Or_missing.t) -> slambda -> halves
 
-(** Pretty-print a [value Or_missing.t] in a structural form suitable for
-    debugging tools (e.g. [ocamlobjinfo]). The [SLVhalves] case mirrors the
-    [SLhalves] printer in [Printlambda]; closures are printed as functions with
-    their environments elided. *)
 val print : Format_doc.formatter -> value Or_missing.t -> unit
