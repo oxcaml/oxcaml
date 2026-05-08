@@ -41,7 +41,6 @@ test test-promote:
 	version=$$(find "$$MERLIN_TEST_OCAML_PATH" -type f -exec sha256sum {} + \
 	    | sort | sha256sum | awk '{print $$1}'); \
 	export MERLIN_TEST_OCAML_VERSION="$$version"; \
-	echo "$$MERLIN_TEST_OCAML_VERSION"; \
 	if [ -z "$(strip $(ARGS))" ]; then \
 	    dune build $(DUNE_OPTS) @runtest $(PROMOTE); \
 	else \
