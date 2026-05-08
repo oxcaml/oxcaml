@@ -139,9 +139,8 @@ apply direct(length_2_1)
                  where k1 (apply_result : imm tagged) =
                    let prim = %phys_eq (apply_result, 3) in
                    switch prim
-                     | 0 -> error
-                              pop(regular error)
-                              ($camlLocal__Pmakeblock96)
+                     | 0 ->
+                       error pop(regular error) ($camlLocal__Pmakeblock96)
                      | 1 -> k)
             where k =
               let `unit` = %end_region (`region`) in
@@ -312,9 +311,10 @@ apply direct(length_2_1)
                       where k1 (apply_result : imm tagged) =
                         let prim = %phys_eq (apply_result, 3) in
                         switch prim
-                          | 0 -> error
-                                   pop(regular error)
-                                   ($camlLocal__Pmakeblock186)
+                          | 0 ->
+                            error
+                              pop(regular error)
+                              ($camlLocal__Pmakeblock186)
                           | 1 -> k)
                  where k =
                    let unit_2 = %end_region (region_1) in

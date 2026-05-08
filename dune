@@ -637,6 +637,7 @@
   cfg_colours
   cfg_edge
   cfg_intf
+  cfg_quick_hash
   cfg_reducibility
   cfg_to_linear
   cfg_with_layout

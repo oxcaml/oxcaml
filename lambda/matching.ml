@@ -2390,7 +2390,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
       let sem = add_barrier_to_read ubr sem in
       let access, sort, layout =
         match lbl.lbl_repres with
-        | Record_boxed _
+        | Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout

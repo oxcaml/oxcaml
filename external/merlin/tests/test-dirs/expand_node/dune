@@ -1,0 +1,9 @@
+; Jane Street disabled tests -- they use upstream ppxlib,
+; which is incompatible with this merlin's expectations
+; around ast format. Maybe one day we can install
+; the ppxlib from our opam repo?
+
+(cram
+ (enabled_if false)
+ (applies_to
+  ppx-tests))
