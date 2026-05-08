@@ -3535,22 +3535,28 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         modl_shape sg ~mode env
     in
     let sg =
-      match discourse_alias with
-      | None -> sg
-      | Some (lid, (m, path)) ->
-        List.map (function
-          | Sig_module (id, pres, decl, rec_status, visibility) ->
-            let md_discourse_alias =
+      let update_alias =
+        match discourse_alias with
+        | None -> fun id ->
               let name = Ident.name id in
-              let lid = { txt = Longident.Ldot (lid.txt, name);
-                          loc = Location.ghostify lid.Location.loc } in
-              let path = Path.Pdot (path, name) in
-              Some (lid, (m, path))
-            in
-            let decl = { decl with md_discourse_alias } in
-            Sig_module (id, pres, decl, rec_status, visibility)
-          | sig_item -> sig_item)
-          sg
+              let lid = { txt = Longident.Lident name;
+                          loc = Location.ghostify modl.mod_loc } in
+              let path = Pident id in
+              Some (lid, (Sig_component_kind.Module, path))
+        | Some (lid, (m, path)) -> fun id ->
+                let name = Ident.name id in
+                let lid = { txt = Longident.Ldot (lid.txt, name);
+                            loc = Location.ghostify lid.Location.loc } in
+                let path = Path.Pdot (path, name) in
+                Some (lid, (m, path))
+      in
+      List.map (function
+        | Sig_module (id, pres, decl, rec_status, visibility) ->
+          let md_discourse_alias = update_alias id in
+          let decl = { decl with md_discourse_alias } in
+          Sig_module (id, pres, decl, rec_status, visibility)
+        | sig_item -> sig_item)
+        sg
     in
     let () = Discourse.define_signature sg in
     let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in

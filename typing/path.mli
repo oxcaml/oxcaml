@@ -61,11 +61,12 @@ and extra_ty =
       Example: [float#], or [t#] given [type t = { i : int ; s : string }].
   *)
 
+include Identifiable.S with type t := t
+
 val unboxed_version : t -> t
 val is_unboxed_version : t -> bool
 
 val same: t -> t -> bool
-val compare: t -> t -> int
 val compare_extra: extra_ty -> extra_ty -> int
 val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
@@ -76,13 +77,9 @@ val name: ?paren:(string -> bool) -> t -> string
     (* [paren] tells whether a path suffix needs parentheses *)
 val head: t -> Ident.t
 
-val print: Format.formatter -> t -> unit
 
 val heads: t -> Ident.t list
 
 val last: t -> string
 
 val is_constructor_typath: t -> bool
-
-module Map : Map.S with type key = t
-module Set : Set.S with type elt = t

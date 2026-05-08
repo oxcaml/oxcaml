@@ -68,6 +68,34 @@ let pp_substs fmt substs =
   in
   Format.pp_print_list ~pp_sep pp_v fmt substs
 
+let fold_on_common_lid_and_path_segments ~init ~kind ~f (lid, path) =
+  (* TODO : is it always true that paths prefixes are always Module ?*)
+  let rec aux acc kind ((lid, path) : Longident.t * Path.t) =
+    let acc = f acc kind (lid, path) in
+    match (lid, path) with
+    | Lident _, Pident _ -> acc
+    | Ldot (l, _), Pdot (p, _) -> aux acc Module (l, p)
+    | Lapply (l1, l2), Papply (p1, p2) ->
+      let acc = aux acc Module (l2, p2) in
+      aux acc Module (l1, p1)
+    | _ -> acc
+  in
+  aux init kind (lid, path)
+
+(* If a path is in D and it includes another module path within it, then that
+   module path is also in D.*)
+let add_all_components acc paths =
+  let seq = Lid_trie.to_seq paths in
+  Seq.fold_left
+    (fun acc (lid, paths) ->
+      Paths.fold
+        (fun (kind, path) init ->
+          fold_on_common_lid_and_path_segments ~init ~kind
+            ~f:(fun acc kind (lid, path) -> Lid_trie.add lid (kind, path) acc)
+            (lid, path))
+        paths acc)
+    acc seq
+
 let debug_print fmt =
   Format.fprintf fmt "Size: %i@;%a@;%a" (Lid_trie.size !g.paths) pp !g.paths
     pp_substs !g.substs
@@ -160,17 +188,25 @@ let rec add_path_to_discourse ?(for_open = false) env discourse kind lid path =
       let mtd = Env.find_modtype_lazy path env in
       (* D8. If a module type path is in U then any paths used in its definition
          are in *)
+      (* TODO : If a path is in D and it includes another module path within it,
+         then that module path is also in D. *)
       (Lid_trie.union paths mtd.mtd_discourse, substs)
     | Value ->
       (* D4. If a value path is in U and its value description was written by a user -
          as opposed to being inferred - then the paths used in that description are
          in D. *)
+      (* TODO : If a path is in D and it includes another module path within it,
+         then that module path is also in D. *)
       let vd = Env.find_value path env in
       (Lid_trie.union paths vd.val_discourse, substs)
     | Type ->
       (* D6. If a type path is in U then any paths used in its equation or
          representation are in D. *)
+      (* TODO : If a path is in D and it includes another module path within it,
+         then that module path is also in D. *)
       let td = Env.find_type path env in
+      (* What does it mean when such a path is just an ident that is local to
+         another module ?*)
       (Lid_trie.union paths td.type_discourse, substs)
     | _ -> (paths, substs)
   in
@@ -255,11 +291,7 @@ and define_module ?root_path ?root_lid (decl : Types.module_declaration) id =
   define Module ?root_path ?root_lid id;
   let root_lid, root_path = lid_and_path_of_ident ?root_path ?root_lid id in
   match decl.md_type with
-  | Mty_ident path
-  | Mty_alias path
-  | Mty_strengthen ((Mty_ident path | Mty_alias path), _, _) ->
-    (* TODO can we have nested Mty_strengthen ? *)
-    add_subst path root_lid
+  | Mty_ident path | Mty_alias path -> add_subst path root_lid
   | Mty_signature module_type ->
     define_signature ~root_path ~root_lid module_type
   | _ -> ()
@@ -267,7 +299,7 @@ and define_module ?root_path ?root_lid (decl : Types.module_declaration) id =
 and define_modtype ?root_path ?root_lid id =
   define ?root_path ?root_lid Module_type id
 
-let define_signature_for_open ~root_path (sg : Subst.Lazy.signature) =
+let define_signature_for_open _env ~root_path (sg : Subst.Lazy.signature) =
   List.iter
     (fun sig_item ->
       match sig_item with
@@ -291,7 +323,7 @@ let open_module env path =
       let root_path = Env.normalize_module_path None env path in
       let md = Env.find_module_lazy root_path env in
       match md.md_type with
-      | Mty_signature sg -> define_signature_for_open ~root_path sg
+      | Mty_signature sg -> define_signature_for_open env ~root_path sg
       | _ -> ()
     with Not_found -> ()
   end
@@ -302,14 +334,40 @@ let use_modtype env lid path = add_used env Module_type lid path
 let use_type env lid path = add_used env Type lid path
 let use_value env lid path = add_used env Value lid path
 
-let use_constructor _env (constr : Types.constructor_description) =
+let use_constructor env ({ Location.loc; _ } as lid)
+    (constr : Types.constructor_description) =
   if record_usages then begin
+    let () =
+      (* When using a constructor, the modules appearing in its path should be
+         added to U. TODO we might want to do that even if the constructor has
+         been disambiguated. *)
+      match lid.txt with
+      | Longident.Ldot (lid, _) ->
+        (* This find should not load additional CUs, because
+           [lookup_structure_components] was called anyway by the compiler. *)
+        let path, _ = Env.find_module_by_name_lazy lid env in
+        use_module env { Location.txt = lid; loc } path
+      | _ -> ()
+    in
     (* If a constructor is in U then any paths used in its type are in D. *)
     g := { !g with paths = Lid_trie.union !g.paths constr.cstr_discourse }
   end
 
-let use_label _env (label : _ Types.gen_label_description) =
+let use_label env ({ Location.loc; _ } as lid)
+    (label : _ Types.gen_label_description) =
   if record_usages then begin
+    let () =
+      (* When using a label, the modules appearing in its path should be added
+         to U. TODO we might want to do that even if the constructor has been
+         disambiguated. *)
+      match lid.txt with
+      | Longident.Ldot (lid, _) ->
+        (* This find should not load additional CUs, because [lookup_all_labels]
+           was called anyway by the compiler. *)
+        let path, _ = Env.find_module_by_name_lazy lid env in
+        use_module env { Location.txt = lid; loc } path
+      | _ -> ()
+    in
     (* If a label is in U then any paths used in its type are in D. *)
     g := { !g with paths = Lid_trie.union !g.paths label.lbl_discourse }
   end

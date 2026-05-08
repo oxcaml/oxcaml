@@ -180,9 +180,13 @@ let is_constructor_typath p =
   | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, Punboxed_ty) -> false
   | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> true
 
-module T = struct
+include Identifiable.Make(struct
   type nonrec t = t
+  let hash (p : t) = Hashtbl.hash p
   let compare = compare
-end
-module Set = Set.Make(T)
-module Map = Map.Make(T)
+  let equal p p' = compare p p' = 0
+  let print = print
+  let output oc t =
+    let fmt = Format.formatter_of_out_channel oc in
+    print fmt t
+end)

@@ -8546,9 +8546,11 @@ and type_label_access
   let () =
     match labels with
     | Ok ((label1,_) :: _) when label1 == label ->
-        (* We only add labels not used via type-based disambiguation to
-          the discourse. See the [Discourse] module. *)
-        Discourse.use_label env label
+        (* We only add labels not used via type-based disambiguation to the
+          discourse. See the [Discourse] module. A label did not need
+          disambiguation if the selected name is the last introduced in scope.
+        *)
+        Discourse.use_label env lid label
     | _ -> ()
   in
   (record, record_sort, Mode.Value.disallow_right mode,
@@ -9461,8 +9463,10 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     match constrs with
     | Ok (((constr1, _),_) :: _) when constr1 == constr ->
         (* We only add constructors not used via type-based disambiguation to
-           the discourse. See the [Discourse] module. *)
-        Discourse.use_constructor env constr
+           the discourse. See the [Discourse] module. A constructor did not need
+           disambiguation if the selected name is the last introduced in scope.
+        *)
+        Discourse.use_constructor env lid constr
     | _ -> ()
  in
   let sargs =

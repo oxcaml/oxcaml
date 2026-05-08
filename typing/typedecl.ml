@@ -487,8 +487,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          raise(Error(loc, Duplicate_label name));
        all_labels := String.Set.add name !all_labels)
     lbls;
-  let mk {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
-          pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
+  let mk d {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
+            pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
          let is_atomic = Builtin_attributes.has_atomic attrs in
@@ -509,7 +509,9 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
          let arg = Ast_helper.Typ.force_poly arg in
-         let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
+         let cty, discourse = transl_simple_type_with_discourse ~new_var_jkind
+           env ?univars ~closed Mode.Alloc.Const.legacy arg in
+         Discourse_types.union d discourse,
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -518,7 +520,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
       )
   in
-  let lbls = List.map mk lbls in
+  let discourse, lbls = List.fold_left_map mk Discourse_types.empty lbls in
   let lbls' =
     List.map
       (fun ld ->
@@ -538,7 +540,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          }
       )
       lbls in
-  lbls, lbls'
+  lbls, lbls', discourse
 
 let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
   let mk acc_discourse arg =
@@ -574,13 +576,13 @@ let transl_constructor_arguments ~new_var_jkind ~unboxed
       in
       Types.Cstr_tuple flds', Cstr_tuple flds, discourse
   | Pcstr_record l ->
-      let lbls, lbls' =
+      let lbls, lbls', discourse =
         transl_labels ~record_form:Legacy ~new_var_jkind
           env univars closed l (Inlined_record { unboxed })
       in
       Types.Cstr_record lbls',
       Cstr_record lbls,
-      Discourse_types.empty
+      discourse
 
 (* Note that [make_constructor] does not fill in the [ld_jkind] field of any
    computed record types, because it's called too early in the translation of a
@@ -1025,7 +1027,7 @@ let transl_declaration env sdecl (id, uid) =
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None),
           jkind, discourse
       | Ptype_record lbls ->
-          let lbls, lbls' =
+          let lbls, lbls', lbls_discourse =
             transl_labels ~record_form:Legacy ~new_var_jkind:Any
               env None true lbls (Record { unboxed = unbox })
           in
@@ -1042,12 +1044,13 @@ let transl_declaration env sdecl (id, uid) =
               Record_boxed (Array.make (List.length lbls) Jkind.Sort.Const.void),
               Jkind.for_non_float ~why:Boxed_record
           in
+          let discourse = Discourse_types.union discourse lbls_discourse in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind,
           discourse
       | Ptype_record_unboxed_product lbls ->
           Language_extension.assert_enabled ~loc:sdecl.ptype_loc Layouts
             Language_extension.Stable;
-          let lbls, lbls' =
+          let lbls, lbls', lbls_discourse =
             transl_labels ~record_form:Unboxed_product ~new_var_jkind:Any
               env None true lbls Record_unboxed_product
           in
@@ -1059,6 +1062,7 @@ let transl_declaration env sdecl (id, uid) =
               ~level:(Ctype.get_current_level ())
               (List.length lbls)
           in
+          let discourse = Discourse_types.union discourse lbls_discourse in
           Ttype_record_unboxed_product lbls,
           Type_record_unboxed_product(lbls', Record_unboxed_product, None),
           jkind, discourse
