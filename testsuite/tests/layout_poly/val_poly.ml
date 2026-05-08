@@ -491,6 +491,17 @@ module type S =
   sig val foo2 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
 |}]
 
+(* The ordering of the explicitly-quantified type variables matters most in
+   determining the order of layouts. *)
+module type S = sig
+  val poly_ ordering : 'a 'b. 'b -> 'a
+end
+[%%expect {|
+module type S =
+  sig val ordering : layout_ l l0. ('b : l0) ('a : l). 'b -> 'a end
+|}]
+
+
 (* Type scheme with a subset of polymorphic type variables that are explicitly
    forall-bound *)
 module type S = sig
