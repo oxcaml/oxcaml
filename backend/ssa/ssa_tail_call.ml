@@ -1,3 +1,5 @@
+open! Int_replace_polymorphic_compare
+
 [@@@ocaml.warning "+a-40-41-42"]
 
 open Ssa_reducer

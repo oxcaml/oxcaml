@@ -108,6 +108,8 @@ val use_ssa : bool ref
 
 val ssa_simplify : bool ref
 
+val ssa_validate : bool ref
+
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
