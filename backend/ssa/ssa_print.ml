@@ -1,3 +1,5 @@
+open! Int_replace_polymorphic_compare
+
 [@@@ocaml.warning "+a-40-41-42"]
 
 (** Pretty-printer for {!Ssa.Finished_graph} instances.

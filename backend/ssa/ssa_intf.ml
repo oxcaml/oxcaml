@@ -1,3 +1,5 @@
+open! Int_replace_polymorphic_compare
+
 [@@@ocaml.warning "-30"]
 
 (** SSA graph interface.

@@ -1,3 +1,5 @@
+open! Int_replace_polymorphic_compare
+
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
 (** SSA → CFG lowering.
@@ -653,11 +655,10 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
   (** Remove the optimistic prologue [Poll] inserted by
       {!prepend_entry_prologue} unless [Cfg_polling] determines it is required
       for safe-point coverage. *)
-  let drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id
-      ~future_funcnames =
+  let drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id ~funcnames =
     if
       not
-        (Cfg_polling.requires_prologue_poll ~future_funcnames
+        (Cfg_polling.requires_prologue_poll ~future_funcnames:funcnames
            ~fun_name:function_info.fun_name
            ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
     then
@@ -665,7 +666,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       DLL.filter_left entry.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
           not (InstructionId.equal instr.id prologue_poll_instr_id))
 
-  let convert ~keep_unused_ops ~future_funcnames : Cfg_with_layout.t =
+  let convert ~keep_unused_ops ~funcnames : Cfg_with_layout.t =
     (* Start instruction ids at 0, matching [Cfg_selectgen.emit_fundecl]. *)
     Sub_cfg.reset_instr_id ();
     let env = create_env () in
@@ -695,8 +696,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     in
     Select_utils.Stack_offset_and_exn.update_cfg cfg;
     Cfg.register_predecessors_for_all_blocks cfg;
-    drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id
-      ~future_funcnames;
+    drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id ~funcnames;
     let fun_contains_calls =
       Label.Tbl.to_seq_values cfg.blocks
       |> Seq.exists Cfg.basic_block_contains_calls
@@ -706,8 +706,8 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     Cfg_simplify.run cfg_with_layout
 end
 
-let convert ~keep_unused_ops ~future_funcnames (m : (module Ssa.Finished_graph))
-    : Cfg_with_layout.t =
+let convert ~keep_unused_ops ~funcnames (m : (module Ssa.Finished_graph)) :
+    Cfg_with_layout.t =
   let module S = (val m : Ssa.Finished_graph) in
   let module C = Make (S) in
-  C.convert ~keep_unused_ops ~future_funcnames
+  C.convert ~keep_unused_ops ~funcnames

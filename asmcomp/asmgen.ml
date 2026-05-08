@@ -506,67 +506,59 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   | true -> fd)
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
+module Cfg_selection = Cfg_selectgen.Make (Cfg_selection)
+
+let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
+    Cfg_with_layout.t =
+  let report_pipeline_error exn ssa =
+    let bt = Printexc.get_raw_backtrace () in
+    Format.fprintf ppf_dump
+      "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
+      fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl fd_cmm
+      Ssa_print.print ssa;
+    Printexc.raise_with_backtrace exn bt
+  in
+  let ssa = fd_cmm ++ Ssa_of_cmm.convert ++ Ssa_tail_call.run in
+  if !Oxcaml_flags.ssa_validate
+  then begin
+    let cfg_without_ssa =
+      Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+    in
+    let cfg_from_ssa_for_compare =
+      (* First conversion: used only for [Cfg_compare], so we emit a CFG that
+         stays faithful to plain [cfg_selectgen]. *)
+      try Cfg_of_ssa.convert ~keep_unused_ops:true ~funcnames ssa
+      with exn -> report_pipeline_error exn ssa
+    in
+    try
+      Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
+        ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
+    with exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
+      Format.fprintf ppf_dump "*** SSA:@.%a@." Ssa_print.print ssa;
+      Printexc.raise_with_backtrace exn bt
+  end;
+  if !Oxcaml_flags.dump_ssa
+  then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
+  (* Second conversion: produces the CFG that feeds the real pipeline. This is
+     where SSA-level optimizations run. *)
+  let ssa = if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ssa else ssa in
+  if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_simplify
+  then
+    Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
+      ssa;
+  try Cfg_of_ssa.convert ~keep_unused_ops:false ~funcnames ssa
+  with exn -> report_pipeline_error exn ssa
+
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
-  let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
-  ++ (fun (fd_cmm : Cmm.fundecl) ->
-  (if !Oxcaml_flags.use_ssa
-   then (
-     let cfg_without_ssa =
-       Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-     in
-     let ssa = Ssa_of_cmm.convert fd_cmm in
-     let ssa = Ssa_tail_call.run ssa in
-     let cfg_from_ssa_for_compare =
-       (* First conversion: used only for [Cfg_compare], so we emit a CFG that
-          stays faithful to plain [cfg_selectgen]. *)
-       try
-         Cfg_of_ssa.convert ~keep_unused_ops:true ~future_funcnames:funcnames
-           ssa
-       with exn ->
-         let bt = Printexc.get_raw_backtrace () in
-         Format.fprintf ppf_dump
-           "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
-           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
-           fd_cmm Ssa_print.print ssa;
-         Printexc.raise_with_backtrace exn bt
-     in
-     (try
-        Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
-          ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
-      with exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
-        Format.fprintf ppf_dump "*** SSA:@.%a@." Ssa_print.print ssa;
-        Printexc.raise_with_backtrace exn bt);
-     if !Oxcaml_flags.dump_ssa
-     then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
-     (* Second conversion: produces the CFG that feeds the real pipeline. This
-        is where SSA-level optimizations run. *)
-     let ssa =
-       if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ssa else ssa
-     in
-     if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_simplify
-     then
-       Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a"
-         Ssa_print.print ssa;
-     let cfg_final =
-       try
-         Cfg_of_ssa.convert ~keep_unused_ops:true ~future_funcnames:funcnames
-           ssa
-       with exn ->
-         let bt = Printexc.get_raw_backtrace () in
-         Format.fprintf ppf_dump
-           "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
-           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
-           fd_cmm Ssa_print.print ssa;
-         Printexc.raise_with_backtrace exn bt
-     in
-     cfg_final)
-   else Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm)
-  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
+  ++ (if !Oxcaml_flags.use_ssa
+      then compile_via_ssa ~ppf_dump ~funcnames
+      else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "Initial CFG"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend
