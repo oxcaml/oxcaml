@@ -527,10 +527,13 @@ let mk_add_extension add_extension id args =
       ext_args =
         Cstr_tuple
           (List.map
-            (fun (ca_type, ca_sort) ->
+            (fun (ca_type, _ca_sort) ->
+              (* The check above restricts [_ca_sort] to [Sort.Const.scannable]
+                 so reuse the shared [Some] box for it. *)
               {
                 ca_type;
-                ca_sort = Some ca_sort;
+                ca_sort =
+                  Jkind_types.Sort.Const.(some_static scannable);
                 ca_modalities=Mode.Modality.Const.id;
                 ca_loc=Location.none
               })
@@ -578,7 +581,7 @@ let variant constrs =
 
 let unrestricted tvar ca_sort =
   {ca_type=tvar;
-   ca_sort=Some ca_sort;
+   ca_sort=Jkind_types.Sort.Const.some_static ca_sort;
    ca_modalities=Mode.Modality.Const.id;
    ca_loc=Location.none}
 
@@ -708,7 +711,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
-               ld_sort=Some Jkind_types.Sort.Const.scannable;
+               ld_sort=Jkind_types.Sort.Const.(some_static scannable);
                ld_loc=Location.none;
                ld_attributes=[];
                ld_uid=Uid.of_predef_id id;
