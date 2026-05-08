@@ -309,7 +309,7 @@ let dummy_label (type rep) (record_form : rep record_form)
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
     lbl_sort = None;
     lbl_pos = -1; lbl_all = [||];
-    lbl_repres = Some repres;
+    lbl_repres = repres;
     lbl_private = Public;
     lbl_loc = Location.none;
     lbl_attributes = [];
@@ -318,7 +318,6 @@ let dummy_label (type rep) (record_form : rep record_form)
 
 let label_descrs record_form ty_res lbls repres priv =
   let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
-  let lbl_repres = Some repres in
   let rec describe_labels pos = function
       [] -> []
     | l :: rest ->
@@ -331,7 +330,7 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_sort = l.ld_sort;
             lbl_pos = pos;
             lbl_all = all_labels;
-            lbl_repres;
+            lbl_repres = repres;
             lbl_private = priv;
             lbl_loc = l.ld_loc;
             lbl_attributes = l.ld_attributes;

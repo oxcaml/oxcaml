@@ -694,10 +694,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let repres =
         match lbl.lbl_repres with
-        | Some repres -> repres
-        | None ->
+        | Record_variable ->
             Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
               lbl.lbl_name
+        | repres -> repres
       in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl repres in
       let loc = of_location ~scopes e.exp_loc in

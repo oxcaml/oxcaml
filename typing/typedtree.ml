@@ -1710,7 +1710,7 @@ let label_sort (type rep)
       (record_form : rep record_form)
       (label : rep gen_label_description) record_sorts =
   match record_form, label.lbl_repres with
-  | Legacy, Some Record_unboxed -> `Same_as_record_sort
+  | Legacy, Record_unboxed -> `Same_as_record_sort
   | _ ->
     begin match record_sorts, label.lbl_sort with
     | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)

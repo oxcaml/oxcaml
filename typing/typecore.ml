@@ -1726,14 +1726,12 @@ let is_variable_repres : type rep. rep record_form -> rep -> bool =
     | Unboxed_product, Record_unboxed_product_variable -> true
     | _ -> false
 
-(* Treats [Some Record_variable] / [Some Record_unboxed_product_variable] as
-   [None]: in both cases the representation cannot be determined from the
-   declaration alone. *)
+(* Returns [None] when the representation cannot be determined from the
+   declaration alone (i.e. [Record_variable] /
+   [Record_unboxed_product_variable]); otherwise [Some rep]. *)
 let determined_lbl_repres (type rep) (form : rep record_form)
-      (repres : rep option) : rep option =
-  match repres with
-  | None -> None
-  | Some rep -> if is_variable_repres form rep then None else Some rep
+      (rep : rep) : rep option =
+  if is_variable_repres form rep then None else Some rep
 
 let update_labels (type rep) env (form : rep record_form) ~representative_label
       ~loc ~containing_type
@@ -2547,10 +2545,9 @@ module Label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Legacy ~loc usage path env
   let in_env lbl =
     match lbl.lbl_repres with
-    | Some (Record_boxed | Record_float | Record_ufloat | Record_unboxed
-           | Record_mixed _ | Record_dummy _ | Record_variable)
-    | None -> true
-    | Some (Record_inlined _) -> false
+    | Record_boxed | Record_float | Record_ufloat | Record_unboxed
+    | Record_mixed _ | Record_dummy _ | Record_variable -> true
+    | Record_inlined _ -> false
 end)
 
 module Unboxed_label = NameChoice (struct
@@ -2564,8 +2561,7 @@ module Unboxed_label = NameChoice (struct
       env
   let in_env (lbl : t) =
     match lbl.lbl_repres with
-    | Some (Record_unboxed_product | Record_unboxed_product_variable)
-    | None  -> true
+    | Record_unboxed_product | Record_unboxed_product_variable -> true
 end)
 
 let label_get_type_path
@@ -6276,24 +6272,21 @@ and type_expect_
           lid_sexp_list
       in
       let repres_might_allocate (type rep) (record_form : rep record_form)
-            (rep : rep option) =
+            (rep : rep) =
         match record_form with
         | Legacy -> begin match rep with
-          | Some Record_unboxed
-          | Some (Record_inlined (_, _, (Variant_unboxed | Variant_with_null)))
+          | Record_unboxed
+          | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
             -> false
-          | Some (Record_boxed | Record_float | Record_ufloat | Record_mixed _
-                 | Record_inlined (_, _, (Variant_boxed _
-                                         | Variant_extensible)))
-          | Some Record_variable
-          | None
+          | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+          | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
+          | Record_variable
             -> true
-          | Some (Record_dummy _) ->
+          | Record_dummy _ ->
             Misc.fatal_error "type_expect: dummy record representation"
         end
         | Unboxed_product -> begin match rep with
-          | Some (Record_unboxed_product | Record_unboxed_product_variable)
-          | None -> false
+          | Record_unboxed_product | Record_unboxed_product_variable -> false
         end
       in
       let is_boxed =
@@ -8285,8 +8278,8 @@ and type_block_access env expected_base_ty principal
           to [float#] here because it could be a singleton unboxed record
           containing a float, and thus be followed by an unboxed access *)
       match label.lbl_repres with
-      | Some Record_boxed -> false
-      | Some (Record_mixed mixed) ->
+      | Record_boxed -> false
+      | Record_mixed mixed ->
         begin match mixed.(label.lbl_pos) with
         | Float_boxed -> true
         | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32 | Bits64
@@ -8294,16 +8287,15 @@ and type_block_access env expected_base_ty principal
         | Untagged_immediate ->
           false
         end
-      | Some Record_float -> true
-      | Some Record_ufloat -> false
-      | Some Record_unboxed ->
+      | Record_float -> true
+      | Record_ufloat -> false
+      | Record_unboxed ->
         raise (Error (lid.loc, env, Block_access_record_unboxed))
-      | Some (Record_inlined _) ->
+      | Record_inlined _ ->
         Misc.fatal_error "Typecore.type_block_access: inlined record"
-      | Some (Record_dummy _) ->
+      | Record_dummy _ ->
         Misc.fatal_error "Typecore.type_block_access: dummy representation"
-      | Some Record_variable
-      | None ->
+      | Record_variable ->
         (* Records with [any] fields are never flattened *)
         false
     in
