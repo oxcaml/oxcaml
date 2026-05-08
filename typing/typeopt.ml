@@ -725,21 +725,25 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited cstrs rep)
-        | Type_record (labels, Some rep, _) ->
+        | Type_record (_, Record_variable, _) ->
+          num_nodes_visited, non_nullable Pgenval
+        | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
+        | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
+          num_nodes_visited, nullable Pgenval
         | Type_record_unboxed_product ([{ld_type}],
-                                       Some Record_unboxed_product, _) ->
+                                       Record_unboxed_product, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () ->
                value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type)
         | Type_record_unboxed_product (([] | _::_::_),
-                                       (Some Record_unboxed_product | None),
+                                       Record_unboxed_product,
                                        _) ->
           Misc.fatal_error
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
@@ -748,10 +752,6 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           add_nullability_from_ty env scty
             (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
-        | Type_record (_, None, _) ->
-          num_nodes_visited, non_nullable Pgenval
-        | Type_record_unboxed_product (_, None, _) ->
-          num_nodes_visited, nullable Pgenval
     end
   | Ttuple labeled_fields ->
     if cannot_proceed () then
@@ -1035,6 +1035,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
+  | Record_variable ->
+    Misc.fatal_error
+      "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
@@ -1047,7 +1050,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed | Record_dummy _ ->
+          | Record_unboxed | Record_dummy _ | Record_variable ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -1068,7 +1071,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                       | Record_inlined _ | Record_boxed ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _ ->
+                      | Record_mixed _ | Record_unboxed | Record_dummy _
+                      | Record_variable ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1097,6 +1101,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
           | Record_dummy _ -> assert false
+          | Record_variable -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))

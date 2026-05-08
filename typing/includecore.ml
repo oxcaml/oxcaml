@@ -1001,7 +1001,7 @@ module Record_diffing = struct
 
   let compare_with_representation (type rep) ~loc
         (record_form : rep record_form) env params1 params2 l r
-        (rep1 : rep option) (rep2 : rep option) =
+        (rep1 : rep) (rep2 : rep) =
     if not (equal ~loc env params1 params2 l r) then
       let patch = diffing loc env params1 params2 l r in
       Some (Record_mismatch (Label_mismatch patch))
@@ -1009,10 +1009,10 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
-        | None, None -> None
-        | Some _, None -> Some (Fixed_representation First)
-        | None, Some _ -> Some (Fixed_representation Second)
-        | Some rep1, Some rep2 ->
+        | Record_variable, Record_variable -> None
+        | Record_variable, _ -> Some (Fixed_representation Second)
+        | _, Record_variable -> Some (Fixed_representation First)
+        | rep1, rep2 ->
           begin match rep1, rep2 with
           | Record_unboxed, Record_unboxed -> None
           | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
@@ -1053,15 +1053,20 @@ module Record_diffing = struct
           | Record_dummy _, _ | _, Record_dummy _ ->
             Misc.fatal_error
               "compare_with_representation: dummy record representation"
+          | Record_variable, _ | _, Record_variable ->
+            (* Outer match guards against this. *)
+            assert false
           end
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | None, None
-        | Some Record_unboxed_product, Some Record_unboxed_product ->
+        | Record_unboxed_product_variable, Record_unboxed_product_variable
+        | Record_unboxed_product, Record_unboxed_product ->
             None
-        | Some _, None -> Some (Fixed_representation First)
-        | None, Some _ -> Some (Fixed_representation Second)
+        | Record_unboxed_product, Record_unboxed_product_variable ->
+            Some (Fixed_representation First)
+        | Record_unboxed_product_variable, Record_unboxed_product ->
+            Some (Fixed_representation Second)
         end
 end
 

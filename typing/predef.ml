@@ -720,7 +720,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ("pos_bol", type_int);
            ("pos_cnum", type_int) ]
          in
-         Type_record (labels, Some Record_boxed, None)
+         Type_record (labels, Record_boxed, None)
        )
        (* Fields are [int] and [string], so [immutable_data] already captures
           their direct contribution. Encoding this directly avoids predef-time

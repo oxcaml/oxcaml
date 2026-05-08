@@ -260,11 +260,15 @@ let record_representation i ppf = let open Types in function
     line i ppf "Record_dummy [@@represent_as_float_array]\n"
   | Record_dummy { represent_as_float_array = false } ->
     line i ppf "Record_dummy\n"
+  | Record_variable ->
+    line i ppf "Record_variable\n"
 
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
     line i ppf "Record_unboxed_product\n"
+  | Record_unboxed_product_variable ->
+    line i ppf "Record_unboxed_product_variable\n"
 
 let attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.Parsetree.attr_name.txt;

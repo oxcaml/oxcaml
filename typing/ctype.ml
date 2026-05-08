@@ -2879,7 +2879,8 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
       let type_decl = Env.find_type p env in
       let jkind =
         match type_decl.type_kind with
-        | Type_record_unboxed_product (lbls, None, _) when expand_components ->
+        | Type_record_unboxed_product (lbls, Record_unboxed_product_variable, _)
+          when expand_components ->
           (* This is an unboxed product with at least one [any] field, so we
              need to recompute the jkind if we want it to be precise *)
           let label_params_and_tys, record_params =
@@ -4331,15 +4332,14 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     else
       match decl.type_kind, decl'.type_kind with
       | Type_record (lst,r,umc), Type_record (lst',r',umc')
-        when Option.equal equal_record_representation_up_to_scannable_axes r r'
+        when equal_record_representation_up_to_scannable_axes r r'
         ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_record_unboxed_product (lst,r,umc),
         Type_record_unboxed_product (lst',r',umc')
-        when Option.equal
-               equal_record_unboxed_product_representation_up_to_scannable_axes
+        when equal_record_unboxed_product_representation_up_to_scannable_axes
                r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
@@ -8416,7 +8416,7 @@ let check_decl_jkind env decl jkind =
        above CRs. *)
     | Type_record (
         [{ ld_type = inner_ty; ld_modalities = modality }],
-        Some Record_unboxed, None), _
+        Record_unboxed, None), _
     | Type_record_unboxed_product ([{ ld_type = inner_ty;
                                       ld_modalities = modality }], _, None), _
     | Type_variant (

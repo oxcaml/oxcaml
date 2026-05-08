@@ -569,8 +569,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     | None ->
                         let rep =
                           match rep with
-                          | Some rep -> rep
-                          | None ->
+                          | Record_variable ->
                               let label_params_and_types, record_params =
                                 Ctype.instance_label_declarations
                                   ~fixed:false
@@ -584,13 +583,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                   lbl_list
                                   (label_params_and_types |> Array.to_list)
                               in
-                              match
+                              (match
                                 Typedecl.update_record_representation env
                                   Location.none Legacy lds_and_types
                               with
                               | Ok (_sorts, rep) -> rep
                               | Error _ ->
-                                  Misc.fatal_error "unrepresentable record"
+                                  Misc.fatal_error "unrepresentable record")
+                          | rep -> rep
                         in
                         let pos =
                           match rep with
@@ -621,6 +621,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                 else Outval_record_boxed
                           | Record_dummy _ ->
                               Misc.fatal_error "dummy record representation"
+                          | Record_variable ->
+                              Misc.fatal_error "variable record representation"
                         in
                         tree_of_record_fields depth
                           env path decl.type_params ty_list

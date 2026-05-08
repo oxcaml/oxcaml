@@ -585,16 +585,16 @@ module Type_decl_shape = struct
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
-          | Some Record_boxed ->
+          | Record_boxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
-          | Some (Record_mixed fields) ->
+          | Record_mixed fields ->
             record_of_labels ~shape_for_constr ~type_subst
               (Record_mixed (Array.map mixed_block_shape_to_layout fields))
               lbl_list
-          | Some Record_unboxed ->
+          | Record_unboxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_unboxed
               lbl_list
-          | Some (Record_float | Record_ufloat) ->
+          | Record_float | Record_ufloat ->
             let lbl_list =
               List.map
                 (fun (lbl : Types.label_declaration) ->
@@ -609,7 +609,7 @@ module Type_decl_shape = struct
             in
             record_of_labels ~shape_for_constr ~type_subst Record_floats
               lbl_list
-          | Some (Record_inlined _) ->
+          | Record_inlined _ ->
             if !Clflags.dwarf_pedantic
             then
               Misc.fatal_error
@@ -619,9 +619,8 @@ module Type_decl_shape = struct
                  [Foo { a : int; b : int }], then [r] is an inline record in \
                  [match e with Foo r -> ...]."
             else unknown_shape ()
-          | Some (Record_dummy _) ->
-            Misc.fatal_error "unexpected dummy representation"
-          | None -> unknown_shape ())
+          | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+          | Record_variable -> unknown_shape ())
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->

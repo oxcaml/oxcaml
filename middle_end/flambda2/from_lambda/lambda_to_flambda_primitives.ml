@@ -2145,6 +2145,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           Printlambda.primitive prim
       | Record_dummy _ ->
         Misc.fatal_error "convert_lprim: Pduprecord: dummy representation"
+      | Record_variable ->
+        Misc.fatal_error "convert_lprim: Pduprecord: variable representation"
     in
     [Unary (Duplicate_block { kind }, arg)]
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]

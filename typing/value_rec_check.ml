@@ -819,6 +819,9 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_variable ->
+            Misc.fatal_error
+              "value_rec_check: unexpected unknown representation"
         in
         let field (label, _sort, field_def) =
           let env =
@@ -848,6 +851,9 @@ let rec expression : Typedtree.expression -> term_judg =
           array field es;
           option expression (Option.map fst eo) << Dereference
         ]
+      | Record_unboxed_product_variable ->
+        Misc.fatal_error
+          "value_rec_check: unexpected unknown unboxed-product representation"
       end
     | Texp_ifthenelse (cond, ifso, ifnot) ->
       (*
