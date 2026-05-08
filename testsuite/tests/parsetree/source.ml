@@ -7490,3 +7490,8 @@ type t = String.( t )
 
 let x: [`A] :> [> `A | `B ] = `A
 let x :> [> `A | `B ] = `A
+
+(* Return annotations on anonymous functions that require parens. *)
+let f = [fun x : (int -> int) -> x]
+
+let g = [fun x : (_ as 'a) -> x]
