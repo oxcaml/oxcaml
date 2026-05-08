@@ -1656,28 +1656,43 @@ let transl_type_scheme_poly_val env styp =
     | Ptyp_poly (vars, styp) -> vars, styp
     | _ -> [], styp
   in
-  let cty =
-    with_local_level begin fun () ->
-      TyVarEnv.reset ();
-      List.iter
-        (fun (name_loc, jkind_opt) ->
-           let name = name_loc.txt in
-           if Option.is_some jkind_opt then
-             let jkind =
-               jkind_of_annotation env
-                 (Type_variable ("'" ^ name)) [] (Option.get jkind_opt)
-             in
-             let var = newvar ~name jkind in
-             TyVarEnv.add name var jkind (Env.stage env))
-        vars;
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false
-        Alloc.Const.legacy styp
-    end
-    ~post:generalize_ctyp
+  let cty, preregistered =
+    with_local_level
+      begin fun () ->
+        TyVarEnv.reset ();
+        let preregistered =
+          List.map
+            (fun (name_loc, jkind_opt) ->
+              let name = name_loc.txt in
+              let jkind =
+                match jkind_opt with
+                | Some jkind_annot ->
+                  jkind_of_annotation env
+                    (Type_variable ("'" ^ name)) [] jkind_annot
+                | None ->
+                  let level = get_current_level () in
+                  Jkind.of_new_legacy_sort ~why:Unification_var ~level
+              in
+              let var = newvar ~name jkind in
+              TyVarEnv.add name var jkind (Env.stage env);
+              var)
+            vars
+        in
+        let cty =
+          transl_simple_type ~new_var_jkind:Sort env ~closed:false
+            Alloc.Const.legacy styp
+        in
+        cty, preregistered
+      end
+      ~post:(fun (cty, _) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
+  let declared_sort_vars =
+    List.concat_map generalize_layout_variables preregistered
+  in
   let ety = Subst.type_expr Subst.identity ty in
-  let sort_vars = generalize_layout_variables ety in
+  let body_sort_vars = generalize_layout_variables ety in
+  let sort_vars = declared_sort_vars @ body_sort_vars in
   let vars_names_loc =
     List.map (fun v -> mknoloc (Jkind_types.Sort.Var.name v)) sort_vars
   in
