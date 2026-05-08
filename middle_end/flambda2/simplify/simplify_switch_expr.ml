@@ -617,6 +617,28 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
            scrutinee ))
       dbg
   in
+  (* When the scrutinee was produced by [Untag_immediate], CSE knows the
+     tagged version. If the slope is even and we are on a 64-bit target, we
+     can compute the result directly from the tagged form, saving a shift:
+     [v * slope + offset] where [v] is the untagged scrutinee equals
+     [t * (slope/2) + (offset - slope/2)] where [t] is the tagged scrutinee
+     viewed as a naked_int64 (since [t = 2v + 1]). The view from value to
+     naked_int64 is a no-op at the Cmm level. *)
+  let try_via_tagged_int64 ~slope ~offset =
+    if (not (Target_system.is_64_bit ())) || not (Int64.equal (Int64.rem slope 2L) 0L)
+    then None
+    else
+      match
+        find_cse_simple ~required:false dacc_before_switch
+          (UA.required_names uacc)
+          (P.Unary (Tag_immediate, scrutinee))
+      with
+      | None -> None
+      | Some tagged_scrutinee ->
+        let half_slope = Int64.div slope 2L in
+        let new_offset = Int64.sub offset half_slope in
+        Some (tagged_scrutinee, half_slope, new_offset)
+  in
   run ~dacc_before_switch uacc
     (match affine_form with
     | Naked_immediate { offset; slope } ->
@@ -643,15 +665,29 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
         K.Standard_int.Naked_int32
         (Reg_width_const.naked_int32 slope)
         (Reg_width_const.naked_int32 offset)
-    | Naked_int64 { offset; slope } ->
-      let$ scrutinee_int64 =
-        convert_scrutinee K.Standard_int_or_float.Naked_int64 K.naked_int64
-          "scrutinee_int64"
-      in
-      rebuild_affine_expr scrutinee_int64 K.naked_int64
-        K.Standard_int.Naked_int64
-        (Reg_width_const.naked_int64 slope)
-        (Reg_width_const.naked_int64 offset)
+    | Naked_int64 { offset; slope } -> (
+      match try_via_tagged_int64 ~slope ~offset with
+      | Some (tagged_scrutinee, new_slope, new_offset) ->
+        let$ scrutinee_int64 =
+          bound_prim "scrutinee_int64" K.naked_int64
+            (P.Unary
+               ( Reinterpret_64_bit_word Tagged_int63_as_unboxed_int64,
+                 tagged_scrutinee ))
+            dbg
+        in
+        rebuild_affine_expr scrutinee_int64 K.naked_int64
+          K.Standard_int.Naked_int64
+          (Reg_width_const.naked_int64 new_slope)
+          (Reg_width_const.naked_int64 new_offset)
+      | None ->
+        let$ scrutinee_int64 =
+          convert_scrutinee K.Standard_int_or_float.Naked_int64 K.naked_int64
+            "scrutinee_int64"
+        in
+        rebuild_affine_expr scrutinee_int64 K.naked_int64
+          K.Standard_int.Naked_int64
+          (Reg_width_const.naked_int64 slope)
+          (Reg_width_const.naked_int64 offset))
     | Naked_nativeint { offset; slope } ->
       let$ scrutinee_nativeint =
         convert_scrutinee K.Standard_int_or_float.Naked_nativeint
