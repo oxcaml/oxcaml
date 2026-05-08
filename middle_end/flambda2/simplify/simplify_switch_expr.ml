@@ -378,7 +378,9 @@ let ( let$ ) (name, kind, prim, dbg) k uacc ~dacc_before_switch =
   | None ->
     let named = Named.create_prim prim dbg in
     let var = Variable.create name kind in
-    let uacc = UA.add_free_names uacc (NO.singleton_variable var NM.normal) in
+    (* Don't add [var] to [uacc]'s free names here: [k] will add the references
+       coming from the body, and inflating the count would cause To_cmm to
+       misclassify this binding as multi-use and not inline it. *)
     let body, uacc = k (Simple.var var) uacc ~dacc_before_switch in
     let duid = Flambda_debug_uid.none in
     let machine_width = UE.machine_width (UA.uenv uacc) in
