@@ -101,7 +101,8 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Some Jkind_types.Sort.Const.scannable;
+          ca_sort =
+            Jkind_types.Sort.Const.(some_static scannable);
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }

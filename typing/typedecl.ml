@@ -1769,7 +1769,9 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
-      let ld_sort = Option.map Jkind.Sort.default_to_scannable_and_get sort in
+      let ld_sort =
+        Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+      in
       ld_sort, jkind
     ) types
   in
@@ -1805,7 +1807,7 @@ let update_constructor_arguments_sorts env loc cd_args =
           let jkind = Ctype.type_jkind env ca_type in
           let sort = Jkind.sort_option_of_jkind env jkind in
           let ca_sort =
-            Option.map Jkind.Sort.default_to_scannable_and_get sort
+            Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
           in
           {arg with ca_sort}, jkind)
         args
@@ -2237,7 +2239,9 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       Jkind.apply_modality_l lbl.Types.ld_modalities
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
-    let ld_sort = Option.map Jkind.Sort.default_to_scannable_and_get sort in
+    let ld_sort =
+      Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+    in
     let rep =
       (* Weirdly, we CAN give the record a representation even if its kind is
          [any]. This works because the representation doesn't include a sort,
@@ -2403,7 +2407,7 @@ let rec update_decl_jkind env dpath decl =
             payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
         let jkind = Ctype.type_jkind env ty in
         let sort = Jkind.sort_of_jkind env jkind in
-        let ca_sort = Jkind.Sort.default_to_scannable_and_get sort in
+        let ca_sort = Jkind.Sort.default_to_scannable_and_get_some sort in
         let cstrs =
           List.map
             (fun (cstr : Types.constructor_declaration) ->
@@ -2413,7 +2417,7 @@ let rec update_decl_jkind env dpath decl =
                    { cstr with
                      cd_args =
                        Cstr_tuple
-                         [{ ca_type; ca_sort = Some ca_sort; ca_modalities;
+                         [{ ca_type; ca_sort; ca_modalities;
                             ca_loc }] }
                  | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
                    Misc.fatal_error "Invalid constructor for Variant_with_null"
@@ -2439,7 +2443,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ca_sort =
-              Option.map Jkind.Sort.default_to_scannable_and_get sort
+              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
             in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
@@ -2449,7 +2453,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ld_sort =
-              Option.map Jkind.Sort.default_to_scannable_and_get sort
+              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
             in
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
