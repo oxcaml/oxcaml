@@ -899,7 +899,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       | _ -> assert false
     end
-  | Variant_boxed cstrs_and_sorts ->
+  | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
@@ -981,9 +981,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            match cstrs_and_sorts.(idx) with
-            | None -> None
-            | Some (cstr_shape, _) ->
+            match cstr_layouts.(idx) with
+            | Cstr_layout_variable -> None
+            | Cstr_layout_known { shape = cstr_shape; _ } ->
                 let (is_mutable, num_nodes_visited), fields =
                   for_one_constructor constructor ~depth ~num_nodes_visited
                     ~cstr_shape

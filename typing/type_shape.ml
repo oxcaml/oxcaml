@@ -442,8 +442,8 @@ module Type_decl_shape = struct
               lbl.ld_sort)
           list
     in
-    match arg_layout, args with
-    | Some (constructor_repr, _), Some args ->
+    match (arg_layout : Types.cstr_layout), args with
+    | Cstr_layout_known { shape = constructor_repr; _ }, Some args ->
       let constructor_repr =
         match (constructor_repr : Types.constructor_representation) with
         | Constructor_mixed shapes ->
@@ -488,7 +488,7 @@ module Type_decl_shape = struct
           kind = constructor_repr;
           args
         }
-    | _, _ -> None
+    | Cstr_layout_known _, None | Cstr_layout_variable, _ -> None
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     match cstr_args.cd_args with

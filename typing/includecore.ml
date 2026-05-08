@@ -1237,11 +1237,15 @@ module Variant_diffing = struct
   let compare_with_representation ~loc env params1 params2
       cstrs1 cstrs2 rep1 rep2
     =
+    let shape_of_layout = function
+      | Cstr_layout_known { shape; _ } -> Some shape
+      | Cstr_layout_variable -> None
+    in
     let shapes1, shapes2 =
       match rep1, rep2 with
-      | Variant_boxed cstr_shapes1, Variant_boxed cstr_shapes2 ->
-          Array.map (Option.map fst) cstr_shapes1 |> Array.to_list,
-          Array.map (Option.map fst) cstr_shapes2 |> Array.to_list
+      | Variant_boxed cstr_layouts1, Variant_boxed cstr_layouts2 ->
+          Array.map shape_of_layout cstr_layouts1 |> Array.to_list,
+          Array.map shape_of_layout cstr_layouts2 |> Array.to_list
       | _, _ ->
           (* Only need to compare shapes in the boxed-versus-boxed case. In
              other cases, either the comparison is doomed anyway due to

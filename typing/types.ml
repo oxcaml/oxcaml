@@ -517,10 +517,16 @@ and record_unboxed_product_representation =
 
 and variant_representation =
   | Variant_unboxed
-  | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t array) option array
+  | Variant_boxed of cstr_layout array
   | Variant_extensible
   | Variant_with_null
+
+and cstr_layout =
+  | Cstr_layout_known of
+      { shape : constructor_representation;
+        sorts : Jkind_types.Sort.Const.t array;
+      }
+  | Cstr_layout_variable
 
 and constructor_representation =
   | Constructor_uniform_value
@@ -946,14 +952,17 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
-  | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
+  | Variant_boxed layouts1, Variant_boxed layouts2 ->
       Misc.Stdlib.Array.equal
-        (Option.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation_up_to_scannable_axes cstr1 cstr2
-          && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
-               sorts1 sorts2))
-        cstrs_and_sorts1
-        cstrs_and_sorts2
+        (fun l1 l2 -> match l1, l2 with
+           | Cstr_layout_variable, Cstr_layout_variable -> true
+           | Cstr_layout_known { shape = s1; sorts = ss1 },
+             Cstr_layout_known { shape = s2; sorts = ss2 } ->
+             equal_constructor_representation_up_to_scannable_axes s1 s2
+             && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
+           | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
+        layouts1
+        layouts2
   | Variant_extensible, Variant_extensible ->
       true
   | Variant_with_null, Variant_with_null -> true

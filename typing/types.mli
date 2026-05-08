@@ -965,19 +965,30 @@ and record_unboxed_product_representation =
 
 and variant_representation =
   | Variant_unboxed
-  | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t array) option array
-  (* The outer array has an element for each constructor. Each inner array
-     has a jkind for each argument of the corresponding constructor.
-
-     A constructor with an inlined record argument has a length-1 inner array.
-     Its single element is the jkind of the record itself. (It doesn't have a
-     jkind for each field.) However, the constructor representation is about the
-     fields of the record, not the record itself; that is, it will be
-     [Constructor_mixed] if the inlined record has any unboxed fields.
+  | Variant_boxed of cstr_layout array
+  (* The array has an element for each constructor. See [cstr_layout].
   *)
   | Variant_extensible
   | Variant_with_null
+
+and cstr_layout =
+  | Cstr_layout_known of
+      { shape : constructor_representation;
+        sorts : Jkind_types.Sort.Const.t array;
+        (* [sorts] has a jkind for each argument of the corresponding
+           constructor.
+
+           A constructor with an inlined record argument has a length-1 inner
+           array. Its single element is the jkind of the record itself. (It
+           doesn't have a jkind for each field.) However, [shape] is about the
+           fields of the record, not the record itself; that is, it will be
+           [Constructor_mixed] if the inlined record has any unboxed fields.
+        *)
+      }
+  | Cstr_layout_variable
+  (* The constructor's payload contains a field of layout [any], so neither
+     its [shape] nor the [sorts] of its arguments can be determined at
+     typedecl time. Counterpart of [Record_variable] for variants. *)
   (* CR layouts v3.5: A custom variant representation for ['a or_null].
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one

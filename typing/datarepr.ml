@@ -138,7 +138,7 @@ let find_variant_with_null_payload cstrs =
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
-  let cstr_shapes_and_arg_sorts, is_unboxed =
+  let cstr_layouts, is_unboxed =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
     | Variant_boxed x, _ -> x, false
@@ -155,48 +155,51 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       begin match cd_args with
       | Cstr_tuple [{ ca_sort = Some sort }]
       | Cstr_record [{ ld_sort = Some sort }] ->
-        [| Some (Constructor_uniform_value, [| sort |]) |],
+        [| Cstr_layout_known
+             { shape = Constructor_uniform_value; sorts = [| sort |] } |],
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
-        [| None |], true
+        [| Cstr_layout_variable |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
     | Variant_unboxed, ([] | _ :: _) ->
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
     | Variant_with_null, _ ->
-      let shape cstr =
+      let layout cstr =
         match classify_variant_with_null_constructor cstr with
         | Variant_with_null_nullary ->
-          Some (Constructor_uniform_value, [| |])
+          Cstr_layout_known
+            { shape = Constructor_uniform_value; sorts = [| |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
-          Some (Constructor_uniform_value, [| sort |])
+          Cstr_layout_known
+            { shape = Constructor_uniform_value; sorts = [| sort |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = None; _ }; _ } ->
           (* Sort may be [None] during the recursive-decl temp-env phase
              (see Note [Default jkinds in transl_declaration] in typedecl.ml);
              the temp-env descriptors are not consumed, and the real ones are
              recomputed after [update_decls_jkind] fills the sorts. *)
-          None
+          Cstr_layout_variable
       in
-      Array.of_list (List.map shape cstrs), false
+      Array.of_list (List.map layout cstrs), false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Array.map
-      (fun shape_and_arg_sorts_opt ->
+      (fun layout ->
          let all_void =
-           match shape_and_arg_sorts_opt with
-           | None ->
+           match layout with
+           | Cstr_layout_variable ->
              (* Someday we'll want to let a constructor be constant iff the type
                 argument is void (after all, [unit# option] is [bool]), but
                 we're not there yet. For now, assume [Some #()] (so to speak) is
                 an empty block, which is to say, assume that unknown sorts
                 aren't all void. *)
              false
-           | Some (_, sorts) ->
+           | Cstr_layout_known { sorts; _ } ->
              Array.for_all Jkind_types.Sort.Const.all_void sorts
          in
          (* constant constructors are constructors of non-[@@unboxed] variants
@@ -204,7 +207,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          let is_const = all_void && not is_unboxed in
          if is_const then incr num_consts else incr num_nonconsts;
          is_const)
-      cstr_shapes_and_arg_sorts
+      cstr_layouts
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
         {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
@@ -214,7 +217,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Some ty_res' -> ty_res'
       | None -> ty_res
     in
-    let cstr_shape = Option.map fst cstr_shapes_and_arg_sorts.(src_index) in
+    let cstr_shape =
+      match cstr_layouts.(src_index) with
+      | Cstr_layout_known { shape; _ } -> Some shape
+      | Cstr_layout_variable -> None
+    in
     let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
       if cstr_constant
