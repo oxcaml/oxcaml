@@ -1,7 +1,8 @@
 type ('a : value non_float) t =
   { mutable foo : 'a; mutable bar : 'a }
 
-external get : ('a : value_or_null) ('b : value non_float). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+external get : ('a : value_or_null) ('b : value non_float).
+  'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
 
 (*
 let safe_get1 is_bar t =

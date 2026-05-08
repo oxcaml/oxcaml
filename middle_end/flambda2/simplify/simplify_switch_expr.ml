@@ -617,15 +617,17 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
            scrutinee ))
       dbg
   in
-  (* When the scrutinee was produced by [Untag_immediate], CSE knows the
-     tagged version. If the slope is even and we are on a 64-bit target, we
-     can compute the result directly from the tagged form, saving a shift:
-     [v * slope + offset] where [v] is the untagged scrutinee equals
-     [t * (slope/2) + (offset - slope/2)] where [t] is the tagged scrutinee
-     viewed as a naked_int64 (since [t = 2v + 1]). The view from value to
-     naked_int64 is a no-op at the Cmm level. *)
+  (* When the scrutinee was produced by [Untag_immediate], CSE knows the tagged
+     version. If the slope is even and we are on a 64-bit target, we can compute
+     the result directly from the tagged form, saving a shift: [v * slope +
+     offset] where [v] is the untagged scrutinee equals [t * (slope/2) + (offset
+     - slope/2)] where [t] is the tagged scrutinee viewed as a naked_int64
+     (since [t = 2v + 1]). The view from value to naked_int64 is a no-op at the
+     Cmm level. *)
   let try_via_tagged_int64 ~slope ~offset =
-    if (not (Target_system.is_64_bit ())) || not (Int64.equal (Int64.rem slope 2L) 0L)
+    if
+      (not (Target_system.is_64_bit ()))
+      || not (Int64.equal (Int64.rem slope 2L) 0L)
     then None
     else
       match
