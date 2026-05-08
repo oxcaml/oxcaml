@@ -1105,7 +1105,8 @@ let transl_declaration env sdecl (id, uid) =
                        Array.make (List.length args) Jkind.Sort.Const.void
                      | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                    in
-                   Some (Constructor_uniform_value, sorts))
+                   Cstr_layout_known
+                     { shape = Constructor_uniform_value; sorts })
                 (Array.of_list cstrs)
             ),
           Jkind.for_non_float ~why:Boxed_variant
@@ -2462,7 +2463,7 @@ let rec update_decl_jkind env dpath decl =
         | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
           assert false
       end
-    | cstrs, Variant_boxed cstr_shapes ->
+    | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
           let cd_args, _all_void, jkinds, arg_sorts =
@@ -2476,11 +2477,11 @@ let rec update_decl_jkind env dpath decl =
           in
           let () =
             match cstr_repr, arg_sorts with
-            | Ok cstr_repr, Some arg_sorts ->
-                cstr_shapes.(idx) <- Some (cstr_repr, arg_sorts)
+            | Ok shape, Some sorts ->
+                cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
             | Ok _, None ->
                 Misc.fatal_error "Representation but no arg sorts?"
-            | _, _ -> cstr_shapes.(idx) <- None
+            | _, _ -> cstr_layouts.(idx) <- Cstr_layout_variable
           in
           let cstr = { cstr with Types.cd_args } in
           cstr
@@ -2494,7 +2495,7 @@ let rec update_decl_jkind env dpath decl =
           ~get_free_vars:(Ctype.free_variable_set_of_list env)
           (List.rev cstrs)
       in
-      cstrs, Variant_boxed cstr_shapes, jkind
+      cstrs, Variant_boxed cstr_layouts, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
   in

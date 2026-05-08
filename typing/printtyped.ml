@@ -232,12 +232,15 @@ let tag ppf = let open Types in function
 let variant_representation i ppf = let open Types in function
   | Variant_unboxed ->
     line i ppf "Variant_unboxed\n"
-  | Variant_boxed cstrs ->
+  | Variant_boxed layouts ->
     line i ppf "Variant_boxed %a\n"
-      (array (i+1) (fun _ ppf o ->
-         option (i+1) (fun _ ppf (_cstr, sorts) ->
-           sort_array (i+1) ppf sorts) ppf o))
-      cstrs
+      (array (i+1) (fun _ ppf l ->
+         match (l : Types.cstr_layout) with
+         | Cstr_layout_variable ->
+           line (i+1) ppf "Cstr_layout_variable\n"
+         | Cstr_layout_known { sorts; _ } ->
+           sort_array (i+1) ppf sorts))
+      layouts
   | Variant_extensible -> line i ppf "Variant_inlined\n"
   | Variant_with_null -> line i ppf "Variant_with_null\n"
 

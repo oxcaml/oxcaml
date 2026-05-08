@@ -572,7 +572,10 @@ let variant constrs =
       | Cstr_record lbls ->
         array_of_list_map_option (fun { ld_sort } -> ld_sort) lbls
     in
-    sorts |> Option.map (fun sorts -> Constructor_uniform_value, sorts)
+    match sorts with
+    | Some sorts ->
+      Cstr_layout_known { shape = Constructor_uniform_value; sorts }
+    | None -> Cstr_layout_variable
   in
   Type_variant (
     constrs,
