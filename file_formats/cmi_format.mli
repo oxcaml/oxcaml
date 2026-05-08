@@ -34,6 +34,7 @@ type 'sg cmi_infos_generic = {
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg;
+    cmi_staticity : Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : Import_info.t array;
     cmi_flags : pers_flags list;

@@ -108,8 +108,13 @@ let typecheck_intf info ast =
           (Printtyp.printed_signature
              (Unit_info.original_source_file info.target))
           sg);
-  ignore (Includemod.signatures info.env ~mark:true
-    ~modes:Includemod.modes_unit sg sg);
+  let modes =
+    let modalities = tsg.Typedtree.sig_modalities in
+    let staticity = Typemod.staticity_of_modalities modalities in
+    let mode = Env.mode_unit ~staticity in
+    Includecore.Specific ((mode, None), mode)
+  in
+  ignore (Includemod.signatures info.env ~mark:true ~modes sg sg);
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
@@ -128,7 +133,10 @@ let emit_signature info alerts tsg =
         Normal { cmi_impl = info.module_name; cmi_arg_for }
       end
     in
-    Env.save_signature ~alerts tsg.Typedtree.sig_type
+    let staticity =
+      Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
+    in
+    Env.save_signature ~alerts ~staticity tsg.Typedtree.sig_type
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
   in

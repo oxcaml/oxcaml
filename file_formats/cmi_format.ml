@@ -66,6 +66,7 @@ type header = {
     header_globals : Global_module.With_precision.t array;
     header_sign : Serialized.signature;
     header_params : Global_module.Parameter_name.t list;
+    header_staticity : Mode.Staticity.Const.t;
 }
 
 type 'sg cmi_infos_generic = {
@@ -73,6 +74,7 @@ type 'sg cmi_infos_generic = {
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg;
+    cmi_staticity : Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : crcs;
     cmi_flags : flags;
@@ -171,6 +173,7 @@ let input_cmi_lazy ic =
       header_globals = globals;
       header_sign = sign;
       header_params = params;
+      header_staticity = staticity;
     } = (input_value ic : header) in
   let crcs = (input_value ic : crcs) in
   let flags = (input_value ic : flags) in
@@ -180,6 +183,7 @@ let input_cmi_lazy ic =
       cmi_kind = kind;
       cmi_globals = globals;
       cmi_sign = deserialize data sign;
+      cmi_staticity = staticity;
       cmi_params = params;
       cmi_crcs = crcs;
       cmi_flags = flags;
@@ -240,6 +244,7 @@ let output_cmi filename oc cmi =
       header_globals = cmi.cmi_globals;
       header_sign = sign;
       header_params = cmi.cmi_params;
+      header_staticity = cmi.cmi_staticity;
     };
   flush oc;
   let crc = Digest.file filename in

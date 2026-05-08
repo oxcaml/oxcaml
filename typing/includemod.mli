@@ -165,9 +165,6 @@ val is_runtime_component: Types.signature_item -> bool
 
 type modes = Includecore.mmodes
 
-(** The modes used for compilation unit inclusion check *)
-val modes_unit : modes
-
 (** The modes used for top-level inclusion check, where top-level is similiar to
   a structure *)
 val modes_toplevel : modes
@@ -218,11 +215,12 @@ val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 (** Check an implementation against an interface *)
 
 val compunit:
-      Env.t -> mark:bool -> string -> signature ->
-      string -> signature -> Shape.t -> module_coercion * Shape.t
+      modes:modes -> Env.t -> mark:bool -> string ->
+      signature -> string -> signature -> Shape.t -> module_coercion * Shape.t
 
 val compunit_as_argument:
-      Env.t -> string -> signature -> string -> signature -> module_coercion
+      modes:modes -> Env.t -> string -> signature ->
+      string -> signature -> module_coercion
 
 val type_declarations:
   loc:Location.t -> Env.t -> mark:bool ->
