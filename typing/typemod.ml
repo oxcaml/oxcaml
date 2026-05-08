@@ -3286,11 +3286,10 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   | Pmod_instance glob ->
       Language_extension.assert_enabled ~loc:smod.pmod_loc Instances ();
       let glob = instance_name ~loc:smod.pmod_loc env glob in
-      let path, locks =
+      let path, mode_with_locks =
         Env.lookup_module_instance_path ~load:(not alias) ~loc:smod.pmod_loc
           glob env
       in
-      let mode_with_locks = (Value.disallow_right Env.mode_unit, locks) in
       let lid =
         (* Only used by [untypeast] *)
         let name =
@@ -4341,7 +4340,17 @@ let cms_register_toplevel_struct_attributes ~sourcefile ~uid ast =
         | { pstr_desc = Pstr_attribute attr; _ }  -> Some attr
         | _ -> None)
 
-let check_argument_type_if_given env sourcefile actual_sig arg_module_opt =
+let staticity_of_modalities (modalities : Typedtree.modalities) =
+  if List.exists (fun { Location.txt = atom; _ } ->
+    match atom with
+    | Mode.Modality.Atom (Monadic Staticity, _) -> true
+    | _ -> false)
+    modalities.moda_desc
+  then Staticity.Static
+  else Staticity.Dynamic
+
+let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
+      arg_module_opt =
   match arg_module_opt with
   | None -> None
   | Some arg_param ->
@@ -4365,13 +4374,18 @@ let check_argument_type_if_given env sourcefile actual_sig arg_module_opt =
         Unit_info.Artifact.from_filename ~for_pack_prefix arg_filename
       in
       let arg_module = Global_module.Name.of_parameter_name arg_param in
-      let arg_sig = Env.read_signature arg_module arg_cmi in
+      let arg_sig, arg_staticity = Env.read_signature arg_module arg_cmi in
       if not (Env.is_parameter_unit arg_module) then
         raise (Error (Location.none, env,
                       Argument_for_non_parameter (arg_module, arg_filename)));
+      let modes =
+        Includecore.Specific
+          ((Env.mode_unit ~staticity:actual_staticity, None),
+           Env.mode_unit ~staticity:arg_staticity)
+      in
       let coercion =
-        Includemod.compunit_as_argument env sourcefile actual_sig
-          arg_filename arg_sig
+        Includemod.compunit_as_argument ~modes
+          env sourcefile actual_sig arg_filename arg_sig
       in
       Some { ai_signature = arg_sig;
              ai_coercion_from_primary = coercion;
@@ -4407,7 +4421,7 @@ let type_implementation target modulename initial_env ast =
         Profile.record_call "infer" (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
-        mode Env.mode_unit;
+        mode (Env.mode_unit ~staticity:Staticity.Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4473,7 +4487,9 @@ let type_implementation target modulename initial_env ast =
           let global_name =
             Compilation_unit.to_global_name_without_prefix modulename
           in
-          let dclsig = Env.read_signature global_name compiled_intf_file in
+          let dclsig, staticity =
+            Env.read_signature global_name compiled_intf_file
+          in
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi = Env.implemented_parameter global_name in
@@ -4484,7 +4500,10 @@ let type_implementation target modulename initial_env ast =
                        old_arg_type = arg_type_from_cmi });
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true
+              Includemod.compunit
+                ~modes:(Includecore.Specific
+                  ((mode, None), Env.mode_unit ~staticity))
+                initial_env ~mark:true
                 sourcefile sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
@@ -4497,7 +4516,8 @@ let type_implementation target modulename initial_env ast =
              coercion in the .cmi if we can sort out the dependency issues
              ([Tcoerce_primitive] is a pain in particular). *)
           let argument_interface =
-            check_argument_type_if_given initial_env source_intf dclsig arg_type
+            check_argument_type_if_given initial_env source_intf
+              ~actual_staticity:staticity dclsig arg_type
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
@@ -4520,8 +4540,14 @@ let type_implementation target modulename initial_env ast =
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
           let coercion, shape =
+            (* No [.mli], so the inferred signature has no file-level [@@]
+               and is at [Dynamic] on both sides. *)
+            let modes =
+              let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+              Includecore.Specific ((mode, None), mode)
+            in
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true
+              Includemod.compunit ~modes initial_env ~mark:true
                 sourcefile sg "(inferred signature)" simple_sg shape)
           in
           check_nongen_signature finalenv simple_sg;
@@ -4537,7 +4563,8 @@ let type_implementation target modulename initial_env ast =
           in
           normalize_signature simple_sg;
           let argument_interface =
-            check_argument_type_if_given initial_env sourcefile simple_sg arg_type
+            check_argument_type_if_given initial_env sourcefile
+              ~actual_staticity:Staticity.Dynamic simple_sg arg_type
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
@@ -4555,8 +4582,8 @@ let type_implementation target modulename initial_env ast =
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature ~alerts simple_sg name kind
-                  (Unit_info.cmi target))
+                Env.save_signature ~alerts ~staticity:Staticity.Dynamic
+                  simple_sg name kind (Unit_info.cmi target))
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
@@ -4615,7 +4642,9 @@ let type_interface ~sourcefile modulename env ast =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
   in
-  ignore (check_argument_type_if_given env sourcefile sg.sig_type arg_type
+  let actual_staticity = staticity_of_modalities sg.sig_modalities in
+  ignore (check_argument_type_if_given env sourcefile ~actual_staticity
+            sg.sig_type arg_type
           : Typedtree.argument_interface option);
   sg
 
@@ -4665,7 +4694,7 @@ let package_units initial_env objfiles target_cmi modulename =
          let global_name =
            Compilation_unit.to_global_name_without_prefix modname
          in
-         let sg =
+         let sg, _ =
            Env.read_signature global_name (Unit_info.companion_cmi artifact)
          in
          if Unit_info.is_cmi artifact &&
@@ -4696,9 +4725,18 @@ let package_units initial_env objfiles target_cmi modulename =
                   Interface_not_compiled mli))
     end;
     let name = Compilation_unit.to_global_name_without_prefix modulename in
-    let dclsig = Env.read_signature name target_cmi in
+    let dclsig, staticity = Env.read_signature name target_cmi in
+    (* [-pack] is a corner case feature that doesn't support staticity, so the
+       packed [.mli] should not carry a file-level [@@ static]/[@@ dynamic]. *)
+    Staticity.submode_err (Location.in_file mli, Module)
+      (Staticity.of_const staticity)
+      (Staticity.of_const Staticity.Dynamic);
     let cc, _shape =
-      Includemod.compunit initial_env ~mark:true
+      let modes =
+        let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+        Includecore.Specific ((mode, None), mode)
+      in
+      Includemod.compunit ~modes initial_env ~mark:true
         "(obtained by packing)" sg mli dclsig shape
     in
     let decl_deps =
@@ -4728,7 +4766,8 @@ let package_units initial_env objfiles target_cmi modulename =
       let kind = Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for } in
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
-          sg name kind target_cmi (Array.of_list imports)
+          ~staticity:Staticity.Dynamic sg name kind target_cmi
+          (Array.of_list imports)
       in
       let sign = Subst.Lazy.force_signature cmi.Cmi_format.cmi_sign in
       let decl_deps =

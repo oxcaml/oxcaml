@@ -1212,7 +1212,7 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit =
+let mode_unit ~staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
   Mode.Value.of_const
     { areality = Global;
@@ -1224,12 +1224,11 @@ let mode_unit =
       yielding = Unyielding;
       statefulness = Stateful;
       visibility = Read_write;
-      staticity = Dynamic;
-      (* CR-soon zqian: persistent modules are always static *)
+      staticity;
     }
     ~hint_monadic:hint ~hint_comonadic:hint
 
-let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
+let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags ~staticity =
   let id = Ident.create_global name in
   let path = Pident id in
   let alerts =
@@ -1247,7 +1246,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let mda_address = Lazy_backtrack.create_forced addr in
   let mda_declaration = md in
-  let mda_mode = Mode.Value.disallow_right mode_unit in
+  let mda_mode = Mode.Value.disallow_right (mode_unit ~staticity) in
   let mda_shape = shape in
   let mda_components =
     let mty = md.md_type in
@@ -3226,8 +3225,8 @@ let enter_unbound_module name reason env =
 
 (* Read a signature from a file *)
 let read_signature modname cmi =
-  let mty = read_pers_mod modname cmi in
-  Subst.Lazy.force_signature mty
+  let mty, staticity = read_pers_mod modname cmi in
+  Subst.Lazy.force_signature mty, staticity
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3253,8 +3252,8 @@ let persistent_structures_of_dir dir =
   |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
-let save_signature_with_transform cmi_transform ~alerts sg modname kind
-      cmi_info =
+let save_signature_with_transform cmi_transform ~alerts ~staticity sg modname
+      kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
   let sg = Subst.Lazy.of_signature sg
@@ -3262,7 +3261,7 @@ let save_signature_with_transform cmi_transform ~alerts sg modname kind
         (Subst.with_additional_action Prepare_for_saving Subst.identity)
   in
   let cmi =
-    Persistent_env.make_cmi !persistent_env modname kind sg alerts
+    Persistent_env.make_cmi !persistent_env modname kind sg alerts ~staticity
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
@@ -3274,12 +3273,14 @@ let save_signature_with_transform cmi_transform ~alerts sg modname kind
   Persistent_env.save_cmi !persistent_env pers_sig;
   cmi
 
-let save_signature ~alerts sg modname cu cmi =
-  save_signature_with_transform (fun cmi -> cmi) ~alerts sg modname cu cmi
+let save_signature ~alerts ~staticity sg modname cu cmi =
+  save_signature_with_transform (fun cmi -> cmi) ~alerts ~staticity sg modname
+    cu cmi
 
-let save_signature_with_imports ~alerts sg modname cu cmi imports =
+let save_signature_with_imports ~alerts ~staticity sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
-  save_signature_with_transform with_imports ~alerts sg modname cu cmi
+  save_signature_with_transform with_imports ~alerts ~staticity sg modname cu
+    cmi
 
 (* Make the initial environment. *)
 let initial () =
@@ -3629,7 +3630,16 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       let path, a =
         lookup_global_name_module_no_locks load ~errors ~use ~loc name env
       in
-      path, (Mode.Value.(disallow_right mode_unit), locks), a
+      let mode =
+        match load with
+        | Load -> (a : module_data).mda_mode
+        | Don't_load ->
+          (* The cmi is not loaded, so [cmi_staticity] is unknown.
+             Conservatively fall back to [Dynamic]. *)
+          Mode.Value.disallow_right
+            (mode_unit ~staticity:Mode.Staticity.Dynamic)
+      in
+      path, (mode, locks), a
     end
 
 let closure_mode ~loc ~item ~lid
@@ -4317,21 +4327,25 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
   let locks = IdTbl.get_all_locks env.modules in
-  let path, loc_def =
+  let path, loc_def, mode =
     if !Clflags.transparent_modules && not load then
       let path, () =
         lookup_global_name_module_no_locks Don't_load ~errors ~use ~loc name env
       in
-      path, Location.none
+      (* The cmi is not loaded, so [cmi_staticity] is unknown. Conservatively
+         fall back to [Dynamic]. *)
+      path, Location.none,
+        Mode.Value.disallow_right
+          (mode_unit ~staticity:Mode.Staticity.Dynamic)
     else
       let path, (mda : module_data) =
         lookup_global_name_module_no_locks Load ~errors ~use ~loc name env
       in
-      path, mda.mda_declaration.md_loc
+      path, mda.mda_declaration.md_loc, mda.mda_mode
   in
   let stage_locks, locks = partition_locks locks in
   assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
-  path, locks
+  path, (mode, locks)
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
   check_value_name (Longident.last lid) loc;
