@@ -356,8 +356,10 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
 
 let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms
     =
-  (* Switch must be large enough. *)
-  if TI.Map.cardinal arms < 3
+  (* The recognition logic itself works for any number of arms; the lookup-table
+     and affine variants impose their own minimum sizes (3 and 2 respectively)
+     in [normal_case] below. *)
+  if TI.Map.cardinal arms < 2
   then None
   else
     recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
@@ -549,40 +551,56 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
         we have *added* operations here (load). *)
      return ~added_code_size ~free_names:extra_free_names expr)
 
-let recognize_affine_switch_to_same_destination machine_width consts =
+let do_recognize_affine ~sub ~add ~mul ~equal ~one ~of_int consts =
   match consts with
   | [] | [_] -> None
   | const0 :: const1 :: other_consts ->
-    let slope = TI.sub const1 const0 in
+    let slope = sub const1 const0 in
     let rec check offset slope index = function
       | [] -> Some (offset, slope)
-      | const :: _ when not TI.(equal const (add (mul index slope) offset)) ->
-        None
-      | _ :: consts ->
-        check offset slope (TI.add index (TI.one machine_width)) consts
+      | const :: _ when not (equal const (add (mul index slope) offset)) -> None
+      | _ :: consts -> check offset slope (add index one) consts
     in
-    check const0 slope (TI.of_int machine_width 2) other_consts
+    check const0 slope (of_int 2) other_consts
 
-type affine_immediate_kind =
-  | Tagged
-  | Naked
+type affine_form =
+  | Tagged_immediate of
+      { offset : TI.t;
+        slope : TI.t
+      }
+  | Naked_immediate of
+      { offset : TI.t;
+        slope : TI.t
+      }
+  | Naked_int32 of
+      { offset : Int32.t;
+        slope : Int32.t
+      }
+  | Naked_int64 of
+      { offset : Int64.t;
+        slope : Int64.t
+      }
+  | Naked_nativeint of
+      { offset : Targetint_32_64.t;
+        slope : Targetint_32_64.t
+      }
 
 let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg =
+    ~scrutinee ~dest ~affine_form dbg =
   (* We are creating the following fragment: *)
-  (* let scaled = x * slope in
+  (* let s = (kind-conversion of) x in
+   * let scaled = s * slope in
    * let final = scaled + offset in
    * apply_cont k final
    *)
-  let rebuild_affine_expr scrutinee kind standard_int const =
+  let rebuild_affine_expr scrutinee kind standard_int slope_const offset_const =
     let mul_prim : P.t =
-      Binary
-        (Int_arith (standard_int, Mul), scrutinee, Simple.const (const slope))
+      Binary (Int_arith (standard_int, Mul), scrutinee, Simple.const slope_const)
     in
     let$ scaled_arg = bound_prim "scaled_arg" kind mul_prim dbg in
     let add_prim : P.t =
       Binary
-        (Int_arith (standard_int, Add), scaled_arg, Simple.const (const offset))
+        (Int_arith (standard_int, Add), scaled_arg, Simple.const offset_const)
     in
     let$ final_arg = bound_prim "final_arg" kind add_prim dbg in
     let apply_cont = Apply_cont.create dest ~args:[final_arg] ~dbg in
@@ -590,19 +608,57 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
     let added_code_size = Code_size.apply_cont apply_cont in
     return ~added_code_size ~free_names (RE.create_apply_cont apply_cont)
   in
+  let convert_scrutinee dst kind name =
+    bound_prim name kind
+      (P.Unary
+         ( Num_conv { src = K.Standard_int_or_float.Naked_immediate; dst },
+           scrutinee ))
+      dbg
+  in
   run ~dacc_before_switch uacc
-    (match (immediate_kind : affine_immediate_kind) with
-    | Naked ->
+    (match affine_form with
+    | Naked_immediate { offset; slope } ->
       rebuild_affine_expr scrutinee K.naked_immediate
-        K.Standard_int.Naked_immediate Reg_width_const.naked_immediate
-    | Tagged ->
+        K.Standard_int.Naked_immediate
+        (Reg_width_const.naked_immediate slope)
+        (Reg_width_const.naked_immediate offset)
+    | Tagged_immediate { offset; slope } ->
       let$ tagged_scrutinee =
         bound_prim "tagged_scrutinee" K.value
           (P.Unary (Tag_immediate, scrutinee))
           dbg
       in
       rebuild_affine_expr tagged_scrutinee K.value
-        K.Standard_int.Tagged_immediate Reg_width_const.tagged_immediate)
+        K.Standard_int.Tagged_immediate
+        (Reg_width_const.tagged_immediate slope)
+        (Reg_width_const.tagged_immediate offset)
+    | Naked_int32 { offset; slope } ->
+      let$ scrutinee_int32 =
+        convert_scrutinee K.Standard_int_or_float.Naked_int32 K.naked_int32
+          "scrutinee_int32"
+      in
+      rebuild_affine_expr scrutinee_int32 K.naked_int32
+        K.Standard_int.Naked_int32
+        (Reg_width_const.naked_int32 slope)
+        (Reg_width_const.naked_int32 offset)
+    | Naked_int64 { offset; slope } ->
+      let$ scrutinee_int64 =
+        convert_scrutinee K.Standard_int_or_float.Naked_int64 K.naked_int64
+          "scrutinee_int64"
+      in
+      rebuild_affine_expr scrutinee_int64 K.naked_int64
+        K.Standard_int.Naked_int64
+        (Reg_width_const.naked_int64 slope)
+        (Reg_width_const.naked_int64 offset)
+    | Naked_nativeint { offset; slope } ->
+      let$ scrutinee_nativeint =
+        convert_scrutinee K.Standard_int_or_float.Naked_nativeint
+          K.naked_nativeint "scrutinee_nativeint"
+      in
+      rebuild_affine_expr scrutinee_nativeint K.naked_nativeint
+        K.Standard_int.Naked_nativeint
+        (Reg_width_const.naked_nativeint slope)
+        (Reg_width_const.naked_nativeint offset))
 
 let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     ~dacc_before_switch uacc ~after_rebuild =
@@ -681,45 +737,114 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         match switch_is_single_arg_to_same_destination with
         | None -> normal_case0 uacc
         | Some (dest, lookup_table_fields) -> (
-          let try_affine immediate_kind consts =
-            assert (List.length consts = TI.Map.cardinal arms);
-            Option.map
-              (fun (offset, slope) -> immediate_kind, offset, slope)
-              (recognize_affine_switch_to_same_destination machine_width consts)
+          let extract_consts_from_simples prover simples =
+            let consts =
+              List.filter_map
+                (fun simple ->
+                  Simple.pattern_match' simple
+                    ~var:(fun _ ~coercion:_ -> None)
+                    ~symbol:(fun _ ~coercion:_ -> None)
+                    ~const:prover)
+                simples
+            in
+            if List.compare_lengths consts simples = 0
+            then Some consts
+            else None
           in
+          let try_affine ~consts ~num_arms ~recognize ~build_form =
+            assert (List.length consts = num_arms);
+            Option.map build_form (recognize consts)
+          in
+          let num_arms = TI.Map.cardinal arms in
           let affine =
             match lookup_table_fields with
-            | Tagged_immediates consts -> try_affine Tagged consts
+            | Tagged_immediates consts ->
+              try_affine ~consts ~num_arms
+                ~recognize:(fun consts ->
+                  do_recognize_affine ~sub:TI.sub ~add:TI.add ~mul:TI.mul
+                    ~equal:TI.equal ~one:(TI.one machine_width)
+                    ~of_int:(TI.of_int machine_width) consts)
+                ~build_form:(fun (offset, slope) ->
+                  Tagged_immediate { offset; slope })
             | Static_arguments_of_single_kind
                 { array_kind; array_load_kind = _; element_kind = _; simples }
               -> (
               match (array_kind : P.Array_kind.t) with
-              | Naked_ints ->
-                let consts =
-                  List.filter_map
-                    (fun simple ->
-                      Simple.pattern_match' simple
-                        ~var:(fun _ ~coercion:_ -> None)
-                        ~symbol:(fun _ ~coercion:_ -> None)
-                        ~const:Reg_width_const.is_naked_immediate)
+              | Naked_ints -> (
+                match
+                  extract_consts_from_simples Reg_width_const.is_naked_immediate
                     simples
-                in
-                if List.compare_lengths consts simples = 0
-                then try_affine Naked consts
-                else None
+                with
+                | None -> None
+                | Some consts ->
+                  try_affine ~consts ~num_arms
+                    ~recognize:(fun consts ->
+                      do_recognize_affine ~sub:TI.sub ~add:TI.add ~mul:TI.mul
+                        ~equal:TI.equal ~one:(TI.one machine_width)
+                        ~of_int:(TI.of_int machine_width) consts)
+                    ~build_form:(fun (offset, slope) ->
+                      Naked_immediate { offset; slope }))
+              | Naked_int32s -> (
+                match
+                  extract_consts_from_simples Reg_width_const.is_naked_int32
+                    simples
+                with
+                | None -> None
+                | Some consts ->
+                  try_affine ~consts ~num_arms
+                    ~recognize:(fun consts ->
+                      do_recognize_affine ~sub:Int32.sub ~add:Int32.add
+                        ~mul:Int32.mul ~equal:Int32.equal ~one:Int32.one
+                        ~of_int:Int32.of_int consts)
+                    ~build_form:(fun (offset, slope) ->
+                      Naked_int32 { offset; slope }))
+              | Naked_int64s -> (
+                match
+                  extract_consts_from_simples Reg_width_const.is_naked_int64
+                    simples
+                with
+                | None -> None
+                | Some consts ->
+                  try_affine ~consts ~num_arms
+                    ~recognize:(fun consts ->
+                      do_recognize_affine ~sub:Int64.sub ~add:Int64.add
+                        ~mul:Int64.mul ~equal:Int64.equal ~one:Int64.one
+                        ~of_int:Int64.of_int consts)
+                    ~build_form:(fun (offset, slope) ->
+                      Naked_int64 { offset; slope }))
+              | Naked_nativeints -> (
+                match
+                  extract_consts_from_simples Reg_width_const.is_naked_nativeint
+                    simples
+                with
+                | None -> None
+                | Some consts ->
+                  try_affine ~consts ~num_arms
+                    ~recognize:(fun consts ->
+                      do_recognize_affine ~sub:Targetint_32_64.sub
+                        ~add:Targetint_32_64.add ~mul:Targetint_32_64.mul
+                        ~equal:Targetint_32_64.equal
+                        ~one:(Targetint_32_64.one machine_width)
+                        ~of_int:(Targetint_32_64.of_int machine_width)
+                        consts)
+                    ~build_form:(fun (offset, slope) ->
+                      Naked_nativeint { offset; slope }))
               | Immediates | Gc_ignorable_values | Values | Naked_floats
-              | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
-              | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-              | Naked_vec512s | Unboxed_product _ ->
+              | Naked_float32s | Naked_int8s | Naked_int16s | Naked_vec128s
+              | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
                 None)
           in
           match affine with
-          | None ->
-            rebuild_switch_with_single_arg_to_same_destination uacc
-              ~dacc_before_switch ~scrutinee ~dest ~lookup_table_fields dbg
-          | Some (immediate_kind, offset, slope) ->
+          | Some affine_form ->
             rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-              ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg)
+              ~scrutinee ~dest ~affine_form dbg
+          | None ->
+            (* Lookup tables are only worthwhile for sufficiently many arms. *)
+            if num_arms < 3
+            then normal_case0 uacc
+            else
+              rebuild_switch_with_single_arg_to_same_destination uacc
+                ~dacc_before_switch ~scrutinee ~dest ~lookup_table_fields dbg)
       in
       match switch_merged with
       | Some (dest, args) ->
