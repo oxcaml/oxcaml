@@ -1591,15 +1591,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let cfg_with_layout = Cfg_with_layout.create cfg ~layout in
     (* CR xclerc for xclerc: Regalloc_irc_utils.log_cfg_with_infos ~indent:1
        (Cfg_with_infos.make cfg_with_layout); *)
-    let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
-    let cfg = Cfg_with_layout.cfg cfg_with_layout in
-    let fun_contains_calls =
-      Label.Tbl.to_seq_values cfg.blocks
-      |> Seq.exists Cfg.basic_block_contains_calls
-    in
-    Cfg_with_layout.create
-      { cfg with fun_contains_calls }
-      ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    Cfg_simplify.run cfg_with_layout
 end
 
 let report_error ppf = function

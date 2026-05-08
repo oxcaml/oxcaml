@@ -665,17 +665,6 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       DLL.filter_left entry.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
           not (InstructionId.equal instr.id prologue_poll_instr_id))
 
-  let compute_fun_contains_calls cfg_with_layout : Cfg_with_layout.t =
-    let cfg = Cfg_with_layout.cfg cfg_with_layout in
-    let fun_contains_calls =
-      Label.Tbl.fold
-        (fun _label block acc -> acc || Cfg.basic_block_contains_calls block)
-        cfg.blocks false
-    in
-    Cfg_with_layout.create
-      { cfg with fun_contains_calls }
-      ~layout:(Cfg_with_layout.layout cfg_with_layout)
-
   let convert ~keep_unused_ops ~future_funcnames : Cfg_with_layout.t =
     (* Start instruction ids at 0, matching [Cfg_selectgen.emit_fundecl]. *)
     Sub_cfg.reset_instr_id ();
@@ -708,9 +697,13 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     Cfg.register_predecessors_for_all_blocks cfg;
     drop_optimistic_prologue_poll cfg env ~prologue_poll_instr_id
       ~future_funcnames;
+    let fun_contains_calls =
+      Label.Tbl.to_seq_values cfg.blocks
+      |> Seq.exists Cfg.basic_block_contains_calls
+    in
+    let cfg = { cfg with fun_contains_calls } in
     let cfg_with_layout = Cfg_with_layout.create cfg ~layout in
-    let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
-    compute_fun_contains_calls cfg_with_layout
+    Cfg_simplify.run cfg_with_layout
 end
 
 let convert ~keep_unused_ops ~future_funcnames (m : (module Ssa.Finished_graph))
