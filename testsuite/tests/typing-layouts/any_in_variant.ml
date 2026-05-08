@@ -172,7 +172,7 @@ module All_void_in_module = struct
     | B -> assert false
 end
 
-(* CR rtjoa: tweaked this wording *)
+(* CR rtjoa for lmaurer: tweaked this wording *)
 [%%expect {|
 Lines 12-18, characters 8-5:
 12 | ........struct
@@ -211,7 +211,7 @@ Error: Signature mismatch:
 |}]
 
 
-(* CR rtjoa: This worked before the any-fields PR, because
+(* CR-soon rtjoa: This worked before the any-fields PR, because
    1. In the temporary environment, [pt] gets a jkind made with
       [product_of_sorts].
    2. When updating the constructor [A], those sorts are defaulted to [value].
@@ -289,7 +289,7 @@ Error: Signature mismatch:
          but has layout any in the second?
 |}]
 
-(* CR rtjoa: this one is still broken *)
+(* CR-soon rtjoa: this one should also work *)
 module M : sig
   type pt = { x : int; y : int }
   and t = A of pt#

@@ -637,7 +637,7 @@ let report_constructor_mismatch first second decl env ppf err =
         (i + 1) (report_modality_equate_error first second) err
         (* argument position is one-based; more intuitive *)
   | Fixed_representation ord ->
-      (* CR rtjoa: tweaked this wording *)
+      (* CR rtjoa for lmaurer: Tweaked this wording *)
       pr "%s has a fixed representation and %s doesn't."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second);
