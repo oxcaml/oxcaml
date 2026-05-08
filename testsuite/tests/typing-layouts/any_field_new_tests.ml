@@ -59,7 +59,7 @@ Error: Cannot access record with unrepresentable field.
 
 (* Block indices *)
 
-(* CR rtjoa: fix *)
+(* CR-soon rtjoa: This should typecheck and default to value *)
 type ('a : any) r = { t : 'a }
 let f = (.t)
 [%%expect{|

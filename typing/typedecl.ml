@@ -2556,8 +2556,8 @@ let rec update_decl_jkind env dpath decl =
        incorrectly override the jkind to [non_null].
     *)
     | Type_record_unboxed_product (lbls, _rep, umc) ->
-        (* CR lmaurer: This is now nearly identical to the previous case and
-           should be factored out *)
+        (* CR-soon lmaurer: This is now nearly identical to the previous case
+           and should be factored out *)
         let sorts, rep, type_jkind =
           let lbls = List.map (fun lbl -> lbl, lbl.Types.ld_type) lbls in
           compute_record_kind env decl.type_loc Unboxed_product lbls
