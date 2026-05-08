@@ -1,3 +1,5 @@
+open! Int_replace_polymorphic_compare
+
 [@@@ocaml.warning "+a-30-40-41-42-67"]
 
 (** SSA graph implementation; signatures are in {!Ssa_intf}.
