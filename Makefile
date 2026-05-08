@@ -210,6 +210,18 @@ _compare/config.status: ocaml/config.status
 promote:
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) promote $(ws_main)
 
+.PHONY: merlin-build
+merlin-build:
+	$(MAKE) -C external/merlin build
+
+.PHONY: merlin-test
+merlin-test:
+	$(MAKE) -C external/merlin test
+
+.PHONY: merlin-promote
+merlin-promote:
+	$(MAKE) -C external/merlin test-promote
+
 .PHONY: fmt
 fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
