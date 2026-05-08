@@ -4,11 +4,11 @@ open! Int_replace_polymorphic_compare
 
 open Ssa_reducer
 
-(* Detects [Call] terminators whose continuation does nothing but [Return] the
-   call's results, and whose enclosing block has an empty trap stack. Rewrites
-   them as [Tailcall_self] (when the callee is the current function by name) or
-   [Tailcall_func]. The matching predicates are the SSA-level analogue of the
-   eager checks that used to live in [Ssa_of_cmm.emit_tail_apply]. *)
+(** Detects [Call] terminators whose continuation does nothing but [Return] the
+    call's results, and whose enclosing block has an empty trap stack. Rewrites
+    them as [Tailcall_self] (when the callee is the current function by name) or
+    [Tailcall_func]. The matching predicates are the SSA-level analogue of the
+    checks in [Cfg_selectgen.emit_tail_apply]. *)
 module Detect (C : Context) = struct
   include Default (C)
 
@@ -76,4 +76,5 @@ module Detect (C : Context) = struct
     | _ -> Unchanged
 end
 
-let run ssa = run ~keep_unused_ops:true (module Detect : Reducer) ssa
+let run ~keep_unused_ops ssa =
+  run ~keep_unused_ops (module Detect : Reducer) ssa

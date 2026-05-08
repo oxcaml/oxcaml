@@ -150,6 +150,18 @@ let is_move (i : Cfg.basic Cfg.instruction) =
     && i.res.(0).Reg.loc = Reg.Unknown
   | _ -> false
 
+(** A [Pushtrap]/[Poptrap] whose target has no predecessors is unreachable as a
+    trap handler at runtime. [Cfg_selectgen] keeps an [unreachable_handler]
+    block as the target while [Cfg_of_ssa] drops the trap op entirely; we treat
+    both options as equivalent by skipping the op on either side when its target
+    has no predecessors. *)
+let is_skippable_trap cfg (i : Cfg.basic Cfg.instruction) =
+  match i.desc with
+  | Pushtrap { lbl_handler } | Poptrap { lbl_handler } ->
+    let target = Cfg.get_block_exn cfg lbl_handler in
+    Label.Set.is_empty target.predecessors
+  | _ -> false
+
 (* === Phase 1: structural matching === *)
 
 let basic_desc_match ~map_label (old_d : Cfg.basic) (new_d : Cfg.basic) =
@@ -160,32 +172,16 @@ let basic_desc_match ~map_label (old_d : Cfg.basic) (new_d : Cfg.basic) =
     true
   | _ -> Cfg.equal_basic old_d new_d
 
-let compare_body ~ppf_m ~map_label ~old_cfg_t ~new_cfg_t ~ol ~nl old_body
-    new_body =
-  (* A [Pushtrap]/[Poptrap] whose target has no predecessors is unreachable as a
-     trap handler at runtime. The legacy pipeline keeps a [Cfg_selectgen]
-     [unreachable_handler] block as the target while [Cfg_of_ssa] drops the trap
-     op entirely; we treat both shapes as equivalent by skipping the op on
-     either side when its target has no predecessors. *)
-  let is_skippable_trap cfg (i : Cfg.basic Cfg.instruction) =
-    match i.desc with
-    | Pushtrap { lbl_handler } | Poptrap { lbl_handler } ->
-      let target = Cfg.get_block_exn cfg lbl_handler in
-      Label.Set.is_empty target.predecessors
-    | _ -> false
-  in
-  let advance cfg cell =
-    let rec loop c =
-      match c with
-      | Some c when is_move (DLL.value c) || is_skippable_trap cfg (DLL.value c)
-        ->
-        loop (DLL.next c)
-      | _ -> c
-    in
-    loop cell
+let compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl old_body new_body =
+  let rec advance cfg cell =
+    match cell with
+    | Some c when is_move (DLL.value c) || is_skippable_trap cfg (DLL.value c)
+      ->
+      advance cfg (DLL.next c)
+    | _ -> cell
   in
   let rec loop oc nc =
-    match oc, nc with
+    match advance old_cfg oc, advance new_cfg nc with
     | None, None -> ()
     | Some _, None | None, Some _ ->
       Format.fprintf ppf_m
@@ -208,11 +204,9 @@ let compare_body ~ppf_m ~map_label ~old_cfg_t ~new_cfg_t ~ol ~nl old_body
           Label.format ol InstructionId.print oi.id Label.format nl
           InstructionId.print ni.id Cfg.dump_basic oi.desc
           Debuginfo.print_compact oi.dbg Debuginfo.print_compact ni.dbg;
-      loop (advance old_cfg_t (DLL.next oc)) (advance new_cfg_t (DLL.next nc))
+      loop (DLL.next oc) (DLL.next nc)
   in
-  loop
-    (advance old_cfg_t (DLL.hd_cell old_body))
-    (advance new_cfg_t (DLL.hd_cell new_body))
+  loop (DLL.hd_cell old_body) (DLL.hd_cell new_body)
 
 let terminator_structure_match ~map_label (old_t : Cfg.terminator)
     (new_t : Cfg.terminator) =
@@ -229,13 +223,14 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
     map_label ot.ifso nt.ifso;
     map_label ot.ifnot nt.ifnot;
     true
-  (* Truth_test ≈ Int_test with Cne/Ceq 0 *)
-  | Int_test { lt; eq; gt; imm = Some 0; _ }, Truth_test { ifso; ifnot }
+  | ( Int_test { lt; eq; gt; imm = Some 0; is_signed = _ },
+      Truth_test { ifso; ifnot } )
     when Label.equal lt gt ->
     map_label lt ifso;
     map_label eq ifnot;
     true
-  | Truth_test { ifso; ifnot }, Int_test { lt; eq; gt; imm = Some 0; _ }
+  | ( Truth_test { ifso; ifnot },
+      Int_test { lt; eq; gt; imm = Some 0; is_signed = _ } )
     when Label.equal lt gt ->
     map_label ifso lt;
     map_label ifnot eq;
@@ -290,7 +285,7 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
       _ ) ->
     false
 
-let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
+let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
   (* new_to_old: the primary label mapping (new_label -> old_label) *)
   let new_to_old = Label.Tbl.create 64 in
   (* old_to_new: inverse mapping, used only to assert injectivity *)
@@ -315,15 +310,15 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
     | None -> Label.Tbl.replace old_to_new ol nl);
     Queue.add (ol, nl) queue
   in
-  map_label (Cfg.entry_label old_cfg_t) (Cfg.entry_label new_cfg_t);
+  map_label (Cfg.entry_label old_cfg) (Cfg.entry_label new_cfg);
   let visited = ref Label.Set.empty in
   while not (Queue.is_empty queue) do
     let ol, nl = Queue.pop queue in
     if not (Label.Set.mem ol !visited)
     then begin
       visited := Label.Set.add ol !visited;
-      let ob = Cfg.get_block old_cfg_t ol in
-      let nb = Cfg.get_block new_cfg_t nl in
+      let ob = Cfg.get_block old_cfg ol in
+      let nb = Cfg.get_block new_cfg nl in
       match ob, nb with
       | None, _ | _, None ->
         Format.fprintf ppf_m "Missing block: old=%a(%s) new=%a(%s)@."
@@ -348,65 +343,57 @@ let collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t =
            keeps unreachable trap handlers as [Pushtrap]/[Poptrap] pairs while
            [Cfg_of_ssa] drops them, so the trap-stack-derived component of
            [stack_offset] can legitimately differ. *)
+        (match ob.exn, nb.exn with
+        | Some oe, Some ne -> map_label oe ne
+        | None, None -> ()
+        | _ ->
+          Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
+            Label.format ol Label.format nl);
+        (* Compare body structure, debuginfo, and map labels *)
+        compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl ob.body nb.body;
+        (* Compare terminator structure and map labels *)
         if
-          Label.Set.is_empty ob.predecessors
-          && Label.Set.is_empty nb.predecessors
+          not
+            (terminator_structure_match ~map_label ob.terminator.desc
+               nb.terminator.desc)
         then
-          (* We don't compare unreachable trap handlers, since their replacement
-             with a dummy block is unreliable and it makes no semantic
-             difference as they are unreachable anyway. *)
-          ()
-        else begin
-          (match ob.exn, nb.exn with
-          | Some oe, Some ne -> map_label oe ne
-          | None, None -> ()
-          | _ ->
-            Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
-              Label.format ol Label.format nl);
-          (* Compare body structure, debuginfo, and map labels *)
-          compare_body ~ppf_m ~map_label ~old_cfg_t ~new_cfg_t ~ol ~nl ob.body
-            nb.body;
-          (* Compare terminator structure and map labels *)
-          if
-            not
-              (terminator_structure_match ~map_label ob.terminator.desc
-                 nb.terminator.desc)
-          then
-            Format.fprintf ppf_m
-              "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
-              Label.format ol InstructionId.print ob.terminator.id Label.format
-              nl InstructionId.print nb.terminator.id
-              (Cfg.dump_terminator ~sep:"")
-              ob.terminator.desc
-              (Cfg.dump_terminator ~sep:"")
-              nb.terminator.desc;
-          (* Compare terminator debuginfo *)
-          if Debuginfo.compare ob.terminator.dbg nb.terminator.dbg <> 0
-          then
-            Format.fprintf ppf_m
-              "Debuginfo mismatch at terminator old=%a(id:%a) new=%a(id:%a) \
-               %a: %a vs %a@."
-              Label.format ol InstructionId.print ob.terminator.id Label.format
-              nl InstructionId.print nb.terminator.id
-              (Cfg.dump_terminator ~sep:"")
-              ob.terminator.desc Debuginfo.print_compact ob.terminator.dbg
-              Debuginfo.print_compact nb.terminator.dbg;
-          ()
-        end
+          Format.fprintf ppf_m
+            "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
+            Label.format ol InstructionId.print ob.terminator.id Label.format nl
+            InstructionId.print nb.terminator.id
+            (Cfg.dump_terminator ~sep:"")
+            ob.terminator.desc
+            (Cfg.dump_terminator ~sep:"")
+            nb.terminator.desc;
+        (* Compare terminator debuginfo *)
+        if Debuginfo.compare ob.terminator.dbg nb.terminator.dbg <> 0
+        then
+          Format.fprintf ppf_m
+            "Debuginfo mismatch at terminator old=%a(id:%a) new=%a(id:%a) %a: \
+             %a vs %a@."
+            Label.format ol InstructionId.print ob.terminator.id Label.format nl
+            InstructionId.print nb.terminator.id
+            (Cfg.dump_terminator ~sep:"")
+            ob.terminator.desc Debuginfo.print_compact ob.terminator.dbg
+            Debuginfo.print_compact nb.terminator.dbg
     end
   done;
   (* Validate predecessors match under the label mapping *)
   new_to_old
   |> Label.Tbl.iter (fun nl ol ->
-      let ob = Cfg.get_block_exn old_cfg_t ol in
-      let nb = Cfg.get_block_exn new_cfg_t nl in
+      let ob = Cfg.get_block_exn old_cfg ol in
+      let nb = Cfg.get_block_exn new_cfg nl in
+      (* We ignore unvisited predecessors, which could be eliminated handler
+         blocks and their successors.*)
       let mapped_old_preds =
-        Label.Set.map
-          (fun op ->
-            Label.Tbl.find_opt old_to_new op |> Option.value ~default:Label.none)
+        Label.Set.filter_map
+          (fun op -> Label.Tbl.find_opt old_to_new op)
           ob.predecessors
       in
-      if not (Label.Set.equal mapped_old_preds nb.predecessors)
+      let visited_new_preds =
+        Label.Set.filter (Label.Tbl.mem new_to_old) nb.predecessors
+      in
+      if not (Label.Set.equal mapped_old_preds visited_new_preds)
       then
         Format.fprintf ppf_m "Predecessor mismatch at old=%a new=%a@."
           Label.format ol Label.format nl);
@@ -434,8 +421,8 @@ let effective_arg (i : Cfg.basic Cfg.instruction) =
     regs
   | _ -> i.arg
 
-let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
-    ~(new_block : Cfg.basic_block) =
+let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
+    ~(old_block : Cfg.basic_block) ~(new_block : Cfg.basic_block) =
   let ol = old_block.start in
   let nl = new_block.start in
   let add_reg_pairs eqs old_regs new_regs =
@@ -526,7 +513,7 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     process_instruction eqs ~old_i:old_t ~new_i:new_t ~old_arg:old_t.arg
       ~new_arg:new_t.arg
   in
-  (* Process body backwards, skipping moves *)
+  (* Process body backwards, skipping moves and unreachable trap handlers *)
   let old_rev = List.rev (DLL.to_list old_block.body) in
   let new_rev = List.rev (DLL.to_list new_block.body) in
   let rec loop eqs old_is new_is =
@@ -542,6 +529,8 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
       loop
         (Equations.subst_new_move eqs ~src:ni.arg.(0) ~dst:ni.res.(0))
         old_is rest
+    | oi :: rest, _ when is_skippable_trap old_cfg oi -> loop eqs rest new_is
+    | _, ni :: rest when is_skippable_trap new_cfg ni -> loop eqs old_is rest
     | oi :: old_rest, ni :: new_rest ->
       let (oi : Cfg.basic Cfg.instruction) = oi in
       let (ni : Cfg.basic Cfg.instruction) = ni in
@@ -552,15 +541,15 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
       loop eqs old_rest new_rest
     | _ :: _, [] | [], _ :: _ ->
       Format.fprintf ppf_m
-        "Body length mismatch (after skipping moves) at old=%a new=%a: \
-         old_remaining=%d new_remaining=%d@."
+        "Body length mismatch at old=%a new=%a: old_remaining=%d \
+         new_remaining=%d@."
         Label.format ol Label.format nl (List.length old_is)
         (List.length new_is);
       eqs
   in
   loop eqs old_rev new_rev
 
-let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
+let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
   (* block_eqs and worklist are keyed by new labels. new_to_old is used to find
      the corresponding old block. Predecessors come from the new CFG's
      block.predecessors. *)
@@ -574,11 +563,12 @@ let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
   while not (Queue.is_empty worklist) do
     let nl = Queue.pop worklist in
     let ol = Label.Tbl.find new_to_old nl in
-    let ob = Cfg.get_block_exn old_cfg_t ol in
-    let nb = Cfg.get_block_exn new_cfg_t nl in
+    let ob = Cfg.get_block_exn old_cfg ol in
+    let nb = Cfg.get_block_exn new_cfg nl in
     let eqs = Label.Tbl.find block_eqs nl in
     let start_eqs =
-      process_block_backward ~ppf_m eqs ~old_block:ob ~new_block:nb
+      process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs ~old_block:ob
+        ~new_block:nb
     in
     Label.Set.iter
       (fun pred_nl ->
@@ -590,10 +580,10 @@ let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
           then (
             Label.Tbl.replace block_eqs pred_nl merged;
             Queue.add pred_nl worklist))
-      nb.predecessors
+      (Label.Set.filter (Label.Tbl.mem new_to_old) nb.predecessors)
   done;
   (* Check entry equations are empty *)
-  let new_entry = Cfg.entry_label new_cfg_t in
+  let new_entry = Cfg.entry_label new_cfg in
   match Label.Tbl.find_opt block_eqs new_entry with
   | None -> ()
   | Some entry_eqs ->
@@ -613,12 +603,9 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
     let old_cfg = Cfg_with_layout.cfg old_cfg in
     let new_cfg = Cfg_with_layout.cfg new_cfg in
     (* Phase 1: structural matching *)
-    let new_to_old =
-      collect_matching_blocks ~ppf_m ~old_cfg_t:old_cfg ~new_cfg_t:new_cfg
-    in
+    let new_to_old = collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg in
     (* Phase 2: register equivalence *)
-    verify_register_equivalence ~ppf_m ~old_cfg_t:old_cfg ~new_cfg_t:new_cfg
-      ~new_to_old;
+    verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old;
     (* Check CFG metadata. [fun_contains_calls] is intentionally not compared:
        dropping unreachable trap-handler blocks (which contain a [Raise]) can
        legitimately change whether the function appears to contain calls. *)

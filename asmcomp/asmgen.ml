@@ -519,7 +519,9 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
       Ssa_print.print ssa;
     Printexc.raise_with_backtrace exn bt
   in
-  let ssa = fd_cmm ++ Ssa_of_cmm.convert ++ Ssa_tail_call.run in
+  let ssa =
+    fd_cmm ++ Ssa_of_cmm.convert ++ Ssa_tail_call.run ~keep_unused_ops:true
+  in
   if !Oxcaml_flags.ssa_validate
   then begin
     let cfg_without_ssa =
