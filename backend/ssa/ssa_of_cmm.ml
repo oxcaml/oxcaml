@@ -678,7 +678,7 @@ let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
     let result = Builder.finish () in
     Ssa_validate.validate result;
     result
-  with exn ->
+  with Misc.Fatal_error as exn ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "*** Ssa_of_cmm error for %s: %s@.*** CMM:@.%a@."
       f.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl f;
