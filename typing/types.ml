@@ -1014,7 +1014,7 @@ type 'a gen_label_description =
     lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;
                                         (* All the labels in this type *)
-    lbl_repres: 'a option;              (* Representation for outer record *)
+    lbl_repres: 'a;                     (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
     lbl_loc: Location.t;
     lbl_attributes: Parsetree.attributes;
