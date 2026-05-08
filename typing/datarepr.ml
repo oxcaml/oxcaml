@@ -232,10 +232,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =
-      (* This is the representation of the inner record, IF there is one *)
       let record_repr =
-        Option.map (fun shape -> Record_inlined (cstr_tag, shape, rep))
-          cstr_shape
+        match cstr_shape with
+        | None -> Record_variable
+        | Some shape -> Record_inlined (cstr_tag, shape, rep)
       in
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
@@ -274,7 +274,7 @@ let extension_descr ~current_unit path_ext ext =
   let existentials, cstr_args, cstr_inlined =
     constructor_args ~current_unit ext.ext_private ext.ext_args ext.ext_ret_type
       Path.(Pextra_ty (path_ext, Pext_ty))
-      (Some (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible)))
+      (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible))
   in
     { cstr_name = Path.last path_ext;
       cstr_res = ty_res;
@@ -318,6 +318,7 @@ let dummy_label (type rep) (record_form : rep record_form)
 
 let label_descrs record_form ty_res lbls repres priv =
   let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
+  let lbl_repres = Some repres in
   let rec describe_labels pos = function
       [] -> []
     | l :: rest ->
@@ -330,7 +331,7 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_sort = l.ld_sort;
             lbl_pos = pos;
             lbl_all = all_labels;
-            lbl_repres = repres;
+            lbl_repres;
             lbl_private = priv;
             lbl_loc = l.ld_loc;
             lbl_attributes = l.ld_attributes;

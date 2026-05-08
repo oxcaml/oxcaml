@@ -1028,7 +1028,7 @@ let src_pos loc attrs env =
   }
 
 type 'rep record_extraction_result =
-  | Record_type of Path.t * Path.t * Types.label_declaration list * 'rep option
+  | Record_type of Path.t * Path.t * Types.label_declaration list * 'rep
   | Record_type_of_other_form
   | Not_a_record_type
   | Maybe_a_record_type
@@ -1719,6 +1719,22 @@ and build_as_type_aux (env : Env.t) p ~mode =
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
+let is_variable_repres : type rep. rep record_form -> rep -> bool =
+  fun form rep ->
+    match form, rep with
+    | Legacy, Record_variable -> true
+    | Unboxed_product, Record_unboxed_product_variable -> true
+    | _ -> false
+
+(* Treats [Some Record_variable] / [Some Record_unboxed_product_variable] as
+   [None]: in both cases the representation cannot be determined from the
+   declaration alone. *)
+let determined_lbl_repres (type rep) (form : rep record_form)
+      (repres : rep option) : rep option =
+  match repres with
+  | None -> None
+  | Some rep -> if is_variable_repres form rep then None else Some rep
+
 let update_labels (type rep) env (form : rep record_form) ~representative_label
       ~loc ~containing_type
     : record_sorts * rep =
@@ -1730,7 +1746,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
   in
   unify_exp_types loc env containing_type ty_res;
   let sorts, rep =
-    match representative_label.lbl_repres with
+    match determined_lbl_repres form representative_label.lbl_repres with
     | Some rep -> Fixed, rep
     | None ->
       let lbls_and_ty_args =
@@ -2532,7 +2548,7 @@ module Label = NameChoice (struct
   let in_env lbl =
     match lbl.lbl_repres with
     | Some (Record_boxed | Record_float | Record_ufloat | Record_unboxed
-           | Record_mixed _ | Record_dummy _)
+           | Record_mixed _ | Record_dummy _ | Record_variable)
     | None -> true
     | Some (Record_inlined _) -> false
 end)
@@ -2548,7 +2564,8 @@ module Unboxed_label = NameChoice (struct
       env
   let in_env (lbl : t) =
     match lbl.lbl_repres with
-    | Some Record_unboxed_product | None  -> true
+    | Some (Record_unboxed_product | Record_unboxed_product_variable)
+    | None  -> true
 end)
 
 let label_get_type_path
@@ -6268,13 +6285,15 @@ and type_expect_
           | Some (Record_boxed | Record_float | Record_ufloat | Record_mixed _
                  | Record_inlined (_, _, (Variant_boxed _
                                          | Variant_extensible)))
+          | Some Record_variable
           | None
             -> true
           | Some (Record_dummy _) ->
             Misc.fatal_error "type_expect: dummy record representation"
         end
         | Unboxed_product -> begin match rep with
-          | Some Record_unboxed_product| None -> false
+          | Some (Record_unboxed_product | Record_unboxed_product_variable)
+          | None -> false
         end
       in
       let is_boxed =
@@ -6477,7 +6496,7 @@ and type_expect_
         lbl_all, lbl_repres
       in
       let representation =
-        match representation with
+        match determined_lbl_repres record_form representation with
         | Some rep -> rep
         | None ->
             let labels_with_updated_types =
@@ -8283,6 +8302,7 @@ and type_block_access env expected_base_ty principal
         Misc.fatal_error "Typecore.type_block_access: inlined record"
       | Some (Record_dummy _) ->
         Misc.fatal_error "Typecore.type_block_access: dummy representation"
+      | Some Record_variable
       | None ->
         (* Records with [any] fields are never flattened *)
         false

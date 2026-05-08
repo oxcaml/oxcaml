@@ -2443,6 +2443,8 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
+        | Record_variable ->
+          fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let str = if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias in
       let str = add_barrier_to_let_kind ubr str in

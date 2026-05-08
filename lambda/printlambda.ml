@@ -321,6 +321,7 @@ let record_rep ppf r = match r with
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
   | Record_dummy _ -> fprintf ppf "dummy"
+  | Record_variable -> fprintf ppf "variable"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =

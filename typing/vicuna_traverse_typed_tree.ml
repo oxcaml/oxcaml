@@ -359,21 +359,21 @@ and value_kind_variant env subst ~visited ~depth
 and value_kind_record env subst ~visited ~depth
     (labels : Types.label_declaration list) rep =
   match rep with
-  | Some (Record_mixed _) ->
+  | Record_mixed _ ->
     raise (Vicuna_unsupported Mixed_records)
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
-  | Some (Record_inlined (Null, _, _)) ->
-    raise (Vicuna_unsupported With_null_variants)
-  | None -> raise (Vicuna_unsupported Field_of_kind_any)
-  | Some (Record_unboxed | Record_inlined (_, _, Variant_unboxed)) -> (
+  | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
+  | Record_variable -> raise (Vicuna_unsupported Field_of_kind_any)
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type
     | [] | _ :: _ :: _ ->
       raise
         (Vicuna_unsupported
            (Other "Unboxed record should have exactly one field")))
-  | Some rep ->
+  | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
+  | Record_dummy _ ->
     let fields =
       List.map
         (fun (label : Types.label_declaration) ->
@@ -396,6 +396,7 @@ and value_kind_record env subst ~visited ~depth
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
       | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+      | Record_variable -> Misc.fatal_error "unexpected variable representation"
     in
     non_consts
 

@@ -1122,7 +1122,7 @@ let transl_declaration env sdecl (id, uid) =
               Record_dummy { represent_as_float_array },
               Jkind.for_non_float ~why:Boxed_record
           in
-          Ttype_record lbls, Type_record(lbls', Some rep, None), jkind
+          Ttype_record lbls, Type_record(lbls', rep, None), jkind
       | Ptype_record_unboxed_product lbls ->
           Language_extension.assert_enabled ~loc:sdecl.ptype_loc Layouts
             Language_extension.Stable;
@@ -1140,7 +1140,7 @@ let transl_declaration env sdecl (id, uid) =
             Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
           in
           Ttype_record_unboxed_product lbls,
-          Type_record_unboxed_product(lbls', Some rep, None), jkind
+          Type_record_unboxed_product(lbls', rep, None), jkind
       | Ptype_open ->
         Ttype_open, Type_open,
         Jkind.for_non_float ~why:Extensible_variant
@@ -1292,10 +1292,12 @@ let record_has_float_boxed = function
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
+  | Record_variable ->
+    fatal_error "record_has_float_boxed: unexpected variable representation"
 
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed -> true
+  | Record_boxed | Record_variable -> true
   | Record_dummy { represent_as_float_array } ->
     not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
@@ -1304,20 +1306,20 @@ let gets_unboxed_version decl =
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
-  | Type_record (_, None, _) ->
-    (* As of this writing (2025-11-14), it's not possible to have [None] as the
-       representation for a record that doesn't get an unboxed version. Please
-       enjoy convincing yourself that this is true (you'll want to consult
-       [update_record_kind]). *)
+  | Type_record (_, Record_variable, _) ->
+    (* As of this writing (2025-11-14), it's not possible to have
+       [Record_variable] as the representation for a record that doesn't get an
+       unboxed version. Please enjoy convincing yourself that this is true
+       (you'll want to consult [update_record_kind]). *)
     true
-  | Type_record (_, Some repr, _) -> record_gets_unboxed_version repr
+  | Type_record (_, repr, _) -> record_gets_unboxed_version repr
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ ->
     None
-  | Type_record (_, Some repr, _) when not (record_gets_unboxed_version repr) ->
+  | Type_record (_, repr, _) when not (record_gets_unboxed_version repr) ->
     None
   | Type_record (lbls, _rep, umc) ->
     let keep_attribute a =
@@ -1345,7 +1347,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
           })
         lbls
     in
-    let rep = Some Types.Record_unboxed_product in
+    let rep = Types.Record_unboxed_product in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
       Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
@@ -2302,7 +2304,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     sorts, rep, jkind
   | Legacy, _,
     (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
-          | Record_ufloat | Record_unboxed)
+          | Record_ufloat | Record_unboxed | Record_variable)
     ->
     (* These are never created by [transl_declaration], so they will only
        appear here when updating later for dealing with [any]. Since none of
@@ -2518,7 +2520,7 @@ let rec update_decl_jkind env dpath decl =
     | Type_record (lbls, rep, umc) ->
       let rep =
         match rep with
-        | Some (Record_dummy _ | Record_unboxed as rep) -> rep
+        | Record_dummy _ | Record_unboxed as rep -> rep
         | _ -> Misc.fatal_error "not created by transl_declaration"
       in
       let sorts, rep, type_jkind =
@@ -2528,7 +2530,11 @@ let rec update_decl_jkind env dpath decl =
       let lbls =
         List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
       in
-      let rep = Result.to_option rep in
+      let rep =
+        match rep with
+        | Ok rep -> rep
+        | Error _ -> Record_variable
+      in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
@@ -2555,7 +2561,11 @@ let rec update_decl_jkind env dpath decl =
         let lbls =
           List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
         in
-        let rep = Result.to_option rep in
+        let rep =
+          match rep with
+          | Ok rep -> rep
+          | Error _ -> Record_unboxed_product_variable
+        in
         (* See Note [Quality of jkinds during inference] for more information
            about when we mark jkinds as best *)
         let type_jkind = Jkind.mark_best type_jkind in
@@ -2636,7 +2646,10 @@ let update_decls_jkind env decls =
          in
          let is_mixed_float_float64 =
            match new_decl.type_kind with
-           | Type_record (_, Some rep, _) -> record_has_float_boxed rep
+           | Type_record (_, (Record_unboxed | Record_inlined _ | Record_boxed
+                            | Record_float | Record_ufloat | Record_mixed _
+                            | Record_dummy _ as rep), _) ->
+             record_has_float_boxed rep
            | _ -> false
          in
          begin match has_flatten_floats, is_mixed_float_float64 with
@@ -3733,7 +3746,7 @@ let transl_extension_constructor ~scope env type_path type_params
               List.iter2 (Ctype.unify env) decl.type_params tl;
               let lbls =
                 match decl.type_kind with
-                | Type_record (lbls, Some (Record_inlined _), _) -> lbls
+                | Type_record (lbls, Record_inlined _, _) -> lbls
                 | _ -> assert false
               in
               Types.Cstr_record lbls

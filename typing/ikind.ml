@@ -772,7 +772,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
           let immutable_base =
             Ldd.const
               (match rep with
-              | Some Types.Record_unboxed -> Axis_lattice.immediate
+              | Types.Record_unboxed -> Axis_lattice.immediate
               (* CR box: This will no longer be [non_float] once we update the
                  representation of singleton float64 records *)
               | _ -> Axis_lattice.immutable_data)

@@ -867,10 +867,10 @@ and unsafe_mode_crossing =
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
   | Type_record of
-      'lbl list * record_representation option * unsafe_mode_crossing option
+      'lbl list * record_representation * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
-      record_unboxed_product_representation option *
+      record_unboxed_product_representation *
       unsafe_mode_crossing option
   | Type_variant of 'cstr list * variant_representation * unsafe_mode_crossing option
   | Type_open
@@ -952,9 +952,16 @@ and record_representation =
      (which must all be [float64]).
 
      After [update_decls_jkind], no record should have this representation. *)
+  | Record_variable
+  (* Used after [update_decls_jkind] for records whose representation cannot be
+     determined because at least one field has layout [any]. The actual
+     representation is decided at construction sites. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
+  | Record_unboxed_product_variable
+  (* Counterpart of [Record_variable] for unboxed product records that have at
+     least one field of layout [any]. *)
 
 and variant_representation =
   | Variant_unboxed
