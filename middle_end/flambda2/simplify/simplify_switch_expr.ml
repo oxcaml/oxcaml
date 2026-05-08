@@ -27,6 +27,13 @@ type mergeable_arms =
       }
   | Not_mergeable
 
+(* Kind of the arguments in an identity or boolean-NOT switch arm. The rebuild
+   emits different primitives depending on whether the arms are passing tagged
+   immediates or naked immediates. *)
+type identity_or_not_arg_kind =
+  | Tagged_immediate
+  | Naked_immediate
+
 let find_all_aliases env arg =
   let find_all_aliases () =
     TE.aliases_of_simple env ~min_name_mode:NM.normal arg
@@ -161,31 +168,32 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
                 not_arms )
       in
       (* Check to see if the arm is of a form that might mean the whole [Switch]
-         is a boolean NOT. *)
+         is a boolean NOT or an identity (possibly with a kind change). *)
       match Apply_cont.to_one_arg_without_trap_action action with
       | None -> maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
       | Some arg ->
+        let[@inline always] check_imm arg =
+          let machine_width = UE.machine_width (UA.uenv uacc) in
+          if TI.equal arm arg
+          then
+            let identity_arms = TI.Map.add arm action identity_arms in
+            maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
+          else if
+            TI.equal arm (TI.bool_true machine_width)
+            && TI.equal arg (TI.bool_false machine_width)
+            || TI.equal arm (TI.bool_false machine_width)
+               && TI.equal arg (TI.bool_true machine_width)
+          then
+            let not_arms = TI.Map.add arm action not_arms in
+            maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
+          else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
+        in
         let[@inline always] const arg =
           match Reg_width_const.descr arg with
-          | Tagged_immediate arg ->
-            if TI.equal arm arg
-            then
-              let identity_arms = TI.Map.add arm action identity_arms in
-              maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
-            else
-              let machine_width = UE.machine_width (UA.uenv uacc) in
-              if
-                TI.equal arm (TI.bool_true machine_width)
-                && TI.equal arg (TI.bool_false machine_width)
-                || TI.equal arm (TI.bool_false machine_width)
-                   && TI.equal arg (TI.bool_true machine_width)
-              then
-                let not_arms = TI.Map.add arm action not_arms in
-                maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
-              else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
-          | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
-          | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null ->
+          | Tagged_immediate arg | Naked_immediate arg -> check_imm arg
+          | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
+          | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _ | Naked_vec256 _
+          | Naked_vec512 _ | Naked_nativeint _ | Null ->
             maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
         in
         Simple.pattern_match arg ~const ~name:(fun _ ~coercion:_ ->
@@ -719,15 +727,47 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       then Some (cont, args)
       else None
   in
+  (* For 2-arm switches, the [identity_arms] / [not_arms] maps may contain
+     entries whose [Apply_cont] argument is either a tagged or a naked
+     immediate. We need to inspect any arm to determine which case we are in,
+     because the rebuild emits different primitives. *)
+  let kind_of_arms_arg arms_map : identity_or_not_arg_kind option =
+    match TI.Map.choose_opt arms_map with
+    | None -> None
+    | Some (_, action) -> (
+      match Apply_cont.to_one_arg_without_trap_action action with
+      | None -> None
+      | Some arg ->
+        Simple.pattern_match arg
+          ~name:(fun _ ~coercion:_ -> None)
+          ~const:(fun cst ->
+            let result : identity_or_not_arg_kind option =
+              match Reg_width_const.descr cst with
+              | Tagged_immediate _ -> Some Tagged_immediate
+              | Naked_immediate _ -> Some Naked_immediate
+              | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
+              | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _ | Naked_vec256 _
+              | Naked_vec512 _ | Naked_nativeint _ | Null ->
+                None
+            in
+            result))
+  in
   let switch_is_identity =
     let arm_discrs = TI.Map.keys arms in
     let identity_arms_discrs = TI.Map.keys identity_arms in
     if not (TI.Set.equal arm_discrs identity_arms_discrs)
     then None
     else
-      TI.Map.data identity_arms
-      |> List.map Apply_cont.continuation
-      |> Continuation.Set.of_list |> Continuation.Set.get_singleton
+      match kind_of_arms_arg identity_arms with
+      | None -> None
+      | Some kind -> (
+        match
+          TI.Map.data identity_arms
+          |> List.map Apply_cont.continuation
+          |> Continuation.Set.of_list |> Continuation.Set.get_singleton
+        with
+        | None -> None
+        | Some dest -> Some (dest, kind))
   in
   let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
   let switch_is_boolean_not =
@@ -738,9 +778,16 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       || not (TI.Set.equal arm_discrs not_arms_discrs)
     then None
     else
-      TI.Map.data not_arms
-      |> List.map Apply_cont.continuation
-      |> Continuation.Set.of_list |> Continuation.Set.get_singleton
+      match kind_of_arms_arg not_arms with
+      | None -> None
+      | Some kind -> (
+        match
+          TI.Map.data not_arms
+          |> List.map Apply_cont.continuation
+          |> Continuation.Set.of_list |> Continuation.Set.get_singleton
+        with
+        | None -> None
+        | Some dest -> Some (dest, kind))
   in
   let switch_is_single_arg_to_same_destination =
     recognize_switch_with_single_arg_to_same_destination condition_dbg
@@ -897,7 +944,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         expr, uacc
       | None -> (
         match switch_is_identity with
-        | Some dest ->
+        | Some (dest, kind) ->
           let uacc =
             (* CR mshinwell: it seems like this should be registering the
                potentially significant reduction in code size -- likewise in
@@ -906,43 +953,76 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             UA.notify_removed ~operation:Removed_operations.branch uacc
           in
           run uacc ~dacc_before_switch
-            (let$ tagged_scrutinee =
-               bound_prim "tagged_scrutinee" K.value
-                 (P.Unary (Tag_immediate, scrutinee))
-                 dbg
-             in
-             let apply_cont =
-               Apply_cont.create dest ~args:[tagged_scrutinee] ~dbg
-             in
-             let expr = RE.create_apply_cont apply_cont in
-             return
-               ~added_code_size:(Code_size.apply_cont apply_cont)
-               ~free_names:(Apply_cont.free_names apply_cont)
-               expr)
-        | None -> (
-          match switch_is_boolean_not with
-          | Some dest ->
-            let uacc =
-              UA.notify_removed ~operation:Removed_operations.branch uacc
-            in
-            run uacc ~dacc_before_switch
+            (match (kind : identity_or_not_arg_kind) with
+            | Tagged_immediate ->
               (let$ tagged_scrutinee =
                  bound_prim "tagged_scrutinee" K.value
                    (P.Unary (Tag_immediate, scrutinee))
                    dbg
                in
-               let$ not_scrutinee =
-                 bound_prim "not_scrutinee" K.value
-                   (P.Unary (Boolean_not, tagged_scrutinee))
-                   dbg
-               in
                let apply_cont =
-                 Apply_cont.create dest ~args:[not_scrutinee] ~dbg
+                 Apply_cont.create dest ~args:[tagged_scrutinee] ~dbg
                in
-               let free_names = Apply_cont.free_names apply_cont in
-               let added_code_size = Code_size.apply_cont apply_cont in
-               return ~added_code_size ~free_names
-                 (RE.create_apply_cont apply_cont))
+               let expr = RE.create_apply_cont apply_cont in
+               return
+                 ~added_code_size:(Code_size.apply_cont apply_cont)
+                 ~free_names:(Apply_cont.free_names apply_cont)
+                 expr)
+            | Naked_immediate ->
+              (* Scrutinee is already a naked immediate: pass it through. *)
+              let apply_cont =
+                Apply_cont.create dest ~args:[scrutinee] ~dbg
+              in
+              let expr = RE.create_apply_cont apply_cont in
+              return
+                ~added_code_size:(Code_size.apply_cont apply_cont)
+                ~free_names:(Apply_cont.free_names apply_cont)
+                expr)
+        | None -> (
+          match switch_is_boolean_not with
+          | Some (dest, kind) ->
+            let uacc =
+              UA.notify_removed ~operation:Removed_operations.branch uacc
+            in
+            run uacc ~dacc_before_switch
+              (match (kind : identity_or_not_arg_kind) with
+              | Tagged_immediate ->
+                (let$ tagged_scrutinee =
+                   bound_prim "tagged_scrutinee" K.value
+                     (P.Unary (Tag_immediate, scrutinee))
+                     dbg
+                 in
+                 let$ not_scrutinee =
+                   bound_prim "not_scrutinee" K.value
+                     (P.Unary (Boolean_not, tagged_scrutinee))
+                     dbg
+                 in
+                 let apply_cont =
+                   Apply_cont.create dest ~args:[not_scrutinee] ~dbg
+                 in
+                 let free_names = Apply_cont.free_names apply_cont in
+                 let added_code_size = Code_size.apply_cont apply_cont in
+                 return ~added_code_size ~free_names
+                   (RE.create_apply_cont apply_cont))
+              | Naked_immediate ->
+                (* Compute [scrutinee xor 1] in [naked_immediate] kind. *)
+                (let$ not_scrutinee =
+                   bound_prim "not_scrutinee" K.naked_immediate
+                     (P.Binary
+                        ( Int_arith (Naked_immediate, Xor),
+                          scrutinee,
+                          Simple.const
+                            (Reg_width_const.naked_immediate
+                               (TI.one machine_width)) ))
+                     dbg
+                 in
+                 let apply_cont =
+                   Apply_cont.create dest ~args:[not_scrutinee] ~dbg
+                 in
+                 let free_names = Apply_cont.free_names apply_cont in
+                 let added_code_size = Code_size.apply_cont apply_cont in
+                 return ~added_code_size ~free_names
+                   (RE.create_apply_cont apply_cont)))
           | None -> normal_case uacc))
   in
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
