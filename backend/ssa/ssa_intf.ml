@@ -25,10 +25,9 @@ open! Int_replace_polymorphic_compare
       terminator.
 
     - {!Finished_graph}: the view after [finish ()] has run. The full [Block.t]
-      record is exposed, [predecessors] / [dominator_info] /
-      [param_usage_counts] are populated, and graph-level queries
-      ([predecessors], [successors], [dominates], [common_dominator]) become
-      available.
+      record is exposed, [predecessors] / [dominator_info] / [usage_count] are
+      populated, and graph-level queries ([predecessors], [successors],
+      [dominates], [common_dominator]) become available.
 
     Within one graph instance, [Block.t] is the same record at runtime under
     both views; the views just expose different subsets of its fields and
@@ -37,14 +36,6 @@ open! Int_replace_polymorphic_compare
 type call_op =
   | Func of Cfg_intf.S.func_call_operation
   | Prim of Cfg_intf.S.prim_call_operation
-
-(** A block parameter: its machtype component and an optional human-readable
-    name (set from the corresponding Cmm variable name where known — function
-    args on [entry], [Ccatch] handler params; [None] otherwise). *)
-type block_param =
-  { typ : Cmm.machtype_component;
-    mutable name : string option
-  }
 
 type function_info =
   { fun_name : string;
@@ -66,6 +57,15 @@ module type Finished_graph = sig
   type usage_count = int
 
   module rec Block : sig
+    (** A param with [usage_count = 0] is "dead": args passed from predecessor
+        blocks do not need to be kept alive and we can remove the parameter
+        completely in Ssa_reducer. *)
+    type param = private
+      { typ : Cmm.machtype_component;
+        mutable name : string option;
+        mutable usage_count : usage_count
+      }
+
     type dominator_info = private
       { depth : int;
         dominator : Block.t
@@ -74,17 +74,12 @@ module type Finished_graph = sig
     and t = private
       { id : Block_id.t;
         is_function_start : bool;
-        params : block_param array;
+        params : param array;
         mutable predecessors : Block.Set.t;
         mutable body : Instruction.t array;
         mutable terminator : Terminator.t;
         mutable terminator_dbg : Debuginfo.t;
         mutable dominator_info : dominator_info;
-        mutable param_usage_counts : usage_count array;
-            (** Per-parameter usage counts, symmetric with [Op]'s [usage_count].
-                A param with count 0 is "dead": no arg passed via an
-                unconditional jump ([Goto]/[Raise]/[Tailcall_self]) to this
-                param need be kept alive. *)
         mutable block_end_trap_stack : Block.t list
             (** Trap stack at the end of the block (after applying the body's
                 [Push_trap]/[Pop_trap] effects to the stack inherited from
@@ -241,6 +236,14 @@ module type Graph_builder = sig
   type usage_count
 
   module rec Block : sig
+    type param = private
+      { typ : Cmm.machtype_component;
+        mutable name : string option;
+        mutable usage_count : usage_count
+      }
+
+    val set_param_name : param -> string -> unit
+
     (** [Block.t] is opaque during construction: callers can hash, compare and
         consult the visible accessors, but the fields are kept inaccessible
         because they are not yet meaningful. *)
@@ -250,7 +253,7 @@ module type Graph_builder = sig
 
     val is_function_start : Block.t -> bool
 
-    val params : Block.t -> block_param array
+    val params : Block.t -> param array
 
     val equal : Block.t -> Block.t -> bool
 

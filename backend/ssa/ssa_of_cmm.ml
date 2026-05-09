@@ -528,8 +528,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
               let n = Array.length ty in
               let name = V.name (VP.var id) in
               for i = 0 to n - 1 do
-                (block_params.(!pos + i) : Ssa_intf.block_param).name
-                  <- Some name
+                Block.set_param_name block_params.(!pos + i) name
               done;
               pos := !pos + n);
           ( Static_label.Map.add nfail new_block.block static_exceptions,
