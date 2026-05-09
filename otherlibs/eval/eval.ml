@@ -124,12 +124,24 @@ let eval (expr : 'a expr) =
     && not (Opttoploop.using_existing_compilerlibs_state_for_artifacts ())
   then read_bundles_from_exe ();
   (* TODO: reset all the things *)
-  (* TODO: these flags should maybe be snapshotted and restored *)
-  Clflags.no_cwd := true;
-  Clflags.native_code := true;
-  Clflags.dont_write_files := true;
-  Clflags.shared := true;
-  Clflags.dlcode := false;
+  (* These mutations configure the JIT compile of the quoted body. They must
+     be snapshotted and restored: leaving them set across calls breaks
+     subsequent compilations performed by the surrounding host (e.g.
+     [expectnat]'s phrase-by-phrase compile-and-link cycle, where a lingering
+     [dlcode = false] causes the system linker to reject non-PIC text
+     relocations when bundling the next phrase into a shared object). *)
+  Clflags.protect_optimization_state @@ fun () ->
+  Misc.protect_refs
+    [ Misc.R (Clflags.no_cwd, true);
+      Misc.R (Clflags.native_code, true);
+      Misc.R (Clflags.dont_write_files, true);
+      Misc.R (Clflags.shared, true);
+      Misc.R (Clflags.dlcode, false) ]
+  @@ fun () ->
+  (* Each [Eval.eval] call compiles a fresh, self-contained unit. Snapshot the
+     JIT's global symbol table so anonymous local labels (e.g. [.L277]) from
+     this call do not collide with those of earlier calls. *)
+  Jit.protect_global_symbols @@ fun () ->
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
   (* TODO: Set a bunch of flags to match the initial compile (like
