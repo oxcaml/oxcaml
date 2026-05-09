@@ -216,10 +216,9 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     if any_non_goto_pred || keep_unused_ops
     then Array.init n Fun.id
     else
-      let counts = blk.param_usage_counts in
       let buf = ref [] in
       for i = n - 1 downto 0 do
-        if counts.(i) > 0 then buf := i :: !buf
+        if blk.params.(i).usage_count > 0 then buf := i :: !buf
       done;
       Array.of_list !buf
   in
@@ -236,15 +235,14 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
       then begin
         let kept = compute_kept blk in
         In.Block.Tbl.replace kept_params blk kept;
-        let params =
-          Array.map (fun i -> (blk.params.(i) : Ssa_intf.block_param).typ) kept
-        in
+        let params = Array.map (fun i -> blk.params.(i).typ) kept in
         let { Out.block = new_out; _ } = Out.new_block ~params in
         let out_params = Out.Block.params new_out in
         Array.iteri
           (fun i k ->
-            (out_params.(i) : Ssa_intf.block_param).name
-              <- (blk.params.(k) : Ssa_intf.block_param).name)
+            Option.iter
+              (Out.Block.set_param_name out_params.(i))
+              blk.params.(k).name)
           kept;
         In.Block.Tbl.replace block_map blk new_out
       end)

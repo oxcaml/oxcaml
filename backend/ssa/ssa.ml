@@ -44,6 +44,14 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     type usage_count = int
 
     module rec Block : sig
+      type param =
+        { typ : Cmm.machtype_component;
+          mutable name : string option;
+          mutable usage_count : usage_count
+        }
+
+      val set_param_name : param -> string -> unit
+
       type dominator_info =
         { depth : int;
           dominator : Block.t
@@ -52,13 +60,12 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       and t =
         { id : Block_id.t;
           is_function_start : bool;
-          params : block_param array;
+          params : param array;
           mutable predecessors : Block.Set.t;
           mutable body : Instruction.t array;
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
-          mutable param_usage_counts : usage_count array;
           mutable block_end_trap_stack : Block.t list
         }
 
@@ -66,7 +73,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
       val is_function_start : Block.t -> bool
 
-      val params : Block.t -> block_param array
+      val params : Block.t -> param array
 
       val equal : Block.t -> Block.t -> bool
 
@@ -80,6 +87,14 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
       module Tbl : Hashtbl.S with type key = Block.t
     end = struct
+      type param =
+        { typ : Cmm.machtype_component;
+          mutable name : string option;
+          mutable usage_count : usage_count
+        }
+
+      let set_param_name (p : param) name = p.name <- Some name
+
       type dominator_info =
         { depth : int;
           dominator : Block.t
@@ -88,13 +103,12 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       and t =
         { id : Block_id.t;
           is_function_start : bool;
-          params : block_param array;
+          params : param array;
           mutable predecessors : Block.Set.t;
           mutable body : Instruction.t array;
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
-          mutable param_usage_counts : usage_count array;
           mutable block_end_trap_stack : Block.t list
         }
 
@@ -401,7 +415,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
-        param_usage_counts = [||];
         block_end_trap_stack = []
       }
 
@@ -414,15 +427,14 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
-        param_usage_counts = [||];
         block_end_trap_stack = []
       }
 
     let make_block_result ~is_function_start ~(params : Cmm.machtype) :
         new_block_result =
-      let block_params : Ssa_intf.block_param array =
+      let block_params : Block.param array =
         Array.map
-          (fun typ : Ssa_intf.block_param -> { typ; name = None })
+          (fun typ : Block.param -> { typ; name = None; usage_count = 0 })
           params
       in
       let block = create_block ~is_function_start ~params:block_params in
@@ -443,8 +455,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         (fun i (var, _ty) ->
           if i < Array.length block.params
           then
-            block.params.(i).name
-              <- Some (Backend_var.name (Backend_var.With_provenance.var var)))
+            Block.set_param_name block.params.(i)
+              (Backend_var.name (Backend_var.With_provenance.var var)))
         function_info.fun_args_names;
       block, params
 
@@ -520,7 +532,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     let predecessors (blk : Block.t) : Block.Set.t = blk.predecessors
 
     let params_machtype (blk : Block.t) : Cmm.machtype =
-      Array.map (fun (p : Ssa_intf.block_param) -> p.typ) blk.params
+      Array.map (fun (p : Block.param) -> p.typ) blk.params
 
     (* The implicit trap successor of [blk]: the topmost handler in
        [block_end_trap_stack], if the terminator can raise. *)
@@ -558,9 +570,11 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       else
         common_dominator a.dominator_info.dominator b.dominator_info.dominator
 
-    (* For a predecessor's terminator, return the argument at [index] that is
-       passed through an unconditional jump to a successor whose params may be
-       dropped. Only [Goto] targets such successors. *)
+    (** For a predecessor's terminator, return the argument at [index] that is
+        passed through an unconditional jump to a successor whose params may be
+        dropped. We only do this delayed counting of arguments for [Goto], the
+        other terminator's arguments are counted unconditionally in
+        [increment_uses_in_terminator]. *)
     let block_param_arg (term : Terminator.t) (index : int) :
         Instruction.t option =
       match term with
@@ -691,34 +705,24 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     (* Reference-counting walk over each reachable block's body and terminator.
        [Block_param] increments propagate to predecessors' [Goto] args via
-       [block_param_arg]. Per-Op counts mutate [op_data.usage_count]; per-block
-       param counts live in a side table and are written back to
-       [param_usage_counts] at the end. *)
+       [block_param_arg]. *)
     let compute_use_counts ~(reachable_blocks : Block.t list) : unit =
-      let param_counts : int array Block.Tbl.t = Block.Tbl.create 64 in
-      List.iter
-        (fun (blk : Block.t) ->
-          Block.Tbl.replace param_counts blk
-            (Array.make (Array.length blk.params) 0))
-        reachable_blocks;
       let rec increment_use (i : Instruction.t) =
         match i with
         | Op r ->
           r.usage_count <- r.usage_count + 1;
           if r.usage_count = 1 then Array.iter increment_use r.args
         | Proj { src; _ } -> increment_use src
-        | Block_param { block; index; _ } ->
-          let counts = Block.Tbl.find param_counts block in
-          let old = counts.(index) in
-          counts.(index) <- old + 1;
+        | Block_param { block; index } ->
+          let p = block.params.(index) in
+          let old = p.usage_count in
+          p.usage_count <- old + 1;
           if old = 0
           then
-            Block.Set.iter
-              (fun (pred : Block.t) ->
-                match block_param_arg pred.terminator index with
-                | Some arg -> increment_use arg
-                | None -> ())
-              block.predecessors
+            block.predecessors
+            |> Block.Set.iter (fun pred ->
+                block_param_arg pred.terminator index
+                |> Option.iter increment_use)
         | Tuple _ ->
           Misc.fatal_error
             "Ssa.increment_use: Tuple should have been short-circuited by proj"
@@ -750,10 +754,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
                 Misc.fatal_error "impossible body instruction")
             blk.body;
           increment_uses_in_terminator blk.terminator)
-        reachable_blocks;
-      List.iter
-        (fun (blk : Block.t) ->
-          blk.param_usage_counts <- Block.Tbl.find param_counts blk)
         reachable_blocks
 
     (* Walk [blocks] in the input order, but when first visiting a block emit
