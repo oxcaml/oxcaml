@@ -326,6 +326,57 @@ Error: Cannot access record with unrepresentable field.
        The record has type t, whose field a is not representable.
 |}]
 
+(* CR-soon rtjoa: The below two programs should work *)
+module Substitution_mismatch : sig
+  type a : any
+  type t = { a : a }
+end with type a := float# = struct
+  type t = { a : float# }
+end
+[%%expect{|
+Lines 4-6, characters 28-3:
+4 | ............................struct
+5 |   type t = { a : float# }
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float#; } end
+       is not included in
+         sig type t = { a : float#; } end
+       Type declarations do not match:
+         type t = { a : float#; }
+       is not included in
+         type t = { a : float#; }
+       Their internal representations differ:
+       the first declaration has a fixed representation while the other varies.
+|}]
+
+module Substitution_mismatch_with_abstract_kinds : sig
+  kind_ k
+  type a : k
+  type t = { a : a }
+end with kind_ k := float64 and type a := float# = struct
+  type t = { a : float# }
+end
+let f c { M.a = a } = if c then a else #0.
+[%%expect{|
+Lines 5-7, characters 51-3:
+5 | ...................................................struct
+6 |   type t = { a : float# }
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float#; } end
+       is not included in
+         sig type t = { a : float#; } end
+       Type declarations do not match:
+         type t = { a : float#; }
+       is not included in
+         type t = { a : float#; }
+       Their internal representations differ:
+       the first declaration has a fixed representation while the other varies.
+|}]
+
 module M : sig
   kind_ k
   type t : k
