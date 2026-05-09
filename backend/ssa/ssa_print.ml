@@ -13,11 +13,10 @@ module Make (S : Ssa.Finished_graph) = struct
   let print_block_id ppf (b : S.Block.t) =
     Format.fprintf ppf "B%d" (b.id :> int)
 
-  let print_block_param ppf ((b : S.Block.t), index) =
-    let p : Ssa_intf.block_param = b.params.(index) in
-    match p.name with
-    | None -> Format.fprintf ppf "%a.%d" print_block_id b index
-    | Some n -> Format.fprintf ppf "%s/%a.%d" n print_block_id b index
+  let print_block_param ppf (block : S.Block.t) index =
+    match block.params.(index).name with
+    | None -> Format.fprintf ppf "%a.%d" print_block_id block index
+    | Some n -> Format.fprintf ppf "%s/%a.%d" n print_block_id block index
 
   let print_op_id ppf (od : S.Instruction.op_data) =
     match od.name with
@@ -50,7 +49,7 @@ module Make (S : Ssa.Finished_graph) = struct
   and print_instr_ref ppf (i : S.Instruction.t) =
     match i with
     | Op od -> print_op_id ppf od
-    | Block_param { block; index; _ } -> print_block_param ppf (block, index)
+    | Block_param { block; index; _ } -> print_block_param ppf block index
     | Proj { index; src } ->
       Format.fprintf ppf "%d.%a" index print_instr_ref src
     | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
@@ -117,10 +116,10 @@ module Make (S : Ssa.Finished_graph) = struct
 
   let print_typed_params ppf (blk : S.Block.t) =
     Array.iteri
-      (fun i (p : Ssa_intf.block_param) ->
+      (fun i (p : S.Block.param) ->
         if i > 0 then Format.fprintf ppf ", ";
-        Format.fprintf ppf "%a : %a" print_block_param (blk, i)
-          Printcmm.machtype_component p.typ)
+        print_block_param ppf blk i;
+        Format.fprintf ppf " : %a" Printcmm.machtype_component p.typ)
       blk.params
 
   let print_block_header ppf (blk : S.Block.t) =
