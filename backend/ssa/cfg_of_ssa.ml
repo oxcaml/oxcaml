@@ -270,7 +270,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     let result =
       Block.Set.exists (fun p -> is_call_predecessor p block) block.predecessors
     in
-    if result && Block.Set.cardinal block.predecessors != 1
+    if result && Block.Set.cardinal block.predecessors <> 1
     then
       Misc.fatal_errorf
         "Cfg_of_ssa: block %d has a call predecessor alongside other \
@@ -415,7 +415,9 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
         let src =
           if Array.length exn_val > Array.length dst
           then Array.sub exn_val 0 (Array.length dst)
-          else exn_val
+          else (
+            assert (Array.length exn_val = Array.length dst);
+            exn_val)
         in
         emit_moves body ~src ~dst;
         make_cfg_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg

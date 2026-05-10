@@ -67,14 +67,15 @@ module Make (Builder : Ssa.Graph_builder) = struct
            { ident = VP.var v; provenance; which_parameter = None; regs = r1 });
     env
 
-  let chunk_of_component (c : Cmm.machtype_component) : Cmm.memory_chunk =
+  let chunk_of_machtype (c : Cmm.machtype_component) : Cmm.memory_chunk =
     match c with
     | Float -> Double
     | Float32 -> Single { reg = Float32 }
     | Vec128 -> Onetwentyeight_unaligned
     | Vec256 -> Twofiftysix_unaligned
     | Vec512 -> Fivetwelve_unaligned
-    | Val | Int | Addr | Valx2 -> Word_val
+    | Val | Int | Addr -> Word_val
+    | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
   let size_of_cmm_expr env (e : Cmm.expression) =
     let rec size (e : Cmm.expression) =
@@ -96,8 +97,10 @@ module Make (Builder : Ssa.Graph_builder) = struct
         let ty = SU.oper_result_type op in
         Array.fold_left (fun acc c -> acc + SU.size_component c) 0 ty
       | Clet (_, _, body) | Csequence (_, body) -> size body
-      | Cifthenelse (_, _, e1, _, _, _) -> size e1
-      | _ -> Arch.size_addr
+      | Cifthenelse _ | Cphantom_let _ | Cswitch _ | Ccatch _ | Cexit _
+      | Cinvalid _ ->
+        Misc.fatal_error
+          "Ssa_of_cmm.size_of_cmm_expr: unexpected kind of expression"
     in
     size e
 
@@ -259,7 +262,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
         | None ->
           Array.iter
             (fun (r : Instruction.t) ->
-              let chunk = chunk_of_component (Instruction.arg_type r) in
+              let chunk = chunk_of_machtype (Instruction.arg_type r) in
               ignore
                 (emit_op c
                    ~op:(Operation.Store (chunk, !addressing_mode, false))
@@ -453,6 +456,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
       let rd = emit_op c ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
       emit_stores env c dbg new_args rd;
       Ok [| rd |]
+    | Basic (Op (Alloc _)) ->
+      Misc.fatal_error "Alloc is expected to have exactly one dbginfo"
     | _ -> (
       let* arg_instrs = emit_tuple env c new_args in
       match new_op with
@@ -466,7 +471,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
             | Rc_close_at_apply ->
               Misc.fatal_error
                 "Rc_close_at_apply should have been lowered by Flambda2")
-          | _ -> true
+          | _ -> false
         in
         emit_call env c ~ty ~nontail term arg_instrs dbg
       | Basic (Op op) -> Ok (emit_op_res c ~dbg op ty arg_instrs)
