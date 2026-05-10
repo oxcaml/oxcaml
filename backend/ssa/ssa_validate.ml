@@ -3,18 +3,17 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-40-41-42"]
 
 (** Post-finish SSA invariants. Most structural invariants are enforced by the
-    graph builder. Here, we just that SSA definitions dominate their uses. *)
+    graph builder. Here, we just verify that SSA definitions dominate their uses
+    and that trap stacks are consistent. *)
 
 module Make (S : Ssa.Finished_graph) = struct
-  module P = Ssa_print.Make (S)
-
   let error fmt =
     Format.kasprintf
       (fun s ->
         Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.fun_name s)
       fmt
 
-  let pb = P.print_block_id
+  let pb = S.print_block_id
 
   (* The trap stack at entry to [bl] must agree across all predecessors: on a
      normal edge it's the predecessor's [block_end_trap_stack]; on an trap edge
@@ -62,14 +61,13 @@ module Make (S : Ssa.Finished_graph) = struct
       match i with
       | Op { id; _ } -> (
         match S.Instruction_id.Tbl.find_opt defined_ops id with
-        | None ->
-          error "block %a: v%d used but not defined" pb bl
-            (S.Instruction_id.hash id)
+        | None -> error "block %a: v%d used but not defined" pb bl (id :> int)
         | Some def_block ->
           if not (S.dominates def_block bl)
           then
             error "block %a: v%d defined in non-dominating block %a" pb bl
-              (S.Instruction_id.hash id) pb def_block)
+              (id :> int)
+              pb def_block)
       | Block_param { block; _ } ->
         if not (block_exists block)
         then
@@ -99,9 +97,7 @@ module Make (S : Ssa.Finished_graph) = struct
           | Op { id; args; _ } ->
             check_args bl args;
             if S.Instruction_id.Tbl.mem defined_ops id
-            then
-              error "block %a: duplicate Op id v%d" pb bl
-                (S.Instruction_id.hash id);
+            then error "block %a: duplicate Op id v%d" pb bl (id :> int);
             S.Instruction_id.Tbl.replace defined_ops id bl
           | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
           | Block_param _ | Proj _ | Tuple _ ->

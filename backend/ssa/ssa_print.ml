@@ -2,117 +2,21 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-(** Pretty-printer for {!Ssa.Finished_graph} instances.
-
-    Op result names are [v<id>] (or [<name>/v<id>] when the op carries a name),
-    block ids are [B<id>]. References to ops use the result name, or
-    [v<i>.<index>] when with projection, references to block params use
-    [B<id>.<index>]. *)
+(** Block- and graph-level pretty-printers for {!Ssa.Finished_graph}. The
+    instruction-, terminator- and block-id printers live in {!Ssa} itself, so
+    they are shared between the [Graph_builder] and [Finished_graph] views. *)
 
 module Make (S : Ssa.Finished_graph) = struct
-  let print_block_id ppf (b : S.Block.t) =
-    Format.fprintf ppf "B%d" (b.id :> int)
+  let print_block_id = S.print_block_id
+
+  let print_instruction = S.print_instruction
+
+  let print_terminator = S.print_terminator
 
   let print_block_param ppf (block : S.Block.t) index =
     match block.params.(index).name with
     | None -> Format.fprintf ppf "%a.%d" print_block_id block index
     | Some n -> Format.fprintf ppf "%s/%a.%d" n print_block_id block index
-
-  let print_op_id ppf (od : S.Instruction.op_data) =
-    match od.name with
-    | None -> Format.fprintf ppf "v%d" (od.id :> int)
-    | Some n -> Format.fprintf ppf "%s/v%d" n (od.id :> int)
-
-  let rec print_instruction ppf (i : S.Instruction.t) =
-    match i with
-    | Op ({ op; args; _ } as od) ->
-      let op_str = Format.asprintf "%a" Operation.dump op in
-      if Array.length args = 0
-      then Format.fprintf ppf "%a = %s" print_op_id od op_str
-      else
-        let formatted_op =
-          if String.contains op_str ' ' then "(" ^ op_str ^ ")" else op_str
-        in
-        Format.fprintf ppf "%a = %s(%a)" print_op_id od formatted_op print_args
-          args
-    | Push_trap { handler } ->
-      Format.fprintf ppf "push_trap %a" print_block_id handler
-    | Pop_trap { handler } ->
-      Format.fprintf ppf "pop_trap %a" print_block_id handler
-    | Stack_check { max_frame_size_bytes } ->
-      Format.fprintf ppf "stack_check %d" max_frame_size_bytes
-    | Name_for_debugger { ident; _ } ->
-      Format.fprintf ppf "name_for_debugger %a" Ident.print ident
-    | Block_param _ | Tuple _ | Proj _ ->
-      Misc.fatal_error "Unexpected body instruction in Ssa_print"
-
-  and print_instr_ref ppf (i : S.Instruction.t) =
-    match i with
-    | Op od -> print_op_id ppf od
-    | Block_param { block; index; _ } -> print_block_param ppf block index
-    | Proj { index; src } ->
-      Format.fprintf ppf "%d.%a" index print_instr_ref src
-    | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
-    | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
-      Misc.fatal_error "Unexpected instruction reference in Ssa_print"
-
-  and print_args ppf args =
-    Array.iteri
-      (fun i arg ->
-        if i > 0 then Format.fprintf ppf ", ";
-        print_instr_ref ppf arg)
-      args
-
-  let print_terminator ppf (t : S.Terminator.t) =
-    match t with
-    | Goto { goto; args } ->
-      Format.fprintf ppf "goto %a(%a)" print_block_id goto print_args args
-    | Branch { cond; ifso; ifnot } ->
-      Format.fprintf ppf "if %a then goto %a else goto %a" print_instr_ref cond
-        print_block_id ifso print_block_id ifnot
-    | Switch { index; targets } ->
-      Format.fprintf ppf "switch(%a) [" print_instr_ref index;
-      Array.iteri
-        (fun i tgt ->
-          if i > 0 then Format.fprintf ppf ", ";
-          print_block_id ppf tgt)
-        targets;
-      Format.fprintf ppf "]"
-    | Return { args } -> Format.fprintf ppf "return(%a)" print_args args
-    | Raise { args; _ } -> Format.fprintf ppf "raise(%a)" print_args args
-    | Tailcall_self { destination; args } ->
-      Format.fprintf ppf "tailcall_self %a(%a)" print_block_id destination
-        print_args args
-    | Tailcall_func { args; _ } ->
-      Format.fprintf ppf "tailcall_func(%a)" print_args args
-    | Call { op = Func (Direct sym); args; continuation; may_raise; nontail } ->
-      Format.fprintf ppf "call %s(%a) -> %a" sym.sym_name print_args args
-        print_block_id continuation;
-      if may_raise then Format.fprintf ppf " may_raise";
-      if nontail then Format.fprintf ppf " nontail"
-    | Call { op = Func (Indirect _); args; continuation; may_raise; nontail } ->
-      Format.fprintf ppf "call_indirect(%a) -> %a" print_args args
-        print_block_id continuation;
-      if may_raise then Format.fprintf ppf " may_raise";
-      if nontail then Format.fprintf ppf " nontail"
-    | Call
-        { op = Prim (External { func_symbol; _ });
-          args;
-          continuation;
-          may_raise;
-          nontail = _
-        } ->
-      Format.fprintf ppf "prim %s(%a) -> %a" func_symbol print_args args
-        print_block_id continuation;
-      if may_raise then Format.fprintf ppf " may_raise"
-    | Call { op = Prim (Probe { name; _ }); args; continuation; _ } ->
-      Format.fprintf ppf "probe %s(%a) -> %a" name print_args args
-        print_block_id continuation
-    | Invalid { message = _; args; continuation } -> (
-      Format.fprintf ppf "invalid(%a)" print_args args;
-      match continuation with
-      | Some l -> Format.fprintf ppf " -> %a" print_block_id l
-      | None -> ())
 
   let print_typed_params ppf (blk : S.Block.t) =
     Array.iteri

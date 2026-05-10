@@ -190,6 +190,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
       val make_proj : index:int -> Instruction.t -> Instruction.t
 
+      val result_arity : Instruction.t -> int
+
       val arg_type : Instruction.t -> Cmm.machtype_component
     end = struct
       type t =
@@ -227,10 +229,30 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           src : Instruction.t
         }
 
-      let equal (a : Instruction.t) (b : Instruction.t) =
-        match[@warning "-4"] a, b with
+      let rec equal (a : Instruction.t) (b : Instruction.t) =
+        match a, b with
         | Op a, Op b -> Instruction_id.equal a.id b.id
-        | _ -> a == b
+        | Block_param a, Block_param b ->
+          Block.equal a.block b.block && Int.equal a.index b.index
+        | Proj a, Proj b -> Int.equal a.index b.index && equal a.src b.src
+        | Tuple a, Tuple b ->
+          Array.length a = Array.length b && Array.for_all2 equal a b
+        | Push_trap { handler = a }, Push_trap { handler = b }
+        | Pop_trap { handler = a }, Pop_trap { handler = b } ->
+          Block.equal a b
+        | ( Stack_check { max_frame_size_bytes = a },
+            Stack_check { max_frame_size_bytes = b } ) ->
+          Int.equal a b
+        | Name_for_debugger a, Name_for_debugger b ->
+          Ident.same a.ident b.ident
+          && Option.equal Backend_var.Provenance.equal a.provenance b.provenance
+          && Option.equal Int.equal a.which_parameter b.which_parameter
+          && Array.length a.regs = Array.length b.regs
+          && Array.for_all2 equal a.regs b.regs
+        | ( ( Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+            | Stack_check _ | Name_for_debugger _ ),
+            _ ) ->
+          false
 
       let arg_type (instr : Instruction.t) : Cmm.machtype_component =
         match instr with
@@ -272,10 +294,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             (Array.length block.params);
         Block_param { block; index }
 
+      let result_arity instr =
+        match instr with
+        | Tuple elems -> Array.length elems
+        | Op { typ; _ } -> Array.length typ
+        | Proj _ | Block_param _ -> 1
+        | Name_for_debugger _ | Push_trap _ | Pop_trap _ | Stack_check _ -> 0
+
       let make_proj ~index src =
         match src with
         | Tuple elems -> Array.get elems index
-        | Op _ -> Proj { index; src }
+        | Op _ ->
+          assert (index >= 0 && index < result_arity src);
+          Proj { index; src }
         | Block_param _ | Proj _ | Push_trap _ | Pop_trap _ | Stack_check _
         | Name_for_debugger _ ->
           Misc.fatal_error
@@ -430,6 +461,127 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         block_end_trap_stack = []
       }
 
+    (* Pretty-printers shared between the [Graph_builder] and [Finished_graph]
+       views: only depend on data exposed in both signatures, so reducer
+       diagnostics can print under-construction graphs the same way as finished
+       ones. Op result names are [v<id>] (or [<name>/v<id>] when the op carries
+       a name), block ids are [B<id>]. References to ops use the result name, or
+       [<index>.v<id>] under a projection; references to block params use
+       [B<id>.<index>] (or [<name>/B<id>.<index>]). *)
+    let print_block_id ppf (b : Block.t) =
+      Format.fprintf ppf "B%d" (b.id :> int)
+
+    let print_block_param ppf (block : Block.t) index =
+      match block.params.(index).name with
+      | None -> Format.fprintf ppf "%a.%d" print_block_id block index
+      | Some n -> Format.fprintf ppf "%s/%a.%d" n print_block_id block index
+
+    let print_op_id ppf (od : Instruction.op_data) =
+      match od.name with
+      | None -> Format.fprintf ppf "v%d" (od.id :> int)
+      | Some n -> Format.fprintf ppf "%s/v%d" n (od.id :> int)
+
+    (* Handles every [Instruction.t] kind, including the virtual [Block_param] /
+       [Proj] / [Tuple] that don't appear in a finished body, since reducer
+       diagnostics may print partially-built instructions whose kind is not
+       constrained. *)
+    let rec print_instruction ppf (i : Instruction.t) =
+      match i with
+      | Op ({ op; args; _ } as od) ->
+        if Instruction.result_arity i <> 0
+        then Format.fprintf ppf "%a = " print_op_id od;
+        let op_str = Format.asprintf "%a" Operation.dump op in
+        if Array.length args = 0
+        then Format.pp_print_string ppf op_str
+        else
+          let formatted_op =
+            if String.contains op_str ' ' then "(" ^ op_str ^ ")" else op_str
+          in
+          Format.fprintf ppf "%s(%a)" formatted_op print_args args
+      | Push_trap { handler } ->
+        Format.fprintf ppf "push_trap %a" print_block_id handler
+      | Pop_trap { handler } ->
+        Format.fprintf ppf "pop_trap %a" print_block_id handler
+      | Stack_check { max_frame_size_bytes } ->
+        Format.fprintf ppf "stack_check %d" max_frame_size_bytes
+      | Name_for_debugger { ident; _ } ->
+        Format.fprintf ppf "name_for_debugger %a" Ident.print ident
+      | Block_param { block; index } -> print_block_param ppf block index
+      | Proj { index; src } ->
+        Format.fprintf ppf "%d.%a" index print_instr_ref src
+      | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
+
+    and print_instr_ref ppf (i : Instruction.t) =
+      match i with
+      | Op od -> print_op_id ppf od
+      | Block_param { block; index; _ } -> print_block_param ppf block index
+      | Proj { index; src } ->
+        Format.fprintf ppf "%d.%a" index print_instr_ref src
+      | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
+      | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
+        Misc.fatal_error
+          "Ssa.print_instr_ref: not a value-producing instruction"
+
+    and print_args ppf args =
+      Array.iteri
+        (fun i arg ->
+          if i > 0 then Format.fprintf ppf ", ";
+          print_instr_ref ppf arg)
+        args
+
+    let print_terminator ppf (t : Terminator.t) =
+      match t with
+      | Goto { goto; args } ->
+        Format.fprintf ppf "goto %a(%a)" print_block_id goto print_args args
+      | Branch { cond; ifso; ifnot } ->
+        Format.fprintf ppf "if %a then goto %a else goto %a" print_instr_ref
+          cond print_block_id ifso print_block_id ifnot
+      | Switch { index; targets } ->
+        Format.fprintf ppf "switch(%a) [" print_instr_ref index;
+        Array.iteri
+          (fun i tgt ->
+            if i > 0 then Format.fprintf ppf ", ";
+            print_block_id ppf tgt)
+          targets;
+        Format.fprintf ppf "]"
+      | Return { args } -> Format.fprintf ppf "return(%a)" print_args args
+      | Raise { args; _ } -> Format.fprintf ppf "raise(%a)" print_args args
+      | Tailcall_self { destination; args } ->
+        Format.fprintf ppf "tailcall_self %a(%a)" print_block_id destination
+          print_args args
+      | Tailcall_func { args; _ } ->
+        Format.fprintf ppf "tailcall_func(%a)" print_args args
+      | Call { op = Func (Direct sym); args; continuation; may_raise; nontail }
+        ->
+        Format.fprintf ppf "call %s(%a) -> %a" sym.sym_name print_args args
+          print_block_id continuation;
+        if may_raise then Format.fprintf ppf " may_raise";
+        if nontail then Format.fprintf ppf " nontail"
+      | Call { op = Func (Indirect _); args; continuation; may_raise; nontail }
+        ->
+        Format.fprintf ppf "call_indirect(%a) -> %a" print_args args
+          print_block_id continuation;
+        if may_raise then Format.fprintf ppf " may_raise";
+        if nontail then Format.fprintf ppf " nontail"
+      | Call
+          { op = Prim (External { func_symbol; _ });
+            args;
+            continuation;
+            may_raise;
+            nontail = _
+          } ->
+        Format.fprintf ppf "prim %s(%a) -> %a" func_symbol print_args args
+          print_block_id continuation;
+        if may_raise then Format.fprintf ppf " may_raise"
+      | Call { op = Prim (Probe { name; _ }); args; continuation; _ } ->
+        Format.fprintf ppf "probe %s(%a) -> %a" name print_args args
+          print_block_id continuation
+      | Invalid { message = _; args; continuation } -> (
+        Format.fprintf ppf "invalid(%a)" print_args args;
+        match continuation with
+        | Some l -> Format.fprintf ppf " -> %a" print_block_id l
+        | None -> ())
+
     let make_block_result ~is_function_start ~(params : Cmm.machtype) :
         new_block_result =
       let block_params : Block.param array =
@@ -462,19 +614,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     (* === Builder operations: mutate the cursor in place === *)
 
-    let start_block (blk : Block.t) : cursor = { block = blk; instrs_rev = [] }
+    let start_block (block : Block.t) : cursor = { block; instrs_rev = [] }
 
     let move_cursor (c : cursor) ~(new_pos : cursor) : unit =
       c.block <- new_pos.block;
       c.instrs_rev <- new_pos.instrs_rev
 
-    let emit_instruction (c : cursor) (i : Instruction.t) =
-      (match i with
+    let emit_instruction (c : cursor) (instr : Instruction.t) =
+      (match instr with
       | Instruction.Block_param _ | Instruction.Proj _ | Instruction.Tuple _ ->
         Misc.fatal_errorf
           "Ssa.emit_instruction: %s is a virtual value and cannot be emitted \
            into a block body"
-          (match[@warning "-fragile-match"] i with
+          (match[@warning "-fragile-match"] instr with
           | Instruction.Block_param _ -> "Block_param"
           | Instruction.Proj _ -> "Proj"
           | Instruction.Tuple _ -> "Tuple"
@@ -482,7 +634,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       | Instruction.Op _ | Instruction.Push_trap _ | Instruction.Pop_trap _
       | Instruction.Stack_check _ | Instruction.Name_for_debugger _ ->
         ());
-      c.instrs_rev <- i :: c.instrs_rev
+      c.instrs_rev <- instr :: c.instrs_rev
 
     let emit_op (c : cursor) ~op ~dbg ~typ ~args : Instruction.t =
       let instr = Instruction.make_op ~op ~typ ~args ~dbg in
@@ -515,30 +667,32 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         Array.iter (check_target_has_no_params ~term_name:"Switch") targets
       | Return _ | Raise _ | Tailcall_func _ | Call _ | Invalid _ -> ()
 
+    let is_finished (c : cursor) = c.block.terminator != pending_terminator
+
     let finish_block (c : cursor) ~(dbg : Debuginfo.t) (term : Terminator.t) :
         unit =
-      let blk = c.block in
-      if blk.terminator != pending_terminator
+      let block = c.block in
+      if is_finished c
       then Misc.fatal_error "Ssa.finish_block: block already finished";
       check_terminator term;
-      blk.body <- Array.of_list (List.rev c.instrs_rev);
-      blk.terminator <- term;
-      blk.terminator_dbg <- dbg;
-      finished_blocks := blk :: !finished_blocks;
+      block.body <- Array.of_list (List.rev c.instrs_rev);
+      block.terminator <- term;
+      block.terminator_dbg <- dbg;
+      finished_blocks := block :: !finished_blocks;
       c.instrs_rev <- []
 
     (* === Predecessors / dominators === *)
 
-    let predecessors (blk : Block.t) : Block.Set.t = blk.predecessors
+    let predecessors (block : Block.t) : Block.Set.t = block.predecessors
 
-    let params_machtype (blk : Block.t) : Cmm.machtype =
-      Array.map (fun (p : Block.param) -> p.typ) blk.params
+    let params_machtype (block : Block.t) : Cmm.machtype =
+      Array.map (fun (p : Block.param) -> p.typ) block.params
 
-    (* The implicit trap successor of [blk]: the topmost handler in
+    (* The implicit trap successor of [block]: the topmost handler in
        [block_end_trap_stack], if the terminator can raise. *)
-    let trap_successor (blk : Block.t) : Block.t option =
+    let trap_successor (block : Block.t) : Block.t option =
       let raises =
-        match blk.terminator with
+        match block.terminator with
         | Raise _ -> true
         | Call { may_raise; _ } -> may_raise
         | Goto _ | Branch _ | Switch _ | Return _ | Tailcall_self _
@@ -546,12 +700,12 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           false
       in
       if raises
-      then match blk.block_end_trap_stack with [] -> None | h :: _ -> Some h
+      then match block.block_end_trap_stack with [] -> None | h :: _ -> Some h
       else None
 
-    let successors (blk : Block.t) : Block.t list =
-      let structural = Terminator.non_trap_successors blk.terminator in
-      match trap_successor blk with
+    let successors (block : Block.t) : Block.t list =
+      let structural = Terminator.non_trap_successors block.terminator in
+      match trap_successor block with
       | None -> structural
       | Some h -> structural @ [h]
 
@@ -574,7 +728,13 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         passed through an unconditional jump to a successor whose params may be
         dropped. We only do this delayed counting of arguments for [Goto], the
         other terminator's arguments are counted unconditionally in
-        [increment_uses_in_terminator]. *)
+        [increment_uses_in_terminator].
+
+        CR ttebbi: We could also treat [Tailcall_self] arguments as unused when
+        the corresponding entry param is dead, since the function-entry params
+        themselves cannot be dropped (they come from the ABI), but the args we
+        pass at the recursive call site could be replaced with an indefinite
+        value. *)
     let block_param_arg (term : Terminator.t) (index : int) :
         Instruction.t option =
       match term with
@@ -588,7 +748,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     (* Apply the [Push_trap]/[Pop_trap] effects of [body] to [start_stack]. Each
        [Pop_trap { handler = h }] must find [h] at the top of the current
        stack. *)
-    let apply_body_trap_effects ~(blk : Block.t) (start_stack : Block.t list)
+    let apply_body_trap_effects ~(block : Block.t) (start_stack : Block.t list)
         (body : Instruction.t array) : Block.t list =
       Array.fold_left
         (fun (stack : Block.t list) (instr : Instruction.t) ->
@@ -599,7 +759,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             | [] ->
               Misc.fatal_errorf
                 "Ssa.finish: block B%d pops handler B%d off an empty trap stack"
-                (blk.id :> int)
+                (block.id :> int)
                 (h.id :> int)
             | top :: rest ->
               if not (Block.equal top h)
@@ -607,7 +767,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
                 Misc.fatal_errorf
                   "Ssa.finish: block B%d pops handler B%d but top of trap \
                    stack is B%d"
-                  (blk.id :> int)
+                  (block.id :> int)
                   (h.id :> int)
                   (top.id :> int);
               rest)
@@ -631,7 +791,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         then begin
           Block.Tbl.add visited block ();
           let end_stack =
-            apply_body_trap_effects ~blk:block start_stack block.body
+            apply_body_trap_effects ~block start_stack block.body
           in
           block.block_end_trap_stack <- end_stack;
           let add_pred start_stack (succ : Block.t) =
@@ -647,7 +807,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         end
       done;
       let reachable_blocks =
-        List.filter (fun blk -> Block.Tbl.mem visited blk) finished_blocks
+        List.filter (fun block -> Block.Tbl.mem visited block) finished_blocks
       in
       let unfinished_blocks =
         Block.Set.diff
@@ -663,13 +823,13 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     let compute_dominators ~(entry : Block.t) ~(reachable_blocks : Block.t list)
         : unit =
       entry.dominator_info <- { depth = 0; dominator = entry };
-      let has_idom (blk : Block.t) = blk.dominator_info.depth >= 0 in
+      let has_idom (block : Block.t) = block.dominator_info.depth >= 0 in
       let changed = ref true in
       while !changed do
         changed := false;
         List.iter
-          (fun (blk : Block.t) ->
-            if not (Block.equal blk entry)
+          (fun (block : Block.t) ->
+            if not (Block.equal block entry)
             then begin
               let new_idom =
                 Block.Set.fold
@@ -680,9 +840,9 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
                       | None -> Some pred
                       | Some current -> Some (common_dominator pred current)
                     else acc)
-                  blk.predecessors
-                  (if has_idom blk
-                   then Some blk.dominator_info.dominator
+                  block.predecessors
+                  (if has_idom block
+                   then Some block.dominator_info.dominator
                    else None)
               in
               match new_idom with
@@ -691,14 +851,15 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
                 let new_info : Block.dominator_info =
                   { depth = idom.dominator_info.depth + 1; dominator = idom }
                 in
-                if blk.dominator_info.depth != new_info.depth
+                if block.dominator_info.depth <> new_info.depth
                 then begin
-                  blk.dominator_info <- new_info;
+                  block.dominator_info <- new_info;
                   changed := true
                 end
                 else
                   assert (
-                    Block.equal blk.dominator_info.dominator new_info.dominator)
+                    Block.equal block.dominator_info.dominator
+                      new_info.dominator)
             end)
           reachable_blocks
       done
@@ -707,8 +868,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
        [Block_param] increments propagate to predecessors' [Goto] args via
        [block_param_arg]. *)
     let compute_use_counts ~(reachable_blocks : Block.t list) : unit =
-      let rec increment_use (i : Instruction.t) =
-        match i with
+      let rec increment_use (instr : Instruction.t) =
+        match instr with
         | Op r ->
           r.usage_count <- r.usage_count + 1;
           if r.usage_count = 1 then Array.iter increment_use r.args
@@ -743,17 +904,17 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           incr_all args
       in
       List.iter
-        (fun (blk : Block.t) ->
+        (fun (block : Block.t) ->
           Array.iter
-            (fun (i : Instruction.t) ->
-              match i with
-              | Op r when not (Operation.is_pure r.op) -> increment_use i
+            (fun (instr : Instruction.t) ->
+              match instr with
+              | Op r when not (Operation.is_pure r.op) -> increment_use instr
               | Name_for_debugger { regs; _ } -> Array.iter increment_use regs
               | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
               | Block_param _ | Proj _ | Tuple _ ->
                 Misc.fatal_error "impossible body instruction")
-            blk.body;
-          increment_uses_in_terminator blk.terminator)
+            block.body;
+          increment_uses_in_terminator block.terminator)
         reachable_blocks
 
     (* Walk [blocks] in the input order, but when first visiting a block emit
@@ -764,13 +925,13 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     let order_blocks_dominators_first (blocks : Block.t list) : Block.t list =
       let visited = Block.Tbl.create 64 in
       let acc = ref [] in
-      let rec visit (blk : Block.t) =
-        if not (Block.Tbl.mem visited blk)
+      let rec visit (block : Block.t) =
+        if not (Block.Tbl.mem visited block)
         then begin
-          Block.Tbl.add visited blk ();
-          let dom = blk.dominator_info.dominator in
-          if not (Block.equal dom blk) then visit dom;
-          acc := blk :: !acc
+          Block.Tbl.add visited block ();
+          let dom = block.dominator_info.dominator in
+          if not (Block.equal dom block) then visit dom;
+          acc := block :: !acc
         end
       in
       List.iter visit blocks;
@@ -799,6 +960,14 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         module Block = Block
         module Instruction = Instruction
         module Terminator = Terminator
+
+        let print_block_id = print_block_id
+
+        let print_instruction = print_instruction
+
+        let print_instr_ref = print_instr_ref
+
+        let print_terminator = print_terminator
 
         let function_info = function_info
 
