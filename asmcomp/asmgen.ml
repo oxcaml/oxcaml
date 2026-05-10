@@ -561,7 +561,8 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   ++ (if !Oxcaml_flags.use_ssa
       then compile_via_ssa ~ppf_dump ~funcnames
       else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
-  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "Initial CFG"
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
+       (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend

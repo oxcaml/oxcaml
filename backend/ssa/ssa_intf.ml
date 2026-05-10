@@ -147,6 +147,9 @@ module type Finished_graph = sig
 
     val equal : Instruction.t -> Instruction.t -> bool
 
+    (** The number of results produced by an instruction. *)
+    val result_arity : Instruction.t -> int
+
     (** The type of an instruction when used as an argument; see
         {!Graph_builder} for details. *)
     val arg_type : Instruction.t -> Cmm.machtype_component
@@ -200,6 +203,14 @@ module type Finished_graph = sig
 
     val non_trap_successors : Terminator.t -> Block.t list
   end
+
+  val print_block_id : Format.formatter -> Block.t -> unit
+
+  val print_instruction : Format.formatter -> Instruction.t -> unit
+
+  val print_instr_ref : Format.formatter -> Instruction.t -> unit
+
+  val print_terminator : Format.formatter -> Terminator.t -> unit
 
   val function_info : function_info
 
@@ -330,6 +341,9 @@ module type Graph_builder = sig
         via [block.params.(index)] when needed. *)
     val make_block_param : Block.t -> int -> Instruction.t
 
+    (** The number of results produced by an instruction. *)
+    val result_arity : Instruction.t -> int
+
     (** Smart constructor for [Proj] that short-circuits projections out of a
         [Tuple]: [make_proj ~index (Tuple elems)] returns [elems.(index)]
         directly. This is the only supported way to consume a [Tuple]. *)
@@ -391,6 +405,14 @@ module type Graph_builder = sig
     val non_trap_successors : t -> Block.t list
   end
 
+  val print_block_id : Format.formatter -> Block.t -> unit
+
+  val print_instruction : Format.formatter -> Instruction.t -> unit
+
+  val print_instr_ref : Format.formatter -> Instruction.t -> unit
+
+  val print_terminator : Format.formatter -> Terminator.t -> unit
+
   type cursor
 
   (** A new cursor pointing to the given block. *)
@@ -411,6 +433,8 @@ module type Graph_builder = sig
     Instruction.t
 
   val finish_block : cursor -> dbg:Debuginfo.t -> Terminator.t -> unit
+
+  val is_finished : cursor -> bool
 
   type new_block_result =
     { block : Block.t;

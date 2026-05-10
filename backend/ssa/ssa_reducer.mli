@@ -17,7 +17,7 @@
     output-side [rewrite] hook before moving on.
 
     The new interface keeps input and output graphs in separate modules ([C.In]
-    for the read-only input, [C.Out] for the in-progress output): the type
+    for the read-only input, [C] itself for the in-progress output): the type
     checker prevents accidentally mixing references between them. *)
 
 (** Framework-provided context: bindings to the input and output modules,
@@ -49,7 +49,8 @@ module type Context = sig
   (** Resolve an input-graph block reference to its output-graph counterpart. *)
   val map_block : In.Block.t -> Block.t
 
-  (** The finish method from the underlying [Graph_builder] is hidden. *)
+  (** Shadowing the [finish] declaration in Ssa.Graph_builder, as [finish] must
+      not be invoked from within reducers. *)
   val finish : unit
 end
 
@@ -70,25 +71,30 @@ module type Reducer = functor (C : Context) -> sig
   val visit_block : C.In.Block.t -> C.cursor -> unit result
 
   (** Called for each instruction in each input block. [Unchanged]: defer to the
-      framework's default translation. [Replaced]: the reducer has handled the
-      instruction itself (via direct emission on the cursor or through one of
-      the [Context] helpers). *)
+      framework's default translation. [Replaced instr]: the reducer has handled
+      the instruction itself (by emitting a replacement via the [Context] or by
+      doing nothing, which means the instruction will be dropped completely).
+      [instr] will be remembered as the output graph mapping for the input
+      instruction. *)
   val visit_instruction :
-    C.In.Block.t -> instr_index:int -> C.cursor -> unit result
+    C.In.Block.t -> instr_index:int -> C.cursor -> C.Instruction.t result
 
   (** Called once per input block, after its body. *)
   val visit_terminator : C.In.Block.t -> C.cursor -> unit result
 
   (** Called each time the framework is about to emit an instruction into the
-      cursor. [Unchanged]: keep as-is. [Replaced i]: the reducer has emitted a
-      replacement; [i] is the representative for op-id remapping (use
-      [Tuple [||]] to remap to nothing). *)
+      cursor. [Unchanged]: keep as-is. [Replaced instr]: the reducer has already
+      emitted a replacement [instr] (you can use [Tuple [||]] if the instruction
+      has no results). Note that returning an instruction with [Replaced instr]
+      does NOT add the instruction to the output graph, this has to be done
+      beforehand using the [Context]. *)
   val rewrite_instruction :
     C.cursor -> C.Instruction.t -> C.Instruction.t result
 
   (** Called each time the framework is about to finish a block. [Unchanged]:
-      finish with this terminator. [Replaced]: the reducer has already finalised
-      the block. *)
+      the framework will finish the block with the given terminator.
+      [Replaced ()]: the reducer indicates it has already finalised the block
+      using the [Context]. *)
   val rewrite_terminator :
     C.cursor -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
 end

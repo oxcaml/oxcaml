@@ -1,6 +1,10 @@
 module Make (S : Ssa.Finished_graph) : sig
   val print_block_id : Format.formatter -> S.Block.t -> unit
 
+  val print_instruction : Format.formatter -> S.Instruction.t -> unit
+
+  val print_terminator : Format.formatter -> S.Terminator.t -> unit
+
   val print_block : Format.formatter -> S.Block.t -> unit
 
   val print : Format.formatter -> unit

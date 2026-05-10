@@ -12,25 +12,25 @@ open Ssa_reducer
 module Detect (C : Context) = struct
   include Default (C)
 
-  let returns_args_unchanged (k : C.In.Block.t) : bool =
+  let returns_args_unchanged (block : C.In.Block.t) : bool =
     Array.for_all
-      (fun (i : C.In.Instruction.t) ->
-        match[@warning "-fragile-match"] i with
+      (fun (instr : C.In.Instruction.t) ->
+        match[@warning "-fragile-match"] instr with
         | Name_for_debugger _ -> true
         | _ -> false)
-      k.body
+      block.body
     &&
-    match[@warning "-fragile-match"] k.terminator with
+    match[@warning "-fragile-match"] block.terminator with
     | Return { args } ->
-      Array.length args = Array.length k.params
+      Array.length args = Array.length block.params
       &&
       let n = Array.length args in
       let rec loop i =
         i >= n
         ||
         match[@warning "-fragile-match"] args.(i) with
-        | Block_param { block; index } ->
-          C.In.Block.equal block k && index = i && loop (i + 1)
+        | Block_param { block = param_block; index } ->
+          C.In.Block.equal param_block block && index = i && loop (i + 1)
         | _ -> false
       in
       loop 0
@@ -48,8 +48,8 @@ module Detect (C : Context) = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
-  let visit_terminator (blk : C.In.Block.t) (c : C.cursor) =
-    match[@warning "-fragile-match"] blk.terminator with
+  let visit_terminator (block : C.In.Block.t) (c : C.cursor) =
+    match[@warning "-fragile-match"] block.terminator with
     | Call
         { op = Func call_op;
           args;
@@ -57,7 +57,7 @@ module Detect (C : Context) = struct
           may_raise = _;
           nontail = false
         }
-      when List.is_empty blk.block_end_trap_stack
+      when List.is_empty block.block_end_trap_stack
            && returns_args_unchanged continuation
            && stack_offsets_zero call_op args
                 (C.In.params_machtype continuation) ->
@@ -71,7 +71,7 @@ module Detect (C : Context) = struct
         | Direct _ | Indirect _ ->
           Tailcall_func { op = call_op; args = mapped_args }
       in
-      C.finish_block c ~dbg:blk.terminator_dbg term;
+      C.finish_block c ~dbg:block.terminator_dbg term;
       Replaced ()
     | _ -> Unchanged
 end
