@@ -600,8 +600,11 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
   let mismatches = Buffer.create 256 in
   let ppf_m = Format.formatter_of_buffer mismatches in
   begin
-    let old_cfg = Cfg_with_layout.cfg old_cfg in
-    let new_cfg = Cfg_with_layout.cfg new_cfg in
+    (* We did run [Cfg_simplify] already in both pipelines, but it does not
+       always reach a fixed-point and the SSA pipeline differs in more
+       aggressive removal of unreachable blocks. *)
+    let old_cfg = Cfg_with_layout.cfg (Cfg_simplify.run old_cfg) in
+    let new_cfg = Cfg_with_layout.cfg (Cfg_simplify.run new_cfg) in
     (* Phase 1: structural matching *)
     let new_to_old = collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg in
     (* Phase 2: register equivalence *)
