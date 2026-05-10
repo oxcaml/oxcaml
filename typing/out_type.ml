@@ -739,14 +739,18 @@ let wrap_mutation f =
   let snap = Btype.snapshot () in
   try_finally f ~always:(fun () -> Btype.backtrack snap)
 
-let wrap_printing_env env f =
+let wrap_printing_env ~reset_names env f =
   let old_env = !printing_env in
-  set_printing_env env; reset_naming_context ();
+  set_printing_env env;
+  if reset_names then reset_naming_context ();
   try_finally f ~always:(fun () -> set_printing_env old_env)
 
 let wrap_printing_env ~error env f =
-  if error then Env.without_cmis (wrap_printing_env env) f
-  else wrap_printing_env env f
+  if error then Env.without_cmis (wrap_printing_env ~reset_names:true env) f
+  else wrap_printing_env ~reset_names:true env f
+
+and wrap_printing_env_unguarded env f =
+  wrap_printing_env ~reset_names:false env f
 
 let rec lid_of_path = function
     Path.Pident id ->
@@ -1233,6 +1237,11 @@ let add_type_to_preparation = prepare_type
 let print_labels = ref true
 let with_labels b f = Misc.protect_refs [R (print_labels,b)] f
 
+(* Whether to expand [eval] in types for reductions before printing.
+   Disabled when printing errors, as they usually contain an expansion trace. *)
+let print_reduced_evals = ref true
+let with_reduced_evals b f = Misc.protect_refs [R (print_reduced_evals,b)] f
+
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
 
@@ -1240,9 +1249,10 @@ let out_jkind_of_const_jkind env jkind =
    be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   match desc.base with
-  | Layout (Sort (Var n)) ->
+  | Layout (Sort (Var n, sa)) ->
     Ojkind_var ("'_representable_layout_" ^
-                Int.to_string (Jkind.Sort.Var.get_print_number n))
+                Int.to_string (Jkind.Sort.Var.get_print_number n),
+                Jkind.Scannable_axes.to_string_list sa)
   (* Analyze a product before calling [get_const]: the machinery in
      [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
      products. *)
@@ -1266,7 +1276,7 @@ let out_jkind_option_of_jkind ~ignore_null env jkind =
   let elide =
     Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
     || (match desc.base with
-        | Layout (Sort (Var _)) -> not !Clflags.verbose_types (* X1 *)
+        | Layout (Sort (Var _, _)) -> not !Clflags.verbose_types (* X1 *)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc env desc)
@@ -1315,7 +1325,10 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     (* [contention] has implied defaults based on [visibility]: *)
     let contention =
       match modes.visibility, modes.contention with
-      | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
+      | Immutable, Contended
+      | Read, Shared
+      | Write, Corrupted
+      | Read_write, Uncontended -> None
       | _, _ -> Some modes.contention
     in
 
@@ -1323,7 +1336,8 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     let portability =
       match modes.statefulness, modes.portability with
       | Stateless, Portable
-      | Observing, Shareable
+      | Reading, Shareable
+      | Writing, Corruptible
       | Stateful, Nonportable -> None
       | _, _ -> Some modes.portability
     in
@@ -1390,6 +1404,9 @@ let rec tree_of_modal_typexp mode modal ty =
         let mode = Alloc.zap_to_legacy mode in
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
+  in
+  let ty =
+    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
   in
   let px = proxy ty in
   if Aliases.is_printed_proxy px && not (Aliases.is_delayed px) then
@@ -1470,9 +1487,25 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
     | Tquote ty ->
-        Otyp_quote (tree_of_typexp mode alloc_mode ty)
+        wrap_printing_env_unguarded
+          (Env.enter_quotation !printing_env)
+          (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
     | Tsplice ty ->
-        Otyp_splice (tree_of_typexp mode alloc_mode ty)
+        wrap_printing_env_unguarded
+          (Env.enter_splice ~loc:Location.none !printing_env)
+          (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
+    | Tquote_eval ty ->
+        (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
+        let ty = newgenty (Tquote ty) in
+        let p', s = best_type_path Predef.path_eval in
+        let tyl = apply_subst s [ty] in
+        Internal_names.add p';
+        let tyl =
+          wrap_printing_env_unguarded
+            (Env.enter_quotation !printing_env)
+            (fun () -> tree_of_typlist mode tyl)
+        in
+        Otyp_constr (tree_of_path (Some Type) p', tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -1716,6 +1749,18 @@ and tree_of_package mode {pack_path; pack_cstrs} =
 let tree_of_typexp mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
   wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
+
+let tree_of_typexp mode ty =
+  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
+     errors track their stage, as we should usually print at stage 0.
+     See ticket 6726. *)
+  if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+  then
+    wrap_printing_env_unguarded
+      (Env.enter_future !printing_env)
+      (fun () -> tree_of_typexp mode ty)
+  else
+    tree_of_typexp mode ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
@@ -1965,13 +2010,13 @@ let tree_of_type_decl id decl =
   in
   let (name, args) = type_defined decl in
   let constraints = tree_of_constraints params in
-  let ty, priv, unboxed, or_null_reexport, unsafe_mode_crossing =
+  let ty, priv, unboxed, or_null_attribute, unsafe_mode_crossing =
     match decl.type_kind with
     | Type_abstract _ ->
         begin match ty_manifest with
-        | None -> (Otyp_abstract, Public, false, false, false)
+        | None -> (Otyp_abstract, Public, false, None, false)
         | Some ty ->
-            tree_of_typexp Type ty, decl.type_private, false, false, false
+            tree_of_typexp Type ty, decl.type_private, false, None, false
         end
     | Type_variant (cstrs, rep, umc) ->
         let unboxed =
@@ -1979,36 +2024,36 @@ let tree_of_type_decl id decl =
           | Variant_unboxed -> true
           | Variant_boxed _ | Variant_extensible | Variant_with_null -> false
         in
-        (* CR layouts v3.5: remove when [Variant_with_null] is merged into
-           [Variant_unboxed]. *)
-        let or_null_reexport =
-          match rep with
-          | Variant_with_null -> true
-          | Variant_boxed _ | Variant_unboxed | Variant_extensible -> false
+        let or_null_attribute =
+          if Builtin_attributes.has_or_null decl.type_attributes then
+            Some "or_null"
+          else if Builtin_attributes.has_or_null_reexport decl.type_attributes
+          then Some "or_null_reexport"
+          else None
         in
         tree_of_manifest (Otyp_sum (List.map tree_of_constructor_in_decl cstrs)),
         decl.type_private,
         unboxed,
-        or_null_reexport,
+        or_null_attribute,
         (Option.is_some umc)
     | Type_record(lbls, rep, umc) ->
         tree_of_manifest (Otyp_record (List.map tree_of_label lbls)),
         decl.type_private,
         (match rep with Record_unboxed -> true | _ -> false),
-        false,
+        None,
         (Option.is_some umc)
     | Type_record_unboxed_product(lbls, Record_unboxed_product, umc) ->
         tree_of_manifest
           (Otyp_record_unboxed_product (List.map tree_of_label lbls)),
         decl.type_private,
         false,
-        false,
+        None,
         (Option.is_some umc)
     | Type_open ->
         tree_of_manifest Otyp_open,
         decl.type_private,
         false,
-        false,
+        None,
         false
   in
   (* The algorithm for setting [lay] here is described as Case (C1) in
@@ -2037,7 +2082,7 @@ let tree_of_type_decl id decl =
     otype_private = priv;
     otype_jkind;
     otype_unboxed = unboxed;
-    otype_or_null_reexport = or_null_reexport;
+    otype_or_null_attribute = or_null_attribute;
     otype_cstrs = constraints;
     otype_attributes }
 
@@ -2172,7 +2217,13 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
-  let qtvs = extract_qtvs [decl.val_type] in
+  let qsvs, qtvs =
+    (* Important: process the fvs *after* the type; tree_of_type_scheme
+       resets the naming context. Both must be inside print_with_genvars
+       so that sort poly var names are registered when jkinds are printed. *)
+    Jkind_types.Sort.print_with_genvars (Lpoly.get_exn decl.val_lpoly)
+      (fun names -> names, extract_qtvs [decl.val_type])
+  in
   let apparent_arity =
     let rec count n typ =
       match get_desc typ with
@@ -2209,7 +2260,7 @@ let tree_of_value_description id decl =
   in
   let vd =
     { oval_name = id;
-      oval_type = Otyp_poly(qtvs, ty);
+      oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
@@ -2441,6 +2492,7 @@ let dummy =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    type_ikind = Types.ikinds_todo "print dummy";
     type_private = Public;
     type_manifest = None;
     type_variance = [];
@@ -2742,7 +2794,10 @@ let trees_of_type_expansion'
     let t' = if proxy t == proxy t' then unalias t' else t' in
     (* beware order matter due to side effect,
        e.g. when printing object types *)
-    let first = tree_of_typexp' t in
+    let first =
+      (* preserve unreduced eval in types *)
+      with_reduced_evals false (fun () -> tree_of_typexp' t)
+    in
     let second = tree_of_typexp' t' in
     if first = second then Same first
     else Diff(first,second)

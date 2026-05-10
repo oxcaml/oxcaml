@@ -2477,15 +2477,13 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Value_creation why)
 
-<<<<<<< HEAD
     let for_effect_arg ident =
       let why : Jkind_intf.History.value_creation_reason =
         Type_argument
           { parent_path = Path.Pident ident; position = 1; arity = 1 }
       in
       Builtin.value ~why
-||||||| 5.2.0minus-31
-=======
+
     let for_variant_with_null_result path param =
       let why : Jkind_intf.History.value_or_null_creation_reason =
         Type_argument
@@ -2494,7 +2492,6 @@ module Jkind0 = struct
       Builtin.value_or_null ~why
       |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
       |> mark_best
->>>>>>> 5.2.0minus-37
   end
 
   include Jkind

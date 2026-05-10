@@ -58,41 +58,19 @@ let scrape_ty env ty =
     | _ -> ty
   in
   match get_desc ty with
-<<<<<<< HEAD
-  | Tconstr _ ->
-      let ty = Ctype.expand_head_opt env ty in
-      begin match get_desc ty with
-||||||| 5.2.0minus-31
-  | Tconstr _ ->
-      let ty = Ctype.correct_levels ty in
-      let ty' = Ctype.expand_head_opt env ty in
-      begin match get_desc ty' with
-=======
   | Tconstr _
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
-      let ty = Ctype.correct_levels ty in
-      let ty' = Ctype.expand_head_opt env ty in
-      begin match get_desc ty' with
->>>>>>> 5.2.0minus-37
+      let ty = Ctype.expand_head_opt env ty in
+      begin match get_desc ty with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-<<<<<<< HEAD
-          | Some _ -> Some (Ctype.get_unboxed_type_approximation env ty).ty
+          | Some _ -> begin
+            match (Ctype.get_unboxed_type_approximation env ty) with
+            | { ty; or_null = None; modality = _ } ->
+              Some ty
+            | _ -> Some ty end
           | None -> Some ty
           | exception Not_found -> None
-||||||| 5.2.0minus-31
-          | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
-          | None -> ty'
-          | exception Not_found -> ty (* missing cmi file *)
-=======
-          | Some _ -> begin
-            match (Ctype.get_unboxed_type_approximation env ty') with
-            | { ty; or_null = None; modality = _ } ->
-              ty
-            | _ -> ty' end
-          | None -> ty'
-          | exception Not_found -> ty (* missing cmi file *)
->>>>>>> 5.2.0minus-37
           end
       | _ ->
           Some ty
@@ -173,16 +151,10 @@ type 'a classification =
    See comment on [classification] above to understand [classify_product]. *)
 let classify ~classify_product env ty sort : _ classification =
   match (sort : Jkind.Sort.Const.t) with
-<<<<<<< HEAD
-  | Base Value -> begin
+  | Base Scannable -> begin
   match scrape_ty env ty with
   | None -> Any
   | Some ty ->
-||||||| 5.2.0minus-31
-  | Base Value -> begin
-=======
-  | Base Scannable -> begin
->>>>>>> 5.2.0minus-37
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
@@ -227,7 +199,7 @@ let classify ~classify_product env ty sort : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code)
+      | Some (`Lexing_position | `Code | `Eval)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try
@@ -818,9 +790,6 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | { type_kind = Type_record_unboxed_product (lbls, _, _);
               type_params; _ } ->
             let type_of_ld { Types.ld_type } =
-              let ld_type = Ctype.correct_levels ld_type in
-              let type_params = List.map Ctype.correct_levels type_params in
-              (* [args] is already corrected by [scrape_ty] *)
               try Some (Ctype.apply env type_params ld_type args)
               with Ctype.Cannot_apply -> None
             in
@@ -1279,16 +1248,8 @@ let report_error ppf = function
       | Some err ->
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
            ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
-||||||| 5.2.0minus-31
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
-=======
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) err
->>>>>>> 5.2.0minus-37
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
@@ -1345,16 +1306,8 @@ let report_error ppf = function
   | Not_a_sort (env, ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
            ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
-||||||| 5.2.0minus-31
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
-=======
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) err
->>>>>>> 5.2.0minus-37
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1389,16 +1342,8 @@ let report_error ppf = function
           Printtyp.Doc.type_expr array_type
           Printtyp.Doc.type_expr ty
           (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
              ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ()) env) err
-||||||| 5.2.0minus-31
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ()) env) err
-=======
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
              env) err
->>>>>>> 5.2.0minus-37
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \

@@ -426,14 +426,8 @@ let check_type
     | ((Tnil | Tfield _)  , Sep    )
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
-<<<<<<< HEAD
-    | (Tpackage _         , Sep    )
-||||||| 5.2.0minus-31
-    | (Tpackage(_,_)      , Sep    )
-=======
     | (Tquote_eval(_)     , Sep    )
-    | (Tpackage(_,_)      , Sep    )
->>>>>>> 5.2.0minus-37
+    | (Tpackage _         , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
     (* "Deeply separable" case for these same constructors. *)
     | (Tarrow _           , Deepsep)
@@ -444,14 +438,8 @@ let check_type
     | ((Tnil | Tfield _)  , Deepsep)
     | (Tquote(_)          , Deepsep)
     | (Tsplice(_)         , Deepsep)
-<<<<<<< HEAD
-    | (Tpackage _         , Deepsep) ->
-||||||| 5.2.0minus-31
-    | (Tpackage(_,_)      , Deepsep) ->
-=======
     | (Tquote_eval(_)     , Deepsep)
-    | (Tpackage(_,_)      , Deepsep) ->
->>>>>>> 5.2.0minus-37
+    | (Tpackage _         , Deepsep) ->
         let tys = immediate_subtypes ty in
         let on_subtype context ty =
           context ++ check_type (Hyps.guard hyps) ty Deepsep in
