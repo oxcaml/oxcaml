@@ -17,7 +17,7 @@ Line 1, characters 19-20:
 1 | external void_id : t -> t = "%identity" [@@unboxed]
                        ^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 

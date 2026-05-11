@@ -124,6 +124,40 @@ other context. For example, an `int8# array` of length 30 takes up 4 words of
 space, plus the header word, but a `#(int8# * int8#)` takes up 2 words of space
 and requires 2 registers to pass around.
 
+### C ABI
+
+Both tagged and untagged `int8`s and `int16`s may be passed to C stubs.
+
+```ocaml
+external int16_stub : (int16[@unboxed]) -> (int16[@unboxed]) =
+  "tagged_int16_stub" "untagged_int16_stub"
+
+external int16_hash_stub : int16# -> int16# =
+  "tagged_int16_stub" "untagged_int16_stub"
+
+external int8_stub : (int8[@unboxed]) -> (int8[@unboxed]) =
+  "tagged_int8_stub" "untagged_int8_stub"
+
+external int8_hash_stub : int8# -> int8# =
+  "tagged_int8_stub" "untagged_int8_stub"
+```
+
+The following is also valid, but discouraged:
+```ocaml
+external int16_stub_untagged : (int16[@untagged]) -> (int16[@untagged]) =
+  "tagged_int16_stub" "untagged_int16_stub"
+```
+`[@untagged]` can be applied to any `immediate` type, and it doesn't sign
+extend the stub return value, which is usually zero-extended. On the other
+hand, the behavior of `[@unboxed]` depends on the particular type,
+so the proper sign extensions are applied to the return value.
+
+For example, the following implementation makes `int16_stub` and
+`int16_hash_stub` valid, but `int16_stub_untagged` invalid:
+```c
+signed short untagged_int16_stub (short x) { return -2; }
+```
+
 ## Untagged Char
 
 When small numbers are enabled, the types `char#` and `char# array`
@@ -154,3 +188,14 @@ library.
 
 Untagged chars have the same layout as `int8#`, and `char# array`s are packed
 like `int8# array`s.
+
+### C ABI
+
+Untagged chars may be passed to C stubs:
+```ocaml
+external char_hash_stub : char# -> char# =
+  "tagged_char_stub" "untagged_char_stub"
+```
+
+`char[@unboxed]` is not allowed in external declarations. As a reminder, you may
+use upstream OCaml's `char[@untagged]` in correspondence with `intnat` in C.

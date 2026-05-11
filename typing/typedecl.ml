@@ -5178,17 +5178,17 @@ let report_error_doc ppf = function
         Style.inline_code "[@@unpacked]"
   | Cannot_unbox_or_untag_type Unboxed ->
       fprintf ppf "@[Don't know how to unbox this type.@ \
-                   Only %a, %a, %a, %a, vector primitives, and@ \
+                   Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
                    the corresponding unboxed types can be marked unboxed.@]"
         Style.inline_code "float"
+        Style.inline_code "int8"
+        Style.inline_code "int16"
         Style.inline_code "int32"
         Style.inline_code "int64"
         Style.inline_code "nativeint"
   | Cannot_unbox_or_untag_type Untagged ->
-      fprintf ppf "@[Don't know how to untag this type. Only %a, %a, %a, \
+      fprintf ppf "@[Don't know how to untag this type. Only %a \
                    and@ other immediate types can be untagged.@]"
-        Style.inline_code "int8"
-        Style.inline_code "int16"
         Style.inline_code "int"
   | Cannot_unbox_or_untag_type Unpacked ->
       fprintf ppf "@[Don't know how to unpack this type.@ \
