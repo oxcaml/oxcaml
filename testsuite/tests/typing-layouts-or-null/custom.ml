@@ -199,7 +199,7 @@ Line 1, characters 31-44:
                                    ^^^^^^^^^^^^^
 Error: This type "float_payload" should be an instance of type
          "('a : any separable)"
-       The layout of float_payload is value maybe_separable maybe_null
+       The layout of float_payload is value_or_null
          because of the definition of float_payload at lines 1-4, characters 0-11.
        But the layout of float_payload must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -213,10 +213,10 @@ Line 1, characters 36-49:
                                         ^^^^^^^^^^^^^
 Error: This type "float_payload" should be an instance of type
          "('a : value_or_null non_float)"
-       The layout of float_payload is value maybe_separable maybe_null
+       The layout of float_payload is value_or_null
          because of the definition of float_payload at lines 1-4, characters 0-11.
        But the layout of float_payload must be a sublayout of
-           value non_float maybe_null
+           value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
@@ -231,8 +231,9 @@ Lines 1-4, characters 0-11:
 2 |   | Probe_none
 3 |   | Probe_some of int
 4 | [@@or_null]
-Error: The layout of type "probe_result" is value non_pointer maybe_null
-         because it is the primitive type int.
+Error: The layout of type "probe_result" is value_or_null non_pointer
+         because an [@@or_null] type gets its layout by applying or_null to its
+         payload layout.
        But the layout of type "probe_result" must be a sublayout of value
          because of the annotation on the declaration of the type probe_result.
 |}]
@@ -281,10 +282,10 @@ type bad_payload =
 Line 3, characters 15-20:
 3 |   | Yep_bad of int t
                    ^^^^^
-Error: The layout of type "int t" is value maybe_separable maybe_null
+Error: The layout of type "int t" is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.
        But the layout of type "int t" must be a sublayout of
-           value maybe_separable
+           value_maybe_separable
          because the payload of bad_payload has layout value.
 |}]
 
@@ -389,8 +390,8 @@ Lines 1-4, characters 0-11:
 3 |   | B of 'a
 4 | [@@or_null]
 Error: The layout of type "wrong_result_kind" is value_or_null
-         because of the annotation on 'a in the declaration of the type
-                                      wrong_result_kind.
+         because an [@@or_null] type gets its layout by applying or_null to its
+         payload layout.
        But the layout of type "wrong_result_kind" must be a sublayout of value
          because of the annotation on the declaration of the type wrong_result_kind.
 |}]

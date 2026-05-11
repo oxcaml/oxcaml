@@ -2466,7 +2466,12 @@ let rec update_decl_jkind env dpath decl =
           Jkind.apply_modality_l modality jkind
           |> Jkind.apply_or_null_l
         with
-        | Ok type_jkind -> cstrs, rep, type_jkind
+        | Ok type_jkind ->
+          let type_jkind =
+            Jkind.History.update_reason type_jkind
+              (Value_or_null_creation (Or_null_payload dpath))
+          in
+          cstrs, rep, type_jkind
         | Error () ->
           Misc.fatal_error
             "Typedecl.update_variant_kind: Variant_with_null payload is \
