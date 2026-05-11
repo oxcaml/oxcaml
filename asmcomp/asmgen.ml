@@ -512,36 +512,30 @@ module Cfg_selection = Cfg_selectgen.Make (Cfg_selection)
 let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
     Cfg_with_layout.t =
   let report_pipeline_error exn ssa =
-    let bt = Printexc.get_raw_backtrace () in
-    Format.fprintf ppf_dump
-      "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
-      fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl fd_cmm
-      Ssa_print.print ssa;
-    Printexc.raise_with_backtrace exn bt
+    let backtrace = Printexc.get_raw_backtrace () in
+    Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
+    Format.fprintf ppf_dump "*** SSA:@.%a@." Ssa_print.print ssa;
+    Printexc.raise_with_backtrace exn backtrace
   in
   let ssa =
-    fd_cmm ++ Ssa_of_cmm.convert ++ Ssa_tail_call.run ~keep_unused_ops:true
+    fd_cmm ++ Ssa_of_cmm.convert
+    ++ Ssa_tail_call.run ~keep_unused_ops:!Oxcaml_flags.ssa_validate
   in
   if !Oxcaml_flags.ssa_validate
-  then begin
-    let cfg_without_ssa =
-      Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-    in
-    let cfg_from_ssa_for_compare =
+  then
+    begin try
+      let cfg_without_ssa =
+        Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+      in
       (* First conversion: used only for [Cfg_compare], so we emit a CFG that
          stays faithful to plain [cfg_selectgen]. *)
-      try Cfg_of_ssa.convert ~keep_unused_ops:true ~funcnames ssa
-      with exn -> report_pipeline_error exn ssa
-    in
-    try
+      let cfg_from_ssa_for_compare =
+        Cfg_of_ssa.convert ~keep_unused_ops:true ~funcnames ssa
+      in
       Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
         ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
-    with exn ->
-      let bt = Printexc.get_raw_backtrace () in
-      Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
-      Format.fprintf ppf_dump "*** SSA:@.%a@." Ssa_print.print ssa;
-      Printexc.raise_with_backtrace exn bt
-  end;
+    with exn -> report_pipeline_error exn ssa
+    end;
   if !Oxcaml_flags.dump_ssa
   then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
   (* Second conversion: produces the CFG that feeds the real pipeline. This is

@@ -1,3 +1,5 @@
+open! Int_replace_polymorphic_compare
+
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
 (** Structural and register-equivalence check between two CFGs for the same
@@ -13,22 +15,25 @@
       continuation, Invalid continuation), from [Pushtrap]/[Poptrap] body
       instructions, and from block-level [exn] pointers. As blocks are paired up
       the framework checks that their bodies match instruction-by-instruction
-      (modulo Move skipping), that their terminators have the same shape, and
-      that block-level metadata (is_trap_handler, can_raise, cold) agrees.
-      Unreachable trap handlers (no predecessors on both sides) are skipped —
-      their bodies may differ harmlessly between [Cfg_of_ssa]'s
-      [make_invalid_handler_bloc] and [Cfg_selectgen]'s [unreachable_handler] or
-      a remaining input block.
+      (modulo skipping moves and [Pushtrap]/[Poptrap] with unreachable
+      handlers), that their terminators have the same shape, and that
+      block-level metadata (is_trap_handler, can_raise, cold) agrees.
+      [Pushtrap]/[Poptrap] with unreachable trap handlers are skipped because
+      the handlers are unreachable anyway and the trap stack is not being
+      observed in this case. This is necessary because the SSA pipeline eagerly
+      removes unreachable blocks including trap handlers.
 
     - [verify_register_equivalence]: Backward fixpoint over matched block pairs:
-      starting from the observable register set at exits (return, raise,
-      tailcall, indirect call), propagate equality obligations between old and
-      new registers up through each block's instructions until reaching a
-      fixpoint. The [Equations] module tracks these (old_reg, new_reg) pairs
-      symmetrically; moves are handled as substitutions rather than re-emitted
-      equations. Any obligation that survives back to a block's entry must be
-      derivable from the entry's incoming equations, which the pass checks
-      against the meet of all predecessors' exit equations. *)
+      starting from all block ends with the empty equation set, propagate
+      equality obligations between old and new registers up through each block's
+      instructions until reaching a fixpoint. The [Equations] module tracks
+      these (old_reg, new_reg) pairs , which are proof obligations rather than
+      assumptions. Moves are handled as substitutions on the equations set. Any
+      obligation that survives back to a block's entry is added to the
+      predecessors final equation set. The two possible failure cases are
+      equations propagated to the function start and equations about an
+      instruction's result that remain after removing the equations for the
+      matching results of two matched instructions. *)
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
@@ -72,52 +77,60 @@ end = struct
 
   let equal a b = Reg.Map.equal Reg.Set.equal a.fwd b.fwd
 
-  let mirror t = { fwd = t.bwd; bwd = t.fwd }
+  let mirror { fwd; bwd } = { fwd = bwd; bwd = fwd }
 
-  let add_to_map key value m =
+  let add_to_map key value map =
     Reg.Map.update key
       (function
         | None -> Some (Reg.Set.singleton value)
         | Some s -> Some (Reg.Set.add value s))
-      m
+      map
 
-  let add_pair t ~old_r ~new_r =
-    { fwd = add_to_map old_r new_r t.fwd; bwd = add_to_map new_r old_r t.bwd }
+  let add_pair { fwd; bwd } ~old_r ~new_r =
+    { fwd = add_to_map old_r new_r fwd; bwd = add_to_map new_r old_r bwd }
 
-  let remove_from_map r partner m =
-    Reg.Map.update partner
+  let remove_from_map key value map =
+    Reg.Map.update key
       (function
         | None -> None
         | Some s ->
-          let s = Reg.Set.remove r s in
+          let s = Reg.Set.remove value s in
           if Reg.Set.is_empty s then None else Some s)
-      m
+      map
 
-  (* Remove all equations involving [r] on the forward/left side. *)
-  let remove_old t r =
-    match Reg.Map.find_opt r t.fwd with
-    | None -> t
+  (* Remove all equations involving [old_r] on the old/left side. *)
+  let remove_old eqs old_r =
+    match Reg.Map.find_opt old_r eqs.fwd with
+    | None -> eqs
     | Some partners ->
-      { fwd = Reg.Map.remove r t.fwd;
-        bwd = Reg.Set.fold (remove_from_map r) partners t.bwd
+      { fwd = Reg.Map.remove old_r eqs.fwd;
+        bwd =
+          Reg.Set.fold
+            (fun partner -> remove_from_map partner old_r)
+            partners eqs.bwd
       }
 
-  let remove_new t r = mirror (remove_old (mirror t) r)
+  let remove_new eqs r = mirror (remove_old (mirror eqs) r)
 
-  let remove_pair t ~old_r ~new_r =
-    { fwd = remove_from_map new_r old_r t.fwd;
-      bwd = remove_from_map old_r new_r t.bwd
+  let remove_pair { fwd; bwd } ~old_r ~new_r =
+    { fwd = remove_from_map old_r new_r fwd;
+      bwd = remove_from_map new_r old_r bwd
     }
 
-  (* Move: dst <- src. Replace dst with src on the forward/left side. *)
-  let subst_old_move t ~src ~dst =
-    match Reg.Map.find_opt dst t.fwd with
-    | None -> t
+  (* Move: dst <- src. Replace dst with src on the old/left side. Note that we
+     replace the destination with the source because we are processing
+     backwards. *)
+  let subst_old_move eqs ~src ~dst =
+    match Reg.Map.find_opt dst eqs.fwd with
+    | None -> eqs
     | Some partners ->
-      let t = remove_old t dst in
-      Reg.Set.fold (fun nr t -> add_pair t ~old_r:src ~new_r:nr) partners t
+      let eqs = remove_old eqs dst in
+      Reg.Set.fold
+        (fun nr eqs -> add_pair eqs ~old_r:src ~new_r:nr)
+        partners eqs
 
-  let subst_new_move t ~src ~dst = mirror (subst_old_move (mirror t) ~src ~dst)
+  let subst_new_move eqs ~src ~dst =
+    mirror (subst_old_move (mirror eqs) ~src ~dst)
 
   let union a b =
     let merge _ s1 s2 = Some (Reg.Set.union s1 s2) in
@@ -125,14 +138,14 @@ end = struct
       bwd = Reg.Map.union merge a.bwd b.bwd
     }
 
-  let find_partners_of_old t r = Reg.Map.find_opt r t.fwd
+  let find_partners_of_old eqs r = Reg.Map.find_opt r eqs.fwd
 
-  let find_partners_of_new t r = Reg.Map.find_opt r t.bwd
+  let find_partners_of_new eqs r = Reg.Map.find_opt r eqs.bwd
 
-  let iter_old_to_new t ~f =
+  let iter_old_to_new eqs ~f =
     Reg.Map.iter
       (fun old_r new_rs -> Reg.Set.iter (fun new_r -> f old_r new_r) new_rs)
-      t.fwd
+      eqs.fwd
 end
 
 (* === Helpers === *)
@@ -146,15 +159,15 @@ let is_move (i : Cfg.basic Cfg.instruction) =
   | Op (Move | Opaque) ->
     Array.length i.arg = 1
     && Array.length i.res = 1
-    && i.arg.(0).Reg.loc = Reg.Unknown
-    && i.res.(0).Reg.loc = Reg.Unknown
+    && Reg.equal_location i.arg.(0).Reg.loc Reg.Unknown
+    && Reg.equal_location i.res.(0).Reg.loc Reg.Unknown
   | _ -> false
 
 (** A [Pushtrap]/[Poptrap] whose target has no predecessors is unreachable as a
     trap handler at runtime. [Cfg_selectgen] keeps an [unreachable_handler]
-    block as the target while [Cfg_of_ssa] drops the trap op entirely; we treat
-    both options as equivalent by skipping the op on either side when its target
-    has no predecessors. *)
+    block as the target while [Cfg_of_ssa] drops the trap push/pop entirely; we
+    treat both options as equivalent by skipping the op on either side when the
+    handler has no predecessors. *)
 let is_skippable_trap cfg (i : Cfg.basic Cfg.instruction) =
   match i.desc with
   | Pushtrap { lbl_handler } | Poptrap { lbl_handler } ->
@@ -172,6 +185,62 @@ let basic_desc_match ~map_label (old_d : Cfg.basic) (new_d : Cfg.basic) =
     true
   | _ -> Cfg.equal_basic old_d new_d
 
+(** Compare the non-register, non-desc fields of a [Cfg.instruction] pair.
+    [desc] is compared by the caller (its type and equality depend on whether it
+    is a basic or terminator instruction); [arg]/[res] are compared in phase 2
+    ([process_block_backward]); [id] is allowed to differ; [stack_offset] can
+    legitimately differ because the SSA pipeline removes [Pushtrap]/[Poptrap]
+    instructions when the handler is unreachable. *)
+let compare_instruction_fields ~ppf_m ~kind ~ol ~nl (oi : _ Cfg.instruction)
+    (ni : _ Cfg.instruction) =
+  let[@warning "+9"] { Cfg.desc = _;
+                       id = oi_id;
+                       arg = _;
+                       res = _;
+                       dbg = oi_dbg;
+                       fdo = oi_fdo;
+                       live = oi_live;
+                       stack_offset = _;
+                       available_before = oi_avail_before;
+                       available_across = oi_avail_across
+                     } =
+    oi
+  in
+  let[@warning "+9"] { Cfg.desc = _;
+                       id = ni_id;
+                       arg = _;
+                       res = _;
+                       dbg = ni_dbg;
+                       fdo = ni_fdo;
+                       live = ni_live;
+                       stack_offset = _;
+                       available_before = ni_avail_before;
+                       available_across = ni_avail_across
+                     } =
+    ni
+  in
+  let report_with field pp_value oi_v ni_v =
+    Format.fprintf ppf_m
+      "%s %s mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@." kind field
+      Label.format ol InstructionId.print oi_id Label.format nl
+      InstructionId.print ni_id pp_value oi_v pp_value ni_v
+  in
+  let report field =
+    Format.fprintf ppf_m "%s %s mismatch at old=%a(id:%a) new=%a(id:%a)@." kind
+      field Label.format ol InstructionId.print oi_id Label.format nl
+      InstructionId.print ni_id
+  in
+  if Debuginfo.compare oi_dbg ni_dbg <> 0
+  then report_with "dbg" Debuginfo.print_compact oi_dbg ni_dbg;
+  if not (Fdo_info.equal oi_fdo ni_fdo) then report "fdo";
+  if not (Reg.Set.equal oi_live ni_live)
+  then report_with "live" Printreg.regset oi_live ni_live;
+  let pp_avail = Reg_availability_set.print ~print_reg:Printreg.reg in
+  if not (Reg_availability_set.equal oi_avail_before ni_avail_before)
+  then report_with "available_before" pp_avail oi_avail_before ni_avail_before;
+  if not (Reg_availability_set.equal oi_avail_across ni_avail_across)
+  then report_with "available_across" pp_avail oi_avail_across ni_avail_across
+
 let compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl old_body new_body =
   let rec advance cfg cell =
     match cell with
@@ -184,8 +253,7 @@ let compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl old_body new_body =
     match advance old_cfg oc, advance new_cfg nc with
     | None, None -> ()
     | Some _, None | None, Some _ ->
-      Format.fprintf ppf_m
-        "Body length mismatch (after skipping moves) at old=%a new=%a@."
+      Format.fprintf ppf_m "Body length mismatch at old=%a new=%a@."
         Label.format ol Label.format nl
     | Some oc, Some nc ->
       let (oi : Cfg.basic Cfg.instruction) = DLL.value oc in
@@ -197,13 +265,7 @@ let compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl old_body new_body =
           Label.format ol InstructionId.print oi.id Label.format nl
           InstructionId.print ni.id Cfg.dump_basic oi.desc Cfg.dump_basic
           ni.desc
-      else if Debuginfo.compare oi.dbg ni.dbg <> 0
-      then
-        Format.fprintf ppf_m
-          "Debuginfo mismatch at old=%a(id:%a) new=%a(id:%a) %a: %a vs %a@."
-          Label.format ol InstructionId.print oi.id Label.format nl
-          InstructionId.print ni.id Cfg.dump_basic oi.desc
-          Debuginfo.print_compact oi.dbg Debuginfo.print_compact ni.dbg;
+      else compare_instruction_fields ~ppf_m ~kind:"Instruction" ~ol ~nl oi ni;
       loop (DLL.next oc) (DLL.next nc)
   in
   loop (DLL.hd_cell old_body) (DLL.hd_cell new_body)
@@ -215,14 +277,16 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
   | Always ol, Always nl ->
     map_label ol nl;
     true
-  | Parity_test ot, Parity_test nt ->
-    map_label ot.ifso nt.ifso;
-    map_label ot.ifnot nt.ifnot;
+  | ( Parity_test { ifso = ot_ifso; ifnot = ot_ifnot },
+      Parity_test { ifso = nt_ifso; ifnot = nt_ifnot } )
+  | ( Truth_test { ifso = ot_ifso; ifnot = ot_ifnot },
+      Truth_test { ifso = nt_ifso; ifnot = nt_ifnot } ) ->
+    map_label ot_ifso nt_ifso;
+    map_label ot_ifnot nt_ifnot;
     true
-  | Truth_test ot, Truth_test nt ->
-    map_label ot.ifso nt.ifso;
-    map_label ot.ifnot nt.ifnot;
-    true
+  (* Truth_test ≈ Int_test against [0] when [lt = gt] (both miss-the-equality
+     arms go to the same label, so only the equality bit matters). [is_signed]
+     is irrelevant when comparing to [0]. *)
   | ( Int_test { lt; eq; gt; imm = Some 0; is_signed = _ },
       Truth_test { ifso; ifnot } )
     when Label.equal lt gt ->
@@ -235,17 +299,35 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
     map_label ifso lt;
     map_label ifnot eq;
     true
-  | Int_test ot, Int_test nt ->
-    map_label ot.lt nt.lt;
-    map_label ot.eq nt.eq;
-    map_label ot.gt nt.gt;
-    true
-  | Float_test ot, Float_test nt ->
-    map_label ot.lt nt.lt;
-    map_label ot.eq nt.eq;
-    map_label ot.gt nt.gt;
-    map_label ot.uo nt.uo;
-    true
+  | ( Int_test
+        { lt = ot_lt;
+          eq = ot_eq;
+          gt = ot_gt;
+          is_signed = ot_is_signed;
+          imm = ot_imm
+        },
+      Int_test
+        { lt = nt_lt;
+          eq = nt_eq;
+          gt = nt_gt;
+          is_signed = nt_is_signed;
+          imm = nt_imm
+        } ) ->
+    map_label ot_lt nt_lt;
+    map_label ot_eq nt_eq;
+    map_label ot_gt nt_gt;
+    Scalar.Signedness.equal ot_is_signed nt_is_signed
+    && Option.equal Int.equal ot_imm nt_imm
+  | ( Float_test
+        { width = ot_width; lt = ot_lt; eq = ot_eq; gt = ot_gt; uo = ot_uo },
+      Float_test
+        { width = nt_width; lt = nt_lt; eq = nt_eq; gt = nt_gt; uo = nt_uo } )
+    ->
+    map_label ot_lt nt_lt;
+    map_label ot_eq nt_eq;
+    map_label ot_gt nt_gt;
+    map_label ot_uo nt_uo;
+    Cmm.equal_float_width ot_width nt_width
   | Switch ols, Switch nls ->
     if Array.length ols = Array.length nls
     then (
@@ -260,25 +342,36 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
   | Tailcall_func oo, Tailcall_func no -> Cfg.equal_func_call_operation oo no
   | Call_no_return oo, Call_no_return no ->
     Cfg.equal_external_call_operation oo no
-  | Call oc, Call nc ->
-    map_label oc.label_after nc.label_after;
-    Cfg.equal_func_call_operation oc.op nc.op
-  | Prim op, Prim np ->
-    map_label op.label_after np.label_after;
-    Cfg.equal_prim_call_operation op.op np.op
-  | Invalid oi, Invalid ni ->
+  | ( Call { op = ot_op; label_after = ot_la },
+      Call { op = nt_op; label_after = nt_la } ) ->
+    map_label ot_la nt_la;
+    Cfg.equal_func_call_operation ot_op nt_op
+  | ( Prim { op = ot_op; label_after = ot_la },
+      Prim { op = nt_op; label_after = nt_la } ) ->
+    map_label ot_la nt_la;
+    Cfg.equal_prim_call_operation ot_op nt_op
+  | ( Invalid
+        { message = ot_msg;
+          stack_ofs = ot_so;
+          stack_align = ot_sa;
+          label_after = ot_la
+        },
+      Invalid
+        { message = nt_msg;
+          stack_ofs = nt_so;
+          stack_align = nt_sa;
+          label_after = nt_la
+        } ) ->
     let labels_match =
-      match oi.label_after, ni.label_after with
+      match ot_la, nt_la with
       | None, None -> true
       | Some ol, Some nl ->
         map_label ol nl;
         true
       | Some _, None | None, Some _ -> false
     in
-    labels_match
-    && String.equal oi.message ni.message
-    && Int.equal oi.stack_ofs ni.stack_ofs
-    && Cmm.equal_stack_align oi.stack_align ni.stack_align
+    labels_match && String.equal ot_msg nt_msg && Int.equal ot_so nt_so
+    && Cmm.equal_stack_align ot_sa nt_sa
   | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Int_test _
       | Float_test _ | Switch _ | Return | Raise _ | Tailcall_self _
       | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
@@ -288,7 +381,7 @@ let terminator_structure_match ~map_label (old_t : Cfg.terminator)
 let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
   (* new_to_old: the primary label mapping (new_label -> old_label) *)
   let new_to_old = Label.Tbl.create 64 in
-  (* old_to_new: inverse mapping, used only to assert injectivity *)
+  (* old_to_new: inverse mapping, used only to assert bijectivity *)
   let old_to_new = Label.Tbl.create 64 in
   let queue = Queue.create () in
   let map_label ol nl =
@@ -323,9 +416,9 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
       | None, _ | _, None ->
         Format.fprintf ppf_m "Missing block: old=%a(%s) new=%a(%s)@."
           Label.format ol
-          (if ob = None then "missing" else "ok")
+          (if Option.is_none ob then "missing" else "ok")
           Label.format nl
-          (if nb = None then "missing" else "ok")
+          (if Option.is_none nb then "missing" else "ok")
       | Some ob, Some nb ->
         if not (Bool.equal ob.is_trap_handler nb.is_trap_handler)
         then
@@ -364,18 +457,10 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
             (Cfg.dump_terminator ~sep:"")
             ob.terminator.desc
             (Cfg.dump_terminator ~sep:"")
-            nb.terminator.desc;
-        (* Compare terminator debuginfo *)
-        if Debuginfo.compare ob.terminator.dbg nb.terminator.dbg <> 0
-        then
-          Format.fprintf ppf_m
-            "Debuginfo mismatch at terminator old=%a(id:%a) new=%a(id:%a) %a: \
-             %a vs %a@."
-            Label.format ol InstructionId.print ob.terminator.id Label.format nl
-            InstructionId.print nb.terminator.id
-            (Cfg.dump_terminator ~sep:"")
-            ob.terminator.desc Debuginfo.print_compact ob.terminator.dbg
-            Debuginfo.print_compact nb.terminator.dbg
+            nb.terminator.desc
+        else
+          compare_instruction_fields ~ppf_m ~kind:"Terminator" ~ol ~nl
+            ob.terminator nb.terminator
     end
   done;
   (* Validate predecessors match under the label mapping *)
@@ -405,15 +490,6 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
    to propagate register equations. Only handles register tracking — all
    structural checks (desc, debuginfo) are done in phase 1. *)
 
-let fold_left2_arr f init a b =
-  let len = Array.length a in
-  assert (len = Array.length b);
-  let acc = ref init in
-  for i = 0 to len - 1 do
-    acc := f !acc a.(i) b.(i)
-  done;
-  !acc
-
 let effective_arg (i : Cfg.basic Cfg.instruction) =
   match i.desc with
   | Op (Name_for_debugger { regs; _ }) ->
@@ -425,53 +501,46 @@ let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
     ~(old_block : Cfg.basic_block) ~(new_block : Cfg.basic_block) =
   let ol = old_block.start in
   let nl = new_block.start in
-  let add_reg_pairs eqs old_regs new_regs =
-    fold_left2_arr
-      (fun eqs old_r new_r ->
-        if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
-        then (
-          if not (Reg.same_loc old_r new_r)
-          then
-            Format.fprintf ppf_m "Physical reg mismatch at old=%a new=%a@."
-              Label.format ol Label.format nl;
-          eqs)
-        else Equations.add_pair eqs ~old_r ~new_r)
-      eqs old_regs new_regs
+  let process_reg_pairs eqs ~old_regs ~new_regs ~(old_instr : _ Cfg.instruction)
+      ~(new_instr : _ Cfg.instruction) f =
+    let eqs = ref eqs in
+    for i = 0 to Array.length old_regs - 1 do
+      let old_r = old_regs.(i) in
+      let new_r = new_regs.(i) in
+      if
+        Reg.equal_location old_r.Reg.loc Reg.Unknown
+        && Reg.equal_location new_r.Reg.loc Reg.Unknown
+      then eqs := f !eqs ~old_r ~new_r
+      else if not (Reg.same_loc old_r new_r)
+      then
+        Format.fprintf ppf_m
+          "Physical reg mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
+          Label.format ol InstructionId.print old_instr.id Label.format nl
+          InstructionId.print new_instr.id Printreg.reg old_r Printreg.reg new_r
+    done;
+    !eqs
   in
   (* Process a matched instruction pair: remove output equations, then add input
      equations. *)
-  let process_instruction eqs ~(old_i : _ Cfg.instruction)
-      ~(new_i : _ Cfg.instruction) ~old_arg ~new_arg =
+  let process_instruction eqs ~(old_instr : _ Cfg.instruction)
+      ~(new_instr : _ Cfg.instruction) ~old_arg ~new_arg =
     (* Check physical result registers match, then remove matched output
        pairs *)
     let eqs =
-      let n = Array.length old_i.res in
-      if n <> Array.length new_i.res
+      let n = Array.length old_instr.res in
+      if n <> Array.length new_instr.res
       then (
         Format.fprintf ppf_m
           "Result register count mismatch at old=%a(id:%a) new=%a(id:%a): old \
            has %d res, new has %d res@."
-          Label.format ol InstructionId.print old_i.id Label.format nl
-          InstructionId.print new_i.id n (Array.length new_i.res);
+          Label.format ol InstructionId.print old_instr.id Label.format nl
+          InstructionId.print new_instr.id n
+          (Array.length new_instr.res);
         eqs)
       else
-        let eqs = ref eqs in
-        for i = 0 to n - 1 do
-          let old_r = old_i.res.(i) in
-          let new_r = new_i.res.(i) in
-          if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
-          then (
-            if not (Reg.same_loc old_r new_r)
-            then
-              Format.fprintf ppf_m
-                "Physical result reg mismatch at old=%a(id:%a) new=%a(id:%a): \
-                 %a vs %a@."
-                Label.format ol InstructionId.print old_i.id Label.format nl
-                InstructionId.print new_i.id Printreg.reg old_r Printreg.reg
-                new_r)
-          else eqs := Equations.remove_pair !eqs ~old_r ~new_r
-        done;
-        !eqs
+        process_reg_pairs eqs ~old_regs:old_instr.res ~new_regs:new_instr.res
+          ~old_instr ~new_instr (fun eqs ~old_r ~new_r ->
+            Equations.remove_pair eqs ~old_r ~new_r)
     in
     (* Check for residual output equations *)
     let check_side res ~find =
@@ -485,69 +554,73 @@ let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
                 Format.fprintf ppf_m
                   "Residual output equation at old=%a(id:%a) new=%a(id:%a): %a \
                    still paired with %a@."
-                  Label.format ol InstructionId.print old_i.id Label.format nl
-                  InstructionId.print new_i.id Printreg.reg r Printreg.reg r')
+                  Label.format ol InstructionId.print old_instr.id Label.format
+                  nl InstructionId.print new_instr.id Printreg.reg r
+                  Printreg.reg r')
               partners)
         res
     in
-    check_side old_i.res ~find:Equations.find_partners_of_old;
-    check_side new_i.res ~find:Equations.find_partners_of_new;
+    check_side old_instr.res ~find:Equations.find_partners_of_old;
+    check_side new_instr.res ~find:Equations.find_partners_of_new;
     (* Remove all remaining output equations *)
-    let eqs = Array.fold_left Equations.remove_old eqs old_i.res in
-    let eqs = Array.fold_left Equations.remove_new eqs new_i.res in
+    let eqs = Array.fold_left Equations.remove_old eqs old_instr.res in
+    let eqs = Array.fold_left Equations.remove_new eqs new_instr.res in
     (* Add input equations *)
     if Array.length old_arg <> Array.length new_arg
     then (
       Format.fprintf ppf_m
         "Arg length mismatch at old=%a(id:%a) new=%a(id:%a): %d vs %d@."
-        Label.format ol InstructionId.print old_i.id Label.format nl
-        InstructionId.print new_i.id (Array.length old_arg)
+        Label.format ol InstructionId.print old_instr.id Label.format nl
+        InstructionId.print new_instr.id (Array.length old_arg)
         (Array.length new_arg);
       eqs)
-    else add_reg_pairs eqs old_arg new_arg
+    else
+      process_reg_pairs eqs ~old_regs:old_arg ~new_regs:new_arg ~old_instr
+        ~new_instr (fun eqs ~old_r ~new_r ->
+          Equations.add_pair eqs ~old_r ~new_r)
   in
   (* Process terminator *)
   let old_t = old_block.terminator in
   let new_t = new_block.terminator in
   let eqs =
-    process_instruction eqs ~old_i:old_t ~new_i:new_t ~old_arg:old_t.arg
+    process_instruction eqs ~old_instr:old_t ~new_instr:new_t ~old_arg:old_t.arg
       ~new_arg:new_t.arg
   in
   (* Process body backwards, skipping moves and unreachable trap handlers *)
-  let old_rev = List.rev (DLL.to_list old_block.body) in
-  let new_rev = List.rev (DLL.to_list new_block.body) in
-  let rec loop eqs old_is new_is =
-    match old_is, new_is with
+  let old_instrs = List.rev (DLL.to_list old_block.body) in
+  let new_instrs = List.rev (DLL.to_list new_block.body) in
+  let rec loop eqs ~old_instrs ~new_instrs =
+    match old_instrs, new_instrs with
     | [], [] -> eqs
-    | oi :: rest, _ when is_move oi ->
-      let (oi : Cfg.basic Cfg.instruction) = oi in
+    | (old_instr : _ Cfg.instruction) :: rest, _ when is_move old_instr ->
       loop
-        (Equations.subst_old_move eqs ~src:oi.arg.(0) ~dst:oi.res.(0))
-        rest new_is
-    | _, ni :: rest when is_move ni ->
-      let (ni : Cfg.basic Cfg.instruction) = ni in
+        (Equations.subst_old_move eqs ~src:old_instr.arg.(0)
+           ~dst:old_instr.res.(0))
+        ~old_instrs:rest ~new_instrs
+    | _, (new_instr : _ Cfg.instruction) :: rest when is_move new_instr ->
       loop
-        (Equations.subst_new_move eqs ~src:ni.arg.(0) ~dst:ni.res.(0))
-        old_is rest
-    | oi :: rest, _ when is_skippable_trap old_cfg oi -> loop eqs rest new_is
-    | _, ni :: rest when is_skippable_trap new_cfg ni -> loop eqs old_is rest
-    | oi :: old_rest, ni :: new_rest ->
-      let (oi : Cfg.basic Cfg.instruction) = oi in
-      let (ni : Cfg.basic Cfg.instruction) = ni in
+        (Equations.subst_new_move eqs ~src:new_instr.arg.(0)
+           ~dst:new_instr.res.(0))
+        ~old_instrs ~new_instrs:rest
+    | old_instr :: rest, _ when is_skippable_trap old_cfg old_instr ->
+      loop eqs ~old_instrs:rest ~new_instrs
+    | _, new_instr :: rest when is_skippable_trap new_cfg new_instr ->
+      loop eqs ~old_instrs ~new_instrs:rest
+    | old_instr :: old_rest, new_instr :: new_rest ->
       let eqs =
-        process_instruction eqs ~old_i:oi ~new_i:ni ~old_arg:(effective_arg oi)
-          ~new_arg:(effective_arg ni)
+        process_instruction eqs ~old_instr ~new_instr
+          ~old_arg:(effective_arg old_instr) ~new_arg:(effective_arg new_instr)
       in
-      loop eqs old_rest new_rest
+      loop eqs ~old_instrs:old_rest ~new_instrs:new_rest
     | _ :: _, [] | [], _ :: _ ->
       Format.fprintf ppf_m
         "Body length mismatch at old=%a new=%a: old_remaining=%d \
          new_remaining=%d@."
-        Label.format ol Label.format nl (List.length old_is)
-        (List.length new_is);
+        Label.format ol Label.format nl (List.length old_instrs)
+        (List.length new_instrs);
       eqs
   in
-  loop eqs old_rev new_rev
+  loop eqs ~old_instrs ~new_instrs
 
 let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
   (* block_eqs and worklist are keyed by new labels. new_to_old is used to find
@@ -616,16 +689,16 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
     then
       Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg.fun_name
         new_cfg.fun_name;
-    if old_cfg.fun_codegen_options <> new_cfg.fun_codegen_options
+    if Stdlib.( <> ) old_cfg.fun_codegen_options new_cfg.fun_codegen_options
     then Format.fprintf ppf_m "fun_codegen_options mismatch@.";
     if Debuginfo.compare old_cfg.fun_dbg new_cfg.fun_dbg <> 0
     then
       Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
         Debuginfo.print_compact old_cfg.fun_dbg Debuginfo.print_compact
         new_cfg.fun_dbg;
-    if old_cfg.fun_poll <> new_cfg.fun_poll
+    if Stdlib.( <> ) old_cfg.fun_poll new_cfg.fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
-    if old_cfg.fun_ret_type <> new_cfg.fun_ret_type
+    if Stdlib.( <> ) old_cfg.fun_ret_type new_cfg.fun_ret_type
     then Format.fprintf ppf_m "fun_ret_type mismatch@."
   end;
   (* Report *)
