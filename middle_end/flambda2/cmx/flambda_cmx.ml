@@ -50,6 +50,17 @@ let load_cmx_file_contents loader comp_unit =
             Flambda_cmx_format.import_typing_env_and_code cmx
           in
           let newly_imported_names = TE.Serializable.name_domain typing_env in
+          Code_id.Set.iter
+            (fun code_id ->
+              if not (EC.mem code_id all_code)
+              then
+                Misc.fatal_errorf
+                  "Missing metadata for code id '%a' that appears in the \
+                   typing environment (while loading cmx for %a)"
+                  Code_id.print code_id
+                  (Format_doc.compat Compilation_unit.print)
+                  accessible_comp_unit)
+            (TE.Serializable.reachable_code_ids typing_env);
           loader.imported_names
             <- Name.Set.union newly_imported_names loader.imported_names;
           loader.imported_code <- EC.merge all_code loader.imported_code;
