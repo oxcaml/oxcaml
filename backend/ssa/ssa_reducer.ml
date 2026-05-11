@@ -392,11 +392,11 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
           match[@warning "-fragile-match"] instr with
           (* Skip dead Ops: their args may reference [Block_param]s that we've
              dropped (see [compute_kept_block_params]), and emitting them would
-             propagate those dangling references into the new graph. An Op
-             with [usage_count = 0] is by definition not referenced by any
-             live consumer. [keep_unused_ops] disables this filtering so the
-             output is structurally faithful to the input — used before
-             [Cfg_compare] so it can match the baseline pipeline. *)
+             propagate those dangling references into the new graph. An Op with
+             [usage_count = 0] is by definition not referenced by any live
+             consumer. [keep_unused_ops] disables this filtering so the output
+             is structurally faithful to the input — used before [Cfg_compare]
+             so it can match the baseline pipeline. *)
           | Op { usage_count = 0; _ } when not keep_unused_ops -> true
           (* We drop trap handlers as well as their [Push_trap] / [Pop_trap]
              when they become unreachable. *)
