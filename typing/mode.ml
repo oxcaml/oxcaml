@@ -2517,7 +2517,7 @@ module Report = struct
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
-    | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Skip -> Some (Fmt.dprintf "???", (Location.none, Unknown))
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
