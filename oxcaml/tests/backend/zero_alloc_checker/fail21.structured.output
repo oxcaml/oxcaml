@@ -1,0 +1,7 @@
+File "fail21.ml", line 9, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Fail21.test4 (_CamlU6Fail21F7test4_HIDE_STAMP).
+
+File "fail21.ml", line 3, characters 30-34:
+Error: allocation of 24 bytes
+inlined from
+fail21.ml:11,2--9[Fail21.test4]

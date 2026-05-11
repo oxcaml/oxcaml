@@ -1,0 +1,15 @@
+File "test_assume_inlining.ml", line 27, characters 7-17:
+Error: Annotation check for zero_alloc failed on function Test_assume_inlining.A2.foo (_CamlU20Test_assume_inliningM2A2F5foo_HIDE_STAMP).
+
+File "test_assume_inlining.ml", line 25, characters 55-58:
+Error: called function may allocate (direct call _CamlU20Test_assume_inliningM2A2F3f_HIDE_STAMP)
+inlined from
+test_assume_inlining.ml:27,27--32[Test_assume_inlining.A2.foo]
+
+File "test_assume_inlining.ml", line 85, characters 7-17:
+Error: Annotation check for zero_alloc failed on function Test_assume_inlining.A6.foo (_CamlU20Test_assume_inliningM2A6F6foo_HIDE_STAMP).
+
+File "test_assume_inlining.ml", line 83, characters 55-58:
+Error: called function may allocate (direct call _CamlU20Test_assume_inliningM2A6F4f_HIDE_STAMP)
+inlined from
+test_assume_inlining.ml:85,27--32[Test_assume_inlining.A6.foo]

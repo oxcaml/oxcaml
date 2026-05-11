@@ -1,0 +1,595 @@
+Don't know what to do with fail29.cmi
+Usage: Usage: ocamlopt <options> <files>
+Options are: <options> <files>
+Try 'Usage: ocamlopt <options> <files>
+Options are: --help' for more information.
+  -fno-asan  Disable AddressSanitizer. This is only meaningful if the compiler was built with AddressSanitizer support enabled.
+  -fcssc  Enable the Common Short Sequence Compression (CSSC) instructions.
+  -gupstream-dwarf  Only emit the same DWARF information as the upstream compiler
+  -gno-upstream-dwarf  Emit potentially more DWARF information than the upstream compiler. Implies -shape-format debugging-shapes.
+  -gdwarf-inlined-frames  Emit DWARF inlined frame information
+  -gno-dwarf-inlined-frames  Do not emit DWARF inlined frame information
+  -gstartup  Emit potentially more DWARF information
+     for the startup file than the upstream compiler
+     (only takes effect with -gno-upstream-dwarf)
+  -gno-startup  Emit the same DWARF information for the
+     startup file as the upstream compiler
+  -gdwarf-may-alter-codegen  Allow code generation (and
+     when finalizers may run, etc) to be altered
+     in order to produce a better debugging experience
+  -gno-dwarf-may-alter-codegen  Do not alter code generation when emitting debugging information
+  -gdwarf-may-alter-codegen-experimental  Like -gdwarf-may-alter-codegen but with more experimental features.
+     Implies -gdwarf-may-alter-codegen.
+     THIS MAY GENERATE BROKEN CODE.
+  -gno-dwarf-may-alter-codegen-experimental  Disable experimental changes to code generation when emitting
+     debugging information.
+  -gdwarf-max-function-complexity  Maximum function
+     complexity above which -gno-upstream-dwarf information
+     will not be emitted, to improve compilation time (default 50)
+  -gdwarf-compression  Set the DWARF compression format (default zlib)
+  -gdwarf-fission  Set the DWARF fission method: none, objcopy, or dsymutil.
+     Default: none (dsymutil on macOS with --enable-oxcaml-dwarf).
+     Only takes effect with -gno-upstream-dwarf or --enable-oxcaml-dwarf
+  -gdwarf-pedantic  Enable pedantic DWARF error checking (fatal errors instead of silent fallbacks)
+  -dump-inlining-paths  Dump inlining paths when dumping flambda2 terms
+  -davail  Dump register availability information
+  -dranges  Dump results of Compute_ranges
+  -ddebug-invariants  Run invariant checks during generation of debugging information
+  -ddebug-available-regs  Enable debug output for available registers analysis
+  -ddwarf-types  Enable debug output for DWARF type generation
+  -ddwarf-metrics  Write DWARF metrics to auxiliary JSON file .debug-stats.json, which can then be aggregated with the analyze_debug_stats.py Python script.
+  -ddwarf-metrics-output-file <file>  Set output filename for DWARF metrics data
+  -ocamlcfg  Use ocamlcfg (deprecated, does nothing)
+  -no-ocamlcfg  Do not use ocamlcfg (deprecated, does nothing)
+  -dcfg  (undocumented)
+  -dcfg-invariants  Extra sanity checks on Cfg
+  -regalloc {cfg|irc|ls|gi} Select the register allocator
+  -regalloc-linscan-threshold  Use linscan on functions with more temporaries than the threshold (default is 100000)
+  -regalloc-param  Pass a parameter to the register allocator
+  -regalloc-validate  Validate register allocation
+  -no-regalloc-validate  Do not validate register allocation
+  -vectorize  Enable vectorizer (EXPERIMENTAL)
+  -no-vectorize  Disable vectorizer (EXPERIMENTAL)
+  -vectorize-max-block-size <n>  Only CFG block with at most n IR instructions will be vectorized (default 100)
+  -dvectorize  (undocumented)
+  -cfg-peephole-optimize  Apply peephole optimizations to CFG
+  -no-cfg-peephole-optimize  Do not apply peephole optimizations to CFG
+  -x86-peephole-optimize  Apply peephole optimizations to x86
+  -no-x86-peephole-optimize  Do not apply peephole optimizations to x86
+  -no-x86-peephole-remove-mov-to-dead-register  Disable x86 peephole: remove mov to dead register
+  -no-x86-peephole-remove-redundant-cmp  Disable x86 peephole: remove redundant cmp
+  -no-x86-peephole-combine-add-rsp  Disable x86 peephole: combine adjacent add rsp
+  -cfg-stack-checks  Insert the stack checks on the CFG representation
+  -no-cfg-stack-checks  Insert the stack checks on the linear representation
+  -cfg-stack-checks-threshold <n>  Only CFGs with fewer than n blocks will be optimized
+  -cfg-eliminate-dead-trap-handlers  Eliminate dead trap handlers
+  -no-cfg-eliminate-dead-trap-handlers  Do not eliminate dead trap handlers
+  -cfg-prologue-validate  Validate prologues added to CFG
+  -no-cfg-prologue-validate  Do not validate prologues added to CFG
+  -cfg-prologue-shrink-wrap  Place prologues optimally in the CFG to minimise unnecessary prologue executions
+  -no-cfg-prologue-shrink-wrap  Place prologues at the entrypoint of the CFG
+  -cfg-prologue-shrink-wrap-threshold <n>  Only CFGs with fewer than n blocks will be shrink-wrapped
+  -cfg-merge-blocks  Merge equivalent CFG blocks
+  -no-cfg-merge-blocks  Do not merge equivalent CFG blocks
+  -cfg-value-propagation  Propagate value to simplify CFG
+  -no-cfg-value-propagation  Do not propagate value to simplify CFG
+  -cfg-value-propagation-float  Propagate float value to simplify CFG
+  -no-cfg-value-propagation-float  Do not propagate float value to simplify CFG
+  -cfg-value-propagation-flow  Propagate values across block to simplify CFG
+  -no-cfg-value-propagation-flow  Do not propagate values across block to simplify CFG
+  -reorder-blocks-random <seed> Randomly reorder basic blocks in every function, using the provided seed (intended for testing, off by default).
+  -basic-block-sections  (option not available)
+  -module-entry-functions-section  (option not available)
+  -dasm-comments  Add comments in .s files (e.g. for DWARF)
+  -dno-asm-comments  Do not add comments in .s files
+  -heap-reduction-threshold  Threshold (in major words, defaulting to 62500000) to trigger a heap reduction before code emission
+  -zero-alloc-check {default|all|opt|none} Check that annotated functions do not allocate and do not have indirect calls. 
+    The argument specifies which annotations to check: 
+      "opt" means attributes with "opt" payload and is intended for debugging;
+      "default" means attributes without "opt" payload; 
+      "all" covers both "opt" and "default" and is intended for optimized builds.
+  -zero-alloc-assert {default|all|all_opt} Add zero_alloc annotations to all functions.
+    The argument specifies which annotations to use: 
+      "all" is equivalent to adding [@@@zero_alloc all]
+      "all_opt" is equivalent to adding [@@@zero_alloc all_opt]
+      "default" does not add any attributes.
+  -dzero-alloc  (undocumented)
+  -disable-zero-alloc-checker  Conservatively assume that all functions may allocate, without checking. Disables computation of zero_alloc function summaries, unlike "-zero-alloc-check none" which disables checking of zero_alloc annotations)
+  -disable-precise-zero-alloc-checker  Conservatively assume that all forward calls and mutually recursive functions may allocate. Disables fixed point computation of summaries for these functions. Intended as a temporary workaround when precise analysis is too expensive.
+  -zero-alloc-checker-details-cutoff  Do not show more than this number of error locations in each function that fails the check (default 20, negative to show all)
+  -zero-alloc-checker-details-extra  Show extra details in error messages from zero_alloc checker
+  -no-zero-alloc-checker-details-extra  Do not show extra details in error messages from zero_alloc checker
+  -zero-alloc-checker-join  How many abstract paths before losing precision (default 100, negative to fail instead of widening, 0 to keep all)
+  -function-layout {topological|source} Order of functions in the generated assembly (default: source)
+  -name-mangling-scheme {flat|structured} Override the default name mangling scheme set at configure time
+  -disable-builtin-check  If an external annotated with [@@builtin] is not recognized, fall back to the corresponding C stub, instead of compilation error.
+  -disable-poll-insertion  Do not insert poll points
+  -enable-poll-insertion  Insert poll points
+  -symbol-visibility-protected  Emit global symbols with visibility STV_PROTECTED on supported systems
+  -no-symbol-visibility-protected  Emit global symbols with visibility STV_DEFAULT
+  -long-frames  Allow stack frames longer than 2^16 bytes
+  -no-long-frames  Do not allow stack frames longer than 2^16 bytes
+  -debug-long-frames-threshold n debug only: set long frames threshold
+  -caml-apply-inline-fast-path  Inline the fast path of caml_applyN
+  -internal-assembler Write object files directly instead of using the system assembler (x86-64 ELF only)
+  -verify-binary-emitter  Verify binary emitter output matches system assembler output. Exits with error on mismatch. (ARM64 only)
+  -dissector  Enable the dissector pass (prevents relocation overflow when linking very large executables with the small code model).  (Experimental)
+  -dissector-partition-size <size>  Set the partition size threshold in gigabytes for the dissector pass (default: 1)
+  -ddissector  Print verbose logging from the dissector pass
+  -ddissector-sizes  Dump allocated section sizes for each input file during linking
+  -ddissector-verbose  Print detailed per-relocation logging from the dissector pass
+  -ddissector-partitions  Keep partition .o files and print their paths (for debugging)
+  -ddissector-inputs <file>  Write dissector input analysis to <file>
+  -dissector-assume-lld-without-64-bit-eh-frames  Assume LLD linker without 64-bit EH frame support (default)
+  -no-dissector-assume-lld-without-64-bit-eh-frames  Do not assume LLD linker limitation
+  -manual-module-init  Enable manual module initialization (emit unit dependency table)
+  -no-manual-module-init  Disable manual module initialization (default)
+  -dgc-timings Output information about time spent in the GC
+  -no-mach-ir  Avoid using the Mach IR (kept temporarily only for backward compatibility, has no effects)
+  -dllvmir  (undocumented)
+  -keep-llvmir  Keep the LLVM IR file produced by -llvm-backend
+  -llvm-path  Specify which LLVM compiler to use
+  -llvm-flags  Extra flags to pass to LLVM (like -march or -mtune)
+  -flambda2-debug  Enable debug output for the Flambda2 pass
+  -no-flambda2-debug  Disable debug output for the Flambda2 pass
+  -reaper-debug-flags  Debug flags for the reaper pass
+  -flambda2-join-points  Propagate information from all incoming edges to a join
+     point (Flambda 2 only)
+  -no-flambda2-join-points  Propagate information to a join point only if there are
+     zero or one incoming edge(s) (default) (Flambda 2 only)
+  -flambda2-result-types-functors-only  Infer result types for functors (but no other
+     functions) (Flambda 2 only)
+  -flambda2-result-types-all-functions  Infer result types for all functions
+     (including functors) (Flambda 2 only)
+  -no-flambda2-result-types  Do not infer result types for functions (or
+     functors) (default) (Flambda 2 only)
+  -flambda2-basic-meet  Use a basic meet algorithm (deprecated, does nothing) (Flambda 2 only)
+  -flambda2-advanced-meet  Use an advanced meet algorithm (deprecated, does nothing) (Flambda 2 only)
+  -flambda2-join-algorithm {binary|n-way|checked} Select the join algorithm to use (Flambda 2 only)
+      Valid values are: 
+       "binary" is the legacy binary join;
+       "n-way" is the new n-way join;
+       "checked" runs both algorithms and compares them (use for debugging).
+  -flambda2-unbox-along-intra-function-control-flow  Pass values within
+     a function as unboxed where possible (default) (Flambda 2 only)
+  -no-flambda2-unbox-along-intra-function-control-flow  Pass values within
+     a function in their normal representation (Flambda 2 only)
+  -flambda2-backend-cse-at-toplevel  Apply the backend CSE pass to module
+     initializers (Flambda 2 only)
+  -no-flambda2-backend-cse-at-toplevel  Do not apply the backend CSE pass to
+     module initializers (default) (Flambda 2 only)
+  -flambda2-cse-depth  Depth threshold for eager tracking of CSE equations
+     (default 2) (Flambda 2 only)
+  -flambda2-join-depth  Depth threshold for alias expansion in join
+     (default 5) (Flambda 2 only)
+  -flambda2-reaper  Enable reaper pass (Flambda2 only)
+  -no-flambda2-reaper  Disable reaper pass (default) (Flambda2 only)
+  -reaper-preserve-direct-calls {never|always|zero-alloc|auto} Choose the direct call preservation strategy of the reaper (Flambda2 only)
+      Valid values are: 
+       "never": do not try to preserve direct calls to old functions;
+       "always": always preserve existing direct calls;
+       "zero-alloc": preserve direct calls only in zero-alloc checked;
+       "auto": preserve direct calls only when the reaper is unable to identify a set of possibly called functions.
+  -reaper-local-fields  Enable local field handing in the reaper (Flambda2 only)
+  -no-reaper-local-fields  Disable local field handing in the reaper (default) (Flambda2 only)
+  -reaper-unbox  Enable unboxing in the reaper (default) (Flambda2 only, requires -reaper-change-calling-conventions)
+  -no-reaper-unbox  Disable unboxing in the reaper (Flambda2 only)
+  -reaper-max-unbox-size  Maximum number of fields unboxed by the reaper for a single block (default 10) (Flambda2 only)
+  -reaper-change-calling-conventions  Allow the reaper to change the calling conventions of functions (default) (Flambda2 only)
+  -no-reaper-change-calling-conventions  Prevent the reaper from changing the calling conventions of functions (Flambda2 only)
+  -flambda2-expert-fallback-inlining-heuristic  Prevent inlining of functions
+     whose bodies contain closures (Flambda 2 only)
+  -no-flambda2-expert-fallback-inlining-heuristic  Allow inlining of functions
+     whose bodies contain closures (default) (Flambda 2 only)
+  -flambda2-expert-inline-effects-in-cmm  Allow inlining of effectful
+     expressions in the produced Cmm code
+     into any context (Flambda 2 only)
+  -no-flambda2-expert-inline-effects-in-cmm  Only allow inlining of effectful
+     expressions in the produced Cmm code into
+     the arguments of allocation primitives (default) (Flambda 2 only)
+  -flambda2-expert-cmm-safe-subst  Prevent potentially unsafe substitutions in cmm but may produce less optimized code
+  -no-flambda2-expert-cmm-safe-subst  Allow more substitutions in cmm, even ones that may be unsafe (default)
+  -flambda2-expert-phantom-lets  Generate phantom lets when -g
+     is specified (Flambda 2 only)
+  -no-flambda2-expert-phantom-lets  Do not generate phantom lets even when -g
+     is specified (default) (Flambda 2 only)
+  -flambda2-expert-max-block-size-for-projections  Do not simplify projections
+     from blocks if the block size exceeds this value (default not set)
+     (Flambda 2 only)
+  -flambda2-expert-max-unboxing-depth  Do not unbox (nested) values deeper
+     than this many levels (default 3) (Flambda 2 only)
+  -flambda2-expert-can-inline-recursive-functions  Consider inlining
+      recursive functions (default ) (Flambda 2 only)
+  -no-flambda2-expert-can-inline-recursive-functions  Only inline recursive
+     functions if forced to so do by an attribute
+     (default  (default)) (Flambda 2 only)
+  -flambda2-expert-max-function-simplify-run  Do not run simplification of function more
+     than this (default 2) (Flambda 2 only)
+  -flambda2-expert-shorten-symbol-names  Shorten symbol names (Flambda 2 only, set by
+     default in classic mode)
+  -no-flambda2-expert-shorten-symbol-names  Do not shorten symbol names (Flambda 2 only, set by
+     default except for classic mode)
+  -flambda2-expert-cont-lifting-budget  Set the limit of extra parameters introduced
+ when lifting continuations (per function)
+  -flambda2-expert-cont-specialization-budget  Set the limit on the number of continuations 
+ copied/generated when specializing a continuation (per function)
+  -flambda2-debug-concrete-types-only-on-canonicals  Check that concrete
+     types are only assigned to canonical
+     names (Flambda 2 only)
+  -no-flambda2-debug-concrete-types-only-on-canonicals  Do not check that
+     concrete types are only assigned to canonical
+     names (default) (Flambda 2 only)
+  -flambda2-debug-keep-invalid-handlers  Keep branches simplified
+     to Invalid (default) (Flambda 2 only)
+  -no-flambda2-debug-keep-invalid-handlers  Delete branches simplified
+     to Invalid (Flambda 2 only)
+  -flambda2-inline-max-depth <int>|<round>=<int>[,...]
+     Maximum depth of search for inlining opportunities inside
+     inlined functions (default 1) (Flambda 2 only)
+  -flambda2-inline-max-rec-depth <int>|<round>=<int>[,...]
+     Maximum depth of search for inlining opportunities inside
+     inlined recursive functions (default 0) (Flambda 2 only)
+  -flambda2-inline-alloc-cost <float>|<round>=<float>[,...]
+     The cost of not removing an allocation during inlining
+     (default 0.875, higher = more costly) (Flambda 2 only)
+  -flambda2-inline-branch-cost <float>|<round>=<float>[,...]
+     The cost of not removing a conditional during inlining
+     (default 0.625, higher = more costly) (Flambda 2 only)
+  -flambda2-inline-call-cost <float>|<round>=<float>[,...]
+     The cost of not removing a call during inlining
+     (default 0.625, higher = more costly) (Flambda 2 only)
+  -flambda2-inline-prim-cost <float>|<round>=<float>[,...]
+     The cost of not removing a primitive during inlining
+     (default 0.375, higher = more costly) (Flambda 2 only)
+  -flambda2-inline-indirect-cost <float>|<round>=<float>[,...]
+     The cost of not removing an indirect call during inlining
+     (default 0.500, higher = more costly) (Flambda 2 only)
+  -flambda2-inline-poly-compare-cost <float>|<round>=<float>[,...]
+     The cost of not removing a polymorphic comparison during inlining
+     (default 1.250, higher = more costly) (Flambda 2 only)
+  -flambda2-inline-small-function-size <int>|<round>=<int>[,...]
+     Functions with a cost less than this will always be inlined
+     unless an attribute instructs otherwise (default 10)
+     (Flambda 2 only)
+  -flambda2-inline-large-function-size <int>|<round>=<int>[,...]
+     Functions with a cost greater than this will never be inlined
+     unless an attribute instructs otherwise (default 10); speculative
+     inlining will be disabled if equal to the small function size
+     (Flambda 2 only)
+  -flambda2-inline-small-functor-size <int>|<round>=<int>[,...]
+     Functors with a cost less than this will always be inlined
+     unless an attribute instructs otherwise (default 10)
+     (Flambda 2 only)
+  -flambda2-inline-large-functor-size <int>|<round>=<int>[,...]
+     Functors with a cost greater than this will never be inlined
+     unless an attribute instructs otherwise (default 2000000); speculative
+     inlining will be disabled if equal to the small functor size
+     (Flambda 2 only)
+  -flambda2-inline-threshold <float>|<round>=<float>[,...]
+     Aggressiveness of inlining (default 10.00, higher numbers mean
+     more aggressive) (Flambda 2 only)
+  -flambda2-speculative-inlining-only-if-arguments-useful  Only
+    perform speculative inlining if the Flambda type system has
+    useful information about the argument(s) at the call site (default)
+    (Flambda 2 only)
+  -no-flambda2-speculative-inlining-only-if-arguments-useful  Ignore
+     whether the Flambda type system has useful information
+     about the argument(s) at the call site when performing
+     speculative inlining (Flambda 2 only)
+  -flambda2-speculative-inlining-track-lifted-constants  Track the size of lifted constants when doing speculative inlining
+    (Flambda 2 only)
+  -no-flambda2-speculative-inlining-track-lifted-constants  Do not track the size of lifted constants when doing speculative
+    inlining (default) (Flambda 2 only)
+  -flambda2-inlining-report-bin  Write inlining report
+     in binary format (Flambda 2 only)
+  -flambda2-unicode  Use Unicode output when printing
+     Flambda 2 code
+  -flambda2-kind-checks  Perform kind checks on Flambda 2
+     code (may cause fatal errors with layout-poly GADT code)
+  -drawfexpr  Like -drawflambda but outputs fexpr language
+     (Flambda 2 only)
+  -drawfexpr-to <file> Like -drawfexpr but dumps to given file (Flambda 2 only)
+  -dfexpr  Like -dflambda but outputs fexpr language
+     (Flambda 2 only)
+  -dfexpr-to <file> Like -dfexpr but dumps to given file (Flambda 2 only)
+  -dfexpr-after {simplify|reaper} <pass> Like -dfexpr, but dumps after the provided pass (Flambda 2 only)
+  -dfexpr-annot  Dump fexpr of all passes alongside each compilation unit
+     (Flambda 2 only)
+  -dfexpr-annot-after  Dump fexpr of given pass alongside each compilation unit
+     (Flambda 2 only)
+  -dslot-offsets  Dump closure offsets (Flambda 2 only)
+  -dfreshen  Freshen bound names when printing (Flambda 2 only)
+  -dflow  Dump debug info for the flow computation (Flambda 2 only)
+  -dsimplify  Print Flambda 2 terms after simplify (Flambda 2 only)
+  -dreaper  Dump debug info for the reaper pass (Flambda 2 only)
+  -use-cached-generic-functions  Use the cached generated functions
+  -cached-generic-functions-path <file>  Set the path of the cached generic functions (default to cached-generic-functions.o)
+  -a  Build a library
+  -alert <list>  Enable or disable alerts according to <list>:
+        +<alertname>  enable alert <alertname>
+        -<alertname>  disable alert <alertname>
+        ++<alertname> treat <alertname> as fatal error
+        --<alertname> treat <alertname> as non-fatal
+        @<alertname>  enable <alertname> and treat it as fatal error
+    <alertname> can be 'all' to refer to all alert names
+  -absname  Show absolute filenames in error messages
+  -no-absname  Do not try to show absolute filenames in error messages (default)
+  -locs  Print line and column numbers in error messages (default)
+  -no-locs  Do not print line and column numbers in error messages
+  -afl-instrument Enable instrumentation for afl-fuzz
+  -afl-inst-ratio Configure percentage of branches instrumented
+     (advanced, see afl-fuzz docs for AFL_INST_RATIO)
+  -annot  (deprecated) Save information in <filename>.annot
+  -as-argument-for <module name> Compile the module as an argument for the named parameter.
+  -as-parameter  Compile the interface as a parameter module.
+  -bin-annot  Save typedtree in <filename>.cmt
+  -bin-annot-cms  Save shapes in <filename>.cms
+  -bin-annot-occurrences  Store every occurrence of a bound name in the .cmt file.
+This information can be used by external tools to provide
+features such as project-wide occurrences. This flag has
+no effect in the absence of '-bin-annot'.
+  -inline-branch-factor <n>|<round>=<n>[,...]  Estimate the probability of a branch being cold as 1/(1+n) (used for inlining) (default 0.10)
+  -c  Compile only (do not link)
+  -cc <command>  Use <command> as the C compiler and linker
+  -cclib <opt>  Pass option <opt> to the C linker
+  -ccopt <opt>  Pass option <opt> to the C compiler and linker
+  -cmi-file <file>  Use the <file> interface file to type-check
+  -clambda-checks  Instrument clambda code with closure and field access checks (for debugging the compiler)
+  -Oclassic  Make inlining decisions at function definition time rather than at the call site (replicates previous behaviour of the compiler).  Implies -linscan (and causes -nolinscan to be ignored).
+  -color {auto|always|never}  Enable or disable colors in compiler messages
+    The following settings are supported:
+      auto    use heuristics to enable colors only if supported
+      always  enable colors
+      never   disable colors
+    The default setting is 'auto', and the current heuristic
+    checks that the TERM environment variable exists and is
+    not empty or "dumb", and that isatty(stderr) holds.
+  If the option is not specified, these setting can alternatively
+  be set through the OCAML_COLOR environment variable.
+  -error-style {contextual|short}  Control the way error messages and warnings are printed
+    The following settings are supported:
+      short       only print the error and its location
+      contextual  like "short", but also display the source code
+                  snippet corresponding to the location of the error
+    The default setting is 'contextual'.
+  If the option is not specified, these setting can alternatively
+  be set through the OCAML_ERROR_STYLE environment variable.
+  -compact  Optimize code size rather than speed
+  -config  Print configuration values and exit
+  -config-var  Print the value of a configuration variable, without a newline, and exit
+    (print nothing and exit with error value if the variable does not exist)
+  -dtypes  (deprecated) same as -annot
+  -disable-all-extensions   Legacy, use [-extension-universe no_extensions].
+    Disable all extensions, wherever they have been specified; this
+    flag overrides prior uses of the -extension flag, disables any
+    extensions that are enabled by default, and causes future uses of
+    the -extension flag to raise an error.
+  -ikinds  Enable ikinds-based kind checker (experimental)
+  -ikinds-debug  Enable ikinds debug logging
+  -only-erasable-extensions  Legacy, use [-extension-universe upstream_compatible].
+    Disable all extensions that cannot be "erased" to attributes,
+    wherever they have been specified; this flag overrides prior
+    contradictory uses of the -extension flag, raises an error on
+    future such uses, and disables any such extensions that are
+    enabled by default.
+    (Erasable extensions: mode, mode_beta, mode_alpha, unique, unique_beta, unique_alpha, overwriting, layouts, layouts_beta, layouts_alpha, layout_poly, layout_poly_beta, layout_poly_alpha)
+  -extension {comprehensions|mode|mode_beta|mode_alpha|unique|unique_beta|unique_alpha|overwriting|include_functor|polymorphic_parameters|immutable_arrays|module_strengthening|layouts|layouts_beta|layouts_alpha|simd|simd_beta|simd_alpha|small_numbers|small_numbers_beta|small_numbers_alpha|instances|let_mutable|layout_poly|layout_poly_beta|layout_poly_alpha|runtime_metaprogramming}  Enable the specified extension (may be specified more than once)
+  -no-extension {comprehensions|mode|mode_beta|mode_alpha|unique|unique_beta|unique_alpha|overwriting|include_functor|polymorphic_parameters|immutable_arrays|module_strengthening|layouts|layouts_beta|layouts_alpha|simd|simd_beta|simd_alpha|small_numbers|small_numbers_beta|small_numbers_alpha|instances|let_mutable|layout_poly|layout_poly_beta|layout_poly_alpha|runtime_metaprogramming}  Disable the specified extension (may be specified more than once)
+  -extension-universe {no_extensions|upstream_compatible|stable|beta|alpha} Set the extension universe and enable all extensions in it. Each universe
+    allows a set of extensions, and every successive universe includes 
+    the previous one.
+  -for-pack <ident>  Generate code that can later be `packed' with
+     ocamlopt -pack -o <ident>.cmx
+  -g  Record debugging information for exception backtrace
+  -no-g  Do not record debugging information (default)
+  -function-sections  (option not available)
+  -stop-after {parsing|typing|lambda|middle_end|linearization|emit|simplify_cfg|selection|register_allocation|llvmize} Stop after the given compilation pass.
+  -save-ir-after {linearization|simplify_cfg|selection|llvmize} Save intermediate representation after the given compilation pass (may be specified more than once).
+  -save-ir-before {register_allocation} Save intermediate representation before the given compilation pass (may be specified more than once).
+  -probes  (option not available)
+  -no-probes  Ignore [%%probe ..]
+  -probes-optimized  (option not available)
+  -no-probes-optimized  Emit naive code for [%%probe ..]
+  -i  Print inferred interface
+  -I <dir>  Add <dir> to the list of include directories
+  -Ix <dir>  Add <dir> to the list of include directories
+     (Like -I, but indicates that cmx files for modules in <dir> are
+     always available)
+  -H <dir>  Add <dir> to the list of "hidden" include directories
+     (Like -I, but the program can not directly reference these dependencies)
+  -I-manifest <file>  Get paths that the compiler can
+    reference from a given manifest file. This option is an alternative
+    to the -I flag, but specifies available files directly instead of
+    adding whole directories to the search path. Each line of the
+    manifest file should be in the format
+    'file|manifest <visible_path> <actual_path>', where 'file' means
+    that the line describes a file that the compiler can reference,
+    'manifest' means that the compiler should read the specified
+    manifest file recursively, <visible_path> is the path as interpreted
+    by the compiler, <actual_path> is where this file is in the
+    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file
+    passed to the [-I-manifest] flag should itself be relative to
+    [$MANIFEST_FILES_ROOT].
+  -H-manifest <file>  Same as -I-manifest, but adds given
+    paths to the list of "hidden" files (see -H for more details)
+  -impl <file>  Compile <file> as a .ml file
+  -inline <n>|<round>=<n>[,...]  Aggressiveness of inlining (default 1.25, higher numbers mean more aggressive)
+  -inline-toplevel <n>|<round>=<n>[,...]  Aggressiveness of inlining at toplevel (higher numbers mean more aggressive)
+  -inline-alloc-cost <n>|<round>=<n>[,...]  The cost of not removing an allocation during inlining (default 7, higher numbers more costly)
+  -inline-branch-cost <n>|<round>=<n>[,...]  The cost of not removing a conditional during inlining (default 5, higher numbers more costly)
+  -inline-call-cost <n>|<round>=<n>[,...]  The cost of not removing a call during inlining (default 5, higher numbers more costly)
+  -inline-prim-cost <n>|<round>=<n>[,...]  The cost of not removing a primitive during inlining (default 3, higher numbers more costly)
+  -inline-indirect-cost <n>|<round>=<n>[,...]  The cost of not removing an indirect call during inlining (default 4, higher numbers more costly)
+  -inline-lifting-benefit <n>|<round>=<n>[,...]  The benefit of lifting definitions to toplevel during inlining (default 1300, higher numbers more beneficial)
+  -inlining-report  Emit `.<round>.inlining' file(s) (one per round) showing the inliner's decisions (Flambda 1 and 2)
+  -insn-sched  Run the instruction scheduling pass (default)
+  -instantiate   Instantiates the first .cmx file, with the remaining ones used as the
+  arguments for its parameters.
+  -intf <file>  Compile <file> as a .mli file
+  -intf-suffix <string>  Suffix for interface files (default: .mli)
+  -keep-docs  Keep documentation strings in .cmi files
+  -no-keep-docs  Do not keep documentation strings in .cmi files (default)
+  -keep-locs  Keep locations in .cmi files (default)
+  -no-keep-locs  Do not keep locations in .cmi files
+  -labels  Use commuting label mode
+  -linkall  Link all modules, even unused ones
+  -requires-metaprogramming  Mark this unit as requiring metaprogramming support libraries
+  -uses-metaprogramming  Link metaprogramming support libraries
+  -llvm-backend  Enable LLVM backend (experimental)
+  -inline-max-depth <n>|<round>=<n>[,...]  Maximum depth of search for inlining opportunities inside inlined functions (default 1)
+  -alias-deps  Do record dependencies for module aliases
+  -no-alias-deps  Do not record dependencies for module aliases
+  -linscan  Use the linear scan register allocator
+  -app-funct  Activate applicative functors
+  -no-app-funct  Deactivate applicative functors
+  -directory  Directory to use for debug reporting like source code location reporting
+  -no-float-const-prop  Deactivate constant propagation for floating-point operations
+  -noassert  Do not compile assertion checks
+  -noautolink  Do not automatically link C libraries specified in .cmxa files
+  -nodynlink  Enable optimizations for code that will not be dynlinked
+  -no-insn-sched  Do not run the instruction scheduling pass
+  -nolabels  Ignore non-optional labels in types
+  -nostdlib  Do not add default directory to the list of include directories
+  -no-auto-include-otherlibs Add only stdlib to the list of include directories (unless -nostdlib is specified). Do not add subdirectories of other libraries distributed with the compiler (such as unix, str, dynlink). Do not alert when they are missing.
+  -nocwd  Do not implicitly add the current directory to the load path
+  -nopervasives  (undocumented)
+  -no-unbox-free-vars-of-closures  Do not unbox variables that will appear inside function closures
+  -no-unbox-specialised-args  Do not unbox arguments to which functions have been specialised
+  -o <file>  Set output file name to <file>
+  -O2  Apply increased optimization for speed
+  -O3  Apply aggressive optimization for speed (may significantly increase code size and compilation time)
+  -O4  Like -O3, but also enable the reaper pass (Flambda 2 only)
+  -opaque  Does not generate cross-module optimization information
+     (reduces necessary recompilation on module change)
+  -open <module>  Opens the module <module> before typing
+  -output-obj  Output an object file instead of an executable
+  -output-complete-obj  Output an object file, including runtime, instead of an executable
+  -p  (no longer supported)
+  -pack  Package the given .cmx files into one .cmx
+  -parameter <module name> Compile the module with <module name> as a parameter.
+  -plugin <plugin>  (no longer supported)
+  -pp <command>  Pipe sources through preprocessor <command>
+  -ppx <command>  Pipe abstract syntax trees through preprocessor <command>
+  -principal  Check principality of type inference
+  -no-principal  Do not check principality of type inference (default)
+  -rectypes  Allow arbitrary recursive types
+  -no-rectypes  Do not allow arbitrary recursive types (default)
+  -remove-unused-arguments  Remove unused function arguments
+  -rounds <n>  Repeat tree optimization and inlining phases this many times (default 1).  Rounds are numbered starting from zero.
+  -runtime-variant <str>  Use the <str> variant of the run-time system
+  -ocamlrunparam <settings>  Use the given OCAMLRUNPARAM settings as the default (ignored except when linking an executable)
+  -with-runtime Include the runtime system in the generated program (default)
+  -without-runtime Do not include the runtime system in the generated program.
+  -S  Keep intermediate assembly file
+  -safe-string  (default unconditionally since 5.0)
+  -safer-matching  Do not use type information to optimize pattern-matching
+  -shared  Produce a dynlinkable plugin
+  -short-paths  Shorten paths in types
+  -strict-sequence  Left-hand part of a sequence must have type unit
+  -no-strict-sequence  Left-hand part of a sequence need not have type unit (default)
+  -strict-formats  Reject invalid formats accepted by legacy implementations (default)
+     (Warning: Invalid formats may behave differently from
+      previous OCaml versions, and will become always-rejected
+      in future OCaml versions. You should always use this flag
+      to detect invalid formats so you can fix them.)
+  -no-strict-formats  Accept invalid formats accepted by legacy implementations
+     (Warning: Invalid formats may behave differently from
+      previous OCaml versions, and will become always-rejected
+      in future OCaml versions. You should never use this flag
+      and instead fix invalid formats.)
+  -thread  (deprecated) same as -I +threads
+  -unbox-closures  Pass free variables via specialised arguments rather than closures
+  -unbox-closures-factor <n > 0>  Scale the size threshold above which unbox-closures will slow down indirect calls rather than duplicating a function (default 10)
+  -inline-max-unroll <n>|<round>=<n>[,...]  Unroll recursive functions at most this many times (default 0)
+  -unboxed-types  unannotated unboxable types will be unboxed
+  -no-unboxed-types  unannotated unboxable types will not be unboxed (default)
+  -ddebug-uids  dump debug uids when printing variables
+  -ddebug-uid-tables  dump tables associating debug uids with shapes
+  -unsafe  Do not compile bounds checking on array and string access
+  -v  Print compiler version and location of standard library and exit
+  -verbose  Print calls to external commands
+  -verbose-types  Print detailed information within types
+  -no-verbose-types  Omit expert information within types (default)
+  -kind-verbosity <n>  Set the verbosity used for printing kinds (0=not verbose, 1=expanded, 2=expanded with all mod bounds)
+  -version  Print version and exit
+  --version  Print version and exit
+  -vnum  Print version number and exit
+  -w <list>  Enable or disable warnings according to <list>:
+        +<spec>   enable warnings in <spec>
+        -<spec>   disable warnings in <spec>
+        @<spec>   enable warnings in <spec> and treat them as errors
+     <spec> can be:
+        <num>             a single warning number
+        <num1>..<num2>    a range of consecutive warning numbers
+        <letter>          a predefined set
+     default setting is "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..184"
+  -warn-error <list>  Enable or disable error status for warnings according
+     to <list>.  See option -w for the syntax of <list>.
+     Default setting is "-a"
+  -warn-help  Show description of warning numbers
+  -where  Print location of standard library and exit
+  - <file>  Treat <file> as a file name (even if it starts with `-')
+  -match-context-rows <n>  (advanced, see manual section 13.2.)
+  -dno-unique-ids  (undocumented)
+  -dunique-ids  (undocumented)
+  -dno-locations  (undocumented)
+  -dlocations  (undocumented)
+  -dsource  (undocumented)
+  -dparsetree  (undocumented)
+  -dtypedtree  (undocumented)
+  -dshape  (undocumented)
+  -dtlambda  (undocumented)
+  -dslambda  (undocumented)
+  -drawlambda  (undocumented)
+  -dlambda  (undocumented)
+  -dblambda  Dump Blambda terms before bytecode generation
+  -dletreclambda  Dump Lambda terms going into Value_rec_compiler
+  -drawclambda  (undocumented)
+  -dclambda  (undocumented)
+  -dcmm-invariants  Extra sanity checks on Cmm
+  -dflambda  Print Flambda (1 or 2) terms on exit from Flambda
+  -drawflambda  Print Flambda terms after closure conversion
+     (for Flambda 2, after [Lambda_to_flambda])
+  -dflambda-invariants  Check Flambda (1 and 2) invariants
+  -dflambda-heavy-invariants  Check Flambda 2 heavy invariants
+  -dflambda-no-invariants  Do not check Flambda (1 and 2) invariants
+  -dflambda-let <stamp>  Print when the given Flambda 1 [Let] is created
+  -dflambda-verbose  Print Flambda 1 terms including around each pass
+  -dcmm  (undocumented)
+  -dcse  (undocumented)
+  -dlinear  (undocumented)
+  -dstartup  (undocumented)
+  -dtimings  Print timings information for each pass
+  -dtimings-precision <n>  Specify precision for timings information (default 3)
+  -dcounters  Print counter information for each pass
+  -dprofile  Print performance information for each pass
+    The columns are: time alloc top-heap absolute-top-heap counters.
+  -dgranularity {file|func|block} Specify granularity level for profile information (-dtimings, -dcounters, -dprofile)
+  -dprofile-output <file>  Set output filename for profile data (e.g., array-profile.csv)
+  -dump-into-file  dump output like -dlambda into <target>.dump
+  -dump-into-csv  Dump profile information to profile.csv
+  -dump-dir redirects any file(s) that would be outputted as a result of other flags
+    to selected directory (adding stamp to ensure uniqueness in directory)
+  -dump-pass  Record transformations performed by these passes: 
+  -debug-ocaml  Debugging output for the compiler
+(internal use only)
+  -shape-format {old-merlin|debugging-shapes}  Set shape format (old-merlin|debugging-shapes) used in the compiler and stored in .cms files. Default is old-merlin unless configured with --enable-oxcaml-dwarf.
+  -gdwarf-config-shape-reduce-depth <n|none>  Maximum depth for shape reduction in DWARF debug info (default: 2, use 'none' for unlimited)
+  -gdwarf-config-shape-eval-depth <n|none>  Maximum depth for shape evaluation in DWARF debug info (default: 2, use 'none' for unlimited)
+  -gdwarf-config-max-cms-files-per-unit <n|none>  Maximum CMS files per compilation unit in DWARF debug info (default: 20, use 'none' for unlimited)
+  -gdwarf-config-max-cms-files-per-variable <n|none>  Maximum CMS files per variable in DWARF debug info (default: 5, use 'none' for unlimited)
+  -gdwarf-config-max-type-to-shape-depth <n|none>  Maximum type-to-shape depth for generating DWARF debug info (default: 10, use 'none' for unlimited)
+  -gdwarf-config-max-shape-reduce-steps-per-variable <n|none>  Maximum shape reduction steps per variable in DWARF debug info (default: 1000, use 'none' for unlimited)
+  -gdwarf-config-max-evaluation-steps-per-variable <n|none>  Maximum evaluation steps per variable in DWARF debug info (default: 1000000, use 'none' for unlimited)
+  -gdwarf-config-shape-reduce-fuel <n|none>  Fuel for shape reduction when producing DWARF debug info (default: 10, use 'none' for unlimited)
+  -gdwarf-fidelity <level>  Set fidelity level of the DWARF debug information (low|medium|high|very-high|ultra-high|unlimited). Higher values produce more detailed debug information at the expense of increased compilation times.
+	- low is fast, but it does not support recursive types or retrieving declaration information from other files
+	- medium is a reasonable default (it does support recursive declarations), but it is conservative with respect to retrieving declarations (including finding them through functor application)
+	- high and above should provide good debugging information at increased compilation times
+  -args <file> Read additional newline-terminated command line arguments
+      from <file>
+  -args0 <file> Read additional null character terminated command line arguments
+from <file>
+  -depend <options> Compute dependencies (use 'ocamlopt -depend -help' for details)
+  -help  Display this list of options
+  --help  Display this list of options
