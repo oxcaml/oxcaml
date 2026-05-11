@@ -94,6 +94,15 @@ let compare_prefix prefix0 bit0 prefix1 bit1 =
   let c = compare bit0 bit1 in
   if c = 0 then compare prefix0 prefix1 else c
 
+type 'a or_null =
+  | Null
+  | This of 'a
+[@@or_null]
+
+let[@inline] option_of_or_null = function Null -> None | This x -> Some x
+
+let[@inline] _or_null_of_option = function None -> Null | Some x -> This x
+
 type empty = [`Empty]
 
 type leaf = [`Leaf]
@@ -1249,36 +1258,40 @@ end = struct
     | Non_empty t0, Non_empty t1 -> subset_domain_tree t0 t1
 
   (* CR lmaurer: Should use [raise_notrace] internally *)
-  let rec find_tree i t =
+  let[@inline never] rec find_tree i t =
     match tree_descr t with
-    | Leaf l -> if leaf_key l = i then leaf_datum l else raise Not_found
+    | Leaf l -> if leaf_key l = i then This (leaf_datum l) else Null
     | Branch b ->
       let prefix, bit = unpack (branch_prefix_and_bit b) in
       if not (match_prefix i prefix bit)
-      then raise Not_found
+      then Null
       else if zero_bit i bit
       then find_tree i (branch0 b)
       else find_tree i (branch1 b)
 
   let find i t =
+    let[@local] not_found () = raise Not_found in
     match descr t with
-    | Empty -> raise Not_found
-    | Non_empty tree -> find_tree i tree
+    | Empty -> not_found ()
+    | Non_empty tree ->
+      match find_tree i tree with
+        | Null -> not_found ()
+        | This x -> x
 
   let rec inter_tree iv f t0 t1 =
     match tree_descr t0, tree_descr t1 with
     | Leaf l0, _ -> (
       let i = leaf_key l0 in
       match find_tree i t1 with
-      | exception Not_found -> empty iv
-      | d1 ->
+      | Null -> empty iv
+      | This d1 ->
         let d0 = leaf_datum l0 in
         of_tree (leaf iv i (Inter_callback.call f i d0 d1)))
     | _, Leaf l1 -> (
       let i = leaf_key l1 in
       match find_tree i t0 with
-      | exception Not_found -> empty iv
-      | d0 ->
+      | Null -> empty iv
+      | This d0 ->
         let d1 = leaf_datum l1 in
         of_tree (leaf iv i (Inter_callback.call f i d0 d1)))
     | Branch b0, Branch b1 ->
@@ -1710,8 +1723,10 @@ end = struct
     | Non_empty t0, Empty -> merge_left iv f t0
     | Non_empty t0, Non_empty t1 -> merge_tree iv f t0 t1
 
-  let find_opt t key =
-    match find t key with exception Not_found -> None | datum -> Some datum
+  let find_opt key t =
+    match descr t with
+    | Empty -> None
+    | Non_empty tree -> option_of_or_null (find_tree key tree)
 
   let get_singleton t =
     match descr t with
