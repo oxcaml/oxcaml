@@ -6,7 +6,7 @@ open! Int_replace_polymorphic_compare
 
     Walks a [Cmm.fundecl] in expression order, emitting into an
     {!Ssa.Graph_builder} via the [Make] functor. Operation-level lowering is
-    delegated to {!Cfg_selectgen} via [Sel.select_operation].
+    delegated to {!Cfg_selectgen} via [Cfg_selectgen.select_operation].
 
     Trap handling: [Cexit]'s trap actions are emitted as [Push_trap] /
     [Pop_trap] body instructions. In contrast to {!Cfg_selectgen}, we do not
@@ -14,10 +14,10 @@ open! Int_replace_polymorphic_compare
     do this automatically instead.
 
     Also in contrast to Cfg_selectgen, we do not emit tail calls.
-    {!Ssa_tail_call} later rewrites that pattern into [Tailcall_self] /
-    [Tailcall_func] when the calling-convention and trap stack constraints are
-    satisfied. The [Capply]'s [region_close] is forwarded as the [Call.nontail]
-    flag so [@nontail] annotations suppress the rewrite. *)
+    {!Ssa_tail_call} later rewrites call+return patterns into [Tailcall_self] /
+    [Tailcall_func] when possible. The [Capply]'s [region_close] is forwarded as
+    the [Call.nontail] flag so [@nontail] annotations can suppress the rewrite.
+*)
 
 module SU = Select_utils
 module V = Backend_var
@@ -26,6 +26,10 @@ module Sel = Cfg_selectgen.Make (Cfg_selection)
 
 module Make (Builder : Ssa.Graph_builder) = struct
   open Builder
+
+  let current_function_is_check_enabled =
+    Zero_alloc_checker.is_check_enabled function_info.fun_codegen_options
+      function_info.fun_name function_info.fun_dbg
 
   type 'a or_never_returns =
     | Ok of 'a
@@ -55,16 +59,16 @@ module Make (Builder : Ssa.Graph_builder) = struct
       Array.init (Array.length typ) (fun index ->
           Instruction.make_proj ~index i)
 
-  let bind_let env c v r1 =
-    let env = env_add v r1 env in
+  let bind_let env c v args =
+    let env = env_add v args env in
     let name = V.name (VP.var v) in
-    Array.iter (fun i -> Instruction.set_name i name) r1;
+    Array.iter (fun i -> Instruction.set_name i name) args;
     let provenance = VP.provenance v in
     if Option.is_some provenance
     then
       emit_instruction c
         (Name_for_debugger
-           { ident = VP.var v; provenance; which_parameter = None; regs = r1 });
+           { ident = VP.var v; provenance; which_parameter = None; args });
     env
 
   let chunk_of_machtype (c : Cmm.machtype_component) : Cmm.memory_chunk =
@@ -77,32 +81,30 @@ module Make (Builder : Ssa.Graph_builder) = struct
     | Val | Int | Addr -> Word_val
     | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
-  let size_of_cmm_expr env (e : Cmm.expression) =
-    let rec size (e : Cmm.expression) =
-      match e with
-      | Cconst_int _ | Cconst_natint _ -> Arch.size_int
-      | Cconst_symbol _ -> Arch.size_addr
-      | Cconst_float _ -> Arch.size_float
-      | Cconst_float32 _ -> Arch.size_float
-      | Cconst_vec128 _ -> Arch.size_vec128
-      | Cconst_vec256 _ -> Arch.size_vec256
-      | Cconst_vec512 _ -> Arch.size_vec512
-      | Cvar id ->
-        let instrs = V.Map.find id env.vars in
-        Array.fold_left
-          (fun acc i -> acc + SU.size_component (Instruction.arg_type i))
-          0 instrs
-      | Ctuple el -> List.fold_left (fun acc e -> acc + size e) 0 el
-      | Cop (op, _, _) ->
-        let ty = SU.oper_result_type op in
-        Array.fold_left (fun acc c -> acc + SU.size_component c) 0 ty
-      | Clet (_, _, body) | Csequence (_, body) -> size body
-      | Cifthenelse _ | Cphantom_let _ | Cswitch _ | Ccatch _ | Cexit _
-      | Cinvalid _ ->
-        Misc.fatal_error
-          "Ssa_of_cmm.size_of_cmm_expr: unexpected kind of expression"
-    in
-    size e
+  let rec size_of_cmm_expr env (e : Cmm.expression) =
+    match e with
+    | Cconst_int _ | Cconst_natint _ -> Arch.size_int
+    | Cconst_symbol _ -> Arch.size_addr
+    | Cconst_float _ -> Arch.size_float
+    | Cconst_float32 _ -> Arch.size_float
+    | Cconst_vec128 _ -> Arch.size_vec128
+    | Cconst_vec256 _ -> Arch.size_vec256
+    | Cconst_vec512 _ -> Arch.size_vec512
+    | Cvar id ->
+      let instrs = V.Map.find id env.vars in
+      Array.fold_left
+        (fun acc i -> acc + SU.size_component (Instruction.arg_type i))
+        0 instrs
+    | Ctuple el ->
+      List.fold_left (fun acc e -> acc + size_of_cmm_expr env e) 0 el
+    | Cop (op, _, _) ->
+      let ty = SU.oper_result_type op in
+      Array.fold_left (fun acc c -> acc + SU.size_component c) 0 ty
+    | Clet (_, _, body) | Csequence (_, body) -> size_of_cmm_expr env body
+    | Cifthenelse _ | Cphantom_let _ | Cswitch _ | Ccatch _ | Cexit _
+    | Cinvalid _ ->
+      Misc.fatal_error
+        "Ssa_of_cmm.size_of_cmm_expr: unexpected kind of expression"
 
   let emit_branch c (test : Operation.test) rarg ~true_block ~false_block =
     let make_cond op args =
@@ -200,11 +202,10 @@ module Make (Builder : Ssa.Graph_builder) = struct
   and emit_tuple env c exp_list : result =
     let rec emit_list = function
       | [] -> Ok []
-      | exp :: rem -> (
+      | exp :: rem ->
         let* loc_rem = emit_list rem in
-        match emit env c exp ~tail:false with
-        | Never_returns -> Never_returns
-        | Ok loc_exp -> Ok (loc_exp :: loc_rem))
+        let* loc_exp = emit env c exp ~tail:false in
+        Ok (loc_exp :: loc_rem)
     in
     let* l = emit_list exp_list in
     Ok (Array.concat l)
@@ -353,16 +354,14 @@ module Make (Builder : Ssa.Graph_builder) = struct
     match r with Ok _ when tail -> insert_return c r | _ -> r
 
   and insert_return c (r : result) : result =
-    match r with
-    | Never_returns -> Never_returns
-    | Ok r ->
-      finish_block c ~dbg:Debuginfo.none (Return { args = r });
-      Never_returns
+    let* r = r in
+    finish_block c ~dbg:Debuginfo.none (Return { args = r });
+    Never_returns
 
   and emit_invalid env c message symbol =
     let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
     let* arg_instrs = emit_tuple env c [arg_expr] in
-    if !SU.current_function_is_check_enabled
+    if current_function_is_check_enabled
     then (
       let { block = cont_block; params = cont_params } =
         new_block ~params:Cmm.typ_int
@@ -424,7 +423,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
       Ok cont_params
     | Call_no_return _ ->
       Misc.fatal_errorf
-        "Ssa_of_cmm: Currently unused codepath, implement if hit"
+        "Ssa_of_cmm: Currently unused codepath, implement when it becomes \
+         reachable"
     | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
     | Invalid _ ->
@@ -563,10 +563,10 @@ module Make (Builder : Ssa.Graph_builder) = struct
           let provenance = VP.provenance id in
           if Option.is_some provenance
           then
-            let regs = V.Map.find (VP.var id) handler_env.vars in
+            let args = V.Map.find (VP.var id) handler_env.vars in
             emit_instruction c
               (Name_for_debugger
-                 { ident = VP.var id; provenance; which_parameter = None; regs }))
+                 { ident = VP.var id; provenance; which_parameter = None; args }))
         handler.params;
       emit handler_env c handler.body ~tail, c
     in
@@ -604,8 +604,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
       Never_returns
 
   (* Join a set of branches (each with its own end-cursor) into a fresh block.
-     [c] is left pointing at the joined block, or unchanged if every branch did
-     not return. *)
+     [c] is left pointing at the joined block, or unchanged if no branch
+     returns. *)
   and join c (results : (result * cursor) array) : result =
     let join_info = ref None in
     Array.iter
@@ -618,9 +618,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
           | None -> join_info := Some types
           | Some prev ->
             (* Different paths may produce values of compatible but distinct
-               machtype components (e.g. a [try val E with _ 456] mixes [val]
-               and [int]). Pick the least upper bound so the joined block's
-               param types accommodate every incoming arm. *)
+               machtype components. Pick the least upper bound so the joined
+               block's param types accommodate every incoming arm. *)
             assert (Array.length prev = Array.length types);
             let lub = Array.map2 Cmm.lub_component prev types in
             join_info := Some lub))
@@ -644,10 +643,6 @@ module Make (Builder : Ssa.Graph_builder) = struct
 end
 
 let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
-  SU.current_function_name := f.fun_name.sym_name;
-  SU.current_function_is_check_enabled
-    := Zero_alloc_checker.is_check_enabled f.fun_codegen_options
-         f.fun_name.sym_name f.fun_dbg;
   try
     let fun_arg_types = List.map snd f.fun_args |> Array.concat in
     let fi : Ssa.function_info =

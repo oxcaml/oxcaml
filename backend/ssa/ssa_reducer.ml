@@ -320,9 +320,9 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     | Pop_trap { handler } -> Pop_trap { handler = map_block handler }
     | Stack_check { max_frame_size_bytes } ->
       Stack_check { max_frame_size_bytes }
-    | Name_for_debugger { ident; provenance; which_parameter; regs } ->
+    | Name_for_debugger { ident; provenance; which_parameter; args } ->
       Name_for_debugger
-        { ident; provenance; which_parameter; regs = map_args regs }
+        { ident; provenance; which_parameter; args = map_args args }
     | Block_param _ | Proj _ | Tuple _ -> assert false
   in
   let map_terminator (t : In.Terminator.t) : Out.Terminator.t =

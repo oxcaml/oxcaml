@@ -27,8 +27,8 @@ open! Int_replace_polymorphic_compare
 
     Invariants enforced here:
     - Every reachable block is [finish_block]ed.
-    - [Tuple] never appears in a finished body, only transiently as an
-      [Ssa_reducer] instruction representative.
+    - [Tuple] never appears in a finished graph, only transiently as an
+      [Ssa_reducer] instruction replacement representative.
     - [Block_param], [Proj] never appear in a block body.
     - [Block_param.index] is bounds-checked by [make_block_param]. *)
 
@@ -152,7 +152,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             { ident : Ident.t;
               provenance : Backend_var.Provenance.t option;
               which_parameter : int option;
-              regs : Instruction.t array
+              args : Instruction.t array
             }
 
       and op_data =
@@ -206,7 +206,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             { ident : Ident.t;
               provenance : Backend_var.Provenance.t option;
               which_parameter : int option;
-              regs : Instruction.t array
+              args : Instruction.t array
             }
 
       and op_data =
@@ -247,8 +247,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           Ident.same a.ident b.ident
           && Option.equal Backend_var.Provenance.equal a.provenance b.provenance
           && Option.equal Int.equal a.which_parameter b.which_parameter
-          && Array.length a.regs = Array.length b.regs
-          && Array.for_all2 equal a.regs b.regs
+          && Array.length a.args = Array.length b.args
+          && Array.for_all2 equal a.args b.args
         | ( ( Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
             | Stack_check _ | Name_for_debugger _ ),
             _ ) ->
@@ -258,9 +258,11 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         match instr with
         | Op { typ = [| t |]; _ } -> t
         | Op { typ; _ } ->
-          Misc.fatal_errorf
-            "Ssa.Instruction.arg_type: Op has %d-component type; project first"
+          Misc.fatal_errorf "Ssa.Instruction.arg_type: Op has %d results; %s"
             (Array.length typ)
+            (if Array.length typ = 0
+             then "cannot be used as argument"
+             else "please project before using as an argument")
         | Block_param { block; index } -> block.params.(index).typ
         | Proj { index; src = Op { typ; _ } } -> typ.(index)
         | Proj _ | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _
@@ -305,7 +307,13 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         match src with
         | Tuple elems -> Array.get elems index
         | Op _ ->
-          assert (index >= 0 && index < result_arity src);
+          let arity = result_arity src in
+          if not (index >= 0 && index < arity)
+          then
+            Misc.fatal_errorf
+              "Ssa.Instruction.make_proj: index %d out of range for \
+               instruction with %d results"
+              index arity;
           Proj { index; src }
         | Block_param _ | Proj _ | Push_trap _ | Pop_trap _ | Stack_check _
         | Name_for_debugger _ ->
@@ -354,8 +362,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
               args : Instruction.t array;
               continuation : Block.t option
             }
-
-      val non_trap_successors : Terminator.t -> Block.t list
     end = struct
       type t =
         | Goto of
@@ -396,19 +402,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
               args : Instruction.t array;
               continuation : Block.t option
             }
-
-      (* The terminator is missing the trap successors, which are derived from
-         [block_end_trap_stack]. *)
-      let non_trap_successors (t : Terminator.t) : Block.t list =
-        match t with
-        | Return _ | Tailcall_func _ | Raise _ -> []
-        | Goto { goto; _ } -> [goto]
-        | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
-        | Switch { targets; _ } -> Array.to_list targets
-        | Tailcall_self { destination; _ } -> [destination]
-        | Call { continuation; _ } -> [continuation]
-        | Invalid { continuation; _ } -> (
-          match continuation with Some l -> [l] | None -> [])
     end
 
     (* === Builder state === *)
@@ -425,15 +418,13 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     let function_info : function_info = function_info
 
-    (* Finished blocks, in reverse [finish_block] order. Populated by
-       [finish_block]; unfinished or never-finished blocks do not appear
-       here. *)
+    (* Finished blocks, in reverse [finish_block] order, populated by
+       [finish_block]. *)
     let finished_blocks : Block.t list ref = ref []
 
     (* Sentinel terminator used as the initial value of the [terminator] field.
-       [finish_block] checks (via physical equality) that the field still holds
-       this sentinel before sealing — i.e., that [finish_block] hasn't already
-       been called for this block. *)
+       [is_finished] checks (via physical equality) that the field still holds
+       this sentinel. *)
     let rec pending_terminator : Terminator.t =
       Terminator.Goto { goto = dummy_block; args = [||] }
 
@@ -449,6 +440,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         block_end_trap_stack = []
       }
 
+    let is_finished (c : cursor) = c.block.terminator != pending_terminator
+
     let create_block ~is_function_start ~params : Block.t =
       { id = Block_id.create ();
         is_function_start;
@@ -461,30 +454,20 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         block_end_trap_stack = []
       }
 
-    (* Pretty-printers shared between the [Graph_builder] and [Finished_graph]
-       views: only depend on data exposed in both signatures, so reducer
-       diagnostics can print under-construction graphs the same way as finished
-       ones. Op result names are [v<id>] (or [<name>/v<id>] when the op carries
-       a name), block ids are [B<id>]. References to ops use the result name, or
-       [<index>.v<id>] under a projection; references to block params use
-       [B<id>.<index>] (or [<name>/B<id>.<index>]). *)
+    (* Pretty-printing, the code is placed here so it can be shared between the
+       graph builder and the finished graph. *)
+
     let print_block_id ppf (b : Block.t) =
       Format.fprintf ppf "B%d" (b.id :> int)
 
     let print_block_param ppf (block : Block.t) index =
-      match block.params.(index).name with
-      | None -> Format.fprintf ppf "%a.%d" print_block_id block index
-      | Some n -> Format.fprintf ppf "%s/%a.%d" n print_block_id block index
+      block.params.(index).name |> Option.iter (Format.fprintf ppf "%s/");
+      Format.fprintf ppf "%a.%d" print_block_id block index
 
     let print_op_id ppf (od : Instruction.op_data) =
-      match od.name with
-      | None -> Format.fprintf ppf "v%d" (od.id :> int)
-      | Some n -> Format.fprintf ppf "%s/v%d" n (od.id :> int)
+      od.name |> Option.iter (Format.fprintf ppf "%s/");
+      Format.fprintf ppf "v%d" (od.id :> int)
 
-    (* Handles every [Instruction.t] kind, including the virtual [Block_param] /
-       [Proj] / [Tuple] that don't appear in a finished body, since reducer
-       diagnostics may print partially-built instructions whose kind is not
-       constrained. *)
     let rec print_instruction ppf (i : Instruction.t) =
       match i with
       | Op ({ op; args; _ } as od) ->
@@ -504,23 +487,18 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         Format.fprintf ppf "pop_trap %a" print_block_id handler
       | Stack_check { max_frame_size_bytes } ->
         Format.fprintf ppf "stack_check %d" max_frame_size_bytes
-      | Name_for_debugger { ident; _ } ->
-        Format.fprintf ppf "name_for_debugger %a" Ident.print ident
+      | Name_for_debugger { ident; args; _ } ->
+        Format.fprintf ppf "name_for_debugger %a(%a)" Ident.print ident
+          print_args args
       | Block_param { block; index } -> print_block_param ppf block index
       | Proj { index; src } ->
-        Format.fprintf ppf "%d.%a" index print_instr_ref src
+        Format.fprintf ppf "%a.%i" print_instr_ref src index
       | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
 
     and print_instr_ref ppf (i : Instruction.t) =
-      match i with
+      match[@warning "-fragile-match"] i with
       | Op od -> print_op_id ppf od
-      | Block_param { block; index; _ } -> print_block_param ppf block index
-      | Proj { index; src } ->
-        Format.fprintf ppf "%d.%a" index print_instr_ref src
-      | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
-      | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
-        Misc.fatal_error
-          "Ssa.print_instr_ref: not a value-producing instruction"
+      | _ -> print_instruction ppf i
 
     and print_args ppf args =
       Array.iteri
@@ -549,8 +527,10 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       | Tailcall_self { destination; args } ->
         Format.fprintf ppf "tailcall_self %a(%a)" print_block_id destination
           print_args args
-      | Tailcall_func { args; _ } ->
-        Format.fprintf ppf "tailcall_func(%a)" print_args args
+      | Tailcall_func { op = Direct sym; args } ->
+        Format.fprintf ppf "tailcall %s(%a)" sym.sym_name print_args args
+      | Tailcall_func { op = Indirect _; args } ->
+        Format.fprintf ppf "tailcall_indirect(%a)" print_args args
       | Call { op = Func (Direct sym); args; continuation; may_raise; nontail }
         ->
         Format.fprintf ppf "call %s(%a) -> %a" sym.sym_name print_args args
@@ -570,19 +550,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             may_raise;
             nontail = _
           } ->
-        Format.fprintf ppf "prim %s(%a) -> %a" func_symbol print_args args
+        Format.fprintf ppf "call_prim %s(%a) -> %a" func_symbol print_args args
           print_block_id continuation;
         if may_raise then Format.fprintf ppf " may_raise"
       | Call { op = Prim (Probe { name; _ }); args; continuation; _ } ->
         Format.fprintf ppf "probe %s(%a) -> %a" name print_args args
           print_block_id continuation
-      | Invalid { message = _; args; continuation } -> (
-        Format.fprintf ppf "invalid(%a)" print_args args;
+      | Invalid { message; args; continuation } -> (
+        Format.fprintf ppf "invalid(%a) \"%s\"" print_args args message;
         match continuation with
         | Some l -> Format.fprintf ppf " -> %a" print_block_id l
         | None -> ())
 
-    let make_block_result ~is_function_start ~(params : Cmm.machtype) :
+    let new_block_impl ~is_function_start ~(params : Cmm.machtype) :
         new_block_result =
       let block_params : Block.param array =
         Array.map
@@ -596,11 +576,11 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       in
       { block; params = params_arr }
 
-    let new_block ~params = make_block_result ~is_function_start:false ~params
+    let new_block ~params = new_block_impl ~is_function_start:false ~params
 
     let entry, entry_params =
       let { block; params } =
-        make_block_result ~is_function_start:true ~params:function_info.fun_args
+        new_block_impl ~is_function_start:true ~params:function_info.fun_args
       in
       (* Initialize names from the function's argument names, when known. *)
       List.iteri
@@ -617,24 +597,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
     let start_block (block : Block.t) : cursor = { block; instrs_rev = [] }
 
     let move_cursor (c : cursor) ~(new_pos : cursor) : unit =
+      assert (is_finished c);
       c.block <- new_pos.block;
       c.instrs_rev <- new_pos.instrs_rev
 
     let emit_instruction (c : cursor) (instr : Instruction.t) =
-      (match instr with
-      | Instruction.Block_param _ | Instruction.Proj _ | Instruction.Tuple _ ->
-        Misc.fatal_errorf
-          "Ssa.emit_instruction: %s is a virtual value and cannot be emitted \
-           into a block body"
-          (match[@warning "-fragile-match"] instr with
-          | Instruction.Block_param _ -> "Block_param"
-          | Instruction.Proj _ -> "Proj"
-          | Instruction.Tuple _ -> "Tuple"
-          | _ -> assert false)
+      match instr with
       | Instruction.Op _ | Instruction.Push_trap _ | Instruction.Pop_trap _
       | Instruction.Stack_check _ | Instruction.Name_for_debugger _ ->
-        ());
-      c.instrs_rev <- instr :: c.instrs_rev
+        c.instrs_rev <- instr :: c.instrs_rev
+      | Instruction.Block_param _ | Instruction.Proj _ | Instruction.Tuple _ ->
+        Misc.fatal_errorf
+          "Ssa.emit_instruction: %a cannot be emitted into a block body"
+          print_instruction instr
 
     let emit_op (c : cursor) ~op ~dbg ~typ ~args : Instruction.t =
       let instr = Instruction.make_op ~op ~typ ~args ~dbg in
@@ -666,8 +641,6 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       | Switch { targets; _ } ->
         Array.iter (check_target_has_no_params ~term_name:"Switch") targets
       | Return _ | Raise _ | Tailcall_func _ | Call _ | Invalid _ -> ()
-
-    let is_finished (c : cursor) = c.block.terminator != pending_terminator
 
     let finish_block (c : cursor) ~(dbg : Debuginfo.t) (term : Terminator.t) :
         unit =
@@ -703,11 +676,24 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       then match block.block_end_trap_stack with [] -> None | h :: _ -> Some h
       else None
 
+    (* The terminator is missing the trap successors, which are derived from
+       [block_end_trap_stack]. *)
+    let non_trap_successors (t : Terminator.t) : Block.t list =
+      match t with
+      | Return _ | Tailcall_func _ | Raise _ -> []
+      | Goto { goto; _ } -> [goto]
+      | Branch { ifso; ifnot; _ } -> [ifso; ifnot]
+      | Switch { targets; _ } -> Array.to_list targets
+      | Tailcall_self { destination; _ } -> [destination]
+      | Call { continuation; _ } -> [continuation]
+      | Invalid { continuation; _ } -> (
+        match continuation with Some l -> [l] | None -> [])
+
     let successors (block : Block.t) : Block.t list =
-      let structural = Terminator.non_trap_successors block.terminator in
+      let structural = non_trap_successors block.terminator in
       match trap_successor block with
       | None -> structural
-      | Some h -> structural @ [h]
+      | Some h -> h :: structural
 
     let rec dominates (a : Block.t) (b : Block.t) =
       Block.equal a b
@@ -724,32 +710,14 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       else
         common_dominator a.dominator_info.dominator b.dominator_info.dominator
 
-    (** For a predecessor's terminator, return the argument at [index] that is
-        passed through an unconditional jump to a successor whose params may be
-        dropped. We only do this delayed counting of arguments for [Goto], the
-        other terminator's arguments are counted unconditionally in
-        [increment_uses_in_terminator].
-
-        CR ttebbi: We could also treat [Tailcall_self] arguments as unused when
-        the corresponding entry param is dead, since the function-entry params
-        themselves cannot be dropped (they come from the ABI), but the args we
-        pass at the recursive call site could be replaced with an indefinite
-        value. *)
-    let block_param_arg (term : Terminator.t) (index : int) :
-        Instruction.t option =
-      match term with
-      | Goto { args; _ } -> Some (Array.get args index)
-      | Branch _ | Switch _ | Return _ | Raise _ | Tailcall_self _
-      | Tailcall_func _ | Call _ | Invalid _ ->
-        None
-
     (* === Compute metadata: predecessors, traps, dominators, use counts === *)
 
     (* Apply the [Push_trap]/[Pop_trap] effects of [body] to [start_stack]. Each
        [Pop_trap { handler = h }] must find [h] at the top of the current
        stack. *)
-    let apply_body_trap_effects ~(block : Block.t) (start_stack : Block.t list)
-        (body : Instruction.t array) : Block.t list =
+    let compute_block_end_trap_stack ~(block : Block.t)
+        (start_stack : Block.t list) (body : Instruction.t array) : Block.t list
+        =
       Array.fold_left
         (fun (stack : Block.t list) (instr : Instruction.t) ->
           match instr with
@@ -791,14 +759,14 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         then begin
           Block.Tbl.add visited block ();
           let end_stack =
-            apply_body_trap_effects ~block start_stack block.body
+            compute_block_end_trap_stack ~block start_stack block.body
           in
           block.block_end_trap_stack <- end_stack;
           let add_pred start_stack (succ : Block.t) =
             succ.predecessors <- Block.Set.add block succ.predecessors;
             worklist := (succ, start_stack) :: !worklist
           in
-          Terminator.non_trap_successors block.terminator
+          non_trap_successors block.terminator
           |> List.iter (fun succ -> add_pred end_stack succ);
           (* On entry to a trap handler, the runtime has popped the topmost
              handler off the trap stack. *)
@@ -864,9 +832,10 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           reachable_blocks
       done
 
-    (* Reference-counting walk over each reachable block's body and terminator.
-       [Block_param] increments propagate to predecessors' [Goto] args via
-       [block_param_arg]. *)
+    (* Reference-counting walks over each reachable block's body and terminator.
+       An unused operation does not incrase use counts of its inputs.
+       [Block_param] increments propagate to predecessors' [Goto] args when the
+       parameter becomes used. *)
     let compute_use_counts ~(reachable_blocks : Block.t list) : unit =
       let rec increment_use (instr : Instruction.t) =
         match instr with
@@ -882,19 +851,29 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           then
             block.predecessors
             |> Block.Set.iter (fun pred ->
-                block_param_arg pred.terminator index
-                |> Option.iter increment_use)
+                match pred.terminator with
+                | Goto { args; _ } -> increment_use (Array.get args index)
+                | Branch _ | Switch _ | Return _ | Raise _ | Tailcall_self _
+                | Tailcall_func _ | Call _ | Invalid _ ->
+                  (* CR ttebbi: We could also treat [Tailcall_self] arguments as
+                     unused when the corresponding entry param is dead, since
+                     the function-entry params themselves cannot be dropped
+                     (they come from the ABI), but the args we pass at the
+                     recursive call site could be replaced with an indefinite
+                     value. *)
+                  ())
         | Tuple _ ->
           Misc.fatal_error
-            "Ssa.increment_use: Tuple should have been short-circuited by proj"
+            "Ssa.compute_use_counts: Tuple should have been short-circuited by \
+             make_proj"
         | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
       in
       let increment_uses_in_terminator (term : Terminator.t) =
         let incr_all arr = Array.iter increment_use arr in
         match term with
         | Goto _ -> ()
-        | Branch { cond; _ } -> increment_use cond
-        | Switch { index; _ } -> increment_use index
+        | Branch { cond = arg; _ } | Switch { index = arg; _ } ->
+          increment_use arg
         | Return { args }
         | Raise { args; _ }
         | Tailcall_self { args; _ }
@@ -909,10 +888,11 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
             (fun (instr : Instruction.t) ->
               match instr with
               | Op r when not (Operation.is_pure r.op) -> increment_use instr
-              | Name_for_debugger { regs; _ } -> Array.iter increment_use regs
+              | Name_for_debugger { args; _ } -> Array.iter increment_use args
               | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
               | Block_param _ | Proj _ | Tuple _ ->
-                Misc.fatal_error "impossible body instruction")
+                Misc.fatal_error
+                  "Ssa.compute_use_counts: impossible body instruction")
             block.body;
           increment_uses_in_terminator block.terminator)
         reachable_blocks
@@ -961,6 +941,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         module Instruction = Instruction
         module Terminator = Terminator
 
+        let print_block_param = print_block_param
+
         let print_block_id = print_block_id
 
         let print_instruction = print_instruction
@@ -978,6 +960,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         let predecessors = predecessors
 
         let params_machtype = params_machtype
+
+        let non_trap_successors = non_trap_successors
 
         let successors = successors
 
