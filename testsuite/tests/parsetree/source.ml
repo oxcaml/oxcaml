@@ -7490,3 +7490,13 @@ type t = String.( t )
 
 let x: [`A] :> [> `A | `B ] = `A
 let x :> [> `A | `B ] = `A
+
+(* oxcaml PR #5622 *)
+
+type 'a t =
+  | None
+  | Some of 'a
+
+let bar (type a) =
+  fun f  : ('a t -> 'a t) -> function | None -> None | Some x -> Some (f x)
+
