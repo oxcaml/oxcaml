@@ -1666,7 +1666,7 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id) ->
+          | Kconstr (Pident id, sa) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1676,8 +1676,7 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
             (match v_opt with
             | Some v ->
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, {separability = Maybe_separable;
-                                        nullability = Maybe_null})) in
+                = Layout (Sort (Var v, sa)) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind

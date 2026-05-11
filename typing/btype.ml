@@ -433,7 +433,8 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr p; mod_bounds = _; with_bounds = No_with_bounds } ->
+    | Some { base = Kconstr (p, _); mod_bounds = _;
+             with_bounds = No_with_bounds } ->
       it.it_path p
     | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
       ()
@@ -1240,7 +1241,7 @@ module Jkind0 = struct
     end)
 
     let of_path path =
-      { base = Kconstr path;
+      { base = Kconstr (path, Jkind_types.Scannable_axes.max);
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1269,8 +1270,9 @@ module Jkind0 = struct
       | None -> false
       | Some (t1, t2) -> (
         match t1.base, t2.base with
-        | Kconstr p1, Kconstr p2 ->
+        | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
+          Jkind_types.Scannable_axes.equal sa1 sa2 &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
