@@ -492,7 +492,7 @@ let get_saved_types () = !saved_types
 let set_saved_types l = if save_partial_types () then saved_types := l
 
 let record_declaration_dependency (rk, uid1, uid2) =
-  if not (Uid.equal uid1 uid2) then
+  if save_partial_types () && not (Uid.equal uid1 uid2) then
     uids_deps := (rk, uid1, uid2) :: !uids_deps
 
 let save_cmt target cu binary_annots initial_env cmi shape =
