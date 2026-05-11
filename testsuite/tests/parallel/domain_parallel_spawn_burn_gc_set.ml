@@ -1,21 +1,8 @@
 (* TEST
-<<<<<<< HEAD
   multicore;
   include unix;
   hasunix;
   { bytecode; } { native; }
-||||||| 5.2.0minus-31
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
-=======
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
->>>>>>> 5.2.0minus-37
 *)
 
 open Domain
