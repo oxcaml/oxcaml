@@ -11,7 +11,7 @@ type t_float64 : float64
 type t_float64_mod_e : float64 mod everything
 [%%expect{|
 type t_value
-type t_value_mod_e : immediate separable
+type t_value_mod_e : value mod everything
 type t_float64 : float64
 type t_float64_mod_e : float64 mod everything
 |}]
@@ -254,7 +254,7 @@ type t : value_or_null mod everything
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value maybe_separable maybe_null
+Error: The layout of type "t" is value_or_null
          because of the definition of t at line 1, characters 0-37.
        But the layout of type "t" must be a sublayout of value
          because of the definition of bad at line 2, characters 0-20.
@@ -287,13 +287,13 @@ type t : immediate & immediate
 
 type t : value & float64 mod everything
 [%%expect{|
-type t : immediate separable & float64 mod everything
+type t : value mod everything & float64 mod everything
 |}]
 
 type t : value & (immediate & bits64) & float32 mod everything
 [%%expect{|
 type t
-  : immediate separable
+  : value mod everything
     & (immediate & bits64 mod everything)
     & float32 mod everything
 |}]
