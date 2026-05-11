@@ -1,15 +1,6 @@
 (* TEST
  flags += "-alert +unsafe_multidomain";
-<<<<<<< HEAD
  multicore;
-||||||| 5.2.0minus-31
- flags += "-alert -do_not_spawn_domains";
- runtime5;
- multidomain;
-=======
- runtime5;
- multidomain;
->>>>>>> 5.2.0minus-37
  { bytecode; }
  { native; }
 *)
