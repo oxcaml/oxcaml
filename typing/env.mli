@@ -175,7 +175,7 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
-val add_required_global: Path.t -> t -> unit
+val add_required_global: bool -> Path.t -> t -> unit
 
 val reset_probes: unit -> unit
 val add_probe: string -> unit
