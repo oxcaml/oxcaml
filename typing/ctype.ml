@@ -2764,7 +2764,7 @@ let apply_layout_wrapping_l ~env
         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
         here we recompute the layout based on the inner jkind. *)
-    begin match Jkind.apply_or_null_l jkind with
+    begin match Jkind.apply_or_null_l env jkind with
     | Ok jkind -> Ok (get_layout jkind)
     | Error () -> Error prev
     end
@@ -2792,14 +2792,15 @@ let apply_jkind_wrapping_l ~env ~level
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
-let apply_jkind_wrapping_r ~unwrapped_ty:{ ty = _; modality; or_null } jkind =
+let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
+      jkind =
   begin
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
          [constrain_type_jkind].) *)
-      match Jkind.apply_or_null_r jkind with
+      match Jkind.apply_or_null_r env jkind with
       | Ok jkind -> jkind
       | Error () ->
         Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
@@ -3128,7 +3129,9 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind = apply_jkind_wrapping_r jkind ~unwrapped_ty in
+                      let jkind =
+                        apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
+                      in
                       loop ~fuel ~expanded:false env unwrapped_ty.ty ty's_jkind
                         jkind)
                    unwrapped_tys ty's_jkinds jkinds
@@ -3166,7 +3169,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             in
             let jkind = Jkind.apply_modality_r modality jkind in
             match
-              Jkind.apply_or_null_r jkind
+              Jkind.apply_or_null_r env jkind
             with
             | Ok jkind ->
               (match
@@ -7903,7 +7906,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr p -> begin
+  | Kconstr (p, _sa) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->
