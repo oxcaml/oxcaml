@@ -43,7 +43,7 @@ exception Error of error * Location.t
 (* The table of keywords *)
 
 let all_keywords =
-  let v5_3 = Some (5,3) in
+  let _v5_3 = Some (5,3) in
   let v1_0 = Some (1,0) in
   let v1_6 = Some (1,6) in
   let v4_2 = Some (4,2) in
@@ -60,7 +60,9 @@ let all_keywords =
     "do", DO, always;
     "done", DONE, always;
     "downto", DOWNTO, always;
+(*
     "effect", EFFECT, v5_3;
+*)
     "else", ELSE, always;
     "end", END, always;
     "exception", EXCEPTION, always;
