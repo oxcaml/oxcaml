@@ -533,7 +533,7 @@ let mk_add_extension add_extension id args =
               {
                 ca_type;
                 ca_sort =
-                  Jkind_types.Sort.Const.(some_static scannable);
+                  Jkind_types.Sort.Const.(some scannable);
                 ca_modalities=Mode.Modality.Const.id;
                 ca_loc=Location.none
               })
@@ -584,7 +584,7 @@ let variant constrs =
 
 let unrestricted tvar ca_sort =
   {ca_type=tvar;
-   ca_sort=Jkind_types.Sort.Const.some_static ca_sort;
+   ca_sort=Jkind_types.Sort.Const.some ca_sort;
    ca_modalities=Mode.Modality.Const.id;
    ca_loc=Location.none}
 
@@ -714,7 +714,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
-               ld_sort=Jkind_types.Sort.Const.(some_static scannable);
+               ld_sort=Jkind_types.Sort.Const.(some scannable);
                ld_loc=Location.none;
                ld_attributes=[];
                ld_uid=Uid.of_predef_id id;

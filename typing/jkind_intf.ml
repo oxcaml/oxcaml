@@ -170,7 +170,7 @@ module type Sort = sig
         base sort. Use this when constructing [_sort : Const.t option] fields
         (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
         doesn't allocate a fresh [Some] block. *)
-    val some_static : t -> t option
+    val some : t -> t option
   end
 
   module Var : sig
