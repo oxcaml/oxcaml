@@ -35,9 +35,14 @@ let build : State.t -> Cfg_with_infos.t -> unit =
  fun state cfg_with_infos ->
   if debug then log "build";
   let liveness = Cfg_with_infos.liveness cfg_with_infos in
+  let no_destroyed = [||] in
   let add_edges_live (id : InstructionId.t) ~(def : Reg.t array)
       ~(move_src : Reg.t) ~(destroyed : Reg.t array) : unit =
-    let destroyed = filter_unavailable destroyed in
+    let destroyed =
+      if Array.length destroyed = 0
+      then destroyed
+      else filter_unavailable destroyed
+    in
     let live = InstructionId.Tbl.find liveness id in
     if debug && Reg.set_has_collisions live.across
     then fatal "live set has physical register collisions";
@@ -81,7 +86,7 @@ let build : State.t -> Cfg_with_infos.t -> unit =
           then Reg.dummy
           else instr.arg.(0)
         in
-        add_edges_live instr.id ~def:instr.res ~move_src ~destroyed:[||])
+        add_edges_live instr.id ~def:instr.res ~move_src ~destroyed:no_destroyed)
       else
         add_edges_live instr.id ~def:instr.res ~move_src:Reg.dummy
           ~destroyed:(Proc.destroyed_at_basic instr.desc))
@@ -89,6 +94,15 @@ let build : State.t -> Cfg_with_infos.t -> unit =
       (* we assume that a terminator cannot be a move instruction *)
       add_edges_live term.id ~def:term.res ~move_src:Reg.dummy
         ~destroyed:(Proc.destroyed_at_terminator term.desc));
+  let destroyed_at_raise = ref None in
+  let destroyed_at_raise () =
+    match !destroyed_at_raise with
+    | Some destroyed -> destroyed
+    | None ->
+      let destroyed = filter_unavailable Proc.destroyed_at_raise in
+      destroyed_at_raise := Some destroyed;
+      destroyed
+  in
   Cfg.iter_blocks (Cfg_with_layout.cfg cfg_with_layout) ~f:(fun _label block ->
       if block.is_trap_handler
       then
@@ -96,8 +110,8 @@ let build : State.t -> Cfg_with_infos.t -> unit =
         let live = InstructionId.Tbl.find liveness first_id in
         Reg.Set.iter
           (fun reg1 ->
-            Array.iter (filter_unavailable Proc.destroyed_at_raise)
-              ~f:(fun reg2 -> State.add_edge state reg1 reg2))
+            Array.iter (destroyed_at_raise ()) ~f:(fun reg2 ->
+                State.add_edge state reg1 reg2))
           (Reg.Set.remove Proc.loc_exn_bucket live.before))
 
 let make_work_list : State.t -> unit =
