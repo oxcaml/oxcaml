@@ -1002,6 +1002,7 @@ let maybe_pmod_constraint mode expr =
 %token DOTDOT                 ".."
 %token DOTHASH                ".#"
 %token DOWNTO                 "downto"
+%token EFFECT                 "effect"
 %token ELSE                   "else"
 %token END                    "end"
 %token EOF                    ""

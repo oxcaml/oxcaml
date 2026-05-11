@@ -49,6 +49,7 @@ let keyword_table =
     "downto", DOWNTO;
     "else", ELSE;
     "end", END;
+    "effect", EFFECT;
     "exception", EXCEPTION;
     "exclave_", EXCLAVE;
     "external", EXTERNAL;
