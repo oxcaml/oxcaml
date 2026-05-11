@@ -33,6 +33,7 @@ module Strtab = Compiler_owee.Owee_elf_string_table
 module Buf = Compiler_owee.Owee_buf
 module String = Misc.Stdlib.String
 module FRP = Form_rewrite_plan
+open Rela.X86_64
 
 (* Safe conversion from int64 to int with bounds checking. Fatal error if the
    value doesn't fit in an int (would happen on 32-bit platforms for values >
@@ -76,12 +77,8 @@ let write_synthetic_symbol ~cursor ~strtab ~name ~section_index ~offset ~size
       st_size = Int64.of_int size
     }
 
-let write_rela ~cursor ~symbol_to_index ~r_offset ~symbol ~r_type ~r_addend =
-  let r_sym =
-    String.Tbl.find_opt symbol_to_index symbol |> Option.value ~default:0
-  in
-  Rela.write_rela_entry ~cursor
-    { r_offset = Int64.of_int r_offset; r_sym; r_type; r_addend }
+let lookup_sym ~symbol_to_index symbol =
+  String.Tbl.find_opt symbol_to_index symbol |> Option.value ~default:0
 
 let execute_plan unix ~input_file ~output_file ~header ~sections
     ~shstrtab_section ~igot_and_iplt ~plan =
@@ -122,12 +119,30 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
   let cursor =
     Buf.cursor output_buf ~at:(int64_to_int (SL.offset rela_igot_layout))
   in
-  List.iter
-    (fun r ->
-      write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
-        ~r_offset:(Igot.Relocation.offset r) ~symbol:(Igot.Relocation.symbol r)
-        ~r_type:Rela.Reloc_type.r64 ~r_addend:(Igot.Relocation.addend r))
-    (Igot.relocations igot);
+  let symbol_to_index = FRP.symbol_to_index plan in
+  (match Target_system.architecture () with
+  | X86_64 ->
+    List.iter
+      (fun r ->
+        Rela.X86_64.write_rela_entry ~cursor
+          { r_offset = Int64.of_int (Igot.Relocation.offset r);
+            r_sym = lookup_sym ~symbol_to_index (Igot.Relocation.symbol r);
+            r_type = Rela.X86_64.Reloc_type.R_X86_64_64;
+            r_addend = Igot.Relocation.addend r
+          })
+      (Igot.relocations igot)
+  | AArch64 ->
+    List.iter
+      (fun r ->
+        Rela.Aarch64.write_rela_entry ~cursor
+          { r_offset = Int64.of_int (Igot.Relocation.offset r);
+            r_sym = lookup_sym ~symbol_to_index (Igot.Relocation.symbol r);
+            r_type = Rela.Aarch64.Reloc_type.R_AARCH64_ABS64;
+            r_addend = Igot.Relocation.addend r
+          })
+      (Igot.relocations igot)
+  | IA32 | ARM | POWER | Z | Riscv ->
+    Misc.fatal_error "Dissector: unsupported architecture");
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset iplt_layout)))
     (int64_to_int (SL.size iplt_layout))
@@ -137,9 +152,12 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
   in
   List.iter
     (fun r ->
-      write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
-        ~r_offset:(Iplt.Relocation.offset r) ~symbol:(Iplt.Relocation.symbol r)
-        ~r_type:Rela.Reloc_type.pc32 ~r_addend:(Iplt.Relocation.addend r))
+      Rela.X86_64.write_rela_entry ~cursor
+        { r_offset = Int64.of_int (Iplt.Relocation.offset r);
+          r_sym = lookup_sym ~symbol_to_index (Iplt.Relocation.symbol r);
+          r_type = Rela.X86_64.Reloc_type.R_X86_64_PC32;
+          r_addend = Iplt.Relocation.addend r
+        })
     (Iplt.relocations iplt);
   let cursor =
     Buf.cursor output_buf ~at:(int64_to_int (SL.offset symtab_layout))
@@ -234,9 +252,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
             (int64_to_int
                (FRP.Rewritten_rela_section.section_offset rewritten_section))
       in
-      List.iter
-        (fun e -> Rela.write_rela_entry ~cursor e)
-        (FRP.Rewritten_rela_section.entries rewritten_section))
+      FRP.Rewritten_rela_section.write_entries rewritten_section ~cursor)
     (FRP.rewritten_rela_sections plan);
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset shstrtab_layout)))
