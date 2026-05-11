@@ -1374,6 +1374,14 @@ module Jkind0 = struct
           name = "value"
         }
 
+      let value_mod_everything =
+        { jkind =
+            mk_jkind (Base (Scannable, Scannable_axes.value_axes))
+              ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min;
+          name = "value mod everything"
+        }
+
       let immutable_data_mod_bounds =
         let open Mod_bounds in
         let crossing =
@@ -1816,6 +1824,7 @@ module Jkind0 = struct
 
       let additional_common_jkinds =
         [ any_mod_everything;
+          value_mod_everything;
           value_or_null_mod_everything;
           void_mod_everything;
           kind_of_untagged_int;

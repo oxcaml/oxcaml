@@ -162,6 +162,12 @@ type t16 : value non_pointer
 type t17 : value & value non_pointer
 |}]
 
+type ('a : value mod external_ stateless many unyielding non_float) t18 =
+  ('a : value mod immutable global aliased)
+[%%expect{|
+type ('a : value mod everything non_float) t18 = 'a
+|}]
+
 type t = #(int * float#)
 
 let f xs = match xs with

@@ -496,7 +496,7 @@ Line 2, characters 0-23:
 Error: The layout of type "r#" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
+           value_or_null & float64
          because it is an unboxed record.
        Note: The layout of immediate is value non_pointer.
 |}]
@@ -512,7 +512,7 @@ Line 2, characters 0-23:
 Error: The layout of type "r#" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
+           value_or_null & float64
          because it is an unboxed record.
        Note: The layout of immediate is value non_pointer.
 |}]

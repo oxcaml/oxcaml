@@ -94,7 +94,7 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer)"
-       The layout of t_maybeptr_val is value maybe_separable
+       The layout of t_maybeptr_val is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer
@@ -164,7 +164,7 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer64)"
-       The layout of t_maybeptr_val is value maybe_separable
+       The layout of t_maybeptr_val is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer64
@@ -241,7 +241,7 @@ Line 3, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : any separable)"
-       The layout of t_maybeptr_val is value maybe_separable
+       The layout of t_maybeptr_val is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -261,7 +261,7 @@ type fails : value non_pointer = #{ a : t_maybeptr_val }
 Line 1, characters 0-56:
 1 | type fails : value non_pointer = #{ a : t_maybeptr_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "fails" is value maybe_separable
+Error: The layout of type "fails" is value_maybe_separable
          because it is an unboxed record.
        But the layout of type "fails" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type fails.
@@ -509,7 +509,7 @@ Error: Signature mismatch:
          type 'a t = t_maybeptr_val
        is not included in
          type ('a : value non_pointer) t : value non_pointer
-       The layout of the first is value maybe_separable
+       The layout of the first is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.

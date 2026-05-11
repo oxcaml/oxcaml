@@ -78,23 +78,29 @@ module Scannable_axes = struct
       separability = Separability.meet s1 s2
     }
 
+  (* A scannable axis annotation can only lower, so [base] is only a valid
+     prefix when [actual <= base] on every axis. If it's not, return [None]. *)
   let to_string_list_diff
       ~base:{ nullability = n_against; separability = s_against }
       { nullability; separability } =
-    let diff = [] in
-    let diff =
-      if Nullability.equal n_against nullability
-      then diff
-      else Nullability.to_string nullability :: diff
+    let nullability_diff =
+      match Nullability.less_or_equal nullability n_against with
+      | Equal -> Some []
+      | Less -> Some [Nullability.to_string nullability]
+      | Not_le -> None
     in
-    let diff =
-      if Separability.equal s_against separability
-      then diff
-      else Separability.to_string separability :: diff
+    let separability_diff =
+      match Separability.less_or_equal separability s_against with
+      | Equal -> Some []
+      | Less -> Some [Separability.to_string separability]
+      | Not_le -> None
     in
-    diff
+    Misc.Stdlib.List.some_if_all_elements_are_some
+      [separability_diff; nullability_diff]
+    |> Option.map List.concat
 
-  let to_string_list = to_string_list_diff ~base:max
+  let to_string_list sa =
+    Option.value (to_string_list_diff ~base:max sa) ~default:[]
 
   let debug_print ppf { nullability; separability } =
     Fmt.fprintf ppf "@[{ nullability = %a;@ separability = %a }@]"
@@ -169,17 +175,47 @@ module Layout = struct
       | Univar _ -> t
       | Genvar _ -> t
 
+    (* Compute how to print the layout [scannable sa] *)
+    let format_scannable_layout ~include_redundant_scannable_axes
+        (sa : Scannable_axes.t) =
+      let scannable_layout_abbrevs : (string * Scannable_axes.t) list =
+        (* CR-someday rtjoa: This somewhat-duplicative list exists because we
+           don't have a notion of layout abbreviations (and in general, conflate
+           layouts and kinds-with-max-crossing). *)
+        (* Listed from most-specific to least-specific so [find_map] yields the
+           tightest match. *)
+        [ "value", Scannable_axes.value_axes;
+          ( "value_maybe_null",
+            { nullability = Maybe_null; separability = Separable } );
+          ( "value_maybe_separable",
+            { nullability = Non_null; separability = Maybe_separable } );
+          ( "value_or_null",
+            { nullability = Maybe_null; separability = Maybe_separable } ) ]
+      in
+      let format_wrt (name, base) =
+        match Scannable_axes.to_string_list_diff ~base sa with
+        | None -> None
+        | Some diff ->
+          let axes =
+            if include_redundant_scannable_axes
+            then Scannable_axes.to_string_list sa
+            else diff
+          in
+          Some (name :: axes)
+      in
+      match List.find_map format_wrt scannable_layout_abbrevs with
+      | Some r -> r
+      | None ->
+        (* [value_or_null] is max on every axis, so at least it should work *)
+        Misc.fatal_error "Jkind.Layout.Const.format_scannable_layout"
+
     let to_string t ~include_redundant_scannable_axes =
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
         | Base (Scannable, sa) ->
-          let sa =
-            if include_redundant_scannable_axes
-            then Scannable_axes.to_string_list sa
-            else Scannable_axes.(to_string_list_diff ~base:value_axes) sa
-          in
-          String.concat " " ("value" :: sa)
+          String.concat " "
+            (format_scannable_layout ~include_redundant_scannable_axes sa)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -407,10 +443,9 @@ module Layout = struct
       | Sort (s, sa) -> (
         match Sort.get s with
         | Base Scannable ->
-          let value_axes_diff =
-            Scannable_axes.(to_string_list_diff ~base:value_axes sa)
-          in
-          pp_string_list ppf ("value" :: value_axes_diff)
+          pp_string_list ppf
+            (Const.format_scannable_layout
+               ~include_redundant_scannable_axes:false sa)
         | Var _ ->
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
           pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
@@ -1679,11 +1714,13 @@ module Const = struct
           |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s))
         bounds_to_print
 
+    (* Returns [None] if [actual] has any scannable axis strictly greater
+       than [base], and thus can't be printed in terms of [base] *)
     let get_scannable_axes_diff ~base actual =
       let base_sa = Layout.Const.get_root_scannable_axes base in
       let actual_sa = Layout.Const.get_root_scannable_axes actual in
       match base_sa, actual_sa with
-      | None, _ | _, None -> []
+      | None, _ | _, None -> Some []
       | Some base_sa, Some actual_sa ->
         Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
 
@@ -1729,9 +1766,9 @@ module Const = struct
           then
             match base_jkind.base with
             | Layout base_l -> get_scannable_axes_diff ~base:base_l l
-            | Kconstr _ -> []
-          else []
-        | Kconstr _ -> []
+            | Kconstr _ -> Some []
+          else Some []
+        | Kconstr _ -> Some []
       in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
@@ -1773,15 +1810,15 @@ module Const = struct
               out_type, modal @ nonmodal)
             with_bounds otys
       in
-      match matching_layouts, modal_bounds with
-      | true, Some modal_bounds ->
+      match matching_layouts, modal_bounds, scannable_axes with
+      | true, Some modal_bounds, Some scannable_axes ->
         Some
           { base = base.name;
             scannable_axes;
             modal_bounds;
             printable_with_bounds
           }
-      | false, _ | _, None -> None
+      | false, _, _ | _, None, _ | _, _, None -> None
 
     (** Select the out_jkind_const with the least number of modal bounds and
         scannable axes to print *)
