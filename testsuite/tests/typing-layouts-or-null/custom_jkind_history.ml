@@ -24,5 +24,5 @@ let () =
 
 [%%expect{|
 The kind of custom_or_null is
-  because the type argument of custom_or_null has kind value_or_null.
+  because the payload of custom_or_null determines its kind value_or_null.
 |}]

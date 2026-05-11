@@ -2923,6 +2923,9 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Or_null_payload parent_path ->
+      fprintf ppf "the payload of %a determines its %s value_or_null"
+        !printtyp_path parent_path layout_or_kind
     | Recmod_fun_arg ->
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
@@ -3943,6 +3946,10 @@ module Debug_printers = struct
     | Let_rec_variable v -> fprintf ppf "Let_rec_variable %a" Ident.print v
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
+        (Fmt.compat !printtyp_path)
+        parent_path
+    | Or_null_payload parent_path ->
+      fprintf ppf "Or_null_payload of %a"
         (Fmt.compat !printtyp_path)
         parent_path
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
