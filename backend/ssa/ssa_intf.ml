@@ -11,7 +11,7 @@ open! Int_replace_polymorphic_compare
     have *distinct* [Block.t] and [Instruction.t] types — the type checker
     refuses to mix references between them. This is what gives us a clean
     separation between the read-only input of a transformation and the
-    in-progress output (e.g., the [In] / [Out] distinction in {!Ssa_reducer}).
+    in-progress output in {!Ssa_reducer}.
 
     A graph has two views, captured by two module types:
 
@@ -19,19 +19,18 @@ open! Int_replace_polymorphic_compare
       [id], [is_function_start] and [params] accessors are exposed), the
       predecessor / dominator / use-count fields are not yet populated, and the
       operations are emit/finish_block/new_block, plus the smart constructors
-      {!Instruction.make_op} and {!Instruction.make_proj}. Construction is
-      mostly functional: each emit returns a new [unfinished_block] cursor, and
-      only [finish_block] mutates the underlying [Block.t] to seal its body and
-      terminator.
+      {!Instruction.make_op} and {!Instruction.make_proj}. Construction uses the
+      imperative [cursor] interface, to avoid accidentally dropping already
+      emitted parts of the graph.
 
     - {!Finished_graph}: the view after [finish ()] has run. The full [Block.t]
       record is exposed, [predecessors] / [dominator_info] / [usage_count] are
       populated, and graph-level queries ([predecessors], [successors],
       [dominates], [common_dominator]) become available.
 
-    Within one graph instance, [Block.t] is the same record at runtime under
-    both views; the views just expose different subsets of its fields and
-    different graph-level helpers. *)
+    Within one graph instance, the actual data structures are the same under
+    both views and [finish] does not create a copy; the views just expose
+    different subsets of its fields and different graph-level helpers. *)
 
 type call_op =
   | Func of Cfg_intf.S.func_call_operation
@@ -109,11 +108,7 @@ module type Finished_graph = sig
       | Block_param of block_param_data
       | Proj of proj_data
       | Tuple of Instruction.t array
-          (** A multi-value bundle. Only appears transiently, e.g. as the
-              representative an [Ssa_reducer] reducer nominates for a
-              multi-output instruction. Projections out of a [Tuple]
-              short-circuit via {!proj}, so a well-formed graph never contains a
-              [Tuple] in an arg or block body. *)
+          (** A multi-value bundle; must never appear in a [Finished_graph]. *)
       | Push_trap of { handler : Block.t }
       | Pop_trap of { handler : Block.t }
       | Stack_check of { max_frame_size_bytes : int }
@@ -121,7 +116,7 @@ module type Finished_graph = sig
           { ident : Ident.t;
             provenance : Backend_var.Provenance.t option;
             which_parameter : int option;
-            regs : Instruction.t array
+            args : Instruction.t array
           }
 
     and op_data = private
@@ -150,8 +145,8 @@ module type Finished_graph = sig
     (** The number of results produced by an instruction. *)
     val result_arity : Instruction.t -> int
 
-    (** The type of an instruction when used as an argument; see
-        {!Graph_builder} for details. *)
+    (** The type of an instruction when used as an argument. Must only be called
+        on instructions with [result_arity] of 1. *)
     val arg_type : Instruction.t -> Cmm.machtype_component
   end
 
@@ -200,9 +195,9 @@ module type Finished_graph = sig
             args : Instruction.t array;
             continuation : Block.t option
           }
-
-    val non_trap_successors : Terminator.t -> Block.t list
   end
+
+  val print_block_param : Format.formatter -> Block.t -> int -> unit
 
   val print_block_id : Format.formatter -> Block.t -> unit
 
@@ -222,6 +217,10 @@ module type Finished_graph = sig
 
   (** Project just the machtype out of a block's [params] array. *)
   val params_machtype : Block.t -> Cmm.machtype
+
+  (** Structural successors of a terminator, not including the implicit trap
+      successor derived from [block_end_trap_stack]. *)
+  val non_trap_successors : Terminator.t -> Block.t list
 
   (** All successors of a block, including [trap_successor]. *)
   val successors : Block.t -> Block.t list
@@ -255,9 +254,8 @@ module type Graph_builder = sig
 
     val set_param_name : param -> string -> unit
 
-    (** [Block.t] is opaque during construction: callers can hash, compare and
-        consult the visible accessors, but the fields are kept inaccessible
-        because they are not yet meaningful. *)
+    (** [Block.t] is opaque during construction to prevent access to fields that
+        are only meaningful after [finish]. *)
     type t
 
     val id : Block.t -> Block_id.t
@@ -286,10 +284,10 @@ module type Graph_builder = sig
       | Proj of proj_data
       | Tuple of Instruction.t array
           (** A multi-value bundle. Only appears transiently, e.g. as the
-              representative an [Ssa_reducer] reducer nominates for a
+              representative an [Ssa_reducer] reducer nominates to replace a
               multi-output instruction. Projections out of a [Tuple]
-              short-circuit via {!proj}, so a well-formed graph never contains a
-              [Tuple] in an arg or block body. *)
+              short-circuit via [make_proj], so a well-formed graph never
+              contains a [Tuple], neither in an arg nor block body. *)
       | Push_trap of { handler : Block.t }
       | Pop_trap of { handler : Block.t }
       | Stack_check of { max_frame_size_bytes : int }
@@ -297,7 +295,7 @@ module type Graph_builder = sig
           { ident : Ident.t;
             provenance : Backend_var.Provenance.t option;
             which_parameter : int option;
-            regs : Instruction.t array
+            args : Instruction.t array
           }
 
     and op_data = private
@@ -349,10 +347,8 @@ module type Graph_builder = sig
         directly. This is the only supported way to consume a [Tuple]. *)
     val make_proj : index:int -> Instruction.t -> Instruction.t
 
-    (** The type of an instruction when used as an argument: a single
-        [Cmm.machtype_component]. Fatals on [Op] with multi-component result
-        (must be projected first), [Tuple], or non-value instructions
-        ([Push_trap]/[Pop_trap]/[Stack_check]/[Name_for_debugger]). *)
+    (** The type of an instruction when used as an argument. Must only be called
+        on instructions with [result_arity] of 1. *)
     val arg_type : Instruction.t -> Cmm.machtype_component
   end
 
@@ -401,9 +397,13 @@ module type Graph_builder = sig
             args : Instruction.t array;
             continuation : Block.t option
           }
-
-    val non_trap_successors : t -> Block.t list
   end
+
+  (** Structural successors of a terminator, not including the implicit trap
+      successor derived from [block_end_trap_stack]. *)
+  val non_trap_successors : Terminator.t -> Block.t list
+
+  val print_block_param : Format.formatter -> Block.t -> int -> unit
 
   val print_block_id : Format.formatter -> Block.t -> unit
 
@@ -419,7 +419,8 @@ module type Graph_builder = sig
   val start_block : Block.t -> cursor
 
   (** Move the given cursor to the given position. As they now point to the same
-      block, only one of the two cursors can be finished with [finish_block].*)
+      block, only one of the two cursors can be finished with [finish_block].
+      Asserts that the modified cursor used to point to a finished block.*)
   val move_cursor : cursor -> new_pos:cursor -> unit
 
   val emit_instruction : cursor -> Instruction.t -> unit
@@ -442,6 +443,8 @@ module type Graph_builder = sig
     }
 
   val new_block : params:Cmm.machtype -> new_block_result
+
+  val function_info : function_info
 
   (** The function-start block, created at [make_builder] time using
       [function_info.fun_args] as its parameters. *)
