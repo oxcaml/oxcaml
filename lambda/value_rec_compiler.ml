@@ -264,6 +264,9 @@ let compute_static_size lam =
         | Record_dummy _ ->
             Misc.fatal_error
               "size_of_primitive: unexpected dummy representation"
+        | Record_variable ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (_, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the

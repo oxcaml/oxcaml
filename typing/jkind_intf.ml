@@ -165,6 +165,12 @@ module type Sort = sig
     val for_type_extension : t
 
     val for_class : t
+
+    (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
+        base sort. Use this when constructing [_sort : Const.t option] fields
+        (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
+        doesn't allocate a fresh [Some] block. *)
+    val some : t -> t option
   end
 
   module Var : sig
@@ -221,6 +227,11 @@ module type Sort = sig
   (** [default_to_scannable_and_get] extracts the sort as a `const`. If it's a
       variable, it is set to [scannable] first. *)
   val default_to_scannable_and_get : t -> Const.t
+
+  (** Like [default_to_scannable_and_get] but returns a [Some] wrapping. Avoids
+      allocating a fresh [Some] box when the result is one of the known base
+      constants. *)
+  val default_to_scannable_and_get_some : t -> Const.t option
 
   (* CR layouts v12: Default this to void. *)
 
@@ -306,11 +317,16 @@ module History = struct
   (* For sort variables that are topmost on the jkind lattice. *)
   type concrete_creation_reason =
     | Match
-    | Constructor_declaration of int
-    | Label_declaration of Ident.t
+    | Extension_constructor_declaration of int
+    | Extension_label_declaration of Ident.t
     | Record_projection
     | Record_assignment
     | Record_functional_update
+    | Field_projection
+    | Field_assignment
+    | Field_functional_update
+    | Constructor_arg_projection
+    | Constructor_arg_assignment
     | Let_binding
     | Function_argument
     | Function_result
@@ -322,7 +338,6 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
-    | Old_style_unboxed_type
     | Array_element
     | Idx_element
     | Structure_item
@@ -454,6 +469,7 @@ module History = struct
     | Overapproximation_of_with_bounds
     | Inside_quote
     | Evaluated_quote
+    | Old_style_unboxed_type
 
   type product_creation_reason =
     | Unboxed_tuple
