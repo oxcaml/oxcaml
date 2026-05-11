@@ -102,40 +102,46 @@ let hierarchy = ref (create ())
 let initial_measure = ref None
 let reset () = hierarchy := create (); initial_measure := None
 
+let enabled () = !Clflags.profile_columns <> [] || !Clflags.dump_into_csv
+
 let record_call_internal ?(accumulate = false) ?counter_f name f =
-  let E prev_hierarchy = !hierarchy in
-  let start_measure = Measure.create () in
-  if !initial_measure = None then initial_measure := Some start_measure;
-  let this_measure_diff, this_table =
-    (* We allow the recording of multiple categories by the same name, for tools
-       like ocamldoc that use the compiler libs but don't care about profile
-       information, and so may record, say, "parsing" multiple times. *)
-    if accumulate
-    then
-      match Hashtbl.find prev_hierarchy name with
-      | exception Not_found -> Measure_diff.zero (), Hashtbl.create 2
-      | measure_diff, E table ->
-        Hashtbl.remove prev_hierarchy name;
-        measure_diff, table
-    else Measure_diff.zero (), Hashtbl.create 2
-  in
-  hierarchy := E this_table;
-  let counters = ref (Counters.create ()) in
-  Misc.try_finally (
-    match counter_f with
-    | Some counter_f ->
+  if not (enabled ())
+  then f ()
+  else
+    let E prev_hierarchy = !hierarchy in
+    let start_measure = Measure.create () in
+    if !initial_measure = None then initial_measure := Some start_measure;
+    let this_measure_diff, this_table =
+      (* We allow the recording of multiple categories by the same name, for
+         tools like ocamldoc that use the compiler libs but don't care about
+         profile information, and so may record, say, "parsing" multiple
+         times. *)
+      if accumulate
+      then
+        match Hashtbl.find prev_hierarchy name with
+        | exception Not_found -> Measure_diff.zero (), Hashtbl.create 2
+        | measure_diff, E table ->
+          Hashtbl.remove prev_hierarchy name;
+          measure_diff, table
+      else Measure_diff.zero (), Hashtbl.create 2
+    in
+    hierarchy := E this_table;
+    let counters = ref (Counters.create ()) in
+    Misc.try_finally
+      (match counter_f with
+      | Some counter_f ->
         fun () ->
           let result = f () in
-          if List.mem `Counters !Clflags.profile_columns then
-            counters := counter_f result;
+          if List.mem `Counters !Clflags.profile_columns
+          then counters := counter_f result;
           result
-    | None -> f
-    )
-    ~always:(fun () ->
+      | None -> f)
+      ~always:(fun () ->
         hierarchy := E prev_hierarchy;
-        let end_measure = Measure.create ~counters:(!counters) () in
+        let end_measure = Measure.create ~counters:!counters () in
         let measure_diff =
-          Measure_diff.accumulate this_measure_diff start_measure end_measure in
+          Measure_diff.accumulate this_measure_diff start_measure end_measure
+        in
         Hashtbl.add prev_hierarchy name (measure_diff, E this_table))
 
 let record_call = record_call_internal ?counter_f:None
