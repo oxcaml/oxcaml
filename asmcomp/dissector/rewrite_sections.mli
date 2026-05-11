@@ -48,15 +48,15 @@
     - Modified .rela.text entries pointing to IPLT/IGOT symbols instead of
       original external symbols *)
 
-(** [rewrite unix ~input_file ~output_file ~partition_kind ~igot_and_iplt
-     ~relocations] reads the ELF object file at [input_file], adds IGOT and IPLT
+(** [rewrite unix ~input_buf ~output_file ~partition_kind ~igot_and_iplt
+     ~relocations] rewrites the ELF object in [input_buf], adds IGOT and IPLT
     sections, rewrites relocations, and writes the result to [output_file].
 
     For [Large_code] partitions, section names are also prefixed (e.g., .text ->
     .caml.p1.text). [Main] partition sections keep their original names.
 
-    @param unix First-class Unix module for file operations
-    @param input_file Path to the input partially-linked object file
+    @param unix First-class Unix module for file operations (needed for output)
+    @param input_buf Already-mapped ELF buffer (caller owns the mmap lifetime)
     @param output_file Path to write the rewritten object file
     @param partition_kind The kind of partition (Main or Large_code)
     @param igot_and_iplt The IGOT and IPLT structures to add
@@ -64,7 +64,7 @@
       The extracted relocations identifying which entries need rewriting *)
 val rewrite :
   (module Compiler_owee.Unix_intf.S) ->
-  input_file:string ->
+  input_buf:Compiler_owee.Owee_buf.t ->
   output_file:string ->
   partition_kind:Partition.kind ->
   igot_and_iplt:Build_igot_and_iplt.t ->

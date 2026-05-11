@@ -54,6 +54,11 @@ val convert_to_plt : t -> Relocation_entry.t list
 *)
 val convert_to_got : t -> Relocation_entry.t list
 
+(** [extract_from_buf buf] extracts relocations from an already-mapped ELF
+    buffer. Use this when the caller already holds an open mmap so that a single
+    mapping can be shared across multiple operations. *)
+val extract_from_buf : Compiler_owee.Owee_buf.t -> t
+
 (** [extract unix ~filename] reads the ELF object file at [filename] and
     extracts relocations from the .rela.text section that need to be converted
     for the medium code model.

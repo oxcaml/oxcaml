@@ -112,3 +112,55 @@ CAMLprim value owee_blit_bytes_bigstring_stub(
   return Val_unit;
 }
 
+#include <sys/mman.h>
+
+/* Eagerly unmap a memory-mapped bigarray buffer.
+ *
+ * After munmap we make three changes to the caml_ba_array:
+ *
+ *   ba->data = NULL          -- prevent any accidental use of freed memory
+ *   ba->dim[0] = 0           -- purely defensive: stops caml_ba_byte_size()
+ *                               from computing a nonzero size on any code path
+ *                               that might reach the finalizer
+ *   ba->flags |= CAML_BA_EXTERNAL -- purely defensive marker; note that
+ *                               caml_ba_mapped_finalize (the actual finaliser
+ *                               for MAPPED_FILE bigarrays) does not check this
+ *                               flag, so double-munmap is prevented by the
+ *                               data=NULL / dim[0]=0 / proxy zeroing above
+ *
+ * GC memory-accounting note: the GC tracks how many bytes this custom block
+ * "owns" in Custom_mem_val(v) (word 2 of the OCaml custom block header).
+ * That value is written once by caml_alloc_custom_mem at allocation time and
+ * is completely independent of the caml_ba_array C struct (which begins at
+ * word 3+ of the block).  Zeroing ba->dim[0] therefore does NOT affect the
+ * GC's accounting.  When the GC eventually frees the custom block it reads
+ * Custom_mem_val(v) and correctly removes the original N bytes from its live-
+ * memory estimate, regardless of what dim[0] contains at that point.
+ *
+ * There is a brief window between this call and GC collection during which
+ * the GC overestimates live memory by N bytes.  This is harmless and slightly
+ * beneficial: the extra apparent pressure encourages prompt collection of the
+ * now-empty custom block. */
+CAMLprim value owee_buf_unmap(value v_buf)
+{
+  struct caml_ba_array *ba = Caml_ba_array_val(v_buf);
+  void *data = ba->data;
+  intnat size = ba->dim[0];
+  if (data != NULL && size > 0) {
+    munmap(data, (size_t)size);
+    ba->data = NULL;
+    ba->dim[0] = 0;
+    ba->flags = (ba->flags & ~CAML_BA_MANAGED_MASK) | CAML_BA_EXTERNAL;
+    /* If sub-arrays were created (via Bigarray.Array1.sub / Elf.section_body),
+     * the bigarray has a proxy whose data/size still point at the now-freed
+     * mapping.  caml_ba_mapped_finalize uses the proxy path when proxy != NULL,
+     * so zero those fields here so the eventual caml_ba_unmap_file(NULL, 0)
+     * call hits the early len==0 return guard instead of double-unmapping. */
+    if (ba->proxy != NULL) {
+      ba->proxy->data = NULL;
+      ba->proxy->size = 0;
+    }
+  }
+  return Val_unit;
+}
+
