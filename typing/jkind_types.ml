@@ -303,9 +303,9 @@ module Sort = struct
     let for_class = scannable
 
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
-       once at module initialization and shared by [some_static] /
-       [some_static_of_base] to avoid allocating a fresh [Some] block per
-       call. Not exposed: callers go through [some_static]. *)
+       once at module initialization and shared by [some] /
+       [some_of_base] to avoid allocating a fresh [Some] block per
+       call. Not exposed: callers go through [some]. *)
     let some_scannable = Some scannable
 
     let some_void = Some void
@@ -332,7 +332,7 @@ module Sort = struct
 
     let some_vec512 = Some vec512
 
-    let[@inline] some_static_of_base = function
+    let[@inline] some_of_base = function
       | Scannable -> some_scannable
       | Void -> some_void
       | Untagged_immediate -> some_untagged_immediate
@@ -347,8 +347,8 @@ module Sort = struct
       | Vec256 -> some_vec256
       | Vec512 -> some_vec512
 
-    let[@inline] some_static : t -> t option = function
-      | Base b -> some_static_of_base b
+    let[@inline] some : t -> t option = function
+      | Base b -> some_of_base b
       | (Product _ | Univar _ | Genvar _) as t -> Some t
   end
 
@@ -810,7 +810,7 @@ module Sort = struct
      pre-allocated [Some] boxes when the result is one of the known base
      constants, to avoid an allocation per call site. *)
   let default_to_scannable_and_get_some s =
-    Const.some_static (default_to_scannable_and_get s)
+    Const.some (default_to_scannable_and_get s)
 
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
@@ -1039,7 +1039,7 @@ module Layout = struct
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
-      | Base (b, _) -> Sort.Const.some_static_of_base b
+      | Base (b, _) -> Sort.Const.some_of_base b
       | Product ts ->
         Option.map
           (fun x -> Sort.Const.Product x)

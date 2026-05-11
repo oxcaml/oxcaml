@@ -599,7 +599,7 @@ module Type_decl_shape = struct
               List.map
                 (fun (lbl : Types.label_declaration) ->
                   { lbl with
-                    ld_sort = Jkind_types.Sort.Const.(some_static float64);
+                    ld_sort = Jkind_types.Sort.Const.(some float64);
                     ld_type = Types_predef.type_unboxed_float
                   })
                   (* CR sspies: We are changing the type and the layout here.
