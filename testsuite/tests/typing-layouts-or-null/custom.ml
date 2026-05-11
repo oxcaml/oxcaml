@@ -116,7 +116,7 @@ Error: This type "float t" should be an instance of type
        The layout of float t is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.
        But the layout of float t must be a sublayout of
-           value_maybe_null non_float
+           value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 

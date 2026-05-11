@@ -182,30 +182,39 @@ module Layout = struct
         (* CR-someday rtjoa: This somewhat-duplicative list exists because we
            don't have a notion of layout abbreviations (and in general, conflate
            layouts and kinds-with-max-crossing). *)
-        (* Listed from most-specific to least-specific so [find_map] yields the
-           tightest match. *)
+        (* We pick the abbreviation requiring the fewest annotations, with ties
+           broken by order in this list. So when annotating separability anyway
+           we get [value_or_null non_float] rather than [value_maybe_null
+           non_float]. *)
         [ "value", Scannable_axes.value_axes;
-          ( "value_maybe_null",
-            { nullability = Maybe_null; separability = Separable } );
+          ( "value_or_null",
+            { nullability = Maybe_null; separability = Maybe_separable } );
           ( "value_maybe_separable",
             { nullability = Non_null; separability = Maybe_separable } );
-          ( "value_or_null",
-            { nullability = Maybe_null; separability = Maybe_separable } ) ]
+          ( "value_maybe_null",
+            { nullability = Maybe_null; separability = Separable } ) ]
       in
-      let format_wrt (name, base) =
-        match Scannable_axes.to_string_list_diff ~base sa with
-        | None -> None
-        | Some diff ->
-          let axes =
-            if include_redundant_scannable_axes
-            then Scannable_axes.to_string_list sa
-            else diff
-          in
-          Some (name :: axes)
+      let diff_against (_, base) =
+        Scannable_axes.to_string_list_diff ~base sa
       in
-      match List.find_map format_wrt scannable_layout_abbrevs with
-      | Some r -> r
-      | None ->
+      let shorter_diff (_, d1) (_, d2) =
+        Int.compare (List.length d1) (List.length d2)
+      in
+      let sorted =
+        List.filter_map
+          (fun abbrev -> Option.map (fun d -> abbrev, d) (diff_against abbrev))
+          scannable_layout_abbrevs
+        |> List.stable_sort shorter_diff
+      in
+      match sorted with
+      | ((name, _), diff) :: _ ->
+        let axes =
+          if include_redundant_scannable_axes
+          then Scannable_axes.to_string_list sa
+          else diff
+        in
+        name :: axes
+      | [] ->
         (* [value_or_null] is max on every axis, so at least it should work *)
         Misc.fatal_error "Jkind.Layout.Const.format_scannable_layout"
 

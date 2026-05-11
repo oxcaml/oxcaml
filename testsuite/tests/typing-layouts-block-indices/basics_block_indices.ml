@@ -693,8 +693,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of
-           value_maybe_null non_float
+       But the layout of float must be a sublayout of value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -714,7 +713,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
        The layout of non_sep is value_or_null
          because it is the primitive type or_null.
        But the layout of non_sep must be a sublayout of
-           value_maybe_null non_float
+           value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -733,7 +732,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
        The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
        But the layout of abstract must be a sublayout of
-           value_maybe_null non_float
+           value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -748,8 +747,7 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
        The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of
-           value_maybe_null non_float
+       But the layout of float must be a sublayout of value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -767,8 +765,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of
-           value_maybe_null non_float
+       But the layout of float must be a sublayout of value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -788,7 +785,7 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        The layout of non_sep is value_or_null
          because it is the primitive type or_null.
        But the layout of non_sep must be a sublayout of
-           value_maybe_null non_float
+           value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -807,7 +804,7 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
        But the layout of abstract must be a sublayout of
-           value_maybe_null non_float
+           value_or_null non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).

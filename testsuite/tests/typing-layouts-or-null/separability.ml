@@ -940,7 +940,7 @@ Error: Signature mismatch:
        The layout of the first is value_or_null
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of
-           value_maybe_null non_float
+           value_or_null non_float
          because of the definition of t at line 2, characters 2-65.
 |}]
 
