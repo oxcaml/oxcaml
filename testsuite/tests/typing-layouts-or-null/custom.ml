@@ -220,6 +220,23 @@ Error: This type "float_payload" should be an instance of type
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
+type probe_result : value =
+  | Probe_none
+  | Probe_some of int
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type probe_result : value =
+2 |   | Probe_none
+3 |   | Probe_some of int
+4 | [@@or_null]
+Error: The layout of type "probe_result" is value non_pointer maybe_null
+         because it is the primitive type int.
+       But the layout of type "probe_result" must be a sublayout of value
+         because of the annotation on the declaration of the type probe_result.
+|}]
+
 (* CR or-null: allow custom [@@or_null] types with unused type parameters.
    Internal ticket 6853. *)
 
