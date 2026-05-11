@@ -19,7 +19,7 @@ type code_status =
   | Loaded of Code.t
   | Not_loaded of
       { sections : File_sections.t;
-        index : int;
+        index : File_sections.idx;
         metadata : Code_metadata.t;
         delayed_renaming : Renaming.t
       }
@@ -29,7 +29,7 @@ type t =
   | Metadata_only of Code_metadata.t
 
 type code_present =
-  | Present of { index : int }
+  | Present of { index : File_sections.idx }
   | Absent
 
 type raw =
@@ -225,9 +225,3 @@ let map_result_types t ~f =
 
 let code_present t =
   match t with Code_present _ -> true | Metadata_only _ -> false
-
-let map_raw_index map_index t =
-  match t.code_present with
-  | Absent -> t
-  | Present { index } ->
-    { t with code_present = Present { index = map_index index } }

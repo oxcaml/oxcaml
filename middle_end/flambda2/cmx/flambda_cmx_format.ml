@@ -44,17 +44,6 @@ let to_raw (t, sections) = t, sections
 
 let from_raw ~sections t = t, sections
 
-type current_sections =
-  { mutable sections_rev : Obj.t list;
-    mutable num_sections : int
-  }
-
-let add_section cs section =
-  let n = cs.num_sections in
-  cs.sections_rev <- section :: cs.sections_rev;
-  cs.num_sections <- n + 1;
-  n
-
 let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots =
   let typing_env_exported_ids =
     Flambda2_types.Typing_env.Serializable.ids_for_export final_typing_env
@@ -98,9 +87,13 @@ let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots =
   let table_data =
     { symbols; variables; simples; consts; code_ids; continuations }
   in
-  let sections = { sections_rev = []; num_sections = 0 } in
+  let num_code = ref 0 in
+  Exported_code.iter_code ~f:(fun _ -> incr num_code) all_code;
+  let sections = File_sections.Builder.create !num_code in
   let all_code =
-    Exported_code.to_raw ~add_section:(add_section sections) all_code
+    Exported_code.to_raw
+      ~add_section:(File_sections.Builder.add sections)
+      all_code
   in
   ( [ { original_compilation_unit = Compilation_unit.get_current_exn ();
         final_typing_env;
@@ -109,7 +102,7 @@ let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots =
         used_value_slots;
         table_data
       } ],
-    File_sections.from_array (Array.of_list (List.rev sections.sections_rev)) )
+    File_sections.Builder.build sections )
 
 module Make_importer (S : sig
   type t
@@ -226,20 +219,8 @@ let merge t1_opt t2_opt =
     Misc.fatal_error
       "Some pack units do not have their export info set.\n\
        Flambda doesn't support packing opaque and normal units together."
-  | Some (t1, sections1), Some (t2, sections2) ->
-    (* Put the sections of t2 before the sections of t1, so that
-       right-associative merge is linear *)
-    let nsections = File_sections.concat sections2 sections1 in
-    let n = File_sections.length sections2 in
-    let t1 =
-      List.map
-        (fun t0 ->
-          { t0 with
-            all_code = Exported_code.map_raw_index (fun x -> x + n) t0.all_code
-          })
-        t1
-    in
-    Some (t1 @ t2, nsections)
+  | Some _, Some _ ->
+    Misc.fatal_error "Packing not currently supported by Flambda"
 
 let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
   Format.fprintf ppf "@[<hov>Original unit:@ %a@]@;"
