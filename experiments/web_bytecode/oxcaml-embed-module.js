@@ -1173,7 +1173,8 @@ function injectStyles() {
       --_oxcaml-margin-block: var(--oxcaml-margin-block, 1rem);
       container-name: oxcaml-embed;
       font-family: var(--oxcaml-font-family, Avenir Next, Segoe UI, system-ui, sans-serif);
-      margin: var(--_oxcaml-margin-block) 0;
+      margin-block: var(--_oxcaml-margin-block);
+      margin-inline: 0;
     }
 
     .oxcaml-embed__surface {
