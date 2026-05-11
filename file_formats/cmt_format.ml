@@ -480,9 +480,16 @@ let clear () =
   saved_types := [];
   uids_deps := []
 
-let add_saved_type b = saved_types := b :: !saved_types
+let save_partial_types () =
+  !Clflags.annotations
+  || (!Clflags.binary_annotations && not !Clflags.print_types)
+  || (!Clflags.binary_annotations_cms && not !Clflags.print_types)
+
+let add_saved_type b =
+  if save_partial_types () then saved_types := b :: !saved_types
+
 let get_saved_types () = !saved_types
-let set_saved_types l = saved_types := l
+let set_saved_types l = if save_partial_types () then saved_types := l
 
 let record_declaration_dependency (rk, uid1, uid2) =
   if not (Uid.equal uid1 uid2) then
