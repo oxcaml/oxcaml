@@ -20,5 +20,5 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test.output test.output.corrected)
- (action (diff test.output test.output.corrected)))
+ (action
+  (diff test.%{env:OXCAML_NAME_MANGLING=flat}.output test.output.corrected)))
