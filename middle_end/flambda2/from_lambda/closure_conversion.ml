@@ -36,11 +36,10 @@ module VB = Bound_var
    [simplify_apply_expr.ml]. The bit must follow the CU that *defined* the
    function. Today no path in the compiler runs simplification/closure-
    conversion for one CU while reading flags of another, but if cross-CU
-   inlining of unloadable IR is ever added the global flag would silently
-   stamp the wrong value. This helper asserts the invariant. *)
+   inlining of unloadable IR is ever added the global flag would silently stamp
+   the wrong value. This helper asserts the invariant. *)
 let unloadable_bit_for_code_id code_id =
-  assert (
-    Compilation_unit.is_current (Code_id.get_compilation_unit code_id));
+  assert (Compilation_unit.is_current (Code_id.get_compilation_unit code_id));
   !Clflags.unit_is_unloadable
 
 type 'a close_program_metadata =

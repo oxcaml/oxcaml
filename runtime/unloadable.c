@@ -101,12 +101,30 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
   /* Register each text range as a code fragment so
    * [caml_find_code_fragment_by_pc] returns true for any PC in the unit's
    * text. Digests are not used for unloadable units (DIGEST_IGNORE);
-   * uniqueness is by-pc rather than by-content. */
+   * uniqueness is by-pc rather than by-content.
+   *
+   * Immediately after registration, tag the fragment with this unit so the
+   * stack-scan hot path (F.3 in [caml_visit_frame_code_ptr_slots]) can
+   * derive "is this PC in unloadable code?" from the same skiplist lookup
+   * it already does, without a second O(units) scan over the registration
+   * list. The fragment is allocated by [caml_register_code_fragment] with
+   * [owner_unloadable_unit = NULL], so no race window exists between
+   * registration and tagging: the fragment is published to the skiplist
+   * before this loop returns, but the mark phase cannot find a PC inside
+   * the unit's text until the unit's text has executed at least once,
+   * which only happens after this function returns and the JIT loader
+   * calls the entry. */
   for (uintnat i = 0; i < u->num_text_ranges; i++) {
     char *start = u->text_ranges[2 * i];
     char *end = u->text_ranges[2 * i + 1];
-    u->text_range_fragnums[i] =
+    int fragnum =
         caml_register_code_fragment(start, end, DIGEST_IGNORE, NULL);
+    u->text_range_fragnums[i] = fragnum;
+    struct code_fragment *cf = caml_find_code_fragment_by_num(fragnum);
+    /* [caml_register_code_fragment] just inserted this fragment; the lookup
+     * cannot miss. */
+    CAMLassert(cf != NULL);
+    cf->owner_unloadable_unit = u;
   }
 
   /* Register the frame table so stack walks can find frame descriptors for
@@ -213,16 +231,26 @@ void caml_unloadable_check_and_unload_dead(void) {
       /* Survives: rewrite all blocks to MARKED bits so the imminent
        * rotation maps them uniformly to UNMARKED in cycle N+1. Blocks
        * that were already MARKED need no update; this is the simplest
-       * uniform write. */
+       * uniform write.
+       *
+       * We use [atomic_store_relaxed] on [Hp_atomic_val] for consistency
+       * with [normalize_block_color] and with the rest of the runtime's
+       * header-write conventions. The caller is in STW (no other domain
+       * is running mutator or marker code), so a plain non-atomic store
+       * would also be visible to all domains once the STW ends — but
+       * matching the atomic-header-store convention avoids a footgun if
+       * this code is ever called from a non-STW context. The relaxed
+       * ordering is sufficient: STW provides the happens-before edge
+       * with respect to the imminent cycle rotation. */
       for (uintnat i = 0; i < u->num_code_blocks; i++) {
         value v = u->code_blocks[i];
         header_t hd = Hd_val(v);
-        *Hp_val(v) = With_status_hd(hd, marked);
+        atomic_store_relaxed(Hp_atomic_val(v), With_status_hd(hd, marked));
       }
       for (uintnat i = 0; i < u->num_data_blocks; i++) {
         value v = u->data_blocks[i];
         header_t hd = Hd_val(v);
-        *Hp_val(v) = With_status_hd(hd, marked);
+        atomic_store_relaxed(Hp_atomic_val(v), With_status_hd(hd, marked));
       }
       link = &u->next;
     }
@@ -276,19 +304,19 @@ uintnat caml_unloadable_units_unloaded_total(void) {
 }
 
 struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc) {
-  caml_plat_lock_blocking(&units_mutex);
-  struct caml_unloadable_unit *result = NULL;
-  for (struct caml_unloadable_unit *u = units_head; u != NULL; u = u->next) {
-    for (uintnat i = 0; i < u->num_text_ranges; i++) {
-      char *start = u->text_ranges[2 * i];
-      char *end = u->text_ranges[2 * i + 1];
-      if (start <= pc && pc < end) {
-        result = u;
-        goto done;
-      }
-    }
-  }
-done:
-  caml_plat_unlock(&units_mutex);
-  return result;
+  /* O(log n) via the code-fragment skiplist: every text range of every
+   * unloadable unit was registered as a code fragment in
+   * [caml_register_unloadable_unit] with [cf->owner_unloadable_unit]
+   * pointing back to the unit. A NULL fragment means the PC is not in any
+   * registered code (so not in any unloadable text); a non-NULL fragment
+   * with a NULL owner means the PC is in non-unloadable registered code
+   * (main program, Dynlink, etc.). The units_mutex is not needed here:
+   * the cf->owner_unloadable_unit field is set once at registration and
+   * cleared once at unload (via the [caml_remove_code_fragment] path,
+   * which removes the fragment from the skiplist before its garbage-
+   * collection runs); a concurrent reader either gets the live unit
+   * pointer or gets a NULL fragment lookup. */
+  struct code_fragment *cf = caml_find_code_fragment_by_pc(pc);
+  if (cf == NULL) return NULL;
+  return (struct caml_unloadable_unit *)cf->owner_unloadable_unit;
 }

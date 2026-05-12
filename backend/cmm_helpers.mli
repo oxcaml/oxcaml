@@ -790,13 +790,13 @@ val flush_unloadable_data_block_symbols : unit -> symbol list
     [make_symbol]. *)
 val unloadable_data_blocks_symbol_basename : string
 
-(** Register an unloadable function entry's linkage name so that to_cmm can
-    emit the [unloadable_code_blocks] sentinel array. No-op if the CU is not
+(** Register an unloadable function entry's linkage name so that to_cmm can emit
+    the [unloadable_code_blocks] sentinel array. No-op if the CU is not
     unloadable. *)
 val register_unloadable_code_block_entry : string -> unit
 
-(** Retrieve and clear the list of registered unloadable function entry
-    linkage names. Called once per compilation unit by [to_cmm.ml]. *)
+(** Retrieve and clear the list of registered unloadable function entry linkage
+    names. Called once per compilation unit by [to_cmm.ml]. *)
 val flush_unloadable_code_block_entries : unit -> string list
 
 (** The CU-relative basename of the sentinel array emitted by to_cmm to

@@ -4270,18 +4270,17 @@ let emit_block symb white_header cont =
   let black_header = Nativeint.logor white_header caml_black in
   (Cint black_header :: cdefine_symbol symb) @ cont
 
-(* Tracking of static data blocks in unloadable CUs. The symbols registered
-   here are emitted in [to_cmm.ml]'s unit emission as a static array
+(* Tracking of static data blocks in unloadable CUs. The symbols registered here
+   are emitted in [to_cmm.ml]'s unit emission as a static array
    ("unloadable_data_blocks") that the runtime registration path reads to
-   populate the [data_blocks] field of [caml_unloadable_unit]. The runtime
-   needs this list to normalize surviving units' block headers at end of
-   major cycle. [Code_block]s are tracked in a parallel sentinel array
-   ("unloadable_code_blocks") via [register_unloadable_code_block_entry]
-   below.
+   populate the [data_blocks] field of [caml_unloadable_unit]. The runtime needs
+   this list to normalize surviving units' block headers at end of major cycle.
+   [Code_block]s are tracked in a parallel sentinel array
+   ("unloadable_code_blocks") via [register_unloadable_code_block_entry] below.
 
    File-global state is OK here because compilation is serial (one CU per
-   process); concurrent CU compilation would need this threaded through
-   the to_cmm context. *)
+   process); concurrent CU compilation would need this threaded through the
+   to_cmm context. *)
 let unloadable_data_block_symbols : Cmm.symbol list ref = ref []
 
 let suppress_unloadable_data_block_tracking = ref false
@@ -4295,8 +4294,8 @@ let flush_unloadable_data_block_symbols () =
   unloadable_data_block_symbols := [];
   r
 
-(* Tracking of (function-entry linkage name) for each unloadable function in
-   the CU. The corresponding [Code_block] linkage name is reconstructed via
+(* Tracking of (function-entry linkage name) for each unloadable function in the
+   CU. The corresponding [Code_block] linkage name is reconstructed via
    [code_block_symbol_name]. *)
 let unloadable_code_block_entries : string list ref = ref []
 
@@ -4311,15 +4310,14 @@ let flush_unloadable_code_block_entries () =
   unloadable_code_block_entries := [];
   r
 
-(* The known name (relative to the current compilation unit) of the static
-   array emitted by to_cmm to enumerate unloadable static data blocks. The
-   JIT loader looks up this symbol and passes its address to the runtime. *)
+(* The known name (relative to the current compilation unit) of the static array
+   emitted by to_cmm to enumerate unloadable static data blocks. The JIT loader
+   looks up this symbol and passes its address to the runtime. *)
 let unloadable_data_blocks_symbol_basename = "unloadable_data_blocks"
 
-(* The known name of the parallel sentinel array that lists every
-   unloadable function in the CU as (entry_address, code_block_address)
-   pairs. Layout: [count; entry_1; code_block_1; ...; entry_count;
-   code_block_count]. *)
+(* The known name of the parallel sentinel array that lists every unloadable
+   function in the CU as (entry_address, code_block_address) pairs. Layout:
+   [count; entry_1; code_block_1; ...; entry_count; code_block_count]. *)
 let unloadable_code_blocks_symbol_basename = "unloadable_code_blocks"
 
 (* CU-appropriate emit: in unloadable mode, [Global] symbols get a white

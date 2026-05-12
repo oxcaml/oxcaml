@@ -210,6 +210,20 @@ load of a closure's Field 0 for indirect call should produce a
 no-op (the registered-fragment check misses), so the only cost is the
 parallel array.
 
+`Code_pointer` values are register/stack-only by construction: the
+only in-tree producers are closure Field-0 loads (via
+`Word_code_pointer`) and static `Csymbol_address` references of
+function entries, and the only consumer is `Capply` (indirect call).
+There is no path through to_cmm that would store a `Code_pointer`-
+typed value into a heap block, and the `cfg_selectgen.ml`
+`emit_stores` arm for `Code_pointer` is `Misc.fatal_error` as a
+guard against accidentally introducing such a path in the future:
+silently routing the raw PC through `caml_initialize` (which is what
+mapping to `Word_val` would do) would create a non-`value` word in a
+scannable heap-block field, and silently mapping to `Word_int` would
+skip GC tracking but still leave the field unscannable to later
+mark scans.
+
 ## B. Static data for unloadable CUs
 
 ### B.1 Header color
@@ -409,7 +423,12 @@ function.
    the concurrent marker's conventions.
 2. Registers each `text_range[i]` as a code fragment so
    `caml_find_code_fragment_by_pc` returns true for any PC in the
-   unit's text. Digests are unused (`DIGEST_IGNORE`).
+   unit's text. Digests are unused (`DIGEST_IGNORE`). Immediately
+   after registration, the per-fragment field
+   `cf->owner_unloadable_unit` is set to this unit, so subsequent
+   skiplist lookups for any PC in the unit's text return a fragment
+   whose owner pointer is the unit itself. This avoids a second
+   O(units) linear scan on the F.3 hot path; see F.3 below.
 3. Registers `frametable` via `caml_register_frametables`.
 4. Registers `gc_roots` via `caml_register_dyn_globals`.
 5. Links the unit into the global registration list and bumps
@@ -540,13 +559,18 @@ if frame_has_code_ptr_slots(d):
 
 `caml_visit_frame_code_ptr_slots` (in `runtime/caml/unloadable.h`)
 walks the parallel `code_ptr_live_ofs[]` array, reads each slot, and
-for any whose target lies in **both** a registered code fragment and
-a registered unloadable unit, darkens the `Code_block` at
-`*((value*)cp - 1)`. Both checks are needed: the code-fragment table
-also contains non-unloadable text (main program startup, Dynlink),
-for which dereferencing the back-pointer at `entry - 1` would read
-arbitrary memory. The unloadable-unit membership check
-(`caml_find_unloadable_unit_by_pc`) is the authoritative gate.
+for any whose target lies in a registered code fragment whose owning
+CU is unloadable, darkens the `Code_block` at `*((value*)cp - 1)`.
+The check is a single O(log n) skiplist lookup
+(`caml_find_code_fragment_by_pc`) followed by a field read
+(`cf->owner_unloadable_unit`): a NULL fragment means non-registered
+text; a non-NULL fragment with a NULL owner means non-unloadable
+registered text (main program, Dynlink), for which dereferencing the
+back-pointer at `entry - 1` would read arbitrary memory; a non-NULL
+fragment with a non-NULL owner is unloadable text and is safe to
+deref. `caml_find_unloadable_unit_by_pc` is a thin wrapper on the
+same lookup, retained for callers (e.g. future stack-walk paths)
+that do not already have the fragment pointer in hand.
 
 A DEBUG `CAMLassert` checks `cf->code_start == cp` before
 dereferencing: the only in-tree producers of `Code_pointer`-typed
@@ -584,6 +608,16 @@ for each registered unit u:
         // the simplest way to leave the unit consistent.
 ```
 
+The surviving-unit header rewrite uses `atomic_store_relaxed` on
+`Hp_atomic_val` for consistency with `normalize_block_color` and with
+the rest of the runtime's header-write conventions. The caller is in
+STW (no other domain is running mutator or marker code), so a plain
+non-atomic store would also be visible to all domains once the STW
+ends — but matching the atomic-header-store convention avoids a
+footgun if this code is ever called from a non-STW context. The
+relaxed ordering is sufficient: STW provides the happens-before edge
+with respect to the imminent cycle rotation.
+
 After releasing the units lock (so code-fragment skiplist mutexes and
 the loader callback do not nest with it), each deferred unit is
 finalised under STW:
@@ -605,18 +639,11 @@ finalised under STW:
 1. **Reset cost**: walking every block in every unloadable unit at
    end of cycle to rewrite marks is O(total unloadable symbols).
    Bounded and infrequent (major GC). Measure if it shows up.
-2. **`caml_find_unloadable_unit_by_pc` is O(units)**. F.3 (and
-   future stack-walk paths) call it on every code-pointer slot whose
-   PC is in a registered code fragment. To make this O(log n),
-   tag each code-fragment record with its owning unloadable unit
-   (or NULL for non-unloadable fragments), so the membership check
-   becomes a single field read on the fragment we already looked
-   up. Out of scope for the current implementation.
-3. **Dynlink applicability**: same machinery should serve Dynlink
+2. **Dynlink applicability**: same machinery should serve Dynlink
    units that opt in to unloadability. The `is_unloadable` flag in
    `Code_metadata` is the natural opt-in; the runtime registration
    path would mirror `caml_register_unloadable_unit`.
-4. **LLVM backend does not implement unloadable codegen**. The
+3. **LLVM backend does not implement unloadable codegen**. The
    `Cmm.Unloadable` codegen option is recognised but raises
    `Misc.fatal_error` in `backend/llvm/llvmize.ml`. Wiring LLVM up
    to honour the bit (back-pointer at `entry - 1`,
@@ -719,6 +746,7 @@ Coverage axes currently exercised:
 | Stack scan F.2 / F.3 injections | `runtime/fiber.c` (`caml_scan_stack`) |
 | Closure slot walker, code-block back-pointer helpers, code-ptr-slot walker | `runtime/caml/unloadable.h` |
 | Registration, end-of-cycle pass, "born-marked" normalisation, debug tracing, `caml_unloadable_units_live_count` | `runtime/unloadable.c` |
+| `cf->owner_unloadable_unit` field, initialisation to NULL on registration | `runtime/caml/codefrag.h`, `runtime/codefrag.c` |
 | End-of-cycle pass call site (before rotation) | `runtime/major_gc.c` `cycle_major_heap_from_stw_single` |
 | Allocation status convention | `runtime/caml/shared_heap.h` `caml_allocation_status` |
 | Heap colors | `runtime/caml/shared_heap.h` |

@@ -155,12 +155,13 @@ CAMLextern atomic_uintnat caml_unloadable_units_live_count;
  * code-fragment presence alone is not a reliable "unloadable code"
  * predicate.
  *
- * Implementation walks the registered units list — O(units) per call.
- * On hot paths the caller should already have filtered by
- * [caml_find_code_fragment_by_pc] (O(log n)) for the cheap negative
- * answer; this function is only reached when that fragment is non-NULL.
- * For a future O(log n) check, tag code fragments with their owning
- * unit. */
+ * O(log n) via the code-fragment skiplist: every unloadable text range is
+ * registered as a code fragment with [cf->owner_unloadable_unit] pointing
+ * at its owning unit (see [caml_register_unloadable_unit]). A NULL
+ * fragment means non-registered text; a non-NULL fragment with NULL
+ * owner means non-unloadable registered text. Performance-critical
+ * callers (e.g. [caml_visit_frame_code_ptr_slots]) prefer to inline the
+ * skiplist lookup themselves to avoid a redundant call. */
 struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc);
 
 /* Darken the [Code_block] associated with an unloadable function entry. The
@@ -295,13 +296,15 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
     for (uint32_t k = 0; k < n; k++) {
       uint32_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
-      /* The code fragment table contains non-unloadable code too (main
-       * program, Dynlink). Dereferencing the [entry - 1] back-pointer word
-       * is only valid for unloadable entries, so require membership in an
-       * unloadable unit. */
+      /* Single O(log n) check: the code-fragment skiplist returns the
+       * fragment (if any) for this PC, and the fragment's
+       * [owner_unloadable_unit] field tells us whether it belongs to an
+       * unloadable CU (non-NULL) or to non-unloadable registered code
+       * (NULL — main program, Dynlink). Dereferencing the [entry - 1]
+       * back-pointer word is only valid for unloadable entries, so the
+       * owner check is the authoritative gate. */
       struct code_fragment *cf = caml_find_code_fragment_by_pc((char *)cp);
-      if (cf != NULL
-          && caml_find_unloadable_unit_by_pc((char *)cp) != NULL) {
+      if (cf != NULL && cf->owner_unloadable_unit != NULL) {
         CAMLassert(cf->code_start == (char *)cp);
         caml_visit_code_block_for_entry(f, fdata, cp);
       }
@@ -315,8 +318,7 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
       /* See long-format case above. */
       struct code_fragment *cf = caml_find_code_fragment_by_pc((char *)cp);
-      if (cf != NULL
-          && caml_find_unloadable_unit_by_pc((char *)cp) != NULL) {
+      if (cf != NULL && cf->owner_unloadable_unit != NULL) {
         CAMLassert(cf->code_start == (char *)cp);
         caml_visit_code_block_for_entry(f, fdata, cp);
       }

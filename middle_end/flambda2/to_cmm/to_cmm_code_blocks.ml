@@ -47,21 +47,20 @@ let emit_code_block_for ~all_code (code : Code.t) res =
       |> Code_id.Set.filter (dep_is_unloadable all_code)
       |> Code_id.Set.elements
     in
-    (* Filter [symbol_deps] to symbols defined in the current (unloadable)
-       CU. Symbols carry data-block addresses (Symbol.mli: "identifies a
-       piece of statically-allocated data"); cross-CU symbols (e.g.
-       [caml_int_ops], stdlib lifted constants, predefined exceptions)
-       have NOT_MARKABLE headers, so [caml_darken] is a no-op on them
-       and including them only bloats Code_block dep_fields and the
-       mark-scan workload. Same-CU [Local] symbols are also no-op darkens
-       (black headers) but the same-CU filter keeps them in: any same-CU
-       data block referenced from a function's code path may be marked
-       via the Code_block dep_field chain, and B.1 emits same-CU
-       unloadable data blocks with white headers. *)
+    (* Filter [symbol_deps] to symbols defined in the current (unloadable) CU.
+       Symbols carry data-block addresses (Symbol.mli: "identifies a piece of
+       statically-allocated data"); cross-CU symbols (e.g. [caml_int_ops],
+       stdlib lifted constants, predefined exceptions) have NOT_MARKABLE
+       headers, so [caml_darken] is a no-op on them and including them only
+       bloats Code_block dep_fields and the mark-scan workload. Same-CU [Local]
+       symbols are also no-op darkens (black headers) but the same-CU filter
+       keeps them in: any same-CU data block referenced from a function's code
+       path may be marked via the Code_block dep_field chain, and B.1 emits
+       same-CU unloadable data blocks with white headers. *)
     let symbol_deps =
       Name_occurrences.symbols free_names
       |> Symbol.Set.filter (fun sym ->
-             Compilation_unit.is_current (Symbol.compilation_unit sym))
+          Compilation_unit.is_current (Symbol.compilation_unit sym))
       |> Symbol.Set.elements
     in
     let dep_fields =
@@ -86,18 +85,18 @@ let emit_code_block_for ~all_code (code : Code.t) res =
     C.suppress_unloadable_data_block_tracking := prev;
     R.add_archive_data_items res data_items
 
-(* The entry function's [Code_block] has zero dependency fields, even
-   though the entry calls top-level functions in the unit and references
-   the unit's static data. The entry is only on-stack during
-   initialisation (so F.2 keeps its [Code_block] alive while running),
-   and once [Eval.eval] returns nothing reaches the entry's Code_block.
+(* The entry function's [Code_block] has zero dependency fields, even though the
+   entry calls top-level functions in the unit and references the unit's static
+   data. The entry is only on-stack during initialisation (so F.2 keeps its
+   [Code_block] alive while running), and once [Eval.eval] returns nothing
+   reaches the entry's Code_block.
 
-   If a major GC fires *during* eval'd initialisation and walks the
-   running entry, the entry's Code_block is darkened but the rest of
-   the unit is not marked through its dep fields — only through
-   whatever the stack and closures already point at. This is fine
-   because every same-CU function the entry transitively calls is
-   itself reachable via stack frames or live closures at that point. *)
+   If a major GC fires *during* eval'd initialisation and walks the running
+   entry, the entry's Code_block is darkened but the rest of the unit is not
+   marked through its dep fields — only through whatever the stack and closures
+   already point at. This is fine because every same-CU function the entry
+   transitively calls is itself reachable via stack frames or live closures at
+   that point. *)
 let emit_entry_code_block ~(entry_sym : Cmm.symbol) res =
   if not !Clflags.unit_is_unloadable
   then res
@@ -109,9 +108,9 @@ let emit_entry_code_block ~(entry_sym : Cmm.symbol) res =
       }
     in
     let header = C.unit_block_header Runtimetags.code_block_tag 0 in
-    (* Suppress data-block tracking: Code_blocks are tracked separately via
-       the unit's [unloadable_code_blocks] sentinel array (see [to_cmm.ml]
-       and the JIT loader). *)
+    (* Suppress data-block tracking: Code_blocks are tracked separately via the
+       unit's [unloadable_code_blocks] sentinel array (see [to_cmm.ml] and the
+       JIT loader). *)
     let prev = !C.suppress_unloadable_data_block_tracking in
     C.suppress_unloadable_data_block_tracking := true;
     let data_items = C.emit_unit_block block_sym header [] in

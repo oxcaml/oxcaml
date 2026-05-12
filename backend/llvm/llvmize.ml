@@ -1474,17 +1474,15 @@ let fun_attrs ~has_try codegen_options =
         | Cfg.Cold -> [Cold; Noinline]
         | Cfg.Unloadable ->
           (* The LLVM backend does not implement the runtime support for
-             unloadable code (per-function back-pointer at [entry - 1] in
-             .text, [FRAME_DESCRIPTOR_UNLOADABLE] /
-             [FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS] frame-descriptor flags,
-             and [code_ptr_live_ofs] slots). The front-end has still set
-             the closinfo unloadable bit on closures of this CU, so
-             silently ignoring the option would leave F.1 to dereference
-             [entry - 1] in LLVM-compiled text and read garbage at the
-             next major GC. Fail loudly until LLVM is taught to honour
-             the bit. *)
-          Misc.fatal_error
-            "LLVM backend does not implement unloadable codegen"
+             unloadable code (per-function back-pointer at [entry - 1] in .text,
+             [FRAME_DESCRIPTOR_UNLOADABLE] /
+             [FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS] frame-descriptor flags, and
+             [code_ptr_live_ofs] slots). The front-end has still set the
+             closinfo unloadable bit on closures of this CU, so silently
+             ignoring the option would leave F.1 to dereference [entry - 1] in
+             LLVM-compiled text and read garbage at the next major GC. Fail
+             loudly until LLVM is taught to honour the bit. *)
+          Misc.fatal_error "LLVM backend does not implement unloadable codegen"
         | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
         | Use_regalloc_param _ | Assume_zero_alloc _ | Check_zero_alloc _ ->
           [] (* CR yusumez: Do these require any attributes? *))

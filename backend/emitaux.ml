@@ -85,9 +85,9 @@ let is_long_stack_index n =
 
 let record_frame_descr ~label ~frame_size ~live_offset ~code_ptr_live_offset
     ~unloadable debuginfo =
-  (* The runtime packs flag bits into the low 4 bits of [frame_data]
-     (see [FRAME_DESCRIPTOR_FLAGS = 0xF] in [frame_descriptors.h]), so the
-     emitted [frame_size] must be 16-byte aligned. *)
+  (* The runtime packs flag bits into the low 4 bits of [frame_data] (see
+     [FRAME_DESCRIPTOR_FLAGS = 0xF] in [frame_descriptors.h]), so the emitted
+     [frame_size] must be 16-byte aligned. *)
   assert (frame_size land 0xF = 0);
   let fd_long =
     is_long (frame_size + get_flags debuginfo)
@@ -251,14 +251,13 @@ let emit_frames a =
             && Config.max_young_wosize <= 256);
           emit_u8 (alloc_words - 2))
         dbg;
-      (* Mask off bits 2 (UNLOADABLE) and 3 (HAS_CODE_PTR_SLOTS) before
-         deciding whether to emit per-alloc debuginfo labels: those bits
-         do not affect this layout, but with [flags = flags lor 4]
-         (or 8) the unmasked check would falsely skip emission for any
-         unloadable function with [Dbg_alloc] under [-g], leaving the
-         runtime parser ([next_frame_descr]) to read [4 * num_allocs]
-         bytes that aren't there and silently misalign the rest of the
-         frame table. *)
+      (* Mask off bits 2 (UNLOADABLE) and 3 (HAS_CODE_PTR_SLOTS) before deciding
+         whether to emit per-alloc debuginfo labels: those bits do not affect
+         this layout, but with [flags = flags lor 4] (or 8) the unmasked check
+         would falsely skip emission for any unloadable function with
+         [Dbg_alloc] under [-g], leaving the runtime parser ([next_frame_descr])
+         to read [4 * num_allocs] bytes that aren't there and silently misalign
+         the rest of the frame table. *)
       if flags land 3 = 3
       then (
         a.efa_align 4;
