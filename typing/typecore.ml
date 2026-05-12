@@ -8002,10 +8002,14 @@ and type_expect_
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
+      (* If we are checking staged modes in the metaprogram,
+         we need to assume the expression in quotes is at legacy.
+         Otherwise, we are delaying checking modes until program generation
+         (with magic_staged_modes), and we do not constrain the mode. *)
       let mode_quoted =
-        match Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes with
-        | true -> mode_default Value.max
-        | false -> mode_quoted
+        if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+        then mode_default Value.max
+        else mode_quoted
       in
       let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
       if maybe_computation arg then
@@ -8020,7 +8024,14 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      if not (Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes) then
+      (* If we are checking staged modes in the metaprogram,
+         we need to assume the splice is at legacy.
+         Otherwise, if we are delaying checking modes until program generation
+         (with magic_staged_modes), and we do not constrain the mode. *)
+      let magic_staged_modes =
+        Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+      in
+      if not magic_staged_modes then
         submode ~loc ~env ~reason:Other mode_splice expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
