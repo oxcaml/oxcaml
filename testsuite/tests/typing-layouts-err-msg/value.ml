@@ -232,19 +232,9 @@ type ('a : void) t = 'a
 Line 2, characters 31-32:
 2 | let f (x : int -> int): 'a t = x
                                    ^
-<<<<<<< HEAD
 Error: The value "x" has type "int -> int" but an expression was expected of type
          "'a t" = "('a : void)"
-       The layout of int -> int is value
-||||||| 5.2.0minus-31
-Error: This expression has type "int -> int"
-       but an expression was expected of type "'a t" = "('a : void)"
-       The layout of int -> int is value
-=======
-Error: This expression has type "int -> int"
-       but an expression was expected of type "'a t" = "('a : void)"
        The layout of int -> int is value non_float
->>>>>>> 5.2.0minus-37
          because it's a function type.
        But the layout of int -> int must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.

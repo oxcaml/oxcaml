@@ -30,8 +30,8 @@ let code loopify(never) size(44) newer_version_of(f_0)
              | 0 -> k2 (float_add)
              | 1 -> k3 (for_next_naked, prim_2))
     where k2 (float_add) =
-      let r_277_unboxed0 = float_add in
-      cont k (r_277_unboxed0)
+      let r_281_unboxed0 = float_add in
+      cont k (r_281_unboxed0)
 in
 let $camlFloat_unboxing__f_1 = closure f_0_1 @f in
 let $camlFloat_unboxing__Pmakeblock120 = Block 0 ($camlFloat_unboxing__f_1)

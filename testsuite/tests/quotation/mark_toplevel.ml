@@ -57,10 +57,10 @@ module M : sig type t val x : t end
 |}];;
 let id (x : <[M.t]> expr) = x
 [%%expect {|
-Line 1, characters 14-17:
+Line 1, characters 14-15:
 1 | let id (x : <[M.t]> expr) = x
-                  ^^^
-Error: Identifier "M" is used at line 1, characters 14-17,
+                  ^
+Error: Identifier "M" is used at line 1, characters 14-15,
        inside a quotation (<[ ... ]>);
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;

@@ -244,16 +244,8 @@ end
 Line 11, characters 79-82:
 11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
                                                                                     ^^^
-<<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
-         "('a : bits32 mod separable)"
-||||||| 5.2.0minus-31
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : bits32 mod separable)"
-=======
-Error: This expression has type "int64#" but an expression was expected of type
          "('a : bits32)"
->>>>>>> 5.2.0minus-37
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a sublayout of bits32
@@ -295,16 +287,8 @@ let _ =
 Line 2, characters 39-44:
 2 |   let[@warning "-10"] rec x = [| x |]; #42.0 in
                                            ^^^^^
-<<<<<<< HEAD
 Error: This constant has type "float#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-||||||| 5.2.0minus-31
-Error: This expression has type "float#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-=======
-Error: This expression has type "float#" but an expression was expected of type
          "('a : value maybe_null)"
->>>>>>> 5.2.0minus-37
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
        But the layout of float# must be a value layout
@@ -319,16 +303,8 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42l in
                                            ^^^^
-<<<<<<< HEAD
 Error: This constant has type "int32#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-||||||| 5.2.0minus-31
-Error: This expression has type "int32#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-=======
-Error: This expression has type "int32#" but an expression was expected of type
          "('a : value maybe_null)"
->>>>>>> 5.2.0minus-37
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
        But the layout of int32# must be a value layout
@@ -343,16 +319,8 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42L in
                                            ^^^^
-<<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-||||||| 5.2.0minus-31
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-=======
-Error: This expression has type "int64#" but an expression was expected of type
          "('a : value maybe_null)"
->>>>>>> 5.2.0minus-37
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a value layout
@@ -367,18 +335,8 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42n in
                                            ^^^^
-<<<<<<< HEAD
 Error: This constant has type "nativeint#"
-       but an expression was expected of type
-         "('a : value_or_null mod separable)"
-||||||| 5.2.0minus-31
-Error: This expression has type "nativeint#"
-       but an expression was expected of type
-         "('a : value_or_null mod separable)"
-=======
-Error: This expression has type "nativeint#"
        but an expression was expected of type "('a : value maybe_null)"
->>>>>>> 5.2.0minus-37
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of nativeint# must be a value layout
@@ -393,17 +351,8 @@ let _ =
 Line 2, characters 39-45:
 2 |   let[@warning "-10"] rec x = [| x |]; #42.0s in
                                            ^^^^^^
-<<<<<<< HEAD
 Error: This constant has type "float32#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
-||||||| 5.2.0minus-31
-Error: This expression has type "float32#"
-       but an expression was expected of type
-         "('a : value_or_null mod separable)"
-=======
-Error: This expression has type "float32#"
-       but an expression was expected of type "('a : value maybe_null)"
->>>>>>> 5.2.0minus-37
+         "('a : value maybe_null)"
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
        But the layout of float32# must be a value layout

@@ -1536,87 +1536,6 @@ L396:
   %55 = icmp eq i64 %54, 0
   br i1 %55, label %L397, label %L355
 L397:
-<<<<<<< HEAD
-  %111 = load i64, ptr %26
-  %112 = load i64, ptr %7
-  %113 = icmp sgt i64 %111, %112
-  br i1 %113, label %L377, label %L384
-L377:
-  %114 = ptrtoint ptr @camlExn_part2__Pmakeblock195 to i64
-  store i64 %114, ptr %27
-  %115 = load i64, ptr %27
-  store i64 %115, ptr %4
-  %116 = load i64, ptr %ds
-  %117 = add i64 %116, 272
-  %118 = inttoptr i64 %117 to ptr
-  store i64 0, ptr %118
-  %119 = load i64, ptr %4
-  %120 = load i64, ptr %ds
-  %121 = load i64, ptr %alloc
-  %122 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %120, i64 %121, i64 %119) "statepoint-id"="0"
-  %123 = extractvalue { { i64, i64 }, {  } } %122, 0, 0
-  %124 = extractvalue { { i64, i64 }, {  } } %122, 0, 1
-  store i64 %123, ptr %ds
-  store i64 %124, ptr %alloc
-  unreachable
-L380:
-  %125 = load ptr addrspace(1), ptr %12
-  %126 = ptrtoint ptr addrspace(1) %125 to i64
-  store i64 %126, ptr %4
-  %127 = load i64, ptr %4
-  %128 = load i64, ptr %ds
-  %129 = load i64, ptr %alloc
-  %130 = call oxcamlcc { { i64, i64 }, {  } } @caml_reraise_exn(i64 %128, i64 %129, i64 %127) "statepoint-id"="0"
-  %131 = extractvalue { { i64, i64 }, {  } } %130, 0, 0
-  %132 = extractvalue { { i64, i64 }, {  } } %130, 0, 1
-  store i64 %131, ptr %ds
-  store i64 %132, ptr %alloc
-  unreachable
-L384:
-  %133 = load i64, ptr %7
-  %134 = icmp slt i64 %133, 2001
-  br i1 %134, label %L386, label %L398
-||||||| 5.2.0minus-31
-  %111 = load i64, ptr %26
-  %112 = load i64, ptr %7
-  %113 = icmp sgt i64 %111, %112
-  br i1 %113, label %L377, label %L384
-L377:
-  %114 = ptrtoint ptr @camlExn_part2__Pmakeblock195 to i64
-  store i64 %114, ptr %27
-  %115 = load i64, ptr %27
-  store i64 %115, ptr %4
-  %116 = load i64, ptr %ds
-  %117 = add i64 %116, 240
-  %118 = inttoptr i64 %117 to ptr
-  store i64 0, ptr %118
-  %119 = load i64, ptr %4
-  %120 = load i64, ptr %ds
-  %121 = load i64, ptr %alloc
-  %122 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %120, i64 %121, i64 %119) "statepoint-id"="0"
-  %123 = extractvalue { { i64, i64 }, {  } } %122, 0, 0
-  %124 = extractvalue { { i64, i64 }, {  } } %122, 0, 1
-  store i64 %123, ptr %ds
-  store i64 %124, ptr %alloc
-  unreachable
-L380:
-  %125 = load ptr addrspace(1), ptr %12
-  %126 = ptrtoint ptr addrspace(1) %125 to i64
-  store i64 %126, ptr %4
-  %127 = load i64, ptr %4
-  %128 = load i64, ptr %ds
-  %129 = load i64, ptr %alloc
-  %130 = call oxcamlcc { { i64, i64 }, {  } } @caml_reraise_exn(i64 %128, i64 %129, i64 %127) "statepoint-id"="0"
-  %131 = extractvalue { { i64, i64 }, {  } } %130, 0, 0
-  %132 = extractvalue { { i64, i64 }, {  } } %130, 0, 1
-  store i64 %131, ptr %ds
-  store i64 %132, ptr %alloc
-  unreachable
-L384:
-  %133 = load i64, ptr %7
-  %134 = icmp slt i64 %133, 2001
-  br i1 %134, label %L386, label %L398
-=======
   store ptr blockaddress(@camlExn_part2__raise_in_loop_7_16_code, %L396), ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L396
   %56 = call  ptr @llvm.stacksave()
   %57 = alloca { i64, i64, i64, i64 }
@@ -1704,7 +1623,6 @@ L355:
   %108 = load i64, ptr %26
   %109 = icmp slt i64 %107, %108
   br i1 %109, label %L382, label %L398
->>>>>>> 5.2.0minus-37
 L398:
   %110 = load i64, ptr %27
   %111 = load i64, ptr %26
@@ -1732,7 +1650,7 @@ L379:
   %124 = load i64, ptr %30
   store i64 %124, ptr %4
   %125 = load i64, ptr %ds
-  %126 = add i64 %125, 240
+  %126 = add i64 %125, 272
   %127 = inttoptr i64 %126 to ptr
   store i64 0, ptr %127
   %128 = load i64, ptr %4

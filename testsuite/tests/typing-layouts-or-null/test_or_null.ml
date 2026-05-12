@@ -197,21 +197,9 @@ let should_fail = [| This 5.; Null |]
 Line 1, characters 26-28:
 1 | let should_fail = [| This 5.; Null |]
                               ^^
-<<<<<<< HEAD
 Error: The constant "5." has type "float" but an expression was expected of type
-         "('a : value mod non_float)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
-||||||| 5.2.0minus-31
-Error: This expression has type "float" but an expression was expected of type
-         "('a : value mod non_float)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
-=======
-Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
->>>>>>> 5.2.0minus-37
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
@@ -266,21 +254,9 @@ let should_fail = [: Null; This 5. :]
 Line 1, characters 32-34:
 1 | let should_fail = [: Null; This 5. :]
                                     ^^
-<<<<<<< HEAD
 Error: The constant "5." has type "float" but an expression was expected of type
-         "('a : value mod non_float)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
-||||||| 5.2.0minus-31
-Error: This expression has type "float" but an expression was expected of type
-         "('a : value mod non_float)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
-=======
-Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
->>>>>>> 5.2.0minus-37
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
