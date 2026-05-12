@@ -180,7 +180,7 @@ let
 
   lldb = makeLlvm rec {
     pname = "oxcaml-lldb";
-    version = "21.1.0minus-1";
+    version = "21.1.0+oxcaml0";
     projects = [
       "clang"
       "lldb"
@@ -189,7 +189,7 @@ let
       owner = "ocaml-flambda";
       repo = "llvm-project";
       tag = "oxcaml-lldb-${version}";
-      hash = "sha256-g7/ddWJ0+Eh7Wk/pHh9rwzXnlIdEBwIOJzqrpQfggpM=";
+      hash = "sha256-DrXQY/1MJCgSqHd4vHpUbdTVWbLZEXkDbUVRYOp3e6Y=";
     };
   };
 

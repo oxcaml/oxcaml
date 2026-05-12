@@ -3,8 +3,8 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_string(len=100)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_string(len=100)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Bytes__make_XXX_XXX_code [inlined]
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__String__make_XXX_XXX_code [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Bytes.make [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.String.make [inlined]
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=[100, 120] : ocaml_value)
 === Testing OCaml/C boundary - array allocation ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=101, init=201)
@@ -15,7 +15,7 @@
 === Testing OCaml/C boundary - bytes blit ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_blit_bytes(s1=<PTR>, ofs1=1, s2=<PTR>, ofs2=1, n=21)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_blit_bytes(s1=<PTR>, ofs1=1, s2=<PTR>, ofs2=1, n=21)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Bytes__blit_XXX_XXX_code [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Bytes.blit [inlined]
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_bytes_blit(src=<unavailable>, dst=<unavailable>, len=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlTest_ocaml_and_c_dwarf__entry
 === Testing OCaml/C boundary - GC minor ===
@@ -40,13 +40,13 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_output_value_to_buffer(buf=<PTR>, ofs=1, len=129, v=<PTR>, flags=1)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_output_value_to_buffer(buf=<PTR>, ofs=1, len=129, v=<PTR>, flags=1)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Marshal__to_buffer_XXX_XXX_code [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Marshal.to_buffer [inlined]
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_marshal(param=<unavailable>)
 === Testing OCaml/C boundary - unmarshal input ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_input_value_from_bytes(str=<PTR>, ofs=1)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_input_value_from_bytes(str=<PTR>, ofs=1)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Marshal__from_bytes_XXX_XXX_code [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Marshal.from_bytes [inlined]
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_unmarshal(param=<unavailable>)
 === Testing OCaml/C boundary - MD5 hash ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_md5_string(str=<PTR>, ofs=1, len=27)
@@ -78,7 +78,7 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(arg=1, closure=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Sys__fn$5b$2fworkspace_root$2fsys.ml.in$3a187$2c0$2d$2d82$5d_XXX_XXX_code at sys.ml.in:187 [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Sys.(partial) at sys.ml.in:187 [inlined]
 === Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)

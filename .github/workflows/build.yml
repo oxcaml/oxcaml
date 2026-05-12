@@ -209,7 +209,7 @@ jobs:
             config: --enable-runtime5 --enable-function-sections
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
-            oxcaml_llvm_tag: oxcaml-lldb-21.1.0minus-1
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml0
             oxcaml_llvm_source_branch: oxcaml-llvm-plugin
             sysdeps: gdb
 
