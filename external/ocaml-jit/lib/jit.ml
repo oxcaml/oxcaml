@@ -195,66 +195,6 @@ let entry_points ~phrase_name symbols =
       failwithf "Toplevel phrase entry point symbol %s is not defined"
         entry_name
 
-(** Walk [local_symbols] and produce the per-unit metadata required to
-    register an unloadable compilation unit:
-      - [code_blocks]: addresses of every [_code_block] static-data symbol
-        (one per function defined in the unit).
-      - [function_entries]: addresses of the corresponding function entries
-        (the prefix of each [_code_block] name), sorted ascending so that
-        the runtime can build per-function code-fragment ranges
-        [entry_i .. entry_{i+1}).
-
-    Returns [None] if the unit has no [_code_block] symbols (nothing to
-    register). *)
-(* REVIEW(claude): suffix-based detection is fragile. Any user function
-   whose name happens to end in [_code_block] would be misclassified as a
-   Code_block descriptor (and worse: the entry-name lookup [Symbols.find]
-   would happen to return [Some] when the prefix exists). Consider having
-   to_cmm emit a sentinel symbol listing the unit's [Code_block]s
-   explicitly (mirroring the [unloadable_data_blocks] table) so that the
-   loader does no name-pattern matching. The same comment applies to the
-   [__unloadable_data_blocks] suffix walk later in [jit_load]. *)
-let unloadable_metadata local_symbols =
-  let suffix = "_code_block" in
-  let suffix_len = String.length suffix in
-  let code_blocks_rev, entries_rev =
-    Symbols.fold local_symbols ~init:([], [])
-      ~f:(fun (cbs, ents) name addr ->
-        let n = String.length name in
-        if n > suffix_len
-           && String.equal (String.sub name (n - suffix_len) suffix_len) suffix
-        then
-          let entry_name = String.sub name 0 (n - suffix_len) in
-          match Symbols.find local_symbols entry_name with
-          | Some entry_addr ->
-              ( Address.to_nativeint addr :: cbs,
-                Address.to_nativeint entry_addr :: ents )
-          | None -> (cbs, ents)
-        else (cbs, ents))
-  in
-  match code_blocks_rev with
-  | [] -> None
-  | _ ->
-      let code_blocks = Array.of_list (List.rev code_blocks_rev) in
-      let entries = Array.of_list (List.rev entries_rev) in
-      (* REVIEW(claude): after this sort, [entries] is no longer
-         index-aligned with [code_blocks]. The C side does not rely on
-         the alignment (code_blocks is an opaque list of mark targets;
-         entries is only used to derive sorted text ranges), but the
-         asymmetry is non-obvious. Rename to [entries_sorted] / document
-         that the index correspondence is intentionally dropped. *)
-      Array.sort Nativeint.compare entries;
-      (* REVIEW(codex): On Mach-O the assembler/linker can expose both global and
-         local alias symbols for the same address. If those aliases end in
-         [_code_block], this can introduce duplicate [entries] (and possibly
-         duplicate [code_blocks]) at the same address. Passing duplicates down
-         to [jit_register_unloadable_unit_native] risks registering multiple
-         code fragments with identical [start] PCs, which can lead to
-         unpredictable lookups in [caml_find_code_fragment_by_pc]. Consider
-         deduplicating by address here and asserting the resulting [entries] is
-         strictly increasing. *)
-      Some (code_blocks, entries)
-
 let jit_run entry_points =
   match
     try Result (Obj.magic (Externals.run_toplevel entry_points))
@@ -321,106 +261,70 @@ let jit_load (type a r)
   load_text (module E) relocated_text;
   load_sections (module E) addressed_sections;
   let entry_points = entry_points ~phrase_name symbols in
-  (* If the compilation unit emitted any [_code_block] symbols, register the
-     unit with the runtime so the GC can detect when the unit becomes
-     unreachable and unload its text/data buffers. *)
+  (* If the compilation unit emitted an [unloadable_code_blocks] sentinel
+     symbol, register the unit with the runtime so the GC can detect
+     when the unit becomes unreachable and unload its text/data buffers.
+     Both the code-blocks and data-blocks sentinels are looked up by
+     exact linker name (constructed from [phrase_name]) — no symbol-table
+     scan by suffix. *)
   let entry_points =
-    match unloadable_metadata local_symbols with
-    | None -> entry_points
-    | Some (code_blocks, function_entries) ->
-        let code_end_addr =
-          match entry_points.code_end with
-          | Some addr -> Address.to_nativeint addr
-          | None -> failwithf "code_end missing for unloadable unit"
-        in
-        let frametable_addr =
-          match entry_points.frametable with
-          | Some addr -> Address.to_nativeint addr
-          | None -> 0n
-        in
-        let gc_roots_addr =
-          match entry_points.gc_roots with
-          | Some addr -> Address.to_nativeint addr
-          | None -> 0n
-        in
-        (* The compiler emits a static array, named by appending
-           [unloadable_data_blocks_symbol_basename] to the unit's symbol
-           prefix, listing every static data block's address (excluding
-           Code_blocks, which are tracked separately via [code_blocks]).
-           Layout: [count; addr_1; ...; addr_count]. The C side reads it to
-           populate the unit's [data_blocks] field. We pass [0n] only when
-           no such symbol exists (which only happens for non-unloadable
-           units; see the [unloadable_metadata] gate above). *)
-        (* REVIEW(claude): the comment above [unloadable_metadata]
-           applies here too — suffix matching is fragile. More
-           importantly, this fold runs on every unloadable JIT load and
-           costs O(N) in the symbol map; combined with the
-           [unloadable_metadata] fold that's three full passes over the
-           symbol table per load. If load latency matters, consider a
-           single fold producing both pieces. *)
-        let data_blocks_table_addr =
-          (* Match symbols whose name ends in
-             [_<unloadable_data_blocks_symbol_basename>]. The exact prefix
-             depends on the compilation-unit linkage prefix, which the JIT
-             does not track explicitly, so we filter by suffix. Must match
-             [Cmm_helpers.unloadable_data_blocks_symbol_basename]; the linker
-             name is [caml<UnitPrefix>__<basename>], possibly emitted with
-             target-specific aliases (e.g. on Mach-O the assembler emits both
-             a global [_<name>] and a local [L_<name>] entry pointing to the
-             same address). We deduplicate by address. *)
-          let suffix = "__unloadable_data_blocks" in
-          let suffix_len = String.length suffix in
-          let addrs =
-            Symbols.fold local_symbols ~init:[]
-              ~f:(fun acc name addr ->
-                let n = String.length name in
-                if n >= suffix_len
-                   && String.equal
-                        (String.sub name (n - suffix_len) suffix_len)
-                        suffix
-                then
-                  let a = Address.to_nativeint addr in
-                  if List.exists (Nativeint.equal a) acc then acc else a :: acc
-                else acc)
-          in
-          match addrs with
-          | [addr] -> addr
-          | [] -> 0n
-          | _ ->
-              failwithf
-                "More than one distinct unloadable_data_blocks symbol address \
-                 found in JIT unit (expected at most one)"
-        in
-        (* REVIEW(claude): there is a window between
-           [Externals.register_unloadable_unit] (which inserts our text
-           range into the code-fragment table and frametable list) and
-           [jit_run] (which calls [caml_callback] on the entry, the
-           first time mutator code in this unit runs). If a major GC on
-           another domain begins marking in this window, [F.2] could
-           visit a stale return address (from before our registration)
-           that lies in our newly-registered text range, and we'd treat
-           it as an entry into our unit. Mitigated in practice because
-           callbacks are synchronous and OCaml domains poll, but worth
-           explicitly arguing why this is safe (perhaps via the
-           born-marked normalisation, but I can't see the chain). *)
-        Externals.register_unloadable_unit code_blocks data_blocks_table_addr
-          function_entries code_end_addr frametable_addr gc_roots_addr
-          (Address.to_nativeint buffer_base)
-          buffer_size;
-        (* The unloadable-unit registration owns the frame table, gc_roots
-           and code-fragment registrations — drop them from [entry_points]
-           so [jit_run] (the legacy non-unloadable path) does not also
-           register them. A duplicate gc_roots in particular is fatal
-           (caml_register_dyn_global raises [Register_dyn_global_duplicate])
-           when a freed unit's buffer address gets reused by a later unit.
-           [data_begin]/[data_end] go to [caml_page_table_add] under
-           runtime 4 only, so leaving them is harmless on runtime 5. *)
-        { entry_points with
-          frametable = None;
-          gc_roots = None;
-          code_begin = None;
-          code_end = None;
-        }
+    let prefix = symbol_prefix () in
+    let separator = "__" in
+    let sentinel_name basename =
+      Printf.sprintf "%scaml%s%s%s" prefix phrase_name separator basename
+    in
+    let sentinel basename =
+      match Symbols.find local_symbols (sentinel_name basename) with
+      | Some addr -> Address.to_nativeint addr
+      | None -> 0n
+    in
+    let code_blocks_table_addr = sentinel "unloadable_code_blocks" in
+    if Nativeint.equal code_blocks_table_addr 0n
+    then entry_points
+    else
+      let data_blocks_table_addr = sentinel "unloadable_data_blocks" in
+      let code_end_addr =
+        match entry_points.code_end with
+        | Some addr -> Address.to_nativeint addr
+        | None -> failwithf "code_end missing for unloadable unit"
+      in
+      let frametable_addr =
+        match entry_points.frametable with
+        | Some addr -> Address.to_nativeint addr
+        | None -> 0n
+      in
+      let gc_roots_addr =
+        match entry_points.gc_roots with
+        | Some addr -> Address.to_nativeint addr
+        | None -> 0n
+      in
+      (* Registration window safety: between this call and [jit_run],
+         a major GC on another domain might scan via gc_roots, the
+         frametable, or registered code fragments — all of which are
+         now visible. The unit's static blocks are born-marked
+         (white -> MARKED via [normalize_block_color]) and the
+         entry's Code_block has zero dep fields, so a scan in this
+         window cannot dereference a not-yet-populated field. F.2
+         return-address scans cannot land in our text range because
+         no thread has yet entered this unit's code. *)
+      Externals.register_unloadable_unit code_blocks_table_addr
+        data_blocks_table_addr code_end_addr frametable_addr gc_roots_addr
+        (Address.to_nativeint buffer_base)
+        buffer_size;
+      (* The unloadable-unit registration owns the frame table, gc_roots
+         and code-fragment registrations — drop them from [entry_points]
+         so [jit_run] (the legacy non-unloadable path) does not also
+         register them. A duplicate gc_roots in particular is fatal
+         (caml_register_dyn_global raises [Register_dyn_global_duplicate])
+         when a freed unit's buffer address gets reused by a later unit.
+         [data_begin]/[data_end] go to [caml_page_table_add] under
+         runtime 4 only, so leaving them is harmless on runtime 5. *)
+      { entry_points with
+        frametable = None;
+        gc_roots = None;
+        code_begin = None;
+        code_end = None;
+      }
   in
   let result = jit_run entry_points in
   outcome_ref := Some result

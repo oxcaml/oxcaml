@@ -37,6 +37,10 @@ let emit_code_block_for ~all_code (code : Code.t) res =
   then res
   else
     let code_id = Code.code_id code in
+    let entry_linkage_name =
+      Linkage_name.to_string (Code_id.linkage_name code_id)
+    in
+    C.register_unloadable_code_block_entry entry_linkage_name;
     let free_names = Code.free_names_of_params_and_body code in
     let code_id_deps =
       Name_occurrences.code_ids free_names
@@ -97,18 +101,19 @@ let emit_code_block_for ~all_code (code : Code.t) res =
 let emit_entry_code_block ~(entry_sym : Cmm.symbol) res =
   if not !Clflags.unit_is_unloadable
   then res
-  else
+  else (
+    C.register_unloadable_code_block_entry entry_sym.sym_name;
     let block_sym : Cmm.symbol =
       { sym_name = C.code_block_symbol_name entry_sym.sym_name;
         sym_global = Global
       }
     in
     let header = C.unit_block_header Runtimetags.code_block_tag 0 in
-    (* Suppress data-block tracking: Code_blocks are tracked separately via the
-       [_code_block] suffix during JIT registration (see jit.ml's
-       [unloadable_metadata]). *)
+    (* Suppress data-block tracking: Code_blocks are tracked separately via
+       the unit's [unloadable_code_blocks] sentinel array (see [to_cmm.ml]
+       and the JIT loader). *)
     let prev = !C.suppress_unloadable_data_block_tracking in
     C.suppress_unloadable_data_block_tracking := true;
     let data_items = C.emit_unit_block block_sym header [] in
     C.suppress_unloadable_data_block_tracking := prev;
-    R.add_archive_data_items res data_items
+    R.add_archive_data_items res data_items)

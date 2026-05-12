@@ -35,11 +35,12 @@ val get_page_size : unit -> int
 val dlsym : string -> Address.t option
 
 val register_unloadable_unit :
-  nativeint array (* code-block addresses *) ->
   nativeint
-  (* Address of the unit's data-blocks table:
-     a static array [count; addr_1; ...; addr_count]. 0n if absent. *) ->
-  nativeint array (* function entries, sorted by address *) ->
+  (* Address of the unit's code-blocks sentinel array:
+     [count; entry_1; code_block_1; ...; entry_count; code_block_count]. *) ->
+  nativeint
+  (* Address of the unit's data-blocks sentinel array:
+     [count; addr_1; ...; addr_count]. 0n if absent. *) ->
   nativeint (* code_end *) ->
   nativeint (* frametable, or 0n if absent *) ->
   nativeint (* gc_roots, or 0n if absent *) ->

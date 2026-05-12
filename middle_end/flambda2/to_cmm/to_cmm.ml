@@ -168,8 +168,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     then
       let syms = C.flush_unloadable_data_block_symbols () in
       (* Reverse-and-dedup: the helper accumulates in reverse order, and a
-         symbol may have been registered more than once if [emit_unit_block] was
-         called multiple times for the same definition (defensive). *)
+         symbol may have been registered more than once if [emit_unit_block]
+         was called multiple times for the same definition (defensive). *)
       let seen = Hashtbl.create 8 in
       let syms =
         List.rev syms
@@ -189,6 +189,50 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
         Cmm.Cdefine_symbol array_sym
         :: Cmm.Cint (Nativeint.of_int count)
         :: List.map (fun s -> Cmm.Csymbol_address s) syms
+      in
+      R.add_archive_data_items res data_items
+    else res
+  in
+  (* Parallel sentinel for the unit's [Code_block]s. Layout:
+     [count; entry_1; code_block_1; ...; entry_count; code_block_count]
+     The JIT loader reads this by exact name to discover every
+     (function-entry, code-block) pair without scanning the symbol table by
+     suffix. The symbol is always emitted (with count = 0 if no unloadable
+     functions exist) so the loader can rely on its presence whenever the
+     CU is unloadable. *)
+  let res =
+    if !Clflags.unit_is_unloadable
+    then
+      let entries = C.flush_unloadable_code_block_entries () in
+      let seen = Hashtbl.create 8 in
+      let entries =
+        List.rev entries
+        |> List.filter (fun name ->
+            if Hashtbl.mem seen name
+            then false
+            else (
+              Hashtbl.add seen name ();
+              true))
+      in
+      let count = List.length entries in
+      let array_name =
+        Cmm_helpers.make_symbol C.unloadable_code_blocks_symbol_basename
+      in
+      let res, array_sym = R.raw_symbol res ~global:Global array_name in
+      let pairs =
+        List.concat_map
+          (fun entry_name ->
+            let cb_name = C.code_block_symbol_name entry_name in
+            [ Cmm.Csymbol_address
+                { sym_name = entry_name; sym_global = Global };
+              Cmm.Csymbol_address
+                { sym_name = cb_name; sym_global = Global } ])
+          entries
+      in
+      let data_items =
+        Cmm.Cdefine_symbol array_sym
+        :: Cmm.Cint (Nativeint.of_int count)
+        :: pairs
       in
       R.add_archive_data_items res data_items
     else res

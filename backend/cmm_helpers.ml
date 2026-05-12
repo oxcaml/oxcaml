@@ -4270,27 +4270,18 @@ let emit_block symb white_header cont =
   let black_header = Nativeint.logor white_header caml_black in
   (Cint black_header :: cdefine_symbol symb) @ cont
 
-(* Tracking of static data blocks in unloadable CUs. The symbols registered here
-   are emitted in [to_cmm.ml]'s unit emission as a static array
+(* Tracking of static data blocks in unloadable CUs. The symbols registered
+   here are emitted in [to_cmm.ml]'s unit emission as a static array
    ("unloadable_data_blocks") that the runtime registration path reads to
-   populate the [data_blocks] field of [caml_unloadable_unit]. The runtime needs
-   this list to normalize surviving units' block headers at end of major cycle.
-   [Code_block]s are NOT included — they're tracked separately via the
-   [_code_block] suffix and registered in the unit's [code_blocks] list. *)
-(* REVIEW(claude): two pieces of file-global mutable state for what is
-   conceptually per-CU compilation context:
-     - [unloadable_data_block_symbols]: per-CU accumulator of tracked
-       static blocks
-     - [suppress_unloadable_data_block_tracking]: a stack of one,
-       implemented via save/restore at each Code_block emission site
-   This means concurrent compilation of multiple CUs in one process
-   would corrupt each other's tracking lists, and there's no enforcement
-   that the accumulator is reset between CUs (relying on
-   [flush_unloadable_data_block_symbols] being called from to_cmm.ml
-   exactly once per unit). [Clflags.unit_is_unloadable] is similarly
-   global. None of this is broken today (compilations are serialised),
-   but the contract should be either (a) made explicit (a CU-id
-   assertion) or (b) threaded as an explicit context value. *)
+   populate the [data_blocks] field of [caml_unloadable_unit]. The runtime
+   needs this list to normalize surviving units' block headers at end of
+   major cycle. [Code_block]s are tracked in a parallel sentinel array
+   ("unloadable_code_blocks") via [register_unloadable_code_block_entry]
+   below.
+
+   File-global state is OK here because compilation is serial (one CU per
+   process); concurrent CU compilation would need this threaded through
+   the to_cmm context. *)
 let unloadable_data_block_symbols : Cmm.symbol list ref = ref []
 
 let suppress_unloadable_data_block_tracking = ref false
@@ -4304,10 +4295,32 @@ let flush_unloadable_data_block_symbols () =
   unloadable_data_block_symbols := [];
   r
 
-(* The known name (relative to the current compilation unit) of the static array
-   emitted by to_cmm to enumerate unloadable static data blocks. The JIT loader
-   looks up this symbol and passes its address to the runtime. *)
+(* Tracking of (function-entry linkage name) for each unloadable function in
+   the CU. The corresponding [Code_block] linkage name is reconstructed via
+   [code_block_symbol_name]. *)
+let unloadable_code_block_entries : string list ref = ref []
+
+let register_unloadable_code_block_entry entry_linkage_name =
+  if !Clflags.unit_is_unloadable
+  then
+    unloadable_code_block_entries
+      := entry_linkage_name :: !unloadable_code_block_entries
+
+let flush_unloadable_code_block_entries () =
+  let r = !unloadable_code_block_entries in
+  unloadable_code_block_entries := [];
+  r
+
+(* The known name (relative to the current compilation unit) of the static
+   array emitted by to_cmm to enumerate unloadable static data blocks. The
+   JIT loader looks up this symbol and passes its address to the runtime. *)
 let unloadable_data_blocks_symbol_basename = "unloadable_data_blocks"
+
+(* The known name of the parallel sentinel array that lists every
+   unloadable function in the CU as (entry_address, code_block_address)
+   pairs. Layout: [count; entry_1; code_block_1; ...; entry_count;
+   code_block_count]. *)
+let unloadable_code_blocks_symbol_basename = "unloadable_code_blocks"
 
 (* CU-appropriate emit: in unloadable mode, [Global] symbols get a white
    (UNMARKED) header and are registered for end-of-cycle normalization; [Local]
