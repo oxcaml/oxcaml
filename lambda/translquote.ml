@@ -590,6 +590,8 @@ module Exp_attribute : sig
   val loop : t'
 
   val tail_mod_cons : t'
+
+  val magic_staged_modes : t'
 end = struct
   type s = lambda
 
@@ -618,6 +620,8 @@ end = struct
   let loop = use "Exp_attribute" "loop"
 
   let tail_mod_cons = use "Exp_attribute" "tail_mod_cons"
+
+  let magic_staged_modes = use "Exp_attribute" "magic_staged_modes"
 end
 
 module Vb_attribute : sig
@@ -2311,6 +2315,7 @@ let quote_attributes e =
       | "poll" -> Exp_attribute.poll
       | "loop" -> Exp_attribute.loop
       | "tail_mod_cons" -> Exp_attribute.tail_mod_cons
+      | "magic_staged_modes" -> Exp_attribute.magic_staged_modes
       | s ->
         fatal_errorf "Translquote (at %a): unknown attribute %s"
           Location.print_loc attr.attr_name.loc s)
