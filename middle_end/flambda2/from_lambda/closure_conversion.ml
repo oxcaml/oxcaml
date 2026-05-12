@@ -31,6 +31,18 @@ module K = Flambda_kind
 module P = Flambda_primitive
 module VB = Bound_var
 
+(* The [is_unloadable] bit is sourced from [!Clflags.unit_is_unloadable] at
+   several function-creation sites in this module and in
+   [simplify_apply_expr.ml]. The bit must follow the CU that *defined* the
+   function. Today no path in the compiler runs simplification/closure-
+   conversion for one CU while reading flags of another, but if cross-CU
+   inlining of unloadable IR is ever added the global flag would silently
+   stamp the wrong value. This helper asserts the invariant. *)
+let unloadable_bit_for_code_id code_id =
+  assert (
+    Compilation_unit.is_current (Code_id.get_compilation_unit code_id));
+  !Clflags.unit_is_unloadable
+
 type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
@@ -2479,7 +2491,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:false
-      ~is_unloadable:!Clflags.unit_is_unloadable
+      ~is_unloadable:(unloadable_bit_for_code_id code_id)
       ~is_opaque:false ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
@@ -2886,20 +2898,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:(Function_decl.cold decl)
-      (* REVIEW(claude): the [is_unloadable] bit is sourced from a
-         global mutable flag at three call sites in this module
-         ([make_unboxed_function_wrapper], here, and [close_functions])
-         and again from [!Clflags.unit_is_unloadable] in
-         [simplify_apply_expr.ml] for the partial-app stub. If a future
-         change ever runs simplification of one CU's code while
-         compiling another (e.g. cross-CU inlining post-load), the flag
-         reflects the host CU but the function originally belongs to a
-         different CU. The current design assumes a function's
-         [is_unloadable] follows the CU it was *defined in*. Worth
-         either threading the bit through [Code_metadata.create] from a
-         per-CU input, or asserting that the global flag is stable
-         across the whole compile. *)
-      ~is_unloadable:!Clflags.unit_is_unloadable
+      ~is_unloadable:(unloadable_bit_for_code_id main_code_id)
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
@@ -3063,7 +3062,7 @@ let close_functions acc external_env ~current_region function_declarations =
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
             ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute
             ~regalloc_param_attribute ~cold:(Function_decl.cold decl)
-            ~is_unloadable:!Clflags.unit_is_unloadable
+            ~is_unloadable:(unloadable_bit_for_code_id code_id)
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)

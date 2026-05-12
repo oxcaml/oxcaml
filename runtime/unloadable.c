@@ -116,53 +116,41 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
     caml_register_frametables(&tbl, 1);
   }
 
-  /* REVIEW(claude): the comment here is misleading — and the entire
-     interaction between the unloadable design and gc_roots deserves a
-     dedicated section in the design doc. [scan_native_globals] iterates
-     each glob_block and applies [f] to its FIELDS only (not to the
-     glob_block itself). So gc_roots is NOT what marks the unit's static
-     data blocks; heap-side Symbol references via [caml_darken] are. The
-     gc_roots scan only preserves heap values STORED IN those static
-     blocks (e.g. a ref cell with a heap pointer).
-
-     If a unit ever has a non-empty gc_roots whose entries are themselves
-     reachable via non-fully-static computation (see
-     [to_cmm_static.ml:static_consts]'s [Bound_static.gc_roots] usage),
-     each element of [u->gc_roots] is a value pointer to a static block.
-     The current scan walks the BLOCK's fields, so the static block
-     itself is not darkened — good, we want unloadability. But this is
-     extremely subtle and depends on the structure of [scan_native_
-     globals]; a future cleanup that "fixes" the scan to darken
-     glob_block itself would silently make every unloadable unit
-     immortal. Worth an explicit invariant in the design doc and ideally
-     a runtime assertion. */
-   /* Register the unit's gc_roots so the major GC's global-root scan walks
-   * the unit's static blocks. The runtime would otherwise leave them
-   * unmarked (they are emitted with white headers per B.1). */
+  /* gc_roots semantics, important to unloadability:
+   * [scan_native_globals] iterates each registered glob_block and applies
+   * the scanning action to its FIELDS only — not to the glob_block
+   * itself. So the gc_roots scan does NOT keep the unit's static data
+   * blocks alive; it only preserves heap values stored INTO those
+   * blocks (e.g. a heap pointer stuck into a static ref cell). The
+   * unit's static data blocks are marked by ordinary heap-side
+   * [caml_darken] following Symbol references from the module block
+   * and from Code_block dep fields.
+   *
+   * Consequence: unloadability of a CU hinges on the gc_roots scan
+   * walking the block's fields, not the block itself. A future
+   * "improvement" that darkens the glob_block before scanning its
+   * fields would silently make every registered unit immortal. If
+   * that ever changes, the unit's static data blocks would all stay
+   * MARKED forever and the end-of-cycle unload pass would never
+   * select them for reclamation. */
   if (u->gc_roots != NULL) {
-    /* REVIEW(codex): Registering [gc_roots] here means global-root scanning will walk
-       the unit every major cycle, regardless of whether any heap root reaches
-       the unit. Please confirm this cannot keep an otherwise-dead unit live
-       (e.g. via the module block pointing at other markable unit blocks), and
-       that scanning via reachability (closures/stack/code_ptr slots) would be
-       insufficient. */
     caml_register_dyn_globals(&u->gc_roots, 1);
   }
 
-  /* REVIEW(claude): registration order is:
-       1. patch headers (born-marked normalisation)
-       2. register code fragments
-       3. register frametable
-       4. register dyn_globals
-       5. link into units_head (here)
-     Steps 2-4 add the unit to *globally visible* tables before step 5 puts
-     it on our own list. Between those steps, a major-GC cycle starting on
-     another domain would scan via gc_roots and via the frametable, but
-     would not see the unit on the list. That's actually what we want
-     during born-marked, but it does mean an unloaded check-and-unload
-     pass that interleaved between steps 2 and 5 would not find this
-     unit. Worth a comment block explaining the invariant; today it's
-     implicit. */
+  /* Registration order matters:
+   *   1. patch headers (born-marked normalisation)
+   *   2. register code fragments       (now visible to F.2 / F.3)
+   *   3. register frametable           (now visible to stack walks)
+   *   4. register dyn_globals          (now visible to global-root scan)
+   *   5. link into units_head          (now visible to the end-of-cycle
+   *                                     unload pass — done below)
+   * Steps 2-4 publish the unit to *globally visible* tables before
+   * step 5 makes it visible on our own list. A major-GC cycle that
+   * starts on another domain in this window will scan via gc_roots
+   * and the frametable, see the unit's blocks, and mark them; the
+   * end-of-cycle unload pass will not visit this unit (it is not
+   * yet on units_head) but that is correct — it has just been
+   * registered as born-marked. */
   caml_plat_lock_blocking(&units_mutex);
   u->next = units_head;
   units_head = u;
@@ -287,10 +275,6 @@ uintnat caml_unloadable_units_unloaded_total(void) {
   return r;
 }
 
-/* REVIEW(claude): this function is exposed and dead. The header documents
-   it for F.2 / F.3 but those paths use [caml_find_code_fragment_by_pc]
-   instead — and grep finds no callers. Drop it, or wire it up where it was
-   meant to be used. */
 struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc) {
   caml_plat_lock_blocking(&units_mutex);
   struct caml_unloadable_unit *result = NULL;

@@ -130,12 +130,16 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
   match (ty : machtype_component) with
   | Int | Addr | Val | Code_pointer ->
-    (* REVIEW(codex): Unlike arm64, this path returns a physical reg with whatever
-       machtype [hard_int_reg] was created with (typically [Int]) unless the
-       LLVM backend flag is set. If any post-regalloc logic relies on
-       preserving [Code_pointer] on physical regs (e.g. to emit the parallel
-       [code_ptr_live_ofs] array accurately), consider mirroring the arm64
-       approach of creating an alias reg with typ [Code_pointer]. *)
+    (* Unlike arm64, this path returns the underlying [hard_int_reg]
+       (typically machtype [Int]) rather than an alias with the
+       caller-supplied [ty]. The IRC register allocator relies on
+       physical regs carrying their canonical machtype. For
+       [Code_pointer]-typed values that need to flow through frame
+       descriptors' [code_ptr_live_ofs] array, the relevant info is
+       carried by the IR-level [Reg.t] (not the physical reg) until
+       emission, so the asymmetry with arm64 does not break F.3.
+       The LLVM backend, which does need physical regs to carry
+       [ty], goes through the [Reg.create_alias] branch below. *)
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM

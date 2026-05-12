@@ -149,23 +149,18 @@ CAMLextern atomic_uintnat caml_unloadable_units_live_count;
 
 /* Look up the unloadable unit (if any) whose [.text] range contains [pc].
  * Returns NULL when [pc] lies in non-unloadable code. Used by F.2 (stack
- * return-address scan) and F.3 (stack code-pointer slot scan).
+ * return-address scan) and F.3 (stack code-pointer slot scan) to gate
+ * dereference of the [entry - 1] back-pointer: the code-fragment table
+ * also contains non-unloadable text (main program startup, Dynlink), so
+ * code-fragment presence alone is not a reliable "unloadable code"
+ * predicate.
  *
- * Reasonably fast: walks the registered units list. The runtime
- * code-fragment table is the primary lookup; this helper exists for the
- * additional unit-level information.
- *
- * Note: callers may prefer [caml_find_code_fragment_by_pc] when they need
- * only to know whether [pc] is in unloadable code (cheap negative answer);
- * use this when the unit pointer itself is needed. */
-/* REVIEW(codex): [caml_find_code_fragment_by_pc] is not a reliable "unloadable code"
- * predicate as written: the main program's .text is also registered as a code
- * fragment (startup_nat.c), and Dynlink/meta fragments may be too. Any use of
- * code-fragment presence to gate dereferencing the [entry - 1] back-pointer
- * must additionally establish that [pc] lies in an unloadable unit to avoid
- * reading arbitrary words from non-unloadable code. For performance, consider
- * making this check O(log n) by tagging code fragments as unloadable (or
- * pointing at their owning unit) rather than doing an O(units) scan. */
+ * Implementation walks the registered units list — O(units) per call.
+ * On hot paths the caller should already have filtered by
+ * [caml_find_code_fragment_by_pc] (O(log n)) for the cheap negative
+ * answer; this function is only reached when that fragment is non-NULL.
+ * For a future O(log n) check, tag code fragments with their owning
+ * unit. */
 struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc);
 
 /* Darken the [Code_block] associated with an unloadable function entry. The
