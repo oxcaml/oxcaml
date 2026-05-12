@@ -1621,10 +1621,13 @@ let assemble_line b loc ins =
             target_symbol;
             addend = 4L;
             offset = C.Sub (C.This, C.Signed_int 4L)
-          })
-      when String.Tbl.mem local_labels (Asm_symbol.encode target_symbol) ->
+          }) ->
+      (* This [.reloc] directive creates an R_X86_64_PLT32 relocation for the
+         preceding 4-byte field.  Representing it as [REL32 (sym, 0L)] gives an
+         ELF addend of [-4], because the ELF writer subtracts the width of the
+         PC-relative field from the addend. *)
       let sym = Asm_symbol.encode target_symbol in
-      record_local_reloc b ~offset:(-4) (RelocCall sym)
+      record_reloc b (Buffer.length b.buf - 4) (Relocation.Kind.REL32 (sym, 0L))
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
