@@ -24,10 +24,10 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
 cd "$repo_root"
 
 start_marker="<<<<<<<"
-middle_marker="\|\|\|\|\|\|\|"
+middle_marker="|||||||"
 end_marker=">>>>>>>"
 
-matches=$(git grep --no-color -nE \
+matches=$(git grep --no-color -n \
   -e "^${start_marker}" \
   -e "^${middle_marker}" \
   -e "^${end_marker}") || true
