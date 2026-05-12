@@ -154,7 +154,8 @@ type 'a t = {
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
   imported_units: CU.Name.Set.t ref;
   imported_opaque_units: CU.Name.Set.t ref;
-  quoted_globals: CU.Name.Set.t ref;
+  quoted_intfs: CU.Name.Set.t ref;
+  quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
   crc_units: Consistbl.t;
   can_load_cmis: can_load_cmis ref;
@@ -168,7 +169,8 @@ let empty () = {
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
   imported_units = ref CU.Name.Set.empty;
   imported_opaque_units = ref CU.Name.Set.empty;
-  quoted_globals = ref CU.Name.Set.empty;
+  quoted_intfs = ref CU.Name.Set.empty;
+  quoted_impls = ref CU.Set.empty;
   param_imports = ref Param_set.empty;
   crc_units = Consistbl.create ();
   can_load_cmis = ref Can_load_cmis;
@@ -183,7 +185,8 @@ let clear penv =
     locals_bound_to_runtime_parameters;
     imported_units;
     imported_opaque_units;
-    quoted_globals;
+    quoted_intfs;
+    quoted_impls;
     param_imports;
     crc_units;
     can_load_cmis;
@@ -195,7 +198,8 @@ let clear penv =
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
   imported_units := CU.Name.Set.empty;
   imported_opaque_units := CU.Name.Set.empty;
-  quoted_globals := CU.Name.Set.empty;
+  quoted_intfs := CU.Name.Set.empty;
+  quoted_impls := CU.Set.empty;
   param_imports := Param_set.empty;
   Consistbl.clear crc_units;
   can_load_cmis := Can_load_cmis;
@@ -997,10 +1001,38 @@ let imports {imported_units; crc_units; _} =
   List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
     imports
 
-let require_global_for_quote {quoted_globals; _} name =
-  quoted_globals := CU.Name.Set.add name !quoted_globals
+let require_intf_for_quote {quoted_intfs; _} name =
+  quoted_intfs := CU.Name.Set.add name !quoted_intfs
 
-let quoted_globals {quoted_globals; _} = CU.Name.Set.elements !quoted_globals
+let quoted_intfs ({quoted_intfs; _} as penv) =
+  let names = ref !quoted_intfs in
+  let rec add_aliases { imp_crcs; _ } =
+    Array.iter
+      (fun import_info ->
+        let name = Import_info.name import_info in
+        if Option.is_none (Import_info.crc import_info) then
+          (* This is an alias so we need to make sure to include it if it's
+              been used. *)
+          match find_import_info_in_cache penv name with
+          | Some import when not (CU.Name.Set.mem name !names) ->
+              names := CU.Name.Set.add name !names;
+              add_aliases import
+          | _ -> ()
+        )
+      imp_crcs
+  in
+  Compilation_unit.Name.Set.iter
+    (fun name ->
+      match find_import_info_in_cache penv name with
+      | Some import -> add_aliases import
+      | None -> Misc.fatal_errorf_doc "No interface for %a" CU.Name.print name)
+    !names;
+  !names
+
+let require_impl_for_quote {quoted_impls; _} name =
+  quoted_impls := CU.Set.add name !quoted_impls
+
+let quoted_impls {quoted_impls; _} = !quoted_impls
 
 let is_imported_parameter penv modname =
   match find_info_in_cache penv modname with

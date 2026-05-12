@@ -87,7 +87,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Unit (file_name, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
       Linkenv.remove_required linkenv info.ui_unit;
-      Linkenv.add_quoted_globals linkenv info.ui_quoted_globals;
+      Linkenv.add_quoted_cmi linkenv info.ui_quoted_cmi;
+      Linkenv.add_quoted_cmx linkenv info.ui_quoted_cmx;
       List.iter
         (fun import -> Linkenv.add_required linkenv (file_name, None) import)
         info.ui_imports_cmx;
@@ -101,7 +102,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               dynu_defines = info.ui_defines;
               dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
               dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
-              dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list
+              dynu_quoted_cmi = info.ui_quoted_cmi |> Array.of_list;
+              dynu_quoted_cmx = info.ui_quoted_cmx |> Array.of_list
             }
       in
       let unit =
@@ -185,10 +187,14 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                     if Misc.Bitmap.get bits i then Some tbl.(i) else None)
                 |> List.filter_map Fun.id
               in
-              let quoted_globals =
-                imports_list infos.lib_quoted_globals info.li_quoted_globals
+              let quoted_cmi =
+                imports_list infos.lib_quoted_cmi info.li_quoted_cmi
               in
-              Linkenv.add_quoted_globals linkenv quoted_globals;
+              let quoted_cmx =
+                imports_list infos.lib_quoted_cmx info.li_quoted_cmx
+              in
+              Linkenv.add_quoted_cmi linkenv quoted_cmi;
+              Linkenv.add_quoted_cmx linkenv quoted_cmx;
               let dynunit : Cmxs_format.dynunit option =
                 if not shared
                 then None
@@ -203,7 +209,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                       dynu_imports_cmx =
                         imports_list infos.lib_imports_cmx info.li_imports_cmx
                         |> Array.of_list;
-                      dynu_quoted_globals = quoted_globals |> Array.of_list
+                      dynu_quoted_cmi = quoted_cmi |> Array.of_list;
+                      dynu_quoted_cmx = quoted_cmx |> Array.of_list
                     }
               in
               let imports_cmx =

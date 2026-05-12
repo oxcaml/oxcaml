@@ -511,7 +511,7 @@ let report_error_doc ppf = function
   | Cm_bundle_error (Missing_impl_for_quote impl) ->
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
-      CU.Name.print_as_inline_code impl
+      CU.print_as_inline_code impl
 
 let report_error = Format_doc.compat report_error_doc
 

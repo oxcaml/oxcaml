@@ -175,8 +175,14 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
-val add_required_global:
-  require_for_quote_in_persistent_env:bool -> Path.t -> t -> unit
+val add_required_global: Path.t -> t -> unit
+val add_required_global_for_quote: Path.t -> t -> unit
+
+(* Return the set of interfaces referenced by quotes *)
+val quoted_intfs: unit -> Compilation_unit.Name.Set.t
+
+(* Return the set of implementations referenced by quotes *)
+val quoted_impls: unit -> Compilation_unit.Set.t
 
 val reset_probes: unit -> unit
 val add_probe: string -> unit
@@ -609,9 +615,6 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
-
-(* Return the set of compilation units referenced by quotes *)
-val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)

@@ -2416,12 +2416,7 @@ let rec module_for_path loc env = function
       | None -> (
         match Ident.to_global id with
         | Some global ->
-          (* CR metaprogramming jrickard: I'm pretty confident this is bugged:
-             it ignores parameterized libraries, and references the wrong file for
-             impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
-             this references Stdlib). *)
-          Env.add_required_global ~require_for_quote_in_persistent_env:true path
-            env;
+          Env.add_required_global_for_quote path env;
           Identifier.Module.global_module loc global
         | None ->
           (* We must be in a [Toplevel_lock_for_directive] if we are quoting
@@ -2503,16 +2498,7 @@ let value_for_path loc env = function
 let value_for_path_opt loc env p =
   match value_for_path loc env p with res -> Some res | exception Exit -> None
 
-let quote_value_ident_path loc env path ident_kind =
-  (* CR metaprogramming jrickard: This probably doesn't work with parameterised
-     libraries etc. *)
-  (match ident_kind with
-  | Id_prim _ -> ()
-  | Id_value -> (
-    match Env.address_head (Env.find_value_address path env) with
-    | Env.AHunit _ ->
-      Env.add_required_global ~require_for_quote_in_persistent_env:true path env
-    | _ | (exception Not_found) -> ()));
+let quote_value_ident_path loc env path =
   match value_for_path_opt loc env path with
   | Some ident_val -> ident_val
   | None -> (
@@ -2531,8 +2517,8 @@ let quote_value_ident_path loc env path ident_kind =
         (Format_doc.compat Path.print)
         path)
 
-let quote_value_ident_path_as_exp loc env path ident_kind =
-  Exp_desc.ident loc (quote_value_ident_path loc env path ident_kind)
+let quote_value_ident_path_as_exp loc env path =
+  Exp_desc.ident loc (quote_value_ident_path loc env path)
 
 let type_path env ty =
   let desc =
@@ -3670,8 +3656,7 @@ and quote_expression_desc ~scopes ~transl stage e =
   List.iter (update_env_with_extra ~loc) e.exp_extra;
   let body =
     match e.exp_desc with
-    | Texp_ident { path; kind; _ } ->
-      quote_value_ident_path_as_exp loc env path kind
+    | Texp_ident { path; _ } -> quote_value_ident_path_as_exp loc env path
     | Texp_apply_layout _ ->
       Misc.fatal_error
         "Translquote: translation of layout-polymorphic instantiation is not \
@@ -3936,7 +3921,7 @@ and quote_expression_desc ~scopes ~transl stage e =
         in
         Exp_desc.splice loc (Code.inject exp)
     | Texp_new (path, _, _, _) ->
-      Exp_desc.new_ loc (quote_value_ident_path loc env path Id_value)
+      Exp_desc.new_ loc (quote_value_ident_path loc env path)
     | Texp_pack m -> Exp_desc.pack loc (quote_module_exp ~transl stage loc m)
     | Texp_unreachable -> Exp_desc.unreachable
     | Texp_src_pos -> Exp_desc.src_pos
@@ -3986,13 +3971,13 @@ and quote_expression_desc ~scopes ~transl stage e =
       let let_l =
         quote_value_ident_path
           (of_location ~scopes rcd.let_.bop_loc)
-          env rcd.let_.bop_op_path Id_value
+          env rcd.let_.bop_op_path
       and ands_l =
         List.map
           (fun bop ->
             quote_value_ident_path
               (of_location ~scopes bop.bop_loc)
-              env bop.bop_op_path Id_value)
+              env bop.bop_op_path)
           rcd.ands
       and defs =
         quote_expression ~scopes ~transl stage rcd.let_.bop_exp

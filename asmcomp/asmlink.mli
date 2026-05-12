@@ -27,7 +27,7 @@ val link :
   genfns:Generic_fns.Tbl.t ->
   units_tolink:Linkenv.unit_link_info list ->
   uses_eval:bool ->
-  quoted_globals:Compilation_unit.Name.Set.t ->
+  quoted_globals:Compilation_unit.Name.Set.t * Compilation_unit.Set.t ->
   ppf_dump:Format.formatter ->
   unit
 

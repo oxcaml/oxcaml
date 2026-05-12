@@ -1274,9 +1274,6 @@ let imports () = Persistent_env.imports !persistent_env
 let import_crcs ~source crcs =
   Persistent_env.import_crcs !persistent_env ~source crcs
 
-
-let quoted_globals () = Persistent_env.quoted_globals !persistent_env
-
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
 
@@ -1846,26 +1843,35 @@ let shape_or_leaf uid = function
 let required_globals = s_ref []
 let reset_required_globals () = required_globals := []
 let get_required_globals () = !required_globals
-let add_required_unit require_in_penv cu =
+let add_required_unit cu =
   if not (List.exists (Compilation_unit.equal cu) !required_globals)
-  then begin
-    required_globals := cu :: !required_globals;
-    if require_in_penv then
-      Persistent_env.require_global_for_quote !persistent_env
-        (Compilation_unit.name cu)
-  end
-let add_required_ident ~require_for_quote_in_persistent_env id env =
+  then required_globals := cu :: !required_globals
+let add_required_ident id env =
   if not !Clflags.transparent_modules && Ident.is_global id then
     let address = find_ident_module_address id env in
     match address_head address with
     | AHlocal _ -> ()
-    | AHunit cu -> begin
-        Persistent_env.require_global_for_quote !persistent_env
-          (Compilation_unit.name cu);
-        add_required_unit require_for_quote_in_persistent_env cu
-      end
-let add_required_global ~require_for_quote_in_persistent_env path env =
-  add_required_ident ~require_for_quote_in_persistent_env (Path.head path) env
+    | AHunit cu -> add_required_unit cu
+let add_required_global path env =
+  add_required_ident (Path.head path) env
+
+let add_required_global_for_quote path env =
+  let ident = Path.head path in
+  match Ident.to_global ident with
+  | None -> ()
+  | Some global ->
+    let address = find_ident_module_address ident env in
+    match address_head address with
+    | AHlocal _ -> ()
+    | AHunit cu ->
+      add_required_unit cu;
+      Persistent_env.require_intf_for_quote
+        !persistent_env (Compilation_unit.Name.of_head_of_global_name global);
+      Persistent_env.require_impl_for_quote !persistent_env cu
+
+let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
+
+let quoted_impls () = Persistent_env.quoted_impls !persistent_env
 
 let rec normalize_module_path lax env = function
   | Pident id as path when lax && Ident.is_global id ->
@@ -1890,9 +1896,7 @@ and expand_module_path lax env path =
       if not (lax || !Clflags.transparent_modules) then begin
         let id = Path.head path in
         if Ident.is_global_or_predef id && not (Ident.same id (Path.head path'))
-        then
-          add_required_global ~require_for_quote_in_persistent_env:false
-            (Pident id) env
+        then add_required_global (Pident id) env
       end;
       path'
   | _ -> path
