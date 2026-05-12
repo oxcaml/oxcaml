@@ -124,12 +124,6 @@ let iter_code t ~f =
       Code_or_metadata.iter_code code_or_metadata ~f)
     t
 
-let iter_code_metadata t ~f =
-  Code_id.Map.iter
-    (fun _code_id code_or_metadata ->
-      f (Code_or_metadata.code_metadata code_or_metadata))
-    t
-
 let from_raw ~sections t =
   Code_id.Map.map (Code_or_metadata.from_raw ~sections) t
 

@@ -61,24 +61,6 @@ let load_cmx_file_contents loader comp_unit =
                   (Format_doc.compat Compilation_unit.print)
                   accessible_comp_unit)
             (TE.Serializable.reachable_code_ids typing_env);
-          Exported_code.iter_code_metadata all_code ~f:(fun code_metadata ->
-              match Code_metadata.result_types code_metadata with
-              | Unknown | Bottom -> ()
-              | Ok result_types ->
-                let free_names = Result_types.free_names result_types in
-                let code_ids = Name_occurrences.code_ids free_names in
-                Code_id.Set.iter
-                  (fun code_id ->
-                    if not (EC.mem code_id all_code)
-                    then
-                      Misc.fatal_errorf
-                        "Missing metadata for code id '%a' that appears in the \
-                         result types for %a (while loading cmx for %a)"
-                        Code_id.print code_id Code_id.print
-                        (Code_metadata.code_id code_metadata)
-                        (Format_doc.compat Compilation_unit.print)
-                        accessible_comp_unit)
-                  code_ids);
           loader.imported_names
             <- Name.Set.union newly_imported_names loader.imported_names;
           loader.imported_code <- EC.merge all_code loader.imported_code;
