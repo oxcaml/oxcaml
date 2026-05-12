@@ -58,8 +58,8 @@ struct caml_unloadable_unit {
 
   /* (text_start, text_end) pairs covering the unit's [.text] regions. Each
    * range is registered with the runtime code-fragment table; the fragnums
-   * are stored here so [caml_unregister_unloadable_unit] can remove them
-   * during unload. */
+   * are stored here so the end-of-major-cycle unload pass can remove
+   * them during unload. */
   char **text_ranges; /* Flat: [s0, e0, s1, e1, ...]; length = 2 * num_text_ranges. */
   int *text_range_fragnums;
   uintnat num_text_ranges;
@@ -95,7 +95,9 @@ struct caml_unloadable_unit {
  *
  * The runtime takes ownership of the [unit] structure and links it into the
  * global registration list. The arrays referenced by the structure must
- * remain valid until [caml_unregister_unloadable_unit] is called.
+ * remain valid until the end-of-major-cycle unload pass
+ * ([caml_unloadable_check_and_unload_dead]) reclaims the unit and calls its
+ * [on_unload] callback.
  *
  * Side effects:
  *   - Registers each [text_ranges[i]] pair as a code fragment.
@@ -104,21 +106,6 @@ struct caml_unloadable_unit {
  * Must be called from a non-GC context (or holding the appropriate mutex);
  * the runtime takes the unloadable-units lock internally. */
 CAMLextern void caml_register_unloadable_unit(struct caml_unloadable_unit *u);
-
-/* Unregister and finalize an unloadable compilation unit. Removes the unit
- * from the global list, removes its code fragments, and clears any frame
- * table registration. Called by the end-of-major-cycle unload pass (G) when
- * the unit has been determined to be entirely unreachable.
- *
- * Does not free the [unit] memory or the buffer-backed arrays it points at;
- * those are the loader's responsibility (the loader [munmap]s the text and
- * data buffers after this returns). */
-/* REVIEW(claude): this entry point has no in-tree callers
-   (caml_unloadable_check_and_unload_dead inlines all its steps). It is also
-   a foot-gun: it claims to require STW in its comment but does not enforce
-   it, and would race the unload pass if a caller used it. Either delete it,
-   or add an assertion-style check / restrict its visibility. */
-CAMLextern void caml_unregister_unloadable_unit(struct caml_unloadable_unit *u);
 
 /* Iterate over all currently-registered unloadable units, calling [f] on
  * each. Used by the end-of-major-cycle pass (G) to find units that have
@@ -248,15 +235,12 @@ Caml_inline void caml_darken_unloadable_code_blocks_in_closure(
       caml_darken_code_block_for_entry(state, Field(closure, code_offset));
     }
     if (Is_last_closinfo(closinfo)) break;
-    /* REVIEW(claude): the [+ 1] here assumes there's always an infix
-       header between two function slots in a multi-function closure
-       prefix. That matches Slot_offsets.Layout's emission for
-       Function_slot ... Infix_header ... Function_slot. If the
-       front-end ever emits two adjacent function slots without an
-       infix header (or emits a different prefix layout), this walk
-       miscounts. Worth a hard assert in DEBUG that
-       [Tag_val(Field(closure, slot_start - 1) - X)] is Infix_tag (or
-       similar) before stepping. */
+    /* In a multi-function closure, [Slot_offsets.Layout] emits an
+       [Infix_tag] header between adjacent function slots. The word at
+       [slot_start + slot_size] is that header; assert this in DEBUG so a
+       layout change does not silently miscount. */
+    CAMLassert(
+      Tag_hd((header_t)Field(closure, slot_start + slot_size)) == Infix_tag);
     slot_start += slot_size + 1; /* skip past the infix header */
   }
 }
@@ -288,16 +272,15 @@ Caml_inline void caml_visit_code_block_for_entry(
  * works in mark, oldify, and compactor scans uniformly. */
 #include "frame_descriptors.h"
 #include "codefrag.h"
-/* REVIEW(claude): correctness depends on every value that ever reaches a
-   [Code_pointer]-typed slot being a function-entry PC (so [*((value*)cp - 1)]
-   is the back-pointer to the [Code_block]). The compiler enforces this only
-   by convention — [Code_pointer] machtype is not arithmetic-safe and any path
-   that produces a code pointer via something other than a closure Field-0
-   load or a static [Csymbol_address] of a function entry will silently break
-   here (we'd dereference random text). It would be safer to look up the code
-   fragment first and use [cf->code_start - 1] as the back-pointer slot rather
-   than trusting [cp - 1]; or at minimum to assert in DEBUG that the
-   fragment's code_start matches [cp]. */
+/* Correctness depends on every value that ever reaches a
+ * [Code_pointer]-typed slot being a function-entry PC: only then is
+ * [*((value*)cp - 1)] the back-pointer to the unit's [Code_block]. The
+ * compiler enforces this only by convention — [Code_pointer] machtype is
+ * not arithmetic-safe and the only in-tree producers are closure Field-0
+ * loads and static [Csymbol_address] references of entry symbols. The
+ * DEBUG assertion below catches any future divergence: if a non-entry
+ * PC ever reaches a [Code_pointer] slot, [cf->code_start != cp] and the
+ * assertion fires before we dereference [cp - 1]. */
 Caml_inline void caml_visit_frame_code_ptr_slots(
     scanning_action f, void *fdata, frame_descr *d, char *sp, value *regs) {
   unsigned char *p = frame_end_of_live_ofs(d);
@@ -318,11 +301,13 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
       uint32_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
       /* The code fragment table contains non-unloadable code too (main
-       * program, Dynlink). Dereferencing the [entry - 1] back-pointer word is
-       * only valid for unloadable entries, so require membership in an
+       * program, Dynlink). Dereferencing the [entry - 1] back-pointer word
+       * is only valid for unloadable entries, so require membership in an
        * unloadable unit. */
-      if (caml_find_code_fragment_by_pc((char *)cp) != NULL
+      struct code_fragment *cf = caml_find_code_fragment_by_pc((char *)cp);
+      if (cf != NULL
           && caml_find_unloadable_unit_by_pc((char *)cp) != NULL) {
+        CAMLassert(cf->code_start == (char *)cp);
         caml_visit_code_block_for_entry(f, fdata, cp);
       }
     }
@@ -334,8 +319,10 @@ Caml_inline void caml_visit_frame_code_ptr_slots(
       uint16_t ofs = q[k];
       value cp = (ofs & 1) ? regs[ofs >> 1] : *(value *)(sp + ofs);
       /* See long-format case above. */
-      if (caml_find_code_fragment_by_pc((char *)cp) != NULL
+      struct code_fragment *cf = caml_find_code_fragment_by_pc((char *)cp);
+      if (cf != NULL
           && caml_find_unloadable_unit_by_pc((char *)cp) != NULL) {
+        CAMLassert(cf->code_start == (char *)cp);
         caml_visit_code_block_for_entry(f, fdata, cp);
       }
     }

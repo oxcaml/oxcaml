@@ -400,19 +400,10 @@ static void jit_unit_on_unload(struct caml_unloadable_unit *u) {
     if (ld->buffer_base != NULL && ld->buffer_size > 0) {
       /* Restore RW protection on the entire buffer before [free]: parts
        * have been mapped RX (text) or RO (.rodata) and the allocator may
-       * touch arbitrary regions of the buffer when reclaiming. */
-      /* REVIEW(claude): [buffer_size] here is the RAW byte count
-         passed to [aligned_alloc(page_size, total_size)] by
-         [jit_memalign]; total_size is computed in [alloc_all] as the
-         sum of section sizes and is not in general page-aligned. The
-         kernel rounds [length] up to the next page boundary, so this
-         mprotect can change protection on memory just past the end of
-         the buffer. With a glibc/Mach-O aligned_alloc that mmaps whole
-         pages this is harmless slack, but it is implementation-defined
-         and could trip if the allocator places small allocations
-         tail-packed against this region. Round [buffer_size] up to the
-         page size before storing it in [jit_unit_loader_data], or
-         compute it from the buffer-extent contract of the allocator. */
+       * touch arbitrary regions of the buffer when reclaiming. The
+       * stored [buffer_size] is rounded up to the page size at
+       * registration time so [mprotect] does not affect memory past
+       * the buffer. */
       (void)mprotect(ld->buffer_base, ld->buffer_size, PROT_READ | PROT_WRITE);
       free(ld->buffer_base);
     }
@@ -464,9 +455,38 @@ CAMLprim value jit_register_unloadable_unit_native(
   uintnat n_data = (data_blocks_table == NULL) ? 0
                                                : (uintnat)data_blocks_table[0];
 
+  /* Allocate every owned buffer up-front and check each. On any failure,
+   * free everything allocated so far and raise. This avoids the
+   * longjmp-leaks-prior-allocations pattern of a cascade of
+   * [caml_stat_alloc_noexc] + [caml_raise_out_of_memory]. */
   struct caml_unloadable_unit *u =
       caml_stat_alloc_noexc(sizeof(struct caml_unloadable_unit));
-  if (u == NULL) caml_raise_out_of_memory();
+  struct jit_unit_loader_data *ld =
+      caml_stat_alloc_noexc(sizeof(struct jit_unit_loader_data));
+  value *code_blocks_buf =
+      (n_code > 0) ? caml_stat_alloc_noexc(n_code * sizeof(value)) : NULL;
+  value *data_blocks_buf =
+      (n_data > 0) ? caml_stat_alloc_noexc(n_data * sizeof(value)) : NULL;
+  char **text_ranges_buf =
+      (n_funcs > 0) ? caml_stat_alloc_noexc(2 * n_funcs * sizeof(char *))
+                    : NULL;
+  int *text_range_fragnums_buf =
+      (n_funcs > 0) ? caml_stat_alloc_noexc(n_funcs * sizeof(int)) : NULL;
+
+  if (u == NULL || ld == NULL
+      || (n_code > 0 && code_blocks_buf == NULL)
+      || (n_data > 0 && data_blocks_buf == NULL)
+      || (n_funcs > 0 && text_ranges_buf == NULL)
+      || (n_funcs > 0 && text_range_fragnums_buf == NULL)) {
+    caml_stat_free(u);
+    caml_stat_free(ld);
+    caml_stat_free(code_blocks_buf);
+    caml_stat_free(data_blocks_buf);
+    caml_stat_free(text_ranges_buf);
+    caml_stat_free(text_range_fragnums_buf);
+    caml_raise_out_of_memory();
+  }
+
   u->next = NULL;
   u->num_code_blocks = n_code;
   u->num_data_blocks = n_data;
@@ -474,30 +494,29 @@ CAMLprim value jit_register_unloadable_unit_native(
   u->frametable = (intnat *)Nativeint_val(frametable_addr);
   u->gc_roots = (void *)Nativeint_val(gc_roots_addr);
   u->on_unload = &jit_unit_on_unload;
-
-  struct jit_unit_loader_data *ld =
-      caml_stat_alloc_noexc(sizeof(struct jit_unit_loader_data));
-  if (ld == NULL) caml_raise_out_of_memory();
-  ld->buffer_base = (void *)Nativeint_val(buffer_base_addr);
-  ld->buffer_size = (size_t)Long_val(buffer_size);
+  u->code_blocks = code_blocks_buf;
+  u->data_blocks = data_blocks_buf;
+  u->text_ranges = text_ranges_buf;
+  u->text_range_fragnums = text_range_fragnums_buf;
   u->loader_data = ld;
 
-  /* REVIEW(claude): the cascade of [caml_stat_alloc_noexc] +
-     [caml_raise_out_of_memory] below leaks every previously-allocated
-     buffer (and [u] / [ld] above) on any one of these failures, because
-     [caml_raise_out_of_memory] longjmps out of the function. The leak
-     amount is small and OOM is fatal-ish, but it would be cleaner to
-     either compute total bytes once and call a single allocator, or
-     stash partial state on a cleanup list. At minimum the pattern
-     should be commented. */
-  u->code_blocks = caml_stat_alloc_noexc(n_code * sizeof(value));
-  if (u->code_blocks == NULL && n_code > 0) caml_raise_out_of_memory();
+  ld->buffer_base = (void *)Nativeint_val(buffer_base_addr);
+  {
+    /* Round [buffer_size] up to the page size: the buffer came from
+     * [aligned_alloc(page_size, ...)] in [jit_memalign], so the kernel-
+     * visible mapping covers at least the page-aligned length. Storing
+     * the page-aligned size makes [mprotect] in [jit_unit_on_unload]
+     * self-consistent and avoids relying on implementation-defined
+     * "round length up" behaviour. */
+    size_t raw = (size_t)Long_val(buffer_size);
+    size_t pg = (size_t)getpagesize();
+    ld->buffer_size = (raw + pg - 1) & ~(pg - 1);
+  }
+
   for (uintnat i = 0; i < n_code; i++) {
     u->code_blocks[i] = (value)Nativeint_val(Field(code_blocks, i));
   }
 
-  u->data_blocks = caml_stat_alloc_noexc(n_data * sizeof(value));
-  if (u->data_blocks == NULL && n_data > 0) caml_raise_out_of_memory();
   for (uintnat i = 0; i < n_data; i++) {
     /* The array entries are stored as raw addresses (Csymbol_address, which
      * the assembler emits as machine words). */
@@ -505,19 +524,12 @@ CAMLprim value jit_register_unloadable_unit_native(
   }
 
   /* Per-function text ranges: [entry_i .. entry_{i+1}); last extends to
-   * code_end. */
-  /* REVIEW(claude): each text range starts at the function entry, NOT
-     at the back-pointer word at [entry - 1]. So a PC-based fragment
-     lookup for [entry - 1] (e.g. someone treating the back-pointer
-     itself as a code pointer) would miss. This is fine for the
-     designed paths (return-address scan, code-pointer-slot scan, both
-     start from in-function PCs) but is worth a comment to forestall
-     "improvements" that try to expand the range to cover the
-     back-pointer. */
-  u->text_ranges = caml_stat_alloc_noexc(2 * n_funcs * sizeof(char *));
-  if (u->text_ranges == NULL && n_funcs > 0) caml_raise_out_of_memory();
-  u->text_range_fragnums = caml_stat_alloc_noexc(n_funcs * sizeof(int));
-  if (u->text_range_fragnums == NULL && n_funcs > 0) caml_raise_out_of_memory();
+   * [code_end]. Each range starts at the function entry, NOT at the
+   * back-pointer word at [entry - 1]. PC-based fragment lookups for
+   * [entry - 1] therefore miss — this is intentional: the designed
+   * paths (return-address scan, code-pointer-slot scan) both start
+   * from in-function PCs. Do not expand the range to cover the
+   * back-pointer. */
   char *code_end = (char *)Nativeint_val(code_end_addr);
   for (uintnat i = 0; i < n_funcs; i++) {
     char *start = (char *)Nativeint_val(Field(function_entries, i));

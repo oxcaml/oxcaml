@@ -182,44 +182,6 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
   }
 }
 
-void caml_unregister_unloadable_unit(struct caml_unloadable_unit *u) {
-  CAMLassert(u != NULL);
-
-  caml_plat_lock_blocking(&units_mutex);
-  struct caml_unloadable_unit **link = &units_head;
-  while (*link != NULL && *link != u) link = &(*link)->next;
-  int unlinked = (*link == u);
-  if (unlinked) *link = u->next;
-  caml_plat_unlock(&units_mutex);
-
-  if (unlinked) {
-    atomic_fetch_sub(&caml_unloadable_units_live_count, 1);
-  }
-
-  /* Remove each text range's code fragment. The fragment objects are placed
-   * on the codefrag garbage list and freed by
-   * [caml_code_fragment_cleanup_from_stw_single]. */
-  for (uintnat i = 0; i < u->num_text_ranges; i++) {
-    struct code_fragment *cf =
-        caml_find_code_fragment_by_num(u->text_range_fragnums[i]);
-    if (cf != NULL) caml_remove_code_fragment(cf);
-  }
-
-  /* Frame-table removal: must be performed under STW because it mutates the
-   * shared [current_frame_descrs] hashtable in place. The unload pass (G),
-   * which is the primary unloader, calls
-   * [caml_unregister_frametable_from_stw_single] directly. The explicit
-   * [caml_unregister_unloadable_unit] entry point assumes its caller is
-   * also STW-safe. */
-  if (u->frametable != NULL) {
-    caml_unregister_frametable_from_stw_single(u->frametable);
-  }
-
-  if (u->gc_roots != NULL) {
-    caml_unregister_dyn_global(u->gc_roots);
-  }
-}
-
 void caml_iter_unloadable_units(
     void (*f)(struct caml_unloadable_unit *, void *), void *user_data) {
   caml_plat_lock_blocking(&units_mutex);
