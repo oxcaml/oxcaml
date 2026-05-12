@@ -40,23 +40,24 @@ let cmi_bundle ~quoted_cmi =
     match missing_globals with
     | [] -> cmis
     | (_, true) :: missing_globals -> loop cmis missing_globals
-    | (global, false) :: missing_globals -> (
+    | (global, false) :: missing_globals ->
       if CU.Name.Map.mem global cmis
       then loop cmis missing_globals
       else
-        match Load_path.find_normalized (CU.Name.to_string global ^ ".cmi") with
-        | exception Not_found -> raise (Error (Missing_intf_for_quote global))
-        | path ->
-          let cmi = Cmi_format.read_cmi path in
-          let missing_globals =
-            Array.fold_left
-              (fun missing_globals import ->
-                let is_alias = Option.is_none (Import_info.crc import) in
-                (Import_info.name import, is_alias) :: missing_globals)
-              missing_globals cmi.cmi_crcs
-          in
-          let new_cmis = CU.Name.Map.add global cmi cmis in
-          loop new_cmis missing_globals)
+        let path =
+          try Load_path.find_normalized (CU.Name.to_string global ^ ".cmi")
+          with Not_found -> raise (Error (Missing_intf_for_quote global))
+        in
+        let cmi = Cmi_format.read_cmi path in
+        let missing_globals =
+          Array.fold_left
+            (fun missing_globals import ->
+              let is_alias = Option.is_none (Import_info.crc import) in
+              (Import_info.name import, is_alias) :: missing_globals)
+            missing_globals cmi.cmi_crcs
+        in
+        let new_cmis = CU.Name.Map.add global cmi cmis in
+        loop new_cmis missing_globals
   in
   let initial =
     List.map (fun g -> g, false) (CU.Name.Set.elements quoted_cmi)

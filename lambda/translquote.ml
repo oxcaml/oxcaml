@@ -2740,19 +2740,17 @@ let assert_no_jkinds jkind =
           Location.print_loc pjka_loc)
     jkind
 
-let rec quote_module_path loc = function
-  (* CR metaprogramming jrickard: I think this should probably use
-     [Env.find_module_address] at least it should do to register the globals
-     that will be needed. *)
-  | Path.Pident s -> (
+let rec quote_module_path loc env = function
+  | Path.Pident s as path -> (
     match Ident.to_global s with
     | Some global ->
+      Env.add_required_global_for_quote path env;
       Identifier.Module.global_module loc global |> Identifier.Module.wrap
     | None ->
       fatal_errorf "Translquote [at %a]: non-global module %a"
         Location.print_loc (to_location loc) Ident.print s)
   | Path.Pdot (p, s) ->
-    Identifier.Module.dot loc (quote_module_path loc p) s
+    Identifier.Module.dot loc (quote_module_path loc env p) s
     |> Identifier.Module.wrap
   | _ ->
     fatal_errorf "Translquote [at %a]: no support for Papply in quoting modules"
@@ -3421,20 +3419,20 @@ and quote_function ~scopes ~transl stage loc fn extras =
     fatal_errorf "Translquote [at %a]: unexpected usage of quote_function."
       Location.print_loc (to_location loc)
 
-and quote_module_exp ~transl stage loc mod_exp =
+and quote_module_exp ~transl stage loc env mod_exp =
   match mod_exp.mod_desc with
   | Tmod_ident (path, _) ->
-    let m = quote_module_path loc path in
+    let m = quote_module_path loc env path in
     Module.ident loc m |> Module.wrap
   | Tmod_apply (funct, arg, _) ->
-    let transl_funct = quote_module_exp ~transl stage loc funct in
-    let transl_arg = quote_module_exp ~transl stage loc arg in
+    let transl_funct = quote_module_exp ~transl stage loc env funct in
+    let transl_arg = quote_module_exp ~transl stage loc env arg in
     Module.apply loc transl_funct transl_arg |> Module.wrap
   | Tmod_apply_unit funct ->
-    let transl_funct = quote_module_exp ~transl stage loc funct in
+    let transl_funct = quote_module_exp ~transl stage loc env funct in
     Module.apply_unit loc transl_funct |> Module.wrap
   | Tmod_constraint (mod_exp, _, _, _) ->
-    quote_module_exp ~transl stage loc mod_exp
+    quote_module_exp ~transl stage loc env mod_exp
   | Tmod_structure _ | Tmod_functor _ ->
     fatal_errorf "Translquote [at %a]: cannot quote struct..end blocks"
       Location.print_loc (to_location loc)
@@ -3886,7 +3884,7 @@ and quote_expression_desc ~scopes ~transl stage e =
       fatal_errorf "Translquote [at %a]: Texp_open not implemented"
         Location.print_loc (to_location loc)
     | Texp_letmodule (ident, _, _, mod_exp, body) -> (
-      let mod_exp = quote_module_exp ~transl stage loc mod_exp in
+      let mod_exp = quote_module_exp ~transl stage loc env mod_exp in
       match ident with
       | None ->
         Exp_desc.letmodule_nonbinding loc mod_exp
@@ -3922,7 +3920,8 @@ and quote_expression_desc ~scopes ~transl stage e =
         Exp_desc.splice loc (Code.inject exp)
     | Texp_new (path, _, _, _) ->
       Exp_desc.new_ loc (quote_value_ident_path loc env path)
-    | Texp_pack m -> Exp_desc.pack loc (quote_module_exp ~transl stage loc m)
+    | Texp_pack m ->
+      Exp_desc.pack loc (quote_module_exp ~transl stage loc env m)
     | Texp_unreachable -> Exp_desc.unreachable
     | Texp_src_pos -> Exp_desc.src_pos
     | Texp_exclave e ->
