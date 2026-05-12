@@ -326,9 +326,11 @@ module type Solver_mono = sig
     log:changes ref option ->
     unit
 
-  (** Copies all reachable variables whose level is at or above
+  (** If the variable has not yet been copied within the same [copy_scope],
+      [copy] copies all reachable variables whose level is at or above
       [copy_from_level], and enforces that the copy is below [copy_to_level].
-      Returns the copied mode *)
+      Returns either the freshly copied mode, or the copy cached in
+      [copy_scope]. *)
   val copy :
     copy_scope:copy_scope ->
     copy_from_level:int ->
