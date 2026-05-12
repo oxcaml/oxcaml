@@ -376,27 +376,15 @@ let pat
           (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
     | Tpat_record_unboxed_product (l, closed) ->
         Tpat_record_unboxed_product
-<<<<<<< HEAD
           (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) ->
         Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
-||||||| 5.2.0minus-31
-          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
-=======
-          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
     | Tpat_fun_layout { id; name; uid; sort; mode; lpoly } ->
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode; lpoly }
->>>>>>> 5.2.0minus-37
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -536,19 +524,7 @@ let expr sub x =
   in
   let map_block_access sub = function
     | Baccess_field (lid, ld) ->
-<<<<<<< HEAD
       Baccess_field (map_loc_lid sub lid, ld)
-    | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
-      let index = sub.expr sub index in
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
-||||||| 5.2.0minus-31
-      Baccess_field (map_loc sub lid, ld)
-    | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
-      let index = sub.expr sub index in
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
-=======
-      Baccess_field (map_loc sub lid, ld)
->>>>>>> 5.2.0minus-37
     | Baccess_block (mut, idx) ->
       Baccess_block (mut, sub.expr sub idx)
   in
@@ -558,18 +534,10 @@ let expr sub x =
   in
   let exp_desc =
     match x.exp_desc with
-<<<<<<< HEAD
-    | Texp_ident (path, lid, vd, idk, uu, mode) ->
-        Texp_ident (path, map_loc_lid sub lid, vd, idk, uu, mode)
-||||||| 5.2.0minus-31
-    | Texp_ident (path, lid, vd, idk, uu, mode) ->
-        Texp_ident (path, map_loc sub lid, vd, idk, uu, mode)
-=======
     | Texp_ident r ->
-        Texp_ident { r with lid = map_loc sub r.lid }
+        Texp_ident { r with lid = map_loc_lid sub r.lid }
     | Texp_apply_layout (exp, args) ->
         Texp_apply_layout (sub.expr sub exp, args)
->>>>>>> 5.2.0minus-37
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
@@ -871,18 +839,10 @@ let with_constraint sub = function
   | Twith_typesubst decl -> Twith_typesubst (sub.type_declaration sub decl)
   | Twith_modtype mty -> Twith_modtype (sub.module_type sub mty)
   | Twith_modtypesubst mty -> Twith_modtypesubst (sub.module_type sub mty)
-<<<<<<< HEAD
   | Twith_module (path, lid) -> Twith_module (path, map_loc_lid sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc_lid sub lid)
-||||||| 5.2.0minus-31
-  | Twith_module (path, lid) -> Twith_module (path, map_loc sub lid)
-  | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc sub lid)
-=======
-  | Twith_module (path, lid) -> Twith_module (path, map_loc sub lid)
-  | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc sub lid)
   | Twith_jkind      jd -> Twith_jkind (sub.jkind_declaration sub jd)
   | Twith_jkindsubst jd -> Twith_jkindsubst (sub.jkind_declaration sub jd)
->>>>>>> 5.2.0minus-37
 
 let open_description sub od =
   {od with open_loc = sub.location sub od.open_loc;
