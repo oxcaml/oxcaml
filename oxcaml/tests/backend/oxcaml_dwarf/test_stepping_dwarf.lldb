@@ -1,6 +1,6 @@
-(lldb) breakpoint set -b Test_stepping_dwarf.f_start
+(lldb) b Test_stepping_dwarf.f_start
 (lldb) run
-(lldb) breakpoint set -b Test_stepping_dwarf.f_step_through_mutations
+(lldb) b Test_stepping_dwarf.f_step_through_mutations
 (lldb) c
 (lldb) script print("=== Stepping through mutations ===")
 (lldb) frame variable
