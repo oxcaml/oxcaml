@@ -677,26 +677,6 @@ type error =
 
 exception Error of error
 
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-
-val report_error: level:int -> error Format_doc.format_printer
-val report_error_doc: level:int -> error Format_doc.printer
-
-val report_lookup_error:
-    level:int -> Location.t -> t -> lookup_error Format_doc.format_printer
-val report_lookup_error_doc:
-    level:int -> Location.t -> t -> lookup_error Format_doc.printer
-=======
-
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
-
-val report_lookup_error:
-    Location.t -> t -> lookup_error Format_doc.format_printer
-val report_lookup_error_doc:
-    Location.t -> t -> lookup_error Format_doc.printer
->>>>>>> 5.2.0minus-37
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool

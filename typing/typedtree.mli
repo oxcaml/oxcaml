@@ -751,29 +751,7 @@ and ident_kind =
   | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
 
 and block_access =
-<<<<<<< HEAD
   | Baccess_field of Longident.t loc * Data_types.label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
-||||||| 5.2.0minus-31
-  | Baccess_field of Longident.t loc * Types.label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
-=======
-  | Baccess_field of Longident.t loc * Types.label_description
->>>>>>> 5.2.0minus-37
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =

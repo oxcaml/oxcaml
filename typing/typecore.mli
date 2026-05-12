@@ -75,14 +75,10 @@ type pattern_variable =
     pv_kind: pattern_variable_kind;
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
-<<<<<<< HEAD
     pv_uid: Uid.t;
-||||||| 5.2.0minus-31
-=======
     pv_lpoly: Types.Lpoly.t;
     (** Not yet determined; gets determined during generalization in
         [type_let]. *)
->>>>>>> 5.2.0minus-37
   }
 
 val mk_expected:
@@ -211,15 +207,12 @@ type unsupported_stack_allocation =
   | List_comprehension
   | Array_comprehension
 
-<<<<<<< HEAD
 type existential_binding =
   | Bind_already_bound
   | Bind_not_in_scope
   | Bind_non_locally_abstract
-||||||| 5.2.0minus-31
-=======
+
 type mode_mismatch_kind = Parameter | Return
->>>>>>> 5.2.0minus-37
 
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
