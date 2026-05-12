@@ -152,8 +152,6 @@ module Typing_env : sig
 
     val extract_symbol_approx :
       t -> Symbol.t -> (Code_id.t -> 'code) -> 'code Value_approximation.t
-
-    val reachable_code_ids : t -> Code_id.Set.t
   end
 
   val print : Format.formatter -> t -> unit

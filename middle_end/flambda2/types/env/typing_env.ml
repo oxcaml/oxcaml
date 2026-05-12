@@ -1136,8 +1136,6 @@ module Serializable : sig
 
   val extract_symbol_approx :
     t -> Symbol.t -> (Code_id.t -> 'code) -> 'code Value_approximation.t
-
-  val reachable_code_ids : t -> Code_id.Set.t
 end = struct
   type t = serializable
 
@@ -1161,14 +1159,6 @@ end = struct
         env.defined_symbols []
     in
     { defined_symbols_without_equations; code_age_relation; just_after_level }
-
-  let reachable_code_ids (t : t) =
-    let names_to_types = Cached_level.names_to_types t.just_after_level in
-    Name.Map.fold
-      (fun _name (ty, _) code_ids ->
-        Name_occurrences.fold_code_ids (TG.free_names ty) ~init:code_ids
-          ~f:(fun code_ids code_id -> Code_id.Set.add code_id code_ids))
-      names_to_types Code_id.Set.empty
 
   let predefined_exceptions symbols : t =
     let defined_symbols_without_equations = Symbol.Set.elements symbols in
