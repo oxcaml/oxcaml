@@ -392,10 +392,6 @@ unsigned_to_int:
 .L1:
   movl  $1, %eax
   ret
-.L2:
-  call  .Lcaml_call_gc_
-.L3:
-  jmp   .L0
 |}]
 
 let of_float x = Int64_u.of_float x
@@ -420,10 +416,6 @@ to_float:
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_sse_
-.L2:
-  jmp   .L0
 |}]
 
 let of_int32 x = Int64_u.of_int32 x
@@ -450,10 +442,6 @@ to_int32:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let of_nativeint x = Int64_u.of_nativeint x
@@ -479,10 +467,6 @@ to_nativeint:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let of_int32_u x = Int64_u.of_int32_u x
@@ -533,10 +517,6 @@ float_of_bits:
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 (* CR ttebbi: Subtraction should be done on byte registers. *)
@@ -642,10 +622,6 @@ to_int64:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let of_int64 x = Int64_u.of_int64 x

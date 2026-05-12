@@ -40,14 +40,6 @@ one_or_two_element_list:
   movq  %rdi, 8(%rax)
   addq  $8, %rsp
   ret
-.L3:
-  call  .Lcaml_call_gc_
-.L4:
-  jmp   .L2
-.L5:
-  call  .Lcaml_call_gc_
-.L6:
-  jmp   .L0
 |}]
 
 
@@ -94,10 +86,6 @@ spill_slot_lifetime:
   vmovsd %xmm0, 24(%rax)
   addq  $24, %rsp
   ret
-.L5:
-  call  .Lcaml_call_gc_sse_
-.L6:
-  jmp   .L4
 
 spill_slot_lifetime.get_one:
   vmovsd .L122(%rip), %xmm0

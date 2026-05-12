@@ -483,10 +483,6 @@ to_float:
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let to_float_u x = Int16_u.to_float_u x
@@ -513,10 +509,6 @@ to_float32:
   vmovss %xmm0, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let to_float32_u x = Int16_u.to_float32_u x
@@ -563,10 +555,6 @@ to_int32:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let to_int32_u x = Int16_u.to_int32_u x
@@ -591,10 +579,6 @@ to_int64:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let to_int64_u x = Int16_u.to_int64_u x
@@ -636,10 +620,6 @@ to_nativeint:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let to_nativeint_u x = Int16_u.to_nativeint_u x

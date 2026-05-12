@@ -141,10 +141,6 @@ poly_unsafe_get:
 .L1:
   movq  -4(%rdi,%rbx,4), %rax
   ret
-.L2:
-  call  .Lcaml_call_gc_
-.L3:
-  jmp   .L0
 |}]
 
 let poly_unsafe_set (a : 'a array) (i : int) (v : 'a) =
@@ -507,10 +503,6 @@ poly_safe_get:
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L3:
-  call  .Lcaml_call_gc_
-.L4:
-  jmp   .L0
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =

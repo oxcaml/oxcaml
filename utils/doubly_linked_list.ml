@@ -367,10 +367,24 @@ let for_alli t ~f =
   in
   aux f 0 t.first
 
-let to_list t = fold_right t ~f:(fun hd tl -> hd :: tl) ~init:[]
+let range_to_list ~from_incl ~to_excl =
+  match from_incl, to_excl with
+  | None, _ -> []
+  | Some from_incl, None ->
+    let[@tail_mod_cons] rec suffix pos =
+      match next pos with None -> [] | Some cell -> value cell :: suffix cell
+    in
+    value from_incl :: suffix from_incl
+  | Some from_incl, Some to_excl ->
+    let[@tail_mod_cons] rec loop pos =
+      if pos.node == to_excl.node
+      then []
+      else
+        value pos :: (match next pos with None -> [] | Some cell -> loop cell)
+    in
+    loop from_incl
 
-let[@tail_mod_cons] rec suffix pos =
-  match next pos with None -> [] | Some cell -> value cell :: suffix cell
+let to_list t = range_to_list ~from_incl:(hd_cell t) ~to_excl:None
 
 let to_array t =
   let len = length t in

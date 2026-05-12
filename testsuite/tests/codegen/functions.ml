@@ -55,10 +55,6 @@ mutual_recursion:
   leaq  24(%rdi), %rbx
   addq  $8, %rsp
   jmp   camlTOP3__f_5_8_code@PLT
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 
 mutual_recursion.f:
   movq  %rbx, %rdi
@@ -128,14 +124,6 @@ f:
   movq  (%rbx), %rdi
   addq  $8, %rsp
   jmp   *%rdi
-.L4:
-  call  .Lcaml_call_gc_
-.L5:
-  jmp   .L2
-.L6:
-  call  .Lcaml_call_gc_
-.L7:
-  jmp   .L0
 |}]
 
 

@@ -185,10 +185,6 @@ two_element_list:
   movq  %rdi, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 
@@ -276,10 +272,6 @@ pause:
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 (* Cross-type conversions between unboxed types *)

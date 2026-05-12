@@ -87,10 +87,13 @@ val for_all : 'a t -> f:('a -> bool) -> bool
 
 val for_alli : 'a t -> f:(int -> 'a -> bool) -> bool
 
-val to_list : 'a t -> 'a list
+(** The range of cells from [from_incl] to [to_excl]. If [from_incl] is [None],
+    then the result is the empty list. Otherwise, if [to_excl] is [None], then
+    the reange extends to the end of the list.*)
+val range_to_list :
+  from_incl:'a cell option -> to_excl:'a cell option -> 'a list
 
-(** the list suffix from the provided cell (exclusive) *)
-val suffix : 'a cell -> 'a list
+val to_list : 'a t -> 'a list
 
 val to_array : 'a t -> 'a array
 

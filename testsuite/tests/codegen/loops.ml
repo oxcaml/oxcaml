@@ -143,10 +143,6 @@ f:
   movl  $1, %eax
   addq  $8, %rsp
   jmp   camlTOP5__do_work_11_15_code@PLT
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 
 f.do_work:
   movq  16(%rbx), %rax

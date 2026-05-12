@@ -289,7 +289,7 @@ let generate_asm oc lines =
       Buffer.add_char b '\n';
       Buffer.output_buffer oc b)
 
-let format_asm_for_expect_asm ~name ~body =
+let format_asm_for_expect_asm ~name ~body ~hidden =
   let module D = Asm_targets.Asm_directives.Directive in
   let module L = Asm_targets.Asm_label in
   let tab_stops = [| 2; 8 |] in
@@ -321,13 +321,11 @@ let format_asm_for_expect_asm ~name ~body =
       match[@warning "-4"] line with
       | Directive (D.New_label (D.Label l, _)) ->
         let old_str = L.encode l in
-        if not (Hashtbl.mem label_map old_str)
-        then (
-          let new_label = L.create_int (L.section l) !next_id in
-          Hashtbl.add label_map old_str new_label;
-          incr next_id)
+        let new_label = L.create_int (L.section l) !next_id in
+        Hashtbl.add label_map old_str new_label;
+        incr next_id
       | Ins _ | Directive _ -> ())
-    body;
+    (body @ hidden);
   let rewrite_str s =
     match Hashtbl.find_opt label_map s with
     | None -> s

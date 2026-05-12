@@ -77,6 +77,8 @@ val current_output_pos : unit -> output_pos
 
 val output_from : output_pos -> asm_line list
 
+val output_range : from_pos:output_pos -> to_pos:output_pos -> asm_line list
+
 val peephole_optimize_from : output_pos -> unit
 
 (** Code emission *)

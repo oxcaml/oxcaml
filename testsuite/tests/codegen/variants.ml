@@ -306,13 +306,4 @@ double_match:
   movq  %rsi, 64(%r14)
   addq  $8, %rsp
   ret
-.L6:
-  call  caml_call_local_realloc@PLT
-  jmp   .L4
-.L7:
-  call  caml_call_local_realloc@PLT
-  jmp   .L2
-.L8:
-  call  caml_call_local_realloc@PLT
-  jmp   .L0
 |}]

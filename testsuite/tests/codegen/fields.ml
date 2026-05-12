@@ -102,10 +102,6 @@ header:
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 (* int_as_pointer *)
@@ -149,10 +145,6 @@ make_ref:
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
 
 let deref r = !r

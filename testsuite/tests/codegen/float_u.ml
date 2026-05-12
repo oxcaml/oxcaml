@@ -117,10 +117,6 @@ to_float:
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_sse_
-.L2:
-  jmp   .L0
 |}]
 
 
