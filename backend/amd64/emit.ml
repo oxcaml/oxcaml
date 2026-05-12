@@ -3192,5 +3192,6 @@ let end_assembly () =
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   invoke_expect_asm_callbacks ();
   X86_proc.generate_code asm;
+  Binary_emitter_helpers.end_emission ();
   (* The internal assembler does not work if reset_all is called here *)
   if not !Oxcaml_flags.internal_assembler then reset_all ()
