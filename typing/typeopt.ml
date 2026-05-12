@@ -204,7 +204,7 @@ let classify ~classify_product env ty layout : _ classification =
     if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
   else match get_desc ty with
-  | Tvar _ | Tunivar _ ->
+  | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
   | Tconstr (p, _args, _abbrev) ->
       if Path.same p Predef.path_float then Float
@@ -261,7 +261,7 @@ let classify ~classify_product env ty layout : _ classification =
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
-  | Tof_kind _ | Trepr _ ->
+  | Trepr _ ->
       assert false
   end
   | Base (Float64, _) -> Unboxed_float Unboxed_float64
