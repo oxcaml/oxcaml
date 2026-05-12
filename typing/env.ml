@@ -1274,11 +1274,6 @@ let imports () = Persistent_env.imports !persistent_env
 let import_crcs ~source crcs =
   Persistent_env.import_crcs !persistent_env ~source crcs
 
-let require_global_for_quote name =
-  Persistent_env.require_global_for_quote !persistent_env name
-
-let quoted_globals () = Persistent_env.quoted_globals !persistent_env
-
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
 
@@ -1848,17 +1843,24 @@ let shape_or_leaf uid = function
 let required_globals = s_ref []
 let reset_required_globals () = required_globals := []
 let get_required_globals () = !required_globals
-let add_required_unit cu =
+let add_required_unit ~for_quote cu =
   if not (List.exists (Compilation_unit.equal cu) !required_globals)
-  then required_globals := cu :: !required_globals
-let add_required_ident id env =
+  then begin
+    required_globals := cu :: !required_globals;
+    if for_quote then
+      Persistent_env.require_global_for_quote !persistent_env
+        (Compilation_unit.name cu)
+  end
+let add_required_ident ~for_quote id env =
   if not !Clflags.transparent_modules && Ident.is_global id then
     let address = find_ident_module_address id env in
     match address_head address with
     | AHlocal _ -> ()
-    | AHunit cu -> add_required_unit cu
-let add_required_global path env =
-  add_required_ident (Path.head path) env
+    | AHunit cu -> add_required_unit ~for_quote cu
+let add_required_global ~for_quote path env =
+  add_required_ident ~for_quote (Path.head path) env
+
+let quoted_globals () = Persistent_env.quoted_globals !persistent_env
 
 let rec normalize_module_path lax env = function
   | Pident id as path when lax && Ident.is_global id ->
@@ -1883,7 +1885,7 @@ and expand_module_path lax env path =
       if not (lax || !Clflags.transparent_modules) then begin
         let id = Path.head path in
         if Ident.is_global_or_predef id && not (Ident.same id (Path.head path'))
-        then add_required_global (Pident id) env
+        then add_required_global ~for_quote:false (Pident id) env
       end;
       path'
   | _ -> path
