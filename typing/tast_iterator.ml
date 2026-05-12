@@ -388,14 +388,8 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     | Uaccess_unboxed_field (lid, _) -> iter_loc sub lid
   in
   match exp_desc with
-<<<<<<< HEAD
-  | Texp_ident (_, lid, _, _, _, _)  -> iter_loc_lid sub lid
-||||||| 5.2.0minus-31
-  | Texp_ident (_, lid, _, _, _, _)  -> iter_loc sub lid
-=======
-  | Texp_ident { lid; _ } -> iter_loc sub lid
+  | Texp_ident { lid; _ } -> iter_loc_lid sub lid
   | Texp_apply_layout (exp, _) -> sub.expr sub exp
->>>>>>> 5.2.0minus-37
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);

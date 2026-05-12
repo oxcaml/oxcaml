@@ -1666,7 +1666,8 @@ let type_declarations ~loc env ~mark id decl1 decl2 =
 let jkind_declarations ~loc env ~mark id decl1 decl2 =
   let direction = Directionality.unknown ~mark in
   match
-    jkind_declarations ~loc env ~direction Subst.identity id decl1 decl2
+    Core_inclusion.jkind_declarations ~loc env ~direction
+      Subst.identity id ~mmodes:All decl1 decl2
   with
   | Ok _ -> ()
   | Error (Error.Core reason) ->

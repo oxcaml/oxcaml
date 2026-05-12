@@ -152,7 +152,6 @@ let primitive_descriptions pd1 pd2 =
   else
     native_repr_args pd1.prim_native_repr_args pd2.prim_native_repr_args
 
-<<<<<<< HEAD
 (* A value description [vd1] is consistent with the value description [vd2] if
    there is a context E such that [E |- vd1 <: vd2] for the ordinary subtyping.
    For values, this is the case as soon as the kind of [vd1] is a subkind of the
@@ -173,8 +172,7 @@ let value_descriptions_consistency _env vd1 vd2 =
       Tcoerce_invalid
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
-||||||| 5.2.0minus-31
-=======
+
 let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
   let pat_refs =
     Ctype.moregeneral env true pat_lpoly subj_lpoly ty1 ty2
@@ -210,7 +208,6 @@ let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
   | _ ->
     raise (Dont_match (Layout_poly_coercion
       (Extra_rhs { extra = List.length subj_rest })))
->>>>>>> 5.2.0minus-37
 
 let value_descriptions ~loc env name
     ~mmodes
@@ -271,18 +268,10 @@ let value_descriptions ~loc env name
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-<<<<<<< HEAD
         let ty1, mode_l1, _, sort1 =
           Ctype.instance_prim env p1 vd1.val_type
         in
-        (try Ctype.moregeneral env true ty1 vd2.val_type
-||||||| 5.2.0minus-31
-        let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
-        (try Ctype.moregeneral env true ty1 vd2.val_type
-=======
-        let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
         (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
->>>>>>> 5.2.0minus-37
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
