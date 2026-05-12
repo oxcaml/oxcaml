@@ -213,6 +213,7 @@ module Flambda2 : sig
     val simplify : bool ref
     val reaper : bool ref
     val functor_sizes : bool ref
+    val functor_sizes_dir : string option ref
   end
 
   module Expert : sig

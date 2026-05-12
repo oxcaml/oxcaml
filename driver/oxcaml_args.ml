@@ -1070,6 +1070,13 @@ let mk_dfunctor_sizes f =
     " Dump sizes of functors tested against the functor inlining size\n\
     \     limits, with their code IDs and source locations (Flambda 2 only)" )
 
+let mk_dfunctor_sizes_dir f =
+  ( "-dfunctor-sizes-dir",
+    Arg.String f,
+    "<dir> Write -dfunctor-sizes output under <dir>/SUBDIR where SUBDIR is\n\
+    \     the value of -directory (or directly under <dir> if -directory is\n\
+    \     unset) (Flambda 2 only)" )
+
 module Debugging = Dwarf_flags
 
 (* CR mshinwell: These help texts should show the default values. *)
@@ -1359,6 +1366,7 @@ module type Oxcaml_options = sig
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
   val dfunctor_sizes : unit -> unit
+  val dfunctor_sizes_dir : string -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
 end
@@ -1564,6 +1572,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dsimplify F.dsimplify;
       mk_dreaper F.dreaper;
       mk_dfunctor_sizes F.dfunctor_sizes;
+      mk_dfunctor_sizes_dir F.dfunctor_sizes_dir;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
     ]
@@ -1980,6 +1989,8 @@ module Oxcaml_options_impl = struct
   let dsimplify = set' Flambda2.Dump.simplify
   let dreaper = set' Flambda2.Dump.reaper
   let dfunctor_sizes = set' Flambda2.Dump.functor_sizes
+
+  let dfunctor_sizes_dir dir = Flambda2.Dump.functor_sizes_dir := Some dir
 
   let use_cached_generic_functions =
     set' Oxcaml_flags.use_cached_generic_functions

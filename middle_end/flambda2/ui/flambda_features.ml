@@ -178,6 +178,8 @@ let dump_reaper () = !Oxcaml_flags.Flambda2.Dump.reaper
 
 let dump_functor_sizes () = !Oxcaml_flags.Flambda2.Dump.functor_sizes
 
+let dump_functor_sizes_dir () = !Oxcaml_flags.Flambda2.Dump.functor_sizes_dir
+
 let freshen_when_printing () = !Oxcaml_flags.Flambda2.Dump.freshen
 
 module Inlining = struct

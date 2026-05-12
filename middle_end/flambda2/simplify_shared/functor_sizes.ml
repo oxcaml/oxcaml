@@ -20,8 +20,33 @@ type entry =
 
 let entries : entry list ref = ref []
 
-let record ~code_id ~dbg ~size =
-  entries := { code_id; dbg; size } :: !entries
+let record ~code_id ~dbg ~size = entries := { code_id; dbg; size } :: !entries
+
+let rec mkdir_p dir =
+  if Sys.file_exists dir
+  then ()
+  else
+    let parent = Filename.dirname dir in
+    if not (String.equal parent dir) then mkdir_p parent;
+    try Sys.mkdir dir 0o777 with Sys_error _ when Sys.file_exists dir -> ()
+
+let output_filename ~prefixname =
+  let basename =
+    Filename.basename prefixname ^ ".ml.functor-sizes.corrected"
+  in
+  match Flambda_features.dump_functor_sizes_dir () with
+  | None -> prefixname ^ ".ml.functor-sizes.corrected"
+  | Some dir ->
+    let subdir =
+      match !Clflags.directory with
+      | None | Some "" -> ""
+      | Some s -> s
+    in
+    let full_dir =
+      if String.equal subdir "" then dir else Filename.concat dir subdir
+    in
+    mkdir_p full_dir;
+    Filename.concat full_dir basename
 
 let output_then_forget ~prefixname =
   let collected = List.rev !entries in
@@ -29,7 +54,7 @@ let output_then_forget ~prefixname =
   match collected with
   | [] -> ()
   | _ :: _ ->
-    let filename = prefixname ^ ".ml.functor-sizes.corrected" in
+    let filename = output_filename ~prefixname in
     let out_channel = open_out filename in
     Misc.try_finally
       ~always:(fun () -> close_out_noerr out_channel)

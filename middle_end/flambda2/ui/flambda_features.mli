@@ -123,6 +123,8 @@ val dump_reaper : unit -> bool
 
 val dump_functor_sizes : unit -> bool
 
+val dump_functor_sizes_dir : unit -> string option
+
 val freshen_when_printing : unit -> bool
 
 module Inlining : sig

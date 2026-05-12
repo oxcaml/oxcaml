@@ -187,6 +187,7 @@ module type Oxcaml_options = sig
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
   val dfunctor_sizes : unit -> unit
+  val dfunctor_sizes_dir : string -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
 end

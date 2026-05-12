@@ -12,8 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Recording of functor sizes encountered during inlining decisions, for
-    use with the [-dfunctor-sizes] command-line flag. *)
+(** Recording of functor sizes encountered during inlining decisions, for use
+    with the [-dfunctor-sizes] command-line flag. *)
 
 val record : code_id:Code_id.t -> dbg:Debuginfo.t -> size:Code_size.t -> unit
 

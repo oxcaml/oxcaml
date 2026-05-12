@@ -279,6 +279,7 @@ module Flambda2 = struct
     let simplify = ref false
     let reaper = ref false
     let functor_sizes = ref false
+    let functor_sizes_dir = ref None
   end
 
   module Expert = struct
