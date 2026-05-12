@@ -3324,7 +3324,9 @@ and type_module_path_aux ~alias ~hold_locks sttn env path
   let shape = if alias && aliasable then Shape.alias shape else shape in
   let md =
     if alias && aliasable then
-      (Env.add_required_global false path env; md)
+      (Env.add_required_global
+         ~require_for_quote_in_persistent_env:false path env;
+       md)
     else begin
       let mty = Mtype.find_type_of_module
           ~strengthen:sttn ~aliasable env path

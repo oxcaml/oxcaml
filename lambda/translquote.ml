@@ -2420,7 +2420,8 @@ let rec module_for_path loc env = function
              it ignores parameterized libraries, and references the wrong file for
              impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
              this references Stdlib). *)
-          Env.add_required_global true path env;
+          Env.add_required_global ~require_for_quote_in_persistent_env:true path
+            env;
           Identifier.Module.global_module loc global
         | None ->
           (* We must be in a [Toplevel_lock_for_directive] if we are quoting
@@ -2509,7 +2510,8 @@ let quote_value_ident_path loc env path ident_kind =
   | Id_prim _ -> ()
   | Id_value -> (
     match Env.address_head (Env.find_value_address path env) with
-    | Env.AHunit cu -> Env.require_global_for_quote (Compilation_unit.name cu)
+    | Env.AHunit _ ->
+      Env.add_required_global ~require_for_quote_in_persistent_env:true path env
     | _ | (exception Not_found) -> ()));
   match value_for_path_opt loc env path with
   | Some ident_val -> ident_val
