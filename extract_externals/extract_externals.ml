@@ -155,8 +155,8 @@ let extract_shapes_from_file ~verbose file =
 
 let extract_shapes_from_files ~verbose files =
   Clflags.include_dirs := !include_dirs @ !Clflags.include_dirs;
-  Clflags.open_args :=
-    List.map (fun s -> Clflags.Open s) !open_modules @ !Clflags.open_args;
+  Clflags.open_args
+    := List.map (fun s -> Clflags.Open s) !open_modules @ !Clflags.open_args;
   Clflags.hidden_include_dirs
     := !hidden_include_dirs @ !Clflags.hidden_include_dirs;
   Clflags.include_manifests := !include_manifests @ !Clflags.include_manifests;
