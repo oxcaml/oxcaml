@@ -122,8 +122,11 @@ val classic : bool ref
 val nopervasives : bool ref
 val match_context_rows : int ref
 val safer_matching : bool ref
-val open_modules : string list ref
-val open_cmi_modules : string list ref
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
+val open_args : open_arg list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref

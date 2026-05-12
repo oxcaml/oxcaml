@@ -1122,7 +1122,13 @@ module PpxContext = struct
             (make_list (make_pair make_string make_bool))
             (make_list make_string)
             (visible_load_dir_pairs visible, hidden);
-        lid "open_modules", make_list make_string !Clflags.open_modules;
+        lid "open_modules",
+          make_list make_string
+            (List.filter_map
+               (function
+                 | Clflags.Open s -> Some s
+                 | Clflags.Open_cmi _ -> None)
+               !Clflags.open_args);
         lid "for_package",  make_option make_string !Clflags.for_package;
         lid "debug",        make_bool !Clflags.debug;
         lid "use_threads",  make_bool !Clflags.use_threads;
@@ -1219,7 +1225,8 @@ module PpxContext = struct
           in
           Load_path.init ~auto_include ~visible ~hidden
       | "open_modules" ->
-          Clflags.open_modules := get_list get_string payload
+          let names = get_list get_string payload in
+          Clflags.open_args := List.map (fun s -> Clflags.Open s) names
       | "for_package" ->
           Clflags.for_package := get_option get_string payload
       | "debug" ->

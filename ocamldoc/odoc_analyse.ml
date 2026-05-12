@@ -40,14 +40,14 @@ let initial_env () =
     else
       Some initial
   in
-  let open_implicit_modules =
+  let open_implicit_args =
     let ln = !Odoc_global.library_namespace in
     let ln = if current = ln || ln = initial || ln = "" then [] else [ln] in
-    ln @ List.rev !Clflags.open_modules in
+    List.map (fun s -> Clflags.Open s) ln @ List.rev !Clflags.open_args
+  in
   Typemod.initial_env
     ~loc:(Location.in_file "ocamldoc command line")
-    ~open_cmi_implicit_modules:(List.rev !Clflags.open_cmi_modules)
-    ~open_implicit_modules
+    ~open_implicit_args
     ~initially_opened_module
 
 (** Optionally preprocess a source file *)

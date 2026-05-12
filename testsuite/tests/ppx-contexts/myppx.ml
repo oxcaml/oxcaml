@@ -21,7 +21,12 @@ let () =
         (quote_strings !Config.load_path);
       *)
       Printf.eprintf "open_modules: [%s]\n"
-        (quote_strings !Clflags.open_modules);
+        (quote_strings
+           (List.filter_map
+              (function
+                | Clflags.Open s -> Some s
+                | Open_cmi _ -> None)
+              !Clflags.open_args));
       Printf.eprintf "for_package: %S\n"
         (quote_option !Clflags.for_package);
       Printf.eprintf "use_debug: %B\n"
