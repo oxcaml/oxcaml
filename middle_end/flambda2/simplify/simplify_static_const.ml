@@ -374,7 +374,7 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
     let old_code_ids =
       Code_id.Map.fold
         (fun code_id code old_code_ids ->
-          if Code.stub code
+          if Code.stub code && not (Flambda_features.simplify_stubs ())
           then old_code_ids
           else
             match Code.newer_version_of code with
@@ -392,13 +392,18 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
       ~init:([], [], dacc)
       ~code:(fun (bound_static, static_consts, dacc) code_id code ->
         let code, static_const, dacc =
-          if Code.stub code
+          if
+            Code.stub code
+            &&
+            (* With "-flambda2-simplify-stubs" stubs are simplified like other
+               functions at the definition of the set of closures. *)
+            not (Flambda_features.simplify_stubs ())
           then
             let dacc, prior_lifted_constants =
               DA.get_and_clear_lifted_constants dacc
             in
             let static_const, dacc_after_function =
-              Simplify_set_of_closures.simplify_stub_function dacc code
+              Simplify_set_of_closures.simplify_static_stub_function dacc code
                 ~all_code ~simplify_function_body
             in
             let dacc_after_function =

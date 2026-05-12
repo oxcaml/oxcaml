@@ -1,6 +1,7 @@
 (* TEST
  only-default-codegen;
  flags = " -O3";
+ flags += " -flambda2-simplify-stubs";
  flags += " -cfg-prologue-shrink-wrap";
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";

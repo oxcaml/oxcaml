@@ -30,7 +30,7 @@ let function_decl_type ?new_code_id ~rec_info old_code_id =
   let code_id = Option.value new_code_id ~default:old_code_id in
   Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
-let create_for_stub dacc ~all_code ~simplify_function_body =
+let create_for_static_stub dacc ~all_code ~simplify_function_body =
   let dacc_inside_functions =
     (* We ensure that inlining cannot happen inside the code of stubs. This is
        to avoid compile-time performance problems where large functions (or
@@ -41,7 +41,11 @@ let create_for_stub dacc ~all_code ~simplify_function_body =
         Code_id.Map.fold
           (fun code_id code denv -> DE.define_code denv ~code_id ~code)
           all_code
-          (DE.enter_set_of_closures denv ~in_stub:true))
+          (* CR pchambart: We are not entering a set of closure, this function
+             code creates a context to simplify a function while looking at the
+             let code rather than the set of closure. We should rename this
+             `DE.enter_set_of_closures` function *)
+          (DE.enter_stub_function (DE.enter_set_of_closures denv)))
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;
@@ -68,6 +72,20 @@ let closure_bound_names_inside_functions_exactly_one_set t =
   | [] | _ :: _ :: _ -> Misc.fatal_error "Only one set of closures was expected"
 
 let previously_free_depth_variables t = t.previously_free_depth_variables
+
+let stub_can_be_simplified denv =
+  (* Stubs can only be simplified with "-flambda2-simplify-stubs". We want to
+     avoid stub resimplifications because it's costly and often useless. The
+     most problematic case are nested stub definitions. To avoid going through
+     those multiple times, we don't simplify stub definitions while inlining
+     stubs (stub depth > 0) *)
+  Flambda_features.simplify_stubs ()
+  && Inlining_state.stub_depth (DE.get_inlining_state denv) = 0
+
+let function_can_be_simplified denv code =
+  Code_or_metadata.code_present code
+  && ((not (Code_metadata.stub (Code_or_metadata.code_metadata code)))
+     || stub_can_be_simplified denv)
 
 let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_inside_functions_all_sets
@@ -107,11 +125,7 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                   (* The types of the functions involved should reference the
                      _new_ code IDs (where such exist), so that direct recursive
                      calls can be compiled straight to the new code. *)
-                  if
-                    Code_or_metadata.code_present code_or_metadata
-                    && not
-                         (Code_metadata.stub
-                            (Code_or_metadata.code_metadata code_or_metadata))
+                  if function_can_be_simplified denv code_or_metadata
                   then Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
                   else old_code_id
                 in
@@ -212,9 +226,7 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
                 Misc.fatal_errorf "Missing code for %a" Code_id.print
                   old_code_id
             in
-            if
-              Code_or_metadata.code_present code
-              && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
+            if function_can_be_simplified denv code
             then
               let new_code_id = Code_id.rename old_code_id in
               Code_id.Map.add old_code_id new_code_id old_to_new_code_ids
@@ -227,9 +239,7 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
   Code_id.Map.fold
     (fun old_code_id new_code_id denv ->
       let code = DE.find_code_exn denv old_code_id in
-      if
-        Code_or_metadata.code_present code
-        && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
+      if function_can_be_simplified denv code
       then
         let code =
           Code_or_metadata.get_code code
@@ -244,7 +254,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
-    DE.enter_set_of_closures denv ~in_stub:false
+    DE.enter_set_of_closures denv
     (* Even if we are not rebuilding terms we should always rebuild them for
        local functions. The type of a function is dependent on its term and not
        knowing it prohibits us from inlining it. *)
