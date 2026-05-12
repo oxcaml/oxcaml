@@ -40,7 +40,7 @@ let report label =
   Printf.printf "%s: registered=%d unloaded=%d live=%d\n%!"
     label r u (r - u)
 
-let f = ref (fun _ -> 0)
+let f = ref (fun () -> (0, 0, 0))
 
 let[@inline never] populate () =
   f := Eval.eval <[
@@ -93,6 +93,6 @@ let () =
   report "after 3x compact (held)";
 
   (* Drop and unload. *)
-  f := (fun _ -> 0);
+  f := (fun () -> (0, 0, 0));
   Gc.compact ();
   report "after release + compact"
