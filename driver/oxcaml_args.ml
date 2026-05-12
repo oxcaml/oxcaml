@@ -1211,6 +1211,8 @@ let mk_cached_generic_functions_path f =
     "<file>  Set the path of the cached generic functions (default to \
      cached-generic-functions.o)" )
 
+let mk_x f = ("-X", Arg.String f, "(undocumented)")
+
 let set_long_frames_threshold n =
   if n < 0 then raise (Arg.Bad "Long frames threshold must be non-negative.");
   if n > Oxcaml_flags.max_long_frames_threshold then
@@ -1405,6 +1407,7 @@ module type Oxcaml_options = sig
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val x : string -> unit
 end
 
 module Make_oxcaml_options (F : Oxcaml_options) = struct
@@ -1616,6 +1619,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dreaper F.dreaper;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
+      mk_x F.x;
     ]
 end
 
@@ -1625,6 +1629,101 @@ let set_dissector_partition_size f =
       (Arg.Bad
          "-dissector-partition-size must be greater than 0 and less than 2 GiB");
   Clflags.dissector_partition_size := Some f
+
+module Extra_options = struct
+  type 'a arg_parser = string -> 'a ref -> string -> unit
+  type 'a param_setter = Format.formatter -> string -> 'a ref -> string -> unit
+
+  type extra_option =
+    | O : 'a ref * 'a arg_parser * 'a param_setter * string -> extra_option
+
+  let extra_params : (string, extra_option) Hashtbl.t = Hashtbl.create 17
+
+  let register loc r parser setter kwd =
+    match Hashtbl.find_opt extra_params kwd with
+    | Some (O (_, _, _, loc2)) ->
+        Printf.eprintf
+          "Warning: extra compiler argument '-X %s' is already defined:\n" kwd;
+        Printf.eprintf "  First definition: %s\n" loc2;
+        Printf.eprintf "  New definition: %s\n" loc;
+        fun () -> !r
+    | None ->
+        Hashtbl.replace extra_params kwd (O (r, parser, setter, loc));
+        fun () -> !r
+
+  let wrong opt arg expected =
+    raise
+      (Arg.Bad
+         (Format.asprintf "wrong argument '%s'; option '-X %s' expects %s" opt
+            arg expected))
+
+  let set_string _ r opt = r := opt
+  let string_setter _ppf _name option s = option := s
+
+  let string loc kwd default =
+    register loc (ref default) set_string string_setter kwd
+
+  let set_int arg r opt =
+    match int_of_string_opt opt with
+    | Some i -> r := i
+    | None -> wrong opt arg "an integer"
+
+  let int loc kwd default =
+    register loc (ref default) set_int Compenv.int_setter kwd
+
+  let bool_arg arg r opt =
+    match opt with
+    | "0" -> r := false
+    | "1" -> r := true
+    | _ -> wrong opt arg "'0' or '1'"
+
+  let set' ppf name option s = Compenv.setter ppf (fun b -> b) name [ option ] s
+  let bool loc kwd = register loc (ref false) bool_arg set' kwd
+
+  let make_symlist ~sep flags =
+    match flags with
+    | [] -> "<none>"
+    | (h, _) :: t -> List.fold_left (fun x (y, _) -> x ^ sep ^ y) h t
+
+  let set_symbol symbols arg r opt =
+    match List.assoc opt symbols with
+    | exception Not_found ->
+        wrong opt arg ("one of: " ^ make_symlist ~sep:" " symbols)
+    | v -> r := v
+
+  let symbol_setter symbols _ppf name option s =
+    match List.assoc s symbols with
+    | exception Not_found ->
+        Misc.fatal_errorf "Syntax: %s=%s" name (make_symlist ~sep:"|" symbols)
+    | v -> option := v
+
+  let symbol loc kwd default symbols =
+    register loc (ref default) (set_symbol symbols) (symbol_setter symbols) kwd
+
+  let parse_one_arg name =
+    match Misc.cut_at name '=' with
+    | exception Not_found ->
+        raise
+          (Arg.Bad
+             (Format.asprintf
+                "wrong argument '%s'; option '-X' expects a name=value pair"
+                name))
+    | name, v -> (
+        match Hashtbl.find_opt extra_params name with
+        | Some (O (option, parser, _setter, _loc)) -> parser name option v
+        | None ->
+            raise (Arg.Bad (Format.asprintf "unknown option '-X %s'" name)))
+
+  let read_one_param ppf name v =
+    if String.starts_with ~prefix:"X" name then
+      let name_without_prefix = String.sub name 1 (String.length name - 1) in
+      match Hashtbl.find_opt extra_params name_without_prefix with
+      | Some (O (option, _parser, setter, _loc)) ->
+          setter ppf name option v;
+          true
+      | None -> false
+    else false
+end
 
 module Oxcaml_options_impl = struct
   let set r () = r := Oxcaml_flags.Set true
@@ -2062,6 +2161,8 @@ module Oxcaml_options_impl = struct
 
   let cached_generic_functions_path file =
     Oxcaml_flags.cached_generic_functions_path := file
+
+  let x = Extra_options.parse_one_arg
 end
 
 module type Debugging_options = sig
@@ -2547,7 +2648,7 @@ module Extra_params = struct
     | "no-manual-module-init" ->
         Oxcaml_flags.manual_module_init := false;
         true
-    | _ -> false
+    | _ -> Extra_options.read_one_param ppf name v
 end
 
 module type Optcomp_options = sig
