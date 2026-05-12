@@ -58,23 +58,37 @@ let register callback =
     (* Save old x86 internal assembler and register our hook *)
     saved_x86_internal_assembler := !X86_proc.internal_assembler;
     X86_proc.register_internal_assembler (fun ~delayed:_ sections _filename ->
-        (* Assemble each section *)
-        let sections_map =
-          List.fold_left
-            (fun map (name, instrs) ->
+        (* Assemble each section. Empty-section filtering happens after
+           resolution because [size] is only available on resolved buffers. *)
+        let named_unresolved =
+          List.map
+            (fun (name, instrs) ->
               let name_str = X86_proc.Section_name.to_string name in
               let section =
                 { X86_binary_emitter.sec_name = name_str;
                   sec_instrs = DLL.to_array instrs
                 }
               in
-              let binary_section =
-                X86_binary_emitter.assemble_section X86_ast.X64 section
-              in
-              if X86_binary_emitter.size binary_section = 0
+              name_str, X86_binary_emitter.assemble_section X86_ast.X64 section)
+            sections
+        in
+        (* Resolve data-directive references that need a global view across all
+           assembled sections, e.g. cross-section [s1 - s2] expressions:
+
+           - if both s1 and s2 are in the same section, fold to a literal;
+
+           - if s2 is in the current section, encode as REL32 against s1. *)
+        let resolved =
+          X86_binary_emitter.resolve_global_patches
+            (List.map snd named_unresolved)
+        in
+        let sections_map =
+          List.fold_left2
+            (fun map (name_str, _) buf ->
+              if X86_binary_emitter.size buf = 0
               then map
-              else String_map.add name_str binary_section map)
-            String_map.empty sections
+              else String_map.add name_str buf map)
+            String_map.empty named_unresolved resolved
         in
         let packed =
           Packed

@@ -272,7 +272,23 @@ let write buf header section_table symbol_table relocation_tables string_table =
   String_table.write string_table strtab.sh_offset buf
 
 let assemble unix ~delayed asm output_file =
-  let compiler_sections = get_sections ~delayed asm in
+  let unresolved_sections = get_sections ~delayed asm in
+  (* Resolve data-directive references that need a global view across all
+     assembled sections, e.g. cross-section [s1 - s2] expressions:
+     - if both s1 and s2 are in the same section, fold to a literal;
+     - if s2 is in the current section, encode as REL32 against s1.
+     Rebuild the section map with resolved buffers, preserving alignment. *)
+  let bindings = Section_name.Map.bindings unresolved_sections in
+  let resolved_bufs =
+    X86_binary_emitter.resolve_global_patches
+      (List.map (fun (_, (_align, buf)) -> buf) bindings)
+  in
+  let compiler_sections =
+    List.fold_left2
+      (fun acc (name, (align, _)) buf ->
+        Section_name.Map.add name (align, buf) acc)
+      Section_name.Map.empty bindings resolved_bufs
+  in
   let string_table = String_table.create () in
   let sh_string_table = String_table.create () in
   let sections = Section_table.create () in
