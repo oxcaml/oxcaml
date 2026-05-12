@@ -9,12 +9,12 @@ open! Int_replace_polymorphic_compare
     hide use counts, predecessors and dominator info; at [finish] time the same
     module is repackaged with the [Finished_graph] view that exposes them.
 
-    Construction is mostly functional: each [emit_*] returns a new
-    [unfinished_block] cursor that carries the appended instruction list; blocks
-    themselves are mutated only by [finish_block] (which seals the body and
-    terminator) and by [finish] (which fills in metadata).
+    Construction appends each [emit_*] instruction onto the current block's
+    [pending_body] (newest-first); [finish_block] reverses it into program
+    order, seals the terminator, and records the block. [finish] then fills in
+    metadata and produces the final immutable [body] array.
 
-    [finish] performs three passes over the finished blocks, in order:
+    [finish] performs four passes over the finished blocks, in order:
     - [compute_reachability_and_trap_stacks]: forward DFS from [entry] following
       structural and exception successors, threading the trap stack so each
       reachable block gets its [block_end_trap_stack] populated; unreachable
@@ -24,6 +24,10 @@ open! Int_replace_polymorphic_compare
     - [compute_use_counts]: refcount over op args and block params; the latter
       propagate to predecessors' [Goto] args, so a transitively-unused arg keeps
       its defining op count at zero.
+    - [finalize_blocks]: materialise [body] from [pending_body]. Always drops
+      Push_trap/Pop_trap pairs whose handler is unreachable. When
+      [keep_unused_ops] is false, also drops dead [Op]s and replaces [Goto] args
+      going to unused target params with [None].
 
     Invariants enforced here:
     - Every reachable block is [finish_block]ed.
@@ -34,7 +38,8 @@ open! Int_replace_polymorphic_compare
 
 include Ssa_intf
 
-let make_builder (function_info : function_info) : (module Graph_builder) =
+let make_builder (function_info : function_info) ~keep_unused_ops :
+    (module Graph_builder) =
   let module M = struct
     module Instruction_id = Oxcaml_utils.Id_counter.Make ()
     module Block_id = Oxcaml_utils.Id_counter.Make ()
@@ -50,6 +55,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           mutable usage_count : usage_count
         }
 
+      type pending_body = Instruction.t list
+
       val set_param_name : param -> string -> unit
 
       type dominator_info =
@@ -63,6 +70,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           params : param array;
           mutable predecessors : Block.Set.t;
           mutable body : Instruction.t array;
+          mutable pending_body : Instruction.t list;
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
@@ -93,6 +101,8 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           mutable usage_count : usage_count
         }
 
+      type pending_body = Instruction.t list
+
       let set_param_name (p : param) name = p.name <- Some name
 
       type dominator_info =
@@ -106,6 +116,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           params : param array;
           mutable predecessors : Block.Set.t;
           mutable body : Instruction.t array;
+          mutable pending_body : Instruction.t list;
           mutable terminator : Terminator.t;
           mutable terminator_dbg : Debuginfo.t;
           mutable dominator_info : dominator_info;
@@ -281,7 +292,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           }
 
       let set_name (instr : Instruction.t) name =
-        match[@warning "-4"] instr with
+        match[@warning "-fragile-match"] instr with
         | Op r -> r.name <- Some name
         | Block_param { block; index } -> block.params.(index).name <- Some name
         | _ -> ()
@@ -326,7 +337,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       type t =
         | Goto of
             { goto : Block.t;
-              args : Instruction.t array
+              args : Instruction.t option array
             }
         | Branch of
             { cond : Instruction.t;
@@ -366,7 +377,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       type t =
         | Goto of
             { goto : Block.t;
-              args : Instruction.t array
+              args : Instruction.t option array
             }
         | Branch of
             { cond : Instruction.t;
@@ -406,10 +417,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     (* === Builder state === *)
 
-    type cursor =
-      { mutable block : Block.t;
-        mutable instrs_rev : Instruction.t list
-      }
+    type cursor = { mutable block : Block.t }
 
     type new_block_result =
       { block : Block.t;
@@ -434,6 +442,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         params = [||];
         predecessors = Block.Set.empty;
         body = [||];
+        pending_body = [];
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
@@ -448,6 +457,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         params;
         predecessors = Block.Set.empty;
         body = [||];
+        pending_body = [];
         terminator = pending_terminator;
         terminator_dbg = Debuginfo.none;
         dominator_info = { depth = -1; dominator = dummy_block };
@@ -468,10 +478,10 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       od.name |> Option.iter (Format.fprintf ppf "%s/");
       Format.fprintf ppf "v%d" (od.id :> int)
 
-    let rec print_instruction ppf (i : Instruction.t) =
-      match i with
+    let rec print_instruction ppf (instr : Instruction.t) =
+      match instr with
       | Op ({ op; args; _ } as od) ->
-        if Instruction.result_arity i <> 0
+        if Instruction.result_arity instr <> 0
         then Format.fprintf ppf "%a = " print_op_id od;
         let op_str = Format.asprintf "%a" Operation.dump op in
         if Array.length args = 0
@@ -495,10 +505,10 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         Format.fprintf ppf "%a.%i" print_instr_ref src index
       | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
 
-    and print_instr_ref ppf (i : Instruction.t) =
-      match[@warning "-fragile-match"] i with
+    and print_instr_ref ppf (instr : Instruction.t) =
+      match[@warning "-fragile-match"] instr with
       | Op od -> print_op_id ppf od
-      | _ -> print_instruction ppf i
+      | _ -> print_instruction ppf instr
 
     and print_args ppf args =
       Array.iteri
@@ -507,10 +517,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
           print_instr_ref ppf arg)
         args
 
+    and print_opt_args ppf args =
+      Array.iteri
+        (fun i arg ->
+          if i > 0 then Format.fprintf ppf ", ";
+          match arg with
+          | None -> Format.fprintf ppf "_"
+          | Some arg -> print_instr_ref ppf arg)
+        args
+
     let print_terminator ppf (t : Terminator.t) =
       match t with
       | Goto { goto; args } ->
-        Format.fprintf ppf "goto %a(%a)" print_block_id goto print_args args
+        Format.fprintf ppf "goto %a(%a)" print_block_id goto print_opt_args args
       | Branch { cond; ifso; ifnot } ->
         Format.fprintf ppf "if %a then goto %a else goto %a" print_instr_ref
           cond print_block_id ifso print_block_id ifnot
@@ -564,12 +583,12 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     let new_block_impl ~is_function_start ~(params : Cmm.machtype) :
         new_block_result =
-      let block_params : Block.param array =
-        Array.map
-          (fun typ : Block.param -> { typ; name = None; usage_count = 0 })
-          params
+      let params =
+        params
+        |> Array.map (fun typ : Block.param ->
+            { typ; name = None; usage_count = 0 })
       in
-      let block = create_block ~is_function_start ~params:block_params in
+      let block = create_block ~is_function_start ~params in
       let params_arr =
         Array.init (Array.length params) (fun i ->
             Instruction.make_block_param block i)
@@ -577,6 +596,15 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       { block; params = params_arr }
 
     let new_block ~params = new_block_impl ~is_function_start:false ~params
+
+    let new_block_with_names
+        ~(params : (Cmm.machtype_component * string option) array) : Block.t =
+      let params =
+        params
+        |> Array.map (fun (typ, name) : Block.param ->
+            { typ; name; usage_count = 0 })
+      in
+      create_block ~is_function_start:false ~params
 
     let entry, entry_params =
       let { block; params } =
@@ -594,18 +622,17 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
 
     (* === Builder operations: mutate the cursor in place === *)
 
-    let start_block (block : Block.t) : cursor = { block; instrs_rev = [] }
+    let start_block (block : Block.t) : cursor = { block }
 
     let move_cursor (c : cursor) ~(new_pos : cursor) : unit =
       assert (is_finished c);
-      c.block <- new_pos.block;
-      c.instrs_rev <- new_pos.instrs_rev
+      c.block <- new_pos.block
 
     let emit_instruction (c : cursor) (instr : Instruction.t) =
       match instr with
       | Instruction.Op _ | Instruction.Push_trap _ | Instruction.Pop_trap _
       | Instruction.Stack_check _ | Instruction.Name_for_debugger _ ->
-        c.instrs_rev <- instr :: c.instrs_rev
+        c.block.pending_body <- instr :: c.block.pending_body
       | Instruction.Block_param _ | Instruction.Proj _ | Instruction.Tuple _ ->
         Misc.fatal_errorf
           "Ssa.emit_instruction: %a cannot be emitted into a block body"
@@ -648,11 +675,10 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       if is_finished c
       then Misc.fatal_error "Ssa.finish_block: block already finished";
       check_terminator term;
-      block.body <- Array.of_list (List.rev c.instrs_rev);
+      block.pending_body <- List.rev block.pending_body;
       block.terminator <- term;
       block.terminator_dbg <- dbg;
-      finished_blocks := block :: !finished_blocks;
-      c.instrs_rev <- []
+      finished_blocks := block :: !finished_blocks
 
     (* === Predecessors / dominators === *)
 
@@ -716,9 +742,9 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
        [Pop_trap { handler = h }] must find [h] at the top of the current
        stack. *)
     let compute_block_end_trap_stack ~(block : Block.t)
-        (start_stack : Block.t list) (body : Instruction.t array) : Block.t list
+        (start_stack : Block.t list) (body : Instruction.t list) : Block.t list
         =
-      Array.fold_left
+      List.fold_left
         (fun (stack : Block.t list) (instr : Instruction.t) ->
           match instr with
           | Push_trap { handler = h } -> h :: stack
@@ -759,7 +785,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         then begin
           Block.Tbl.add visited block ();
           let end_stack =
-            compute_block_end_trap_stack ~block start_stack block.body
+            compute_block_end_trap_stack ~block start_stack block.pending_body
           in
           block.block_end_trap_stack <- end_stack;
           let add_pred start_stack (succ : Block.t) =
@@ -841,18 +867,19 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         match instr with
         | Op r ->
           r.usage_count <- r.usage_count + 1;
-          if r.usage_count = 1 then Array.iter increment_use r.args
+          if (not keep_unused_ops) && r.usage_count = 1
+          then Array.iter increment_use r.args
         | Proj { src; _ } -> increment_use src
         | Block_param { block; index } ->
           let p = block.params.(index) in
           let old = p.usage_count in
           p.usage_count <- old + 1;
-          if old = 0
+          if (not keep_unused_ops) && old = 0
           then
             block.predecessors
             |> Block.Set.iter (fun pred ->
                 match pred.terminator with
-                | Goto { args; _ } -> increment_use (Array.get args index)
+                | Goto { args; _ } -> args.(index) |> Option.iter increment_use
                 | Branch _ | Switch _ | Return _ | Raise _ | Tailcall_self _
                 | Tailcall_func _ | Call _ | Invalid _ ->
                   (* CR ttebbi: We could also treat [Tailcall_self] arguments as
@@ -869,9 +896,9 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
       in
       let increment_uses_in_terminator (term : Terminator.t) =
-        let incr_all arr = Array.iter increment_use arr in
         match term with
-        | Goto _ -> ()
+        | Goto { args; _ } ->
+          if keep_unused_ops then args |> Array.iter (Option.iter increment_use)
         | Branch { cond = arg; _ } | Switch { index = arg; _ } ->
           increment_use arg
         | Return { args }
@@ -880,22 +907,62 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
         | Tailcall_func { args; _ }
         | Call { args; _ }
         | Invalid { args; _ } ->
-          incr_all args
+          Array.iter increment_use args
       in
-      List.iter
-        (fun (block : Block.t) ->
-          Array.iter
-            (fun (instr : Instruction.t) ->
+      reachable_blocks
+      |> List.iter (fun (block : Block.t) ->
+          block.pending_body
+          |> List.iter (fun (instr : Instruction.t) ->
               match instr with
-              | Op r when not (Operation.is_pure r.op) -> increment_use instr
+              | Op { op; args; _ } ->
+                if keep_unused_ops
+                then Array.iter increment_use args
+                else if not (Operation.is_pure op)
+                then increment_use instr
               | Name_for_debugger { args; _ } -> Array.iter increment_use args
-              | Op _ | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
+              | Push_trap _ | Pop_trap _ | Stack_check _ -> ()
               | Block_param _ | Proj _ | Tuple _ ->
                 Misc.fatal_error
-                  "Ssa.compute_use_counts: impossible body instruction")
-            block.body;
+                  "Ssa.compute_use_counts: impossible body instruction");
           increment_uses_in_terminator block.terminator)
-        reachable_blocks
+
+    (** Materialise [body] from [pending_body], with three pieces of cleanup:
+        - filter out [Op]s with [usage_count = 0] (skipped when
+          [keep_unused_ops]);
+        - drop [Push_trap]/[Pop_trap] whose handler has no predecessors (i.e. is
+          never raised into) — the matching push/pop reference the same handler
+          and are dropped together, preserving trap-stack balance;
+        - null out [Goto] args going to unused target params (skipped when
+          [keep_unused_ops], so [Cfg_compare] sees a structurally faithful
+          output). *)
+    let finalize_blocks ~(reachable_blocks : Block.t list) : unit =
+      reachable_blocks
+      |> List.iter (fun (block : Block.t) ->
+          block.body
+            <- block.pending_body
+               |> List.filter (fun (instr : Instruction.t) : bool ->
+                   match instr with
+                   | Op { usage_count; _ } -> keep_unused_ops || usage_count > 0
+                   | Stack_check _ | Name_for_debugger _ -> true
+                   | Push_trap { handler } | Pop_trap { handler } ->
+                     not (Block.Set.is_empty handler.predecessors)
+                   | Block_param _ | Proj _ | Tuple _ ->
+                     Misc.fatal_error
+                       "Ssa.finalize_blocks: impossible body instruction")
+               |> Array.of_list;
+          block.pending_body <- [];
+          if not keep_unused_ops
+          then
+            block.terminator
+              <- (match[@warning "-fragile-match"] block.terminator with
+                 | Goto { goto; args } ->
+                   let args =
+                     args
+                     |> Array.mapi (fun i arg ->
+                         if goto.params.(i).usage_count = 0 then None else arg)
+                   in
+                   Goto { goto; args }
+                 | terminator -> terminator))
 
     (* Walk [blocks] in the input order, but when first visiting a block emit
        its dominator chain ahead of it. The result has every block preceded by
@@ -924,6 +991,7 @@ let make_builder (function_info : function_info) : (module Graph_builder) =
       in
       compute_dominators ~entry ~reachable_blocks;
       compute_use_counts ~reachable_blocks;
+      finalize_blocks ~reachable_blocks;
       order_blocks_dominators_first reachable_blocks
 
     let finish () : (module Finished_graph) =

@@ -3,8 +3,10 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-40-41-42"]
 
 (** Post-finish SSA invariants. Most structural invariants are enforced by the
-    graph builder. Here, we just verify that SSA definitions dominate their uses
-    and that trap stacks are consistent. *)
+    graph builder. Here, we just verify the following:
+    - SSA definitions dominate their uses
+    - trap stacks are consistent
+    - Goto arguments are only [None] when the parameter is unused *)
 
 module Make (S : Ssa.Finished_graph) = struct
   let error fmt =
@@ -57,8 +59,8 @@ module Make (S : Ssa.Finished_graph) = struct
     List.iter (fun bl -> S.Block.Tbl.replace block_set bl ()) S.blocks;
     let block_exists b = S.Block.Tbl.mem block_set b in
     let defined_ops = S.Instruction_id.Tbl.create 64 in
-    let rec check_arg (bl : S.Block.t) (i : S.Instruction.t) =
-      match i with
+    let rec check_arg (bl : S.Block.t) (instr : S.Instruction.t) =
+      match instr with
       | Op { id; _ } -> (
         match S.Instruction_id.Tbl.find_opt defined_ops id with
         | None -> error "block %a: v%d used but not defined" pb bl (id :> int)
@@ -92,8 +94,8 @@ module Make (S : Ssa.Finished_graph) = struct
     let check_args bl args = Array.iter (check_arg bl) args in
     let visit_block (bl : S.Block.t) =
       Array.iter
-        (fun (i : S.Instruction.t) ->
-          match i with
+        (fun (instr : S.Instruction.t) ->
+          match instr with
           | Op { id; args; _ } ->
             check_args bl args;
             if S.Instruction_id.Tbl.mem defined_ops id
@@ -107,7 +109,17 @@ module Make (S : Ssa.Finished_graph) = struct
               pb bl)
         bl.body;
       (match bl.terminator with
-      | Goto { args; _ } -> check_args bl args
+      | Goto { args; goto } ->
+        args
+        |> Array.iteri (fun i arg ->
+            match arg with
+            | Some arg -> (check_arg bl) arg
+            | None ->
+              if goto.params.(i).usage_count <> 0
+              then
+                Misc.fatal_errorf
+                  "block %a: Goto parameter %i missing despite being live." pb
+                  bl i)
       | Branch { cond; _ } -> check_arg bl cond
       | Switch { index; _ } -> check_arg bl index
       | Return { args } -> check_args bl args
