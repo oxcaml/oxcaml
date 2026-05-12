@@ -73,6 +73,16 @@ Core mechanisms:
    (UNMARKED) header so the standard mark scan can darken them via
    heap references; Local (CU-private) symbols get a *black*
    (NOT_MARKABLE) header and rely transitively on a Global ancestor.
+   The unit's `gc_roots` table is registered with the runtime's
+   global-root scan: that scan walks each registered block's **fields**
+   (not the block itself), preserving any heap values stored into the
+   unit's static data while leaving the static blocks themselves
+   reclaimable when no heap reference reaches them. This subtlety —
+   that `scan_native_globals` darkens fields-of-block, not block-itself
+   — is what allows the unit to become unreachable in the first
+   place. A future "improvement" that darkens the registered block
+   before scanning its fields would silently make every unloadable
+   unit immortal.
 
 7. **End-of-cycle unload pass.** Before the heap state rotation at the
    end of every major cycle: for each registered unloadable CU, if no
@@ -262,14 +272,27 @@ only `.rodata`-prefixed sections are RO; see
 `external/ocaml-jit/lib/jit.ml`). White-headered static data and
 `Code_block`s land there and get the right protection automatically.
 
-### B.3 The `unloadable_data_blocks` enumeration
+### B.3 The `unloadable_data_blocks` and `unloadable_code_blocks` sentinels
 
-The compiler emits a single static array per unit, named
-`<unit-prefix>__unloadable_data_blocks`, listing every tracked
-Global static block's address: `[count; addr_1; ...; addr_count]`.
-The JIT loader looks up this symbol by suffix and passes its address
-to the runtime, which copies the addresses into the unit's
-`data_blocks` field for the end-of-cycle pass.
+The compiler emits two static arrays per unloadable unit, each looked
+up by the JIT loader using its exact linkage name — no symbol-table
+scan by suffix:
+
+- `<unit-prefix>__unloadable_data_blocks`: every tracked Global static
+  block's address. Layout `[count; addr_1; ...; addr_count]`.
+- `<unit-prefix>__unloadable_code_blocks`: every unloadable function
+  in the unit, as `(entry_address, code_block_address)` pairs.
+  Layout `[count; entry_1; code_block_1; ...; entry_count;
+  code_block_count]`.
+
+The JIT loader hands both sentinel addresses to the runtime stub
+(`jit_register_unloadable_unit_native`), which derives the unit's
+`code_blocks` array (mark-time darken targets), per-function text
+ranges (sorted, deduplicated to handle Mach-O alias symbols), and
+`data_blocks` array directly from these arrays. Both sentinels are
+emitted unconditionally for every unloadable CU (count may be 0),
+so the loader can rely on their presence by name without a fallback
+path.
 
 ## C. Code blocks
 
@@ -286,20 +309,57 @@ For each function in an unloadable CU the to_cmm pass emits a
   arm for it.
 
 The `Code_block` symbol name is `<entry>_code_block` (see
-`Cmm_helpers.code_block_symbol_name`). The JIT loader collects them
-by suffix to populate the unit's `code_blocks` list.
+`Cmm_helpers.code_block_symbol_name`). The JIT loader discovers them
+via the `unloadable_code_blocks` sentinel array (see B.3); the
+`_code_block` suffix is internal-only and never consulted by the
+loader.
 
 ### C.1 Dep-list filtering
 
-When computing the dep list, **exclude code IDs whose
-`Code_metadata.is_unloadable` is false**. Non-unloadable callees are
-always live (statically-linked code that can never be unloaded), so
-listing them is redundant — it would just bloat the `Code_block` and
-add no-op darken calls.
+When computing the dep list:
+
+- **Code IDs are filtered to those whose `Code_metadata.is_unloadable`
+  is true.** Non-unloadable callees are always live
+  (statically-linked code that can never be unloaded), so listing them
+  is redundant — it would just bloat the `Code_block` and add no-op
+  darken calls.
+- **Symbol dependencies are filtered to those whose defining
+  compilation unit is the current (unloadable) CU.** Cross-CU
+  symbols (e.g. `caml_int_ops`, stdlib lifted constants, predefined
+  exceptions) have NOT_MARKABLE headers, so `caml_darken` is a no-op
+  on them — including them only bloats every `Code_block` and adds
+  work to the mark scan. Same-CU `Local` symbols are kept because
+  the unit's data section may reference them and they have markable
+  headers per B.1.
 
 Cross-CU direct references go through closures (carrying the
 closinfo flag); the `Code_block` dep list captures only same-CU
 direct edges.
+
+### C.2 Entry function's Code_block has zero dependency fields
+
+The module-initialiser ("entry") function in an unloadable CU also
+gets a `Code_block`, but with **zero scannable fields**, even though
+its body typically calls top-level same-CU functions and references
+the unit's static data.
+
+The justification: the entry is only on-stack during initialisation
+(F.2 keeps its `Code_block` alive while running), and once
+`Eval.eval` returns nothing reaches the entry's `Code_block`. If a
+major GC fires during eval'd initialisation and walks the running
+entry:
+
+- F.2 darkens the entry's `Code_block` (zero deps — no recursion).
+- Every same-CU function the entry has called is also on the stack
+  above it (the call stack), so F.2 darkens *their* `Code_block`s
+  through *their* RAs.
+- Any captured/in-flight values the entry references are reachable
+  via the regular stack scan or via the unit's `gc_roots` table
+  (which the runtime registers for the unit's static data; see
+  strategy point 6).
+
+Together these paths reach every block the entry needs, so the
+entry's `Code_block` not carrying explicit dep fields is sound.
 
 ## D. Back-pointer convention (unloadable functions only)
 
@@ -344,13 +404,37 @@ function.
 1. Normalises every block header in `code_blocks` and `data_blocks`
    to `caml_allocation_status()` (`MARKED` if marking is in progress,
    `UNMARKED` otherwise — see the "born-marked" invariant in
-   strategy point 8).
+   strategy point 8). The header store is atomic
+   (`atomic_store_relaxed` on `Hp_atomic_val`) for consistency with
+   the concurrent marker's conventions.
 2. Registers each `text_range[i]` as a code fragment so
    `caml_find_code_fragment_by_pc` returns true for any PC in the
    unit's text. Digests are unused (`DIGEST_IGNORE`).
 3. Registers `frametable` via `caml_register_frametables`.
 4. Registers `gc_roots` via `caml_register_dyn_globals`.
-5. Links the unit into the global registration list.
+5. Links the unit into the global registration list and bumps
+   `caml_unloadable_units_live_count` (an atomic counter read on the
+   major mark hot path to fast-exit `F.1` when no units are live).
+
+Step ordering matters: steps 2–4 publish the unit to globally
+visible tables before step 5 makes it visible on the units list. A
+major-GC cycle starting on another domain in this window scans via
+`gc_roots` and the frametable, sees the unit's blocks, and marks
+them; the end-of-cycle unload pass does not visit this unit (it is
+not yet on `units_head`) but that is correct — it has just been
+registered as born-marked and survives the current cycle by
+construction.
+
+The window between `caml_register_unloadable_unit` returning and
+the JIT loader's `caml_callback` into the entry is safe because
+the unit's static blocks are born-marked, the entry's `Code_block`
+has no dep fields (so a scan in the window cannot dereference a
+not-yet-populated field), and no thread has yet entered the unit's
+text so F.2 cannot land in the new range.
+
+`units_mutex` is statically initialised
+(`CAML_PLAT_MUTEX_INITIALIZER`); the previous lazy init-on-first-use
+pattern had a multi-domain race that is no longer possible.
 
 ## F. Mark phase changes
 
@@ -389,7 +473,13 @@ fast-path block-pop loop and `mark_stack_push_block`), after computing
 caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
 ```
 
-That helper walks each function slot in the closure prefix:
+The helper fast-exits via a relaxed atomic load on
+`caml_unloadable_units_live_count` when no unloadable units are
+registered, so the cost on the hot mark path for non-unloadable
+programs is one cache-resident load and a conditional branch.
+
+When at least one unit is live, the helper walks each function slot
+in the closure prefix:
 
 ```
 slot_start = 0
@@ -450,11 +540,22 @@ if frame_has_code_ptr_slots(d):
 
 `caml_visit_frame_code_ptr_slots` (in `runtime/caml/unloadable.h`)
 walks the parallel `code_ptr_live_ofs[]` array, reads each slot, and
-for any whose target lies in a registered code fragment (via
-`caml_find_code_fragment_by_pc`) darkens the `Code_block` at
-`*((value*)cp - 1)`. This branch fires regardless of whether the
-current frame is unloadable; non-unloadable targets are a fast no-op
-(fragment lookup miss).
+for any whose target lies in **both** a registered code fragment and
+a registered unloadable unit, darkens the `Code_block` at
+`*((value*)cp - 1)`. Both checks are needed: the code-fragment table
+also contains non-unloadable text (main program startup, Dynlink),
+for which dereferencing the back-pointer at `entry - 1` would read
+arbitrary memory. The unloadable-unit membership check
+(`caml_find_unloadable_unit_by_pc`) is the authoritative gate.
+
+A DEBUG `CAMLassert` checks `cf->code_start == cp` before
+dereferencing: the only in-tree producers of `Code_pointer`-typed
+values are closure Field-0 loads and static `Csymbol_address`
+references to function entries, so a `Code_pointer` slot should
+always hold a function-entry PC. If a future code path ever
+produces a non-entry PC into a `Code_pointer` slot (e.g. via
+arithmetic on a code pointer), this assertion fires before the
+unsafe deref.
 
 ### F.4 Mark propagation semantics
 
@@ -504,21 +605,24 @@ finalised under STW:
 1. **Reset cost**: walking every block in every unloadable unit at
    end of cycle to rewrite marks is O(total unloadable symbols).
    Bounded and infrequent (major GC). Measure if it shows up.
-2. **`code_blocks` deduplication on Mach-O**: when the assembler
-   emits `D.symbol` for a name that is both an exported entry and a
-   joint label (the `_code_block` site in
-   `backend/{amd64,arm64}/emit.ml`), Mach-O produces both a global
-   `_<sym>_code_block` and a local `L_<sym>_code_block` symbol at the
-   same address. The JIT loader's suffix walk in `unloadable_metadata`
-   does not dedupe, so each unit's `code_blocks` array has duplicate
-   entries and the per-function text-range list contains a
-   zero-length range per function. ELF (Linux x86-64 / arm64) emits
-   only one symbol per name, so this issue is Mach-O-specific.
-   Harmless but wasteful (a few words per function on macOS).
+2. **`caml_find_unloadable_unit_by_pc` is O(units)**. F.3 (and
+   future stack-walk paths) call it on every code-pointer slot whose
+   PC is in a registered code fragment. To make this O(log n),
+   tag each code-fragment record with its owning unloadable unit
+   (or NULL for non-unloadable fragments), so the membership check
+   becomes a single field read on the fragment we already looked
+   up. Out of scope for the current implementation.
 3. **Dynlink applicability**: same machinery should serve Dynlink
    units that opt in to unloadability. The `is_unloadable` flag in
    `Code_metadata` is the natural opt-in; the runtime registration
    path would mirror `caml_register_unloadable_unit`.
+4. **LLVM backend does not implement unloadable codegen**. The
+   `Cmm.Unloadable` codegen option is recognised but raises
+   `Misc.fatal_error` in `backend/llvm/llvmize.ml`. Wiring LLVM up
+   to honour the bit (back-pointer at `entry - 1`,
+   `FRAME_DESCRIPTOR_UNLOADABLE` /
+   `FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS` flags, and
+   `code_ptr_live_ofs` slot enumeration) is future work.
 
 ## Testing
 
@@ -568,6 +672,27 @@ Coverage axes currently exercised:
   `unload_large_static`).
 - Exceptions and returned data (`unload_exceptions`,
   `unload_returned_data`).
+- Allocation safe-points under `-g`
+  (`unload_alloc_with_debug`): exercises the
+  `flags land 3 = 3` mask in `emit_frame` for frame descriptors
+  carrying both `Dbg_alloc` and the new `UNLOADABLE` /
+  `HAS_CODE_PTR_SLOTS` flags.
+- Mixed-arity closure prefixes
+  (`unload_closure_prefix_mixed_arity`): stresses F.1's
+  arity-driven slot-size inference and the Infix_tag DEBUG
+  assertion.
+- F.3 gating on non-unloadable code fragments
+  (`unload_code_ptr_slot_gating`, C-side): confirms that
+  `caml_visit_frame_code_ptr_slots` does not deref `entry - 1` for
+  PCs that lie in non-unloadable registered fragments.
+- Frame-table layout sanity
+  (`unload_frametable_layout_sanity`, C-side): walks every emitted
+  frame descriptor and validates the `code_ptr_live_ofs` section
+  parses in bounds.
+- Major GC during eval'd module initialisation
+  (`unload_entry_gc_during_init`): exercises C.2's zero-dep entry
+  Code_block invariant by forcing GCs while a recursive same-CU
+  helper is on the stack.
 
 ## Reference: key source locations
 
@@ -576,10 +701,10 @@ Coverage axes currently exercised:
 | Closinfo layout & macros | `runtime/caml/mlvalues.h` |
 | `Code_block_tag` reservation | `runtime/caml/mlvalues.h` |
 | `Code_metadata.is_unloadable` | `middle_end/flambda2/terms/code_metadata.ml` |
-| `pack_closure_info`, `closure_info'`, `unit_block_header`, `emit_unit_block`, `code_block_symbol_name`, `unloadable_data_blocks_symbol_basename`, `fail_if_called_indirectly_*` | `backend/cmm_helpers.ml` |
+| `pack_closure_info`, `closure_info'`, `unit_block_header`, `emit_unit_block`, `code_block_symbol_name`, `unloadable_data_blocks_symbol_basename`, `unloadable_code_blocks_symbol_basename`, `register_unloadable_code_block_entry`, `fail_if_called_indirectly_*` | `backend/cmm_helpers.ml` |
 | Set-of-closures emit (closinfo + curry stub address) | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml` |
-| `Code_block` emission | `middle_end/flambda2/to_cmm/to_cmm_code_blocks.ml` |
-| `unloadable_data_blocks` array emission | `middle_end/flambda2/to_cmm/to_cmm.ml` |
+| `Code_block` emission, same-CU symbol filter, entry Code_block | `middle_end/flambda2/to_cmm/to_cmm_code_blocks.ml` |
+| `unloadable_data_blocks` and `unloadable_code_blocks` sentinel emission | `middle_end/flambda2/to_cmm/to_cmm.ml` |
 | Frame descriptor flags + accessors | `runtime/caml/frame_descriptors.h` |
 | Frame descriptor parser (skip code-ptr-slot section) | `runtime/frame_descriptors.c` |
 | Frame descriptor emit (record + bits) | `backend/emitaux.ml` |
@@ -587,13 +712,13 @@ Coverage axes currently exercised:
 | `Code_pointer` machtype | `backend/cmm.ml` |
 | `Clflags.unit_is_unloadable` | `utils/clflags.ml(.mli)` |
 | `Eval.eval` entry point + observability externals | `otherlibs/eval/eval.ml(.mli)` |
-| `jit_supports_unloading`, `jit_memalign`, `jit_register_unloadable_unit`, `jit_unit_on_unload` | `external/ocaml-jit/lib/jit_stubs.c` |
-| JIT load path + `unloadable_metadata` (`_code_block` suffix walk) + `unloadable_data_blocks` lookup + `Clflags.unit_is_unloadable` toggle | `external/ocaml-jit/lib/jit.ml` |
+| `jit_supports_unloading`, `jit_memalign`, `jit_register_unloadable_unit_native` (reads both sentinels, dedupes entries), `jit_unit_on_unload` (page-aligned `mprotect`) | `external/ocaml-jit/lib/jit_stubs.c` |
+| JIT load path + exact-name lookup of `unloadable_code_blocks` and `unloadable_data_blocks` sentinels + `Clflags.unit_is_unloadable` toggle | `external/ocaml-jit/lib/jit.ml` |
 | `Externals.supports_unloading` | `external/ocaml-jit/lib/externals.ml(.mli)` |
 | Major-GC closure scan F.1 injection | `runtime/major_gc.c` |
 | Stack scan F.2 / F.3 injections | `runtime/fiber.c` (`caml_scan_stack`) |
 | Closure slot walker, code-block back-pointer helpers, code-ptr-slot walker | `runtime/caml/unloadable.h` |
-| Registration, end-of-cycle pass, "born-marked" normalisation, debug tracing | `runtime/unloadable.c` |
+| Registration, end-of-cycle pass, "born-marked" normalisation, debug tracing, `caml_unloadable_units_live_count` | `runtime/unloadable.c` |
 | End-of-cycle pass call site (before rotation) | `runtime/major_gc.c` `cycle_major_heap_from_stw_single` |
 | Allocation status convention | `runtime/caml/shared_heap.h` `caml_allocation_status` |
 | Heap colors | `runtime/caml/shared_heap.h` |
