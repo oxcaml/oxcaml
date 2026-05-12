@@ -43,38 +43,24 @@ static int unloadable_debug(void) {
 
 /* Linked list of all currently-registered unloadable units. Protected by
  * [units_mutex]. Iteration during the GC's end-of-cycle pass holds the
- * mutex (and runs from a stop-the-world section). */
+ * mutex (and runs from a stop-the-world section). The mutex is statically
+ * initialised so concurrent first-time registrations from multiple domains
+ * do not race on its initialisation. */
 static struct caml_unloadable_unit *units_head = NULL;
-static caml_plat_mutex units_mutex;
-static int units_mutex_initialized = 0;
+static caml_plat_mutex units_mutex = CAML_PLAT_MUTEX_INITIALIZER;
 
 /* Cumulative counters for observability. Updated under [units_mutex]. */
 static uintnat units_registered_total = 0;
 static uintnat units_unloaded_total = 0;
 
-/* REVIEW(claude): not thread-safe. Two domains calling this concurrently
-   can both observe [!units_mutex_initialized] and both run
-   [caml_plat_mutex_init], leaking the first init and producing a
-   double-initialised mutex with undefined behaviour on its first user. The
-   mutex itself is supposed to serialise access here but it can't because
-   it's the thing being initialised. Use a one-shot init at runtime startup
-   (e.g. add to [caml_runtime_startup] / call from a DOMAIN_HOOK), or use
-   pthread_once / ATOMIC_INIT_ONCE. The current callers happen to be
-   single-threaded in [Eval.eval] but the public [caml_register_unloadable_
-   unit] makes no such restriction. */
-static void ensure_mutex_initialized(void) {
-  /* Lazy initialization: the runtime may register a unit before any
-   * explicit [caml_init_unloadable] hook runs. The first registration
-   * initializes; subsequent calls are no-ops. */
-  if (!units_mutex_initialized) {
-    /* REVIEW(codex): This is not thread-safe: concurrent registrations can race and
-       initialize the mutex multiple times (or observe a half-initialized
-       mutex). Prefer a static initializer (CAML_PLAT_MUTEX_INITIALIZER) or
-       an atomic once-style init. */
-    caml_plat_mutex_init(&units_mutex);
-    units_mutex_initialized = 1;
-  }
-}
+/* Number of currently-registered (registered minus unloaded) units. Read
+ * from the major mark path on every closure to short-circuit
+ * [caml_darken_unloadable_code_blocks_in_closure] when there are no
+ * unloadable units at all. Accessed with relaxed atomics: stale reads are
+ * harmless — a false positive walks the closure (cheap), and a false
+ * negative is impossible because mutators only mark after registrations
+ * are visible. */
+CAMLexport atomic_uintnat caml_unloadable_units_live_count = 0;
 
 /* Normalize a static block's header color bits to the current cycle's
  * allocation status. When marking has not started, the block becomes
@@ -92,15 +78,17 @@ static void ensure_mutex_initialized(void) {
  * UNMARKED, after which standard marking takes over. */
 static void normalize_block_color(value v) {
   header_t hd = Hd_val(v);
-  /* REVIEW(codex): This writes the header non-atomically. During concurrent marking,
-     other domains update/read headers via [Hp_atomic_val]; consider using
-     [atomic_store_relaxed(Hp_atomic_val(v), ...)] for consistency. */
-  *Hp_val(v) = With_status_hd(hd, caml_allocation_status());
+  /* Use the atomic-header store path for consistency with concurrent
+   * marking; even though this call site runs before the unit is linked
+   * into [units_head] (and so is not yet visible to other domains), the
+   * runtime convention is that any write through the header word goes
+   * via [Hp_atomic_val]. */
+  atomic_store_relaxed(Hp_atomic_val(v),
+                       With_status_hd(hd, caml_allocation_status()));
 }
 
 void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
   CAMLassert(u != NULL);
-  ensure_mutex_initialized();
 
   /* Patch block headers to current UNMARKED. See [normalize_block_color]. */
   for (uintnat i = 0; i < u->num_code_blocks; i++) {
@@ -182,6 +170,8 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
   uintnat seq = units_registered_total;
   caml_plat_unlock(&units_mutex);
 
+  atomic_fetch_add(&caml_unloadable_units_live_count, 1);
+
   if (unloadable_debug()) {
     fprintf(stderr,
         "[unloadable] register #%lu: unit=%p code_blocks=%lu data_blocks=%lu "
@@ -194,13 +184,17 @@ void caml_register_unloadable_unit(struct caml_unloadable_unit *u) {
 
 void caml_unregister_unloadable_unit(struct caml_unloadable_unit *u) {
   CAMLassert(u != NULL);
-  ensure_mutex_initialized();
 
   caml_plat_lock_blocking(&units_mutex);
   struct caml_unloadable_unit **link = &units_head;
   while (*link != NULL && *link != u) link = &(*link)->next;
-  if (*link == u) *link = u->next;
+  int unlinked = (*link == u);
+  if (unlinked) *link = u->next;
   caml_plat_unlock(&units_mutex);
+
+  if (unlinked) {
+    atomic_fetch_sub(&caml_unloadable_units_live_count, 1);
+  }
 
   /* Remove each text range's code fragment. The fragment objects are placed
    * on the codefrag garbage list and freed by
@@ -228,7 +222,6 @@ void caml_unregister_unloadable_unit(struct caml_unloadable_unit *u) {
 
 void caml_iter_unloadable_units(
     void (*f)(struct caml_unloadable_unit *, void *), void *user_data) {
-  ensure_mutex_initialized();
   caml_plat_lock_blocking(&units_mutex);
   for (struct caml_unloadable_unit *u = units_head; u != NULL; u = u->next) {
     f(u, user_data);
@@ -237,8 +230,6 @@ void caml_iter_unloadable_units(
 }
 
 void caml_unloadable_check_and_unload_dead(void) {
-  ensure_mutex_initialized();
-
   /* The caller (cycle_major_heap_from_stw_single) holds the STW barrier and
    * has not yet rotated [caml_global_heap_state]; MARKED bits below are the
    * cycle-N values, which the imminent rotation will reinterpret as cycle-
@@ -267,6 +258,7 @@ void caml_unloadable_check_and_unload_dead(void) {
       u->next = to_unload;
       to_unload = u;
       units_unloaded_total++;
+      atomic_fetch_sub(&caml_unloadable_units_live_count, 1);
     } else {
       /* Survives: rewrite all blocks to MARKED bits so the imminent
        * rotation maps them uniformly to UNMARKED in cycle N+1. Blocks
@@ -320,7 +312,6 @@ void caml_unloadable_check_and_unload_dead(void) {
 }
 
 uintnat caml_unloadable_units_registered_total(void) {
-  ensure_mutex_initialized();
   caml_plat_lock_blocking(&units_mutex);
   uintnat r = units_registered_total;
   caml_plat_unlock(&units_mutex);
@@ -328,7 +319,6 @@ uintnat caml_unloadable_units_registered_total(void) {
 }
 
 uintnat caml_unloadable_units_unloaded_total(void) {
-  ensure_mutex_initialized();
   caml_plat_lock_blocking(&units_mutex);
   uintnat r = units_unloaded_total;
   caml_plat_unlock(&units_mutex);
@@ -340,7 +330,6 @@ uintnat caml_unloadable_units_unloaded_total(void) {
    instead — and grep finds no callers. Drop it, or wire it up where it was
    meant to be used. */
 struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc) {
-  ensure_mutex_initialized();
   caml_plat_lock_blocking(&units_mutex);
   struct caml_unloadable_unit *result = NULL;
   for (struct caml_unloadable_unit *u = units_head; u != NULL; u = u->next) {

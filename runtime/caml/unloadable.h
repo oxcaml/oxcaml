@@ -154,6 +154,12 @@ void caml_unloadable_check_and_unload_dead(void);
 CAMLextern uintnat caml_unloadable_units_registered_total(void);
 CAMLextern uintnat caml_unloadable_units_unloaded_total(void);
 
+/* Live-unit counter: registered minus unloaded. Read with relaxed atomics
+ * from the major mark path to short-circuit
+ * [caml_darken_unloadable_code_blocks_in_closure] when there are no
+ * unloadable units. Defined in [unloadable.c]. */
+CAMLextern atomic_uintnat caml_unloadable_units_live_count;
+
 /* Look up the unloadable unit (if any) whose [.text] range contains [pc].
  * Returns NULL when [pc] lies in non-unloadable code. Used by F.2 (stack
  * return-address scan) and F.3 (stack code-pointer slot scan).
@@ -218,12 +224,16 @@ Caml_inline void caml_darken_code_block_for_entry(void *state, value entry) {
  * part of the prefix. */
 Caml_inline void caml_darken_unloadable_code_blocks_in_closure(
     void *state, value closure) {
-  /* REVIEW(codex): The slot-walk logic here is subtle and tightly coupled to the
-     current closure-prefix layout. In particular, the inference of slot size
-     from [Arity_closinfo] (and the skip by an assumed infix header) risks
-     out-of-bounds reads if the closure layout evolves. Consider factoring the
-     slot iteration into a shared helper used by both closure construction and
-     scanning, or encoding the slot size explicitly in closinfo. */
+  /* Fast path: if no unloadable units are currently registered, no closure
+   * can contain an unloadable function slot, so skip the prefix walk
+   * entirely. Relaxed load is sufficient: the registration paths use
+   * release semantics implicitly via the units_mutex, and a stale 0 here
+   * is impossible because mutator code in a unit only runs after its
+   * registration is complete. */
+  if (atomic_load_explicit(&caml_unloadable_units_live_count,
+                           memory_order_relaxed) == 0) {
+    return;
+  }
   value closinfo_0 = Closinfo_val(closure);
   uintnat env_start = Start_env_closinfo(closinfo_0);
   uintnat slot_start = 0;

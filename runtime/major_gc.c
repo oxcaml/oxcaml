@@ -947,11 +947,8 @@ static intnat mark_stack_push_block(struct mark_stack* stk, value block)
        Native-code only: closures with unloadable code only exist in the
        native runtime. */
 #ifdef NATIVE_CODE
-    /* REVIEW(codex): This is currently invoked for every closure encountered during
-       major marking. If unloadable closures are expected to be rare compared
-       to regular ones, consider gating this call on
-       [Unloadable_closinfo(closinfo)] (or similar) to avoid repeatedly walking
-       closure prefixes that cannot contain unloadable function slots. */
+    /* The walker fast-exits when no unloadable units are registered (a
+       relaxed atomic load on [caml_unloadable_units_live_count]). */
     caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
 #endif
   }
@@ -1156,16 +1153,7 @@ again:
         me.start += env_offset;
         /* F.1: see [mark_stack_push_block] for the same injection. */
 #ifdef NATIVE_CODE
-        /* REVIEW(codex): Same perf consideration as in [mark_stack_push_block]. */
-        /* REVIEW(claude): this fires for EVERY closure, not just
-           closures that contain unloadable function slots. Most closures
-           are non-unloadable, so the inner loop reads a closinfo, checks
-           the bit, and bails — but the call still happens on the hot
-           mark path. Consider gating this on a cheap predicate like
-           "any registered unloadable units exist" (via a boolean read
-           against a global non-zero counter), or on the closure's own
-           closinfo bit when set, since within a single closure all slots
-           share the same unit. */
+        /* See [mark_stack_push_block]: walker fast-exits on no-units. */
         caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
 #endif
       }

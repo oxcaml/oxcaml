@@ -482,18 +482,17 @@ Caml_inline void* Ptr_val(value val)
 #define Start_env_closinfo(info) (((uintnat)(info) << 10) >> 11)
 #define Is_last_closinfo(info) (((uintnat)(info) << 8) >> 63)
 #define Unloadable_closinfo(info) (((uintnat)(info) << 9) >> 63)
-/* REVIEW(claude): [Make_closinfo] is now subtly wrong: it does not zero
-   bit 54 explicitly, so a [delta] whose top bit (bit 53) is set would
-   alias into the new [is_unloadable] bit. In practice deltas are tiny
-   (closure prefix word counts) so this is fine, but the macro encodes
-   "non-unloadable" only by accident. Either delete this variant in
-   favour of always passing [is_unloadable], or explicitly mask. */
+/* [delta] is masked to 53 bits so that it cannot alias into bit 54
+   (the [is_unloadable] bit) for either macro. In-tree callers pass
+   tiny deltas (closure prefix word counts), but the mask makes the
+   bit-field boundary explicit rather than accidental. */
 #define Make_closinfo(arity,delta,is_last) \
   (((uintnat)(arity) << 56) + ((uintnat)(is_last) << 55) \
-    + ((uintnat)(delta) << 1) + 1)
+    + (((uintnat)(delta) & (((uintnat)1 << 53) - 1)) << 1) + 1)
 #define Make_closinfo_unloadable(arity,delta,is_last,is_unloadable) \
   (((uintnat)(arity) << 56) + ((uintnat)(is_last) << 55) \
-    + ((uintnat)(is_unloadable) << 54) + ((uintnat)(delta) << 1) + 1)
+    + ((uintnat)(is_unloadable) << 54) \
+    + (((uintnat)(delta) & (((uintnat)1 << 53) - 1)) << 1) + 1)
 #else
 #define Arity_closinfo(info) ((intnat)(info) >> 24)
 #define Start_env_closinfo(info) (((uintnat)(info) << 10) >> 11)
@@ -501,10 +500,11 @@ Caml_inline void* Ptr_val(value val)
 #define Unloadable_closinfo(info) (((uintnat)(info) << 9) >> 31)
 #define Make_closinfo(arity,delta,is_last) \
   (((uintnat)(arity) << 24) + ((uintnat)(is_last) << 23) \
-    + ((uintnat)(delta) << 1) + 1)
+    + (((uintnat)(delta) & (((uintnat)1 << 21) - 1)) << 1) + 1)
 #define Make_closinfo_unloadable(arity,delta,is_last,is_unloadable) \
   (((uintnat)(arity) << 24) + ((uintnat)(is_last) << 23) \
-    + ((uintnat)(is_unloadable) << 22) + ((uintnat)(delta) << 1) + 1)
+    + ((uintnat)(is_unloadable) << 22) \
+    + (((uintnat)(delta) & (((uintnat)1 << 21) - 1)) << 1) + 1)
 #endif
 
 /* This tag is used (with Forcing_tag & Forward_tag) to implement lazy values.
