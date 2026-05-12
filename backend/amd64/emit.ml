@@ -69,7 +69,7 @@ let invoke_expect_asm_callbacks () =
   asm_collected_for_expect_asm := [];
   List.iter (fun f -> f output) callbacks
 
-let record_for_expect_asm ~name ~debug_info ~asm_start ~fun_body_end =
+let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end =
   if
     (not (List.is_empty !expect_asm_callbacks))
     && (not (String.ends_with ~suffix:"__entry" name))
@@ -89,7 +89,8 @@ let record_for_expect_asm ~name ~debug_info ~asm_start ~fun_body_end =
     in
     let output =
       X86_gas.format_asm_for_expect_asm ~name
-        ~body:(X86_proc.output_range ~from_pos:asm_start ~to_pos:fun_body_end)
+        ~body:
+          (X86_proc.output_range ~from_pos:fun_body_start ~to_pos:fun_body_end)
         ~hidden:(X86_proc.output_from fun_body_end)
     in
     asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
@@ -2687,7 +2688,7 @@ let fundecl fundecl =
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
   record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~asm_start:fun_body_start ~fun_body_end;
+    ~fun_body_start ~fun_body_end;
   emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
