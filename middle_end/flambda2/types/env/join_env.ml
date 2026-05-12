@@ -1507,10 +1507,156 @@ let join_aliases_into_bindings ~joined_envs ~bindings equations_to_join =
           in
           equations_to_join, bindings))
 
+let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
+    env_extension name relation ~scrutinee =
+  let empty_descr : TG.Head_of_kind_naked_immediate.descr =
+    { naked_immediates = Unknown; inverse_relations = TG.Relation.Map.empty }
+  in
+  let[@inline] type_from_descr (descr : TG.Head_of_kind_naked_immediate.descr) =
+    let inverse_relations =
+      TG.Relation.Map.update relation
+        (function
+          | None -> Some (Name.Set.singleton scrutinee)
+          | Some existing_args -> Some (Name.Set.add scrutinee existing_args))
+        descr.inverse_relations
+    in
+    TG.create_from_head_naked_immediate
+      (TG.Head_of_kind_naked_immediate.from_descr_non_empty
+         { descr with inverse_relations })
+  in
+  match Name.Map.find_opt name (TEE.to_map env_extension) with
+  | None ->
+    TEE.add_or_replace_equation env_extension name (type_from_descr empty_descr)
+  | Some existing_ty -> (
+    match TG.descr existing_ty with
+    | Naked_immediate Bottom ->
+      (* If we already know that we are bottom, we don't need to store anything
+         more precise. *)
+      env_extension
+    | Naked_immediate Unknown ->
+      (* This should not happen, as we would usually only only store non-obvious
+         types in extensions -- but it's also harmless. *)
+      TEE.add_or_replace_equation env_extension name
+        (type_from_descr empty_descr)
+    | Naked_immediate (Ok (No_alias head)) ->
+      let descr = TG.Head_of_kind_naked_immediate.descr head in
+      TEE.add_or_replace_equation env_extension name (type_from_descr descr)
+    | Naked_immediate (Ok (Equals simple)) ->
+      (* This should be rare, but could happen in complex situations. *)
+      Simple.pattern_match simple
+        ~name:(fun name' ~coercion:_ ->
+          if Name.Set.mem name' seen
+          then (
+            if Flambda_features.check_light_invariants () then assert false;
+            env_extension)
+          else
+            add_inverse_relation_to_env_extension ~seen:(Name.Set.add name seen)
+              env_extension name' relation ~scrutinee)
+        ~const:(fun _ ->
+          (* This should not happen: we know *)
+          env_extension)
+    | Value _ | Naked_float32 _ | Naked_float _ | Naked_int8 _ | Naked_int16 _
+    | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
+    | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+      Misc.fatal_error "Kind mismatch for output of relation: expected %a")
+
+let add_to_inverse_relations inverse_relations name relation ~scrutinee =
+  Name.Map.union_total_shared
+    (fun _ inv_rels1 inv_rels2 ->
+      TG.Relation.Map.union_total_shared
+        (fun _ names1 names2 -> Name.Set.union names1 names2)
+        inv_rels1 inv_rels2)
+    inverse_relations
+    (Name.Map.singleton name
+       (TG.Relation.Map.singleton relation (Name.Set.singleton scrutinee)))
+
+let recover_inverse_relations inverse_relations name ty =
+  match TG.descr ty with
+  | Value (Ok (No_alias { is_null = Not_null; non_null = Ok head })) -> (
+    match head with
+    | Variant { immediates = Known imm_ty; get_tag = Some get_tag_var; _ }
+      when TG.is_obviously_bottom imm_ty ->
+      (* If we have no immediates, we can add the inverse relation on [get_tag]
+         at the toplevel. *)
+      let inverse_relations =
+        add_to_inverse_relations inverse_relations (Name.var get_tag_var)
+          TG.Relation.get_tag ~scrutinee:name
+      in
+      ty, inverse_relations
+    | Variant
+        { is_int;
+          get_tag;
+          immediates = (Known _ | Unknown) as immediates;
+          blocks;
+          extensions;
+          is_unique
+        } ->
+      let inverse_relations =
+        match is_int with
+        | None -> inverse_relations
+        | Some is_int_var ->
+          add_to_inverse_relations inverse_relations (Name.var is_int_var)
+            TG.Relation.is_int ~scrutinee:name
+      in
+      let ty =
+        match get_tag with
+        | None -> ty
+        | Some get_tag_var ->
+          let when_immediate, when_block =
+            match extensions with
+            | No_extensions -> TEE.empty, TEE.empty
+            | Ext { when_immediate; when_block } -> when_immediate, when_block
+          in
+          let when_block =
+            add_inverse_relation_to_env_extension when_block
+              (Name.var get_tag_var) TG.Relation.get_tag ~scrutinee:name
+          in
+          let head' =
+            TG.Head_of_kind_value_non_null.create_variant ~is_unique ~blocks
+              ~immediates
+              ~extensions:(Ext { when_immediate; when_block })
+              ~is_int ~get_tag
+          in
+          TG.create_from_head_value { is_null = Not_null; non_null = Ok head' }
+      in
+      ty, inverse_relations
+    | Mutable_block _
+    | Boxed_float32 (_, _)
+    | Boxed_float (_, _)
+    | Boxed_int32 (_, _)
+    | Boxed_int64 (_, _)
+    | Boxed_nativeint (_, _)
+    | Boxed_vec128 (_, _)
+    | Boxed_vec256 (_, _)
+    | Boxed_vec512 (_, _)
+    | Closures _ | String _ | Array _ ->
+      ty, inverse_relations)
+  | Value (Ok (No_alias { is_null = Maybe_null { is_null }; non_null = _ })) ->
+    (* CR bclement: if we are possibly null, we can't recover inverse relations
+       from the non-null case because we don't have an appropriate env extension
+       to place them in. *)
+    let inverse_relations =
+      match is_null with
+      | None -> inverse_relations
+      | Some is_null_var ->
+        add_to_inverse_relations inverse_relations (Name.var is_null_var)
+          TG.Relation.is_null ~scrutinee:name
+    in
+    ty, inverse_relations
+  | Value
+      ( Ok
+          ( Equals _
+          | No_alias { is_null = Not_null; non_null = Unknown | Bottom } )
+      | Unknown | Bottom )
+  | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+    ty, inverse_relations
+
 let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
-    types_in_target_env =
+    types_in_target_env inverse_relations =
   Name_in_target_env.Map.fold
-    (fun name types (types_in_target_env, t) ->
+    (fun name types (types_in_target_env, inverse_relations, t) ->
       if
         Flambda_features.check_light_invariants ()
         && Name_in_target_env.Map.mem name types_in_target_env
@@ -1524,11 +1670,17 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
             : (Index.t * Type_in_one_joined_env.t) list
             :> (Index.t * TG.t) list)
       with
-      | Unknown, t -> types_in_target_env, t
+      | Unknown, t -> types_in_target_env, inverse_relations, t
       | Known ty, t ->
+        let ty, inverse_relations =
+          recover_inverse_relations inverse_relations (name :> Name.t) ty
+        in
         let ty = Type_in_target_env.create ty in
-        Name_in_target_env.Map.add name ty types_in_target_env, t)
-    equations_to_join (types_in_target_env, t)
+        ( Name_in_target_env.Map.add name ty types_in_target_env,
+          inverse_relations,
+          t ))
+    equations_to_join
+    (types_in_target_env, inverse_relations, t)
 
 (** {2:n-way-join Cut and n-way join} *)
 
@@ -1630,17 +1782,27 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
       Name_in_target_env.Map.disjoint_union concrete_equations_to_join
         (equations_for_bindings bindings ~since:empty_bindings)
     in
-    let rec loop t equations_to_join concrete_types_in_target_env =
+    let rec loop t equations_to_join concrete_types_in_target_env
+        inverse_relations =
       let bindings_before_this_round = t.bindings in
-      let types_in_target_env, t =
+      let types_in_target_env, inverse_relations, t =
         n_way_join_round ~n_way_join_type t equations_to_join
-          concrete_types_in_target_env
+          concrete_types_in_target_env inverse_relations
       in
       let new_equations_to_join =
         equations_for_bindings t.bindings ~since:bindings_before_this_round
       in
       if Name_in_target_env.Map.is_empty new_equations_to_join
       then
+        let env_extension_for_inverse_relations =
+          TEE.from_map
+            (Name.Map.map
+               (fun inverse_relations ->
+                 TG.create_from_head_naked_immediate
+                   (TG.Head_of_kind_naked_immediate.create_inverse_relations
+                      inverse_relations))
+               inverse_relations)
+        in
         ( (* We compute symbol projections last so that we can pick up
              existential variables, but there is no need to create existential
              variables from symbol projections since they would not be
@@ -1648,14 +1810,19 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
 
              CR-someday bclement: perform CSE for symbol projections? *)
           types_in_target_env,
+          env_extension_for_inverse_relations,
           n_way_join_symbol_projections t symbol_projections_to_join,
           t.bindings )
-      else loop t new_equations_to_join types_in_target_env
+      else loop t new_equations_to_join types_in_target_env inverse_relations
     in
-    let equations, symbol_projections, bindings =
+    let ( equations,
+          env_extension_for_inverse_relations,
+          symbol_projections,
+          bindings ) =
       loop { joined_envs; bindings } equations_to_join
         (Name_in_target_env.from_source_env_map
            (Bindings_in_target_env.alias_types_in_target_env bindings))
+        Name.Map.empty
     in
     let target_env =
       Bindings_in_target_env.fold_created_variables
@@ -1671,6 +1838,10 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
            (equations
              : Type_in_target_env.t Name_in_target_env.Map.t
              :> TG.t Name.Map.t))
+    in
+    let target_env =
+      ME.add_env_extension ~meet_type target_env
+        env_extension_for_inverse_relations
     in
     let target_env =
       Variable_in_target_env.Map.fold
@@ -2159,9 +2330,9 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t extensions :
          join of env extensions, we might need additional rounds for
          completeness (see comment in [n_way_join_simples]) -- in practice one
          round should be plenty. *)
-      let equations, { bindings; _ } =
+      let equations, _env_extension_for_inverse_relations, { bindings; _ } =
         n_way_join_round ~n_way_join_type { joined_envs; bindings }
-          concrete_types_to_join alias_types_in_target_env
+          concrete_types_to_join alias_types_in_target_env Name.Map.empty
       in
       Ok
         ( TEE.from_map
