@@ -13,7 +13,7 @@ let test e =
   try
     ignore (Eval.eval e)
   with e ->
-    print_endline "eval failed.\n"
+    print_endline "eval failed."; print_newline ()
 
 (* This is fine -- and the attribute should be printed  *)
 let () = test <[ ($(<[42]>) [@magic_staged_modes]) ]>
