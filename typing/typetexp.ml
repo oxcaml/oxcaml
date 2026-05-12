@@ -1195,77 +1195,17 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           vars st
       in
       ctyp desc typ
-<<<<<<< HEAD
+  | Ptyp_newlayout _ ->
+      Language_extension.assert_enabled ~loc Layout_poly
+        Language_extension.Alpha;
+      Env.check_no_open_quotations loc env Layout_polymorphism_qt;
+      raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package ptyp ->
       let path, mty, ptys = transl_package env ~policy ~row_context ptyp in
       let ty = newty (Tpackage {
           pack_path = path;
           pack_cstrs = List.map (fun (s, cty) ->
                          (Longident.flatten s.txt, cty.ctyp_type)) ptys})
-||||||| 5.2.0minus-31
-  | Ptyp_package (p, l) ->
-    (* CR layouts: right now we're doing a real gross hack where we demand
-       everything in a package type with constraint be value.
-
-       An alternative is to walk into the constrained module, using the
-       longidents, and find the actual things that need jkind checking.
-       See [Typemod.package_constraints_sig] for code that does a
-       similar traversal from a longident.
-    *)
-    (* CR layouts: and in the long term, rewrite all of this to eliminate
-       the [create_package_mty] hack that constructs fake source code. *)
-      let loc = styp.ptyp_loc in
-      let l = sort_constraints_no_duplicates loc env l in
-      let mty = Ast_helper.Mty.mk ~loc (Pmty_ident p) in
-      let mty = TyVarEnv.with_local_scope (fun () -> !transl_modtype env mty) in
-      let ptys =
-        List.map (fun (s, pty) ->
-          s, transl_type env ~policy ~row_context Alloc.Const.legacy pty
-        ) l
-      in
-      let mty =
-        if ptys <> [] then
-          !check_package_with_type_constraints loc env mty.mty_type ptys
-        else mty.mty_type
-      in
-      let path = !transl_modtype_longident loc env p.txt in
-      let ty = newty (Tpackage (path,
-                       List.map (fun (s, cty) -> (s.txt, cty.ctyp_type)) ptys))
-=======
-  | Ptyp_newlayout _ ->
-      Language_extension.assert_enabled ~loc Layout_poly
-        Language_extension.Alpha;
-      Env.check_no_open_quotations loc env Layout_polymorphism_qt;
-      raise (Error (loc, env, Lpoly_unsupported))
-  | Ptyp_package (p, l) ->
-    (* CR layouts: right now we're doing a real gross hack where we demand
-       everything in a package type with constraint be value.
-
-       An alternative is to walk into the constrained module, using the
-       longidents, and find the actual things that need jkind checking.
-       See [Typemod.package_constraints_sig] for code that does a
-       similar traversal from a longident.
-    *)
-    (* CR layouts: and in the long term, rewrite all of this to eliminate
-       the [create_package_mty] hack that constructs fake source code. *)
-      let loc = styp.ptyp_loc in
-      let l = sort_constraints_no_duplicates loc env l in
-      let mty = Ast_helper.Mty.mk ~loc (Pmty_ident p) in
-      let mty = TyVarEnv.with_local_scope (fun () -> !transl_modtype env mty) in
-      let ptys =
-        List.map (fun (s, pty) ->
-          s, transl_type env ~policy ~row_context Alloc.Const.legacy pty
-        ) l
-      in
-      let mty =
-        if ptys <> [] then
-          !check_package_with_type_constraints loc env mty.mty_type ptys
-        else mty.mty_type
-      in
-      let path = !transl_modtype_longident loc env p.txt in
-      let ty = newty (Tpackage (path,
-                       List.map (fun (s, cty) -> (s.txt, cty.ctyp_type)) ptys))
->>>>>>> 5.2.0minus-37
       in
       ctyp (Ttyp_package {
             tpt_path = path;
@@ -1985,18 +1925,8 @@ let report_error_doc loc env = function
     in
     Location.errorf ~loc "%s types must have layout value.@ %a"
       s (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
            ~offender:(fun ppf -> pp_type ppf typ)
-           ~level:(get_current_level ()) env) err
-||||||| 5.2.0minus-31
-           ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ()) env) err
-=======
-           ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)
            env) err
->>>>>>> 5.2.0minus-37
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -2005,33 +1935,13 @@ let report_error_doc loc env = function
     in
     Location.errorf ~loc "%s types must have a representable layout.@ %a"
       s (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
            ~offender:(fun ppf -> pp_type ppf typ)
-           ~level:(get_current_level ()) env) err
-||||||| 5.2.0minus-31
-           ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ()) env) err
-=======
-           ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)
            env) err
->>>>>>> 5.2.0minus-37
   | Bad_jkind_annot(ty, violation) ->
     Location.errorf ~loc "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
          ~offender:(fun ppf -> pp_type ppf ty)
-         ~level:(get_current_level ()) env) violation
-||||||| 5.2.0minus-31
-         ~offender:(fun ppf ->
-             Style.as_inline_code Printtyp.type_expr ppf ty)
-         ~level:(get_current_level ()) env) violation
-=======
-         ~offender:(fun ppf ->
-             Style.as_inline_code Printtyp.type_expr ppf ty)
          env) violation
->>>>>>> 5.2.0minus-37
   | Did_you_mean_unboxed lid ->
     Location.errorf ~loc
       "%a isn't a class type.@ Did you mean the unboxed type %a?"
@@ -2053,9 +1963,9 @@ let report_error_doc loc env = function
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
   | Lpoly_unsupported ->
-      fprintf ppf
-        "@[Layout polymorphism is not supported in term-level type \
-         annotations@]"
+      Location.errorf ~loc
+        "Layout polymorphism is not supported in term-level type \
+         annotations"
 
 let () =
   Location.register_error_of_exn

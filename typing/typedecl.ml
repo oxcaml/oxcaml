@@ -3009,24 +3009,14 @@ let name_recursion sdecl id decl =
     let ty' = Btype.newty2 ~level:(get_level ty) (get_desc ty) in
     if Ctype.deep_occur ty ty' then
       let td = Tconstr(Path.Pident id, decl.type_params, ref Mnil) in
-<<<<<<< HEAD
       link_type ty (Btype.newty2 ~level:(get_level ty) td);
-      {decl with type_manifest = Some ty'}
-    else decl
-||||||| 5.2.0minus-31
-      link_type ty (newty2 ~level:(get_level ty) td);
-      {decl with type_manifest = Some ty'}
-    else decl
-=======
-      link_type ty (newty2 ~level:(get_level ty) td);
       { decl with
         type_manifest = Some ty';
         type_ikind =
           Types.ikinds_todo
             (Format_doc.asprintf "name_recursion path=%a"
               Path.print (Path.Pident id)) }
-else decl
->>>>>>> 5.2.0minus-37
+    else decl
   | _ -> decl
 
 let name_recursion_decls sdecls decls =
@@ -4739,7 +4729,7 @@ let transl_jkind_constraint id env orig_decl new_decl =
      considerations that require us to re-check the declaration in the inner
      environment (e.g., [constraint]s) do not occur for lr-jkinds. *)
   Env.mark_jkind_used orig_decl.jkind_uid;
-  let jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
+  let jkind_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
   let context = Jkind.History.Jkind_declaration (Pident id) in
   let jka =
     match new_decl.pjkind_manifest with
@@ -4825,7 +4815,7 @@ module Reaching_path = struct
     Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
 
   let pp_colon ~pp_root ~pp_body ppf path =
-    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" (pp ~pp_root ~pp_body) path
+    Fmt.fprintf ppf ":@\n  @[<v>%a@]" (pp ~pp_root ~pp_body) path
 
   (* Type-specific operations *)
 
@@ -4856,32 +4846,9 @@ module Reaching_path = struct
 
   let pp_type_colon =
     pp_colon
-      ~pp_root:Printtyp.prepared_type_expr
-      ~pp_body:Printtyp.prepared_type_expr
+      ~pp_root:Out_type.prepared_type_expr
+      ~pp_body:Out_type.prepared_type_expr
 
-<<<<<<< HEAD
-  let pp ppf reaching_path =
-    let pp_step ppf = function
-      | Expands_to (ty, body) ->
-          Fmt.fprintf ppf "%a = %a"
-            (Style.as_inline_code Out_type.prepared_type_expr) ty
-            (Style.as_inline_code Out_type.prepared_type_expr) body
-      | Contains (outer, inner) ->
-          Fmt.fprintf ppf "%a contains %a"
-            (Style.as_inline_code Out_type.prepared_type_expr) outer
-            (Style.as_inline_code Out_type.prepared_type_expr) inner
-||||||| 5.2.0minus-31
-  let pp ppf reaching_path =
-    let pp_step ppf = function
-      | Expands_to (ty, body) ->
-          Fmt.fprintf ppf "%a = %a"
-            (Style.as_inline_code Printtyp.prepared_type_expr) ty
-            (Style.as_inline_code Printtyp.prepared_type_expr) body
-      | Contains (outer, inner) ->
-          Fmt.fprintf ppf "%a contains %a"
-            (Style.as_inline_code Printtyp.prepared_type_expr) outer
-            (Style.as_inline_code Printtyp.prepared_type_expr) inner
-=======
   (* Kind-specific operations *)
 
   (* Format a jkind manifest without expanding Kconstr paths, to avoid infinite
@@ -4892,7 +4859,6 @@ module Reaching_path = struct
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
       | Kconstr p -> Printtyp.path ppf p
->>>>>>> 5.2.0minus-37
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds
@@ -4907,15 +4873,7 @@ module Reaching_path = struct
            Fmt.pp_print_string)
         mod_strings
 
-<<<<<<< HEAD
-  let pp_colon ppf path =
-    Fmt.fprintf ppf ":@\n  @[<v>%a@]" pp path
-||||||| 5.2.0minus-31
-  let pp_colon ppf path =
-    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
-=======
   let pp_kind_colon = pp_colon ~pp_root:Printtyp.path ~pp_body:pp_kind_manifest
->>>>>>> 5.2.0minus-37
 end
 
 let report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc =
@@ -5085,8 +5043,7 @@ let report_error ~loc = function
       Location.errorf ~loc
         "@[<v>The definition of %a is recursive without boxing%a@]"
         Style.inline_code s
-<<<<<<< HEAD
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Definition_mismatch (ty, env, err) ->
       let err ppf = match err with
         | None -> ()
@@ -5099,31 +5056,6 @@ let report_error ~loc = function
         "@[This variant or record definition@ \
          does not match that of type@;<1 2>%a@]%t"
         quoted_type ty
-||||||| 5.2.0minus-31
-        Reaching_path.pp_colon reaching_path
-  | Definition_mismatch (ty, _env, None) ->
-      fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]@]"
-        "This variant or record definition" "does not match that of type"
-        (Style.as_inline_code Printtyp.type_expr) ty
-  | Definition_mismatch (ty, env, Some err) ->
-      fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]%a@]"
-        "This variant or record definition" "does not match that of type"
-        (Style.as_inline_code Printtyp.type_expr) ty
-        (Includecore.report_type_mismatch
-           "the original" "this" "definition" env)
-=======
-        Reaching_path.pp_type_colon reaching_path
-  | Definition_mismatch (ty, _env, None) ->
-      fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]@]"
-        "This variant or record definition" "does not match that of type"
-        (Style.as_inline_code Printtyp.type_expr) ty
-  | Definition_mismatch (ty, env, Some err) ->
-      fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]%a@]"
-        "This variant or record definition" "does not match that of type"
-        (Style.as_inline_code Printtyp.type_expr) ty
-        (Includecore.report_type_mismatch
-           "the original" "this" "definition" env)
->>>>>>> 5.2.0minus-37
         err
   | Constraint_failed (env, err) ->
       let get_jkind_error : _ Errortrace.elt -> _ = function
@@ -5169,19 +5101,9 @@ let report_error ~loc = function
         (fun pp ->
            let is_expansion = function Expands_to _ -> true | _ -> false in
            if List.exists is_expansion reaching_path then
-<<<<<<< HEAD
              fprintf pp "@ after the following expansion(s)%a"
-             Reaching_path.pp_colon reaching_path
-           else fprintf pp ".")
-||||||| 5.2.0minus-31
-             fprintf pp "@ after the following expansion(s)%a@ "
-             Reaching_path.pp_colon reaching_path
-           else fprintf pp ".@ ")
-=======
-             fprintf pp "@ after the following expansion(s)%a@ "
              Reaching_path.pp_type_colon reaching_path
-           else fprintf pp ".@ ")
->>>>>>> 5.2.0minus-37
+           else fprintf pp ".")
   | Inconsistent_constraint (env, err) ->
       Location.errorf ~loc "The type constraints are not consistent.@\n%t"
       (fun ppf -> Errortrace_report.unification ppf env err
@@ -5276,13 +5198,7 @@ let report_error ~loc = function
   | Val_in_structure ->
       Location.errorf ~loc "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-<<<<<<< HEAD
-      Location.errorf ~loc "Too many %a/%a attributes"
-||||||| 5.2.0minus-31
-      fprintf ppf "Too many %a/%a attributes"
-=======
-      fprintf ppf "Too many %a/%a/%a attributes"
->>>>>>> 5.2.0minus-37
+      Location.errorf ~loc "Too many %a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
@@ -5303,8 +5219,9 @@ let report_error ~loc = function
         Style.inline_code "int16"
         Style.inline_code "int"
   | Cannot_unbox_or_untag_type Unpacked ->
-      fprintf ppf "@[Don't know how to unpack this type.@ \
-                   Only types with product layouts can be marked %a.@]"
+      Location.errorf ~loc
+        "Don't know how to unpack this type.@ \
+         Only types with product layouts can be marked %a."
         Style.inline_code "unpacked"
   | Deep_unbox_or_untag_attribute kind ->
       Location.errorf ~loc
@@ -5326,31 +5243,15 @@ let report_error ~loc = function
       in
       fprintf ppf "type %a" Style.inline_code path_end
     in
-<<<<<<< HEAD
     Location.errorf ~loc "%t" (fun ppf ->
       Jkind.Violation.report_with_offender ~offender
-        ~level:(Ctype.get_current_level ()) env ppf v)
-||||||| 5.2.0minus-31
-    Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
-=======
-    Jkind.Violation.report_with_offender ~offender
-      env ppf v
->>>>>>> 5.2.0minus-37
+        env ppf v)
   | Jkind_mismatch_of_type (env, ty, v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
-<<<<<<< HEAD
     Location.errorf ~loc "%t" (fun ppf ->
       Jkind.Violation.report_with_offender ~offender
-        ~level:(Ctype.get_current_level ()) env ppf v)
-||||||| 5.2.0minus-31
-    Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
-=======
-    Jkind.Violation.report_with_offender ~offender
-      env ppf v
->>>>>>> 5.2.0minus-37
+        env ppf v)
   | Jkind_sort {env; kloc; typ; err} ->
     let s =
       match kloc with
@@ -5498,7 +5399,7 @@ let report_error ~loc = function
          variable for it to operate on."
         Style.inline_code "[@layout_poly]"
   | Bad_or_null_attribute msg ->
-      fprintf ppf "@[Invalid [@@or_null] declaration:@ %s.@]" msg
+      Location.errorf ~loc "Invalid [@@or_null] declaration:@ %s." msg
   | Zero_alloc_attr_unsupported ca ->
       let variety = match ca with
         | Default_zero_alloc  | Check _ -> assert false
@@ -5559,23 +5460,13 @@ let report_error ~loc = function
     Location.errorf ~loc
       "Atomic record fields must have layout value."
   | Layout_poly_unsupported ->
-<<<<<<< HEAD
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-||||||| 5.2.0minus-31
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
-
-=======
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
   | Recursive_jkind_definition (path, env, reaching_path) ->
     Printtyp.wrap_printing_env ~error:true env @@ fun () ->
-    fprintf ppf "@[<v>The kind %a is cyclic%a@]"
+    Location.errorf ~loc "The kind %a is cyclic%a"
       (Style.as_inline_code Printtyp.path) path
       Reaching_path.pp_kind_colon reaching_path
-
->>>>>>> 5.2.0minus-37
 
 let () =
   Location.register_error_of_exn
