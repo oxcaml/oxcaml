@@ -591,6 +591,9 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 buf_sym b sym offset))
   | Imm _ | Sym _ -> assert false
 
+(** [rex_always] is combined with operand-derived REX bits. Passing [no_rex]
+    here does not mean that no REX prefix will be emitted: [emit_prefix_modrm]
+    can still request REX.R, REX.B or REX.X for the operands. *)
 let emit_mod_rm_reg b rex_always opcodes rm reg =
   emit_prefix_modrm b opcodes rm reg ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
     emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
@@ -632,14 +635,13 @@ let emit_MOV b dst src =
       buf_int8L b n
   | ((Mem _ | Mem64_RIP _) as rm), ((Reg8L _ | Reg8H _) as reg) ->
       emit_mod_rm_reg b (rex_of_reg8 reg) [ 0x88 ] rm (rd_of_reg8 reg)
-  (* no REX.W *)
   (* movw *)
   | ((Mem _ | Mem64_RIP _) as rm), Reg16 reg ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b rex [ 0x89 ] rm (rd_of_reg64 reg) (* no REX.W *)
+      emit_mod_rm_reg b no_rex [ 0x89 ] rm (rd_of_reg64 reg)
   | Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b rex [ 0x8B ] rm (rd_of_reg64 reg) (* no REX.W *)
+      emit_mod_rm_reg b no_rex [ 0x8B ] rm (rd_of_reg64 reg)
   (* movl *)
   | Reg32 reg32, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
       let reg = rd_of_reg64 reg32 in
@@ -1075,7 +1077,7 @@ let emit_mul b ~src =
   let opcode_extension = 4 in
   match src with
   | ((Reg8H _ | Reg8L _ | Mem {typ = BYTE; _} | Mem64_RIP (BYTE, _, _)) as rm) ->
-    emit_mod_rm_reg b rex [ 0xF6 ] rm opcode_extension
+    emit_mod_rm_reg b no_rex [ 0xF6 ] rm opcode_extension
   | ((Reg16 _ | Mem {typ = WORD; _} | Mem64_RIP (WORD, _, _)) as rm) ->
     buf_int8 b 0x66;
     emit_mod_rm_reg b no_rex [ 0xF7 ] rm opcode_extension
@@ -1229,13 +1231,22 @@ let emit_set b condition dst =
 
 let emit_movsx b dst src =
   match (dst, src) with
-  | (Reg64 reg | Reg32 reg), ((Mem { typ = BYTE } | Reg8L _ | Reg8H _) as rm) ->
-      let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b rex [ 0x0F; 0xBE ] rm reg
-      (* no REX.W *)
-  | (Reg64 reg | Reg32 reg), ((Mem { typ = WORD } | Reg16 _) as rm) ->
-      let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b rexw [ 0x0F; 0xBF ] rm reg
+  | Reg64 reg, ((Mem { typ = BYTE } | Reg8L _ | Reg8H _) as rm) ->
+      (* movsbq: REX.W + 0F BE /r *)
+      emit_mod_rm_reg b rexw [ 0x0F; 0xBE ] rm (rd_of_reg64 reg)
+  | Reg32 reg, ((Mem { typ = BYTE } | Reg8L _ | Reg8H _) as rm) ->
+      (* movsbl: 0F BE /r *)
+      (* This is the 32-bit destination form. [emit_mod_rm_reg] still adds
+         operand-extension REX bits such as REX.R and REX.B when needed. *)
+      emit_mod_rm_reg b no_rex [ 0x0F; 0xBE ] rm (rd_of_reg64 reg)
+  | Reg64 reg, ((Mem { typ = WORD } | Reg16 _) as rm) ->
+      (* movswq: REX.W + 0F BF /r *)
+      emit_mod_rm_reg b rexw [ 0x0F; 0xBF ] rm (rd_of_reg64 reg)
+  | Reg32 reg, ((Mem { typ = WORD } | Reg16 _) as rm) ->
+      (* movswl: 0F BF /r *)
+      (* This is the 32-bit destination form. [emit_mod_rm_reg] still adds
+         operand-extension REX bits such as REX.R and REX.B when needed. *)
+      emit_mod_rm_reg b no_rex [ 0x0F; 0xBF ] rm (rd_of_reg64 reg)
   | _ -> assert false
 
 let emit_movsxd b dst src =
@@ -1255,7 +1266,7 @@ let emit_MOVZX b dst src =
       emit_mod_rm_reg b rexw [ 0x0F; 0xB7 ] rm reg
   | Reg32 reg, ((Mem { typ = WORD } | Reg16 _) as rm) ->
       let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b 0 [ 0x0F; 0xB7 ] rm reg
+      emit_mod_rm_reg b no_rex [ 0x0F; 0xB7 ] rm reg
   | _ -> assert false
 
 let emit_neg b dst =
@@ -1422,12 +1433,7 @@ let emit_XCHG b src dst =
   | Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       (* r16, r/m16 *)
       buf_int8 b 0x66;
-      (* CR mshinwell/claude:
-      emit_XCHG r16 uses rex (0x40) as rex_always (line 1398). This forces a
-      bare REX prefix on every 16-bit XCHG, even when unnecessary. It's harmless
-      (a bare 0x40 REX is valid and has no effect) but adds a wasted byte. The
-      32-bit XCHG correctly uses no_rex. *)
-      emit_mod_rm_reg b rex [ 0x87 ] rm (rd_of_reg64 reg)
+      emit_mod_rm_reg b no_rex [ 0x87 ] rm (rd_of_reg64 reg)
   (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI.
      emit_prefix_modrm handles forced REX for the rm operand. *)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
