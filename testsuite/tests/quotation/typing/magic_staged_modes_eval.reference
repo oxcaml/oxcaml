@@ -10,74 +10,12 @@ Error: The expression is "local" because it is "stack_"-allocated.
          because it is the value "eval" in the structure at file "//eval//", line 1, characters 0-29
          which is expected to be "global"
          because modules always need to be allocated on the heap.
-eval failed with:
-Raised at Mode.Comonadic_with.submode_err in file "typing/mode.ml", line 3549, characters 6-73
-Called from Typemod.infer_modalities in file "typing/typemod.ml", line 181, characters 4-65
-Called from Typemod.type_structure.type_str_item.(fun) in file "typing/typemod.ml", line 3715, characters 16-70
-Called from Stdlib__List.fold_left in file "list.ml" (inlined), line 128, characters 24-34
-Called from Typemod.type_structure.type_str_item in file "typing/typemod.ml", lines 3692-3726, characters 10-1688
-Called from Typemod.type_structure.type_struct in file "typing/typemod.ml", line 4070, characters 10-66
-Called from Typemod.type_structure.run in file "typing/typemod.ml", line 4082, characters 6-61
-Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 433, characters 14-18
-Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 438, characters 4-13
-Called from Misc.try_finally in file "utils/misc.ml", line 36, characters 8-15
-Re-raised at Misc.try_finally in file "utils/misc.ml", line 50, characters 10-56
-Called from Typemod.type_implementation.(fun) in file "typing/typemod.ml", line 4407, characters 8-78
-Called from Misc.try_finally in file "utils/misc.ml", line 36, characters 8-15
-Re-raised at Misc.try_finally in file "utils/misc.ml", line 50, characters 10-56
-Called from Eval.eval in file "otherlibs/eval/eval.ml", line 182, characters 4-66
-Called from Stdlib__Fun.protect in file "fun.ml", line 39, characters 8-15
-Re-raised at Stdlib__Fun.protect in file "fun.ml", line 44, characters 6-52
-Called from Eval.eval.(fun) in file "otherlibs/eval/eval.ml", line 240, characters 10-57
-Re-raised at Eval.eval.(fun) in file "otherlibs/eval/eval.ml", line 244, characters 8-51
-Called from Stdlib__Mutex.protect in file "stdlib/mutex.ml", line 30, characters 8-12
-Re-raised at Stdlib__Mutex.protect in file "stdlib/mutex.ml", line 36, characters 10-21
-Called from Magic_staged_modes_eval.test in file "magic_staged_modes_eval.ml", line 14, characters 11-24
+eval failed.
 
 generated program:
 ((Stdlib.ref 0 : _ @ unique) [@magic_staged_modes])
 
 File "//eval//", line 1, characters 14-26:
 Error: This value is "aliased" but is expected to be "unique".
-eval failed with:
-Raised at Typecore.submode in file "typing/typecore.ml", line 704, characters 6-36
-Called from Typecore.type_expect_ in file "typing/typecore.ml", line 6736, characters 6-75
-Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 433, characters 14-18
-Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 438, characters 4-13
-Called from Typecore.type_expect in file "typing/typecore.ml", lines 6036-6039, characters 4-168
-Called from Typecore.type_argument in file "typing/typecore.ml", lines 9433-9434, characters 17-109
-Called from Typecore.type_expect_ in file "typing/typecore.ml", line 7294, characters 16-93
-Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 433, characters 14-18
-Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 438, characters 4-13
-Called from Typecore.type_expect in file "typing/typecore.ml", lines 6036-6039, characters 4-168
-Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 433, characters 14-18
-Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 438, characters 4-13
-Called from Typecore.type_let.(fun) in file "typing/typecore.ml", lines 10570-10571, characters 18-153
-Called from Stdlib__List.map2 in file "list.ml", line 139, characters 15-22
-Called from Typecore.type_let_def_wrap_warnings in file "typing/typecore.ml", lines 10806-10810, characters 4-197
-Called from Typecore.type_let.(fun) in file "typing/typecore.ml", lines 10551-10573, characters 8-1082
-Called from Misc.try_finally in file "utils/misc.ml", line 36, characters 8-15
-Re-raised at Misc.try_finally in file "utils/misc.ml", line 50, characters 10-56
-Called from Ctype.wrap_end_def in file "typing/ctype.ml" (inlined), line 178, characters 21-55
-Called from Ctype.with_local_level in file "typing/ctype.ml", line 188, characters 15-29
-Called from Typecore.type_let in file "typing/typecore.ml", lines 10448-10648, characters 4-8704
-Called from Typecore.type_binding in file "typing/typecore.ml", lines 11446-11451, characters 4-247
-Called from Typemod.type_structure.type_str_item in file "typing/typemod.ml", line 3684, characters 10-76
-Called from Typemod.type_structure.type_struct in file "typing/typemod.ml", line 4070, characters 10-66
-Called from Typemod.type_structure.run in file "typing/typemod.ml", line 4082, characters 6-61
-Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 433, characters 14-18
-Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 438, characters 4-13
-Called from Misc.try_finally in file "utils/misc.ml", line 36, characters 8-15
-Re-raised at Misc.try_finally in file "utils/misc.ml", line 50, characters 10-56
-Called from Typemod.type_implementation.(fun) in file "typing/typemod.ml", line 4407, characters 8-78
-Called from Misc.try_finally in file "utils/misc.ml", line 36, characters 8-15
-Re-raised at Misc.try_finally in file "utils/misc.ml", line 50, characters 10-56
-Called from Eval.eval in file "otherlibs/eval/eval.ml", line 182, characters 4-66
-Called from Stdlib__Fun.protect in file "fun.ml", line 39, characters 8-15
-Re-raised at Stdlib__Fun.protect in file "fun.ml", line 44, characters 6-52
-Called from Eval.eval.(fun) in file "otherlibs/eval/eval.ml", line 240, characters 10-57
-Re-raised at Eval.eval.(fun) in file "otherlibs/eval/eval.ml", line 244, characters 8-51
-Called from Stdlib__Mutex.protect in file "stdlib/mutex.ml", line 30, characters 8-12
-Re-raised at Stdlib__Mutex.protect in file "stdlib/mutex.ml", line 36, characters 10-21
-Called from Magic_staged_modes_eval.test in file "magic_staged_modes_eval.ml", line 14, characters 11-24
+eval failed.
 
