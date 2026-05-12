@@ -600,7 +600,8 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
                desc;
                info = "";
                deprecated = false;
-               ppx_template_generated = false
+               ppx_template_generated = false;
+               is_local = false
              })
     in
     { Compl.entries; context = `Unknown }

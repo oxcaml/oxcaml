@@ -247,7 +247,12 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
   in
   let deprecated = Type_utils.is_deprecated attrs in
   let ppx_template_generated = Type_utils.is_ppx_template_generated attrs in
-  { name; kind; desc; info; deprecated; ppx_template_generated }
+  let is_local =
+    match path with
+    | Some path -> not (Ident.is_global_or_predef (Path.head path))
+    | None -> true
+  in
+  { name; kind; desc; info; deprecated; ppx_template_generated; is_local }
 
 let item_for_global_module name =
   { name;
@@ -255,7 +260,8 @@ let item_for_global_module name =
     desc = `None;
     info = `None;
     deprecated = false;
-    ppx_template_generated = false
+    ppx_template_generated = false;
+    is_local = false
   }
 
 let fold_variant_constructors ~env ~init ~f =
@@ -548,7 +554,8 @@ let complete_methods ~env ~prefix obj =
         desc = `Type_scheme ty;
         info;
         deprecated = false;
-        ppx_template_generated = false
+        ppx_template_generated = false;
+        is_local = true
       })
 
 type is_label =
@@ -651,7 +658,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
                   desc = `None;
                   info = `None;
                   deprecated = false;
-                  ppx_template_generated = false
+                  ppx_template_generated = false;
+                  is_local = false
                 }
                 :: candidates
               else candidates)
@@ -667,7 +675,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
                 desc = `None;
                 info = `None;
                 deprecated = false;
-                ppx_template_generated = false
+                ppx_template_generated = false;
+                is_local = false
               }
             in
             if name = prefix && uniq (`Mod, name) then
