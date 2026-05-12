@@ -133,6 +133,10 @@ type primitive =
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
+  | Pmakefloatblocksingle of mutable_flag * locality_mode
+    (** Allocate a tag-253 ([Double_tag]) single-field block holding one
+        unboxed float, i.e. the same runtime shape as a boxed [float]. Used
+        for the [Record_float_block] representation. *)
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
@@ -140,6 +144,8 @@ type primitive =
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
+  | Pfloatblocksinglefield of field_read_semantics
+    (** Read the (single) float from a tag-253 ([Double_tag]) float block. *)
   | Pmixedfield of int list * mixed_block_shape_with_locality_mode
       * field_read_semantics
     (** The index to [Pmixedfield] corresponds to an element of the shape, not
@@ -147,6 +153,8 @@ type primitive =
         place on entry to Flambda 2. *)
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
+  | Psetfloatblocksinglefield of initialization_or_assignment
+    (** Update the (single) float in a tag-253 ([Double_tag]) float block. *)
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
     (** The same comment about the index as for [Pmixedfield] applies to

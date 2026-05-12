@@ -332,6 +332,7 @@ type record_mismatch =
   | Inlined_representation of position
   | Float_representation of position
   | Ufloat_representation of position
+  | Float_block_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
   | Representation_shape_mismatch
@@ -604,6 +605,10 @@ let report_record_mismatch first second decl env ppf err =
       pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
         (choose ord first second) decl
         "uses float# representation"
+  | Float_block_representation ord ->
+      pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
+        (choose ord first second) decl
+        "uses single float# block representation"
   | Mixed_representation ord ->
       (* CR layouts: As above. *)
       pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
@@ -1035,6 +1040,12 @@ module Record_diffing = struct
              Some (Record_mismatch (Ufloat_representation First))
           | _, Record_ufloat ->
              Some (Record_mismatch (Ufloat_representation Second))
+
+          | Record_float_block, Record_float_block -> None
+          | Record_float_block, _ ->
+             Some (Record_mismatch (Float_block_representation First))
+          | _, Record_float_block ->
+             Some (Record_mismatch (Float_block_representation Second))
 
           | Record_mixed m1, Record_mixed m2 ->
               begin match

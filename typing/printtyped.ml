@@ -256,6 +256,7 @@ let record_representation i ppf = let open Types in function
     line i ppf "Record_inlined (%a, %a)\n" tag t (variant_representation i) v
   | Record_float -> line i ppf "Record_float\n"
   | Record_ufloat -> line i ppf "Record_ufloat\n"
+  | Record_float_block -> line i ppf "Record_float_block\n"
   | Record_mixed shape ->
     line i ppf "Record_mixed\n";
     array (i+1) mixed_block_element ppf shape

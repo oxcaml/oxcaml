@@ -239,6 +239,14 @@ let blocks_to_unbox ~escaping ~source_info ~required_names =
                         (fun _ -> Flambda_kind.With_subkind.naked_float)
                         fields
                   }
+                | Float_block ->
+                  { tag = Tag.double_tag;
+                    mut;
+                    fields_kinds =
+                      List.map
+                        (fun _ -> Flambda_kind.With_subkind.naked_float)
+                        fields
+                  }
                 | Mixed (tag, shape) ->
                   let fields_kinds =
                     List.map Flambda_kind.With_subkind.anything

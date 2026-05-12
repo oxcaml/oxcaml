@@ -392,32 +392,40 @@ module Block_shape = struct
   type t =
     | Scannable of Scannable_block_shape.t
     | Float_record
+    | Float_block
+        (** Tag-253 ([Double_tag]) single-naked-float block — the same runtime
+            shape as a boxed [float]. Used for singleton [float#] records. *)
 
   let equal t1 t2 =
     match t1, t2 with
     | Scannable shape1, Scannable shape2 ->
       Scannable_block_shape.equal shape1 shape2
     | Float_record, Float_record -> true
-    | (Scannable _ | Float_record), _ -> false
+    | Float_block, Float_block -> true
+    | (Scannable _ | Float_record | Float_block), _ -> false
 
   let compare t1 t2 =
     match t1, t2 with
     | Scannable shape1, Scannable shape2 ->
       Scannable_block_shape.compare shape1 shape2
-    | Scannable _, Float_record -> -1
-    | Float_record, Scannable _ -> 1
+    | Scannable _, (Float_record | Float_block) -> -1
+    | (Float_record | Float_block), Scannable _ -> 1
     | Float_record, Float_record -> 0
+    | Float_block, Float_block -> 0
+    | Float_record, Float_block -> -1
+    | Float_block, Float_record -> 1
 
   let print ppf t =
     match t with
     | Scannable shape ->
       Format.fprintf ppf "(Scannable@ %a)" Scannable_block_shape.print shape
     | Float_record -> Format.fprintf ppf "Float_record"
+    | Float_block -> Format.fprintf ppf "Float_block"
 
   let element_kind t index =
     match t with
     | Scannable shape -> Scannable_block_shape.element_kind shape index
-    | Float_record -> Naked_number Naked_float
+    | Float_record | Float_block -> Naked_number Naked_float
 end
 
 module Standard_int = struct

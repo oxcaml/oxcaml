@@ -290,7 +290,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
             let field_types = TG.Product.Int_indexed.components field_types in
             let field_types_and_expected_kinds =
               match shape with
-              | Float_record ->
+              | Float_record | Float_block ->
                 List.map (fun ty -> ty, Flambda_kind.naked_float) field_types
               | Scannable (Mixed_record shape) ->
                 Flambda_kind.Mixed_block_shape.field_kinds shape
@@ -299,7 +299,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
                 List.map (fun ty -> ty, Flambda_kind.value) field_types
             in
             match shape with
-            | Float_record ->
+            | Float_record | Float_block ->
               (* CR mshinwell: lift these and also support arrays (below) with
                  [Simple]s not just numbers in them *)
               try_canonical_simple ()

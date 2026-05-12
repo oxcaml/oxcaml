@@ -2421,6 +2421,9 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
            Lprim (Pufloatfield (lbl.lbl_pos, sem), [ arg ], loc),
            (* Here we are projecting an unboxed float from a float record. *)
            lbl_sort, lbl_layout
+        | Record_float_block ->
+           Lprim (Pfloatblocksinglefield sem, [ arg ], loc),
+           lbl_sort, lbl_layout
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
             Lprim (Pfield (lbl.lbl_pos + 1, ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout

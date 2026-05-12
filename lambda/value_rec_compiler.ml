@@ -258,7 +258,7 @@ let compute_static_size lam =
                 (all_value_mixed_block_size_types shape))
             else
               Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
-        | Record_unboxed | Record_ufloat
+        | Record_unboxed | Record_ufloat | Record_float_block
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         | Record_dummy _ ->
@@ -386,6 +386,7 @@ let compute_static_size lam =
         Block (Float_record size)
 
     | Psetufloatfield (_, _)
+    | Psetfloatblocksinglefield _
     | Pbytes_set_vec _
     | Pbigstring_set_vec _
     | Pfloatarray_set_vec _
@@ -405,6 +406,7 @@ let compute_static_size lam =
         Constant
 
     | Pmakeufloatblock (_, _)
+    | Pmakefloatblocksingle (_, _)
     | Pmake_unboxed_product _ ->
         dynamic_size lam (* Not allowed *)
 
@@ -413,6 +415,7 @@ let compute_static_size lam =
     | Parray_of_iarray
     | Pgetpredef _
     | Pufloatfield (_, _)
+    | Pfloatblocksinglefield _
     | Punboxed_product_field (_, _)
     | Pstring_load_vec _
     | Pbytes_load_vec _

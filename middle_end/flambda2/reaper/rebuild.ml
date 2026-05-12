@@ -1665,6 +1665,8 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
                   (Tag.Scannable.to_tag tag)
               | Naked_floats ->
                 Tag.to_targetint_31_63 env.machine_width Tag.double_array_tag
+              | Float_block ->
+                Tag.to_targetint_31_63 env.machine_width Tag.double_tag
             in
             match uf with
             | Not_unboxed (ff, _) ->
@@ -1735,7 +1737,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
   let _tag, block_shape = P.Block_kind.to_shape block_kind in
   let block_kind =
     match block_kind with
-    | Mixed _ | Naked_floats -> block_kind
+    | Mixed _ | Naked_floats | Float_block -> block_kind
     | Values (tag, subkinds) -> (
       let ks =
         KS.create K.value

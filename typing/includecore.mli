@@ -88,6 +88,7 @@ type record_mismatch =
   | Inlined_representation of position
   | Float_representation of position
   | Ufloat_representation of position
+  | Float_block_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
   | Representation_shape_mismatch

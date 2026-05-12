@@ -2039,6 +2039,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let mutability = Mutability.from_lambda mutability in
     [Variadic (Make_block (Naked_floats, mutability, mode), args)]
+  | Pmakefloatblocksingle (mutability, mode), [[arg]] ->
+    (* Tag-253 ([Double_tag]) single-naked-float block — the same runtime shape
+       as a boxed [float]. Supports both immutable and mutable records. *)
+    let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
+    let mutability = Mutability.from_lambda mutability in
+    [Variadic (Make_block (Float_block, mutability, mode), [arg])]
+  | Pmakefloatblocksingle _, _ ->
+    Misc.fatal_error "Pmakefloatblocksingle: expected exactly one argument"
   | Pmakearray (lambda_array_kind, mutability, mode), _ -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
@@ -2100,6 +2108,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_float | Record_ufloat ->
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
+      | Record_float_block -> Float_block
       | Record_inlined
           (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
         when Mixed_product_bytes.types_shape_is_all_value shape ->
@@ -2593,6 +2602,17 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
+  | Pfloatblocksinglefield sem, [[arg]] ->
+    (* Tag-253 single-float block: read the (single) float at offset 0 via the
+       dedicated [Float_block] access kind. *)
+    let imm = Target_ocaml_int.zero machine_width in
+    let mutability = convert_field_read_semantics sem in
+    let block_access : P.Block_access_kind.t = Float_block in
+    [ Unary
+        (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
+    ]
+  | Pfloatblocksinglefield _, _ ->
+    Misc.fatal_error "Pfloatblocksinglefield: expected one argument"
   | Pmixedfield (field_path, shape, sem), [[arg]] ->
     if List.length field_path < 1
     then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
@@ -2664,6 +2684,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Block_set { kind = block_access; init = init_or_assign; field = imm },
           block,
           value ) ]
+  | Psetfloatblocksinglefield initialization_or_assignment, [[block]; [value]]
+    ->
+    (* Tag-253 single-float block update at offset 0 via the dedicated
+       [Float_block] access kind. *)
+    let imm = Target_ocaml_int.zero machine_width in
+    let block_access : P.Block_access_kind.t = Float_block in
+    let init_or_assign = convert_init_or_assign initialization_or_assignment in
+    [ Binary
+        ( Block_set { kind = block_access; init = init_or_assign; field = imm },
+          block,
+          value ) ]
+  | Psetfloatblocksinglefield _, _ ->
+    Misc.fatal_error "Psetfloatblocksinglefield: expected two arguments"
   | ( Psetmixedfield (field_path, shape, initialization_or_assignment),
       [[block]; values] ) ->
     if List.length field_path < 1

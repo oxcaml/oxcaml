@@ -2545,7 +2545,8 @@ module Label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Legacy ~loc usage path env
   let in_env lbl =
     match lbl.lbl_repres with
-    | Record_boxed | Record_float | Record_ufloat | Record_unboxed
+    | Record_boxed | Record_float | Record_ufloat | Record_float_block
+    | Record_unboxed
     | Record_mixed _ | Record_dummy _ | Record_variable -> true
     | Record_inlined _ -> false
 end)
@@ -6278,7 +6279,8 @@ and type_expect_
           | Record_unboxed
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
             -> false
-          | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+          | Record_boxed | Record_float | Record_ufloat | Record_float_block
+          | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
           | Record_variable
             -> true
@@ -8289,6 +8291,7 @@ and type_block_access env expected_base_ty principal
         end
       | Record_float -> true
       | Record_ufloat -> false
+      | Record_float_block -> false
       | Record_unboxed ->
         raise (Error (lid.loc, env, Block_access_record_unboxed))
       | Record_inlined _ ->

@@ -3464,7 +3464,7 @@ module Row_like_for_blocks = struct
             | Scannable Value_only -> K.value
             | Scannable (Mixed_record kinds) ->
               (K.Mixed_block_shape.field_kinds kinds).(i)
-            | Float_record -> K.naked_float
+            | Float_record | Float_block -> K.naked_float
           in
           if not (Flambda_kind.equal field_kind shape_kind)
           then
@@ -3487,7 +3487,8 @@ module Row_like_for_blocks = struct
       | Unknown -> (
         match shape with
         | Scannable (Value_only | Mixed_record _) -> Unknown
-        | Float_record -> Known Tag.double_array_tag)
+        | Float_record -> Known Tag.double_array_tag
+        | Float_block -> Known Tag.double_tag)
       | Known tag -> (
         match shape with
         | Scannable (Value_only | Mixed_record _) -> (
@@ -3502,6 +3503,10 @@ module Row_like_for_blocks = struct
           then
             Misc.fatal_error
               "Blocks full of naked floats must have tag [Tag.double_array_tag]";
+          Known tag
+        | Float_block ->
+          if not (Tag.equal tag Tag.double_tag)
+          then Misc.fatal_error "Float blocks must have tag [Tag.double_tag]";
           Known tag)
     in
     let product = Array.of_list field_tys in

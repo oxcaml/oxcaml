@@ -936,6 +936,12 @@ and record_representation =
   (* All fields are [float#]s.  Same runtime representation as [Record_float],
      but operations on these (e.g., projection, update) work with unboxed floats
      rather than boxed floats. *)
+  | Record_float_block
+  (* The record has exactly one [float#] field. The runtime representation is a
+     single tag-253 ([Double_tag]) block holding the float, i.e. the same shape
+     as a boxed [float]. Distinct from [Record_ufloat], which is the
+     tag-254 ([Double_array_tag]) flat-float-array representation triggered by
+     [@@represent_as_float_array]. *)
   | Record_mixed of mixed_product_shape
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
@@ -943,8 +949,9 @@ and record_representation =
   | Record_dummy of { represent_as_float_array : bool }
   (* We typecheck type declarations before updating their kinds, yet some record
      representations are kind-dependent. In particular, we don't choose between
-     [Record_boxed], [Record_float], [Record_ufloat], and [Record_mixed] until
-     type declaration jkinds are updated in [update_decls_jkind].
+     [Record_boxed], [Record_float], [Record_ufloat], [Record_float_block], and
+     [Record_mixed] until type declaration jkinds are updated in
+     [update_decls_jkind].
 
      Until then, we use [Record_dummy], which also tracks whether the
      declaration has the attribute [@@represent_as_float_array], as we can't

@@ -866,6 +866,8 @@ let[@inline always] simplify_immutable_block_load0
             else Or_unknown.Known Tag.double_array_tag
           | Unknown -> Or_unknown.Unknown),
           K.Block_shape.Float_record )
+      | Float_block ->
+        Or_unknown.Known Tag.double_tag, K.Block_shape.Float_block
       | Mixed { tag; size = _; field_kind = _; shape } ->
         ( Or_unknown.map tag ~f:Tag.Scannable.to_tag,
           K.Block_shape.Scannable (Mixed_record shape) )
@@ -904,13 +906,14 @@ let[@inline always] simplify_immutable_block_load0
                   in
                   Values (tag, arity)
                 | Naked_floats _ -> Naked_floats
+                | Float_block -> Float_block
                 | Mixed { shape; _ } ->
                   (match shape_from_type with
                   | Scannable (Mixed_record shape_from_type)
                     when K.Mixed_block_shape.equal shape shape_from_type ->
                     ()
                   | Scannable Value_only
-                  | Float_record
+                  | Float_record | Float_block
                   | Scannable (Mixed_record _) ->
                     Misc.fatal_error
                       "Block access kind disagrees with block shape from type");
@@ -942,6 +945,7 @@ let simplify_immutable_block_load access_kind ~field ~min_name_mode dacc
         match (access_kind : P.Block_access_kind.t) with
         | Values _ -> Scannable Value_only
         | Naked_floats _ -> Float_record
+        | Float_block -> Float_block
         | Mixed { shape; _ } -> Scannable (Mixed_record shape)
       in
       Simplify_common.add_symbol_projection dacc ~projected_from:arg

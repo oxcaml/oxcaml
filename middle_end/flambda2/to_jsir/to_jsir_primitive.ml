@@ -128,6 +128,7 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
   match kind with
   | Values _ -> Non_float
   | Naked_floats _ -> Float
+  | Float_block -> Float
   | Mixed { field_kind = Value_prefix _; _ } -> Non_float
   | Mixed { field_kind = Flat_suffix (Naked_float | Naked_float32); _ } -> Float
   | Mixed
@@ -600,6 +601,7 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
       | Values (tag, _with_subkind) -> Tag.Scannable.to_tag tag
       | Mixed (tag, _mixed_block_shape) -> Tag.Scannable.to_tag tag
       | Naked_floats -> Tag.double_array_tag
+      | Float_block -> Tag.double_tag
     in
     let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields:xs in
     let var = Jsir.Var.fresh () in

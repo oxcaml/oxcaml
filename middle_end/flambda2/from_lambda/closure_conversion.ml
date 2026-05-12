@@ -1211,8 +1211,9 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Some exn_continuation -> exn_continuation
     in
     close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation
-  | (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _), []
-    ->
+  | ( ( Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _
+      | Pmakefloatblocksingle _ | Pmakearray _ ),
+      [] ) ->
     (* Special case for liftable empty block or array *)
     let acc, sym =
       match prim with
@@ -1236,6 +1237,9 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
         Misc.fatal_error "Unexpected empty float# block in [Closure_conversion]"
+      | Pmakefloatblocksingle _ ->
+        Misc.fatal_error
+          "Unexpected empty single-float block in [Closure_conversion]"
       | Pmakearray (array_kind, _, _mode) ->
         let array_kind = Empty_array_kind.of_lambda array_kind in
         register_const0 acc (Static_const.empty_array array_kind) "empty_array"
@@ -1245,7 +1249,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Parray_of_iarray | Parray_to_iarray | Pignore | Pgetglobal _
       | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
-      | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
+      | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _
+      | Pfloatblocksinglefield _ | Psetfloatblocksinglefield _ | Psequand
       | Psequor | Pnot | Pmixedfield _ | Psetmixedfield _ | Poffsetref _
       | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
       | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
@@ -1487,11 +1492,16 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             List.map (find_value_approximation body_env) fields |> Array.of_list
           in
           let fields_kind =
-            classify_fields_of_block env
-              (List.map
-                 (fun field -> Simple.With_debuginfo.create field dbg)
-                 fields)
-              alloc_mode
+            (* [Float_block] (tag 253) is not yet supported as a static const,
+               so always allocate dynamically. *)
+            match block_kind with
+            | Float_block -> Dynamic_block
+            | Values _ | Naked_floats | Mixed _ ->
+              classify_fields_of_block env
+                (List.map
+                   (fun field -> Simple.With_debuginfo.create field dbg)
+                   fields)
+                alloc_mode
           in
           match fields_kind with
           | Constant static_fields | Computed_static static_fields -> (
@@ -1554,6 +1564,11 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                 (* Note: no approximations are currently provided for these. *)
                 let approx = Value_approximation.Unknown Flambda_kind.value in
                 approx, static_const
+              | Float_block ->
+                (* [Float_block] is forced to [Dynamic_block] above, so this
+                   case is unreachable. *)
+                Misc.fatal_error
+                  "Float_block static allocation unexpectedly reached"
             in
             match fields_kind with
             | Constant _ ->
@@ -1608,6 +1623,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                     Flambda_kind.Block_shape.print block_shape)
               | Float_record ->
                 (* No approximations for float records at the moment. *)
+                body_env
+              | Float_block ->
+                (* No approximations for single-float blocks at the moment. *)
                 body_env
             in
             bind acc body_env)

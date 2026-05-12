@@ -468,6 +468,15 @@ val for_boxed_record_with_updates :
   (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
   Types.jkind_l
 
+(** Choose an appropriate jkind for a boxed record type whose runtime
+    representation is a float block (tag 253), or for a record with a single
+    [any]-layout field that may later be filled in with a [float#]. Same as
+    [for_boxed_record_with_updates], but uses [Separable] separability instead
+    of [Non_float]. *)
+val for_float_block_record_with_updates :
+  (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
+  Types.jkind_l
+
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record_with_updates :
   (Types.label_declaration * Types.type_expr * Sort.t Layout.t) list ->

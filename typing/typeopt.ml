@@ -1039,8 +1039,13 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
+  | Record_float_block ->
+    (* A single-[float#] record is represented at runtime as a tag-253 boxed
+       float, so we give it the same value kind. *)
+    num_nodes_visited, non_nullable (Pboxedfloatval Boxed_float64)
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
+  | Record_boxed | Record_float | Record_ufloat
+  | Record_mixed _ -> begin
       let is_mutable =
         List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
           labels
@@ -1050,7 +1055,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed | Record_dummy _ | Record_variable ->
+          | Record_unboxed | Record_dummy _ | Record_variable
+          | Record_float_block ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -1072,7 +1078,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
                       | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_variable ->
+                      | Record_float_block | Record_variable ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1101,6 +1107,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
           | Record_dummy _ -> assert false
+          | Record_float_block -> assert false
           | Record_variable -> assert false
         in
         (num_nodes_visited,
