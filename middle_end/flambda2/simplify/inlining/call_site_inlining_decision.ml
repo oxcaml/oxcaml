@@ -255,14 +255,15 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     fail_if_must_inline ();
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
-    let code_or_metadata =
-      DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
-    in
-    if not (Code_or_metadata.code_present code_or_metadata)
-    then (
+    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    | exception Not_found ->
       fail_if_must_inline ();
-      Missing_code)
-    else
+      Missing_code
+    | code_or_metadata when not (Code_or_metadata.code_present code_or_metadata)
+      ->
+      fail_if_must_inline ();
+      Missing_code
+    | code_or_metadata -> (
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
          1. We see an [@unrolled n] annotation (with n > 0) on an apply
@@ -351,7 +352,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else (
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
-          | `Always -> Attribute_always))
+          | `Always -> Attribute_always)))
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =

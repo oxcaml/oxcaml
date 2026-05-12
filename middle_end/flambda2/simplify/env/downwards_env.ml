@@ -524,8 +524,6 @@ let check_simple_is_bound t (simple : Simple.t) =
 let mem_code t id =
   Code_id.Map.mem id t.all_code || Exported_code.mem id (t.get_imported_code ())
 
-let debug_code_load = Sys.getenv_opt "DEBUG_CODE_LOAD" != None
-
 let find_code_exn t id =
   match Code_id.Map.find id t.all_code with
   | code -> Code_or_metadata.create code
@@ -534,17 +532,9 @@ let find_code_exn t id =
        references it. However we force loading of the corresponding .cmx to make
        sure that we will have access to the actual code (assuming the .cmx isn't
        missing). *)
-    let (loaded_env_opt : TE.Serializable.t option) =
+    let (_ : TE.Serializable.t option) =
       TE.resolver t.typing_env (Code_id.get_compilation_unit id)
     in
-    if debug_code_load && Option.is_none loaded_env_opt
-    then
-      Misc.fatal_errorf
-        "Failed to find .cmx for compilation unit '%a'@.While trying to find \
-         code for code id: '%a'"
-        (Format_doc.compat Compilation_unit.print)
-        (Code_id.get_compilation_unit id)
-        Code_id.print id;
     Exported_code.find_exn (t.get_imported_code ()) id
 
 let define_code t ~code_id ~code =
