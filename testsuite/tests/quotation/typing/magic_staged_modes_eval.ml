@@ -8,7 +8,27 @@
 
 let test e =
   let e = Obj.magic_many e in
+  print_endline "generated program:";
   print_endline (Quote.string_of_expr e); print_newline ();
-  ignore (Eval.eval e)
+  try
+    ignore (Eval.eval e)
+  with e ->
+    (* Print the backtrace if eval fails *)
+    print_endline "eval failed with:";
+    Printexc.print_backtrace stdout; print_newline ()
 
+(* This is fine -- and the attribute should be printed  *)
 let () = test <[ ($(<[42]>) [@magic_staged_modes]) ]>
+
+(* The following two examples show unsound uses of [@magic_staged_modes]
+   that cause program generation failures. *)
+
+(* This causes an eval error -- we ignored that the quote is non-legacy (local),
+   and then spliced it as legacy (global). *)
+let () = test <[ ($(<[stack_ (Some 42)]> [@magic_staged_modes])) ]>
+
+(* This causes an eval error -- we quoted something legacy (aliased),
+   and then spliced it as non-legacy (unique). *)
+let () =
+  let x = <[ref 0]> in
+  test <[ (($x [@magic_staged_modes]) : _ @ unique) ]>
