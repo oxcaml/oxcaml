@@ -229,8 +229,7 @@ module type Solver_mono = sig
   (* CR-soon zqian: [to_const_exn] should return hints as well. *)
 
   (** Given a mode whose lower and upper bounds are equal, returns that bound.
-      Raises exception if the condition does not hold, or if the variable is
-      generic *)
+      Raises exception if the condition does not hold. *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
   (** The minimum mode in the lattice *)
@@ -298,8 +297,9 @@ module type Solver_mono = sig
   val update_level :
     int -> 'a obj -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
 
-  (** Generalizes all reachable variables whose level is above [current_level],
-      by putting their level to [generic_level]. *)
+  (** Generalizes a variable whose level is above [current_level], by putting
+      its level to [generic_level], and all its children above [current_level]
+      to [generic_level + i] for some nonzero [i]. *)
   val generalize :
     current_level:int ->
     'a obj ->
