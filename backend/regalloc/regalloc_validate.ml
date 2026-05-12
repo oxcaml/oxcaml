@@ -857,6 +857,25 @@ module Equation_set : sig
     t ->
     (t, string) Result.t
 
+  (** Like {!remove_result}, but tolerating that the same description-stamp can
+      be live at multiple locations simultaneously. Only the "two distinct
+      registers at the same location" half of the compatibility check is
+      enforced; the symmetric "same register at two locations" half is skipped.
+      Used for the result equation of rematerialized basic instructions added by
+      the split pass: the rematerialization creates a fresh physical copy of the
+      value at the result location, but other physical copies of the same value
+      (typically the pre-destruction spill slot used by a sibling
+      post-destruction path that reloads instead of rematerializing) can
+      legitimately co-exist in the equation set. Those residual equations
+      propagate back to the original definition site through the existing
+      spill/move chain, where the strict {!remove_result} catches any real
+      inconsistency. *)
+  val remove_result_lenient :
+    reg_res:Register.t array ->
+    loc_res:Location.t array ->
+    t ->
+    (t, string) Result.t
+
   val verify_destroyed_locations :
     destroyed:Location.t array -> t -> (t, string) Result.t
 
@@ -1018,6 +1037,40 @@ end = struct
   let remove_result ~reg_res ~loc_res t =
     try
       Array.iter2 (fun reg loc -> compatible_one ~reg ~loc t) reg_res loc_res;
+      let t =
+        array_fold2 (fun t reg loc -> remove (reg, loc) t) t reg_res loc_res
+      in
+      Ok t
+    with Verification_failed message -> Error message
+
+  let compatible_one_lenient ~reg ~loc t =
+    (* Only enforce the "two distinct registers at the same location" half of
+       the compatibility check; intentionally skip the symmetric "same register
+       at two locations" half (cf. [compatible_one]). See the
+       [remove_result_lenient] interface comment for the soundness argument. *)
+    match Location.Map.find_opt loc t.for_loc with
+    | None -> ()
+    | Some regs ->
+      Register.Set.iter
+        (fun eq_reg ->
+          if not (Register.equal eq_reg reg)
+          then (
+            Format.fprintf Format.str_formatter
+              "Unsatisfiable equations when removing a rematerialized result \
+               equation.\n\
+               Two distinct registers cannot be live at the same location.\n\
+               Existing equation %a.\n\
+               Removed equation: %a."
+              Equation.print (eq_reg, loc) Equation.print (reg, loc);
+            let message = Format.flush_str_formatter () in
+            raise (Verification_failed message)))
+        regs
+
+  let remove_result_lenient ~reg_res ~loc_res t =
+    try
+      Array.iter2
+        (fun reg loc -> compatible_one_lenient ~reg ~loc t)
+        reg_res loc_res;
       let t =
         array_fold2 (fun t reg loc -> remove (reg, loc) t) t reg_res loc_res
       in
@@ -1224,10 +1277,18 @@ module Transfer (Desc_val : Description_value) :
       all other cases not handled by [rename_location] or [rename_register]. We
       have an additional parameter which is the equations for the exceptional
       path successor which is not present in the paper [1] because exceptions
-      are not considered there. *)
-  let append_equations (type a) equations ~(instr_kind : a Instruction.Kind.t)
-      ~exn ~(reg_instr : a Instruction.t) ~(loc_instr : a instruction)
-      ~destroyed =
+      are not considered there.
+
+      [remove_result_kind] selects whether the result equations are removed
+      using the strict {!Equation_set.remove_result} or the lenient
+      {!Equation_set.remove_result_lenient}; the lenient variant is used for
+      rematerialized basic instructions (cf. [is_rematerialized_shape] in
+      [basic] below), which can legitimately leave behind other equations for
+      the same description-stamp at different locations. *)
+  let append_equations (type a) equations
+      ~(remove_result_kind : [`Strict | `Lenient])
+      ~(instr_kind : a Instruction.Kind.t) ~exn ~(reg_instr : a Instruction.t)
+      ~(loc_instr : a instruction) ~destroyed =
     let bind f res = Result.bind res f in
     let wrap_error res =
       Result.map_error
@@ -1235,6 +1296,11 @@ module Transfer (Desc_val : Description_value) :
           Transfer_error.create equations ~instr_kind ~exn ~reg_instr ~loc_instr
             message)
         res
+    in
+    let remove_result =
+      match remove_result_kind with
+      | `Strict -> Equation_set.remove_result
+      | `Lenient -> Equation_set.remove_result_lenient
     in
     let exn =
       exn
@@ -1262,7 +1328,7 @@ module Transfer (Desc_val : Description_value) :
     equations
     |>
     (* First remove the result equations. *)
-    Equation_set.remove_result ~reg_res:reg_instr.Instruction.res
+    remove_result ~reg_res:reg_instr.Instruction.res
       ~loc_res:(Location.of_regs_exn loc_instr.res)
     |> wrap_error
     |> bind (fun equations ->
@@ -1312,8 +1378,12 @@ module Transfer (Desc_val : Description_value) :
                [Regalloc_validate.record_rematerialization]"
               InstructionId.format instr.id
         in
-        append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
-          ~reg_instr ~loc_instr:instr
+        (* See [remove_result_lenient]: the rematerialized result equation is
+           removed leniently because the same description-stamp can persist at
+           another location (the spill slot used by a sibling path). *)
+        append_equations t ~remove_result_kind:`Lenient
+          ~instr_kind:Instruction.Kind.Basic ~exn:None ~reg_instr
+          ~loc_instr:instr
           ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       | _ -> assert false)
     | Some instr_before -> (
@@ -1326,8 +1396,9 @@ module Transfer (Desc_val : Description_value) :
            have the same locations. *)
         Result.ok @@ rename_register t ~reg_instr:instr_before
       | _ ->
-        append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
-          ~reg_instr:instr_before ~loc_instr:instr
+        append_equations t ~remove_result_kind:`Strict
+          ~instr_kind:Instruction.Kind.Basic ~exn:None ~reg_instr:instr_before
+          ~loc_instr:instr
           ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       )
 
@@ -1340,8 +1411,9 @@ module Transfer (Desc_val : Description_value) :
       let exn =
         if Cfg.can_raise_terminator instr.desc then Some exn else None
       in
-      append_equations t ~instr_kind:Instruction.Kind.Terminator ~exn
-        ~reg_instr:instr_before ~loc_instr:instr
+      append_equations t ~remove_result_kind:`Strict
+        ~instr_kind:Instruction.Kind.Terminator ~exn ~reg_instr:instr_before
+        ~loc_instr:instr
         ~destroyed:
           (Proc.destroyed_at_terminator instr.desc |> Location.of_regs_exn)
     | None -> (
