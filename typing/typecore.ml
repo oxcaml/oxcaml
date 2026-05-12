@@ -1258,7 +1258,7 @@ let disambiguate_array_literal ~loc env expected_ty =
     { ty_elt; mut }
   in
   if is_floatarray_type env expected_ty then
-    return (Some (instance Predef.type_float, Jkind.Sort.value)) Mutable
+    return (Some (instance Predef.type_float, Jkind.Sort.scannable)) Mutable
   else if is_iarray_type env expected_ty then
     return None Immutable
   else
@@ -1276,6 +1276,7 @@ let type_continuation_pat env expected_ty sp =
       let desc =
         { val_type = expected_ty;
           val_kind = Val_reg (Jkind.Sort.(of_const Const.for_continuation));
+          val_lpoly = Lpoly.determined [];
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
@@ -1442,12 +1443,8 @@ type pattern_variable =
     pv_kind: pattern_variable_kind;
     pv_attributes: attributes;
     pv_sort: Jkind_types.Sort.t;
-<<<<<<< HEAD
     pv_uid : Uid.t;
-||||||| 5.2.0minus-31
-=======
     pv_lpoly: Lpoly.t;
->>>>>>> 5.2.0minus-37
   }
 
 type module_variable =
@@ -1506,7 +1503,8 @@ let continuation_variable = function
      pv_kind = Continuation_var;
      pv_attributes = desc.val_attributes;
      pv_sort = Jkind.Sort.(of_const Const.for_continuation);
-     pv_uid= desc.val_uid}]
+     pv_uid= desc.val_uid;
+     pv_lpoly = desc.val_lpoly}]
 
 let create_type_pat_state ?cont allow_modules =
   let tps_module_variables =
@@ -1554,43 +1552,19 @@ let iter_pattern_variables_type f : pattern_variable list -> unit =
   List.iter (fun {pv_type; _} -> f pv_type)
 
 let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
-<<<<<<< HEAD
-  List.iter (fun {pv_type; pv_value_kind; _ } ->
+  List.iter (fun {pv_type; pv_value_kind; pv_lpoly; _} ->
     match pv_value_kind with
-||||||| 5.2.0minus-31
-  List.iter (fun {pv_type; pv_kind; _ } ->
-    match pv_kind with
-=======
-  List.iter (fun {pv_type; pv_kind; pv_lpoly; _} ->
-    match pv_kind with
->>>>>>> 5.2.0minus-37
     | Val_mut _ -> f_mut pv_type
     | _ -> f_immut pv_lpoly pv_type) pvs
 
 let add_pattern_variables ?check ?check_as env pv =
   List.fold_right
-<<<<<<< HEAD
     (fun {pv_id; pv_mode; pv_value_kind; pv_type; pv_loc; pv_kind;
-          pv_attributes; pv_uid} env ->
-       let check = if pv_kind=As_var then check_as else check in
-||||||| 5.2.0minus-31
-    (fun {pv_id; pv_mode; pv_kind; pv_type; pv_loc; pv_as_var;
-          pv_attributes; pv_uid} env ->
-       let check = if pv_as_var then check_as else check in
-=======
-    (fun {pv_id; pv_mode; pv_kind; pv_type; pv_loc; pv_as_var;
           pv_attributes; pv_uid; pv_lpoly} env ->
-       let check = if pv_as_var then check_as else check in
->>>>>>> 5.2.0minus-37
+       let check = if pv_kind=As_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-<<<<<<< HEAD
-         {val_type = pv_type; val_kind = pv_value_kind; Types.val_loc = pv_loc;
-||||||| 5.2.0minus-31
-         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
-=======
-         {val_type = pv_type; val_kind = pv_kind; val_lpoly = pv_lpoly;
+         {val_type = pv_type; val_kind = pv_value_kind; val_lpoly = pv_lpoly;
           Types.val_loc = pv_loc;
->>>>>>> 5.2.0minus-37
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -3774,13 +3748,7 @@ let type_pattern_list
   let tps = create_type_pat_state allow_modules in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
-<<<<<<< HEAD
-      ~equations_scope ~in_counterexample:false in
-||||||| 5.2.0minus-31
-      ~equations_scope ~allow_recursive_equations:false in
-=======
-      ~is_lpoly ~equations_scope ~allow_recursive_equations:false in
->>>>>>> 5.2.0minus-37
+      ~is_lpoly ~equations_scope ~in_counterexample:false in
   let type_pat (attrs, pat_mode, exp_mode, pat) ty sort =
     Builtin_attributes.warning_scope ~ppwarning:false attrs
       (fun () ->
@@ -6070,53 +6038,6 @@ and type_function_ret_info =
     ret_sort: Jkind.sort;
   }
 
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-(* Generalize expressions *)
-let generalize_structure_exp exp = generalize_structure exp.exp_type
-let may_lower_contravariant_then_generalize env exp =
-  if maybe_expansive exp then lower_contravariant env exp.exp_type;
-  generalize exp.exp_type
-
-let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; flat_float = _ } =
-  generalize_structure base_ty;
-  generalize_structure el_ty;
-  match ba with
-  | Baccess_field _ -> ()
-  | Baccess_array
-      { mut = _; index; index_kind = _; base_ty; elt_ty; elt_sort = _ } ->
-    generalize_structure base_ty;
-    generalize_structure elt_ty;
-    generalize_structure_exp index
-  | Baccess_block (_, idx) ->
-    generalize_structure_exp idx
-
-let generalize_structure_type_unboxed_access_result
-      (el_ty, Uaccess_unboxed_field _) =
-  generalize_structure el_ty
-
-=======
-(* Generalize expressions *)
-let generalize_structure_exp exp = generalize_structure exp.exp_type
-let may_lower_contravariant_then_generalize env exp =
-  if maybe_expansive exp then lower_contravariant env exp.exp_type;
-  generalize exp.exp_type
-
-let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; flat_float = _ } =
-  generalize_structure base_ty;
-  generalize_structure el_ty;
-  match ba with
-  | Baccess_field _ -> ()
-  | Baccess_block (_, idx) ->
-    generalize_structure_exp idx
-
-let generalize_structure_type_unboxed_access_result
-      (el_ty, Uaccess_unboxed_field _) =
-  generalize_structure el_ty
-
->>>>>>> 5.2.0minus-37
 (* value binding elaboration *)
 
 let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
@@ -6619,8 +6540,8 @@ and type_expect_
         exp_env = env }
       in
       submode ~loc ~env actual_mode expected_mode;
-<<<<<<< HEAD
-      exp
+      if List.is_empty layout_args then exp
+      else { exp with exp_desc = Texp_apply_layout (exp, layout_args) }
   | Pexp_constant({pconst_desc = Pconst_string (str, _, _); _} as cst) -> (
     let cst = constant_or_raise env loc cst in
     (* Terrible hack for format strings *)
@@ -6649,68 +6570,6 @@ and type_expect_
         exp_type = instance Predef.type_string;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-||||||| 5.2.0minus-31
-      exp
-  | Pexp_constant(Pconst_string (str, _, _) as cst) -> (
-      let cst = constant_or_raise env loc cst in
-      (* Terrible hack for format strings *)
-      let ty_exp = expand_head env (protect_expansion env ty_expected) in
-      let fmt6_path =
-        Path.(Pdot (Pident (Ident.create_persistent "CamlinternalFormatBasics"),
-                    "format6"))
-      in
-      let is_format = match get_desc ty_exp with
-        | Tconstr(path, _, _) when Path.same path fmt6_path ->
-          if !Clflags.principal && get_level ty_exp <> generic_level then
-            Location.prerr_warning loc
-              (not_principal "this coercion to format6");
-          true
-        | _ -> false
-      in
-      if is_format then
-        let format_parsetree =
-          { (type_format loc str env) with pexp_loc = sexp.pexp_loc }  in
-        type_expect env expected_mode
-          format_parsetree ty_expected_explained
-      else
-        rue {
-          exp_desc = Texp_constant cst;
-          exp_loc = loc; exp_extra = [];
-          exp_type = instance Predef.type_string;
-          exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
-=======
-      if List.is_empty layout_args then exp
-      else { exp with exp_desc = Texp_apply_layout (exp, layout_args) }
-  | Pexp_constant(Pconst_string (str, _, _) as cst) -> (
-      let cst = constant_or_raise env loc cst in
-      (* Terrible hack for format strings *)
-      let ty_exp = expand_head env (protect_expansion env ty_expected) in
-      let fmt6_path =
-        Path.(Pdot (Pident (Ident.create_persistent "CamlinternalFormatBasics"),
-                    "format6"))
-      in
-      let is_format = match get_desc ty_exp with
-        | Tconstr(path, _, _) when Path.same path fmt6_path ->
-          if !Clflags.principal && get_level ty_exp <> generic_level then
-            Location.prerr_warning loc
-              (not_principal "this coercion to format6");
-          true
-        | _ -> false
-      in
-      if is_format then
-        let format_parsetree =
-          { (type_format loc str env) with pexp_loc = sexp.pexp_loc }  in
-        type_expect env expected_mode
-          format_parsetree ty_expected_explained
-      else
-        rue {
-          exp_desc = Texp_constant cst;
-          exp_loc = loc; exp_extra = [];
-          exp_type = instance Predef.type_string;
-          exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
->>>>>>> 5.2.0minus-37
   )
   | Pexp_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
@@ -7596,7 +7455,7 @@ and type_expect_
       ; exp_extra = (Texp_mode modes, loc, []) :: exp.exp_extra
       }
   | Pexp_constraint (sarg, Some sty, []) ->
-      let (ty, extra_cty) = type_constraint env sty Mode.Alloc.Const.legacy in
+      let (ty, exp_extra) = type_constraint env sty Mode.Alloc.Const.legacy in
       let ty' = instance ty in
       let error_message_attr_opt =
         Builtin_attributes.error_message_attr sexp.pexp_attributes in
@@ -7612,10 +7471,7 @@ and type_expect_
         exp_type = ty';
         exp_attributes = arg.exp_attributes;
         exp_env = env;
-        exp_extra =
-          (Texp_constraint extra_cty,
-           loc,
-           sexp.pexp_attributes) :: arg.exp_extra;
+        exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_constraint (sarg, Some sty, modes) ->
       let modes = Typemode.transl_mode_annots modes in
@@ -9732,18 +9588,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         in
         let exp_env = Env.add_value ~mode id desc env in
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
-<<<<<<< HEAD
-        {pat_desc =
-           Tpat_var (id, mknoloc name, desc.val_uid, sort,
-                     Value.disallow_right mode);
-||||||| 5.2.0minus-31
-        {pat_desc = Tpat_var (id, mknoloc name, desc.val_uid, sort,
-          Value.disallow_right mode);
-=======
         {pat_desc = Tpat_var { id; name = mknoloc name;
                                uid = desc.val_uid; sort;
                                mode = Value.disallow_right mode };
->>>>>>> 5.2.0minus-37
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -10344,7 +10191,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
     if !Clflags.strict_sequence then
       (* CR layouts v5: when we have unboxed unit, allow it for -strict-sequence
          *)
-      instance Predef.type_unit, Jkind.Sort.value
+      instance Predef.type_unit, Jkind.Sort.scannable
     else begin
       (* We're requiring the statement to have a representable jkind.  But that
          doesn't actually rule out things like "assert false"---we'll just end
@@ -10354,7 +10201,6 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
       new_rep_var ~why:Statement ()
     end
   in
-<<<<<<< HEAD
   (* Raise the current level to detect non-returning functions *)
   with_local_level_generalize
     (fun () -> type_exp env (mode_max_with_position position) sexp, sort)
@@ -10378,65 +10224,6 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
           raise(Error(exp.exp_loc, env,
             Expr_type_clash(err, None, Some sexp))));
     end
-||||||| 5.2.0minus-31
-  let subexp = final_subexpression exp in
-  let ty = expand_head env exp.exp_type in
-  if is_Tvar ty
-     && get_level ty > get_current_level ()
-     && not (allow_polymorphic subexp) then
-    Location.prerr_warning
-      subexp.exp_loc
-      Warnings.Nonreturning_statement;
-  if !Clflags.strict_sequence then
-    (* CR layouts v5: when we have unboxed unit, allow it for -strict-sequence *)
-    let expected_ty = instance Predef.type_unit in
-    with_explanation explanation (fun () ->
-      unify_exp env exp expected_ty);
-    exp, Jkind.Sort.value
-  else begin
-    (* We're requiring the statement to have a representable jkind.  But that
-       doesn't actually rule out things like "assert false"---we'll just end up
-       getting a sort variable for its jkind. *)
-    (* CR layouts v10: Abstract jkinds will introduce cases where we really have
-       [any] and can't get a sort here. *)
-    let tv, sort = new_rep_var ~why:Statement () in
-    check_partial_application ~statement:true exp;
-    with_explanation explanation (fun () ->
-      try unify_var env ty tv
-      with Unify err ->
-        raise(Error(exp.exp_loc, env,
-          Expr_type_clash(err, None, Some sexp.pexp_desc))));
-    exp, sort
-=======
-  let subexp = final_subexpression exp in
-  let ty = expand_head env exp.exp_type in
-  if is_Tvar ty
-     && get_level ty > get_current_level ()
-     && not (allow_polymorphic subexp) then
-    Location.prerr_warning
-      subexp.exp_loc
-      Warnings.Nonreturning_statement;
-  if !Clflags.strict_sequence then
-    (* CR layouts v5: when we have unboxed unit, allow it for -strict-sequence *)
-    let expected_ty = instance Predef.type_unit in
-    with_explanation explanation (fun () ->
-      unify_exp env exp expected_ty);
-    exp, Jkind.Sort.scannable
-  else begin
-    (* We're requiring the statement to have a representable jkind.  But that
-       doesn't actually rule out things like "assert false"---we'll just end up
-       getting a sort variable for its jkind. *)
-    (* CR layouts v10: Abstract jkinds will introduce cases where we really have
-       [any] and can't get a sort here. *)
-    let tv, sort = new_rep_var ~why:Statement () in
-    check_partial_application ~statement:true exp;
-    with_explanation explanation (fun () ->
-      try unify_var env ty tv
-      with Unify err ->
-        raise(Error(exp.exp_loc, env,
-          Expr_type_clash(err, None, Some sexp.pexp_desc))));
-    exp, sort
->>>>>>> 5.2.0minus-37
   end
 
 (* Most of the arguments are the same as [type_cases].
@@ -10921,19 +10708,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           let (pat_list, _new_env, _force, pvs, _mvs as res) =
             with_local_level_generalize_if is_recursive (fun () ->
               type_pattern_list Value existential_context env mutable_flag spatl
-<<<<<<< HEAD
-                nvs sorts allow_modules
+                nvs sorts allow_modules ~is_lpoly
             ) ~before_generalize:(fun (_, _, _, pvs, _) ->
                                     iter_pattern_variables_type generalize pvs)
-||||||| 5.2.0minus-31
-                nvs sorts allow_modules
-            ) ~post:(fun (_, _, _, pvs, _) ->
-                       iter_pattern_variables_type generalize pvs)
-=======
-                nvs sorts allow_modules ~is_lpoly
-            ) ~post:(fun (_, _, _, pvs, _) ->
-                       iter_pattern_variables_type generalize pvs)
->>>>>>> 5.2.0minus-37
           in
           (* If recursive, first unify with an approximation of the
              expression *)
@@ -11073,22 +10850,6 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
         pvs;
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-      (* update pattern variable jkind reasons *)
-      List.iter
-        (fun pv ->
-          Ctype.check_and_update_generalized_ty_jkind
-            ~name:pv.pv_id ~loc:pv.pv_loc env pv.pv_type)
-        pvs;
-=======
-      (* update pattern variable jkind reasons *)
-      List.iter
-        (fun pv ->
-          Ctype.check_and_update_generalized_ty_jkind
-            ~name:pv.pv_id ~loc:pv.pv_loc pv.pv_type)
-        pvs;
->>>>>>> 5.2.0minus-37
       List.iter2
         (fun (_, _, expected_ty) (exp, vars) ->
           match vars with
@@ -11108,37 +10869,13 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 lower_contravariant env exp.exp_type;
               List.iter generalize (exp.exp_type :: expected_ty :: vars))
         mode_pat_typ_list exp_list;
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-      let update_exp_jkind (_, p, _) (exp, _) =
-        let pat_name =
-          match p.pat_desc with
-            Tpat_var (id, _, _, _, _) -> Some id
-          | Tpat_alias(_, id, _, _, _, _, _) -> Some id
-          | _ -> None in
-        Ctype.check_and_update_generalized_ty_jkind
-          ?name:pat_name ~loc:exp.exp_loc env exp.exp_type
-      in
-      List.iter2 update_exp_jkind mode_pat_typ_list exp_list;
-=======
-      let update_exp_jkind (_, p, _) (exp, _) =
-        let pat_name =
-          match p.pat_desc with
-            Tpat_var { id; _ } -> Some id
-          | Tpat_alias { id; _ } -> Some id
-          | _ -> None in
-        Ctype.check_and_update_generalized_ty_jkind
-          ?name:pat_name ~loc:exp.exp_loc exp.exp_type
-      in
-      List.iter2 update_exp_jkind mode_pat_typ_list exp_list;
->>>>>>> 5.2.0minus-37
     end
   in
   (* update pattern variable jkind reasons *)
   List.iter
     (fun pv ->
        Ctype.check_and_update_generalized_ty_jkind
-         ~name:pv.pv_id ~loc:pv.pv_loc env pv.pv_type)
+         ~name:pv.pv_id ~loc:pv.pv_loc pv.pv_type)
     pvs;
   List.iter2
     (fun (_, _, expected_ty) (exp, vars) ->
@@ -11147,11 +10884,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let update_exp_jkind (_, p, _) (exp, _) =
     let pat_name =
       match p.pat_desc with
-        Tpat_var (id, _, _, _, _) -> Some id
-      | Tpat_alias(_, id, _, _, _, _, _) -> Some id
+        Tpat_var { id; _ } -> Some id
+      | Tpat_alias { id; _ } -> Some id
       | _ -> None in
     Ctype.check_and_update_generalized_ty_jkind
-      ?name:pat_name ~loc:exp.exp_loc env exp.exp_type
+      ?name:pat_name ~loc:exp.exp_loc exp.exp_type
   in
   List.iter2 update_exp_jkind pat_list exp_list;
   let l = List.combine pat_list exp_list in
@@ -12497,7 +12234,6 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
-<<<<<<< HEAD
       let intro =
         let ty_exp = Out_type.prepare_expansion ty_exp in
         doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
@@ -12506,35 +12242,6 @@ let report_error ~loc env =
       in
       Location.errorf ~loc "%t" (fun ppf ->
         Errortrace_report.unification ppf env err
-||||||| 5.2.0minus-31
-      Location.error_of_printer ~loc (fun ppf () ->
-          (* Use deprecated_printer to defer prepare_expansion until after
-             reset() is called inside report_unification_error. This ensures
-             consistent type variable naming between the intro and trace. *)
-          let intro =
-            doc_printf "%t" (fun fmt_doc ->
-              deprecated_printer (fun fmt ->
-                let ty_exp = Printtyp.prepare_expansion ty_exp in
-                Format.fprintf fmt
-                  "This expression cannot be coerced to type@;<1 2>%a;@ \
-                   it has type"
-                  (Fmt.compat
-                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
-                  ty_exp
-              ) fmt_doc
-            )
-          in
-        Printtyp.report_unification_error ppf env err
-=======
-    let intro =
-      let ty_exp = Printtyp.prepare_expansion ty_exp in
-      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
-                  it has type"
-        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
-    in
-    Location.error_of_printer ~loc (fun ppf () ->
-        Printtyp.report_unification_error ppf env err
->>>>>>> 5.2.0minus-37
           intro
           (Fmt.Doc.msg "but is here used with type")
         )
