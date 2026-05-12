@@ -1257,7 +1257,6 @@ end = struct
     | Non_empty _, Empty -> false
     | Non_empty t0, Non_empty t1 -> subset_domain_tree t0 t1
 
-  (* CR lmaurer: Should use [raise_notrace] internally *)
   let[@inline never] rec find_tree i t =
     match tree_descr t with
     | Leaf l -> if leaf_key l = i then This (leaf_datum l) else Null
@@ -1273,10 +1272,8 @@ end = struct
     let[@local] not_found () = raise Not_found in
     match descr t with
     | Empty -> not_found ()
-    | Non_empty tree ->
-      match find_tree i tree with
-        | Null -> not_found ()
-        | This x -> x
+    | Non_empty tree -> (
+      match find_tree i tree with Null -> not_found () | This x -> x)
 
   let rec inter_tree iv f t0 t1 =
     match tree_descr t0, tree_descr t1 with
@@ -1492,72 +1489,85 @@ end = struct
     in
     match descr t with Empty -> t | Non_empty tree -> loop tree
 
-  (* CR-someday lmaurer: Make this O(n) rather than O(n log n). *)
+  let rec partition_tree p tree =
+    let iv = is_value_of_tree tree in
+    match tree_descr tree with
+    | Leaf leaf ->
+      let i, d = leaf_descr leaf in
+      if Callback.call p i d
+      then of_tree leaf, empty iv
+      else empty iv, of_tree leaf
+    | Branch b ->
+      let prefix_and_bit = branch_prefix_and_bit b in
+      let left_true, left_false = partition_tree p (branch0 b) in
+      let right_true, right_false = partition_tree p (branch1 b) in
+      ( branch prefix_and_bit left_true right_true,
+        branch prefix_and_bit left_false right_false )
+
   let partition p t =
     let empty = empty (is_value_of t) in
     match descr t with
     | Empty -> empty, empty
-    | Non_empty tree ->
-      let rec loop ((true_, false_) as acc) tree =
-        match tree_descr tree with
-        | Leaf leaf ->
-          let i, d = leaf_descr leaf in
-          if Callback.call p i d
-          then add i d true_, false_
-          else true_, add i d false_
-        | Branch branch -> loop (loop acc (branch0 branch)) (branch1 branch)
-      in
-      loop (empty, empty) tree
+    | Non_empty tree -> partition_tree p tree
+
+  let rec choose_tree tree =
+    match tree_descr tree with
+    | Leaf leaf -> leaf_binding leaf
+    | Branch branch -> choose_tree (branch0 branch)
 
   let choose t =
     match descr t with
     | Empty -> raise Not_found
-    | Non_empty tree ->
-      let rec loop tree =
-        match tree_descr tree with
-        | Leaf leaf -> leaf_binding leaf
-        | Branch branch -> loop (branch0 branch)
-      in
-      loop tree
+    | Non_empty tree -> choose_tree tree
 
   let choose_opt t =
-    match choose t with exception Not_found -> None | choice -> Some choice
+    match descr t with
+    | Empty -> None
+    | Non_empty tree -> Some (choose_tree tree)
+
+  let min_binding_tree tree =
+    let rec loop tree =
+      match tree_descr tree with
+      | Leaf leaf -> leaf_binding leaf
+      | Branch branch -> loop (branch0 branch)
+    in
+    match tree_descr tree with
+    | Leaf leaf -> leaf_binding leaf
+    | Branch branch ->
+      let t0, _ = order_branches' branch in
+      loop t0
 
   let min_binding t =
     match descr t with
     | Empty -> raise Not_found
-    | Non_empty tree -> (
-      let rec loop tree =
-        match tree_descr tree with
-        | Leaf leaf -> leaf_binding leaf
-        | Branch branch -> loop (branch0 branch)
-      in
-      match tree_descr tree with
-      | Leaf leaf -> leaf_binding leaf
-      | Branch branch ->
-        let t0, _ = order_branches' branch in
-        loop t0)
+    | Non_empty tree -> min_binding_tree tree
 
   let min_binding_opt t =
-    match min_binding t with exception Not_found -> None | min -> Some min
+    match descr t with
+    | Empty -> None
+    | Non_empty tree -> Some (min_binding_tree tree)
+
+  let max_binding_tree tree =
+    let rec loop tree =
+      match tree_descr tree with
+      | Leaf leaf -> leaf_binding leaf
+      | Branch branch -> loop (branch1 branch)
+    in
+    match tree_descr tree with
+    | Leaf leaf -> leaf_binding leaf
+    | Branch branch ->
+      let _, t1 = order_branches' branch in
+      loop t1
 
   let max_binding t =
     match descr t with
     | Empty -> raise Not_found
-    | Non_empty tree -> (
-      let rec loop tree =
-        match tree_descr tree with
-        | Leaf leaf -> leaf_binding leaf
-        | Branch branch -> loop (branch1 branch)
-      in
-      match tree_descr tree with
-      | Leaf leaf -> leaf_binding leaf
-      | Branch branch ->
-        let _, t1 = order_branches' branch in
-        loop t1)
+    | Non_empty tree -> max_binding_tree tree
 
   let max_binding_opt t =
-    match max_binding t with exception Not_found -> None | max -> Some max
+    match descr t with
+    | Empty -> None
+    | Non_empty tree -> Some (max_binding_tree tree)
 
   let rec equal_tree f t0 t1 =
     if t0 == t1
