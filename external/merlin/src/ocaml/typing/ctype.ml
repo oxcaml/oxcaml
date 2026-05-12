@@ -3779,7 +3779,7 @@ let expand_type env ty =
   (* If the type contains top-level splices, then we enter some far-away future
      stage where all splices are valid. *)
   (* CR metaprogramming jbachurski: Remove [contains_toplevel_splice] and
-     track the stage in errors so we don't need this. *)
+     track the stage in errors so we don't need this. See ticket 6726. *)
   let env =
     if contains_toplevel_splice (Env.stage env :> int) ty
     then Env.enter_future env

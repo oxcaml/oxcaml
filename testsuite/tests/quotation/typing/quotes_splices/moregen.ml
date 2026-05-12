@@ -168,9 +168,22 @@ end = struct
   let e = <[ fun x -> () ]>
 end
 [%%expect{|
->> Fatal error: Ctype.decr_stage: Stage decreased below the meta stage
-Uncaught exception: Typemod.Error(_, _, _)
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let e = <[ fun x -> () ]>
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val e : <[$('a) -> unit]> expr end
+       is not included in
+         sig val e : ('a -> unit) expr end
+       Values do not match:
+         val e : <[$('a) -> unit]> expr
+       is not included in
+         val e : ('a -> unit) expr
+       The type "<[$('a) -> unit]> expr" is not compatible with the type
+         "('b -> unit) expr"
+       Type "$('a) -> unit" is not compatible with type "$('b -> unit)"
 |}]
 
 (* error -- quote missing on expr's argument in structure (analogous) *)
