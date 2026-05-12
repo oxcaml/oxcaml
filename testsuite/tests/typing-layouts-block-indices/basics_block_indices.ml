@@ -387,28 +387,6 @@ type t1 = { a : string; }
 val b : unit -> (t1# iarray, string) idx_imm = <fun>
 |}]
 
-<<<<<<< HEAD
-let bad_index_type = (.("test"))
-[%%expect{|
-Line 1, characters 24-30:
-1 | let bad_index_type = (.("test"))
-                            ^^^^^^
-Error: This constant has type "string" but an expression was expected of type
-         "int"
-|}]
-
-||||||| 5.2.0minus-31
-let bad_index_type = (.("test"))
-[%%expect{|
-Line 1, characters 24-30:
-1 | let bad_index_type = (.("test"))
-                            ^^^^^^
-Error: This expression has type "string" but an expression was expected of type
-         "int"
-|}]
-
-=======
->>>>>>> 5.2.0minus-37
 (****************)
 (* Illegal gaps *)
 
@@ -781,22 +759,10 @@ let bad (x : float array) =
   let y = Idx_mut.unsafe_create_into_array 42 in
   Idx_mut.get x y
 [%%expect{|
-<<<<<<< HEAD
-Line 3, characters 23-24:
-3 |   Idx_mut.unsafe_get x y
-                           ^
-Error: The value "y" has type "('a array, 'a) idx_mut"
-||||||| 5.2.0minus-31
-Line 3, characters 23-24:
-3 |   Idx_mut.unsafe_get x y
-                           ^
-Error: This expression has type "('a array, 'a) idx_mut"
-=======
 Line 3, characters 16-17:
 3 |   Idx_mut.get x y
                     ^
-Error: This expression has type "('a array, 'a) idx_mut"
->>>>>>> 5.2.0minus-37
+Error: The value "y" has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
          because it is the primitive type float.
@@ -941,23 +907,11 @@ let f c =
 [%%expect{|
 val f : bool -> (u array, int) idx_mut = <fun>
 |}, Principal{|
-<<<<<<< HEAD
-Line 5, characters 11-12:
-5 |     (.(1).#x)
-               ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation
-  is not principal.
-||||||| 5.2.0minus-31
-Line 5, characters 11-12:
-5 |     (.(1).#x)
-               ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
-=======
 Line 6, characters 51-52:
 6 |     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#x)
                                                        ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
->>>>>>> 5.2.0minus-37
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u array, int) idx_mut = <fun>
 |}]
@@ -973,23 +927,11 @@ let f c =
 [%%expect{|
 val f : bool -> (u t# array, int) idx_mut = <fun>
 |}, Principal{|
-<<<<<<< HEAD
-Line 5, characters 14-15:
-5 |     (.(1).#a.#x)
-                  ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation
-  is not principal.
-||||||| 5.2.0minus-31
-Line 5, characters 14-15:
-5 |     (.(1).#a.#x)
-                  ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
-=======
 Line 6, characters 54-55:
 6 |     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#a.#x)
                                                           ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
->>>>>>> 5.2.0minus-37
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t# array, int) idx_mut = <fun>
 |}]

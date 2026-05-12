@@ -169,21 +169,9 @@ module Or_null :
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-<<<<<<< HEAD
 Error: This constructor has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type
-         "('b : value_or_null mod non_null)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
-||||||| 5.2.0minus-31
-Error: This expression has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type
-         "('b : value_or_null mod non_null)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
-=======
-Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value maybe_separable)"
        The layout of 'a Or_null.t is value maybe_separable maybe_null
->>>>>>> 5.2.0minus-37
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of
            value maybe_separable

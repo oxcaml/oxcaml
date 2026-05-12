@@ -433,30 +433,6 @@ let g () = exclave_ local_
   local_ (() : @ unique once);;
 
 [%%expect{|
-<<<<<<< HEAD
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable "f".
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable "f".
-
-||||||| 5.2.0minus-31
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-=======
->>>>>>> 5.2.0minus-37
 val g : unit -> unit @ local once = <fun>
 |}]
 
@@ -1591,14 +1567,8 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-<<<<<<< HEAD
-Uncaught exception: File "parsing/location.ml", line 1168, characters 2-8: Assertion failed
-||||||| 5.2.0minus-31
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
-=======
 >> Fatal error: Location.todo_overwrite_not_implemented
 Uncaught exception: Misc.Fatal_error
->>>>>>> 5.2.0minus-37
 
 |}]
 
@@ -1719,7 +1689,7 @@ let poly_ id : 'a. 'a -> 'a = fun x -> x
 Line 1, characters 10-12:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
               ^^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -1737,7 +1707,7 @@ let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 Line 1, characters 10-15:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
               ^^^^^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -1760,12 +1730,12 @@ and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 Line 2, characters 10-11:
 2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 1, characters 10-11:
 1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
