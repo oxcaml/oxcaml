@@ -1273,6 +1273,7 @@ module Ast = struct
     | Poll
     | Loop
     | Tail_mod_cons
+    | Magic_staged_modes
 
   let attribute_as_string = function
     | Inline -> "inline"
@@ -1285,6 +1286,7 @@ module Ast = struct
     | Poll -> "poll"
     | Loop -> "loop"
     | Tail_mod_cons -> "tail_mod_cons"
+    | Magic_staged_modes -> "magic_staged_modes"
 
   type vb_attribute =
     { vb_attr_name : string;
@@ -2362,6 +2364,8 @@ module Exp_attribute = struct
   let loop = Ast.Loop
 
   let tail_mod_cons = Ast.Tail_mod_cons
+
+  let magic_staged_modes = Ast.Magic_staged_modes
 end
 
 module Vb_attribute = struct

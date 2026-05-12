@@ -8002,6 +8002,11 @@ and type_expect_
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
+      let mode_quoted =
+        match Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes with
+        | true -> mode_default Value.max
+        | false -> mode_quoted
+      in
       let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
       if maybe_computation arg then
         submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
@@ -8015,7 +8020,8 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      submode ~loc ~env ~reason:Other mode_splice expected_mode;
+      if not (Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes) then
+        submode ~loc ~env ~reason:Other mode_splice expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
