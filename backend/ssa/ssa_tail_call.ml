@@ -7,9 +7,9 @@ open Ssa_reducer
 (** Detects [Call] terminators whose continuation does nothing but [Return] the
     call's results, and whose enclosing block has an empty trap stack. Rewrites
     them as [Tailcall_self] (when the callee is the current function by name) or
-    [Tailcall_func]. The matching predicates are the SSA-level analogue of the
-    checks in [Cfg_selectgen.emit_tail_apply]. *)
-module Detect (C : Context) = struct
+    [Tailcall_func]. The matching predicates are equivalent to the checks in
+    [Cfg_selectgen.emit_tail_apply]. *)
+module Tail_call_reducer (C : Context) = struct
   include Default (C)
 
   let returns_args_unchanged (block : C.In.Block.t) : bool =
@@ -77,4 +77,4 @@ module Detect (C : Context) = struct
 end
 
 let run ~keep_unused_ops ssa =
-  run ~keep_unused_ops (module Detect : Reducer) ssa
+  run ~keep_unused_ops (module Tail_call_reducer : Reducer) ssa

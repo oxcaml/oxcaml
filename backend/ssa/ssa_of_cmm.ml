@@ -595,7 +595,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
       let* src = emit_tuple ext_env c simple_list in
       let handler = find_handler env nfail in
       emit_trap_actions env c traps;
-      finish_block c ~dbg:Debuginfo.none (Goto { goto = handler; args = src });
+      finish_block c ~dbg:Debuginfo.none
+        (Goto { goto = handler; args = src |> Array.map (fun arg -> Some arg) });
       Never_returns
     | Return_lbl ->
       let* src = emit_tuple ext_env c simple_list in
@@ -636,13 +637,16 @@ module Make (Builder : Ssa.Graph_builder) = struct
           | Never_returns -> ()
           | Ok instrs ->
             finish_block c_branch ~dbg:Debuginfo.none
-              (Goto { goto = join_block; args = instrs }))
+              (Goto
+                 { goto = join_block;
+                   args = instrs |> Array.map (fun instr -> Some instr)
+                 }))
         results;
       move_cursor c ~new_pos:(start_block join_block);
       Ok join_params
 end
 
-let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
+let convert (f : Cmm.fundecl) ~keep_unused_ops : (module Ssa.Finished_graph) =
   try
     let fun_arg_types = List.map snd f.fun_args |> Array.concat in
     let fi : Ssa.function_info =
@@ -655,7 +659,9 @@ let convert (f : Cmm.fundecl) : (module Ssa.Finished_graph) =
         fun_ret_type = f.fun_ret_type
       }
     in
-    let module Builder = (val Ssa.make_builder fi : Ssa.Graph_builder) in
+    let module Builder =
+      (val Ssa.make_builder fi ~keep_unused_ops : Ssa.Graph_builder)
+    in
     let module M = Make (Builder) in
     let env =
       { M.vars = V.Map.empty; static_exceptions = Static_label.Map.empty }

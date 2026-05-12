@@ -28,23 +28,11 @@ open! Int_replace_polymorphic_compare
     instructions before [Return] terminators so the runtime trap stack is empty
     on function exit.
 
-    Dead code: the [keep_unused_ops] flag controls whether [Op]s with
-    [usage_count = 0] are emitted. With the flag, naturally unused ops have
-    their counts bumped so they appear in the CFG (matching the baseline
-    pipeline's output, used before [Cfg_compare]). Without it, dead ops are
-    skipped to keep the CFG lean.
-
-    Comparisons feeding [Branch]: [collect_fusion_adjustments] decrements the
-    use count of the comparison [Op] so [fuse_comparison] can splice it directly
-    into the CFG test terminator without leaving the now-dead Op in the body.
-
-    Unreachable trap handlers: [Push_trap] / [Pop_trap] referencing a handler
-    block that was dropped (because it became unreachable) are skipped during
-    lowering rather than routed through a stub. The matching push/pop pair both
-    target the same handler, so they are dropped together and trap-stack balance
-    is preserved. [Cfg_compare] knows to ignore [Pushtrap]/[Poptrap] whose
-    target has no predecessors so the baseline pipeline (which keeps unreachable
-    handlers as segfault stubs) still matches. *)
+    Comparisons feeding [Branch]: [collect_fused_comparisons] records, per
+    comparison [Op], how many [Branch] terminators will fuse it directly into
+    the CFG test. An Op is emitted into the body only if it has more uses than
+    fused-branch consumers — otherwise [fuse_comparison] splices it directly
+    into the terminator and we drop the body Op. *)
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
@@ -57,13 +45,10 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       block_labels : Label.t Block.Tbl.t;
       call_result_locs : Reg.t array Block.Tbl.t;
       call_stack_ofs : int Block.Tbl.t;
-      use_count_adjustments : int Instruction_id.Tbl.t
-          (* Per-Op adjustments applied to [op_data.usage_count] to decide which
-             Ops to emit. The combination [usage_count + adjustment] determines
-             liveness; an Op with adjusted count [<= 0] is skipped. Populated
-             before block conversion to (a) decrement Ops consumed by fused
-             branch terminators and (b) bump naturally unused Ops to keep them
-             in the CFG when [keep_unused_ops] is set. *)
+      fused_comparison_ops : int Instruction_id.Tbl.t
+          (* Comparison ops that will be fused into the block terminator and
+             should therefore not be emitted into the block body. The map counts
+             how often a comparison has been fused. *)
     }
 
   let create_env () =
@@ -72,7 +57,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       block_labels = Block.Tbl.create 64;
       call_result_locs = Block.Tbl.create 16;
       call_stack_ofs = Block.Tbl.create 16;
-      use_count_adjustments = Instruction_id.Tbl.create 16
+      fused_comparison_ops = Instruction_id.Tbl.create 16
     }
 
   let label_of env (blk : Block.t) =
@@ -81,8 +66,8 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       Misc.fatal_errorf "Cfg_of_ssa.label_of: block %d not in block_labels"
         (blk.id :> int)
 
-  let get_reg env (i : Instruction.t) : Reg.t =
-    match i with
+  let get_reg env (instr : Instruction.t) : Reg.t =
+    match instr with
     | Op { id; _ } ->
       let regs =
         try Instruction_id.Tbl.find env.op_regs id
@@ -300,25 +285,20 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       emit_moves body ~src:exn_bucket ~dst:first_param
     end;
     Array.iter
-      (fun (i : Instruction.t) ->
-        match i with
+      (fun (instr : Instruction.t) ->
+        match instr with
         | Op { id; op; args; dbg; typ; usage_count } ->
           let regs = Reg.createv typ in
           Instruction_id.Tbl.replace env.op_regs id regs;
-          let adjustment =
-            Instruction_id.Tbl.find_opt env.use_count_adjustments id
-            |> Option.value ~default:0
-          in
-          if usage_count + adjustment > 0
+          if
+            Instruction_id.Tbl.find_opt env.fused_comparison_ops id
+            |> Option.value ~default:(-1) < usage_count
           then
             let arg = Array.map (get_reg env) args in
             let (_ : Cfg.basic Cfg.instruction) =
               emit_op body op dbg arg regs
             in
             ()
-        | (Push_trap { handler } | Pop_trap { handler })
-          when Block.Set.is_empty handler.predecessors ->
-          ()
         | Push_trap { handler } ->
           DLL.add_end body
             (make_cfg_instr
@@ -349,8 +329,16 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     let terminator =
       match block.terminator with
       | Goto { goto; args } ->
-        let dst_regs = get_block_params_regs env goto in
-        let src_regs = Array.map (get_reg env) args in
+        (* Missing goto arguments are not lowered to any moves. *)
+        let dst_regs =
+          get_block_params_regs env goto
+          |> Misc.Stdlib.Array.filteri (fun i _ -> Option.is_some args.(i))
+        in
+        let src_regs =
+          args
+          |> Misc.Stdlib.Array.filteri (fun _ arg -> Option.is_some arg)
+          |> Array.map (fun arg -> arg |> Option.get |> get_reg env)
+        in
         (* CR ttebbi: We should use a non-quadratic algorithm for long register
            lists. *)
         let has_overlap =
@@ -509,18 +497,11 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       cold = false
     }
 
-  let adjust_use_count env id delta =
-    let cur =
-      Instruction_id.Tbl.find_opt env.use_count_adjustments id
-      |> Option.value ~default:0
-    in
-    Instruction_id.Tbl.replace env.use_count_adjustments id (cur + delta)
-
-  (** Decrement use counts of comparisons that will be folded into branch
-      terminators. The branch terminator consumes the comparison's args
-      directly, so the comparison itself is no longer needed (provided no other
-      consumer references it). *)
-  let collect_fusion_adjustments env =
+  (** Remember comparisons that will be folded into branch terminators. The
+      branch terminator consumes the comparison's args directly, so the
+      comparison itself is no longer needed (provided no other consumer
+      references it). *)
+  let collect_fused_comparisons env =
     List.iter
       (fun (block : Block.t) ->
         match[@warning "-fragile-match"] block.terminator with
@@ -531,26 +512,13 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
                  ~false_label:Label.none)
           then
             match[@warning "-fragile-match"] cond with
-            | Op { id; _ } -> adjust_use_count env id (-1)
-            | _ -> ())
+            | Op { id; _ } ->
+              Instruction_id.Tbl.replace env.fused_comparison_ops id
+                (1
+                + (Instruction_id.Tbl.find_opt env.fused_comparison_ops id
+                  |> Option.value ~default:0))
+            | _ -> assert false)
         | _ -> ())
-      blocks
-
-  (** Bump every Op with [usage_count = 0] up by 1. This disables dead-code
-      elimination for unused Ops, matching the non-SSA pipeline's behaviour (and
-      keeping cfg_compare happy). Disabling removing unused ops in this way
-      preserves the usage count based removal of fused branch comparisons.*)
-  let keep_unused_ops_alive env =
-    List.iter
-      (fun (block : Block.t) ->
-        Array.iter
-          (fun (instr : Instruction.t) ->
-            match instr with
-            | Op r when r.usage_count = 0 -> adjust_use_count env r.id 1
-            | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-            | Stack_check _ | Name_for_debugger _ ->
-              ())
-          block.body)
       blocks
 
   let allocate_block_labels_and_param_regs env =
@@ -662,12 +630,11 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       DLL.filter_left entry.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
           not (InstructionId.equal instr.id prologue_poll_instr_id))
 
-  let convert ~keep_unused_ops ~funcnames : Cfg_with_layout.t =
+  let convert ~funcnames : Cfg_with_layout.t =
     (* Start instruction ids at 0, matching [Cfg_selectgen.emit_fundecl]. *)
     Sub_cfg.reset_instr_id ();
     let env = create_env () in
-    if keep_unused_ops then keep_unused_ops_alive env;
-    collect_fusion_adjustments env;
+    collect_fused_comparisons env;
     allocate_block_labels_and_param_regs env;
     let fun_arg_regs = get_block_params_regs env entry in
     let fun_arg_locs = Proc.loc_parameters (Reg.typv fun_arg_regs) in
@@ -702,8 +669,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     Cfg_simplify.run cfg_with_layout
 end
 
-let convert ~keep_unused_ops ~funcnames (m : (module Ssa.Finished_graph)) :
-    Cfg_with_layout.t =
+let convert ~funcnames (m : (module Ssa.Finished_graph)) : Cfg_with_layout.t =
   let module S = (val m : Ssa.Finished_graph) in
   let module C = Make (S) in
-  C.convert ~keep_unused_ops ~funcnames
+  C.convert ~funcnames

@@ -65,6 +65,9 @@ module type Finished_graph = sig
         mutable usage_count : usage_count
       }
 
+    (** Only used during graph building. *)
+    type pending_body
+
     type dominator_info = private
       { depth : int;
         dominator : Block.t
@@ -76,6 +79,7 @@ module type Finished_graph = sig
         params : param array;
         mutable predecessors : Block.Set.t;
         mutable body : Instruction.t array;
+        mutable pending_body : pending_body;
         mutable terminator : Terminator.t;
         mutable terminator_dbg : Debuginfo.t;
         mutable dominator_info : dominator_info;
@@ -154,7 +158,7 @@ module type Finished_graph = sig
     type t =
       | Goto of
           { goto : Block.t;
-            args : Instruction.t array
+            args : Instruction.t option array
           }
       | Branch of
           { cond : Instruction.t;
@@ -356,7 +360,7 @@ module type Graph_builder = sig
     type t =
       | Goto of
           { goto : Block.t;
-            args : Instruction.t array
+            args : Instruction.t option array
           }
       | Branch of
           { cond : Instruction.t;
@@ -444,6 +448,9 @@ module type Graph_builder = sig
 
   val new_block : params:Cmm.machtype -> new_block_result
 
+  val new_block_with_names :
+    params:(Cmm.machtype_component * string option) array -> Block.t
+
   val function_info : function_info
 
   (** The function-start block, created at [make_builder] time using
@@ -465,5 +472,6 @@ module type Intf = sig
 
   module type Finished_graph = Finished_graph
 
-  val make_builder : function_info -> (module Graph_builder)
+  val make_builder :
+    function_info -> keep_unused_ops:bool -> (module Graph_builder)
 end
