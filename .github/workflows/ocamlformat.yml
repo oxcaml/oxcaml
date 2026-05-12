@@ -45,3 +45,7 @@ jobs:
 
       - name: Check OCaml Formatting
         run: opam exec -- bash tools/ci/actions/check-fmt.sh
+
+      - name: Check for Conflict Markers
+        if: '!cancelled()'
+        run: bash tools/ci/actions/check-conflicts.sh
