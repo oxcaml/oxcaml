@@ -178,6 +178,8 @@ let flambda_to_flambda0 : type m.
            Inlining_report.output_then_forget_decisions ~output_prefix
          in
          Compiler_hooks.execute Inlining_tree inlining_tree);
+      if Flambda_features.dump_functor_sizes ()
+      then Functor_sizes.output_then_forget ~prefixname;
       Compiler_hooks.execute Flambda2 flambda;
       let last_pass_name = "simplify" in
       print_flambda last_pass_name

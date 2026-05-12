@@ -427,6 +427,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~code_metadata:(Code.code_metadata code) ~pass:After_simplify
       ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc_after_body)
       decision;
+    if Code.is_a_functor code && Flambda_features.dump_functor_sizes ()
+    then
+      Functor_sizes.record ~code_id ~dbg:(Code.dbg code)
+        ~size:(Cost_metrics.size cost_metrics);
     decision
   in
   let is_a_functor = Code.is_a_functor code in

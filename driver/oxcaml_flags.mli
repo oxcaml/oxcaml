@@ -212,6 +212,7 @@ module Flambda2 : sig
     val flow : bool ref
     val simplify : bool ref
     val reaper : bool ref
+    val functor_sizes : bool ref
   end
 
   module Expert : sig
