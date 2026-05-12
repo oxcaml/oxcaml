@@ -764,10 +764,10 @@ FUNCTION(caml_start_program)
 
 L(jump_to_caml):
     /* Set up stack frame and save callee-save registers */
-        CFI_OFFSET(29, -224)
-        CFI_OFFSET(30, -216)
         stp     x29, x30, [sp, -224]!
         CFI_ADJUST(224)
+        CFI_OFFSET(29, 0)
+        CFI_OFFSET(30, 8)
         add     x29, sp, #0
         stp     x19, x20, [sp, 16]
         stp     x21, x22, [sp, 32]
@@ -816,17 +816,15 @@ L(jump_to_caml):
         mov     sp, x8
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
-        .cfi_escape DW_CFA_def_cfa_expression, 3 + 2 + 2 + 2,         \
+        .cfi_escape DW_CFA_def_cfa_expression, 3 + 2 + 2,             \
             /* sp points to the exn handler on the OCaml stack */     \
             /* sp + 16 contains the C_STACK_SP */                     \
           DW_OP_breg + DW_REG_sp, 16 /* exn handler */, DW_OP_deref,  \
-            /* 32     struct c_stack_link + pad */                    \
-            /* 10*8   callee-save GPRs (x19..x28) */                  \
-            /* 8*16   callee-save FPRs (q8..q15) */                   \
-            /* 16     fp + ret addr */                                \
-            /* split to keep each ULEB128 in 1 byte (<= 127) */       \
-          DW_OP_plus_uconst, 127, DW_OP_plus_uconst, 127,             \
-          DW_OP_plus_uconst, 2
+            /* 32   struct c_stack_link + pad */                      \
+            /* 18*8 callee save regs */                               \
+            /* 16   fp + ret addr */                                  \
+            /* need to split to get under 127 limit */                \
+          DW_OP_plus_uconst, 96, DW_OP_plus_uconst, 96
 #endif
     /* Call the OCaml code */
         blr     TMP2
