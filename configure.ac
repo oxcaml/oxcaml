@@ -35,6 +35,11 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
+AC_ARG_ENABLE([runtime5], [],
+  [AS_IF([test "x$enableval" != 'xyes'],
+    [AC_MSG_ERROR(m4_normalize([OxCaml 5.4 does not support runtime4 and must be
+                               configured with --enable-runtime5]))])], [])
+
 # Optionally pin to a specific opam switch for reproducible builds
 AC_PATH_PROG([opam], [opam], [])
 
@@ -155,12 +160,6 @@ AC_ARG_ENABLE([middle-end],
     [*], [AC_MSG_ERROR([Invalid middle end: must be 'flambda2'])])],
   [middle_end=flambda2])
 
-AC_ARG_ENABLE([runtime5],
-  [AS_HELP_STRING([--enable-runtime5],
-    [Use the OCaml 5 runtime])],
-  [],
-  [enable_runtime5=yes])
-
 AC_ARG_ENABLE([coverage],
   [AS_HELP_STRING([--enable-coverage],
     [Run compiler tests instrumented to output coverage data using bisect_ppx
@@ -267,21 +266,14 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 # Runtime selection
 
-#AC_ARG_ENABLE([runtime5],
-#  [AS_HELP_STRING([--enable-runtime5],
-#    [Use the OCaml 5 runtime])])
-AS_IF([test x"$enable_runtime5" = xyes],
-      [runtime_suffix=],
-      [runtime_suffix=4])
-
 AC_ARG_ENABLE([stack_checks],
   [AS_HELP_STRING([--enable-stack-checks],
     [Enable stack checks])])
 
 ## Output variables
 
-AC_SUBST([enable_runtime5])
-AC_SUBST([runtime_suffix])
+AC_SUBST([enable_runtime5], [yes])
+AC_SUBST([runtime_suffix], [])
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
@@ -3017,11 +3009,6 @@ AC_CHECK_FUNCS(
       #include <processthreadsapi.h>]])])
 
 ## Activate the systhread library
-
-AS_IF(
-  [test x"$enable_runtime5" = x"yes"],
-  [runtime_suffix=],
-  [runtime_suffix=4])
 
 AS_CASE([$enable_systhreads,$enable_unix_lib],
   [yes,no],
