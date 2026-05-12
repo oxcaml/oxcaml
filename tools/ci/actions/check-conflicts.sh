@@ -14,8 +14,8 @@
 #*                                                                        *#
 #**************************************************************************#
 
-# Raise an error any tracked file contains a conflict marker (`<<<<<<<` or
-# `>>>>>>>` at the start of a line).
+# Raise an error any tracked file contains a conflict marker (`<<<<<<<`,
+# `|||||||` or `>>>>>>>` at the start of a line).
 
 set -euo pipefail
 
