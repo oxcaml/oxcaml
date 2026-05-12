@@ -24,6 +24,13 @@ class cls = object method meth () = 42 end;;
 class cls : object method meth : unit -> int end
 |}];;
 
+module Op = struct
+  let (+) x y = x ^ y
+end
+[%%expect {|
+module Op : sig val ( + ) : string -> string -> string end
+|}];;
+
 #mark_toplevel_in_quotations;;
 
 (* Tests *)
@@ -1552,4 +1559,35 @@ Line 1, characters 31-40:
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
        as seen at line 1, characters 31-40.
+|}];;
+
+(* Correct disambiguation of infix operators. *)
+let open Op in
+<[ "abc" + "def" ]>;;
+[%%expect {|
+- : <[string]> expr = <[Op.( + ) "abc" "def"]>
+|}];;
+
+(* Infix operators are correctly parenthesised when defined in quotations. *)
+<[ let (+) x y = x ^ y in "foo" + "bar" ]>;;
+[%%expect {|
+- : <[string]> expr = <[let ( + ) = (fun x y -> x ^ y) in "foo" + "bar"]>
+|}];;
+
+<[ let (+) x y = x in let f g = g 1 2 in f (+) ]>;;
+[%%expect {|
+- : <[int]> expr =
+<[let ( + ) = (fun x y -> x) in let f = (fun g -> g 1 2) in f ( + )]>
+|}];;
+
+(* Infix operators are correctly named when used in comprehensions. *)
+<[ [2 + 3 for ( + ) in [( + ); ( * )]] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ 2 + 3 for ( + ) in [Stdlib.( + ); Stdlib.( * )] ]
+]>
+|}];;
+
+<[ [( + ) for ( + ) = 1 to 3] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ ( + ) for ( + ) = 1 to 3 ]]>
 |}];;
