@@ -12,16 +12,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Global feature toggles for the ikinds experiment.
-   These are intended to be easy to flip while iterating on
-   performance or correctness. *)
+(* Global feature toggles for ikinds. These are intended to be easy to flip
+   while iterating on performance or correctness. *)
 (* CR jujacobs: remove toggles in the final version. *)
 let enable_crossing = true
 
 let enable_sub_jkind_l = true
 
 let enable_sub_or_intersect = true
-(* Enabled for ikinds experiments. *)
 
 let enable_sub_or_error = false
 

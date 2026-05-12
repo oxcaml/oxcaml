@@ -831,7 +831,7 @@ type type_declaration =
 
     type_ikind: constructor_ikind_entry;
     (* Cached constructor ikind polynomial (opaque) populated when jkinds are
-       normalized under [-ikinds]; carries a reason when absent. *)
+       normalized with ikinds enabled; carries a reason when absent. *)
 
     type_private: private_flag;
     type_manifest: type_expr option;
