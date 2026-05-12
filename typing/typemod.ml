@@ -4681,9 +4681,10 @@ let package_units initial_env objfiles target_cmi modulename =
   let pack_uid = Uid.of_compilation_unit_id modulename in
   let shape =
     List.fold_left (fun map (name, _sg) ->
-      let name = Compilation_unit.Name.to_string name in
-      let id = Ident.create_persistent name in
-      Shape.Map.add_module map id (Shape.for_persistent_unit name)
+      let id = Ident.create_persistent (Compilation_unit.Name.to_string name) in
+      Shape.Map.add_module map id
+        (Shape.for_persistent_unit
+           (Compilation_unit.Name.to_global_name name))
     ) Shape.Map.empty units
     |> Shape.str ~uid:pack_uid
   in

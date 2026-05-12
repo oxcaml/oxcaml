@@ -84,7 +84,9 @@ module Make(_ : sig
     val max_compilation_unit_depth : unit -> Misc.Maybe_bounded.t
 
     val read_unit_shape :
-      diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
+      diagnostics:Diagnostics.t ->
+      unit_name:Global_module.Name.t ->
+      Shape.t option
   end) : sig
   val reduce : ?diagnostics: Diagnostics.t -> Env.t -> Shape.t -> Shape.t
 

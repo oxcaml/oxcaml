@@ -822,7 +822,9 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   in
   let shape =
     match import.imp_impl, import.imp_params with
-    | Some unit, [] -> Shape.for_persistent_unit (CU.full_path_as_string unit)
+    | Some unit, [] ->
+        Shape.for_persistent_unit
+          (CU.to_global_name_without_prefix unit)
     | _, _ ->
         (* TODO Implement shapes for parameters and parameterised modules *)
         Shape.error ~uid "parameter or parameterised module"

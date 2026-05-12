@@ -18,8 +18,9 @@ type base_layout = Jkind_types.Sort.base
 
 module Uid = struct
   type t =
-    | Compilation_unit of string
-    | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
+    | Compilation_unit of Global_module.Name.t
+    | Item of { comp_unit: Global_module.Name.t; id: int;
+                from: Unit_info.intf_or_impl }
     | Internal
     | Predef of string
     | Unboxed_version of t
@@ -29,11 +30,13 @@ module Uid = struct
 
     let rec compare (x : t) y =
       match x, y with
-      | Compilation_unit s1, Compilation_unit s2 -> String.compare s1 s2
+      | Compilation_unit s1, Compilation_unit s2 ->
+        Global_module.Name.compare s1 s2
       | Item c1, Item c2 ->
         let c = Int.compare c1.id c2.id in
         let c =
-          if c <> 0 then c else String.compare c1.comp_unit c2.comp_unit
+          if c <> 0 then c
+          else Global_module.Name.compare c1.comp_unit c2.comp_unit
         in
         if c <> 0 then c else Stdlib.compare c1.from c2.from
       | Internal, Internal -> 0
@@ -63,9 +66,11 @@ module Uid = struct
     let rec print fmt = function
       | Internal -> Format.pp_print_string fmt "<internal>"
       | Predef name -> Format.fprintf fmt "<predef:%s>" name
-      | Compilation_unit s -> Format.pp_print_string fmt s
+      | Compilation_unit s ->
+        Format.fprintf fmt "%a" (Format_doc.compat Global_module.Name.print) s
       | Item { comp_unit; id; from } ->
-          Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
+          Format.fprintf fmt "%a%a.%d" pp_intf_or_impl from
+            (Format_doc.compat Global_module.Name.print) comp_unit id
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
 
     let output oc t =
@@ -81,18 +86,20 @@ module Uid = struct
       let comp_unit, from =
         let open Unit_info in
         match current_unit with
-        | None -> "", Impl
+        | None ->
+          Global_module.Name.create_no_args "", Impl
         | Some ui ->
-          Compilation_unit.full_path_as_string (modname ui), kind ui
+          Compilation_unit.to_global_name_without_prefix (modname ui),
+          kind ui
       in
       incr id;
       Item { comp_unit; id = !id; from }
 
   let of_compilation_unit_id id =
-    Compilation_unit (id |> Compilation_unit.full_path_as_string)
+    Compilation_unit (Compilation_unit.to_global_name_without_prefix id)
 
   let of_compilation_unit_name name =
-    Compilation_unit (name |> Compilation_unit.Name.to_string)
+    Compilation_unit (Compilation_unit.Name.to_global_name name)
 
   let of_predef_id id =
     if not (Ident.is_predef id) then
@@ -517,7 +524,7 @@ and desc =
   | Alias of t
   | Leaf
   | Proj of t * Item.t
-  | Comp_unit of string
+  | Comp_unit of Global_module.Name.t
   | Error of string
 
   (* constructors for types  *)
@@ -631,7 +638,7 @@ let rec equal_desc0 d1 d2 =
   | Proj (t1, i1), Proj (t2, i2) ->
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
-  | Comp_unit c1, Comp_unit c2 -> String.equal c1 c2
+  | Comp_unit c1, Comp_unit c2 -> Global_module.Name.equal c1 c2
   | Constr (c1, ts1), Constr (c2, ts2) ->
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
@@ -759,7 +766,9 @@ let rec print fmt t =
               Item.print item
               Uid.print uid
         end
-    | Comp_unit name -> Format.fprintf fmt "CU %s" name
+    | Comp_unit name ->
+      Format.fprintf fmt "CU %a"
+        (Format_doc.compat Global_module.Name.print) name
     | Struct map ->
         let print_map fmt =
           Item.Map.iter (fun item t ->
@@ -1149,8 +1158,8 @@ let of_path ~find_shape ~namespace path =
   in
   aux namespace path
 
-let for_persistent_unit s =
-  comp_unit ~uid:(Compilation_unit s) s
+let for_persistent_unit name =
+  comp_unit ~uid:(Compilation_unit name) name
 
 let leaf_for_unpack = leaf' None
 
