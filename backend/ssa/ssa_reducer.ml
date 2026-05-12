@@ -25,13 +25,15 @@ open! Int_replace_polymorphic_compare
       from the input to the output via [map_arg] and [map_block].
     - Block params with [usage_count = 0] are dropped from both the block
       parameter list and from [Goto]s.
-    - [Push_trap] / [Pop_trap] whose handler block has become unreachable are
-      dropped entirely. The matching push/pop pair both reference the same
-      handler, so they are dropped together and trap-stack balance is preserved.
     - Other terminators are reconstructed with their args mapped through.
 
-    [keep_unused_ops] disables the dead-Op skip and the dead-param drop, so the
-    output is structurally faithful to the input. Used before [Cfg_compare]. *)
+    Dead-Op and unreachable-handler cleanup (dropping [Op]s with
+    [usage_count = 0] and [Push_trap]/[Pop_trap] whose handler has no
+    predecessors) happens in [Ssa.finalize_blocks] inside [Out.finish], not
+    here.
+
+    [keep_unused_ops] disables removing unused operations and parameters, used
+    before [Cfg_compare]. *)
 
 module type Context = sig
   module In : Ssa.Finished_graph
@@ -187,34 +189,25 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
 let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     (input : (module Ssa.Finished_graph)) : (module Ssa.Finished_graph) =
   let module In = (val input : Ssa.Finished_graph) in
-  let module Out = (val Ssa.make_builder In.function_info : Ssa.Graph_builder)
+  let module Out =
+    (val Ssa.make_builder In.function_info ~keep_unused_ops : Ssa.Graph_builder)
   in
   (* Map each input block to its output counterpart. *)
   let block_map : Out.Block.t In.Block.Tbl.t = In.Block.Tbl.create 64 in
-  (* For input blocks where some params were dropped, bidirectional index maps
-     between input and output param positions: - [to_old.(new_idx) = old_idx] -
-     [to_new.(old_idx) = new_idx], or [-1] if the param was dropped. Blocks not
-     in this table keep all params in order (identity mapping); see
-     [compute_kept_block_params] for the dropping criterion. *)
-  let kept_block_params : (int array * int array) In.Block.Tbl.t =
-    In.Block.Tbl.create 64
-  in
   let op_map : Out.Instruction.t In.Instruction_id.Tbl.t =
     In.Instruction_id.Tbl.create 256
   in
-  (* A param can be dropped only if every incoming edge passes its arg through a
-     [Goto] (the only terminator that has positional per-param args). A non-Goto
-     predecessor supplies the param's value through a runtime-fixed mechanism,
-     so its position must be preserved — we model this as "every param is used"
-     for that target. The function entry is handled separately below: its params
-     come from the function ABI and are never droppable.
-
-     Returns [None] for the identity mapping (all params kept in order), in
-     which case the caller does not record an entry in [kept_block_params]. *)
-  let compute_kept_block_params (block : In.Block.t) :
-      (int array * int array) option =
+  (* Maps each old param index to its new index in [Out], or
+     [dropped_param_sentinel] if the param is dropped. A param can be dropped
+     only if every incoming edge passes its arg through a [Goto] (the only
+     terminator that has positional per-param args). A non-Goto predecessor
+     supplies the parameter's value through a runtime-fixed mechanism, so the
+     parameter's position must be preserved. *)
+  let block_param_map : int array In.Block.Tbl.t = In.Block.Tbl.create 64 in
+  let dropped_param_sentinel = -1 in
+  let compute_block_param_map (block : In.Block.t) : int array =
     let n = Array.length block.params in
-    let any_non_goto_pred =
+    let any_non_goto_pred () =
       In.Block.Set.exists
         (fun (pred : In.Block.t) ->
           match[@warning "-fragile-match"] pred.terminator with
@@ -223,83 +216,55 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         block.predecessors
     in
     if
-      any_non_goto_pred || keep_unused_ops
+      keep_unused_ops || any_non_goto_pred ()
       || Array.for_all
            (fun (param : In.Block.param) -> param.usage_count > 0)
            block.params
-    then None
+    then Array.init n Fun.id
     else
-      let to_old = Array.make n 0 in
-      let to_new = Array.make n (-1) in
+      let to_new = Array.make n dropped_param_sentinel in
       let j = ref 0 in
       for i = 0 to n - 1 do
         if block.params.(i).usage_count > 0
         then begin
-          to_old.(!j) <- i;
           to_new.(i) <- !j;
           incr j
         end
       done;
-      let to_old = Array.sub to_old 0 !j in
-      Some (to_old, to_new)
+      to_new
   in
   (* Step 1: create an output block for each input block. The entry's params
      come from the function ABI and are kept verbatim; other blocks may drop
-     unused params per [compute_kept_block_params]. *)
+     unused params per [compute_block_param_map]. *)
   let entry_out = Out.entry in
   In.Block.Tbl.replace block_map In.entry entry_out;
+  In.Block.Tbl.replace block_param_map In.entry
+    (Array.init (Array.length In.entry.params) Fun.id);
   List.iter
     (fun (block : In.Block.t) ->
       if not (In.Block.equal block In.entry)
       then begin
-        let kept_opt = compute_kept_block_params block in
-        Option.iter (In.Block.Tbl.replace kept_block_params block) kept_opt;
+        let param_map = compute_block_param_map block in
+        In.Block.Tbl.replace block_param_map block param_map;
         let params =
-          match kept_opt with
-          | None -> Array.map (fun (p : In.Block.param) -> p.typ) block.params
-          | Some (to_old, _) -> Array.map (fun i -> block.params.(i).typ) to_old
+          block.params |> Array.to_list
+          |> List.filteri (fun i _ -> param_map.(i) <> dropped_param_sentinel)
+          |> List.map (fun (param : In.Block.param) -> param.typ, param.name)
+          |> Array.of_list
         in
-        let { Out.block = new_out; _ } = Out.new_block ~params in
-        let out_params = Out.Block.params new_out in
-        let copy_name new_idx old_idx =
-          Option.iter
-            (Out.Block.set_param_name out_params.(new_idx))
-            block.params.(old_idx).name
-        in
-        (match kept_opt with
-        | None -> Array.iteri (fun i _ -> copy_name i i) block.params
-        | Some (to_old, _) -> Array.iteri copy_name to_old);
-        In.Block.Tbl.replace block_map block new_out
+        In.Block.Tbl.replace block_map block (Out.new_block_with_names ~params)
       end)
     In.blocks;
   let map_block (old : In.Block.t) : Out.Block.t =
     In.Block.Tbl.find block_map old
   in
-  (* Select from [args] the entries at positions whose target params were kept.
-     Filtering before [map_arg] avoids touching args that feed dropped params:
-     those args may be defined by dead [Op]s skipped by [visit_instruction], so
-     they are absent from [op_map]. *)
-  let filter_in_args_for (old : In.Block.t) (args : In.Instruction.t array) :
-      In.Instruction.t array =
-    match In.Block.Tbl.find_opt kept_block_params old with
-    | None -> args
-    | Some (to_old, _) -> Array.map (fun i -> args.(i)) to_old
-  in
-  (* Old index → new index for [block]'s params (post-filtering). *)
-  let remap_param_index (block : In.Block.t) (old_index : int) : int =
-    match In.Block.Tbl.find_opt kept_block_params block with
-    | None -> old_index
-    | Some (_, to_new) ->
-      let new_index = to_new.(old_index) in
-      assert (new_index >= 0);
-      new_index
-  in
   let rec map_arg (instr : In.Instruction.t) : Out.Instruction.t =
     match instr with
     | Op { id; _ } -> In.Instruction_id.Tbl.find op_map id
     | Block_param { block; index } ->
-      Out.Instruction.make_block_param (map_block block)
-        (remap_param_index block index)
+      let new_index = (In.Block.Tbl.find block_param_map block).(index) in
+      assert (new_index <> dropped_param_sentinel);
+      Out.Instruction.make_block_param (map_block block) new_index
     | Proj { index; src } -> Out.Instruction.make_proj ~index (map_arg src)
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
       ->
@@ -328,7 +293,13 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   let map_terminator (t : In.Terminator.t) : Out.Terminator.t =
     match t with
     | Goto { goto; args } ->
-      let mapped_args = Array.map map_arg (filter_in_args_for goto args) in
+      let param_map = In.Block.Tbl.find block_param_map goto in
+      let mapped_args =
+        args
+        |> Misc.Stdlib.Array.filteri (fun i _ ->
+            param_map.(i) <> dropped_param_sentinel)
+        |> Array.map (Option.map map_arg)
+      in
       Goto { goto = map_block goto; args = mapped_args }
     | Branch { cond; ifso; ifnot } ->
       Branch
@@ -388,44 +359,24 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
 
       let visit_instruction (block : In.Block.t) ~instr_index c =
         let instr = Array.get block.body instr_index in
-        let should_drop =
-          match[@warning "-fragile-match"] instr with
-          (* Skip dead Ops: their args may reference [Block_param]s that we've
-             dropped (see [compute_kept_block_params]), and emitting them would
-             propagate those dangling references into the new graph. An Op with
-             [usage_count = 0] is by definition not referenced by any live
-             consumer. [keep_unused_ops] disables this filtering so the output
-             is structurally faithful to the input — used before [Cfg_compare]
-             so it can match the baseline pipeline. *)
-          | Op { usage_count = 0; _ } when not keep_unused_ops -> true
-          (* We drop trap handlers as well as their [Push_trap] / [Pop_trap]
-             when they become unreachable. *)
-          | (Push_trap { handler } | Pop_trap { handler })
-            when In.Block.Set.is_empty handler.predecessors ->
-            true
-          | _ -> false
+        let replacement =
+          match Red.visit_instruction block ~instr_index c with
+          | Replaced replacement -> replacement
+          | Unchanged -> emit_instruction c (map_instruction instr)
         in
-        if not should_drop
-        then begin
-          let replacement =
-            match Red.visit_instruction block ~instr_index c with
-            | Replaced replacement -> replacement
-            | Unchanged -> emit_instruction c (map_instruction instr)
-          in
-          if
-            In.Instruction.result_arity instr
-            <> Instruction.result_arity replacement
-          then
-            Misc.fatal_errorf
-              "Ssa_reducer: replacement arity %d does not match input arity \
-               %d.@ Input: %a@ Replacement: %a"
-              (Instruction.result_arity replacement)
-              (In.Instruction.result_arity instr)
-              In.print_instruction instr Out.print_instruction replacement;
-          match[@warning "-fragile-match"] instr with
-          | Op { id; _ } -> In.Instruction_id.Tbl.replace op_map id replacement
-          | _ -> ()
-        end
+        if
+          In.Instruction.result_arity instr
+          <> Instruction.result_arity replacement
+        then
+          Misc.fatal_errorf
+            "Ssa_reducer: replacement arity %d does not match input arity %d.@ \
+             Input: %a@ Replacement: %a"
+            (Instruction.result_arity replacement)
+            (In.Instruction.result_arity instr)
+            In.print_instruction instr Out.print_instruction replacement;
+        match[@warning "-fragile-match"] instr with
+        | Op { id; _ } -> In.Instruction_id.Tbl.replace op_map id replacement
+        | _ -> ()
 
       let visit_terminator (block : In.Block.t) c =
         match Red.visit_terminator block c with

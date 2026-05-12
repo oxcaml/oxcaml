@@ -401,8 +401,7 @@ let mk_no_ssa_simplify f =
 let mk_ssa_validate f =
   ( "-ssa-validate",
     Arg.Unit f,
-    " Validate the SSA pipeline by comparing against the legacy CFG \
-     (EXPERIMENTAL)" )
+    " Validate the SSA pipeline by comparing against the legacy CFG" )
 
 let mk_no_ssa_validate f =
   ("-no-ssa-validate", Arg.Unit f, " Disable SSA pipeline validation")

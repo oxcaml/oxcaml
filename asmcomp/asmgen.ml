@@ -518,7 +518,8 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
     Printexc.raise_with_backtrace exn backtrace
   in
   let ssa =
-    fd_cmm ++ Ssa_of_cmm.convert
+    fd_cmm
+    ++ Ssa_of_cmm.convert ~keep_unused_ops:!Oxcaml_flags.ssa_validate
     ++ Ssa_tail_call.run ~keep_unused_ops:!Oxcaml_flags.ssa_validate
   in
   if !Oxcaml_flags.ssa_validate
@@ -529,9 +530,7 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
       in
       (* First conversion: used only for [Cfg_compare], so we emit a CFG that
          stays faithful to plain [cfg_selectgen]. *)
-      let cfg_from_ssa_for_compare =
-        Cfg_of_ssa.convert ~keep_unused_ops:true ~funcnames ssa
-      in
+      let cfg_from_ssa_for_compare = Cfg_of_ssa.convert ~funcnames ssa in
       Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
         ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
     with exn -> report_pipeline_error exn ssa
@@ -545,7 +544,7 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
-  try Cfg_of_ssa.convert ~keep_unused_ops:false ~funcnames ssa
+  try Cfg_of_ssa.convert ~funcnames ssa
   with exn -> report_pipeline_error exn ssa
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
