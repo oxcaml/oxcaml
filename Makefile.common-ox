@@ -116,7 +116,9 @@ compiler: runtime-stdlib
           testsuite/lib/lib.cm{,x}a \
           testsuite/lib/testing.cm{,x}a \
           @middle_end/flambda2/tests/tools/all \
-          $(ocamldir)/tools/dumpobj.bc
+          $(ocamldir)/tools/dumpobj.bc \
+          $(ocamldir)/tools/listprims.exe \
+          $(ocamldir)/lambda/primitives.txt
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler runtime-stdlib
