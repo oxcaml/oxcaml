@@ -195,10 +195,10 @@ ocamlc.byte;
   check-ocamlc.byte-output;
 }
 
-(* Test that [-open-cmi] is processed before [-open], so [-open] can refer
-   to a module brought into scope by [-open-cmi]. *)
+(* Test that an [-open] following an earlier [-open-cmi] can refer to a
+   module brought into scope by it: command-line order is preserved. *)
 {
-  flags = "-nocwd -open A -open-cmi libb/with_sub.cmi";
+  flags = "-nocwd -open-cmi libb/with_sub.cmi -open A";
   module = "libb/uses_float.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
@@ -211,6 +211,15 @@ ocamlc.byte;
 {
   flags = "-nocwd -open-cmi libb/with_sub.cmi -open-cmi liba/a.cmi";
   module = "libb/uses_int.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that a trailing [-open-cmi] overrides an earlier [-open]:
+   command-line order is preserved across the two flag kinds. *)
+{
+  flags = "-I liba -nocwd -open A -open-cmi libb/with_sub.cmi";
+  module = "libb/uses_string.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
