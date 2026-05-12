@@ -417,6 +417,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         else Some (Code.loopify code)
       in
       let is_tupled = Code.is_tupled code in
+      let stub = Code.stub code in
       let params_and_body =
         Flambda.Function_params_and_body.pattern_match
           (Code.params_and_body code)
@@ -484,6 +485,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
           params_and_body;
           code_size;
           is_tupled;
+          stub;
           result_mode
         }
     | Code code_id, Deleted_code ->
@@ -700,7 +702,7 @@ and switch_expr env switch : Fexpr.expr =
           |> Targetint_32_64.to_int
         in
         let app_cont = apply_cont env app_cont in
-        tag, app_cont)
+        tag, Fexpr.Named_cont app_cont)
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }

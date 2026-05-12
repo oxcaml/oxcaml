@@ -22,9 +22,8 @@ let code loopify(never) size(16) newer_version_of(always_0_0)
     where k2 (apply_result : imm tagged) =
       let prim = %phys_eq (apply_result, 0) in
       switch prim
-        | 0 -> k1
-                 pop(regular k1)
-                 ($camlResult_types_of_identity__Pmakeblock21)
+        | 0 ->
+          k1 pop(regular k1) ($camlResult_types_of_identity__Pmakeblock21)
         | 1 -> k (0)
 in
 let $camlResult_types_of_identity__always_0_1 =

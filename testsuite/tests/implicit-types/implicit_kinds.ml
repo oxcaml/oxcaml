@@ -235,16 +235,20 @@ module type S11 =
 
 module type S12 = sig
   [@@@implicit_kind: ('a : immediate)]
+
+  val before : 'a -> 'a
+
   [@@@implicit_kind: ('a : bits64)]
 
-  val f : 'a -> 'a
+  val after : 'a -> 'a
 end
 
 [%%expect{|
-Line 3, characters 27-33:
-3 |   [@@@implicit_kind: ('a : bits64)]
-                               ^^^^^^
-Error: The implicit kind for "a" is already defined at line 2, characters 27-36.
+module type S12 =
+  sig
+    val before : ('a : immediate). 'a -> 'a
+    val after : ('a : bits64). 'a -> 'a
+  end
 |}]
 
 (* No override when variable names don't match. *)
@@ -271,10 +275,8 @@ module type S14 = sig
 end
 
 [%%expect{|
-Line 3, characters 27-36:
-3 |   [@@@implicit_kind: ('b : immediate)]
-                               ^^^^^^^^^
-Error: The implicit kind for "b" is already defined at line 2, characters 44-50.
+module type S14 =
+  sig val f : ('a : float32) ('b : immediate). 'a -> 'b -> 'b list end
 |}]
 
 (* Override in nested modules. *)
@@ -289,13 +291,17 @@ module type S15 = sig
 
     val inner : 't -> 't
   end
+
+  val outer_after : 't -> 't
 end
 
 [%%expect{|
-Line 7, characters 29-38:
-7 |     [@@@implicit_kind: ('t : immediate)]
-                                 ^^^^^^^^^
-Error: The implicit kind for "t" is already defined at line 2, characters 27-33.
+module type S15 =
+  sig
+    val outer : ('t : bits64). 't -> 't
+    module Inner : sig val inner : ('t : immediate). 't -> 't end
+    val outer_after : ('t : bits64). 't -> 't
+  end
 |}]
 
 (* Multiple overrides with different variables. *)
@@ -310,10 +316,12 @@ module type S16 = sig
 end
 
 [%%expect{|
-Line 4, characters 27-31:
-4 |   [@@@implicit_kind: ('a : word) * ('c : immediate)]
-                               ^^^^
-Error: The implicit kind for "a" is already defined at line 2, characters 27-36.
+module type S16 =
+  sig
+    val f :
+      ('a : word) ('b : bits64) ('c : immediate). 'a -> 'b -> 'c -> 'b array
+    val g : ('a : word) ('c : immediate). 'a -> 'c list
+  end
 |}]
 
 (* Annotations narrowing the jkind fail.*)

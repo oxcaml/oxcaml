@@ -4144,7 +4144,8 @@ jkind_decl:
   pjkind_manifest=jkind_manifest
   attrs2=post_item_attributes
     {
-      let pjkind_attributes = attrs1 @ attrs2 in
+      let docs = symbol_docs $sloc in
+      let pjkind_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let pjkind_loc = make_loc $sloc in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }

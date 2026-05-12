@@ -1,5 +1,5 @@
 let code f_1 deleted in
-let code loopify(never) size(7)
+let code loopify(never) size(7) stub
       partial_f_2 (param1)
         my_closure _region _ghost_region my_depth
         -> k * k1
