@@ -2355,8 +2355,8 @@ module Default = struct
     let _nostdlib = set no_std_include
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
-    let _open s = open_modules := (s :: (!open_modules))
-    let _open_cmi s = open_cmi_modules := (s :: (!open_cmi_modules))
+    let _open s = open_args := Open s :: !open_args
+    let _open_cmi s = open_args := Open_cmi s :: !open_args
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching
