@@ -2510,7 +2510,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pmakeufloatblock _ | Pmakefloatblocksingle _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
@@ -2518,7 +2518,9 @@ let lambda_primitive_needs_event_after = function
 
   | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _
-  | Pufloatfield _ | Psetufloatfield _ | Pmixedfield _ | Psetmixedfield _
+  | Pufloatfield _ | Psetufloatfield _
+  | Pfloatblocksinglefield _ | Psetfloatblocksinglefield _
+  | Pmixedfield _ | Psetmixedfield _
   | Poffsetref _
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu

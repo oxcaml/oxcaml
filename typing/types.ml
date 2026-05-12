@@ -507,6 +507,7 @@ and record_representation =
   | Record_boxed
   | Record_float
   | Record_ufloat
+  | Record_float_block
   | Record_mixed of mixed_product_shape
   | Record_dummy of { represent_as_float_array : bool }
   | Record_variable
@@ -985,6 +986,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       true
   | Record_ufloat, Record_ufloat ->
       true
+  | Record_float_block, Record_float_block ->
+      true
   | Record_mixed mx1, Record_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | Record_dummy { represent_as_float_array = a },
@@ -992,7 +995,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       Bool.equal a b
   | Record_variable, Record_variable -> true
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable), _ ->
+    | Record_ufloat | Record_float_block | Record_mixed _ | Record_dummy _
+    | Record_variable), _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
@@ -1103,7 +1107,8 @@ let find_unboxed_type decl =
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
-                    | Record_mixed _ | Record_dummy _ | Record_variable), _)
+                    | Record_float_block | Record_mixed _ | Record_dummy _
+                    | Record_variable), _)
   | Type_record_unboxed_product
       (_, (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed

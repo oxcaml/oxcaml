@@ -22,7 +22,7 @@ let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
   let typing_env = DA.typing_env dacc in
   let typing_env : _ Or_bottom.t =
     match block_kind with
-    | Naked_floats | Mixed _ ->
+    | Naked_floats | Float_block | Mixed _ ->
       (* No useful subkind information *)
       Ok typing_env
     | Values (_tag, field_kinds) ->

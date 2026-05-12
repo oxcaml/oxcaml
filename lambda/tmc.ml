@@ -889,6 +889,7 @@ let rec choice ctx t =
     | Psetfield _ | Psetfield_computed _
     | Pfloatfield _ | Psetfloatfield _
     | Pufloatfield _ | Psetufloatfield _
+    | Pfloatblocksinglefield _ | Psetfloatblocksinglefield _
     | Pmixedfield _  | Psetmixedfield _
     | Pccall _
     | Praise _
@@ -934,6 +935,7 @@ let rec choice ctx t =
     *)
     | Pmakefloatblock _
     | Pmakeufloatblock _
+    | Pmakefloatblocksingle _
     | Pmakeblock _
 
     (* nor unboxed products *)

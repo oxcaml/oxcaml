@@ -1120,8 +1120,18 @@ let transl_declaration env sdecl (id, uid) =
               Record_unboxed,
               Jkind.Builtin.any ~why:Old_style_unboxed_type
             else
-              Record_dummy { represent_as_float_array },
-              Jkind.for_non_float ~why:Boxed_record
+              (* A single-field record may end up represented as a tag-253
+                 float block (if the field is [float#], or has [any] layout
+                 that may later be filled in with [float#]), so we can't
+                 promise [non_float] at this point. The kind will be tightened
+                 to [non_float] later in [update_decl_jkind] if the actual
+                 representation isn't a float block. *)
+              let initial_jkind =
+                if List.length lbls = 1
+                then Jkind.Builtin.value ~why:Boxed_record
+                else Jkind.for_non_float ~why:Boxed_record
+              in
+              Record_dummy { represent_as_float_array }, initial_jkind
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
       | Ptype_record_unboxed_product lbls ->
@@ -1261,9 +1271,10 @@ let transl_declaration env sdecl (id, uid) =
       versions.
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:
-      they become [Record_float]/[Record_boxed]/[Record_mixed], and float
-      records don't have unboxed versions. These unboxed versions are removed in
-      [remove_unboxed_versions].
+      they become [Record_float]/[Record_ufloat]/[Record_float_block]/
+      [Record_boxed]/[Record_mixed], and float records (including
+      [Record_float_block]) don't have unboxed versions. These unboxed versions
+      are removed in [remove_unboxed_versions].
 
    After steps 2 and 3, the set of unboxed versions decreases, so we check for
    newly-unbound unboxed paths with [check_unboxed_paths].
@@ -1290,14 +1301,15 @@ let rec shape_has_float_boxed shape =
 let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
   | Record_unboxed | Record_inlined _ | Record_boxed
-  | Record_float | Record_ufloat -> false
+  | Record_float | Record_ufloat | Record_float_block -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
   | Record_variable ->
     fatal_error "record_has_float_boxed: unexpected variable representation"
 
 let record_gets_unboxed_version = function
-  | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
+  | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat
+  | Record_float_block -> false
   | Record_boxed | Record_variable -> true
   | Record_dummy { represent_as_float_array } ->
     not represent_as_float_array
@@ -2148,8 +2160,14 @@ let compute_record_repr
     ~voids:false, ~first_any:None, .. ->
     if represent_as_float_array then
       Ok Record_ufloat
-    else
-      mixed_record ()
+    else begin
+      (* A single [float#] field (mutable or immutable) is represented as a
+         tag-253 ([Double_tag]) single-naked-float block — the same runtime
+         shape as a boxed [float]. *)
+      match lbls with
+      | [_] -> Ok Record_float_block
+      | _ -> mixed_record ()
+    end
   (* Records with atomic float fields cannot use flat representation *)
   | ~atomic_floats:true, ~first_any:None, .. ->
     if warn && floats && not values
@@ -2256,28 +2274,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     let types = List.map snd lbls in
     let sorts, jkinds = update_label_sorts env loc types ~form in
     let reprs, repr_summary = compute_repr_summary env lbls jkinds in
-    let jkind =
-      match form with
-      | Legacy ->
-          let lbls_with_sorts =
-            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
-          in
-          Jkind.for_boxed_record_with_updates lbls_with_sorts
-      | Unboxed_product ->
-        let lbls_with_layouts =
-          List.map2
-            (fun (lbl, ty) jkind ->
-                let layout =
-                  match Jkind.extract_layout env jkind with
-                  | Ok layout -> layout
-                  | Error _ ->
-                      Jkind.Layout.Any Jkind_types.Scannable_axes.max
-                in
-                lbl, ty, layout)
-            lbls jkinds
-        in
-        Jkind.for_unboxed_record_with_updates lbls_with_layouts
-    in
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
       let { values; floats; atomic_floats; float64s;
@@ -2306,10 +2302,53 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
         | None -> Ok Record_unboxed_product)
     in
+    let jkind =
+      match form with
+      | Legacy ->
+          let lbls_with_sorts =
+            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
+          in
+          (* If the representation is a float block (tag 253), or could become
+             one (a single field of layout [any] that may later be filled in
+             with a [float#]), use a jkind whose separability is [Separable]
+             rather than [Non_float]. *)
+          let could_be_float_block =
+            match (rep : (rep, _) Result.t) with
+            | Ok r ->
+              (match (r :> Types.record_representation) with
+               | Record_float_block -> true
+               | Record_unboxed | Record_inlined _ | Record_boxed
+               | Record_float | Record_ufloat | Record_mixed _
+               | Record_dummy _ | Record_variable -> false)
+            | Error _ ->
+              (* The repr is unrepresentable (single field of layout [any]).
+                 If there is exactly one field, it may later become a
+                 [float#] field and the record a [Record_float_block]. *)
+              List.length lbls = 1
+          in
+          if could_be_float_block
+          then Jkind.for_float_block_record_with_updates lbls_with_sorts
+          else Jkind.for_boxed_record_with_updates lbls_with_sorts
+      | Unboxed_product ->
+        let lbls_with_layouts =
+          List.map2
+            (fun (lbl, ty) jkind ->
+                let layout =
+                  match Jkind.extract_layout env jkind with
+                  | Ok layout -> layout
+                  | Error _ ->
+                      Jkind.Layout.Any Jkind_types.Scannable_axes.max
+                in
+                lbl, ty, layout)
+            lbls jkinds
+        in
+        Jkind.for_unboxed_record_with_updates lbls_with_layouts
+    in
     sorts, rep, jkind
   | Legacy, _,
     (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
-          | Record_ufloat | Record_unboxed | Record_variable)
+          | Record_ufloat | Record_float_block | Record_unboxed
+          | Record_variable)
     ->
     (* These are never created by [transl_declaration], so they will only
        appear here when updating later for dealing with [any]. Since none of
@@ -2341,7 +2380,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
       begin match rep with
-      | Ok (Record_boxed | Record_mixed _) -> ()
+      | Ok (Record_boxed | Record_mixed _ | Record_float_block) -> ()
       | Ok _ ->
         Misc.fatal_error "none became something other than mixed"
       | Error _ -> ()
@@ -2652,8 +2691,8 @@ let update_decls_jkind env decls =
          let is_mixed_float_float64 =
            match new_decl.type_kind with
            | Type_record (_, (Record_unboxed | Record_inlined _ | Record_boxed
-                            | Record_float | Record_ufloat | Record_mixed _
-                            | Record_dummy _ as rep), _) ->
+                            | Record_float | Record_ufloat | Record_float_block
+                            | Record_mixed _ | Record_dummy _ as rep), _) ->
              record_has_float_boxed rep
            | _ -> false
          in

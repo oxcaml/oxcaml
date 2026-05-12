@@ -594,7 +594,7 @@ module Type_decl_shape = struct
           | Record_unboxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_unboxed
               lbl_list
-          | Record_float | Record_ufloat ->
+          | Record_float | Record_ufloat | Record_float_block ->
             let lbl_list =
               List.map
                 (fun (lbl : Types.label_declaration) ->

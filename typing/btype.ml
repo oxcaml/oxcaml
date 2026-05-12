@@ -1409,6 +1409,19 @@ module Jkind0 = struct
           name = "immutable_data_or_null"
         }
 
+      let immutable_data_maybe_float =
+        { jkind =
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Non_null; separability = Separable }));
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name = "immutable_data_maybe_float"
+        }
+
       let exn =
         let open Mod_bounds in
         { jkind =
@@ -1498,6 +1511,19 @@ module Jkind0 = struct
               with_bounds = No_with_bounds
             };
           name = "mutable_data_or_null"
+        }
+
+      let mutable_data_maybe_float =
+        { jkind =
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Non_null; separability = Separable }));
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name = "mutable_data_maybe_float"
         }
 
       let void =
@@ -1877,9 +1903,15 @@ module Jkind0 = struct
 
       let immutable_data = of_const Const.Builtin.immutable_data.jkind
 
+      let immutable_data_maybe_float =
+        of_const Const.Builtin.immutable_data_maybe_float.jkind
+
       let sync_data = of_const Const.Builtin.sync_data.jkind
 
       let mutable_data = of_const Const.Builtin.mutable_data.jkind
+
+      let mutable_data_maybe_float =
+        of_const Const.Builtin.mutable_data_maybe_float.jkind
 
       let void = of_const Const.Builtin.void.jkind
 
@@ -2065,6 +2097,12 @@ module Jkind0 = struct
           ~annotation:(mk_annot "immutable_data")
           ~why:(Value_creation why)
 
+      let immutable_data_maybe_float
+            ~(why : Jkind_intf.History.value_creation_reason) =
+        fresh_jkind Jkind_desc.Builtin.immutable_data_maybe_float
+          ~annotation:(mk_annot "immutable_data_maybe_float")
+          ~why:(Value_creation why)
+
       let sync_data ~(why : Jkind_intf.History.value_creation_reason) =
         fresh_jkind Jkind_desc.Builtin.sync_data
           ~annotation:(mk_annot "sync_data") ~why:(Value_creation why)
@@ -2072,6 +2110,12 @@ module Jkind0 = struct
       let mutable_data ~(why : Jkind_intf.History.value_creation_reason) =
         fresh_jkind Jkind_desc.Builtin.mutable_data
           ~annotation:(mk_annot "mutable_data") ~why:(Value_creation why)
+
+      let mutable_data_maybe_float
+            ~(why : Jkind_intf.History.value_creation_reason) =
+        fresh_jkind Jkind_desc.Builtin.mutable_data_maybe_float
+          ~annotation:(mk_annot "mutable_data_maybe_float")
+          ~why:(Value_creation why)
 
       let immediate ~why =
         fresh_jkind Jkind_desc.Builtin.immediate
@@ -2156,6 +2200,13 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
+    let jkind_of_mutability_maybe_float mutability ~why =
+      (match mutability with
+      | Immutable -> Builtin.immutable_data_maybe_float
+      | Mutable { atomic = Atomic; _ } -> Builtin.sync_data
+      | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data_maybe_float)
+        ~why
+
     let all_void_sort_option sort =
       match sort with
       | Some sort -> Jkind_types.Sort.Const.all_void sort
@@ -2185,6 +2236,19 @@ module Jkind0 = struct
           |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
           |> List.fold_left combine_mutability Immutable
           |> jkind_of_mutability ~why:Boxed_record
+          |> mark_best
+        in
+        add_labels_as_with_bounds lbls base
+
+    let for_float_block_record_with_updates lbls =
+      if all_void_labels_with_updates lbls
+      then Builtin.immediate ~why:Empty_record
+      else
+        let base =
+          lbls
+          |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
+          |> List.fold_left combine_mutability Immutable
+          |> jkind_of_mutability_maybe_float ~why:Boxed_record
           |> mark_best
         in
         add_labels_as_with_bounds lbls base

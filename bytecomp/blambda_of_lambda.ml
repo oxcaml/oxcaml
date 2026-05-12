@@ -425,6 +425,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       (* In bytecode, float# is boxed, so we can treat these two primitives the
          same. *)
       pseudo_event (variadic Makefloatblock)
+    | Pmakefloatblocksingle _ ->
+      (* In bytecode, float# is boxed, so a single-float block is just a
+         regular boxed float. *)
+      pseudo_event (variadic Makefloatblock)
     | Pmakearray (kind, _, _) ->
       pseudo_event
         (match kind with
@@ -603,7 +607,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
        instructions for the ufloat primitives. *)
     | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
       pseudo_event (unary (Getfloatfield n))
+    | Pfloatblocksinglefield _ -> pseudo_event (unary (Getfloatfield 0))
     | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
+    | Psetfloatblocksinglefield _ -> binary (Setfloatfield 0)
     | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
     | Pmixedfield (path, shape, _sem) ->
       (* Non-value mixed fields are always boxed in bytecode; they aren't

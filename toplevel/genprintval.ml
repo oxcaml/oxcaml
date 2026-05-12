@@ -608,6 +608,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           | Record_unboxed
                               -> Outval_record_unboxed
                           | Record_boxed | Record_float | Record_ufloat
+                          | Record_float_block
                           | Record_inlined (_, Constructor_uniform_value, _)
                               -> Outval_record_boxed
                           | Record_inlined (_, Constructor_mixed mixed, _)

@@ -319,6 +319,7 @@ let record_rep ppf r = match r with
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
+  | Record_float_block -> fprintf ppf "float_block"
   | Record_mixed _ -> fprintf ppf "mixed"
   | Record_dummy _ -> fprintf ppf "dummy"
   | Record_variable -> fprintf ppf "variable"
@@ -434,6 +435,15 @@ let primitive ppf = function
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
         (locality_mode_if_local mode)
+  | Pmakefloatblocksingle (Immutable, mode) ->
+      fprintf ppf "make%sfloatblocksingle Immutable"
+        (locality_mode_if_local mode)
+  | Pmakefloatblocksingle (Immutable_unique, mode) ->
+      fprintf ppf "make%sfloatblocksingle Immutable_unique"
+        (locality_mode_if_local mode)
+  | Pmakefloatblocksingle (Mutable, mode) ->
+      fprintf ppf "make%sfloatblocksingle Mutable"
+        (locality_mode_if_local mode)
   | Pmakelazyblock Lazy_tag ->
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
@@ -482,6 +492,9 @@ let primitive ppf = function
   | Pufloatfield (n, sem) ->
       fprintf ppf "ufloatfield%a %i"
         field_read_semantics sem n
+  | Pfloatblocksinglefield sem ->
+      fprintf ppf "floatblocksinglefield%a"
+        field_read_semantics sem
   | Pmixedfield (n, shape, sem) ->
       fprintf ppf "mixedfield%a %a %a"
         field_read_semantics sem
@@ -507,6 +520,15 @@ let primitive ppf = function
         | Assignment Modify_maybe_stack -> "(maybe-stack)"
       in
       fprintf ppf "setufloatfield%s %i" init n
+  | Psetfloatblocksinglefield init ->
+      let init =
+        match init with
+        | Heap_initialization -> "(heap-init)"
+        | Root_initialization -> "(root-init)"
+        | Assignment Modify_heap -> ""
+        | Assignment Modify_maybe_stack -> "(maybe-stack)"
+      in
+      fprintf ppf "setfloatblocksinglefield%s" init
   | Psetmixedfield (n, shape, init) ->
       let init =
         match init with
@@ -937,6 +959,7 @@ let name_of_primitive = function
   | Pmakeblock _ -> "Pmakeblock"
   | Pmakefloatblock _ -> "Pmakefloatblock"
   | Pmakeufloatblock _ -> "Pmakeufloatblock"
+  | Pmakefloatblocksingle _ -> "Pmakefloatblocksingle"
   | Pmakelazyblock _ -> "Pmakelazyblock"
   | Pfield _ -> "Pfield"
   | Pfield_computed _ -> "Pfield_computed"
@@ -946,6 +969,8 @@ let name_of_primitive = function
   | Psetfloatfield _ -> "Psetfloatfield"
   | Pufloatfield _ -> "Pufloatfield"
   | Psetufloatfield _ -> "Psetufloatfield"
+  | Pfloatblocksinglefield _ -> "Pfloatblocksinglefield"
+  | Psetfloatblocksinglefield _ -> "Psetfloatblocksinglefield"
   | Pmixedfield _ -> "Pmixedfield"
   | Psetmixedfield _ -> "Psetmixedfield"
   | Pduprecord _ -> "Pduprecord"

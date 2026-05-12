@@ -373,7 +373,7 @@ and value_kind_record env subst ~visited ~depth
         (Vicuna_unsupported
            (Other "Unboxed record should have exactly one field")))
   | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
-  | Record_dummy _ ->
+  | Record_float_block | Record_dummy _ ->
     let fields =
       List.map
         (fun (label : Types.label_declaration) ->
@@ -395,6 +395,7 @@ and value_kind_record env subst ~visited ~depth
              (Other "Record_unboxed should have been handled above"))
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
+      | Record_float_block -> Block (Some (Obj.double_tag, fields))
       | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
       | Record_variable -> Misc.fatal_error "unexpected variable representation"
     in

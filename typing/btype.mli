@@ -469,6 +469,9 @@ module Jkind0 : sig
       (** Immutable non-float values that don't contain functions. *)
       val immutable_data : t
 
+      (** Like [immutable_data], but may be a float block. *)
+      val immutable_data_maybe_float : t
+
       (** Exceptions; crossing portability, contention, statelessness and
           visibility. *)
       val exn : t
@@ -478,6 +481,9 @@ module Jkind0 : sig
 
       (** Mutable non-float values that don't contain functions. *)
       val mutable_data : t
+
+      (** Like [mutable_data], but may be a float block. *)
+      val mutable_data_maybe_float : t
 
       (** Values of types of this jkind are immediate on 64-bit platforms; on
           other platforms, we know nothing other than that it's a value. *)
@@ -665,8 +671,12 @@ module Jkind0 : sig
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val immutable_data :
         why:Jkind_intf.History.value_creation_reason -> 'd jkind
+      val immutable_data_maybe_float :
+        why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val sync_data : why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val mutable_data :
+        why:Jkind_intf.History.value_creation_reason -> 'd jkind
+      val mutable_data_maybe_float :
         why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val immediate :
         why:Jkind_intf.History.immediate_creation_reason ->
@@ -695,6 +705,10 @@ module Jkind0 : sig
     val for_boxed_record : label_declaration list -> jkind_l
 
     val for_boxed_record_with_updates :
+      (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
+      jkind_l
+
+    val for_float_block_record_with_updates :
       (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
       jkind_l
 

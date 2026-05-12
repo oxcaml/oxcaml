@@ -147,6 +147,9 @@ module Block_shape : sig
   type t =
     | Scannable of Scannable_block_shape.t
     | Float_record
+    | Float_block
+        (** Tag-253 ([Double_tag]) single-naked-float block — the same runtime
+            shape as a boxed [float]. Used for singleton [float#] records. *)
 
   val equal : t -> t -> bool
 

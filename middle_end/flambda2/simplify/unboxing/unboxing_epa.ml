@@ -192,6 +192,8 @@ let access_kind_and_dummy_const machine_width tag shape fields index :
   | Float_record ->
     ( Naked_floats { size },
       Const.naked_float Numeric_types.Float_by_bit_pattern.zero )
+  | Float_block ->
+    Float_block, Const.naked_float Numeric_types.Float_by_bit_pattern.zero
   | Scannable (Mixed_record shape) ->
     let field_kind, const =
       if index < K.Mixed_block_shape.value_prefix_size shape

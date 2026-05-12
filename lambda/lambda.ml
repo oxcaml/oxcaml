@@ -156,6 +156,7 @@ type primitive =
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
+  | Pmakefloatblocksingle of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
@@ -163,6 +164,7 @@ type primitive =
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
+  | Pfloatblocksinglefield of field_read_semantics
   (* CR-someday xclerc: the first argument of `Pmixedfield` and
      `Psetmixedfield` (the path / list of indices) should probably be
      abstracted so that we do not check in multiple places that its length is
@@ -171,6 +173,7 @@ type primitive =
       * field_read_semantics
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
+  | Psetfloatblocksinglefield of initialization_or_assignment
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
   | Pduprecord of Types.record_representation * int
@@ -2435,14 +2438,17 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmakeblock (_, _, _, m) -> Some m
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
+  | Pmakefloatblocksingle (_, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
   | Pfield _ | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
   | Pfloatfield (_, _, m) -> Some m
   | Pufloatfield _ -> None
+  | Pfloatblocksinglefield _ -> None
   | Pmixedfield (path, shape, _) ->
     mixed_block_projection_may_allocate shape ~path
   | Psetfloatfield _ -> None
   | Psetufloatfield _ -> None
+  | Psetfloatblocksinglefield _ -> None
   | Psetmixedfield _ -> None
   | Pduprecord _ -> Some alloc_heap
   | Pmake_unboxed_product _ | Punboxed_product_field _ -> None
@@ -2658,6 +2664,8 @@ let primitive_can_raise prim =
   | Pmakefloatblock _ | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
+  | Pmakefloatblocksingle _ | Pfloatblocksinglefield _
+  | Psetfloatblocksinglefield _
   | Pmakelazyblock _
   | Pmixedfield _ | Psetmixedfield _ | Pnot
   | Poffsetref _
@@ -3015,7 +3023,7 @@ let primitive_result_layout (p : primitive) =
   | Popaque layout | Pobj_magic layout -> layout
   | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
-  | Psetufloatfield _ | Psetmixedfield _
+  | Psetufloatfield _ | Psetfloatblocksinglefield _ | Psetmixedfield _
   | Pbytessetu | Pbytessets | Parraysetu _ | Parraysets _ | Pbigarrayset _
   | Pbytes_set_8 _
   | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
@@ -3033,7 +3041,8 @@ let primitive_result_layout (p : primitive) =
     (* Note the assumption that predefs are always values *)
   | Pgetpredef _ -> layout_predef_value
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
-  | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pduprecord _ | Pmakeufloatblock _ | Pmakefloatblocksingle _
+  | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
   | Pfield _ | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
@@ -3044,6 +3053,7 @@ let primitive_result_layout (p : primitive) =
     Punboxed_or_untagged_integer Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
+  | Pfloatblocksinglefield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
   | Pjoin_vec256 -> layout_unboxed_vector Unboxed_vec256

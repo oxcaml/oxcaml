@@ -126,6 +126,10 @@ let make_block ~dbg kind alloc_mode args =
   | Naked_floats ->
     let tag = Tag.to_int Tag.double_array_tag in
     C.make_float_alloc ~mode dbg ~tag args
+  | Float_block ->
+    (* Tag-253 single-naked-float block — same shape as a boxed [float]. *)
+    let tag = Tag.to_int Tag.double_tag in
+    C.make_float_alloc ~mode dbg ~tag args
   | Mixed (tag, shape) ->
     let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
     let args_memory_chunks =
@@ -166,6 +170,7 @@ let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
   | Values { field_kind = Immediate; _ } ->
     get_field_computed Immediate
   | Naked_floats _ -> get_field_unboxed Double ~offset_in_words:field
+  | Float_block -> get_field_unboxed Double ~offset_in_words:field
   | Mixed { field_kind = Flat_suffix field_kind; shape; _ } ->
     get_field_unboxed
       (memory_chunk_of_flat_suffix_element field_kind)
@@ -189,6 +194,9 @@ let block_set ~dbg (kind : P.Block_access_kind.t) (init : P.Init_or_assign.t)
      | Values { field_kind = Immediate; _ } ->
        setfield_computed Immediate
      | Naked_floats _ ->
+       let index = C.int_const dbg field in
+       C.float_array_set block index new_value dbg
+     | Float_block ->
        let index = C.int_const dbg field in
        C.float_array_set block index new_value dbg
      | Mixed { field_kind = Flat_suffix field_kind; shape; _ } ->

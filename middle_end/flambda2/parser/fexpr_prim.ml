@@ -137,14 +137,15 @@ let block_access_kind =
       ~no_match_handler:
         P.Block_access_kind.(
           function
-          | Mixed _ as bak -> Misc.fatal_errorf "Unsupported %a" print bak
+          | (Mixed _ | Float_block) as bak ->
+            Misc.fatal_errorf "Unsupported %a" print bak
           | Values _ | Naked_floats _ -> assert false)
       [ case
           ~box:(fun _ ((), size) -> P.Block_access_kind.Naked_floats { size })
           ~unbox:(fun _ bak ->
             match (bak : P.Block_access_kind.t) with
             | Naked_floats { size } -> Some ((), size)
-            | Values _ | Mixed _ -> None)
+            | Values _ | Float_block | Mixed _ -> None)
           naked_float;
         case
           ~box:(fun _ (field_kind, tag, size) ->
@@ -152,7 +153,7 @@ let block_access_kind =
           ~unbox:(fun _ bak ->
             match (bak : P.Block_access_kind.t) with
             | Values { field_kind; tag; size } -> Some (field_kind, tag, size)
-            | Naked_floats _ | Mixed _ -> None)
+            | Naked_floats _ | Float_block | Mixed _ -> None)
           value ])
 
 type block_kind =
@@ -1126,7 +1127,7 @@ module OfFlambda = struct
       make_block env (mutability, FNaked_floats, alloc)
     | Make_array (kind, mutability, alloc) ->
       make_array env (kind, mutability, alloc)
-    | Make_block (Mixed (_, _), _, _) ->
+    | Make_block ((Mixed (_, _) | Float_block), _, _) ->
       Misc.fatal_errorf "TODO: Variadic primitive: %a" P.Without_args.print
         (P.Without_args.Variadic op)
 

@@ -49,12 +49,16 @@ module Block_kind = struct
   type t =
     | Values of Tag.Scannable.t * K.With_subkind.t list
     | Naked_floats
+    | Float_block
+      (* Tag-253 ([Double_tag]) single-naked-float block — the same runtime
+         shape as a boxed [float]. Used for singleton [float#] records. *)
     | Mixed of Tag.Scannable.t * Flambda_kind.Mixed_block_shape.t
 
   let to_shape t : _ * K.Block_shape.t =
     match t with
     | Values (tag, _) -> Tag.Scannable.to_tag tag, Scannable Value_only
     | Naked_floats -> Tag.double_array_tag, Float_record
+    | Float_block -> Tag.double_tag, Float_block
     | Mixed (tag, fields) ->
       Tag.Scannable.to_tag tag, Scannable (Mixed_record fields)
 
@@ -70,6 +74,8 @@ module Block_kind = struct
       K.With_subkind.print) shape
    | Naked_floats ->
      Format.pp_print_string ppf "Naked_floats"
+   | Float_block ->
+     Format.pp_print_string ppf "Float_block"
    | Mixed (tag, shape) ->
      Format.fprintf ppf
        "@[<hov 1>(Mixed@ \
@@ -87,6 +93,7 @@ module Block_kind = struct
       then c
       else Misc.Stdlib.List.compare K.With_subkind.compare shape1 shape2
     | Naked_floats, Naked_floats -> 0
+    | Float_block, Float_block -> 0
     | Mixed (tag1, shape1), Mixed (tag2, shape2) ->
       let c = Tag.Scannable.compare tag1 tag2 in
       if c <> 0 then c else K.Mixed_block_shape.compare shape1 shape2
@@ -94,6 +101,8 @@ module Block_kind = struct
     | _, Values _ -> 1
     | Naked_floats, _ -> -1
     | _, Naked_floats -> 1
+    | Float_block, _ -> -1
+    | _, Float_block -> 1
 end
 
 module Init_or_assign = struct
@@ -366,6 +375,7 @@ module Duplicate_block_kind = struct
           length : Target_ocaml_int.t
         }
     | Naked_floats of { length : Target_ocaml_int.t }
+    | Float_block (* Tag-253 ([Double_tag]) single-naked-float block. *)
     | Mixed
 
   let [@ocamlformat "disable"] print ppf t =
@@ -384,6 +394,8 @@ module Duplicate_block_kind = struct
           @[<hov 1>(length@ %a)@]\
           )@]"
         Target_ocaml_int.print length
+    | Float_block ->
+      Format.pp_print_string ppf "Float_block"
     | Mixed ->
       Format.fprintf ppf
         "@[<hov 1>(Mixed)@]"
@@ -396,9 +408,12 @@ module Duplicate_block_kind = struct
       if c <> 0 then c else Target_ocaml_int.compare length1 length2
     | Naked_floats { length = length1 }, Naked_floats { length = length2 } ->
       Target_ocaml_int.compare length1 length2
+    | Float_block, Float_block -> 0
     | Mixed, Mixed -> 0
-    | Naked_floats _, Mixed -> -1
-    | Mixed, Naked_floats _ -> 1
+    | Naked_floats _, (Float_block | Mixed) -> -1
+    | (Float_block | Mixed), Naked_floats _ -> 1
+    | Float_block, Mixed -> -1
+    | Mixed, Float_block -> 1
     | Values _, _ -> -1
     | _, Values _ -> 1
 end
@@ -587,6 +602,9 @@ module Block_access_kind = struct
           field_kind : Block_access_field_kind.t
         }
     | Naked_floats of { size : Target_ocaml_int.t Or_unknown.t }
+    | Float_block
+      (* Tag-253 ([Double_tag]) single-naked-float block. Size is always 1 and
+         tag is always [Double_tag]. *)
     | Mixed of
         { tag : Tag.Scannable.t Or_unknown.t;
           size : Target_ocaml_int.t Or_unknown.t;
@@ -612,6 +630,8 @@ module Block_access_kind = struct
           @[<hov 1>(size@ %a)@]\
           )@]"
         (Or_unknown.print Target_ocaml_int.print) size
+    | Float_block ->
+      Format.pp_print_string ppf "Float_block"
     | Mixed { tag; size; field_kind; shape = _ } ->
       Format.fprintf ppf
         "@[<hov 1>(Mixed@ \
@@ -627,6 +647,7 @@ module Block_access_kind = struct
     match t with
     | Values _ -> K.value
     | Naked_floats _ -> K.naked_float
+    | Float_block -> K.naked_float
     | Mixed { field_kind; _ } ->
       Mixed_block_access_field_kind.to_element_kind field_kind
 
@@ -639,6 +660,7 @@ module Block_access_kind = struct
     | Mixed { field_kind = Value_prefix Immediate; _ } ->
       K.With_subkind.tagged_immediate
     | Naked_floats _ -> K.With_subkind.naked_float
+    | Float_block -> K.With_subkind.naked_float
     | Mixed { field_kind = Flat_suffix field_kind; _ } ->
       K.Flat_suffix_element.to_kind_with_subkind field_kind
 
@@ -646,6 +668,7 @@ module Block_access_kind = struct
     match t with
     | Values _ -> Scannable Value_only
     | Naked_floats _ -> Float_record
+    | Float_block -> Float_block
     | Mixed { shape; _ } -> Scannable (Mixed_record shape)
 
   let from_block_shape (block_shape : K.Block_shape.t)
@@ -660,6 +683,7 @@ module Block_access_kind = struct
       let field_kind = field_kind_of_value_subkind () in
       Values { tag = Unknown; size = Unknown; field_kind }
     | Float_record -> Naked_floats { size = Unknown }
+    | Float_block -> Float_block
     | Scannable (Mixed_record shape) ->
       let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
       let index_int = Target_ocaml_int.to_int_exn index in
@@ -688,6 +712,7 @@ module Block_access_kind = struct
         else Block_access_field_kind.compare field_kind1 field_kind2
     | Naked_floats { size = size1 }, Naked_floats { size = size2 } ->
       Or_unknown.compare Target_ocaml_int.compare size1 size2
+    | Float_block, Float_block -> 0
     | ( Mixed
           { tag = tag1; size = size1; field_kind = field_kind1; shape = shape1 },
         Mixed
@@ -707,8 +732,10 @@ module Block_access_kind = struct
           if c <> 0
           then c
           else Flambda_kind.Mixed_block_shape.compare shape1 shape2
-    | Naked_floats _, Mixed _ -> -1
-    | Mixed _, Naked_floats _ -> 1
+    | Naked_floats _, (Float_block | Mixed _) -> -1
+    | (Float_block | Mixed _), Naked_floats _ -> 1
+    | Float_block, Mixed _ -> -1
+    | Mixed _, Float_block -> 1
     | Values _, _ -> -1
     | _, Values _ -> 1
 end
@@ -2491,6 +2518,7 @@ let args_kind_of_variadic_primitive p : arg_kinds =
   | Begin_region _ | Begin_try_region _ -> Variadic_zero_or_one K.region
   | Make_block (Values _, _, _) -> Variadic_all_of_kind K.value
   | Make_block (Naked_floats, _, _) -> Variadic_all_of_kind K.naked_float
+  | Make_block (Float_block, _, _) -> Variadic_all_of_kind K.naked_float
   | Make_block (Mixed (_tag, shape), _, _) -> Variadic_mixed shape
   | Make_array (kind, _, _) ->
     Variadic_unboxed_product (Array_kind.element_kinds_for_primitive kind)
@@ -2979,7 +3007,9 @@ end = struct
             | Make_block (Values (tag, kinds), mutability, alloc_mode) ->
               let kinds = List.map K.With_subkind.erase_subkind kinds in
               Make_block (Values (tag, kinds), mutability, alloc_mode)
-            | Make_block ((Naked_floats | Mixed _), _, _) | Make_array _ -> prim
+            | Make_block ((Naked_floats | Float_block | Mixed _), _, _)
+            | Make_array _ ->
+              prim
           in
           Variadic (prim, args)
       in

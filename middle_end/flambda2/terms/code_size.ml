@@ -168,7 +168,7 @@ let box_number ~machine_width kind =
     | Naked_int32 | Naked_int64 | Naked_nativeint -> alloc_size (* alloc *)
 
 let block_load (kind : Flambda_primitive.Block_access_kind.t) =
-  match kind with Values _ | Naked_floats _ | Mixed _ -> 1
+  match kind with Values _ | Naked_floats _ | Float_block | Mixed _ -> 1
 
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
@@ -188,6 +188,7 @@ let block_set (kind : Flambda_primitive.Block_access_kind.t)
     does_not_need_caml_c_call_extcall_size (* caml_modify *)
   | Values _, (Assignment Local | Initialization) -> 1 (* cadda + store *)
   | Naked_floats _, (Assignment _ | Initialization) -> 1
+  | Float_block, (Assignment _ | Initialization) -> 1
   | ( Mixed { field_kind = Value_prefix _ | Flat_suffix _; _ },
       (Assignment _ | Initialization) ) ->
     1

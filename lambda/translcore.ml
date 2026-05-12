@@ -62,6 +62,8 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_ufloat ->
       lbl.lbl_pos
+  | Record_float_block ->
+      lbl.lbl_pos
   | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
       fatal_error "Mixed inlined records not supported for extensible variants"
   | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
@@ -737,6 +739,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
           Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
+        | Record_float_block ->
+          Some (Pfloatblocksinglefield sem, [targ])
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
           let immediate_or_pointer, _ = maybe_pointer e in
           if Types.is_atomic lbl.lbl_mut
@@ -856,6 +860,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
         | Record_ufloat ->
           Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+        | Record_float_block ->
+          Psetfloatblocksinglefield mode, [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
@@ -2160,6 +2166,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 Psetfloatfield (lbl.lbl_pos, Assignment modify_heap)
             | Record_ufloat ->
                 Psetufloatfield (lbl.lbl_pos, Assignment modify_heap)
+            | Record_float_block ->
+                Psetfloatblocksinglefield (Assignment modify_heap)
             | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
                 let pos = lbl.lbl_pos + 1 in
                 let ptr, _ = maybe_pointer expr in
@@ -2243,6 +2251,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                        so it's simpler to leave it Alloc_heap *)
                     Pfloatfield (i, sem, alloc_heap)
                  | Record_ufloat -> Pufloatfield (i, sem)
+                 | Record_float_block -> Pfloatblocksinglefield sem
                  | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
                    (* CR layouts v5: once all-void records are allowed, handle
                       constructors with all-void inline records, which are
@@ -2325,7 +2334,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             (* Lconst(Const_block(runtime_tag, cl)) *)
             raise Not_constant
         | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
-        | Record_ufloat ->
+        | Record_ufloat | Record_float_block ->
             (* CR layouts v5.1: We should support structured constants for
                blocks containing unboxed float literals.
             *)
@@ -2357,6 +2366,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lprim(Pmakefloatblock (mut, Option.get mode), ll, loc)
         | Record_ufloat ->
             Lprim(Pmakeufloatblock (mut, Option.get mode), ll, loc)
+        | Record_float_block ->
+            Lprim(Pmakefloatblocksingle (mut, Option.get mode), ll, loc)
         | Record_inlined (Extension _,
                           Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
@@ -2407,7 +2418,8 @@ and transl_atomic_loc ~scopes arg arg_sort lbl repres =
   let arg = transl_exp ~scopes arg_sort arg in
   begin match repres with
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
-  | Record_float | Record_ufloat | Record_dummy _ | Record_variable
+  | Record_float | Record_ufloat | Record_float_block
+  | Record_dummy _ | Record_variable
     ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
@@ -2498,7 +2510,7 @@ and transl_idx ~scopes loc env ba uas =
   | Baccess_field (_id, lbl, repres) ->
     begin match repres with
     | Record_boxed
-    | Record_float | Record_ufloat ->
+    | Record_float | Record_ufloat | Record_float_block ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
         (fun (Uaccess_unboxed_field (_, l, _)) ->

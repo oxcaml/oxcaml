@@ -158,6 +158,7 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
     | Scannable Value_only -> "unboxed_field"
     | Scannable (Mixed_record _) -> "unboxed_mixed_field"
     | Float_record -> "unboxed_float_field"
+    | Float_block -> "unboxed_float_block_field"
   in
   let field_name n =
     Format.asprintf "%s%a_%d" field_base_name (pp_tag add_tag_to_name) tag n

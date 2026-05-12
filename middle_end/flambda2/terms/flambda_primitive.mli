@@ -41,6 +41,9 @@ module Block_kind : sig
   type t =
     | Values of Tag.Scannable.t * Flambda_kind.With_subkind.t list
     | Naked_floats
+    | Float_block
+        (** Tag-253 ([Double_tag]) single-naked-float block — the same runtime
+            shape as a boxed [float]. Used for singleton [float#] records. *)
     | Mixed of Tag.Scannable.t * Flambda_kind.Mixed_block_shape.t
 
   val to_shape : t -> Tag.t * Flambda_kind.Block_shape.t
@@ -168,6 +171,7 @@ module Duplicate_block_kind : sig
           length : Target_ocaml_int.t
         }
     | Naked_floats of { length : Target_ocaml_int.t }
+    | Float_block  (** Tag-253 ([Double_tag]) single-naked-float block. *)
     | Mixed
         (** We could store tag/length (or other relevant fields) on [Mixed], but
             we don't because the fields of [t] are currently only used for
@@ -228,6 +232,9 @@ module Block_access_kind : sig
           field_kind : Block_access_field_kind.t
         }
     | Naked_floats of { size : Target_ocaml_int.t Or_unknown.t }
+    | Float_block
+        (** Tag-253 ([Double_tag]) single-naked-float block. Size is always 1
+            and tag is always [Double_tag]. *)
     | Mixed of
         { tag : Tag.Scannable.t Or_unknown.t;
           size : Target_ocaml_int.t Or_unknown.t;

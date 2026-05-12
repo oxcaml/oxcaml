@@ -805,7 +805,7 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_record { fields = es; extended_expression = eo;
                     representation = rep } ->
         let field_mode i = match rep with
-          | Record_float | Record_ufloat -> Dereference
+          | Record_float | Record_ufloat | Record_float_block -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
           | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
               Guard
