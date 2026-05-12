@@ -1264,18 +1264,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   (* Moves every reachable variable from [u] such that
   [current_level] < [u.level] < [generic_level] to
-  [generic_level + (u.level - current_level)], preserving the exact topology *)
+  [generic_level + (u.level - current_level)], preserving the exact topology
+
+  PRECONDITIONS: None
+  POSTCONDITIONS:
+    current_level < u.level < generic_level ==>
+      Forall v in the reachable set of variables from u:
+        v.level = generic_level + (v.level - current_level) *)
   let rec generalize_topology : type a.
-      log:_ -> a C.obj -> current_level:int -> a var -> unit =
-   fun ~log dst ~current_level u ->
+      log:_ -> current_level:int -> a var -> unit =
+   fun ~log ~current_level u ->
     if u.level <= current_level || u.level >= generic_level
     then ()
     else begin
       let new_level = generic_level + (u.level - current_level) in
       set_level ~log u new_level;
-      let do_gen _ (Amorphvar (v, f, _f_hint)) =
-        let src = C.src dst f in
-        generalize_topology ~log src ~current_level v
+      let do_gen _ (Amorphvar (v, _f, _f_hint)) =
+        generalize_topology ~log ~current_level v
       in
       VarMap.iter do_gen u.vupper;
       VarMap.iter do_gen u.vlower
@@ -1309,55 +1314,75 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let generalize_v : type a.
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
-    generalize_topology ~log dst ~current_level u;
+    generalize_topology ~log ~current_level u;
     update_level_v ~log dst generic_level u
 
-  (* generalize_structure first moves a variable generic_level.
+  (* generalize_structure first moves a variable to generic_level (like generalize does).
      It then has three cases:
     (1) if bounds are tight, leave it as is
     (2) if bounds are fully open --- by virtue of having no
         vupper/vlower at or above the current level, and fully open
         conservative bounds --- we move it to current level
-    (3) if bounds are non-trivial (neither tight nor fully open) we make a copy, move the
-        original var to generic_level, and mark the two variables as equivalent by adding
+    (3) if bounds are non-trivial (neither tight nor fully open) we make a copy, keep the
+        original var at generic_level, and mark the two variables as equivalent by adding
         constraint arrows via [add_vlower] and [add_vupper]
-  *)
+
+    PRECONDITIONS: None
+    POSTCONDITIONS:
+      u.level <= current_level ==> no changes to u
+      current_level < u.level ==>
+        ( (u.upper <= u.lower
+              ==> u.vlower = Ø && u.vupper = Ø && u.level = generic_level)
+          && (u.lower = min && u.upper = max
+              && u does not have children at or above current_level
+              ==> u.level = current_level)
+          && (u.lower < u.upper
+              && (u.lower != min || u.upper != max
+                  || u has children at or above current_level)
+              ==> u.level = generic_level && u.gencopy = v where v is a copy of u
+                  where v.level = current_level && v <= u && u <= v)
+        ) *)
   let generalize_structure_v : type a.
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
-    (* we optimize away vlower and vuppers if bounds are tight *)
-    if C.le dst u.upper u.lower
-    then begin
-      set_vlower ~log u VarMap.empty;
-      set_vupper ~log u VarMap.empty
-    end;
-    let old_level = u.level in
-    generalize_topology ~log dst ~current_level u;
-    update_level_v ~log dst generic_level u;
-    let vlower_above_current =
-      VarMap.filter
-        (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
-        u.vlower
-    in
-    let vupper_above_current =
-      VarMap.filter
-        (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
-        u.vupper
-    in
-    if C.le dst u.upper u.lower
+    (* if the following does not hold: current_level < u.level
+      [generalize_topology] and [update_level] do nothing. We check it here to optimize
+      away the subsequent checks *)
+    if u.level <= current_level
     then ()
-    else if
-      C.le dst (C.max dst) u.upper
-      && C.le dst u.lower (C.min dst)
-      && VarMap.is_empty vlower_above_current
-      && VarMap.is_empty vupper_above_current
-    then
-      (* the bounds are fully open *)
-      update_level_v ~log dst current_level u
-    else if old_level <> generic_level && u.level = generic_level
-    then begin
-      (* we only create a copy if the variable was generalized *)
-      create_gencopy ~log dst ~current_level u
+    else begin
+      (* we optimize away vlower and vuppers if bounds are tight *)
+      if C.le dst u.upper u.lower
+      then begin
+        set_vlower ~log u VarMap.empty;
+        set_vupper ~log u VarMap.empty
+      end;
+      generalize_topology ~log ~current_level u;
+      update_level_v ~log dst generic_level u;
+      let vlower_above_current =
+        VarMap.filter
+          (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
+          u.vlower
+      in
+      let vupper_above_current =
+        VarMap.filter
+          (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
+          u.vupper
+      in
+      if C.le dst u.upper u.lower
+      then ()
+      else if
+        C.le dst (C.max dst) u.upper
+        && C.le dst u.lower (C.min dst)
+        && VarMap.is_empty vlower_above_current
+        && VarMap.is_empty vupper_above_current
+      then
+        (* the bounds are fully open *)
+        update_level_v ~log dst current_level u
+      else begin
+        (* we create a copy of the now generalized variable at [current_level] *)
+        create_gencopy ~log dst ~current_level u
+      end
     end
 
   let generalize (type a l r) ~current_level (obj : a C.obj)
