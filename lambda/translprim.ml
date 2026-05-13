@@ -896,11 +896,14 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%array_element_size_in_bytes" ->
       (* The array kind will be filled in later *)
       Primitive (Parray_element_size_in_bytes Pgenarray, 1)
-    | "%obj_size" -> Primitive ((Parraylength Pgenarray), 1)
-    | "%obj_field" -> Primitive ((Parrayrefu (Pgenarray_ref mode, Ptagged_int_index, Mutable)), 2)
+    | "%obj_size" -> Primitive ((Parraylength gen_array_kind), 1)
+    | "%obj_field" ->
+      Primitive
+        ((Parrayrefu (gen_array_ref_kind mode, Ptagged_int_index, Mutable)), 2)
     | "%obj_set_field" ->
       Primitive
-        ((Parraysetu (Pgenarray_set (get_first_arg_mode ()), Ptagged_int_index)), 3)
+        ((Parraysetu
+            (gen_array_set_kind (get_first_arg_mode ()),Ptagged_int_index)), 3)
     | "%floatarray_length" -> Primitive ((Parraylength Pfloatarray), 1)
     | "%floatarray_safe_get" ->
       Primitive ((Parrayrefs (Pfloatarray_ref mode, Ptagged_int_index, Mutable)), 2)
