@@ -64,9 +64,9 @@ let not_implemented_aux pp_instr ?msg i =
        (fun ppf msg -> Format.fprintf ppf "(%s)" msg))
     msg
 
-let not_implemented_basic = not_implemented_aux Cfg.print_basic
+let not_implemented_basic = not_implemented_aux Printcfg.print_basic
 
-let not_implemented_terminator = not_implemented_aux Cfg.print_terminator
+let not_implemented_terminator = not_implemented_aux Printcfg.print_terminator
 
 type c_call_wrapper =
   { args : LL.Type.t list;

@@ -80,12 +80,12 @@ module Format = struct
     in
     pp_dbg_comment ppf instr_str ins.dbg
 
-  let pp_dbg_instr_basic = pp_dbg_instr_aux Cfg.print_basic
+  let pp_dbg_instr_basic = pp_dbg_instr_aux Printcfg.print_basic
 
   let dbg_instr_basic_string i =
     string_of_pp (fun ppf -> pp_dbg_instr_basic ppf i)
 
-  let pp_dbg_instr_terminator = pp_dbg_instr_aux Cfg.print_terminator
+  let pp_dbg_instr_terminator = pp_dbg_instr_aux Printcfg.print_terminator
 
   let dbg_instr_terminator_string i =
     string_of_pp (fun ppf -> pp_dbg_instr_terminator ppf i)

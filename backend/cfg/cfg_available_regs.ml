@@ -225,10 +225,10 @@ module Transfer = struct
   let basic ({ avail_before } : domain) (instr : Cfg.basic Cfg.instruction) () :
       domain =
     dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print instr.id
-      Cfg.print_basic instr;
+      Printcfg.print_basic instr;
     instr.available_before <- avail_before;
     if !Dwarf_flags.ddebug_invariants
-    then check_invariants instr ~print_instr:Cfg.print_basic ~avail_before;
+    then check_invariants instr ~print_instr:Printcfg.print_basic ~avail_before;
     (* CR gyorsh/mshinwell: There is something subtle here about the handling of
        Name_for_debugger in Cfg_availability : the field regs is part of the
        operation description (not instruction argument or result), and it starts
@@ -381,10 +381,11 @@ module Transfer = struct
   let terminator ({ avail_before } : domain)
       (term : Cfg.terminator Cfg.instruction) () : image =
     dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print term.id
-      Cfg.print_terminator term;
+      Printcfg.print_terminator term;
     term.available_before <- avail_before;
     if !Dwarf_flags.ddebug_invariants
-    then check_invariants term ~print_instr:Cfg.print_terminator ~avail_before;
+    then
+      check_invariants term ~print_instr:Printcfg.print_terminator ~avail_before;
     let avail_across, avail_after =
       match avail_before with
       | Unreachable -> unreachable, unreachable

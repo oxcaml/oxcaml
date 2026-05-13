@@ -333,7 +333,7 @@ let linearize_terminator cfg_with_layout (func : string) start
                   Misc.fatal_errorf
                     "Cannot linearize terminator: meaningless specification of \
                      comparison, always has result %b:@ %a"
-                    result Cfg.print_terminator terminator
+                    result Printcfg.print_terminator terminator
                 | Ok comp ->
                   let test =
                     match imm with

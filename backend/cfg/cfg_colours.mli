@@ -55,4 +55,8 @@ val function_name : directive
 
 val basic : directive
 
+val result : directive
+
+val argument : directive
+
 val without_colours : f:(unit -> 'a) -> 'a

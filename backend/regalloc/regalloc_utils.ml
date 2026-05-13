@@ -207,11 +207,11 @@ let make_log_body_and_terminator :
      ~instr_prefix ~term_prefix body term liveness ->
   DLL.iter body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
       log ~no_eol:() "%s " (instr_prefix instr);
-      if enabled then Cfg.dump_basic Format.err_formatter instr.Cfg.desc;
+      if enabled then Printcfg.basic_desc Format.err_formatter instr.Cfg.desc;
       if enabled then log_instruction_suffix instr liveness);
   log ~no_eol:() "%s " (term_prefix term);
   if enabled
-  then Cfg.dump_terminator ~sep:", " Format.err_formatter term.Cfg.desc;
+  then Printcfg.terminator_desc ~sep:", " Format.err_formatter term.Cfg.desc;
   if enabled then log_instruction_suffix term liveness
 
 (* CR-soon xclerc for xclerc: factor out with `Printcfg`. *)
@@ -350,6 +350,7 @@ let simplify_cfg : Cfg_with_layout.t -> Cfg_with_layout.t =
 let save_cfg : string -> Cfg_with_layout.t -> unit =
  fun str cfg_with_layout ->
   Cfg_with_layout.save_as_dot cfg_with_layout ~show_instr:true ~show_exn:true
+    ~annotate_instr:[Printcfg.print_instruction]
     ~annotate_block:(fun label ->
       let block =
         Cfg.get_block_exn (Cfg_with_layout.cfg cfg_with_layout) label

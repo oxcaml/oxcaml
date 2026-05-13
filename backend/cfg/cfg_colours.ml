@@ -119,3 +119,7 @@ let liveness ppf = push ~fg:243 ppf
 let function_name ppf = push ~fg:1 ~bg:169 ppf
 
 let basic ppf = push ~fg:65 ppf
+
+let result ppf = push ~fg:220 ppf
+
+let argument ppf = push ~fg:81 ppf
