@@ -567,6 +567,11 @@ let ocaml_ignored_flags =
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
     "-directory";
+    "-flambda2-inline-large-functor-size";
+    "-flambda2-inline-small-functor-size";
+    "-flambda2-speculative-inlining-track-lifted-constants";
+    "-name-mangling-scheme";
+    "-no-flambda2-speculative-inlining-track-lifted-constants";
     (* Jane Street specific *)
     "-disable-builtin-check";
     "-disable-poll-insertion";
@@ -1023,9 +1028,9 @@ let ocaml_flags =
       Marg.int (fun kind_verbosity ocaml -> { ocaml with kind_verbosity }),
       "Set the verbosity used for printing kinds (0=not verbose, 1=expanded, \
        2=expanded with all mod bounds)" );
-    ( "-ikinds",
-      Marg.bool (fun ikinds ocaml -> { ocaml with ikinds }),
-      "Enable ikinds-based kind checker (experimental)" )
+    ( "-no-ikinds",
+      Marg.bool (fun no_ikinds ocaml -> { ocaml with ikinds = not no_ikinds }),
+      "Disable ikinds-based kind checker" )
   ]
 
 (** {1 Main configuration} *)
