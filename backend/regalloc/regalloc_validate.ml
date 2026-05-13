@@ -337,14 +337,51 @@ let is_rematerialized_shape (instr : basic Cfg.instruction) =
 let rematerializations : (InstructionId.t, basic Instruction.t) Hashtbl.t =
   Hashtbl.create 64
 
-let clear_rematerializations () = Hashtbl.clear rematerializations
+(* Pre-split (description-style) registers whose value is rematerialized
+   somewhere in this function. Populated alongside [rematerializations] by
+   [record_rematerialization] from the result registers of each emitted
+   rematerialized instruction, then queried by [Equation_set.compatible_one] to
+   relax the "same description-stamp, different location" half of the
+   compatibility check for these registers.
+
+   Why this is needed: in a non-rematerialized split, the value flowing across a
+   destruction point lives at exactly one location at any program point — either
+   in a register or, post-spill, on a stack slot — because every downstream path
+   goes through the same spill/reload pair and the [rename_location] transitions
+   through the slot keep all paths converging on one (stamp, location) pair.
+   With rematerialization the same logical value can simultaneously sit at a
+   register location (where the rematerialized copy was just produced) AND on
+   the spill slot used by a sibling post-destruction path that reloads instead
+   of rematerializing. The resulting equation set legitimately has the same
+   description-stamp at two distinct locations.
+
+   The relaxation is targeted (only stamps recorded as remat results) so that
+   for any stamp the split pass did NOT rematerialize, the strict
+   one-location-per-stamp invariant is still enforced and any genuine regalloc
+   bug for those stamps is still caught. The complementary "two registers at one
+   location" half stays unconditional — that is the genuine aliasing-bug check.
+   Residual same-stamp/different-location equations accumulated through the
+   relaxed pass propagate backward and are eventually cleaned up either at the
+   spill that wrote the slot (via [rename_location]) or at the original
+   definition site, where the same-location check still fires for any actual
+   inconsistency. *)
+let rematerialized_res : Register.Set.t ref = ref Register.Set.empty
+
+let clear_rematerializations () =
+  Hashtbl.clear rematerializations;
+  rematerialized_res := Register.Set.empty
+
+let is_rematerialized_res (reg : Register.t) : bool =
+  Register.Set.mem reg !rematerialized_res
 
 let record_rematerialization ~id ~desc ~arg ~res =
-  Hashtbl.replace rematerializations id
-    { Instruction.desc;
-      arg = Array.map Register.create arg;
-      res = Array.map Register.create res
-    }
+  let arg = Array.map Register.create arg in
+  let res = Array.map Register.create res in
+  Hashtbl.replace rematerializations id { Instruction.desc; arg; res };
+  Array.iter
+    (fun (r : Register.t) ->
+      rematerialized_res := Register.Set.add r !rematerialized_res)
+    res
 
 module Description : sig
   (** A snapshot of the [desc], [arg] and [res] fields of all instructions in
@@ -850,27 +887,19 @@ module Equation_set : sig
   (** Calling [remove_result], [verify_destoyed_locations] and [add_argument] in
       this order corresponds to case (7) in Fig. 1 of the paper [1]. This
       implementation is also generalized for all cases not handled by
-      [rename_loc] or [rename_reg]. *)
-  val remove_result :
-    reg_res:Register.t array ->
-    loc_res:Location.t array ->
-    t ->
-    (t, string) Result.t
+      [rename_loc] or [rename_reg].
 
-  (** Like {!remove_result}, but tolerating that the same description-stamp can
-      be live at multiple locations simultaneously. Only the "two distinct
-      registers at the same location" half of the compatibility check is
-      enforced; the symmetric "same register at two locations" half is skipped.
-      Used for the result equation of rematerialized basic instructions added by
-      the split pass: the rematerialization creates a fresh physical copy of the
-      value at the result location, but other physical copies of the same value
-      (typically the pre-destruction spill slot used by a sibling
-      post-destruction path that reloads instead of rematerializing) can
-      legitimately co-exist in the equation set. Those residual equations
-      propagate back to the original definition site through the existing
-      spill/move chain, where the strict {!remove_result} catches any real
-      inconsistency. *)
-  val remove_result_lenient :
+      The compatibility check has two halves (see [compatible_one] below for
+      details and the soundness argument): the "two registers at one location"
+      half is unconditional (it would always represent a regalloc aliasing bug);
+      the "one register at two locations" half is automatically relaxed for the
+      description-stamps that the split pass has flagged as rematerialized (cf.
+      [is_rematerialized_res] above). Rematerialization legitimately creates a
+      fresh physical copy of the value at the result location while a sibling
+      post-destruction path may still carry the same description-stamp at the
+      spill slot used by its own reload, so the equation set can legitimately
+      hold the same stamp at multiple locations at the same program point. *)
+  val remove_result :
     reg_res:Register.t array ->
     loc_res:Location.t array ->
     t ->
@@ -1020,57 +1049,45 @@ end = struct
         let message = Format.flush_str_formatter () in
         raise (Verification_failed message))
     in
-    (* Check equations that have the location the same. *)
+    (* "Same-location" half: a second register sharing [loc] would mean two
+       distinct values live at the same physical location at the same program
+       point — always a regalloc bug (aliasing). This half is unconditional and
+       is the load-bearing soundness check even under rematerialization. *)
     (match Location.Map.find_opt loc t.for_loc with
     | None -> ()
     | Some regs ->
       let eq_loc = loc in
       Register.Set.iter (fun eq_reg -> check_equation eq_reg eq_loc) regs);
-    (* Check equations that have the register the same. *)
-    (match Register.Map.find_opt reg t.for_reg with
-    | None -> ()
-    | Some locs ->
-      let eq_reg = reg in
-      Location.Set.iter (fun eq_loc -> check_equation eq_reg eq_loc) locs);
+    (* "Same-register" half: under the original Rideau/Leroy semantics each
+       description-stamp lives at exactly one location at any program point,
+       which makes this check the symmetric companion of the same-location half.
+       That assumption is broken by the split pass when rematerialization is on
+       (cf. [rematerialized_res] above for the full argument): a stamp can
+       simultaneously be in a register (from a rematerialized copy on one path)
+       and on a spill slot (from a sibling post-destruction path that reloads).
+       Skip this half exactly for the stamps the split pass recorded as
+       rematerialization results. For every other stamp it is still enforced, so
+       a regalloc that puts a non-rematerialized value at two locations is still
+       caught here. Residual same-stamp/different-location equations from this
+       relaxation get cleaned up downstream: at the spill writing the slot,
+       [rename_location] folds the [= s[i:N]] equation back to the source
+       register; at the original definition the result equation removal does the
+       rest. If those clean-ups don't actually unify the equations (a real bug),
+       the same-location half above will fire at one of the upstream
+       instructions (or [verify_destroyed_locations] at a destroyed location)
+       once the location finally collides. *)
+    (if not (is_rematerialized_res reg)
+     then
+       match Register.Map.find_opt reg t.for_reg with
+       | None -> ()
+       | Some locs ->
+         let eq_reg = reg in
+         Location.Set.iter (fun eq_loc -> check_equation eq_reg eq_loc) locs);
     ()
 
   let remove_result ~reg_res ~loc_res t =
     try
       Array.iter2 (fun reg loc -> compatible_one ~reg ~loc t) reg_res loc_res;
-      let t =
-        array_fold2 (fun t reg loc -> remove (reg, loc) t) t reg_res loc_res
-      in
-      Ok t
-    with Verification_failed message -> Error message
-
-  let compatible_one_lenient ~reg ~loc t =
-    (* Only enforce the "two distinct registers at the same location" half of
-       the compatibility check; intentionally skip the symmetric "same register
-       at two locations" half (cf. [compatible_one]). See the
-       [remove_result_lenient] interface comment for the soundness argument. *)
-    match Location.Map.find_opt loc t.for_loc with
-    | None -> ()
-    | Some regs ->
-      Register.Set.iter
-        (fun eq_reg ->
-          if not (Register.equal eq_reg reg)
-          then (
-            Format.fprintf Format.str_formatter
-              "Unsatisfiable equations when removing a rematerialized result \
-               equation.\n\
-               Two distinct registers cannot be live at the same location.\n\
-               Existing equation %a.\n\
-               Removed equation: %a."
-              Equation.print (eq_reg, loc) Equation.print (reg, loc);
-            let message = Format.flush_str_formatter () in
-            raise (Verification_failed message)))
-        regs
-
-  let remove_result_lenient ~reg_res ~loc_res t =
-    try
-      Array.iter2
-        (fun reg loc -> compatible_one_lenient ~reg ~loc t)
-        reg_res loc_res;
       let t =
         array_fold2 (fun t reg loc -> remove (reg, loc) t) t reg_res loc_res
       in
@@ -1277,18 +1294,10 @@ module Transfer (Desc_val : Description_value) :
       all other cases not handled by [rename_location] or [rename_register]. We
       have an additional parameter which is the equations for the exceptional
       path successor which is not present in the paper [1] because exceptions
-      are not considered there.
-
-      [remove_result_kind] selects whether the result equations are removed
-      using the strict {!Equation_set.remove_result} or the lenient
-      {!Equation_set.remove_result_lenient}; the lenient variant is used for
-      rematerialized basic instructions (cf. [is_rematerialized_shape] in
-      [basic] below), which can legitimately leave behind other equations for
-      the same description-stamp at different locations. *)
-  let append_equations (type a) equations
-      ~(remove_result_kind : [`Strict | `Lenient])
-      ~(instr_kind : a Instruction.Kind.t) ~exn ~(reg_instr : a Instruction.t)
-      ~(loc_instr : a instruction) ~destroyed =
+      are not considered there. *)
+  let append_equations (type a) equations ~(instr_kind : a Instruction.Kind.t)
+      ~exn ~(reg_instr : a Instruction.t) ~(loc_instr : a instruction)
+      ~destroyed =
     let bind f res = Result.bind res f in
     let wrap_error res =
       Result.map_error
@@ -1296,11 +1305,6 @@ module Transfer (Desc_val : Description_value) :
           Transfer_error.create equations ~instr_kind ~exn ~reg_instr ~loc_instr
             message)
         res
-    in
-    let remove_result =
-      match remove_result_kind with
-      | `Strict -> Equation_set.remove_result
-      | `Lenient -> Equation_set.remove_result_lenient
     in
     let exn =
       exn
@@ -1328,7 +1332,7 @@ module Transfer (Desc_val : Description_value) :
     equations
     |>
     (* First remove the result equations. *)
-    remove_result ~reg_res:reg_instr.Instruction.res
+    Equation_set.remove_result ~reg_res:reg_instr.Instruction.res
       ~loc_res:(Location.of_regs_exn loc_instr.res)
     |> wrap_error
     |> bind (fun equations ->
@@ -1378,12 +1382,8 @@ module Transfer (Desc_val : Description_value) :
                [Regalloc_validate.record_rematerialization]"
               InstructionId.format instr.id
         in
-        (* See [remove_result_lenient]: the rematerialized result equation is
-           removed leniently because the same description-stamp can persist at
-           another location (the spill slot used by a sibling path). *)
-        append_equations t ~remove_result_kind:`Lenient
-          ~instr_kind:Instruction.Kind.Basic ~exn:None ~reg_instr
-          ~loc_instr:instr
+        append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
+          ~reg_instr ~loc_instr:instr
           ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       | _ -> assert false)
     | Some instr_before -> (
@@ -1396,9 +1396,8 @@ module Transfer (Desc_val : Description_value) :
            have the same locations. *)
         Result.ok @@ rename_register t ~reg_instr:instr_before
       | _ ->
-        append_equations t ~remove_result_kind:`Strict
-          ~instr_kind:Instruction.Kind.Basic ~exn:None ~reg_instr:instr_before
-          ~loc_instr:instr
+        append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
+          ~reg_instr:instr_before ~loc_instr:instr
           ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       )
 
@@ -1411,9 +1410,8 @@ module Transfer (Desc_val : Description_value) :
       let exn =
         if Cfg.can_raise_terminator instr.desc then Some exn else None
       in
-      append_equations t ~remove_result_kind:`Strict
-        ~instr_kind:Instruction.Kind.Terminator ~exn ~reg_instr:instr_before
-        ~loc_instr:instr
+      append_equations t ~instr_kind:Instruction.Kind.Terminator ~exn
+        ~reg_instr:instr_before ~loc_instr:instr
         ~destroyed:
           (Proc.destroyed_at_terminator instr.desc |> Location.of_regs_exn)
     | None -> (
