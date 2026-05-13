@@ -410,11 +410,11 @@ module Lattices = struct
   end
   [@@inline]
 
-  type locality =
+  type locality = Mode_modality_const.Locality.t =
     | Global
     | Local
 
-  type regionality =
+  type regionality = Mode_modality_const.Regionality.t =
     | Global
     | Regional
     | Local
@@ -491,7 +491,7 @@ module Lattices = struct
   end
 
   module Uniqueness = struct
-    type t =
+    type t = Mode_modality_const.Uniqueness.t =
       | Unique
       | Aliased
 
@@ -513,7 +513,7 @@ module Lattices = struct
   end
 
   module Linearity = struct
-    type t =
+    type t = Mode_modality_const.Linearity.t =
       | Many
       | Once
 
@@ -536,7 +536,7 @@ module Lattices = struct
 
   module Portability = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t =
+    type t = Mode_modality_const.Portability.t =
       | Portable (* 0b00 *)
       | Shareable (* 0b01 *)
       | Corruptible (* 0b10 *)
@@ -565,7 +565,7 @@ module Lattices = struct
 
   module Contention = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t =
+    type t = Mode_modality_const.Contention.t =
       | Uncontended (* 0b00 *)
       | Corrupted (* 0b01 *)
       | Shared (* 0b10 *)
@@ -593,7 +593,7 @@ module Lattices = struct
   end
 
   module Forkable = struct
-    type t =
+    type t = Mode_modality_const.Forkable.t =
       | Forkable
       | Unforkable
 
@@ -615,7 +615,7 @@ module Lattices = struct
   end
 
   module Yielding = struct
-    type t =
+    type t = Mode_modality_const.Yielding.t =
       | Unyielding
       | Yielding
 
@@ -638,7 +638,7 @@ module Lattices = struct
 
   module Statefulness = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t =
+    type t = Mode_modality_const.Statefulness.t =
       | Stateless (* 0b00 *)
       | Writing (* 0b01 *)
       | Reading (* 0b10 *)
@@ -667,7 +667,7 @@ module Lattices = struct
 
   module Visibility = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t =
+    type t = Mode_modality_const.Visibility.t =
       | Read_write (* 0b00 *)
       | Read (* 0b01 *)
       | Write (* 0b10 *)
@@ -695,7 +695,7 @@ module Lattices = struct
   end
 
   module Staticity = struct
-    type t =
+    type t = Mode_modality_const.Staticity.t =
       | Static
       | Dynamic
 
@@ -716,7 +716,7 @@ module Lattices = struct
       | Static -> Fmt.fprintf ppf "static"
   end
 
-  type monadic =
+  type monadic = Mode_modality_const.monadic =
     { uniqueness : Uniqueness.t;
       contention : Contention.t;
       visibility : Visibility.t;
@@ -814,7 +814,7 @@ module Lattices = struct
         Staticity.print m.staticity
   end
 
-  type 'areality comonadic_with =
+  type 'areality comonadic_with = 'areality Mode_modality_const.comonadic_with =
     { areality : 'areality;
       linearity : Linearity.t;
       portability : Portability.t;
@@ -3866,28 +3866,138 @@ module Report = struct
       (* currently not testable *)
       Fmt.dprintf "is a layout-polymorphic expression"
 
-  let modality_if_relevant ~fixpoint pp =
+  type diagnostic_modality_axis =
+    | Areality
+    | Uniqueness
+    | Linearity
+    | Portability
+    | Contention
+    | Forkable
+    | Yielding
+    | Statefulness
+    | Visibility
+    | Staticity
+
+  module MMC = Mode_modality_const.Modality
+
+  let modality_axes_of_obj : type a. a C.obj -> diagnostic_modality_axis list =
+    function
+    | Locality | Regionality -> [Areality]
+    | Uniqueness_op -> [Uniqueness]
+    | Linearity -> [Linearity]
+    | Portability -> [Portability]
+    | Forkable -> [Forkable]
+    | Yielding -> [Yielding]
+    | Statefulness -> [Statefulness]
+    | Contention_op -> [Contention]
+    | Visibility_op -> [Visibility]
+    | Staticity_op -> [Staticity]
+    | Monadic_op -> [Uniqueness; Contention; Visibility; Staticity]
+    | Comonadic_with_locality | Comonadic_with_regionality ->
+      [Areality; Linearity; Portability; Forkable; Yielding; Statefulness]
+
+  let modality_id : Mode_modality_const.t =
+    { monadic = MMC.Monadic.Join_const C.Monadic_op.max;
+      comonadic = MMC.Comonadic.Meet_const C.Comonadic_with_regionality.max
+    }
+
+  let modality_is_id_on axis (modality : Mode_modality_const.t) =
+    let { monadic = MMC.Monadic.Join_const monadic;
+          comonadic = MMC.Comonadic.Meet_const comonadic
+        } =
+      modality
+    in
+    let { monadic = MMC.Monadic.Join_const id_monadic;
+          comonadic = MMC.Comonadic.Meet_const id_comonadic
+        } =
+      modality_id
+    in
+    match axis with
+    | Areality -> comonadic.areality = id_comonadic.areality
+    | Uniqueness -> monadic.uniqueness = id_monadic.uniqueness
+    | Linearity -> comonadic.linearity = id_comonadic.linearity
+    | Portability -> comonadic.portability = id_comonadic.portability
+    | Contention -> monadic.contention = id_monadic.contention
+    | Forkable -> comonadic.forkable = id_comonadic.forkable
+    | Yielding -> comonadic.yielding = id_comonadic.yielding
+    | Statefulness -> comonadic.statefulness = id_comonadic.statefulness
+    | Visibility -> monadic.visibility = id_monadic.visibility
+    | Staticity -> monadic.staticity = id_monadic.staticity
+
+  let print_modality_on axis ppf (modality : Mode_modality_const.t) =
+    let { monadic = MMC.Monadic.Join_const monadic;
+          comonadic = MMC.Comonadic.Meet_const comonadic
+        } =
+      modality
+    in
+    match axis with
+    | Areality -> C.Regionality.print ppf comonadic.areality
+    | Uniqueness -> C.Uniqueness.print ppf monadic.uniqueness
+    | Linearity -> C.Linearity.print ppf comonadic.linearity
+    | Portability -> C.Portability.print ppf comonadic.portability
+    | Contention -> C.Contention.print ppf monadic.contention
+    | Forkable -> C.Forkable.print ppf comonadic.forkable
+    | Yielding -> C.Yielding.print ppf comonadic.yielding
+    | Statefulness -> C.Statefulness.print ppf comonadic.statefulness
+    | Visibility -> C.Visibility.print ppf monadic.visibility
+    | Staticity -> C.Staticity.print ppf monadic.staticity
+
+  let print_modality_axis axis ppf modality =
+    Fmt.fprintf ppf " (with modality %a)"
+      (Misc.Style.as_inline_code (print_modality_on axis))
+      modality
+
+  let modality_if_relevant : type a.
+      fixpoint:bool -> a C.obj -> modality -> pinpoint -> _ =
+   fun ~fixpoint obj modality pp ->
     if
       fixpoint
       (* if the modality doesn't change the bound, we omit the modality and
           print the remaining chain. *)
-    then (fun _ppf Modality -> ()), pp
+    then (fun _ppf _ -> ()), pp
     else
-      (* if the modality change the bound, we signal that. Moreover, since each
-         axis is total ordering, the modality is solely responsible for the
-         bound, and we omit the remaining chain. *)
-      (* CR-someday zqian: print the modality on the offending axis. *)
-      ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
-        (Location.none, Unknown : pinpoint) )
+      (* If the modality changes the bound on exactly one relevant axis, print
+         that axis. If it changes multiple relevant axes, fall back to a generic
+         modality explanation. Either way, the modality is the best local
+         explanation, so we omit the remaining chain. *)
+      match modality with
+      | Modality_const modality ->
+        let axes =
+          List.filter
+            (fun axis -> not (modality_is_id_on axis modality))
+            (modality_axes_of_obj obj)
+        in
+        begin match axes with
+        | [] -> (fun _ppf _ -> ()), pp
+        | [axis] ->
+          ( (fun ppf _ -> print_modality_axis axis ppf modality),
+            (Location.none, Unknown : pinpoint) )
+        | _ :: _ :: _ ->
+          ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality)"),
+            (Location.none, Unknown : pinpoint) )
+        end
+      | Modality ->
+        ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality)"),
+          (Location.none, Unknown : pinpoint) )
+
+  let modality_if_relevant_for_containing ~fixpoint obj containing pp =
+    match containing with
+    | Tuple -> (fun _ppf _ -> ()), pp
+    | Record (_, moda) | Array moda | Constructor (_, moda) ->
+      modality_if_relevant ~fixpoint obj moda pp
+    | Structure (_, moda) -> modality_if_relevant ~fixpoint obj moda pp
 
   let print_contains :
-      fixpoint:bool -> contains -> ((Fmt.formatter -> unit) * pinpoint) option =
-   fun ~fixpoint { containing; contained } ->
+      fixpoint:bool ->
+      _ C.obj ->
+      contains ->
+      ((Fmt.formatter -> unit) * pinpoint) option =
+   fun ~fixpoint obj { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
         let print_pp = print_pp ~definite:true ~capitalize:false in
         let maybe_modality, contained =
-          modality_if_relevant ~fixpoint contained
+          modality_if_relevant_for_containing ~fixpoint obj containing contained
         in
         let pr =
           match containing with
@@ -3937,9 +4047,14 @@ module Report = struct
         container
 
   let print_is_contained_by :
-      fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
-   fun ~fixpoint { containing; container } ->
-    let maybe_modality, pp = modality_if_relevant ~fixpoint container in
+      fixpoint:bool ->
+      _ C.obj ->
+      is_contained_by ->
+      (Fmt.formatter -> unit) * pinpoint =
+   fun ~fixpoint obj { containing; container } ->
+    let maybe_modality, pp =
+      modality_if_relevant_for_containing ~fixpoint obj containing container
+    in
     (* CR-someday zqian: Use the full [container] to improve the printing below.
        E.g., insted of printing "the tuple at XXX", we can print "the tuple
        pattern at XXX" or "the tuple expression at XXX". *)
@@ -3948,7 +4063,7 @@ module Report = struct
 
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
       prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+  let print_const (type a l r) (obj : a C.obj) ((_, pp_desc) : pinpoint) ppf :
       (l * r) const -> unit = function
     | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
@@ -4015,7 +4130,11 @@ module Report = struct
         "it is layout-polymorphic and being instantiated here"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
     | Contained_by c ->
-      let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
+      let print_mod =
+        fst
+          (modality_if_relevant_for_containing ~fixpoint:false obj c.containing
+             c.container)
+      in
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
@@ -4025,9 +4144,10 @@ module Report = struct
   let print_morph : type l r.
       fixpoint:bool ->
       pinpoint ->
+      _ C.obj ->
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
-   fun ~fixpoint pp -> function
+   fun ~fixpoint pp obj -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
@@ -4059,10 +4179,10 @@ module Report = struct
     | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
-    | Contains_l (_, contains) -> print_contains ~fixpoint contains
-    | Contains_r (_, contains) -> print_contains ~fixpoint contains
+    | Contains_l (_, contains) -> print_contains ~fixpoint obj contains
+    | Contains_r (_, contains) -> print_contains ~fixpoint obj contains
     | Is_contained_by (_, is_contained_by) ->
-      Some (print_is_contained_by ~fixpoint is_contained_by)
+      Some (print_is_contained_by ~fixpoint obj is_contained_by)
 
   let print_mode : type a.
       [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
@@ -4154,7 +4274,7 @@ module Report = struct
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;
-        match print_morph ~fixpoint pp morph_hint with
+        match print_morph ~fixpoint pp obj morph_hint with
         | None -> Some Mode
         | Some (t, pp) ->
           Fmt.fprintf ppf "@ because it %t" t;
@@ -4174,7 +4294,7 @@ module Report = struct
     | Const c ->
       Fmt.fprintf ppf "%a@ because %a"
         (print_mode_with_side ~sub side obj)
-        a (print_const pp) c;
+        a (print_const obj pp) c;
       Some Mode_with_hint
   [@@ocaml.warning "-4"]
 
@@ -5950,7 +6070,9 @@ module Modality = struct
     type error = Error : 'a axis * 'a Atom.t simple_error -> error
 
     module Const = struct
-      type t = Join_const of Mode.Const.t [@@unboxed]
+      type t = Mode_modality_const.Modality.Monadic.t =
+        | Join_const of Mode.Const.t
+      [@@unboxed]
 
       let id = Join_const Mode.Const.min
 
@@ -6128,7 +6250,9 @@ module Modality = struct
     type error = Error : 'a axis * 'a Atom.t simple_error -> error
 
     module Const = struct
-      type t = Meet_const of Mode.Const.t [@@unboxed]
+      type t = Mode_modality_const.Modality.Comonadic.t =
+        | Meet_const of Mode.Const.t
+      [@@unboxed]
 
       let id = Meet_const Mode.Const.max
 
@@ -6361,7 +6485,22 @@ module Modality = struct
     module Monadic = Monadic.Const
     module Comonadic = Comonadic.Const
 
-    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+    type t = Mode_modality_const.t =
+      { monadic : Monadic.t;
+        comonadic : Comonadic.t
+      }
+
+    let add_modality_hint t ({ Hint.containing; _ } as is_contained_by) =
+      let modality = Hint.Modality_const t in
+      let containing =
+        match containing with
+        | Tuple -> Hint.Tuple
+        | Record (field, _) -> Hint.Record (field, modality)
+        | Array _ -> Hint.Array modality
+        | Constructor (name, _) -> Hint.Constructor (name, modality)
+        | Structure (item, _) -> Hint.Structure (item, modality)
+      in
+      { is_contained_by with containing }
 
     let id = { monadic = Monadic.id; comonadic = Comonadic.id }
 
@@ -6378,14 +6517,26 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply_left ?is_contained_by t { monadic; comonadic } =
+    let apply_left : type r.
+        ?is_contained_by:Hint.is_contained_by ->
+        t ->
+        (allowed * r) Value.t ->
+        Value.l =
+     fun ?is_contained_by t { monadic; comonadic } ->
+      let is_contained_by = Option.map (add_modality_hint t) is_contained_by in
       let monadic = Monadic.apply_left ?is_contained_by t.monadic monadic in
       let comonadic =
         Comonadic.apply_left ?is_contained_by t.comonadic comonadic
       in
       { monadic; comonadic }
 
-    let apply_right ?is_contained_by t { monadic; comonadic } =
+    let apply_right : type l.
+        ?is_contained_by:Hint.is_contained_by ->
+        t ->
+        (l * allowed) Value.t ->
+        Value.r =
+     fun ?is_contained_by t { monadic; comonadic } ->
+      let is_contained_by = Option.map (add_modality_hint t) is_contained_by in
       let monadic = Monadic.apply_right ?is_contained_by t.monadic monadic in
       let comonadic =
         Comonadic.apply_right ?is_contained_by t.comonadic comonadic
@@ -6429,13 +6580,6 @@ module Modality = struct
     | _ -> false
   [@@ocaml.warning "-4"]
 
-  let apply_left ?is_contained_by t { monadic; comonadic } =
-    let monadic = Monadic.apply_left ?is_contained_by t.monadic monadic in
-    let comonadic =
-      Comonadic.apply_left ?is_contained_by t.comonadic comonadic
-    in
-    { monadic; comonadic }
-
   let sub_log t1 t2 ~log : (unit, error) Result.t =
     match Monadic.sub_log t1.monadic t2.monadic ~log with
     | Error (Error (ax, e)) -> Error (Error (Monadic ax, e))
@@ -6458,13 +6602,13 @@ module Modality = struct
     let monadic = Monadic.infer ~md_mode:md_mode.monadic ~mode:mode.monadic in
     { monadic; comonadic }
 
-  let zap_to_id t =
+  let zap_to_id t : Const.t =
     let { monadic; comonadic } = t in
     let comonadic = Comonadic.zap_to_id comonadic in
     let monadic = Monadic.zap_to_id monadic in
     { monadic; comonadic }
 
-  let zap_to_floor t =
+  let zap_to_floor t : Const.t =
     let { monadic; comonadic } = t in
     let comonadic = Comonadic.zap_to_floor comonadic in
     let monadic = Monadic.zap_to_floor monadic in
@@ -6474,11 +6618,25 @@ module Modality = struct
     let { monadic; comonadic } = t in
     Option.bind (Comonadic.to_const_opt comonadic) (fun comonadic ->
         Option.bind (Monadic.to_const_opt monadic) (fun monadic ->
-            Some { monadic; comonadic }))
+            Some ({ monadic; comonadic } : Const.t)))
 
   let to_const_exn t = t |> to_const_opt |> Option.get
 
-  let of_const { monadic; comonadic } =
+  let add_const_hint_if_known t is_contained_by =
+    match is_contained_by, to_const_opt t with
+    | Some is_contained_by, Some const ->
+      Some (Const.add_modality_hint const is_contained_by)
+    | _ -> is_contained_by
+
+  let apply_left ?is_contained_by t { monadic; comonadic } =
+    let is_contained_by = add_const_hint_if_known t is_contained_by in
+    let monadic = Monadic.apply_left ?is_contained_by t.monadic monadic in
+    let comonadic =
+      Comonadic.apply_left ?is_contained_by t.comonadic comonadic
+    in
+    { monadic; comonadic }
+
+  let of_const ({ monadic; comonadic } : Const.t) =
     let comonadic = Comonadic.of_const comonadic in
     let monadic = Monadic.of_const monadic in
     { monadic; comonadic }
@@ -6787,7 +6945,7 @@ module Crossing = struct
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
-  let modality m { monadic; comonadic } =
+  let modality (m : Modality.Const.t) { monadic; comonadic } =
     let monadic = Monadic.modality m.monadic monadic in
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { monadic; comonadic }
@@ -6920,6 +7078,6 @@ module Crossing = struct
   let to_modality
       { monadic = Monadic.Modality monadic;
         comonadic = Comonadic.Modality comonadic
-      } =
+      } : Modality.Const.t =
     { monadic; comonadic }
 end
