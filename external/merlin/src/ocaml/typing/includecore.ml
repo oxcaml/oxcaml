@@ -334,6 +334,7 @@ type record_mismatch =
   | Ufloat_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
+  | Representation_shape_mismatch
 
 type constructor_mismatch =
   | Type of Errortrace.equality_error
@@ -403,10 +404,8 @@ let report_modality_sub_error first second ppf e =
     first
     (print_modality "not") left
 
-let report_mode_sub_error got expected ppf e =
-  let {left; right} : _ Mode.simple_error =
-    Mode.Value.print_error (Location.none, Unknown) e
-  in
+let report_mode_sub_error ~pp got expected ppf e =
+  let ({ left; right } : _ Mode.simple_error) = Mode.Value.print_error pp e in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
@@ -456,7 +455,7 @@ let report_primitive_mismatch first second ppf err =
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
-let report_value_mismatch first second env ppf err =
+let report_value_mismatch ~pp first second env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
   match (err : value_mismatch) with
@@ -474,7 +473,7 @@ let report_value_mismatch first second env ppf err =
   | Mode e ->
       let got = first ^ " is" in
       let expected = second ^ " is" in
-      report_mode_sub_error got expected ppf e
+      report_mode_sub_error ~pp got expected ppf e
   | Layout_poly_coercion (Extra_lhs { extra }) ->
       pr "%s has %d more layout parameter%s that %s not used,@ \
           which is not supported yet."
@@ -610,6 +609,9 @@ let report_record_mismatch first second decl env ppf err =
       pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
         (choose ord first second) decl
         "uses a mixed representation where boxed floats are stored flat"
+  | Representation_shape_mismatch ->
+    pr "@[<hv>Their internal representations differ:@;\
+        This is likely caused by a layout mismatch in a later definition.@]"
 
 let report_constructor_mismatch first second decl env ppf err =
   let pr fmt  = Fmt.fprintf ppf fmt in
@@ -958,7 +960,10 @@ module Record_diffing = struct
   let find_mismatch_in_mixed_record_representations
       (s1 : mixed_product_shape) (s2 : mixed_product_shape)
     =
-    if s1 = s2 then None
+    (* It's possible for [s1] to be higher than [s2] here: see
+       Note [Ignoring scannable axes in type declaration representations] *)
+    if Types.equal_mixed_product_shape_up_to_scannable_axes s1 s2
+    then None
     else
       let has_float_boxed_on_read fields =
         Array.exists (function
@@ -971,10 +976,11 @@ module Record_diffing = struct
       else if has_float_boxed_on_read s2
       then Some (Mixed_representation_with_flat_floats Second)
       else
-        Misc.fatal_error
-          "Impossible: the only way for mixed blocks to differ in \
-           representation is if one is a flat float record with a boxed float \
-           field, and the other isn't."
+        (* Before, this case was thought to be impossible. We report the first
+           error when doing the inclusion check: the real culprit may be a
+           layout mismatch that is actually defined later defined mutually
+           recursively with this record. *)
+        Some Representation_shape_mismatch
 
   let compare_with_representation (type rep) ~loc
         (record_form : rep record_form) env params1 params2 l r
@@ -1018,7 +1024,7 @@ module Record_diffing = struct
         | _, Record_mixed _ ->
            Some (Record_mismatch (Mixed_representation Second))
 
-        | Record_boxed _, Record_boxed _ -> None
+        | Record_boxed, Record_boxed -> None
         end
       | Unboxed_product ->
         begin match rep1, rep2 with

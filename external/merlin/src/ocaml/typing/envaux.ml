@@ -74,7 +74,9 @@ let rec env_from_summary ~allow_missing_modules sum subst =
           if allow_missing_modules then
             (try Env.open_signature_by_path path' env with
             | Not_found -> env)
-          else Env.open_signature_by_path path' env
+          else
+            (try Env.open_signature_by_path path' env with
+            | Not_found -> raise (Error (Module_not_found path')))
       | Env_functor_arg(Env_module(s, id, pres, desc, mode, locks), id')
             when Ident.same id id' ->
           let desc =
