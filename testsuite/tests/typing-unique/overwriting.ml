@@ -878,7 +878,7 @@ Line 2, characters 3-6:
 2 |   (r.m : @ unique)
        ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 2, characters 3-4.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 2, characters 3-4.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -892,7 +892,7 @@ Line 4, characters 15-18:
 4 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 4, characters 15-16.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 4, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -907,7 +907,7 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 15-16.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -922,7 +922,7 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 15-16.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -939,7 +939,7 @@ Line 5, characters 15-20:
 Error: This value is "aliased"
          because it is the field "x" of the record at line 5, characters 15-18
          which is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 15-16.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -953,7 +953,7 @@ Line 4, characters 35-38:
 4 |     (r.m <- OptionB s), overwrite_ r.m with OptionA s
                                        ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 4, characters 35-36.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 4, characters 35-36.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -969,7 +969,7 @@ Line 4, characters 43-48:
 Error: This value is "aliased"
          because it is the field "x" of the record at line 4, characters 43-46
          which is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 4, characters 43-44.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 4, characters 43-44.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -984,7 +984,7 @@ Line 5, characters 28-31:
 5 |             else overwrite_ r.m with OptionA s
                                 ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 28-29.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 28-29.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1001,7 +1001,7 @@ Line 5, characters 20-25:
 Error: This value is "aliased"
          because it is the field "x" of the record at line 5, characters 20-23
          which is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 20-21.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 20-21.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1016,7 +1016,7 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 15-16.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1033,7 +1033,7 @@ Line 5, characters 15-20:
 Error: This value is "aliased"
          because it is the field "x" of the record at line 5, characters 15-18
          which is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 5, characters 15-16.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1053,7 +1053,7 @@ Line 7, characters 17-20:
 7 |       overwrite_ r.m with OptionB s
                      ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with modality "aliased") of the record at line 7, characters 17-18.
+         because it is the field "m" (with modality "aliased" in effect) of the record at line 7, characters 17-18.
        However, the highlighted expression is expected to be "unique".
 |}]
 

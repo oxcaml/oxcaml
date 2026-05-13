@@ -366,7 +366,7 @@ Line 3, characters 24-25:
 3 |     | ImmutableRef r -> r.contents <- 1
                             ^
 Error: This value is "immutable"
-         because it is contained (via constructor "ImmutableRef") (with modality "immutable") in the value at line 3, characters 6-20.
+         because it is contained (via constructor "ImmutableRef") (with modality "immutable" in effect) in the value at line 3, characters 6-20.
        However, the highlighted expression is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
