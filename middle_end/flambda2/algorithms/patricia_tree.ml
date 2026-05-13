@@ -500,7 +500,7 @@ module Tree_operations (Tree : Tree) : sig
   val update_many :
     (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
 
-  val subset : 'a t -> 'a t -> bool
+  val subset_domain : 'a t -> 'b t -> bool
 
   val find : key -> 'a t -> 'a
 
@@ -1151,9 +1151,7 @@ end = struct
   let diff_shared f t0 t1 =
     toplevel_diff (fun[@inline] t0 t1 -> diff_shared_tree f t0 t1) t0 t1
 
-  (* CR mshinwell: rename to subset_domain and inter_domain? *)
-
-  let rec subset_tree t0 t1 =
+  let rec subset_domain_tree t0 t1 =
     match tree_descr t0, tree_descr t1 with
     | Branch _, Leaf _ -> false
     | Leaf l, _ -> mem_tree (leaf_key l) t1
@@ -1161,22 +1159,22 @@ end = struct
       let prefix_and_bit0, t00, t01 = branch_descr b0 in
       let prefix_and_bit1, t10, t11 = branch_descr b1 in
       if prefix_and_bit0 = prefix_and_bit1
-      then subset_tree t00 t10 && subset_tree t01 t11
+      then subset_domain_tree t00 t10 && subset_domain_tree t01 t11
       else
         let prefix0, bit0 = unpack prefix_and_bit0 in
         let prefix1, bit1 = unpack prefix_and_bit1 in
         if includes_prefix prefix1 bit1 prefix0 bit0
         then
           if zero_bit prefix0 bit1
-          then subset_tree t0 t10
-          else subset_tree t0 t11
+          then subset_domain_tree t0 t10
+          else subset_domain_tree t0 t11
         else false
 
-  let subset t0 t1 =
+  let subset_domain t0 t1 =
     match descr t0, descr t1 with
     | Empty, _ -> true
     | Non_empty _, Empty -> false
-    | Non_empty t0, Non_empty t1 -> subset_tree t0 t1
+    | Non_empty t0, Non_empty t1 -> subset_domain_tree t0 t1
 
   (* CR lmaurer: Should use [raise_notrace] internally *)
   let rec find_tree i t =
@@ -1940,6 +1938,8 @@ module Set = struct
   let max_elt = Ops.max_binding
 
   let max_elt_opt = Ops.max_binding_opt
+
+  let subset = Ops.subset_domain
 
   (* CR bclement: This should just be `Ops.equal (fun _ _ -> true)` once we have
      function specialisation, see the comment on {!module-Merge_callback}. *)

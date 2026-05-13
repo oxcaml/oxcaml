@@ -83,7 +83,8 @@ type env =
     kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
-    inside_code_definition : bool
+    inside_code_definition : bool;
+    types_rewrite_context : Types_rewriter.rewrite_context
   }
 
 type rebuild_result =
@@ -1747,7 +1748,8 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           Non_nullable
       in
       let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.uses bound_name ks
+        Types_rewriter.rewrite_kind_with_subkind env.types_rewrite_context
+          bound_name ks
       in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
@@ -2217,8 +2219,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                     results_vars return_decisions )
             in
             Or_unknown_or_bottom.Ok
-              (Types_rewriter.rewrite_result_types env.uses ~old_typing_env
-                 ~my_closure ~params:params_vars_and_keep
+              (Types_rewriter.rewrite_result_types env.types_rewrite_context
+                 ~old_typing_env ~my_closure ~params:params_vars_and_keep
                  ~results:results_vars_and_keep result_types)
       in
       Code_metadata.with_result_types result_types code_metadata
@@ -2427,7 +2429,7 @@ type result =
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env kinds
+    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context kinds
     (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
@@ -2509,7 +2511,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
                   raw_is_var_used solved_dep v (K.With_subkind.kind kind)
                 in
                 let kind =
-                  Types_rewriter.rewrite_kind_with_subkind solved_dep
+                  Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
                     (Name.var v) kind
                 in
                 (* TODO: fix this, needs the mapping between code ids of
@@ -2540,8 +2542,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       then
         Keep
           ( param,
-            Types_rewriter.rewrite_kind_with_subkind solved_dep (Name.var param)
-              kind )
+            Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
+              (Name.var param) kind )
       else Delete
     | Some fields -> Unbox fields
   in
@@ -2571,7 +2573,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       kinds;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
-      inside_code_definition = false
+      inside_code_definition = false;
+      types_rewrite_context
     }
   in
   let res =
