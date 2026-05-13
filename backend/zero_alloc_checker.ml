@@ -52,7 +52,7 @@ module Witness = struct
 
   type hint =
     | No_hint
-    | Missing_summary
+    | Missing_summary of { callee : string }
     | Conservative
 
   type t =
@@ -80,10 +80,11 @@ module Witness = struct
   let print_hint ppf hint =
     match hint with
     | No_hint -> ()
-    | Missing_summary ->
+    | Missing_summary { callee } ->
       Fmt.fprintf ppf
-        "@.Hint: Build artifacts for the library containing the callee are not \
-         available.@.Try adding the library as an explicit dependency.@."
+        "@.Hint: Build artifacts for the library containing the callee %s are \
+         not available.@.Try adding the library as an explicit dependency.@."
+        callee
     | Conservative ->
       Fmt.fprintf ppf
         "@.Hint: Recompile without -disable-precise-zero-alloc-checker for \
@@ -2266,7 +2267,8 @@ end = struct
           if is_caml_internal callee
           then return_top No_hint "missing summary: callee is caml internal"
           else
-            return_top Missing_summary
+            return_top
+              (Missing_summary { callee })
               "missing summary: callee compiled without checks"
         | Some v -> resolved v)
       | Some callee_info ->
