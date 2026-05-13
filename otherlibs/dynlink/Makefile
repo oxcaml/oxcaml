@@ -132,6 +132,7 @@ COMPILERLIBS_SOURCES=\
   typing/shape_reduce.ml \
   typing/allowance.ml \
   typing/solver.ml \
+  typing/mode_modality_const.ml \
   typing/mode.ml \
   typing/jkind_intf.ml \
   typing/jkind_axis.ml \

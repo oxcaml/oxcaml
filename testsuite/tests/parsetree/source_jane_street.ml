@@ -631,7 +631,7 @@ Line 1, characters 48-49:
                                                     ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" (with some modality) of the record at line 1, characters 46-54.
+         because it is the field "x" (with modality "global") of the record at line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
