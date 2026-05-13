@@ -227,9 +227,17 @@ let emit_data dl =
 let emit_fundecl f =
   if !Clflags.llvm_backend
   then Misc.fatal_error "Linear IR not supported with llvm backend";
+  let counter_f () =
+    Profile.Counters.create ()
+    |> Profile.Counters.set "gc_sites" (Emit.get_num_call_gc_sites ())
+  in
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
-      try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
+      try
+        fundecl
+        |> Profile.record ~accumulate:true "emit" Emit.fundecl
+        |> Profile.record_with_counters ~accumulate:true "emitted" ~counter_f
+             Fun.id
       with Emitaux.Error e ->
         raise (Error (Asm_generation (fundecl.Linear.fun_name, e))))
     f

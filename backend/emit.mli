@@ -25,3 +25,5 @@ val end_assembly: unit -> unit
 (** Register a callback to receive filtered and formatted asm code, for expect
     tests. The callback is automatically cleared after being invoked once. *)
 val register_expect_asm_callback : (string -> unit) -> unit
+
+val get_num_call_gc_sites : unit -> int

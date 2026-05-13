@@ -634,6 +634,8 @@ type gc_call =
 
 let call_gc_sites = ref ([] : gc_call list)
 
+let get_num_call_gc_sites () = List.length !call_gc_sites
+
 let call_gc_local_sym ~simd : Cmm.symbol =
   { sym_name =
       Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd);
