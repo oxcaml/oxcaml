@@ -151,7 +151,7 @@ inactive_dirs := $(if $(filter runtime4,$(RUNTIME_DIR)),runtime debugger,runtime
 # directories not in the dune workspace. (We can exclude external/ as a whole
 # since all the non-merlin directories in that folder are vendored anyways.)
 runtest_subdirs := $(filter-out external $(inactive_dirs), \
-  $(shell find . -mindepth 1 -maxdepth 1 -type d -not -name '_*' -not -name '.*' -printf '%P\n'))
+  $(shell find . -mindepth 1 -maxdepth 1 -type d -not -name '_*' -not -name '.*' | sed 's|^\./||'))
 runtest_targets := $(addprefix @,$(addsuffix /runtest,$(runtest_subdirs)))
 
 # CR dkalinichenko: [runtest] is built using the main profile,
