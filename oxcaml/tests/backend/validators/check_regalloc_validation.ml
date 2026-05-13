@@ -563,9 +563,9 @@ let () =
       cfg1, cfg2)
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
-      ">> Fatal error: The instruction's no. 12 successor id has changed. \
-       Before allocation: 11. After allocation (ignoring instructions added by \
-       allocation): 9."
+      ">> Fatal error: The instruction's no. 11 successor id has changed. \
+       Before allocation: 9. After allocation (ignoring instructions added by \
+       allocation): 12."
 
 let () =
   check "Regalloc added a loop"
@@ -622,16 +622,24 @@ let () =
        return, after: raise."
 
 let () =
+  (* Delete the [Prologue] in [entry_label] rather than a pure instruction so
+     the deletion is rejected by the validator. After
+     "Validator: accept Cfg_deadcode-style deletions" (ef8cd0e0e2), the
+     validator silently accepts the removal of any [Cfg.is_pure_basic]
+     instruction (matching what [Cfg_deadcode.remove_deadcode] does); deleting
+     a pure instruction therefore reaches the [cfg = after] polymorphic
+     equality below, which loops on cycles in [Reg.t.interf]. The deletion
+     check remains exercised by removing a non-pure instruction. *)
   check "Deleted instruction"
     (fun () ->
       let templ, _ = base_templ () in
       let cfg1 = Cfg_desc.make_pre_regalloc templ in
-      templ.&(add_label).body <- List.tl templ.&(add_label).body;
+      templ.&(entry_label).body <- List.tl templ.&(entry_label).body;
       let cfg2 = Cfg_desc.make_post_regalloc templ in
       cfg1, cfg2)
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
-      ">> Fatal error: Instruction no. 8 was deleted by register allocator"
+      ">> Fatal error: Instruction no. 25 was deleted by register allocator"
 
 let make_loop ~loop_loc_first n =
   let make_id =
