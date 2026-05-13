@@ -22,6 +22,11 @@ open Mode_intf
 module Hint = Mode_hint
 module Fmt = Format_doc
 
+let int_of_comparison : type a b. (a, b) Misc.comparison -> int = function
+  | Less_than -> -1
+  | Equal -> 0
+  | Greater_than -> 1
+
 module Hint_for_solver (* : Solver_intf.Hint *) = struct
   module Pinpoint = struct
     type t = Hint.pinpoint
@@ -1622,18 +1627,16 @@ module Lattices_mono = struct
       then c
       else
         match equal_obj src1 src2 with
-        | Misc.Is_eq -> Misc.comparison_result (Axis.compare ax1 ax2)
+        | Misc.Is_eq -> int_of_comparison (Axis.compare ax1 ax2)
         | Misc.Is_not_eq ->
           Misc.fatal_error
             "Mode.Lattices_mono.compare_morph: inconsistent object equality")
     | Proj _, _ -> -1
     | _, Proj _ -> 1
-    | Max_with ax1, Max_with ax2 ->
-      Misc.comparison_result (Axis.compare ax1 ax2)
+    | Max_with ax1, Max_with ax2 -> int_of_comparison (Axis.compare ax1 ax2)
     | Max_with _, _ -> -1
     | _, Max_with _ -> 1
-    | Min_with ax1, Min_with ax2 ->
-      Misc.comparison_result (Axis.compare ax1 ax2)
+    | Min_with ax1, Min_with ax2 -> int_of_comparison (Axis.compare ax1 ax2)
     | Min_with _, _ -> -1
     | _, Min_with _ -> 1
     | Meet_const c1, Meet_const c2 -> compare_total dst c1 c2
@@ -3559,8 +3562,7 @@ module Comonadic_with (Areality : Areality) = struct
         P Forkable;
         P Yielding;
         P Statefulness ]
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> int_of_comparison (compare ax1 ax2))
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3703,8 +3705,7 @@ module Monadic = struct
 
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> int_of_comparison (compare ax1 ax2))
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3864,8 +3865,7 @@ module Value_with (Areality : Areality) = struct
       @ List.map
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> int_of_comparison (compare ax1 ax2))
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function
@@ -5404,7 +5404,8 @@ module Crossing = struct
 
     let print_obj = Axis.print
 
-    let compare_obj ax1 ax2 = Misc.comparison_result (Axis.compare ax1 ax2)
+    let compare_obj : type a b. a Axis.t -> b Axis.t -> int =
+     fun ax1 ax2 -> int_of_comparison (Axis.compare ax1 ax2)
 
     let equal_obj : type a b. a Axis.t -> b Axis.t -> (a, b) Misc.is_eq =
      fun ax1 ax2 ->
