@@ -624,7 +624,7 @@ let (>>) : bind_judg -> term_judg -> term_judg =
 (* Compute the appropriate [mode] for an array expression *)
 let array_mode exp =
   match Typeopt.array_kind exp with
-  | Lambda.Pfloatarray ->
+  | Pfloatarray ->
     (* (flat) float arrays unbox their elements *)
     Dereference
   | Pgenarray ->

@@ -6576,7 +6576,7 @@ and type_expect_
       set_levels saved_levels;
       re {
         exp_desc = Texp_record {
-            fields = [||]; representation = Record_boxed [||];
+            fields = [||]; representation = Record_boxed;
             extended_expression = None;
             alloc_mode = None
           };
@@ -9270,7 +9270,7 @@ and type_label_access
         lbl_all = [||];
         lbl_repres =
           (match record_form with
-          | Legacy -> Record_boxed [||]
+          | Legacy -> Record_boxed
           | Unboxed_product -> Record_unboxed_product);
         lbl_private = Public;
         lbl_loc = lid.loc;
