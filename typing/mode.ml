@@ -4828,7 +4828,7 @@ module Report = struct
     | Staticity -> C.Staticity.print ppf monadic.staticity
 
   let print_modality_axis axis ppf modality =
-    Fmt.fprintf ppf " (with modality %a)"
+    Fmt.fprintf ppf " (with modality %a in effect)"
       (Misc.Style.as_inline_code (print_modality_on axis))
       modality
 
@@ -4858,11 +4858,11 @@ module Report = struct
           ( (fun ppf _ -> print_modality_axis axis ppf modality),
             (Location.none, Unknown : pinpoint) )
         | _ :: _ :: _ ->
-          ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality)"),
+          ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality in effect)"),
             (Location.none, Unknown : pinpoint) )
         end
       | Modality ->
-        ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality)"),
+        ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality in effect)"),
           (Location.none, Unknown : pinpoint) )
 
   let modality_if_relevant_for_containing ~fixpoint obj containing pp =
