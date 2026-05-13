@@ -1008,7 +1008,7 @@ let quoted_intfs ({ quoted_intfs; _ } as penv) =
   (* Also grab everything that the direct dependencies transitively depend on
      as right now we know which ones are actually needed (by whether we had to
      load them). *)
-  let names = ref !quoted_intfs in
+  let names = ref Compilation_unit.Name.Set.empty in
   let rec add_loaded_deps name =
     match find_import_info_in_cache penv name with
     | None -> ()
