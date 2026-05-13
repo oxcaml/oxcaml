@@ -941,16 +941,8 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, _ -> -1
   | _, Void -> 1
 
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  array_equal equal_mixed_block_element r1 r2
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
-=======
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 
 let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
@@ -964,19 +956,9 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
-      array_equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
-          && array_equal Jkind_types.Sort.Const.equal
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-      Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
-          && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
-=======
       Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
           equal_constructor_representation_up_to_scannable_axes cstr1 cstr2
           && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
                sorts1 sorts2)
         cstrs_and_sorts1
         cstrs_and_sorts2
@@ -994,20 +976,10 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
          constructor representation. *)
       ignore (cr1 : constructor_representation);
       ignore (cr2 : constructor_representation);
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
-  | Record_boxed sorts1, Record_boxed sorts2 ->
-      array_equal Jkind_types.Sort.Const.equal sorts1 sorts2
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
-  | Record_boxed sorts1, Record_boxed sorts2 ->
-      Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
-=======
       equal_tag tag1 tag2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
