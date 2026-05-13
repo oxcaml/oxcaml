@@ -1401,6 +1401,9 @@ let arg_list' ?consider_inlining_effectful_expressions ~dbg env res l =
   in
   List.rev args, env, res, effs
 
+(* CR mshinwell: For the moment we don't provide the [Simple]s to the above
+   translation functions for splittable primitives. This is ok for now but may
+   require revisiting in future. *)
 let trans_prim : To_cmm_env.t To_cmm_env.trans_prim =
   { nullary = nullary_primitive;
     unary = (fun env res dbg prim x -> unary_primitive env res dbg prim None x);
