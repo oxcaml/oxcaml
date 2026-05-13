@@ -320,7 +320,9 @@ Line 2, characters 0-68:
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
-           immediate non_float with [< `A of string | `B of int ] t1
+           value mod everything
+             non_float
+             with [< `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
@@ -338,7 +340,9 @@ Line 2, characters 0-68:
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
-           immediate non_float with [> `A of string | `B of int ] t1
+           value mod everything
+             non_float
+             with [> `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
@@ -362,7 +366,7 @@ Line 7, characters 0-64:
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
-           immediate non_float with M1.t
+           value mod everything non_float with M1.t
          because of the annotation on the declaration of the type t2.
 |}]
 
@@ -390,7 +394,7 @@ Line 6, characters 4-68:
 Error: The kind of type "t4" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t4" must be a subkind of
-           immediate non_float with M1.t
+           value mod everything non_float with M1.t
          because of the annotation on the declaration of the type t4.
 |}]
 
@@ -410,7 +414,7 @@ Line 7, characters 0-64:
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
-           immediate non_float with M1.t
+           value mod everything non_float with M1.t
          because of the annotation on the declaration of the type t2.
 |}]
 
@@ -489,7 +493,7 @@ Line 3, characters 4-68:
 Error: The kind of type "t4" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t4" must be a subkind of
-           immediate non_float with M1.t
+           value mod everything non_float with M1.t
          because of the annotation on the declaration of the type t4.
 |}]
 

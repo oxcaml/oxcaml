@@ -13,7 +13,7 @@ type t_vn : value_or_null
 Line 2, characters 0-23:
 2 | type q_v : value = t_vn
     ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t_vn" is value maybe_separable maybe_null
+Error: The layout of type "t_vn" is value_or_null
          because of the definition of t_vn at line 1, characters 0-25.
        But the layout of type "t_vn" must be a sublayout of value
          because of the definition of q_v at line 2, characters 0-23.
@@ -61,7 +61,7 @@ type t_vn2 : value_or_null
 Line 2, characters 0-39:
 2 | type q_sep2 : any mod separable = t_vn2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t_vn2" is value maybe_separable maybe_null
+Error: The layout of type "t_vn2" is value_or_null
          because of the definition of t_vn2 at line 1, characters 0-26.
        But the layout of type "t_vn2" must be a sublayout of any separable
          because of the definition of q_sep2 at line 2, characters 0-39.

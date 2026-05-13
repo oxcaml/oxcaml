@@ -2074,7 +2074,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immutable_data separable & immutable_data separable
+           value mod forkable unyielding many stateless immutable
+           & value mod forkable unyielding many stateless immutable
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2085,8 +2086,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate separable mod dynamic with string u
-           & immediate separable mod dynamic with string u
+           value mod everything mod dynamic with string u
+           & value mod everything mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2120,7 +2121,7 @@ Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
            immediate mod dynamic with int with string
-           & immediate non_float mod dynamic with int with string
+           & value mod everything non_float mod dynamic with int with string
            & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
@@ -2149,7 +2150,8 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immutable_data separable & immutable_data separable
+           value mod forkable unyielding many stateless immutable
+           & value mod forkable unyielding many stateless immutable
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2159,8 +2161,8 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate separable mod dynamic with string u
-           & immediate separable mod dynamic with string u
+           value mod everything mod dynamic with string u
+           & value mod everything mod dynamic with string u
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2576,8 +2578,7 @@ Line 3, characters 0-66:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
@@ -2612,8 +2613,7 @@ Lines 3-4, characters 0-34:
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
@@ -2632,8 +2632,7 @@ Lines 3-4, characters 0-34:
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
