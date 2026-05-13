@@ -101,11 +101,11 @@ let classify_field_map fields =
 type rewrite_context =
   { db : Datalog.database;
     unboxing : UA.result;
-    (* All the sets of closures defined in the current compilation unit that
-       have a given function slot *)
     sets_of_closures_by_function_slot :
       (Code_id_or_name.t * Code_id.t Or_unknown.t) Function_slot.Map.t list
       Function_slot.Map.t
+        (* All the sets of closures defined in the current compilation unit that
+           have a given function slot *)
   }
 
 let prepare_rewrite_context result all_sets_of_closures =
@@ -903,9 +903,9 @@ module Rewriter = struct
               | Many_sources_any_usage -> any_usage ()
               | Many_sources_usages usages -> (
                 match
-                  PTA.compute_usages_by_function_slots
-                    ~follow_known_arity_calls:false context.db usages
-                    current_function_slot
+                  PTA
+                  .compute_usages_by_function_slots_not_following_known_arity_calls
+                    context.db usages current_function_slot
                 with
                 | Unknown -> any_usage ()
                 | Known by_function_slot ->

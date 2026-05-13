@@ -604,8 +604,7 @@ let add_usages_through_function_slots :
   fun ~follow_known_arity_calls db (Usages s) ->
     Usages (run stmt db follow_known_arity_calls s)
 
-let compute_usages_by_function_slots :
-    follow_known_arity_calls:bool ->
+let compute_usages_by_function_slots_not_following_known_arity_calls :
     Datalog.database ->
     usages ->
     Function_slot.t ->
@@ -624,12 +623,7 @@ let compute_usages_by_function_slots :
       (let$ [fs; x] = ["fs"; "x"] in
        [out % [fs; x]; any_usage x] ==> One.flag top) ]
   in
-  fun ~follow_known_arity_calls db (Usages s) current_function_slot ->
-    if follow_known_arity_calls
-    then
-      Misc.fatal_errorf
-        "[follow_known_arity_calls] is never expected to be true for \
-         [add_usages_by_function_slots]";
+  fun db (Usages s) current_function_slot ->
     let table =
       Field.Map.singleton (Field.function_slot current_function_slot) s
     in

@@ -85,8 +85,7 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 val add_usages_through_function_slots :
   follow_known_arity_calls:bool -> Datalog.database -> usages -> usages
 
-val compute_usages_by_function_slots :
-  follow_known_arity_calls:bool ->
+val compute_usages_by_function_slots_not_following_known_arity_calls :
   Datalog.database ->
   usages ->
   Function_slot.t ->
