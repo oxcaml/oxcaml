@@ -1311,12 +1311,11 @@ L(preemption_unhandled):
        gc_regs from the continuation into callee-saved x25 before the C call,
        since x1 will not survive it. */
         ldr     x25, Cont_gc_regs(x1)         /* x25 := gc_regs */
-        mov     x0, x1                        /* C_ARG_1 = continuation */
+        mov     C_ARG_1, x1                   /* C_ARG_1 = continuation */
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_continuation_use_noexc)
-        bl      G(caml_c_call)                /* x0 := stack (discarded) */
+        bl      G(caml_continuation_use_noexc)
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
     /* Jump into caml_resume's preemption-resume path, which handles
@@ -1362,9 +1361,8 @@ FUNCTION(caml_resume)
         ldr     x25, Cont_gc_regs(x0)         /* x25 := gc_regs */
         b       3f
     /* This is not a preemption, so set gc_regs = null */
-2:      mov     x25, xzr                      /* x25 := NULL */
-3:      ADDRGLOBAL(ADDITIONAL_ARG, caml_continuation_use_noexc)
-        bl      G(caml_c_call) /* x0 := stack */
+2:      mov     x25, xzr                       /* x25 := NULL */
+3:      bl      G(caml_continuation_use_noexc) /* x0 := stack */
         sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
         mov     x2, x22 /* x2 := argument */
         mov     x1, x24 /* x1 := fun */
