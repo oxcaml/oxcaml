@@ -203,33 +203,8 @@ let foo () =
   (let z = borrow_ y in z)  (* Error: z cannot escape the inner borrow region *)
 ```
 
-The same restriction applies even when the inner `borrow_` targets the same
-value as the outer borrow. Each `borrow_` creates its own region by syntax,
-and the compiler does not merge regions based on value identity:
-
-```ocaml
-let foo () =
-  let x = "hello" in
-  let _y = borrow_ x in
-  let _w = (let z = borrow_ x in z) in   (* Error: z cannot escape its region *)
-  ()
-```
-
-The inner region ends without disturbing the outer one, and `x` is usable
-uniquely once both regions have ended:
-
-```ocaml
-let foo () =
-  let x = "hello" in
-  (let y = borrow_ x in
-   (let z = borrow_ x in ());   (* inner borrow ends *)
-   local_aliased_use y);        (* outer borrow still active *)
-  unique_use x                  (* both borrows ended *)
-```
-
-A nested borrow region can also target a different value than its enclosing
-region. Once the inner region ends, its borrowed value can be used uniquely
-while the outer borrow is still alive:
+When the inner region ends, the value it borrowed becomes usable uniquely,
+even while the outer borrow is still alive:
 
 ```ocaml
 let foo () =
