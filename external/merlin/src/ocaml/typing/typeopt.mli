@@ -34,27 +34,11 @@ val array_type_kind :
 (*
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
 val array_kind_of_elt :
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
-  elt_sort:(Jkind.Sort.Const.t option)
-  -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
-*)
-val array_kind :
-  Typedtree.expression -> Jkind.Sort.Const.t -> Lambda.array_kind
-(*
-val array_pattern_kind :
-  Typedtree.pattern -> Jkind.Sort.Const.t -> Lambda.array_kind
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-  elt_sort:(Jkind.Sort.Const.t option)
-  -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
-val array_kind :
-  Typedtree.expression -> Jkind.Sort.Const.t -> Lambda.array_kind
-val array_pattern_kind :
-  Typedtree.pattern -> Jkind.Sort.Const.t -> Lambda.array_kind
-=======
   Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
+*)
 val array_kind : Typedtree.expression -> Lambda.array_kind
+(*
 val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 
 (* If [kind] or [layout] is unknown, attempt to specialize it by examining the
    type parameters of the bigarray. If [kind] or [length] is not unknown, returns

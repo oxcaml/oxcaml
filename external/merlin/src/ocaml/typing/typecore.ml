@@ -10912,21 +10912,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         Some m
     | Nonrecursive -> None
   in
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
-  let spatl =  List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
-  let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-  let spatl = List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
-  let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
-=======
   let spatl = List.map vb_pat_constraint spat_sexp_list in
   let spatl =
     List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl
   in
   let attrs_list = List.map (fun (attrs, _, _, _, _) -> attrs) spatl in
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
   let is_recursive = (rec_flag = Recursive) in
 
   let (pat_list, exp_list, new_env, mvs, sorts, _pvs) =

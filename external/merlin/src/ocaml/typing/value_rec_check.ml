@@ -622,17 +622,9 @@ let (>>) : bind_judg -> term_judg -> term_judg =
   fun binder term mode -> binder mode (term mode)
 
 (* Compute the appropriate [mode] for an array expression *)
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
-let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
-  | Pfloatarray ->
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
-  | Lambda.Pfloatarray ->
-=======
 let array_mode exp =
   match Typeopt.array_kind exp with
   | Lambda.Pfloatarray ->
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
     (* (flat) float arrays unbox their elements *)
     Dereference
   | Pgenarray ->

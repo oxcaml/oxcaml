@@ -284,17 +284,9 @@ let classify ~classify_product env ty layout : _ classification =
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
 (*
-let rec scannable_product_array_kind elt_ty_for_error loc sorts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-let rec scannable_product_array_kind elt_ty_for_error loc sorts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
-=======
 let rec scannable_product_array_kind elt_ty_for_error loc layouts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
       (layout : Jkind.Layout.Const.t) =
@@ -442,21 +434,9 @@ let array_type_mut env ty =
 let array_kind exp =
   array_type_kind ~elt_ty:None exp.exp_env exp.exp_loc exp.exp_type
 
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
 (*
-let array_pattern_kind pat elt_sort =
-  array_type_kind
-    ~elt_sort:(Some elt_sort) ~elt_ty:None
-    pat.pat_env pat.pat_loc pat.pat_type
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-let array_pattern_kind pat elt_sort =
-  array_type_kind
-    ~elt_sort:(Some elt_sort) ~elt_ty:None
-    pat.pat_env pat.pat_loc pat.pat_type
-=======
 let array_pattern_kind pat =
   array_type_kind ~elt_ty:None pat.pat_env pat.pat_loc pat.pat_type
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 
 let bigarray_decode_type env ty tbl dfl =
   match scrape env ty with

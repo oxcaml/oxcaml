@@ -1073,24 +1073,7 @@ let merloc startpos ?endpos x =
 %token AMPERSAND [@symbol "&"]
 %token AND [@symbol "and"]
 %token AS [@symbol "as"]
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
 %token ASSERT [@symbol "assert"]
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-%token NONREC                 "nonrec"
-%token OBJECT                 "object"
-%token OF                     "of"
-%token ONCE                   "once_"
-%token OPEN                   "open"
-%token <string> OPTLABEL      "?label:" (* just an example *)
-%token OR                     "or"
-=======
-%token NONREC                 "nonrec"
-%token OBJECT                 "object"
-%token OF                     "of"
-%token OPEN                   "open"
-%token <string> OPTLABEL      "?label:" (* just an example *)
-%token OR                     "or"
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 %token BACKQUOTE [@symbol "`"]
 %token BANG [@symbol "!"]
 %token BAR [@symbol "|"]
@@ -1135,24 +1118,7 @@ let merloc startpos ?endpos x =
 %token GREATERRBRACKET [@symbol ">]"]
 %token HASHLPAREN [@symbol "#("]
 %token HASHLBRACE [@symbol "#{"]
-<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
 %token HASHFALSE [@symbol "#false"]
-||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
-%token TYPE                   "type"
-%token <string> UIDENT        "UIdent" (* just an example *)
-%token UNDERSCORE             "_"
-%token UNIQUE                 "unique_"
-%token VAL                    "val"
-%token VIRTUAL                "virtual"
-%token WHEN                   "when"
-=======
-%token TYPE                   "type"
-%token <string> UIDENT        "UIdent" (* just an example *)
-%token UNDERSCORE             "_"
-%token VAL                    "val"
-%token VIRTUAL                "virtual"
-%token WHEN                   "when"
->>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 %token HASHTRUE [@symbol "#true"]
 %token IF [@symbol "if"]
 %token IN [@symbol "in"]
@@ -1206,7 +1172,6 @@ let merloc startpos ?endpos x =
 %token NONREC [@cost 1] [@symbol "nonrec"]
 %token OBJECT [@symbol "object"]
 %token OF [@symbol "of"]
-%token ONCE [@symbol "once"]
 %token OPEN [@symbol "open"]
 %token <string> OPTLABEL [@cost 2] [@recovery "_"][@printer Printf.sprintf "OPTLABEL(%S)"] [@symbol "?<label>"]
 %token OR [@symbol "or"]
@@ -1229,7 +1194,6 @@ let merloc startpos ?endpos x =
 %token RPAREN [@symbol ")"]
 %token SEMI [@symbol ";"]
 %token SEMISEMI [@symbol ";;"]
-%token UNIQUE [@symbol "unique"]
 %token HASH [@symbol "#"]
 %token HASH_SUFFIX [@symbol "# "]
 %token <string> HASHOP [@cost 2] [@recovery ""][@printer Printf.sprintf "HASHOP(%S)"] [@symbol "#<op>"]
