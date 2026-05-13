@@ -390,13 +390,29 @@ let insert_reloads_in_block :
     | None -> dummy_instr_of_terminator block.terminator
     | Some hd -> hd
   in
-  (* A multi-result rematerialization source (today only multi-result loads;
-     constants and [Intop_imm] are single-result) that is rematerialized at this
-     block appears in [remats] once per result register, all sharing the same
-     source instruction [id]. We must emit only one copy per distinct source:
-     that single rematerialized instruction defines all of the result registers
-     (with their substituted names) in one go. Tracking the set of
-     already-emitted source ids makes the deduplication explicit. *)
+  (* Deduplication policy.
+
+     Multi-result rematerialization sources (today only multi-result immutable
+     loads; constants and [Intop_imm] are single-result) appear in [remats] once
+     per result register, all sharing the same source instruction [id]. We emit
+     a single copy per distinct multi-result source: that one instruction
+     defines all of its result registers (with their substituted names) in one
+     go, as set up by [make_reload]'s multi-result branch.
+
+     Single-result sources, however, MUST be emitted once per [old_reg], not
+     once per source [id]. When [try_rematerialize] follows a [Move] chain (e.g.
+     [a := Load ...; b := a; c := b]), several distinct description-stamps along
+     the chain can independently land in [definitions_at_beginning] at the same
+     block, each routed to its own fresh [new_reg] by
+     [compute_substitution_tree]. They all share the same source instruction
+     (the Load at the head of the chain), and a single-result [make_reload]
+     emits with [res = [|new_reg|]] for its [old_reg]. Deduplicating by
+     [source.id] would emit the source ONCE — defining only ONE of those fresh
+     [new_reg]s and leaving the others undefined, so any consumer reading the
+     un-emitted [new_reg] would read garbage. Emitting per [old_reg] gives each
+     renamed copy its own materializing instruction; downstream coalescing in
+     the register allocator can then often merge them back if they end up in the
+     same physical register. *)
   let already_emitted = ref Instruction.IdSet.empty in
   Reg.Map.iter
     (fun old_reg kind ->
@@ -406,9 +422,14 @@ let insert_reloads_in_block :
         (* [remats] only contains [Rematerialize] entries by construction. *)
         | Reload -> assert false
       in
-      if not (Instruction.IdSet.mem source.id !already_emitted)
+      let single_result = Array.length source.res = 1 in
+      let should_emit =
+        single_result || not (Instruction.IdSet.mem source.id !already_emitted)
+      in
+      if should_emit
       then (
-        already_emitted := Instruction.IdSet.add source.id !already_emitted;
+        if not single_result
+        then already_emitted := Instruction.IdSet.add source.id !already_emitted;
         let new_reg = Substitution.apply_reg block_subst old_reg in
         let remat =
           make_reload state ~instr_id ~stack_subst ~block_subst ~old_reg
