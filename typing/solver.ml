@@ -774,7 +774,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
-    if eq_morphvar dst mv mu || C.le dst (mupper dst mv) (mlower dst mu)
+    if C.le dst (mupper dst mv) (mlower dst mu)
+    then Ok ()
+    else if eq_morphvar dst mv mu
     then Ok ()
     else
       let muupper = mupper dst mu in
