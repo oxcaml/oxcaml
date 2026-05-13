@@ -51,6 +51,7 @@ type _ param_cons =
       (encode_env -> 'p -> param list) * 'p case_cons list
       -> 'p param_cons
   | CMap : 'a param_cons * ('b, 'a) map_lens -> 'b param_cons
+  | CList : 'a param_cons -> 'a list param_cons
   | CParam2 : 'a param_cons * 'b param_cons -> ('a * 'b) param_cons
   | CParam3 :
       'a param_cons * 'b param_cons * 'c param_cons
@@ -112,6 +113,12 @@ let extract_param (env : decode_env) (params : param list)
       match aux param_cons params with
       | Some (p, params) -> Some (decode env p, params)
       | None -> etr cases params)
+  and list : type a.
+      a param_cons -> a list -> param list -> (a list * param list) option =
+   fun cons acc params ->
+    match aux cons params with
+    | None -> Some (List.rev acc, params) (* Empty list always matchable *)
+    | Some (e, params) -> list cons (e :: acc) params
   and map : type a b.
       a param_cons ->
       (decode_env -> a -> b) ->
@@ -146,6 +153,7 @@ let extract_param (env : decode_env) (params : param list)
     | COptional pcons -> opt pcons
     | CEither (_, cases) -> etr cases
     | CMap (pcons, l) -> map pcons l.decode
+    | CList pcons -> list pcons []
     | CVoid -> void
     | CAtom pc -> atom pc []
     | CParam2 (pc1, pc2) -> param2 pc1 pc2
@@ -167,6 +175,7 @@ let rec build_param : type p. encode_env -> p -> p param_cons -> param list =
   | CDefault (pcons, default, eq) ->
     if eq p default then [] else build_param env p pcons
   | CEither (encode, _) -> encode env p
+  | CList pcons -> List.concat_map (fun pe -> build_param env pe pcons) p
   | CMap (pcons, f) -> build_param env (f.encode env p) pcons
   | CParam2 (pc1, pc2) ->
     let p1, p2 = p in
@@ -263,7 +272,7 @@ module Describe = struct
        cases as defaults tend to be at root level *)
     match pcons with
     | CDefault (pcons, _, _) -> CAtom pcons
-    | CVoid | CAtom _ | CLabeled _ | COptional _ | CEither _ | CMap _
+    | CVoid | CAtom _ | CLabeled _ | COptional _ | CEither _ | CList _ | CMap _
     | CParam2 _ | CParam3 _ ->
       CAtom pcons
 
@@ -284,6 +293,11 @@ module Describe = struct
     CDefault (pcons, def, eq)
 
   let option (pcons : 'p param_cons) : 'p option param_cons = COptional pcons
+
+  let list (pcons : 'p param_cons) : 'p list param_cons =
+    (* Atomize the list to render explicitely the empty list and avoid
+       interleaving of other values *)
+    CAtom (CList pcons)
 
   type 'p encode_case = encode_env -> 'p -> param list
 

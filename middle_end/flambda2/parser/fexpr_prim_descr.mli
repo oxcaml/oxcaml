@@ -164,6 +164,10 @@ module Describe : sig
   (** Makes a construction optional. Always matches. *)
   val option : 'p param_cons -> 'p option param_cons
 
+  (** Makes a list of a construction. Atomized to make the list explicit,
+      expects its own level of bracket syntactically *)
+  val list : 'p param_cons -> 'p list param_cons
+
   (** Custom transformation of parameter value.
 
       Labels inverted to be related to the argument. [maps x ~to_ ~from] read

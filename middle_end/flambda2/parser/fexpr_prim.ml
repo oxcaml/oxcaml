@@ -108,17 +108,58 @@ let block_access_field_kind =
     default ~def:P.Block_access_field_kind.Any_value
     @@ constructor_flag ["imm", P.Block_access_field_kind.Immediate])
 
+let flat_suffix_element =
+  D.constructor_flag
+    K.
+      [ "float", Naked_float;
+        "float32", Naked_float32;
+        "int8", Naked_int8;
+        "int16", Naked_int16;
+        "int32", Naked_int32;
+        "int64", Naked_int64;
+        "nativeint", Naked_nativeint;
+        "imm", Naked_immediate;
+        "vec128", Naked_vec128;
+        "vec256", Naked_vec256;
+        "vec512", Naked_vec512 ]
+
+let mixed_block_shape =
+  let open D in
+  maps
+    ~from:(fun _ (size, suffix) ->
+      K.Mixed_block_shape.from_prefix_size_and_suffix_elements size suffix)
+    ~to_:(fun _ shape ->
+      K.Mixed_block_shape.(
+        value_prefix_size shape, Array.to_list (flat_suffix shape)))
+    (param2 int (list flat_suffix_element))
+
 let block_access_kind =
   let open D in
+  let tag = or_unknown @@ labeled "tag" scannable_tag in
+  let size = or_unknown @@ labeled "size" target_ocaml_int in
+  let|= mixed_field_kind =
+    let open P.Mixed_block_access_field_kind in
+    let| value_k = block_access_field_kind, fun _ bak -> Value_prefix bak in
+    let| suffix_k = flat_suffix_element, fun _ fse -> Flat_suffix fse in
+    return_either (fun env mfk ->
+        match mfk with
+        | Value_prefix bak -> value_k env bak
+        | Flat_suffix fse -> suffix_k env fse)
+  in
   let|= bak =
     let| naked_float =
-      ( param2 (flag "float") (or_unknown @@ labeled "size" target_ocaml_int),
+      ( param2 (flag "float") size,
         fun _ ((), size) -> P.Block_access_kind.Naked_floats { size } )
     in
+    let| mixed =
+      ( param2
+          (param3 (flag "mixed") tag size)
+          (param2 mixed_field_kind mixed_block_shape),
+        fun _ (((), tag, size), (field_kind, shape)) ->
+          P.Block_access_kind.Mixed { tag; size; field_kind; shape } )
+    in
     let| value_k =
-      ( param3 block_access_field_kind
-          (or_unknown @@ labeled "tag" scannable_tag)
-          (or_unknown @@ labeled "size" target_ocaml_int),
+      ( param3 block_access_field_kind tag size,
         fun _ (field_kind, tag, size) ->
           P.Block_access_kind.Values { field_kind; tag; size } )
     in
@@ -128,7 +169,7 @@ let block_access_kind =
           | Values { field_kind; tag; size } ->
             value_k env (field_kind, tag, size)
           | Naked_floats { size } -> naked_float env ((), size)
-          | Mixed _ -> Misc.fatal_errorf "Unsupported %a" print bak))
+          | Mixed m -> mixed env (((), m.tag, m.size), (m.field_kind, m.shape))))
   in
   bak
 
