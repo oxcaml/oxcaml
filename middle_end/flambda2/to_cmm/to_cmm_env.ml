@@ -999,6 +999,23 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
         let env = remove_binding env var in
         will_inline_simple env res binding))
 
+let find_pure_bound_cmm_expr env var =
+  let var = resolve_alias env var in
+  match Variable.Map.find var env.bindings with
+  | exception Not_found -> None
+  | Binding binding -> (
+    match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
+    | Effect | Coeffect_only | Generative_immutable -> None
+    | Pure ->
+      let cmm_expr_of_bound_expr (type a) (b : a bound_expr) =
+        match b with
+        | Simple { cmm_expr; free_vars = _ } | Split { cmm_expr; free_vars = _ }
+          ->
+          Some cmm_expr
+        | Splittable_prim _ -> None
+      in
+      cmm_expr_of_bound_expr binding.bound_expr)
+
 (* Handling of aliases between variables *)
 
 (* Situation: [alias_of] is a `must_inline_once` and [var] is used exactly once
