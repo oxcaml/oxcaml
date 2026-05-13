@@ -153,6 +153,23 @@ module Describe : sig
   val param3 :
     'a param_cons -> 'b param_cons -> 'c param_cons -> ('a * 'b * 'c) param_cons
 
+  (** Triple of constructions. *)
+  val param4 :
+    'a param_cons ->
+    'b param_cons ->
+    'c param_cons ->
+    'd param_cons ->
+    ('a * 'b * 'c * 'd) param_cons
+
+  (** Triple of constructions. *)
+  val param5 :
+    'a param_cons ->
+    'b param_cons ->
+    'c param_cons ->
+    'd param_cons ->
+    'e param_cons ->
+    ('a * 'b * 'c * 'd * 'e) param_cons
+
   (** Specify a default value for the underlying constructor, which will be used
       if there is no match. In conversion to fexpr, if the provided parameter
       equals the default, no parameter will be produced. [~eq] allows the
@@ -213,6 +230,38 @@ module Describe : sig
     'p build_either
 
   val ( let|= ) : 'p build_either -> ('p param_cons -> 'a) -> 'a
+
+  val param2_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    ('c1 * 'c2) param_cons * (decode_env -> 'c1 * 'c2 -> 'p)
+
+  val param3_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'c3 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    'c3 param_cons ->
+    ('c1 * 'c2 * 'c3) param_cons * (decode_env -> 'c1 * 'c2 * 'c3 -> 'p)
+
+  val param4_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'c3 -> 'c4 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    'c3 param_cons ->
+    'c4 param_cons ->
+    ('c1 * 'c2 * 'c3 * 'c4) param_cons
+    * (decode_env -> 'c1 * 'c2 * 'c3 * 'c4 -> 'p)
+
+  val param5_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'c3 -> 'c4 -> 'c5 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    'c3 param_cons ->
+    'c4 param_cons ->
+    'c5 param_cons ->
+    ('c1 * 'c2 * 'c3 * 'c4 * 'c5) param_cons
+    * (decode_env -> 'c1 * 'c2 * 'c3 * 'c4 * 'c5 -> 'p)
 
   (** {2 Parameter payload descriptors}
 

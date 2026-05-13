@@ -123,7 +123,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
-        %block.imm_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+        %block.immut_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
       in
       let eval_level = closure eval_level_3_1 @eval_level
       with {
@@ -239,7 +239,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
-        %block.imm_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+        %block.immut_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
       in
       let eval_level = closure eval_level_3_2 @eval_level
       with {

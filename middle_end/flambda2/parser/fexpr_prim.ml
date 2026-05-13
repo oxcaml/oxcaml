@@ -32,11 +32,11 @@ let scannable_tag : Tag.Scannable.t param_cons =
     }
 
 let mutability =
-  D.(
-    default ~def:Mutability.Immutable
-    @@ constructor_flag
-         Mutability.
-           ["immut", Immutable; "imm_uniq", Immutable_unique; "mut", Mutable])
+  D.constructor_flag
+    Mutability.
+      ["immut", Immutable; "immut_uniq", Immutable_unique; "mut", Mutable]
+
+let opt_mutability = D.default ~def:Mutability.Immutable mutability
 
 let mutable_flag =
   D.(
@@ -152,16 +152,15 @@ let block_access_kind =
         fun _ ((), size) -> P.Block_access_kind.Naked_floats { size } )
     in
     let| mixed =
-      ( param2
-          (param3 (flag "mixed") tag size)
-          (param2 mixed_field_kind mixed_block_shape),
-        fun _ (((), tag, size), (field_kind, shape)) ->
-          P.Block_access_kind.Mixed { tag; size; field_kind; shape } )
+      param5_case
+        ~decode:(fun _ () tag size field_kind shape ->
+          P.Block_access_kind.Mixed { tag; size; field_kind; shape })
+        (flag "mixed") tag size mixed_field_kind mixed_block_shape
     in
     let| value_k =
-      ( param3 block_access_field_kind tag size,
-        fun _ (field_kind, tag, size) ->
-          P.Block_access_kind.Values { field_kind; tag; size } )
+      param3_case block_access_field_kind tag size
+        ~decode:(fun _ field_kind tag size ->
+          P.Block_access_kind.Values { field_kind; tag; size })
     in
     P.Block_access_kind.(
       return_either (fun env bak ->
@@ -169,7 +168,7 @@ let block_access_kind =
           | Values { field_kind; tag; size } ->
             value_k env (field_kind, tag, size)
           | Naked_floats { size } -> naked_float env ((), size)
-          | Mixed m -> mixed env (((), m.tag, m.size), (m.field_kind, m.shape))))
+          | Mixed m -> mixed env ((), m.tag, m.size, m.field_kind, m.shape)))
   in
   bak
 
@@ -570,7 +569,7 @@ let block_load =
   D.(
     unary "%block_load"
       ~params:
-        (param3 block_access_kind mutability (positional target_ocaml_int))
+        (param3 block_access_kind opt_mutability (positional target_ocaml_int))
       (fun _env (kind, mut, field) -> P.Block_load { kind; mut; field }))
 
 let bigarray_length =
@@ -760,7 +759,7 @@ let array_load =
     binary "%array_load"
       ~params:
         (maps
-           (param2 array_kind mutability)
+           (param2 array_kind opt_mutability)
            ~from:(fun _ (k, m) ->
              let lk : P.Array_load_kind.t =
                match (k : P.Array_kind.t) with
@@ -806,13 +805,21 @@ let int_comp =
   let open Flambda_primitive in
   let sign = default ~def:Signed @@ constructor_flag ["unsigned", Unsigned] in
   let|= comp =
-    let| lt = param2 sign (flag "lt"), fun _ (s, ()) -> Yielding_bool (Lt s) in
-    let| le = param2 sign (flag "le"), fun _ (s, ()) -> Yielding_bool (Le s) in
-    let| gt = param2 sign (flag "gt"), fun _ (s, ()) -> Yielding_bool (Gt s) in
-    let| ge = param2 sign (flag "ge"), fun _ (s, ()) -> Yielding_bool (Ge s) in
+    let| lt =
+      param2_case sign (flag "lt") ~decode:(fun _ s () -> Yielding_bool (Lt s))
+    in
+    let| le =
+      param2_case sign (flag "le") ~decode:(fun _ s () -> Yielding_bool (Le s))
+    in
+    let| gt =
+      param2_case sign (flag "gt") ~decode:(fun _ s () -> Yielding_bool (Gt s))
+    in
+    let| ge =
+      param2_case sign (flag "ge") ~decode:(fun _ s () -> Yielding_bool (Ge s))
+    in
     let| qmark =
-      ( param2 sign (flag "qmark"),
-        fun _ (s, ()) -> Yielding_int_like_compare_functions s )
+      param2_case sign (flag "qmark") ~decode:(fun _ s () ->
+          Yielding_int_like_compare_functions s)
     in
     let| eq = flag "eq", fun _ () -> Yielding_bool Eq in
     let| neq = flag "ne", fun _ () -> Yielding_bool Neq in
@@ -1009,7 +1016,7 @@ let begin_try_ghost_region =
 let make_block =
   D.(
     variadic "%block"
-      ~params:(param3 mutability block_kind alloc_mode_for_allocation)
+      ~params:(param3 opt_mutability block_kind alloc_mode_for_allocation)
       (fun _ (m, k, a) n ->
         let kind =
           match k with
@@ -1023,7 +1030,7 @@ let make_block =
 let make_array =
   D.(
     variadic "%array"
-      ~params:(param3 array_kind mutability alloc_mode_for_allocation)
+      ~params:(param3 array_kind opt_mutability alloc_mode_for_allocation)
       (fun _ (k, m, a) _ -> P.Make_array (k, m, a)))
 
 module OfFlambda = struct

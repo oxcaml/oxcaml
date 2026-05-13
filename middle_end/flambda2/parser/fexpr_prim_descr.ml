@@ -56,6 +56,16 @@ type _ param_cons =
   | CParam3 :
       'a param_cons * 'b param_cons * 'c param_cons
       -> ('a * 'b * 'c) param_cons
+  | CParam4 :
+      'a param_cons * 'b param_cons * 'c param_cons * 'd param_cons
+      -> ('a * 'b * 'c * 'd) param_cons
+  | CParam5 :
+      'a param_cons
+      * 'b param_cons
+      * 'c param_cons
+      * 'd param_cons
+      * 'e param_cons
+      -> ('a * 'b * 'c * 'd * 'e) param_cons
 
 and 'p case_cons =
   | Case : 'a param_cons * (decode_env -> 'a -> 'p) -> 'p case_cons
@@ -146,6 +156,34 @@ let extract_param (env : decode_env) (params : param list)
         Option.bind (aux pc2 params) (fun (p2, params) ->
             Option.bind (aux pc3 params) (fun (p3, params) ->
                 Some ((p1, p2, p3), params))))
+  and param4 : type p q r s.
+      p param_cons ->
+      q param_cons ->
+      r param_cons ->
+      s param_cons ->
+      param list ->
+      ((p * q * r * s) * param list) option =
+   fun pc1 pc2 pc3 pc4 params ->
+    Option.bind (aux pc1 params) (fun (p1, params) ->
+        Option.bind (aux pc2 params) (fun (p2, params) ->
+            Option.bind (aux pc3 params) (fun (p3, params) ->
+                Option.bind (aux pc4 params) (fun (p4, params) ->
+                    Some ((p1, p2, p3, p4), params)))))
+  and param5 : type p q r s t.
+      p param_cons ->
+      q param_cons ->
+      r param_cons ->
+      s param_cons ->
+      t param_cons ->
+      param list ->
+      ((p * q * r * s * t) * param list) option =
+   fun pc1 pc2 pc3 pc4 pc5 params ->
+    Option.bind (aux pc1 params) (fun (p1, params) ->
+        Option.bind (aux pc2 params) (fun (p2, params) ->
+            Option.bind (aux pc3 params) (fun (p3, params) ->
+                Option.bind (aux pc4 params) (fun (p4, params) ->
+                    Option.bind (aux pc5 params) (fun (p5, params) ->
+                        Some ((p1, p2, p3, p4, p5), params))))))
   and aux : type p. p param_cons -> param list -> (p * param list) option =
     function
     | CLabeled (llens, pc) -> lbl llens pc []
@@ -158,6 +196,8 @@ let extract_param (env : decode_env) (params : param list)
     | CAtom pc -> atom pc []
     | CParam2 (pc1, pc2) -> param2 pc1 pc2
     | CParam3 (pc1, pc2, pc3) -> param3 pc1 pc2 pc3
+    | CParam4 (pc1, pc2, pc3, pc4) -> param4 pc1 pc2 pc3 pc4
+    | CParam5 (pc1, pc2, pc3, pc4, pc5) -> param5 pc1 pc2 pc3 pc4 pc5
   in
   aux cons params
 
@@ -183,6 +223,14 @@ let rec build_param : type p. encode_env -> p -> p param_cons -> param list =
   | CParam3 (pc1, pc2, pc3) ->
     let p1, p2, p3 = p in
     build_param env p1 pc1 @ build_param env p2 pc2 @ build_param env p3 pc3
+  | CParam4 (pc1, pc2, pc3, pc4) ->
+    let p1, p2, p3, p4 = p in
+    build_param env p1 pc1 @ build_param env p2 pc2 @ build_param env p3 pc3
+    @ build_param env p4 pc4
+  | CParam5 (pc1, pc2, pc3, pc4, pc5) ->
+    let p1, p2, p3, p4, p5 = p in
+    build_param env p1 pc1 @ build_param env p2 pc2 @ build_param env p3 pc3
+    @ build_param env p4 pc4 @ build_param env p5 pc5
 
 let lens_of_cons id (cons : 'p param_cons) : 'p params_lens =
   { encode = (fun env p -> build_param env p cons);
@@ -271,9 +319,10 @@ module Describe = struct
        constructors to end with a deeper default, but this should avoid most
        cases as defaults tend to be at root level *)
     match pcons with
-    | CDefault (pcons, _, _) -> CAtom pcons
+    | CDefault (_pcons, _, _) ->
+      Misc.fatal_error "Positional parameter does not support defaulting values"
     | CVoid | CAtom _ | CLabeled _ | COptional _ | CEither _ | CList _ | CMap _
-    | CParam2 _ | CParam3 _ ->
+    | CParam2 _ | CParam3 _ | CParam4 _ | CParam5 _ ->
       CAtom pcons
 
   let labeled label (pcons : 'a param_cons) : 'a param_cons =
@@ -344,6 +393,23 @@ module Describe = struct
   let param2 pc1 pc2 = CParam2 (pc1, pc2)
 
   let param3 pc1 pc2 pc3 = CParam3 (pc1, pc2, pc3)
+
+  let param4 pc1 pc2 pc3 pc4 = CParam4 (pc1, pc2, pc3, pc4)
+
+  let param5 pc1 pc2 pc3 pc4 pc5 = CParam5 (pc1, pc2, pc3, pc4, pc5)
+
+  let param2_case ~decode p1 p2 =
+    param2 p1 p2, fun env (c1, c2) -> decode env c1 c2
+
+  let param3_case ~decode p1 p2 p3 =
+    param3 p1 p2 p3, fun env (c1, c2, c3) -> decode env c1 c2 c3
+
+  let param4_case ~decode p1 p2 p3 p4 =
+    param4 p1 p2 p3 p4, fun env (c1, c2, c3, c4) -> decode env c1 c2 c3 c4
+
+  let param5_case ~decode p1 p2 p3 p4 p5 =
+    ( param5 p1 p2 p3 p4 p5,
+      fun env (c1, c2, c3, c4, c5) -> decode env c1 c2 c3 c4 c5 )
 
   let nullary : type p. string -> params:p param_cons -> p cons0 -> p conv =
    fun id ~params cons ->
