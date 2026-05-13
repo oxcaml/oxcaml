@@ -40,8 +40,8 @@ external foo : (int16 [@untagged]) -> int = "" "foo"
 external foo : int -> (int8 [@unboxed]) = "" "foo"
 external foo : int -> (int16 [@unboxed]) = "" "foo"
 [%%expect {|
-external foo : int -> (int8 [@untagged]) = "" "foo"
-external foo : int -> (int16 [@untagged]) = "" "foo"
+external foo : int -> (int8 [@unboxed]) = "" "foo"
+external foo : int -> (int16 [@unboxed]) = "" "foo"
 |}]
 
 (* Warning can be ignored *)

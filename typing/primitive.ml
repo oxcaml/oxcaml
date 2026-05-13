@@ -279,12 +279,12 @@ let print p osig_val_decl =
     | _, Same_as_ocaml_repr (Base Scannable)
     | _, Repr_poly
     | _, Unpacked_product _
-    | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
-                                    | Untagged_int16) -> false
+    | _, Unboxed_or_untagged_integer Untagged_int -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
-                                    | Unboxed_nativeint) ->
+    | _, Unboxed_or_untagged_integer
+           (Untagged_int8 | Untagged_int16 | Unboxed_int64 | Unboxed_int32
+           | Unboxed_nativeint) ->
       true
     | _, Same_as_ocaml_repr (Base Void) -> false
       (* The [@unboxed] attribute is not supported on void in our compiler
@@ -297,14 +297,13 @@ let print p osig_val_decl =
       Language_extension.erasable_extensions_only ()
   in
   let is_untagged = function
-    | _, Unboxed_or_untagged_integer (Untagged_int8 | Untagged_int16) ->
-      Language_extension.erasable_extensions_only ()
     | _, Unboxed_or_untagged_integer (Untagged_int) -> true
     | _, Same_as_ocaml_repr _
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
-                                    | Unboxed_nativeint)
+    | _, Unboxed_or_untagged_integer
+           (Untagged_int8 | Untagged_int16 | Unboxed_int64 | Unboxed_int32
+           | Unboxed_nativeint)
     | _, Unpacked_product _
     | _, Repr_poly -> false
   in
@@ -345,11 +344,11 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
-     | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64
-                                   | Unboxed_nativeint) ->
+     | Unboxed_or_untagged_integer
+         (Untagged_int8 | Untagged_int16 | Unboxed_int32 | Unboxed_int64
+         | Unboxed_nativeint) ->
        if all_unboxed then [] else [oattr_unboxed]
-     | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
-                                   | Untagged_int16) ->
+     | Unboxed_or_untagged_integer Untagged_int ->
        if all_untagged then [] else [oattr_untagged]
      | Unpacked_product _ -> [oattr_unpacked]
      | Same_as_ocaml_repr _->
