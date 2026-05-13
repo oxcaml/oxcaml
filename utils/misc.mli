@@ -1118,6 +1118,11 @@ end
 (** Propositional equality *)
 type (_, _) eq = Refl : ('a, 'a) eq
 
+(** Propositional equality test *)
+type (_, _) is_eq =
+  | Is_eq : ('a, 'a) is_eq
+  | Is_not_eq : ('a, 'b) is_eq
+
 (** Propositional comparison *)
 type ('a, 'b) comparison =
   | Less_than : ('a, 'b) comparison

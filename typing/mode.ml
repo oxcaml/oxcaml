@@ -1258,29 +1258,29 @@ module Lattices = struct
     | _, Comonadic_with_regionality -> 1
     | Comonadic_with_locality, Comonadic_with_locality -> 0
 
-  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =
+  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.is_eq =
    fun a b ->
     match a, b with
-    | Locality, Locality -> Some Refl
-    | Regionality, Regionality -> Some Refl
-    | Uniqueness_op, Uniqueness_op -> Some Refl
-    | Linearity, Linearity -> Some Refl
-    | Portability, Portability -> Some Refl
-    | Forkable, Forkable -> Some Refl
-    | Yielding, Yielding -> Some Refl
-    | Statefulness, Statefulness -> Some Refl
-    | Contention_op, Contention_op -> Some Refl
-    | Visibility_op, Visibility_op -> Some Refl
-    | Staticity_op, Staticity_op -> Some Refl
-    | Monadic_op, Monadic_op -> Some Refl
-    | Comonadic_with_regionality, Comonadic_with_regionality -> Some Refl
-    | Comonadic_with_locality, Comonadic_with_locality -> Some Refl
+    | Locality, Locality -> Misc.Is_eq
+    | Regionality, Regionality -> Misc.Is_eq
+    | Uniqueness_op, Uniqueness_op -> Misc.Is_eq
+    | Linearity, Linearity -> Misc.Is_eq
+    | Portability, Portability -> Misc.Is_eq
+    | Forkable, Forkable -> Misc.Is_eq
+    | Yielding, Yielding -> Misc.Is_eq
+    | Statefulness, Statefulness -> Misc.Is_eq
+    | Contention_op, Contention_op -> Misc.Is_eq
+    | Visibility_op, Visibility_op -> Misc.Is_eq
+    | Staticity_op, Staticity_op -> Misc.Is_eq
+    | Monadic_op, Monadic_op -> Misc.Is_eq
+    | Comonadic_with_regionality, Comonadic_with_regionality -> Misc.Is_eq
+    | Comonadic_with_locality, Comonadic_with_locality -> Misc.Is_eq
     | ( ( Locality | Regionality | Uniqueness_op | Linearity | Portability
         | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
         | Staticity_op | Monadic_op | Comonadic_with_regionality
         | Comonadic_with_locality ),
         _ ) ->
-      None
+      Misc.Is_not_eq
 end
 
 module Lattices_mono = struct
@@ -1602,6 +1602,13 @@ module Lattices_mono = struct
       let src0 = src dst0 f in
       comonadic_with_obj src0
 
+  let axis_is_eq : type p r1 r2.
+      (p, r1) Axis.t -> (p, r2) Axis.t -> (r1, r2) Misc.is_eq =
+   fun ax1 ax2 ->
+    match Axis.compare ax1 ax2 with
+    | Equal -> Misc.Is_eq
+    | Less_than | Greater_than -> Misc.Is_not_eq
+
   let rec compare_morph : type a1 l1 r1 a2 b l2 r2.
       b obj -> (a1, b, l1 * r1) morph -> (a2, b, l2 * r2) morph -> int =
    fun dst f1 f2 ->
@@ -1615,8 +1622,8 @@ module Lattices_mono = struct
       then c
       else
         match equal_obj src1 src2 with
-        | Some Refl -> Misc.comparison_result (Axis.compare ax1 ax2)
-        | None ->
+        | Misc.Is_eq -> Misc.comparison_result (Axis.compare ax1 ax2)
+        | Misc.Is_not_eq ->
           Misc.fatal_error
             "Mode.Lattices_mono.compare_morph: inconsistent object equality")
     | Proj _, _ -> -1
@@ -1670,8 +1677,8 @@ module Lattices_mono = struct
       then c
       else
         match equal_morph dst f1 f2 with
-        | Some Refl -> compare_morph (src dst f1) g1 g2
-        | None ->
+        | Misc.Is_eq -> compare_morph (src dst f1) g1 g2
+        | Misc.Is_not_eq ->
           Misc.fatal_error
             "Mode.Lattices_mono.compare_morph: inconsistent equality")
     | Compose _, _ -> -1
@@ -1683,42 +1690,42 @@ module Lattices_mono = struct
       b obj ->
       (a1, b, l1 * r1) morph ->
       (a2, b, l2 * r2) morph ->
-      (a1, a2) Misc.eq option =
+      (a1, a2) Misc.is_eq =
    fun dst f1 f2 ->
     match f1, f2 with
-    | Id, Id -> Some Refl
+    | Id, Id -> Misc.Is_eq
     | Proj (src1, ax1), Proj (src2, ax2) -> (
       match equal_obj src1 src2 with
-      | None -> None
-      | Some Refl -> (
-        match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Refl))
-    | Max_with ax1, Max_with ax2 -> (
-      match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Refl)
-    | Min_with ax1, Min_with ax2 -> (
-      match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Refl)
+      | Misc.Is_not_eq -> Misc.Is_not_eq
+      | Misc.Is_eq -> (
+        match Axis.compare ax1 ax2 with
+        | Equal -> Misc.Is_eq
+        | Less_than | Greater_than -> Misc.Is_not_eq))
+    | Max_with ax1, Max_with ax2 -> axis_is_eq ax1 ax2
+    | Min_with ax1, Min_with ax2 -> axis_is_eq ax1 ax2
     | Meet_const c1, Meet_const c2 ->
-      if equal dst c1 c2 then Some Refl else None
+      if equal dst c1 c2 then Misc.Is_eq else Misc.Is_not_eq
     | Imply_const c1, Imply_const c2 ->
-      if equal dst c1 c2 then Some Refl else None
-    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Some Refl
+      if equal dst c1 c2 then Misc.Is_eq else Misc.Is_not_eq
+    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Misc.Is_eq
     | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 ->
       equal_obj a1 a2
-    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Some Refl
+    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Misc.Is_eq
     | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 ->
       equal_obj a1 a2
-    | Local_to_regional, Local_to_regional -> Some Refl
-    | Locality_as_regionality, Locality_as_regionality -> Some Refl
-    | Global_to_regional, Global_to_regional -> Some Refl
-    | Regional_to_local, Regional_to_local -> Some Refl
-    | Regional_to_global, Regional_to_global -> Some Refl
+    | Local_to_regional, Local_to_regional -> Misc.Is_eq
+    | Locality_as_regionality, Locality_as_regionality -> Misc.Is_eq
+    | Global_to_regional, Global_to_regional -> Misc.Is_eq
+    | Regional_to_local, Regional_to_local -> Misc.Is_eq
+    | Regional_to_global, Regional_to_global -> Misc.Is_eq
     | Compose (f1, g1), Compose (f2, g2) -> (
       match equal_morph dst f1 f2 with
-      | None -> None
-      | Some Refl -> equal_morph (src dst f1) g1 g2)
+      | Misc.Is_not_eq -> Misc.Is_not_eq
+      | Misc.Is_eq -> equal_morph (src dst f1) g1 g2)
     | Map_comonadic f, Map_comonadic g ->
       begin match equal_morph (proj_obj Areality dst) f g with
-      | None -> None
-      | Some Refl -> Some Refl
+      | Misc.Is_not_eq -> Misc.Is_not_eq
+      | Misc.Is_eq -> Misc.Is_eq
       end
     | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _ | Imply_const _
         | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
@@ -1727,7 +1734,7 @@ module Lattices_mono = struct
         | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
           ),
         _ ) ->
-      None
+      Misc.Is_not_eq
 
   let rec print_morph : type a b l r.
       b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =
@@ -2819,8 +2826,8 @@ module Report = struct
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
     match C.equal_obj a_obj b_obj with
-    | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | None -> false
+    | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+    | Misc.Is_not_eq -> false
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -5350,16 +5357,6 @@ module Crossing = struct
         | Greater_than -> Greater_than
         end
 
-    let equal : type a b. a t -> b t -> (a, b) Misc.eq option =
-     fun ax1 ax2 ->
-      match ax1, ax2 with
-      | Monadic ax1, Monadic ax2 -> (
-        match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Refl)
-      | Monadic _, _ -> None
-      | _, Monadic _ -> None
-      | Comonadic ax1, Comonadic ax2 -> (
-        match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Refl)
-
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
       | Monadic ax -> Axis.print ppf ax
@@ -5409,7 +5406,11 @@ module Crossing = struct
 
     let compare_obj ax1 ax2 = Misc.comparison_result (Axis.compare ax1 ax2)
 
-    let equal_obj = Axis.equal
+    let equal_obj : type a b. a Axis.t -> b Axis.t -> (a, b) Misc.is_eq =
+     fun ax1 ax2 ->
+      match Axis.compare ax1 ax2 with
+      | Equal -> Misc.Is_eq
+      | Less_than | Greater_than -> Misc.Is_not_eq
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic

@@ -186,8 +186,8 @@ module Per_axis = struct
     let compare_obj : type a b. a t -> b t -> int =
      fun a b -> match a, b with Externality, Externality -> 0
 
-    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
-     fun a b -> match a, b with Externality, Externality -> Some Refl
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
+     fun a b -> match a, b with Externality, Externality -> Misc.Is_eq
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -234,12 +234,12 @@ module Per_axis = struct
     | _, Modal _ -> 1
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.compare_obj ax0 ax1
 
-  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
    fun a b ->
     match a, b with
     | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
-    | Modal _, _ -> None
-    | _, Modal _ -> None
+    | Modal _, _ -> Misc.Is_not_eq
+    | _, Modal _ -> Misc.Is_not_eq
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
 
   let print_obj : type a. Fmt.formatter -> a t -> unit =

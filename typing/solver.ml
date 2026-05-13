@@ -252,8 +252,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         then c
         else
           match C.equal_obj obj1 obj2 with
-          | Some Refl -> C.compare_morph obj1 m1 m2
-          | None ->
+          | Misc.Is_eq -> C.compare_morph obj1 m1 m2
+          | Misc.Is_not_eq ->
             Misc.fatal_error
               "Solver.VarMap.compare: compare_obj inconsistent with equal_obj"
   end)
@@ -772,7 +772,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
     then true
     else
-      match C.equal_morph dst f0 f1 with None -> false | Some Refl -> v0 == v1
+      match C.equal_morph dst f0 f1 with
+      | Misc.Is_not_eq -> false
+      | Misc.Is_eq -> v0 == v1
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
