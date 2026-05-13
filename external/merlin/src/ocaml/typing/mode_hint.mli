@@ -140,6 +140,7 @@ type allocation_desc =
   | Optional_argument
   | Function_coercion
   | Float_projection
+  | Lpoly_captured_environment
 
 type allocation = allocation_desc Location.loc
 

@@ -136,7 +136,6 @@ type t =
 (* Oxcaml specific warnings: numbers should go down from 199 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
-  | Overridden_kind_modifier of string      (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)

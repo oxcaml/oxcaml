@@ -1013,7 +1013,19 @@ let find ~allow_hidden penv f1 f2 name ~allow_excess_args =
 
 let check ~allow_hidden penv f1 f2 ~loc name =
   let {persistent_structures; _} = penv in
-  if not (Hashtbl.mem persistent_structures name) then begin
+  let persistent_structure_visible =
+    match Hashtbl.find persistent_structures name with
+    | ps ->
+        begin
+          match
+            check_visibility ~allow_hidden ps.ps_name_info.pn_import
+          with
+        | () -> true
+        | exception Not_found -> false
+        end
+    | exception Not_found -> false
+  in
+  if not persistent_structure_visible then begin
     (* PR#6843: record the weak dependency ([add_import]) regardless of
        whether the check succeeds, to help make builds more
        deterministic. *)

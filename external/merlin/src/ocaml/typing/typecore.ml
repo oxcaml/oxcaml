@@ -152,6 +152,8 @@ type error =
   | Partial_tuple_pattern_bad_type
   | Extra_tuple_label of string option * type_expr
   | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
   | Label_mismatch of
       record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
@@ -263,6 +265,7 @@ type error =
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
+  | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Wrong_expected_record_boxing of
@@ -302,6 +305,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
+  | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =
@@ -1968,7 +1972,7 @@ let solve_constructor_annotation
         let (id, new_env) =
           Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
-        {name with txt = id}, jkind_annot_opt)
+        {name with txt = id}, jkind_annot_opt, jkind)
       name_list
   in
   let cty, ty, force =
@@ -1991,13 +1995,40 @@ let solve_constructor_annotation
           Ttuple tyl -> (List.map snd tyl)
         | _ -> assert false
   in
-  if existentials <> [] then ignore begin
-    let ids = List.map (fun (x, _) -> x.txt) existentials in
+  (* Check that the kind from the declaration is a subkind of the kind from
+     the pattern annotation. *)
+  let check_existential id declared_jkind =
+    match
+      List.find_opt (fun (n, _, _) -> Ident.same n.txt id) existentials
+    with
+    | None -> assert false
+    | Some (name, jkind_annot_opt, annotated_jkind) ->
+        let type_equal = Ctype.type_equal !!penv in
+        let context = Ctype.mk_jkind_context_always_principal !!penv in
+        (match
+           Jkind.sub_or_error ~type_equal ~context !!penv
+             declared_jkind annotated_jkind
+         with
+         | Ok () -> ()
+         | Error err ->
+             let loc = match jkind_annot_opt with
+               | Some ja -> ja.pjka_loc
+               | None -> name.loc
+             in
+             raise (Error (loc, !!penv,
+                           Existential_jkind_mismatch (name.txt, err))))
+  in
+  (* We don't have to perform checks when [existentials] is empty, because when
+     [name_list] (which has the same length) is empty, [solve_Ppat_construct]
+     uses treatment [Make_existentials_abstract] *)
+  if existentials <> [] then begin
+    let ids = List.map (fun (x, _, _) -> x.txt) existentials in
     let rem =
       List.fold_left
-        (fun rem tv ->
+        (fun rem (tv, declared_jkind) ->
           match get_desc tv with
             Tconstr(Path.Pident id, [], _) when List.mem id rem ->
+              check_existential id declared_jkind;
               list_remove id rem
           | _ ->
               raise (error (cty.ctyp_loc, !!penv,
@@ -2008,6 +2039,10 @@ let solve_constructor_annotation
       raise (error (cty.ctyp_loc, !!penv,
                     Unbound_existential (ids, ty)))
   end;
+  let existentials =
+    List.map (fun (name, jkind_annot_opt, _) -> name, jkind_annot_opt)
+      existentials
+  in
   ty_args, Some (existentials, cty)
 
 let solve_Ppat_construct ~refine tps penv loc constr no_existentials
@@ -2600,7 +2635,7 @@ module Label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Legacy ~loc usage path env
   let in_env lbl =
     match lbl.lbl_repres with
-    | Record_boxed _ | Record_float | Record_ufloat | Record_unboxed
+    | Record_boxed | Record_float | Record_ufloat | Record_unboxed
     | Record_mixed _ -> true
     | Record_inlined _ -> false
 end)
@@ -3088,14 +3123,13 @@ and type_pat_aux
   let type_tuple_pat spl closed =
     (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
        when we allow non-values in boxed tuples. *)
+    Option.iter
+      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
+      (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Ttuple labeled_tl when is_principal expected_ty ->
-        begin match closed with
-        | Open -> Language_extension.assert_enabled ~loc Labeled_tuples ()
-        | Closed -> ()
-        end;
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
@@ -3108,9 +3142,6 @@ and type_pat_aux
     in
     let pl =
       List.map (fun (lbl, p, t, alloc_mode) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
         lbl,
         type_pat tps Value ~alloc_mode p t
           Jkind.Sort.(of_const Const.for_tuple_element))
@@ -3127,14 +3158,13 @@ and type_pat_aux
   let type_unboxed_tuple_pat spl closed =
     Language_extension.assert_enabled ~loc Layouts
       Language_extension.Stable;
+    Option.iter
+      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
+      (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
-                begin match closed with
-        | Open -> Language_extension.assert_enabled ~loc Labeled_tuples ()
-        | Closed -> ()
-        end;
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
@@ -3148,9 +3178,6 @@ and type_pat_aux
     in
     let pl =
       List.map (fun (lbl, p, t, alloc_mode, sort) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
         lbl, type_pat tps Value ~alloc_mode p t sort, sort)
         spl_ann
     in
@@ -3258,18 +3285,23 @@ and type_pat_aux
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
-      let lpoly =
-        if (penv : Pattern_env.t).is_lpoly
-        then Lpoly.pending ~loc
-        else Lpoly.determined []
-      in
-      let id, uid =
-        enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
-      in
       let pat_desc =
-        if (penv : Pattern_env.t).is_lpoly
-        then Tpat_fun_layout { id; name; uid; sort; mode = alloc_mode; lpoly }
-        else Tpat_var { id; name; uid; sort; mode = alloc_mode }
+        match (penv : Pattern_env.t).env_alloc_mode with
+        | Some env_alloc_mode ->
+          let lpoly = Lpoly.pending ~loc in
+          let id, uid =
+            enter_variable ~lpoly tps loc name mode ~kind ty
+              sp.ppat_attributes sort
+          in
+          Tpat_fun_layout { id; name; uid; sort;
+                            mode = alloc_mode; lpoly; env_alloc_mode }
+        | None ->
+          let lpoly = Lpoly.determined [] in
+          let id, uid =
+            enter_variable ~lpoly tps loc name mode ~kind ty
+              sp.ppat_attributes sort
+          in
+          Tpat_var { id; name; uid; sort; mode = alloc_mode }
       in
       rvp {
         pat_desc;
@@ -3699,13 +3731,14 @@ let type_pattern
 
 let type_pattern_list
     category no_existentials env mutable_flag spatl expected_tys expected_sorts
-    allow_modules ~is_lpoly
+    allow_modules
   =
   let tps = create_type_pat_state allow_modules in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
-      ~is_lpoly ~equations_scope ~allow_recursive_equations:false in
-  let type_pat (attrs, pat_mode, exp_mode, pat) ty sort =
+      ~equations_scope ~allow_recursive_equations:false in
+  let type_pat (attrs, pat_mode, env_alloc_mode, exp_mode, pat) ty sort =
+    Pattern_env.set_env_alloc_mode new_penv env_alloc_mode;
     Builtin_attributes.warning_scope ~ppwarning:false attrs
       (fun () ->
          exp_mode,
@@ -5051,6 +5084,38 @@ let rec maybe_computation exp =
     -> true
   | Texp_typed_hole -> false
 
+(* Returns true if, for every [Texp_ident x] occurring in the expression,
+   the comonadic axes of the expression are weaker (higher) than [x].
+   Conservative: may return false when the condition holds. *)
+let rec check_captures_comonadic env (exp : expression) =
+  let check e = check_captures_comonadic env e in
+  let fail () =
+    raise (Error (exp.exp_loc, env, Let_poly_not_syntactic_value))
+  in
+  match exp.exp_desc with
+  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _
+  | Texp_function _ -> ()
+  | Texp_construct (_, _, args, _) ->
+    List.iter check args
+  | Texp_variant (_, None) -> ()
+  | Texp_variant (_, Some (e, _)) -> check e
+  | Texp_tuple (args, _) ->
+    List.iter (fun (_, e) -> check e) args
+  | Texp_unboxed_tuple args ->
+    List.iter (fun (_, e, _) -> check e) args
+  | Texp_record { fields; extended_expression = None; _ } ->
+    Array.iter (fun (_, def) ->
+      match def with
+      | Kept _ -> assert false
+      | Overridden (_, e) -> check e) fields
+  | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
+    Array.iter (fun (_, def) ->
+      match def with
+      | Kept _ -> assert false
+      | Overridden (_, e) -> check e) fields
+  | Texp_apply_layout (e, _) | Texp_exclave e -> check e
+  | _ -> fail ()
+
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
@@ -6067,7 +6132,7 @@ let vb_pat_constraint
   in
   vb.pvb_attributes, spat
 
-let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
+let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   let pat_mode, exp_mode =
     if force_toplevel
     then simple_pat_mode Value.legacy, mode_legacy
@@ -6087,7 +6152,24 @@ let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
     | Some mode ->
         simple_pat_mode mode, mode_default mode
   in
-  attrs, pat_mode, exp_mode, spat
+  let env_alloc_mode, exp_mode =
+    if is_lpoly then
+      (* Since we require [captures_comonadic] for the RHS of [let poly_], we
+         can conservatively use the RHS's comonadic mode as the captured
+         environment's mode. *)
+      let env_alloc_mode, env_mode =
+        register_allocation ~loc:spat.ppat_loc
+          ~desc:Lpoly_captured_environment exp_mode
+      in
+      let exp_mode =
+        (* [env_mode] guaranteed to be lower than [exp_mode], but prioritize
+           [exp_mode] for mode error hints. *)
+        Mode.Value.meet (List.map as_single_mode [exp_mode; env_mode])
+      in
+      Some env_alloc_mode, mode_default exp_mode
+    else None, exp_mode
+  in
+  attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
 let create_merlin_type_error_node loc env ty_expected ~attributes =
     { exp_desc =
@@ -6285,7 +6367,7 @@ and type_expect_
           | Record_unboxed
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
             -> false
-          | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _
+          | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
             -> true
         end
@@ -7075,12 +7157,12 @@ and type_expect_
           match label.lbl_repres with
           | Record_float -> true
           | Record_mixed mixed -> begin
-              match mixed.(label.lbl_pos) with
-              | Float_boxed -> true
-              | Float64 | Float32 | Scannable | Bits8 | Bits16 | Bits32 | Bits64
-              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void
-              | Product _ ->
-                false
+            match mixed.(label.lbl_pos) with
+            | Float_boxed -> true
+            | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32 | Bits64
+            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void
+            | Product _ ->
+              false
             end
           | _ -> false
         in
@@ -8222,6 +8304,15 @@ and type_expect_
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
+      (* If we are checking staged modes in the metaprogram,
+         we need to assume the expression in quotes is at legacy.
+         Otherwise, we are delaying checking modes until program generation
+         (with magic_staged_modes), and we do not constrain the mode. *)
+      let mode_quoted =
+        if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+        then mode_default Value.max
+        else mode_quoted
+      in
       let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
       if maybe_computation arg then
         submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
@@ -8235,7 +8326,15 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      submode ~loc ~env ~reason:Other mode_splice expected_mode;
+      (* If we are checking staged modes in the metaprogram,
+         we need to assume the splice is at legacy.
+         Otherwise, if we are delaying checking modes until program generation
+         (with magic_staged_modes), and we do not constrain the mode. *)
+      let magic_staged_modes =
+        Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+      in
+      if not magic_staged_modes then
+        submode ~loc ~env ~reason:Other mode_splice expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
@@ -8294,11 +8393,11 @@ and type_block_access env expected_base_ty principal
           to [float#] here because it could be a singleton unboxed record
           containing a float, and thus be followed by an unboxed access *)
       match label.lbl_repres with
-      | Record_boxed _ -> false
+      | Record_boxed -> false
       | Record_mixed mixed ->
         begin match mixed.(label.lbl_pos) with
         | Float_boxed -> true
-        | Float64 | Float32 | Scannable | Bits8 | Bits16 | Bits32 | Bits64
+        | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word | Product _ | Void
         | Untagged_immediate ->
           false
@@ -8570,7 +8669,7 @@ and type_ident env ?(recarg=Rejected) lid =
   let layout_args, val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
-       if not (List.is_empty (Lpoly.get_exn desc.val_lpoly)) then
+       if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
@@ -9953,6 +10052,9 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
+  Option.iter
+    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
+    (Misc.repeated_label sexpl);
   let alloc_mode, value_mode =
     register_allocation_value_mode ~loc expected_mode.mode
   in
@@ -10004,9 +10106,6 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let expl =
     Misc.Stdlib.List.map3
       (fun (label, body) ((_, ty), argument_mode) overwrite ->
-        Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-          label;
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
@@ -10025,6 +10124,9 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
   let arity = List.length sexpl in
   assert (arity >= 2);
+  Option.iter
+    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
+    (Misc.repeated_label sexpl);
   let argument_mode =
     expected_mode.mode
     |> apply_is_contained_by {containing = Tuple; container = (loc, Expression)}
@@ -10068,9 +10170,6 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   let expl =
     List.map2
       (fun (label, body) ((_, ty, sort), argument_mode) ->
-        Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-          label;
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect env argument_mode body (mk_expected ty), sort))
@@ -10813,9 +10912,21 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         Some m
     | Nonrecursive -> None
   in
+<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
   let spatl =  List.map vb_pat_constraint spat_sexp_list in
   let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
   let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
+||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
+  let spatl = List.map vb_pat_constraint spat_sexp_list in
+  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
+  let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
+=======
+  let spatl = List.map vb_pat_constraint spat_sexp_list in
+  let spatl =
+    List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl
+  in
+  let attrs_list = List.map (fun (attrs, _, _, _, _) -> attrs) spatl in
+>>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
   let is_recursive = (rec_flag = Recursive) in
 
   let (pat_list, exp_list, new_env, mvs, sorts, _pvs) =
@@ -10830,7 +10941,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           let (pat_list, _new_env, _force, pvs, _mvs as res) =
             with_local_level_if is_recursive (fun () ->
               type_pattern_list Value existential_context env mutable_flag spatl
-                nvs sorts allow_modules ~is_lpoly
+                nvs sorts allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
               iter_pattern_variables_type generalize pvs)
           in
@@ -10956,7 +11067,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             )
         )
         mode_pat_typ_list
-        (List.map2 (fun (attrs, _, _, _) (e, _) -> attrs, e) spatl exp_list);
+        (List.map2 (fun (attrs, _, _, _, _) (e, _) -> attrs, e) spatl exp_list);
+      if is_lpoly then
+        List.iter (fun (exp, _) ->
+          check_captures_comonadic env exp
+        ) exp_list;
       (mode_pat_typ_list, exp_list, new_env, mvs, sorts,
        List.map (fun pv -> { pv with pv_type = instance pv.pv_type}) pvs)
     end
@@ -12641,6 +12756,9 @@ let report_error ~loc env =
         "@[<2>%s:@ %a@]"
         "This type does not bind all existentials in the constructor"
         (Style.as_inline_code pp_type) (ids, ty)
+  | Existential_jkind_mismatch (id, err) ->
+      Location.error_of_printer ~loc
+        (Jkind.Violation.report_with_name ~name:(Ident.name id) env) err
   | Missing_type_constraint ->
       Location.errorf ~loc
         "@[%s@ %s@]"
@@ -12688,6 +12806,14 @@ let report_error ~loc env =
          which is not a %s type."
         (Style.as_inline_code Printtyp.type_expr) ty
         (record_form_to_string record_form)
+  | Repeated_tuple_exp_label l ->
+      Location.errorf ~loc
+        "@[This tuple expression has two labels named %a@]"
+        Style.inline_code l
+  | Repeated_tuple_pat_label l ->
+      Location.errorf ~loc
+        "@[This tuple pattern has two labels named %a@]"
+        Style.inline_code l
   | Expr_record_type_has_wrong_boxing (P record_form, ty) ->
       let expected, actual =
         match record_form with
@@ -12928,6 +13054,11 @@ let report_error ~loc env =
   | Let_poly_not_yet_implemented ->
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
+        Style.inline_code "let poly_"
+  | Let_poly_not_syntactic_value ->
+      Location.errorf ~loc
+        "This expression is not allowed in a %a definition;@ \
+         it must be a function, constructor, tuple, record, or constant."
         Style.inline_code "let poly_"
   | Layout_poly_inst_not_yet_supported ctx ->
       let ctx_str = match ctx with

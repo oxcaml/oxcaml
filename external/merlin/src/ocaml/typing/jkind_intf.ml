@@ -15,6 +15,12 @@
 (* This module contains definitions that we do not otherwise need to repeat
    between the various Jkind modules. See comment in jkind_types.mli. *)
 module type Sort = sig
+  (* CR layouts-scannable: The comment below is no longer entirely accurate,
+     after the addition of scannable axes (which are needed when compiling to
+     determine GC behavior).
+     It may be desirable to make a refined data definition that separates "the
+     thing that stores enough info to compiling" (sort + scannable axes, or
+     similarly layout - any) from "the discrete thing used for unification". *)
   (** A sort classifies how a type is represented at runtime. Every concrete
       jkind has a sort, and knowing the sort is sufficient for knowing the
       calling convention of values of a given type. *)
@@ -165,8 +171,12 @@ module type Sort = sig
     type id = private int
     (* the [private int] allows the debugger to print it *)
 
-    (** Extract the unique id for a [var]; this should be used only for
-        debugging or printing, not for decision making *)
+    (** Checks whether a [var] satisfies the properties that hold for variables
+        saved to a cmi. *)
+    val is_cmi_var : var -> bool
+
+    (** Extract the unique id for a [var]. Outside of a cmi, equal [id]s imply
+        physical equality of [var]s. *)
     val get_id : var -> id
 
     (** Get the number of an [id], useful for printing. These numbers get
@@ -232,8 +242,15 @@ module type Sort = sig
   *)
   val new_genvar : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar}. *)
+  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
+      intended for saving to a cmi. *)
+  val new_genvar_for_cmi : unit -> var
+
+  (** Returns [true] iff the variable was created by {!new_genvar} or
+      {!new_genvar_for_cmi}. *)
   val is_genvar : var -> bool
+
+  val reset_cmi_sort_id : unit -> unit
 
   (** Get the concrete content of a variable. The returned sort must be
       representable (including rigid sorts). *)
@@ -413,6 +430,8 @@ module History = struct
 
   type immediate_or_null_creation_reason = Primitive of Ident.t
 
+  type scannable_creation_reason = Dummy_jkind
+
   (* CR layouts v5: make new void_creation_reasons *)
   type void_creation_reason = |
 
@@ -448,6 +467,7 @@ module History = struct
     | Value_creation of value_creation_reason
     | Immediate_creation of immediate_creation_reason
     | Immediate_or_null_creation of immediate_or_null_creation_reason
+    | Scannable_creation of scannable_creation_reason
     | Void_creation of void_creation_reason
     | Any_creation of any_creation_reason
     | Product_creation of product_creation_reason

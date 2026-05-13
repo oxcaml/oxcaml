@@ -70,7 +70,6 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Module_strengthening -> (module Unit)
   | Layouts -> (module Maturity)
   | SIMD -> (module Maturity)
-  | Labeled_tuples -> (module Unit)
   | Small_numbers -> (module Maturity)
   | Instances -> (module Unit)
   | Let_mutable -> (module Unit)
@@ -88,8 +87,8 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
 let is_erasable : type a. a t -> bool = function
   | Mode | Unique | Overwriting | Layouts | Layout_poly -> true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
-  | Module_strengthening | SIMD | Labeled_tuples | Small_numbers | Instances
-  | Let_mutable | Runtime_metaprogramming ->
+  | Module_strengthening | SIMD | Small_numbers | Instances | Let_mutable
+  | Runtime_metaprogramming ->
     false
 
 let maturity_of_unique_for_drf = Stable
@@ -110,7 +109,6 @@ module Exist_pair = struct
     | Pair (Module_strengthening, ()) -> Stable
     | Pair (Layouts, m) -> m
     | Pair (SIMD, m) -> m
-    | Pair (Labeled_tuples, ()) -> Stable
     | Pair (Small_numbers, m) -> m
     | Pair (Instances, ()) -> Stable
     | Pair (Let_mutable, ()) -> Stable
@@ -130,9 +128,8 @@ module Exist_pair = struct
       to_string Layout_poly ^ "_" ^ maturity_to_string m
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
-           | Immutable_arrays | Module_strengthening | Labeled_tuples
-           | Instances | Overwriting | Let_mutable | Runtime_metaprogramming )
-           as ext),
+           | Immutable_arrays | Module_strengthening | Instances | Overwriting
+           | Let_mutable | Runtime_metaprogramming ) as ext),
           _ ) ->
       to_string ext
 
@@ -160,7 +157,6 @@ module Exist_pair = struct
     | "simd" -> Some (Pair (SIMD, Stable))
     | "simd_beta" -> Some (Pair (SIMD, Beta))
     | "simd_alpha" -> Some (Pair (SIMD, Alpha))
-    | "labeled_tuples" -> Some (Pair (Labeled_tuples, ()))
     | "small_numbers" -> Some (Pair (Small_numbers, Stable))
     | "small_numbers_beta" -> Some (Pair (Small_numbers, Beta))
     | "instances" -> Some (Pair (Instances, ()))
@@ -187,7 +183,6 @@ let all_extensions =
     Pack Module_strengthening;
     Pack Layouts;
     Pack SIMD;
-    Pack Labeled_tuples;
     Pack Small_numbers;
     Pack Instances;
     Pack Let_mutable;
@@ -228,7 +223,6 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Module_strengthening, Module_strengthening -> Some Refl
   | Layouts, Layouts -> Some Refl
   | SIMD, SIMD -> Some Refl
-  | Labeled_tuples, Labeled_tuples -> Some Refl
   | Small_numbers, Small_numbers -> Some Refl
   | Instances, Instances -> Some Refl
   | Let_mutable, Let_mutable -> Some Refl
@@ -236,8 +230,8 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Runtime_metaprogramming, Runtime_metaprogramming -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
-      | Layouts | SIMD | Labeled_tuples | Small_numbers | Instances
-      | Let_mutable | Layout_poly | Runtime_metaprogramming ),
+      | Layouts | SIMD | Small_numbers | Instances | Let_mutable | Layout_poly
+      | Runtime_metaprogramming ),
       _ ) ->
     None
 

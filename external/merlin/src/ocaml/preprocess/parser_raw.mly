@@ -1073,7 +1073,24 @@ let merloc startpos ?endpos x =
 %token AMPERSAND [@symbol "&"]
 %token AND [@symbol "and"]
 %token AS [@symbol "as"]
+<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
 %token ASSERT [@symbol "assert"]
+||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
+%token NONREC                 "nonrec"
+%token OBJECT                 "object"
+%token OF                     "of"
+%token ONCE                   "once_"
+%token OPEN                   "open"
+%token <string> OPTLABEL      "?label:" (* just an example *)
+%token OR                     "or"
+=======
+%token NONREC                 "nonrec"
+%token OBJECT                 "object"
+%token OF                     "of"
+%token OPEN                   "open"
+%token <string> OPTLABEL      "?label:" (* just an example *)
+%token OR                     "or"
+>>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 %token BACKQUOTE [@symbol "`"]
 %token BANG [@symbol "!"]
 %token BAR [@symbol "|"]
@@ -1118,7 +1135,24 @@ let merloc startpos ?endpos x =
 %token GREATERRBRACKET [@symbol ">]"]
 %token HASHLPAREN [@symbol "#("]
 %token HASHLBRACE [@symbol "#{"]
+<<<<<<< janestreet/merlin-jst:liam-merlin-merge-5.2.0minus-39
 %token HASHFALSE [@symbol "#false"]
+||||||| oxcaml/oxcaml:eb63e0e41869ede83ad3001e4facdff54383861d
+%token TYPE                   "type"
+%token <string> UIDENT        "UIdent" (* just an example *)
+%token UNDERSCORE             "_"
+%token UNIQUE                 "unique_"
+%token VAL                    "val"
+%token VIRTUAL                "virtual"
+%token WHEN                   "when"
+=======
+%token TYPE                   "type"
+%token <string> UIDENT        "UIdent" (* just an example *)
+%token UNDERSCORE             "_"
+%token VAL                    "val"
+%token VIRTUAL                "virtual"
+%token WHEN                   "when"
+>>>>>>> oxcaml/oxcaml:c9cc900e4d170ab80a93c703213c3950df14e98f
 %token HASHTRUE [@symbol "#true"]
 %token IF [@symbol "if"]
 %token IN [@symbol "in"]
@@ -4325,7 +4359,8 @@ jkind_decl:
   pjkind_manifest=jkind_manifest
   attrs2=post_item_attributes
     {
-      let pjkind_attributes = attrs1 @ attrs2 in
+      let docs = symbol_docs $sloc in
+      let pjkind_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let pjkind_loc = make_loc $sloc in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }
@@ -4862,10 +4897,6 @@ strict_function_or_labeled_tuple_type:
 %inline mode_legacy:
    | LOCAL
        { mkloc (Mode "local") (make_loc $sloc) }
-   | UNIQUE
-       { mkloc (Mode "unique") (make_loc $sloc) }
-   | ONCE
-       { mkloc (Mode "once") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:

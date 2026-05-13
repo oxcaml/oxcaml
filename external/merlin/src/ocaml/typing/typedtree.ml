@@ -200,6 +200,7 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
       lpoly: Lpoly.t;
+      env_alloc_mode: alloc_mode;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc

@@ -3138,6 +3138,13 @@ let is_unit_arg env ty =
   let ty, vars = tpoly_get_poly ty in
   if vars <> [] then false
   else begin
+    (* CR metaprogramming jbachurski: Remove [contains_toplevel_splice] and
+       track the stage in errors so we don't need this. See ticket 6726. *)
+    let env =
+      if Ctype.contains_toplevel_splice (Env.stage env :> int) ty
+      then Env.enter_future env
+      else env
+    in
     match get_desc (Ctype.expand_head env ty) with
     | Tconstr (p, _, _) -> Path.same p Predef.path_unit
     | _ -> false
