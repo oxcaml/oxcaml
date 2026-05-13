@@ -281,6 +281,9 @@ module type Heyting = sig
 
   include Lattice
 
+  (** A total structural order used for map keys. This is not lattice order:
+      [compare_total a b = 0] must agree with semantic equality of [a] and [b].
+  *)
   val compare_total : t -> t -> int
 
   (** [imply c] is the right adjoint of [meet c]; That is, for any [a] and [b],
@@ -293,6 +296,9 @@ module type CoHeyting = sig
 
   include Lattice
 
+  (** A total structural order used for map keys. This is not lattice order:
+      [compare_total a b = 0] must agree with semantic equality of [a] and [b].
+  *)
   val compare_total : t -> t -> int
 
   (** [subtract _ c] is the left adjoint of [join c]. That is, for any [a] and

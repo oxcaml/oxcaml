@@ -237,6 +237,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           a, Branch (Meet, ahint1, ahint2))
   end
 
+  (* The variable id determines the destination object for all keys that may
+     coexist in a map.  If two equal ids have different destination objects, the
+     comparator below rejects the malformed keys rather than inventing an order
+     that could not be used to compare their morphisms. *)
   type key = Key : 'b C.obj * int * ('a, 'b, 'd) C.morph -> key
 
   module VarMap = Map.Make (struct
