@@ -192,8 +192,9 @@ We plan to switch to the expected behavior in the near future.
 
 ## Nested borrowing
 
-You can borrow a borrowed value. The result is local to the inner borrow region
-and cannot escape it:
+`borrow_` can be applied to an `aliased` value, not just a `unique` one.
+Since a borrow is itself `aliased`, this means you can also borrow a borrowed
+value. The result is local to the inner borrow region and cannot escape it:
 
 ```ocaml
 let foo () =
