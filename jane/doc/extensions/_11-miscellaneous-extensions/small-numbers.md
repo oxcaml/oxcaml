@@ -106,6 +106,11 @@ Literals use `s` for `int8` and `S` for `int16`:
 #42S : int16#
 ```
 
+The range of these literals is `-128s` to `128s` for `int8` and `-32768S` to
+`32768S` for `int16`. Note that `128s` overflows to `-128s` since the max
+value of an `int8` is 127. Similarly, `32768S` overflows to `-32768S`. This
+behavior is consistent with the literals for larger integer types.
+
 ### Operations
 
 Operations on small integers are available via the `Stdlib_stable.Int8`,
@@ -114,15 +119,25 @@ libraries.
 
 ### Representation
 
-The boxed `int8` and `int16` types are encoded as tagged immediates, similar to
-regular OCaml `int`s. Similarly, `int8 array` and `int16 array` are not packed.
+The types `int8` and `int16` are encoded as tagged immediates, similar to
+regular OCaml `int`s. They are sign-extended to the full width of a tagged
+immediate, so polymorphic hash and compare work as expected. `int8 array` and
+`int16 array` are not packed.
 
-The unboxed `int8#` and `int16#` types are passed around using general purpose
-registers, but do not have a tag bit, unlike `int8` and `int16`. The ints in
-`int8# array`s and `int16# array`s are packed, but they are not packed in any
-other context. For example, an `int8# array` of length 30 takes up 4 words of
-space, plus the header word, but a `#(int8# * int8#)` takes up 2 words of space
-and requires 2 registers to pass around.
+The types `int8#` and `int16#` are passed around using general purpose
+registers, but do not have a tag bit. They are sign-extended to the width of a
+`nativeint#`. The ints in `int8# array`s and `int16# array`s are packed, but
+they are not packed in any other context. For example, an `int8# array` of
+length 30 takes up 4 words of memory, plus the header word, but a
+`#(int8# * int8#)` takes up 2 words of memory and requires 2 registers to pass
+around.
+
+### Codegen
+
+In general, the compiler only emits 64-bit instructions, even for 32/16/8-bit
+operations, and results are sign-extended after every operation. The peephole
+optimizer can remove some unnecessary sign-extensions, but there is still a
+noticeable performance decrease compared to C.
 
 ### C ABI
 
