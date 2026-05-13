@@ -435,8 +435,7 @@ Line 1, characters 53-54:
                                                          ^
 Error: The value "x" has type "<[<[int]>]> eval expr"
        but an expression was expected of type "<[int]> expr"
-       Type "<[<[int]>]> eval" = "<$(<[int]>)>" is not compatible with type
-         "<[int]>"
+       Type "<[<[int]>]> eval" is not compatible with type "<[int]>"
 |}]
 let f (x : <[<[int]>]> eval eval) : int = x
 [%%expect {|
