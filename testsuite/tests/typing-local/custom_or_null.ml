@@ -19,7 +19,7 @@ Line 1, characters 33-34:
                                      ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is contained (via constructor "This") (with some modality) in the value at line 1, characters 28-34.
+         because it is contained (via constructor "This") (with modality "global" in effect) in the value at line 1, characters 28-34.
 |}]
 
 let f (s : string) =
