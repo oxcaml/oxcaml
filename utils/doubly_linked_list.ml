@@ -326,6 +326,23 @@ let fold_right t ~f ~init =
   in
   aux f t.last init
 
+let fold_right_range ~right_incl ~left_excl ~f ~init =
+  match right_incl with
+  | None -> init
+  | Some { node = start; t } ->
+    let rec aux f curr ~stop acc =
+      if curr == stop
+      then acc
+      else
+        match curr with
+        | Empty -> acc
+        | Node node -> aux f node.prev ~stop (f node.value acc)
+    in
+    aux f start
+      ~stop:
+        (match left_excl with None -> Empty | Some { node = stop; _ } -> stop)
+      init
+
 let find_cell_opt t ~f =
   let rec aux t f curr =
     match curr with
@@ -369,27 +386,18 @@ let for_alli t ~f =
 
 let to_list t = fold_right t ~f:(fun hd tl -> hd :: tl) ~init:[]
 
-let range_to_list ~from_incl ~to_excl =
-  match from_incl, to_excl with
-  | None, _ -> []
-  | Some from_incl, None ->
-    let[@tail_mod_cons] rec loop node =
-      match node with
-      | Empty -> []
-      | Node { value; next; _ } -> value :: loop next
-    in
-    loop from_incl.node
-  | Some from_incl, Some to_excl ->
-    let to_excl_node = to_excl.node in
-    let[@tail_mod_cons] rec loop node =
-      if node == to_excl_node
-      then []
-      else
-        match node with
-        | Empty -> []
-        | Node { value; next; _ } -> value :: loop next
-    in
-    loop from_incl.node
+let range_to_list ~left_incl ~right_excl =
+  match left_incl with
+  | None -> []
+  | Some left_incl ->
+    fold_right_range
+      ~right_incl:
+        (match right_excl with
+        | None -> last_cell left_incl.t
+        | Some right_excl -> prev right_excl)
+      ~left_excl:(prev left_incl)
+      ~f:(fun hd tl -> hd :: tl)
+      ~init:[]
 
 let to_array t =
   let len = length t in
