@@ -1251,6 +1251,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
+(* CR mshinwell: Apply the logic in address_for_offset_prim to normal array
+   access *)
+
 (* Compute the address used by [Read_offset] / [Write_offset]: [x] is the base
    address (constant zero indicates an out-of-heap pointer; anything else
    produces a derived heap pointer) and [y] is the byte offset. [y_simple] is
