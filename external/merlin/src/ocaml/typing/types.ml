@@ -845,20 +845,6 @@ type constructor_description =
     cstr_uid: Uid.t;
   }
 
-let array_equal eq_elt l1 l2 =
-  (* Basically inlines [Array.for_all2] to avoid the [raise] *)
-  let n = Array.length l1 in
-  Int.equal n (Array.length l2) &&
-  let rec loop i =
-    if Int.equal i n then
-      true
-    else if eq_elt (Array.unsafe_get l1 i) (Array.unsafe_get l2 i) then
-      loop (succ i)
-    else
-      false
-  in
-  loop 0
-
 let equal_tag t1 t2 =
   match (t1, t2) with
   | Ordinary {src_index=i1}, Ordinary {src_index=i2} ->

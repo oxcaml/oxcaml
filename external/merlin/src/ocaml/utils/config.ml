@@ -44,6 +44,13 @@ let index_magic_number = "Merl2023I577"
 let interface_suffix = ref ".mli"
 
 let max_tag = 245
+
+type name_mangling_scheme =
+  | Flat
+  | Structured
+
+let name_mangling_scheme = Flat
+
 let flat_float_array = false
 
 let reserved_header_bits = 8
