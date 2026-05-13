@@ -123,25 +123,18 @@ jobs:
         opam install --yes ppx_string ppx_compare ocamlformat.0.29.0
         opam install . --deps-only --with-test --yes
 
-    - name: Create dune workspace file
-      working-directory: oxcaml/external/merlin
-      # This will tell dune to treat external/merlin as its own workspace. Once
-      # Merlin is kept in sync with the compiler, this should be removed so that
-      # Merlin is built in the same workspace as the compiler.
+    - name: Configure OxCaml
+      working-directory: oxcaml
       run: |
-        touch dune-workspace
-
-    - name: Check formatting
-      working-directory: oxcaml/external/merlin
-      run: |
-        dune build @fmt
+        autoconf
+        ./configure --prefix=$GITHUB_WORKSPACE/_install
 
     - name: Build and test in release mode (linux)
       working-directory: oxcaml/external/merlin
       run: |
         export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
-        dune build
-        dune runtest -p merlin-lib,dot-merlin-reader,merlin,ocaml-index
+        make build
+        make test
         if ! git diff --quiet ; then
           echo "The following files were modified by dune:" >&2
           git diff --name-only >&2
