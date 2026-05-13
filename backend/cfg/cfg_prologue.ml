@@ -623,7 +623,8 @@ end
 let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if !Oxcaml_flags.cfg_prologue_validate then validate_no_prologue cfg;
+  let cfg_prologue_validate = false in
+  if cfg_prologue_validate then validate_no_prologue cfg;
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
     when Label.Tbl.length cfg.blocks
@@ -639,7 +640,8 @@ let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let fun_name = Cfg.fun_name cfg in
-  match !Oxcaml_flags.cfg_prologue_validate with
+  let cfg_prologue_validate = false in
+  match cfg_prologue_validate with
   | true -> (
     match
       Validator.run cfg
