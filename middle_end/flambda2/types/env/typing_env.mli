@@ -132,9 +132,9 @@ val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
 val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
 
-(** If the kind of the name is known, it should be specified, otherwise it can
-    be omitted. Such omission will cause an error if the name satisfies
-    [variable_is_from_missing_cmx_file]. *)
+(** If the kind of the name is known, it should be specified. If it is omitted
+    for a variable from a missing .cmx file, the kind recorded on the variable
+    will be used. *)
 val find : t -> Name.t -> Flambda_kind.t option -> Type_grammar.t
 
 val find_params : t -> Bound_parameters.t -> Type_grammar.t list

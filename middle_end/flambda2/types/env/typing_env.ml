@@ -444,8 +444,10 @@ let find_with_binding_time_and_mode' t name kind =
             check_optional_kind_matches name (fst initial_symbol_type) kind;
             initial_symbol_type)
           ~var:(fun var ->
-            let ty = MTC.unknown (Variable.kind var) in
-            check_optional_kind_matches name ty kind;
+            let kind =
+              match kind with Some kind -> kind | None -> Variable.kind var
+            in
+            let ty = MTC.unknown kind in
             ty, Binding_time.With_name_mode.imported_variables)
       | Some t -> (
         match

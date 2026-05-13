@@ -433,6 +433,19 @@ let test_meet_bottom_after_alias () =
   Format.eprintf "@[<hov 2>after meet:@ %a@]@." T.print meet_ty;
   assert (T.is_bottom env meet_ty)
 
+let test_missing_cmx_find_respects_requested_kind () =
+  let env = create_env () in
+  let previous_unit_info = Env.get_unit_name () in
+  let missing_comp_unit = "Missing_cmx" |> Compilation_unit.of_string in
+  let missing_unit_info =
+    Unit_info.make_dummy ~input_name:"missing_cmx" missing_comp_unit
+  in
+  Env.set_unit_name (Some missing_unit_info);
+  let var_from_missing_cmx = Variable.create "missing" K.value in
+  Env.set_unit_name previous_unit_info;
+  let ty = TE.find env (Name.var var_from_missing_cmx) (Some K.naked_float32) in
+  assert (K.equal (T.kind ty) K.naked_float32)
+
 let () =
   let comp_unit = "Meet_test" |> Compilation_unit.of_string in
   let unit_info = Unit_info.make_dummy ~input_name:"meet_test" comp_unit in
@@ -452,4 +465,5 @@ let () =
   Format.eprintf "@.JOIN WITH EXTENSIONS@\n@.";
   test_join_with_extensions ();
   Format.eprintf "@.JOIN WITH COMPLEX EXTENSIONS@\n@.";
-  test_join_with_complex_extensions ()
+  test_join_with_complex_extensions ();
+  test_missing_cmx_find_respects_requested_kind ()
