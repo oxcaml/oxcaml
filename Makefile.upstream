@@ -1202,6 +1202,7 @@ runtime_COMMON_C_SOURCES = \
   shared_heap \
   signals \
   simd \
+  cpu \
   float32 \
   skiplist \
   startup_aux \
