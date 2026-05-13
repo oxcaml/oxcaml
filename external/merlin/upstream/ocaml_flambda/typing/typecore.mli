@@ -211,6 +211,8 @@ type error =
   | Partial_tuple_pattern_bad_type
   | Extra_tuple_label of string option * type_expr
   | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
   | Label_mismatch of record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
       Errortrace.unification_error * Parsetree.pattern_desc option
@@ -310,6 +312,7 @@ type error =
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
+  | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
@@ -348,6 +351,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
+  | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =
