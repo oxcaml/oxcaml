@@ -623,13 +623,13 @@ let () =
 
 let () =
   (* Delete the [Prologue] in [entry_label] rather than a pure instruction so
-     the deletion is rejected by the validator. After
-     "Validator: accept Cfg_deadcode-style deletions" (ef8cd0e0e2), the
-     validator silently accepts the removal of any [Cfg.is_pure_basic]
-     instruction (matching what [Cfg_deadcode.remove_deadcode] does); deleting
-     a pure instruction therefore reaches the [cfg = after] polymorphic
-     equality below, which loops on cycles in [Reg.t.interf]. The deletion
-     check remains exercised by removing a non-pure instruction. *)
+     the deletion is rejected by the validator. After "Validator: accept
+     Cfg_deadcode-style deletions" (ef8cd0e0e2), the validator silently accepts
+     the removal of any [Cfg.is_pure_basic] instruction (matching what
+     [Cfg_deadcode.remove_deadcode] does); deleting a pure instruction therefore
+     reaches the [cfg = after] polymorphic equality below, which loops on cycles
+     in [Reg.t.interf]. The deletion check remains exercised by removing a
+     non-pure instruction. *)
   check "Deleted instruction"
     (fun () ->
       let templ, _ = base_templ () in
