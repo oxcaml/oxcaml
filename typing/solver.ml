@@ -247,15 +247,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if c <> 0
       then c
       else
-        let c = C.compare_obj obj1 obj2 in
-        if c <> 0
-        then c
-        else
-          match C.equal_obj obj1 obj2 with
-          | Misc.Is_eq -> C.compare_morph obj1 m1 m2
-          | Misc.Is_not_eq ->
-            Misc.fatal_error
-              "Solver.VarMap.compare: compare_obj inconsistent with equal_obj"
+        match C.equal_obj obj1 obj2 with
+        | Misc.Is_eq -> C.compare_morph obj1 m1 m2
+        | Misc.Is_not_eq ->
+          Misc.fatal_error
+            "Solver.VarMap.compare: inconsistent destination objects"
   end)
 
   (** Map the function to the list, and returns the first [Error] found; Returns
