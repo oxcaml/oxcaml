@@ -43,7 +43,7 @@ Line 1, characters 54-65:
 1 | let foo (t : int ref t @ contended) = use_uncontended t.contended
                                                           ^^^^^^^^^^^
 Error: This value is "contended"
-         because it is the field "contended" (with modality "contended") of the record at line 1, characters 54-55.
+         because it is the field "contended" (with modality "contended" in effect) of the record at line 1, characters 54-55.
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
@@ -54,7 +54,7 @@ Line 1, characters 57-63:
 1 | let foo (t : int ref both @ contended) = use_uncontended t.both
                                                              ^^^^^^
 Error: This value is "contended"
-         because it is the field "both" (with modality "contended") of the record at line 1, characters 57-58.
+         because it is the field "both" (with modality "contended" in effect) of the record at line 1, characters 57-58.
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
