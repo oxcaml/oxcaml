@@ -263,40 +263,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
        knowing it prohibits us from inlining it. *)
     |> DE.set_rebuild_terms
   in
-  (* We collect a set of "degraded value slots" whose types involve imported
-     variables from missing .cmx files. Since we don't know the kind of these
-     variables, we can't run the code below that checks if they might need
-     binding as "never inline" depth variables (since we don't know if a given
-     variable is a depth variable or not). Instead we will treat the whole value
-     slot as having [Unknown] type. *)
-  let degraded_value_slots = ref Value_slot.Set.empty in
-  let free_depth_variables =
-    List.concat_map
-      (fun value_slot_types ->
-        Value_slot.Map.mapi
-          (fun value_slot ty ->
-            let vars = TE.free_names_transitive (DE.typing_env denv) ty in
-            NO.fold_variables vars ~init:Variable.Set.empty
-              ~f:(fun free_depth_variables var ->
-                let ty_opt =
-                  TE.find_or_missing
-                    (DE.typing_env denv_inside_functions)
-                    (Name.var var)
-                in
-                match ty_opt with
-                | None ->
-                  degraded_value_slots
-                    := Value_slot.Set.add value_slot !degraded_value_slots;
-                  free_depth_variables
-                | Some ty -> (
-                  match T.kind ty with
-                  | Rec_info -> Variable.Set.add var free_depth_variables
-                  | Value | Naked_number _ | Region -> free_depth_variables)))
-          value_slot_types
-        |> Value_slot.Map.data)
-      value_slot_types_all_sets
-    |> Variable.Set.union_list
-  in
+  let free_depth_variables = Variable.Set.empty in
   (* Pretend that any depth variables appearing free in the closure elements are
      bound to "never inline anything" in the function. This ensures that
      in-types depth variables do not end up in terms. *)
@@ -324,7 +291,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
       (fun value_slot_types_all_sets_inside_functions_rev value_slot_types ->
         let value_slot_types_inside_function =
           compute_value_slot_types_inside_function ~value_slot_types
-            ~degraded_value_slots:!degraded_value_slots
+            ~degraded_value_slots:Value_slot.Set.empty
         in
         value_slot_types_inside_function
         :: value_slot_types_all_sets_inside_functions_rev)

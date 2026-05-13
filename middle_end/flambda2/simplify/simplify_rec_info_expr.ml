@@ -60,18 +60,25 @@ let rec simplify_rec_info_expr0 denv orig ~on_unknown : Rec_info_expr.t =
   match (orig : Rec_info_expr.t) with
   | Const _ -> orig
   | Var dv -> (
-    let ty = TE.find (DE.typing_env denv) (Name.var dv) (Some K.rec_info) in
-    match T.meet_rec_info (DE.typing_env denv) ty with
-    | Known_result rec_info_expr ->
-      (* All bound names are fresh, so fine to use the same environment *)
-      simplify_rec_info_expr0 denv rec_info_expr ~on_unknown
-    | Need_meet -> (
-      match on_unknown with
-      | Leave_unevaluated -> orig
-      | Assume_value value -> value)
-    | Invalid ->
-      (* Shouldn't currently be possible *)
-      Misc.fatal_errorf "Invalid result from [check_rec_info] of %a" T.print ty)
+    match
+      TE.get_canonical_simple_exn (DE.typing_env denv)
+        ~min_name_mode:Name_mode.normal (Simple.var dv)
+    with
+    | exception Not_found -> Rec_info_expr.do_not_inline
+    | _canonical -> (
+      let ty = TE.find (DE.typing_env denv) (Name.var dv) (Some K.rec_info) in
+      match T.meet_rec_info (DE.typing_env denv) ty with
+      | Known_result rec_info_expr ->
+        (* All bound names are fresh, so fine to use the same environment *)
+        simplify_rec_info_expr0 denv rec_info_expr ~on_unknown
+      | Need_meet -> (
+        match on_unknown with
+        | Leave_unevaluated -> orig
+        | Assume_value value -> value)
+      | Invalid ->
+        (* Shouldn't currently be possible *)
+        Misc.fatal_errorf "Invalid result from [check_rec_info] of %a" T.print
+          ty))
   | Succ ri -> (
     match simplify_rec_info_expr0 denv ri ~on_unknown with
     | Const { depth; unrolling } -> compute_succ ~depth ~unrolling
