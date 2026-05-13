@@ -8,7 +8,7 @@ title: Intro
 
 See also the full feature [reference](../reference), [common
 pitfalls](../pitfalls), and [borrowing](../borrow). In this document, we use
-the new [syntax for modes](../../modes/syntax).
+the [syntax for modes](../../modes/syntax).
 
 The `unique` mode designates values that have only a single reference pointing
 to them. If an operation takes a `unique` argument, it will consume the only
