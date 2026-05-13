@@ -867,6 +867,13 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       | None -> callee's_code_id_from_type, callee's_code_metadata_from_type
       | Some callee's_code_id -> (
         match DE.find_code_exn (DA.denv dacc) callee's_code_id with
+        | exception Not_found ->
+          (* This can happen if we have a more precise code id from the call
+             kind, but we don't have the metadata for it. This should be rare
+             (and will trigger warning 58 when we try to load the metadata for
+             this code id); in that case, we use the metadata that we do have
+             available for the code id from the type. *)
+          callee's_code_id_from_type, callee's_code_metadata_from_type
         | callee's_code_or_metadata ->
           ( callee's_code_id,
             Code_or_metadata.code_metadata callee's_code_or_metadata ))
