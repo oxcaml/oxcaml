@@ -470,7 +470,8 @@ end = struct
     t
 
   let create cfg =
-    match !Oxcaml_flags.regalloc_validate with
+    let regalloc_validate = false in
+    match regalloc_validate with
     | false -> None
     | true -> Some (do_create cfg)
 
