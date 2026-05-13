@@ -301,8 +301,8 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
     ?(ppx_cache_hit = ref false) ?(reader_cache_hit = ref false)
     ?(document_overrides_cache_hit = ref false)
     ?(locate_overrides_cache_hit = ref false)
-    ?(typer_cache_stats = ref Mtyper.Miss) ?for_completion
-    ?inject_parsetree config raw_source =
+    ?(typer_cache_stats = ref Mtyper.Miss) ?for_completion ?inject_parsetree
+    config raw_source =
   let state =
     match state with
     | None -> Cache.get config
@@ -313,7 +313,7 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
       (lazy
         (match inject_parsetree with
         | Some parsetree -> (raw_source, Some parsetree)
-        | None ->
+        | None -> (
           match Mconfig.(config.ocaml.pp) with
           | None -> (raw_source, None)
           | Some { workdir; workval } -> (
@@ -324,7 +324,8 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
                 ~source ~pp:workval
             with
             | `Source source -> (Msource.make source, None)
-            | (`Interface _ | `Implementation _) as ast -> (raw_source, Some ast))))
+            | (`Interface _ | `Implementation _) as ast -> (raw_source, Some ast)
+            ))))
   in
   let reader =
     timed_lazy reader_time
@@ -451,17 +452,13 @@ let make_with_parsetree ~state config raw_source parsetree =
      The parsetree is injected via the source tuple (raw_source, Some parsetree),
      which causes the reader to skip parsing. With ppx=[], the ppx phase is a no-op. *)
   let config =
-    Mconfig.{ config with
-      ocaml = { config.ocaml with ppx = []; pp = None }
-    }
+    Mconfig.{ config with ocaml = { config.ocaml with ppx = []; pp = None } }
   in
   let config = Mconfig.normalize config in
   (* Pass the parsetree through the pp mechanism: when source has Some parsetree,
      the reader uses it directly instead of parsing. *)
   let source_with_tree = Msource.make (Msource.text raw_source) in
-  process config source_with_tree
-    ~state
-    ~inject_parsetree:parsetree
+  process config source_with_tree ~state ~inject_parsetree:parsetree
 
 let for_completion position
     { config;

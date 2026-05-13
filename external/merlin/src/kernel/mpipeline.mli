@@ -17,7 +17,8 @@ val make : Mconfig.t -> Msource.t -> t
     which is necessary when called from within [with_pipeline] (where [Local_store] is
     already bound and creating a new state would fail). Use the state from the normal
     pipeline that provided the parsetree. *)
-val make_with_parsetree : state:Mocaml.typer_state -> Mconfig.t -> Msource.t -> Mreader.parsetree -> t
+val make_with_parsetree :
+  state:Mocaml.typer_state -> Mconfig.t -> Msource.t -> Mreader.parsetree -> t
 
 val with_pipeline : t -> (unit -> 'a) -> 'a
 val for_completion : Msource.position -> t -> t
