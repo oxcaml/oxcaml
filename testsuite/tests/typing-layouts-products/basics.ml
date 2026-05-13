@@ -1173,7 +1173,7 @@ Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
                                           ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1182,7 +1182,7 @@ external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
 Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
                                           ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}]
 
@@ -1214,7 +1214,7 @@ Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
                                             ^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1223,7 +1223,7 @@ external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
 Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
                                             ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}]
 
@@ -1259,7 +1259,7 @@ Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@unboxed]) = "foo"
               ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1269,7 +1269,7 @@ external ext_tuple_return_with_attr_t :
 Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@untagged]) = "foo"
               ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}]
 
@@ -1295,7 +1295,7 @@ Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
                                                       ^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1304,7 +1304,7 @@ external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
 Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
                                                       ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}]
 
@@ -1362,7 +1362,7 @@ Line 3, characters 3-29:
 3 |   (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1372,7 +1372,7 @@ external ext_record_arg_with_attr_t :
 Line 2, characters 3-29:
 2 |   (ext_record_arg_attr_record [@untagged]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}]
 
@@ -1429,7 +1429,7 @@ Line 2, characters 49-50:
 2 | external ext_record_return_with_attr_u : int -> (t [@unboxed]) = "foo"
                                                      ^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1438,7 +1438,7 @@ external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
 Line 1, characters 49-50:
 1 | external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
                                                      ^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}]
 
