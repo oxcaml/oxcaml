@@ -2409,24 +2409,26 @@ let quote_arg_label loc = function
        Labelled, Nolabel and Optional"
       Location.print_loc (to_location loc)
 
-let rec module_for_path loc env = function
-  | Path.Pident id as path ->
-    (match Hashtbl.find_opt vars_env.env_mod id with
-      | Some m -> Identifier.Module.var loc m (quote_loc loc)
-      | None -> (
-        match Ident.to_global id with
-        | Some global ->
-          Env.add_required_global_for_quote path env;
-          Identifier.Module.global_module loc global
-        | None ->
-          (* We must be in a [Toplevel_lock_for_directive] if we are quoting
+let module_for_path loc env path =
+  Env.add_required_global_for_quote path env;
+  let rec module_for_path path =
+    match path with
+    | Path.Pident id ->
+      (match Hashtbl.find_opt vars_env.env_mod id with
+        | Some m -> Identifier.Module.var loc m (quote_loc loc)
+        | None -> (
+          match Ident.to_global id with
+          | Some global -> Identifier.Module.global_module loc global
+          | None ->
+            (* We must be in a [Toplevel_lock_for_directive] if we are quoting
              a non-global module. *)
-          Ident.name id |> Identifier.Module.toplevel_module loc))
-    |> Identifier.Module.wrap
-  | Path.Pdot (p, s) ->
-    Identifier.Module.dot loc (module_for_path loc env p) s
-    |> Identifier.Module.wrap
-  | _ -> raise Exit
+            Ident.name id |> Identifier.Module.toplevel_module loc))
+      |> Identifier.Module.wrap
+    | Path.Pdot (p, s) ->
+      Identifier.Module.dot loc (module_for_path p) s |> Identifier.Module.wrap
+    | _ -> raise Exit
+  in
+  module_for_path path
 
 let module_type_for_path loc env = function
   | Path.Pident id ->
@@ -2739,22 +2741,6 @@ let assert_no_jkinds jkind =
            position."
           Location.print_loc pjka_loc)
     jkind
-
-let rec quote_module_path loc env = function
-  | Path.Pident s as path -> (
-    match Ident.to_global s with
-    | Some global ->
-      Env.add_required_global_for_quote path env;
-      Identifier.Module.global_module loc global |> Identifier.Module.wrap
-    | None ->
-      fatal_errorf "Translquote [at %a]: non-global module %a"
-        Location.print_loc (to_location loc) Ident.print s)
-  | Path.Pdot (p, s) ->
-    Identifier.Module.dot loc (quote_module_path loc env p) s
-    |> Identifier.Module.wrap
-  | _ ->
-    fatal_errorf "Translquote [at %a]: no support for Papply in quoting modules"
-      Location.print_loc (to_location loc)
 
 (* Approximate the [core_type] for type annotation from a given [type_expr].
    Used for annotating polymorphic applications with higher-rank types. *)
@@ -3422,7 +3408,7 @@ and quote_function ~scopes ~transl stage loc fn extras =
 and quote_module_exp ~transl stage loc env mod_exp =
   match mod_exp.mod_desc with
   | Tmod_ident (path, _) ->
-    let m = quote_module_path loc env path in
+    let m = module_for_path loc env path in
     Module.ident loc m |> Module.wrap
   | Tmod_apply (funct, arg, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in

@@ -1856,18 +1856,17 @@ let add_required_global path env =
   add_required_ident (Path.head path) env
 
 let add_required_global_for_quote path env =
-  let ident = Path.head path in
-  match Ident.to_global ident with
+  let address = find_module_address path env in
+  match address_head address with
+  | AHlocal _ -> ()
+  | AHunit cu ->
+    add_required_unit cu;
+    Persistent_env.require_impl_for_quote !persistent_env cu;
+  match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let address = find_ident_module_address ident env in
-    match address_head address with
-    | AHlocal _ -> ()
-    | AHunit cu ->
-      add_required_unit cu;
-      Persistent_env.require_intf_for_quote
-        !persistent_env (Compilation_unit.Name.of_head_of_global_name global);
-      Persistent_env.require_impl_for_quote !persistent_env cu
+    Persistent_env.require_intf_for_quote
+      !persistent_env (Compilation_unit.Name.of_head_of_global_name global)
 
 let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
 
