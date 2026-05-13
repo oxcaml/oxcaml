@@ -132,8 +132,11 @@ let eval (expr : 'a expr) =
   Clflags.dlcode := false;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
-  (* TODO: Set a bunch of flags to match the initial compile (like
-     nopervasives) *)
+  (* ensure Stdlib is linked during eval *)
+  Clflags.nopervasives := false;
+  Clflags.no_std_include := false;
+  (* TODO: Set a bunch of flags to match the initial compile; nopervasives is
+     false to ensure Stdlib is available *)
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;
   (* TODO: set commandline flags *)

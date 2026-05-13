@@ -848,6 +848,16 @@ module With_free_and_bound_vars = struct
     With_free_vars.map With_bound_vars.optional (With_free_vars.optional ts)
 end
 
+(* [Availability of identifiers]
+   Paths for identifiers are fully qualified.
+   These paths will either start with a variable (representing a type, a
+   value, module, or a constructor) or a builtin.
+   Builtins are names that are specified in the Predef module of the compiler.
+   In addition, there are global modules, which are registered during the
+   translation to CamlinternalQuote representations of quoted syntax and then
+   become dependencies of the quoted code during evaluation.
+   We also assume that Stdlib is available in quotations. *)
+
 type raw_ident_module_t =
   | Global_module of string
   | MDot of raw_ident_module_t * string
@@ -1427,6 +1437,8 @@ module Ast = struct
 
   let view_fixity_of_exp = function
     | { desc = Ident (VVar _ as l); attributes = [] }
+    (* Stdlib is available inside quotations; if the operator is unambiguous
+       and from Stdlib, it can be written in an infix position *)
     | { desc = Ident (VDot (Global_module "Stdlib", _) as l);
         attributes = [] } ->
       fixity_of_string (suffix_string_of_ident_value l)
