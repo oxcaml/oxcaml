@@ -10,12 +10,15 @@ export RUNTIME_DIR
 
 .DEFAULT_GOAL := build
 
-.PHONY: build test test-promote parent-install
+.PHONY: build test test-promote parent-install parent-boot-config
+
+parent-boot-config:
+	$(MAKE) -C $(PARENT) _build/_bootinstall
 
 parent-install:
 	$(MAKE) -C $(PARENT) install
 
-build:
+build: parent-boot-config
 	dune build $(DUNE_OPTS) $(ARGS)
 
 # If the caller didn't point us at an installed compiler, build and install
@@ -31,7 +34,7 @@ endif
 
 test-promote: PROMOTE := --auto-promote
 
-test test-promote:
+test test-promote: parent-boot-config
 # We want to make sure that dune re-runs the tests in the compiler changes. But
 # the _install directory lives outside the dune boot workspace, so dune doesn't
 # track whether it changes. So we hash the contents of the directory and make
