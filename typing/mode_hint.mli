@@ -76,10 +76,10 @@ type ('d0, 'd1) polarity =
   constraint 'd0 = _ * _ constraint 'd1 = _ * _
 [@@warning "-62"]
 
-(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
-   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
-   while [Modality] stays in place. *)
-type modality = Modality
+type modality =
+  | Modality
+      (** The modality is not known in a form that can be printed precisely. *)
+  | Modality_const of Mode_modality_const.t
 
 type containing =
   | Tuple

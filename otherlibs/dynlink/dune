@@ -119,6 +119,7 @@
   allowance
   solver_intf
   solver
+  mode_modality_const
   mode_hint
   mode_intf
   mode
@@ -329,6 +330,8 @@
 (copy_files ../../typing/allowance.ml)
 
 (copy_files ../../typing/solver.ml)
+
+(copy_files ../../typing/mode_modality_const.ml)
 
 (copy_files ../../typing/shape_reduce.ml)
 
@@ -625,6 +628,8 @@
 
 (copy_files ../../typing/solver_intf.mli)
 
+(copy_files ../../typing/mode_modality_const.mli)
+
 (copy_files ../../typing/mode_hint.mli)
 
 (copy_files ../../typing/mode_intf.mli)
@@ -731,6 +736,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ast_mapper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Allowance.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Solver.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mode_modality_const.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind_axis.cmo
@@ -864,6 +870,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ast_mapper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Allowance.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Solver.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mode_modality_const.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind_axis.cmx

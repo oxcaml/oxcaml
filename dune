@@ -267,6 +267,7 @@
   typecore
   solver_intf
   solver
+  mode_modality_const
   mode_hint
   mode_intf
   mode
