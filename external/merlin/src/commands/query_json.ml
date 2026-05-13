@@ -338,7 +338,14 @@ let json_of_error (error : Location.error) =
   with_location ~skip_none:true loc content
 
 let json_of_completion
-    { Compl.name; kind; desc; info; deprecated; ppx_template_generated; is_local } =
+    { Compl.name;
+      kind;
+      desc;
+      info;
+      deprecated;
+      ppx_template_generated;
+      is_local
+    } =
   `Assoc
     ([ ("name", `String name);
        ("kind", `String (string_of_completion_kind kind));
@@ -346,12 +353,9 @@ let json_of_completion
        ("info", `String info);
        ("deprecated", `Bool deprecated)
      ]
-    @
-    (if ppx_template_generated then [ ("ppx_template_generated", `Bool true) ]
-    else [])
-    @
-    if is_local then [ ("is_local", `Bool true) ]
-    else [])
+    @ (if ppx_template_generated then [ ("ppx_template_generated", `Bool true) ]
+       else [])
+    @ if is_local then [ ("is_local", `Bool true) ] else [])
 
 let json_of_completions { Compl.entries; context } =
   `Assoc
