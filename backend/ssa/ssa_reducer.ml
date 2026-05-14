@@ -29,7 +29,7 @@ open! Int_replace_polymorphic_compare
 
     Dead-Op and unreachable-handler cleanup (dropping [Op]s with
     [usage_count = 0] and [Push_trap]/[Pop_trap] whose handler has no
-    predecessors) happens in [Ssa.finalize_blocks] inside [Out.finish], not
+    predecessors) happens in [finalize_blocks] inside [Out.finish_graph], not
     here.
 
     [keep_unused_ops] disables removing unused operations and parameters, used
@@ -40,10 +40,10 @@ module type Context = sig
 
   include Ssa.Graph_builder
 
-  val emit_instruction : cursor -> Instruction.t -> Instruction.t
+  val emit_instruction : Cursor.t -> Instruction.t -> Instruction.t
 
   val emit_op :
-    cursor ->
+    Cursor.t ->
     op:op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
@@ -53,8 +53,6 @@ module type Context = sig
   val map_arg : In.Instruction.t -> Instruction.t
 
   val map_block : In.Block.t -> Block.t
-
-  val finish : unit
 end
 
 type 'a result =
@@ -64,18 +62,18 @@ type 'a result =
 module type Reducer = functor (C : Context) -> sig
   val analyze : unit -> unit
 
-  val visit_block : C.In.Block.t -> C.cursor -> unit result
+  val visit_block : C.In.Block.t -> C.Cursor.t -> unit result
 
   val visit_instruction :
-    C.In.Block.t -> instr_index:int -> C.cursor -> C.Instruction.t result
+    C.In.Block.t -> instr_index:int -> C.Cursor.t -> C.Instruction.t result
 
-  val visit_terminator : C.In.Block.t -> C.cursor -> unit result
+  val visit_terminator : C.In.Block.t -> C.Cursor.t -> unit result
 
   val rewrite_instruction :
-    C.cursor -> C.Instruction.t -> C.Instruction.t result
+    C.Cursor.t -> C.Instruction.t -> C.Instruction.t result
 
   val rewrite_terminator :
-    C.cursor -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
+    C.Cursor.t -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
 end
 
 module Default : Reducer =
@@ -85,17 +83,17 @@ functor
   struct
     let analyze () = ()
 
-    let visit_block (_ : C.In.Block.t) (_ : C.cursor) = Unchanged
+    let visit_block (_ : C.In.Block.t) (_ : C.Cursor.t) = Unchanged
 
     let visit_instruction (_ : C.In.Block.t) ~instr_index:(_ : int)
-        (_ : C.cursor) =
+        (_ : C.Cursor.t) =
       Unchanged
 
-    let visit_terminator (_ : C.In.Block.t) (_ : C.cursor) = Unchanged
+    let visit_terminator (_ : C.In.Block.t) (_ : C.Cursor.t) = Unchanged
 
-    let rewrite_instruction (_ : C.cursor) (_ : C.Instruction.t) = Unchanged
+    let rewrite_instruction (_ : C.Cursor.t) (_ : C.Instruction.t) = Unchanged
 
-    let rewrite_terminator (_ : C.cursor) ~dbg:(_ : Debuginfo.t)
+    let rewrite_terminator (_ : C.Cursor.t) ~dbg:(_ : Debuginfo.t)
         (_ : C.Terminator.t) =
       Unchanged
   end
@@ -109,18 +107,21 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
       module type S = sig
         val analyze : unit -> unit
 
-        val visit_block : C.In.Block.t -> C.cursor -> unit result
+        val visit_block : C.In.Block.t -> C.Cursor.t -> unit result
 
         val visit_instruction :
-          C.In.Block.t -> instr_index:int -> C.cursor -> C.Instruction.t result
+          C.In.Block.t ->
+          instr_index:int ->
+          C.Cursor.t ->
+          C.Instruction.t result
 
-        val visit_terminator : C.In.Block.t -> C.cursor -> unit result
+        val visit_terminator : C.In.Block.t -> C.Cursor.t -> unit result
 
         val rewrite_instruction :
-          C.cursor -> C.Instruction.t -> C.Instruction.t result
+          C.Cursor.t -> C.Instruction.t -> C.Instruction.t result
 
         val rewrite_terminator :
-          C.cursor -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
+          C.Cursor.t -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
       end
 
       let children : (module S) list =
@@ -189,13 +190,11 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
 let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     (input : (module Ssa.Finished_graph)) : (module Ssa.Finished_graph) =
   let module In = (val input : Ssa.Finished_graph) in
-  let module Out =
-    (val Ssa.make_builder In.function_info ~keep_unused_ops : Ssa.Graph_builder)
-  in
+  let module Out = (val Ssa.make_builder In.function_info ~keep_unused_ops) in
   (* Map each input block to its output counterpart. *)
   let block_map : Out.Block.t In.Block.Tbl.t = In.Block.Tbl.create 64 in
-  let op_map : Out.Instruction.t In.Instruction_id.Tbl.t =
-    In.Instruction_id.Tbl.create 256
+  let op_map : Out.Instruction.t In.Instruction.Id.Tbl.t =
+    In.Instruction.Id.Tbl.create 256
   in
   (* Maps each old param index to its new index in [Out], or
      [dropped_param_sentinel] if the param is dropped. A param can be dropped
@@ -208,7 +207,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   let compute_block_param_map (block : In.Block.t) : int array =
     let n = Array.length block.params in
     let any_non_goto_pred () =
-      In.Block.Set.exists
+      List.exists
         (fun (pred : In.Block.t) ->
           match[@warning "-fragile-match"] pred.terminator with
           | Goto _ -> false
@@ -260,12 +259,13 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   in
   let rec map_arg (instr : In.Instruction.t) : Out.Instruction.t =
     match instr with
-    | Op { id; _ } -> In.Instruction_id.Tbl.find op_map id
-    | Block_param { block; index } ->
-      let new_index = (In.Block.Tbl.find block_param_map block).(index) in
+    | Op { id; _ } -> In.Instruction.Id.Tbl.find op_map id
+    | Block_param { block; param_index } ->
+      let new_index = (In.Block.Tbl.find block_param_map block).(param_index) in
       assert (new_index <> dropped_param_sentinel);
       Out.Instruction.make_block_param (map_block block) new_index
-    | Proj { index; src } -> Out.Instruction.make_proj ~index (map_arg src)
+    | Proj { output_index; src } ->
+      Out.Instruction.make_proj ~index:output_index (map_arg src)
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
       ->
       Misc.fatal_error "Unexpected instruction in Ssa_reducer map_arg_impl"
@@ -329,11 +329,15 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   in
   let module M = struct
     module rec Ctx : sig
-      include Context with module In = In and type cursor = Out.cursor
+      include
+        Context
+          with type block = Out.Block.t
+           and type cursor = Out.Cursor.t
+           and module In = In
 
-      val visit_instruction : In.Block.t -> instr_index:int -> cursor -> unit
+      val visit_instruction : In.Block.t -> instr_index:int -> Cursor.t -> unit
 
-      val visit_terminator : In.Block.t -> cursor -> unit
+      val visit_terminator : In.Block.t -> Cursor.t -> unit
     end = struct
       module In = In
       include Out
@@ -373,15 +377,15 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
              Input: %a@ Replacement: %a"
             (Instruction.result_arity replacement)
             (In.Instruction.result_arity instr)
-            In.print_instruction instr Out.print_instruction replacement;
+            In.Instruction.print instr Out.Instruction.print replacement;
         match[@warning "-fragile-match"] instr with
-        | Op { id; _ } -> In.Instruction_id.Tbl.replace op_map id replacement
+        | Op { id; _ } -> In.Instruction.Id.Tbl.replace op_map id replacement
         | _ -> ()
 
       let visit_terminator (block : In.Block.t) c =
         match Red.visit_terminator block c with
         | Replaced () ->
-          if not (Out.is_finished c)
+          if not (Out.Cursor.is_finished c)
           then
             Misc.fatal_error
               "The reducer promised to have replaced the block terminator, but \
@@ -389,25 +393,26 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         | Unchanged ->
           let term = map_terminator block.terminator in
           finish_block c ~dbg:block.terminator_dbg term
-
-      let finish = ()
     end
 
     and Red : sig
       val analyze : unit -> unit
 
-      val visit_block : In.Block.t -> Out.cursor -> unit result
+      val visit_block : In.Block.t -> Out.Cursor.t -> unit result
 
       val visit_instruction :
-        In.Block.t -> instr_index:int -> Out.cursor -> Out.Instruction.t result
+        In.Block.t ->
+        instr_index:int ->
+        Out.Cursor.t ->
+        Out.Instruction.t result
 
-      val visit_terminator : In.Block.t -> Out.cursor -> unit result
+      val visit_terminator : In.Block.t -> Out.Cursor.t -> unit result
 
       val rewrite_instruction :
-        Out.cursor -> Out.Instruction.t -> Out.Instruction.t result
+        Out.Cursor.t -> Out.Instruction.t -> Out.Instruction.t result
 
       val rewrite_terminator :
-        Out.cursor -> dbg:Debuginfo.t -> Out.Terminator.t -> unit result
+        Out.Cursor.t -> dbg:Debuginfo.t -> Out.Terminator.t -> unit result
     end =
       Red_ctor (Ctx)
   end in
@@ -419,7 +424,7 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
   List.iter
     (fun (block : In.Block.t) ->
       let out_block = In.Block.Tbl.find block_map block in
-      let c = Out.start_block out_block in
+      let c = Out.Cursor.start out_block in
       try
         match Red.visit_block block c with
         | Replaced () -> ()
@@ -433,12 +438,12 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         Format.eprintf
           "*** Ssa_reducer.run error for %s while processing block %a: %s@.*** \
            Input SSA:@.%a@."
-          In.function_info.fun_name In.print_block_id block
-          (Printexc.to_string exn) Ssa_print.print
+          In.function_info.name In.Block.print_id block (Printexc.to_string exn)
+          Ssa_print.print
           (module In : Ssa.Finished_graph);
         Format.pp_print_flush Format.err_formatter ();
         Printexc.raise_with_backtrace exn bt)
     In.blocks;
-  let result = Out.finish () in
+  let result = Out.finish_graph () in
   Ssa_validate.validate result;
   result

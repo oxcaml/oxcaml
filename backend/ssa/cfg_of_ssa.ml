@@ -22,7 +22,7 @@ open! Int_replace_polymorphic_compare
     - [Call] results are moved from [Proc.loc_results_call] to the
       continuation's block param regs at the start of the continuation.
 
-    Trap stack: {!Ssa.finish} populates each block's [block_end_trap_stack]; we
+    Trap stack: [finish_graph] populates each block's [block_end_trap_stack]; we
     use it to (a) decide which blocks have a trap successor (their [Raise] /
     may-raise [Call] branches to the topmost handler), and (b) emit [Poptrap]
     instructions before [Return] terminators so the runtime trap stack is empty
@@ -40,24 +40,24 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
   open Ssa_graph
 
   type env =
-    { op_regs : Reg.t array Instruction_id.Tbl.t;
+    { op_regs : Reg.t array Instruction.Id.Tbl.t;
       block_params_regs : Reg.t array Block.Tbl.t;
       block_labels : Label.t Block.Tbl.t;
       call_result_locs : Reg.t array Block.Tbl.t;
       call_stack_ofs : int Block.Tbl.t;
-      fused_comparison_ops : int Instruction_id.Tbl.t
+      fused_comparison_ops : int Instruction.Id.Tbl.t
           (* Comparison ops that will be fused into the block terminator and
              should therefore not be emitted into the block body. The map counts
              how often a comparison has been fused. *)
     }
 
   let create_env () =
-    { op_regs = Instruction_id.Tbl.create 256;
+    { op_regs = Instruction.Id.Tbl.create 256;
       block_params_regs = Block.Tbl.create 64;
       block_labels = Block.Tbl.create 64;
       call_result_locs = Block.Tbl.create 16;
       call_stack_ofs = Block.Tbl.create 16;
-      fused_comparison_ops = Instruction_id.Tbl.create 16
+      fused_comparison_ops = Instruction.Id.Tbl.create 16
     }
 
   let label_of env (blk : Block.t) =
@@ -70,28 +70,28 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     match instr with
     | Op { id; _ } ->
       let regs =
-        try Instruction_id.Tbl.find env.op_regs id
+        try Instruction.Id.Tbl.find env.op_regs id
         with Not_found ->
           Misc.fatal_errorf "Cfg_of_ssa.get_reg: no regs for Op v%d" (id :> int)
       in
       assert (Array.length regs = 1);
       regs.(0)
-    | Block_param { block; index; _ } -> (
+    | Block_param { block; param_index } -> (
       try
         let regs = Block.Tbl.find env.block_params_regs block in
-        regs.(index)
+        regs.(param_index)
       with Not_found ->
         Misc.fatal_errorf "Cfg_of_ssa: no regs for Block_param B%d.%d"
           (block.id :> int)
-          index)
-    | Proj { index; src = Op { id; _ } } ->
+          param_index)
+    | Proj { output_index; src = Op { id; _ } } ->
       let regs =
-        try Instruction_id.Tbl.find env.op_regs id
+        try Instruction.Id.Tbl.find env.op_regs id
         with Not_found ->
           Misc.fatal_errorf "Cfg_of_ssa.get_reg: no regs for Op v%d (Proj)"
             (id :> int)
       in
-      regs.(index)
+      regs.(output_index)
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
     | Proj _ ->
       Misc.fatal_error "Cfg_of_ssa.get_reg: unexpected instruction"
@@ -216,7 +216,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     Array.concat (Array.to_list locs), stack_ofs, stack_align
 
   let is_trap_predecessor (pred : Block.t) (target : Block.t) =
-    match trap_successor pred with
+    match Block.trap_successor pred with
     | Some h -> Block.equal h target
     | None -> false
 
@@ -232,12 +232,10 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       inserting a merge block to join the non-trap predecessors. *)
   let is_trap_handler (block : Block.t) =
     let any_trap_pred =
-      Block.Set.exists (fun p -> is_trap_predecessor p block) block.predecessors
+      List.exists (fun p -> is_trap_predecessor p block) block.predecessors
     in
     let all_trap_pred () =
-      Block.Set.for_all
-        (fun p -> is_trap_predecessor p block)
-        block.predecessors
+      List.for_all (fun p -> is_trap_predecessor p block) block.predecessors
     in
     if any_trap_pred && not (all_trap_pred ())
     then
@@ -251,9 +249,9 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       relax this in the future by automatically splitting the edges. *)
   let is_call_continuation (block : Block.t) =
     let result =
-      Block.Set.exists (fun p -> is_call_predecessor p block) block.predecessors
+      List.exists (fun p -> is_call_predecessor p block) block.predecessors
     in
-    if result && Block.Set.cardinal block.predecessors <> 1
+    if result && List.length block.predecessors <> 1
     then
       Misc.fatal_errorf
         "Cfg_of_ssa: block %d has a call predecessor alongside other \
@@ -289,9 +287,9 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
         match instr with
         | Op { id; op; args; dbg; typ; usage_count } ->
           let regs = Reg.createv typ in
-          Instruction_id.Tbl.replace env.op_regs id regs;
+          Instruction.Id.Tbl.replace env.op_regs id regs;
           if
-            Instruction_id.Tbl.find_opt env.fused_comparison_ops id
+            Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
             |> Option.value ~default:(-1) < usage_count
           then
             let arg = Array.map (get_reg env) args in
@@ -389,7 +387,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
         let exn_val = Array.map (get_reg env) args in
         let exn_bucket = [| Proc.loc_exn_bucket |] in
         let extra_dst =
-          match trap_successor block with
+          match Block.trap_successor block with
           | Some hb ->
             let handler_regs = get_block_params_regs env hb in
             if Array.length handler_regs > 1
@@ -513,9 +511,9 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
           then
             match[@warning "-fragile-match"] cond with
             | Op { id; _ } ->
-              Instruction_id.Tbl.replace env.fused_comparison_ops id
+              Instruction.Id.Tbl.replace env.fused_comparison_ops id
                 (1
-                + (Instruction_id.Tbl.find_opt env.fused_comparison_ops id
+                + (Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
                   |> Option.value ~default:0))
             | _ -> assert false)
         | _ -> ())
@@ -526,13 +524,13 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
       (fun (block : Block.t) ->
         Block.Tbl.replace env.block_labels block (Label.new_label ());
         Block.Tbl.replace env.block_params_regs block
-          (Reg.createv (params_machtype block)))
+          (Reg.createv (Block.params_machtype block)))
       blocks
 
   let param_naming_instrs ~fun_arg_locs =
     let idx = ref 0 in
     let param_index = ref (-1) in
-    function_info.fun_args_names
+    function_info.args_names
     |> List.filter_map (fun (var, ty) ->
         param_index := !param_index + 1;
         let provenance = Backend_var.With_provenance.provenance var in
@@ -623,7 +621,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     if
       not
         (Cfg_polling.requires_prologue_poll ~future_funcnames:funcnames
-           ~fun_name:function_info.fun_name
+           ~fun_name:function_info.name
            ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
     then
       let entry = Cfg.get_block_exn cfg (label_of env entry) in
@@ -639,14 +637,13 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     let fun_arg_regs = get_block_params_regs env entry in
     let fun_arg_locs = Proc.loc_parameters (Reg.typv fun_arg_regs) in
     let cfg =
-      Cfg.create ~fun_name:function_info.fun_name ~fun_args:fun_arg_locs
+      Cfg.create ~fun_name:function_info.name ~fun_args:fun_arg_locs
         ~fun_codegen_options:
-          (Cfg.of_cmm_codegen_option function_info.fun_codegen_options)
-        ~fun_dbg:function_info.fun_dbg ~fun_contains_calls:true
+          (Cfg.of_cmm_codegen_option function_info.codegen_options)
+        ~fun_dbg:function_info.dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
-        ~fun_poll:function_info.fun_poll ~next_instruction_id:Sub_cfg.instr_id
-        ~fun_ret_type:function_info.fun_ret_type
-        ~allowed_to_be_irreducible:false
+        ~fun_poll:function_info.poll ~next_instruction_id:Sub_cfg.instr_id
+        ~fun_ret_type:function_info.ret_type ~allowed_to_be_irreducible:false
     in
     let layout = DLL.make_empty () in
     let entry_block =
