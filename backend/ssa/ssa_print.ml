@@ -11,40 +11,40 @@ module Make (S : Ssa.Finished_graph) = struct
     Array.iteri
       (fun i (p : S.Block.param) ->
         if i > 0 then Format.fprintf ppf ", ";
-        S.print_block_param ppf blk i;
+        S.Block.print_param ppf blk i;
         Format.fprintf ppf " : %a" Printcmm.machtype_component p.typ)
       blk.params
 
   let print_block_header ppf (blk : S.Block.t) =
     let name = if blk.is_function_start then "FUNCTION_START" else "BLOCK" in
-    Format.fprintf ppf "%a: %s(%a)" S.print_block_id blk name print_typed_params
+    Format.fprintf ppf "%a: %s(%a)" S.Block.print_id blk name print_typed_params
       blk;
-    Format.fprintf ppf " [idom=%a depth=%d]" S.print_block_id
+    Format.fprintf ppf " [idom=%a depth=%d]" S.Block.print_id
       blk.dominator_info.dominator blk.dominator_info.depth;
-    match S.predecessors blk |> S.Block.Set.elements with
+    match S.Block.predecessors blk with
     | [] -> ()
     | preds ->
       Format.fprintf ppf " <- %a"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-           S.print_block_id)
+           S.Block.print_id)
         preds
 
   let print_block ppf (blk : S.Block.t) =
     Format.fprintf ppf "%a@." print_block_header blk;
     Array.iter
-      (fun bi -> Format.fprintf ppf "  %a@." S.print_instruction bi)
+      (fun bi -> Format.fprintf ppf "  %a@." S.Instruction.print bi)
       blk.body;
-    Format.fprintf ppf "  %a" S.print_terminator blk.terminator;
-    (match S.trap_successor blk with
+    Format.fprintf ppf "  %a" S.Terminator.print blk.terminator;
+    (match S.Block.trap_successor blk with
     | None -> ()
-    | Some h -> Format.fprintf ppf " trap_successor=%a" S.print_block_id h);
+    | Some h -> Format.fprintf ppf " trap_successor=%a" S.Block.print_id h);
     Format.fprintf ppf "@.@."
 
   let print ppf =
-    Format.fprintf ppf "ssa %s(%a)@." S.function_info.fun_name Printcmm.machtype
-      S.function_info.fun_args;
-    Format.fprintf ppf "  entry = %a@.@." S.print_block_id S.entry;
+    Format.fprintf ppf "ssa %s(%a)@." S.function_info.name Printcmm.machtype
+      S.function_info.args;
+    Format.fprintf ppf "  entry = %a@.@." S.Block.print_id S.entry;
     List.iter (print_block ppf) S.blocks;
     Format.fprintf ppf "@."
 end

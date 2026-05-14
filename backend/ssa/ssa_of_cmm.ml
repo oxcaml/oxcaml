@@ -28,8 +28,8 @@ module Make (Builder : Ssa.Graph_builder) = struct
   open Builder
 
   let current_function_is_check_enabled =
-    Zero_alloc_checker.is_check_enabled function_info.fun_codegen_options
-      function_info.fun_name function_info.fun_dbg
+    Zero_alloc_checker.is_check_enabled function_info.codegen_options
+      function_info.name function_info.dbg
 
   type 'a or_never_returns =
     | Ok of 'a
@@ -368,7 +368,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
       in
       finish_block c ~dbg:Debuginfo.none
         (Invalid { message; args = arg_instrs; continuation = Some cont_block });
-      move_cursor c ~new_pos:(start_block cont_block);
+      Cursor.move c ~new_pos:(Cursor.start cont_block);
       Ok cont_params)
     else (
       finish_block c ~dbg:Debuginfo.none
@@ -393,7 +393,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
              may_raise = Cfg.can_raise_terminator new_op;
              nontail
            });
-      move_cursor c ~new_pos:(start_block cont_block);
+      Cursor.move c ~new_pos:(Cursor.start cont_block);
       Ok cont_params
     | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
       let { block = cont_block; params = cont_params } =
@@ -407,7 +407,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
              may_raise = Cfg.can_raise_terminator new_op;
              nontail
            });
-      move_cursor c ~new_pos:(start_block cont_block);
+      Cursor.move c ~new_pos:(Cursor.start cont_block);
       Ok cont_params
     | Prim { op = Probe _ as probe_op; _ } ->
       let { block = cont_block; params = cont_params } = new_block ~params:ty in
@@ -419,7 +419,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
              may_raise = Cfg.can_raise_terminator new_op;
              nontail
            });
-      move_cursor c ~new_pos:(start_block cont_block);
+      Cursor.move c ~new_pos:(Cursor.start cont_block);
       Ok cont_params
     | Call_no_return _ ->
       Misc.fatal_errorf
@@ -485,9 +485,9 @@ module Make (Builder : Ssa.Graph_builder) = struct
     let { block = then_block; _ } = new_block ~params:[||] in
     let { block = else_block; _ } = new_block ~params:[||] in
     emit_branch c cond rarg ~true_block:then_block ~false_block:else_block;
-    let then_c = start_block then_block in
+    let then_c = Cursor.start then_block in
     let r_then = emit env then_c eif ~tail in
-    let else_c = start_block else_block in
+    let else_c = Cursor.start else_block in
     let r_else = emit env else_c eelse ~tail in
     join c [| r_then, then_c; r_else, else_c |]
 
@@ -509,7 +509,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
     let case_results =
       Array.mapi
         (fun i (case_expr, _dbg) ->
-          let case_c = start_block case_blocks.(i) in
+          let case_c = Cursor.start case_blocks.(i) in
           emit env case_c case_expr ~tail, case_c)
         ecases
     in
@@ -557,7 +557,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
             env_add id proj_instrs env)
           env handler.params
       in
-      let c = start_block handler_block.block in
+      let c = Cursor.start handler_block.block in
       List.iter
         (fun (id, _ty) ->
           let provenance = VP.provenance id in
@@ -607,7 +607,7 @@ module Make (Builder : Ssa.Graph_builder) = struct
   (* Join a set of branches (each with its own end-cursor) into a fresh block.
      [c] is left pointing at the joined block, or unchanged if no branch
      returns. *)
-  and join c (results : (result * cursor) array) : result =
+  and join c (results : (result * Cursor.t) array) : result =
     let join_info = ref None in
     Array.iter
       (fun (r, _) ->
@@ -642,26 +642,24 @@ module Make (Builder : Ssa.Graph_builder) = struct
                    args = instrs |> Array.map (fun instr -> Some instr)
                  }))
         results;
-      move_cursor c ~new_pos:(start_block join_block);
+      Cursor.move c ~new_pos:(Cursor.start join_block);
       Ok join_params
 end
 
 let convert (f : Cmm.fundecl) ~keep_unused_ops : (module Ssa.Finished_graph) =
   try
     let fun_arg_types = List.map snd f.fun_args |> Array.concat in
-    let fi : Ssa.function_info =
-      { fun_name = f.fun_name.sym_name;
-        fun_args = fun_arg_types;
-        fun_args_names = f.fun_args;
-        fun_codegen_options = f.fun_codegen_options;
-        fun_dbg = f.fun_dbg;
-        fun_poll = f.fun_poll;
-        fun_ret_type = f.fun_ret_type
+    let fi : Ssa.Function_info.t =
+      { name = f.fun_name.sym_name;
+        args = fun_arg_types;
+        args_names = f.fun_args;
+        codegen_options = f.fun_codegen_options;
+        dbg = f.fun_dbg;
+        poll = f.fun_poll;
+        ret_type = f.fun_ret_type
       }
     in
-    let module Builder =
-      (val Ssa.make_builder fi ~keep_unused_ops : Ssa.Graph_builder)
-    in
+    let module Builder = (val Ssa.make_builder fi ~keep_unused_ops) in
     let module M = Make (Builder) in
     let env =
       { M.vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
@@ -677,10 +675,10 @@ let convert (f : Cmm.fundecl) ~keep_unused_ops : (module Ssa.Finished_graph) =
         (env, 0) f.fun_args
     in
     let r =
-      M.emit env (Builder.start_block Builder.entry) f.fun_body ~tail:true
+      M.emit env (Builder.Cursor.start Builder.entry) f.fun_body ~tail:true
     in
     assert (match r with Never_returns -> true | Ok _ -> false);
-    let result = Builder.finish () in
+    let result = Builder.finish_graph () in
     Ssa_validate.validate result;
     result
   with Misc.Fatal_error as exn ->

@@ -2,8 +2,8 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-(** Post-finish SSA invariants. Most structural invariants are enforced by the
-    graph builder. Here, we just verify the following:
+(** Post-[finish_graph] SSA invariants. Most structural invariants are enforced
+    by the graph builder. Here, we just verify the following:
     - SSA definitions dominate their uses
     - trap stacks are consistent
     - Goto arguments are only [None] when the parameter is unused *)
@@ -12,10 +12,10 @@ module Make (S : Ssa.Finished_graph) = struct
   let error fmt =
     Format.kasprintf
       (fun s ->
-        Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.fun_name s)
+        Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.name s)
       fmt
 
-  let pb = S.print_block_id
+  let pb = S.Block.print_id
 
   (* The trap stack at entry to [bl] must agree across all predecessors: on a
      normal edge it's the predecessor's [block_end_trap_stack]; on an trap edge
@@ -24,7 +24,7 @@ module Make (S : Ssa.Finished_graph) = struct
   let check_trap_stacks (bl : S.Block.t) =
     let trap_stack_at_entry_from (pred : S.Block.t) : S.Block.t list =
       let via_exception_edge =
-        match S.trap_successor pred with
+        match S.Block.trap_successor pred with
         | Some h -> S.Block.equal h bl
         | None -> false
       in
@@ -39,7 +39,7 @@ module Make (S : Ssa.Finished_graph) = struct
            pb)
         stack
     in
-    match S.predecessors bl |> S.Block.Set.elements with
+    match S.Block.predecessors bl with
     | [] -> ()
     | first_pred :: rest ->
       let expected = trap_stack_at_entry_from first_pred in
@@ -58,14 +58,14 @@ module Make (S : Ssa.Finished_graph) = struct
     let block_set = S.Block.Tbl.create 16 in
     List.iter (fun bl -> S.Block.Tbl.replace block_set bl ()) S.blocks;
     let block_exists b = S.Block.Tbl.mem block_set b in
-    let defined_ops = S.Instruction_id.Tbl.create 64 in
+    let defined_ops = S.Instruction.Id.Tbl.create 64 in
     let rec check_arg (bl : S.Block.t) (instr : S.Instruction.t) =
       match instr with
       | Op { id; _ } -> (
-        match S.Instruction_id.Tbl.find_opt defined_ops id with
+        match S.Instruction.Id.Tbl.find_opt defined_ops id with
         | None -> error "block %a: v%d used but not defined" pb bl (id :> int)
         | Some def_block ->
-          if not (S.dominates def_block bl)
+          if not (S.Block.dominates def_block bl)
           then
             error "block %a: v%d defined in non-dominating block %a" pb bl
               (id :> int)
@@ -75,7 +75,7 @@ module Make (S : Ssa.Finished_graph) = struct
         then
           error "block %a: Block_param references non-existent block %a" pb bl
             pb block;
-        if not (S.dominates block bl)
+        if not (S.Block.dominates block bl)
         then
           error "block %a: Block_param of non-dominating block %a" pb bl pb
             block
@@ -98,9 +98,9 @@ module Make (S : Ssa.Finished_graph) = struct
           match instr with
           | Op { id; args; _ } ->
             check_args bl args;
-            if S.Instruction_id.Tbl.mem defined_ops id
+            if S.Instruction.Id.Tbl.mem defined_ops id
             then error "block %a: duplicate Op id v%d" pb bl (id :> int);
-            S.Instruction_id.Tbl.replace defined_ops id bl
+            S.Instruction.Id.Tbl.replace defined_ops id bl
           | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
           | Block_param _ | Proj _ | Tuple _ ->
             error
@@ -140,6 +140,6 @@ let validate (m : (module Ssa.Finished_graph)) =
   with exn ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "*** SSA validation failed for %s: %s@.*** SSA:@.%a@."
-      S.function_info.fun_name (Printexc.to_string exn) Ssa_print.print m;
+      S.function_info.name (Printexc.to_string exn) Ssa_print.print m;
     Format.pp_print_flush Format.err_formatter ();
     Printexc.raise_with_backtrace exn bt

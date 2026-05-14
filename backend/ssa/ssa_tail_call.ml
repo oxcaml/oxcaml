@@ -29,8 +29,8 @@ module Tail_call_reducer (C : Context) = struct
         i >= n
         ||
         match[@warning "-fragile-match"] args.(i) with
-        | Block_param { block = param_block; index } ->
-          C.In.Block.equal param_block block && index = i && loop (i + 1)
+        | Block_param { block = param_block; param_index } ->
+          C.In.Block.equal param_block block && param_index = i && loop (i + 1)
         | _ -> false
       in
       loop 0
@@ -48,7 +48,7 @@ module Tail_call_reducer (C : Context) = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
-  let visit_terminator (block : C.In.Block.t) (c : C.cursor) =
+  let visit_terminator (block : C.In.Block.t) (c : C.Cursor.t) =
     match[@warning "-fragile-match"] block.terminator with
     | Call
         { op = Func call_op;
@@ -60,12 +60,11 @@ module Tail_call_reducer (C : Context) = struct
       when List.is_empty block.block_end_trap_stack
            && returns_args_unchanged continuation
            && stack_offsets_zero call_op args
-                (C.In.params_machtype continuation) ->
+                (C.In.Block.params_machtype continuation) ->
       let mapped_args = Array.map C.map_arg args in
       let term : C.Terminator.t =
         match call_op with
-        | Direct func
-          when String.equal func.sym_name C.In.function_info.fun_name ->
+        | Direct func when String.equal func.sym_name C.In.function_info.name ->
           Tailcall_self
             { destination = C.map_block C.In.entry; args = mapped_args }
         | Direct _ | Indirect _ ->
