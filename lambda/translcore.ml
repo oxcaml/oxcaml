@@ -953,6 +953,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 | Punboxedvectorarray _
                 | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
+                | Punspecializedarray ->
+                  Misc.fatal_error "Translcore: Punspecializedarray"
             in
             if Types.is_mutable amut then duparray_to_mutable const else const
         end
@@ -978,6 +980,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error(e.exp_loc, Unboxed_product_in_array_comprehension))
+      | Punspecializedarray ->
+        Misc.fatal_error
+          "Translcore: array comprehension with Punspecializedarray"
       end;
       Transl_array_comprehension.comprehension
         ~transl_exp ~scopes ~loc ~array_kind comp
