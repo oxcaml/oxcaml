@@ -263,12 +263,12 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     | Block_param { block; param_index } ->
       let new_index = (In.Block.Tbl.find block_param_map block).(param_index) in
       assert (new_index <> dropped_param_sentinel);
-      Out.Instruction.make_block_param (map_block block) new_index
+      Out.Instruction.make_block_param (map_block block) ~index:new_index
     | Proj { output_index; src } ->
-      Out.Instruction.make_proj ~index:output_index (map_arg src)
+      Out.Instruction.make_proj (map_arg src) ~index:output_index
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
       ->
-      Misc.fatal_error "Unexpected instruction in Ssa_reducer map_arg_impl"
+      Misc.fatal_error "Unexpected instruction in Ssa_reducer.map_arg"
   in
   let map_args (args : In.Instruction.t array) : Out.Instruction.t array =
     Array.map map_arg args
