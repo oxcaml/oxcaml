@@ -1305,6 +1305,28 @@ CAMLprim value caml_continuation_update_handler_noexc
   return cont;
 }
 
+/* Update only the tick handler of a continuation, leaving all other handlers
+   unchanged */
+CAMLprim value caml_continuation_update_tick_handler_noexc
+  (value cont, value htick)
+{
+  CAMLnoalloc;
+  value stack;
+  struct stack_info *stk;
+
+  stack = caml_continuation_use_noexc (cont);
+  stk = Ptr_val(stack);
+  if (stk == NULL) {
+    /* The continuation has already been taken */
+    return cont;
+  }
+  while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
+  Stack_handle_tick(stk) = htick;
+  caml_continuation_replace(cont, Ptr_val(stack));
+
+  return cont;
+}
+
 CAMLprim value caml_drop_continuation (value cont)
 {
   struct stack_info* stk = Ptr_val(caml_continuation_use(cont));
