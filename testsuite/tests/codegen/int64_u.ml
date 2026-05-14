@@ -381,7 +381,7 @@ unsigned_to_int:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L2
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
@@ -409,7 +409,7 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
@@ -431,7 +431,7 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
@@ -457,7 +457,7 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
@@ -508,7 +508,7 @@ float_of_bits:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
@@ -612,7 +612,7 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)

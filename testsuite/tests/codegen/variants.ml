@@ -270,7 +270,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L8
+  jl    <hidden GC jump pad>
 .L0:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -282,7 +282,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L7
+  jl    <hidden GC jump pad>
 .L2:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -294,7 +294,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L6
+  jl    <hidden GC jump pad>
 .L4:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -306,13 +306,4 @@ double_match:
   movq  %rsi, 64(%r14)
   addq  $8, %rsp
   ret
-.L6:
-  call  caml_call_local_realloc@PLT
-  jmp   .L4
-.L7:
-  call  caml_call_local_realloc@PLT
-  jmp   .L2
-.L8:
-  call  caml_call_local_realloc@PLT
-  jmp   .L0
 |}]

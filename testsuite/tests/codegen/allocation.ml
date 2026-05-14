@@ -18,7 +18,7 @@ one_or_two_element_list:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L5
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rdi
   movq  $2048, -8(%rdi)
@@ -32,7 +32,7 @@ one_or_two_element_list:
 .L1:
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L3
+  jb    <hidden GC jump pad>
 .L2:
   leaq  8(%r15), %rax
   movq  $2048, -8(%rax)
@@ -72,7 +72,7 @@ spill_slot_lifetime:
 .L3:
   subq  $40, %r15
   cmpq  (%r14), %r15
-  jb    .L5
+  jb    <hidden GC jump pad>
 .L4:
   leaq  8(%r15), %rax
   movabsq $72057594037932032, %rbx

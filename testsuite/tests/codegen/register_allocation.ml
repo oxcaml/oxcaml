@@ -357,7 +357,7 @@ double_loop_no_definition_at_beginning:
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    .L6
+  jl    <hidden GC jump pad>
 .L1:
   addq  72(%r14), %rbx
   addq  $8, %rbx
@@ -400,9 +400,6 @@ double_loop_no_definition_at_beginning:
   movl  $1, %eax
   addq  $72, %rsp
   ret
-.L6:
-  call  caml_call_local_realloc@PLT
-  jmp   .L1
 
 double_loop_no_definition_at_beginning.f:
   movq  24(%rbx), %rsi
@@ -590,7 +587,7 @@ register_pressure:
   subq  $24, %rsp
   subq  $488, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rbx
   addq  $456, %rbx
@@ -706,8 +703,4 @@ register_pressure:
   movq  %rbx, 88(%rax)
   addq  $24, %rsp
   ret
-.L1:
-  call  .Lcaml_call_gc_
-.L2:
-  jmp   .L0
 |}]
