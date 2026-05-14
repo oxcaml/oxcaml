@@ -2088,9 +2088,45 @@ end = struct
     | None -> ()
     | Some i -> Zero_alloc_info.set_value info s i
 
+  (* Try to load the .cmx file for the compilation unit that defines symbol [s],
+     so its zero-alloc summaries are merged into [Compilenv.cached_zero_alloc_info].
+     We match [s] against the linkage-name prefix of each imported unit, taking
+     the longest match (to handle nested packs). *)
+  let try_load_cmx_for_symbol s =
+    let infos = Compilenv.current_unit_infos () in
+    let best =
+      List.fold_left
+        (fun acc import ->
+          match Import_info.Intf.info import with
+          | Some (Normal cu, _crc) ->
+            let prefix =
+              Symbol.for_compilation_unit cu
+              |> Symbol.linkage_name |> Linkage_name.to_string
+            in
+            if String.starts_with s ~prefix:(prefix ^ "__")
+            then
+              match acc with
+              | Some (_, plen) when plen >= String.length prefix -> acc
+              | _ -> Some (cu, String.length prefix)
+            else acc
+          | Some (Parameter, _) | None -> acc)
+        None infos.ui_imports_cmi
+    in
+    match best with
+    | None -> ()
+    | Some (cu, _) ->
+      let (_ : Flambda2_cmx.Flambda_cmx_format.t option) =
+        Compilenv.get_unit_export_info cu
+      in
+      ()
+
   let get_value_opt s =
     let info = Compilenv.cached_zero_alloc_info in
-    decode (Zero_alloc_info.get_value info s)
+    match Zero_alloc_info.get_value info s with
+    | Some _ as v -> decode v
+    | None ->
+      try_load_cmx_for_symbol s;
+      decode (Zero_alloc_info.get_value info s)
 end
 
 (** The analysis involved some fixed point computations. Termination: [Value.t]
