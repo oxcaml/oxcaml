@@ -4384,8 +4384,8 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
            Env.mode_unit ~staticity:arg_staticity)
       in
       let coercion =
-        Includemod.compunit_as_argument ~modes
-          env sourcefile actual_sig arg_filename arg_sig
+        Includemod.compunit_as_argument
+          env sourcefile ~modes actual_sig arg_filename arg_sig
       in
       Some { ai_signature = arg_sig;
              ai_coercion_from_primary = coercion;
@@ -4501,10 +4501,10 @@ let type_implementation target modulename initial_env ast =
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit
+                initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
                   ((mode, None), Env.mode_unit ~staticity))
-                initial_env ~mark:true
-                sourcefile sg compiled_intf_file_name dclsig shape)
+                sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
              the visible type of the module and that's what needs to conform to
@@ -4547,8 +4547,8 @@ let type_implementation target modulename initial_env ast =
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit ~modes initial_env ~mark:true
-                sourcefile sg "(inferred signature)" simple_sg shape)
+              Includemod.compunit initial_env ~mark:true sourcefile ~modes
+                sg "(inferred signature)" simple_sg shape)
           in
           check_nongen_signature finalenv simple_sg;
           let zap_modality =
@@ -4736,8 +4736,8 @@ let package_units initial_env objfiles target_cmi modulename =
         let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
-      Includemod.compunit ~modes initial_env ~mark:true
-        "(obtained by packing)" sg mli dclsig shape
+      Includemod.compunit initial_env ~mark:true
+        "(obtained by packing)" ~modes sg mli dclsig shape
     in
     let decl_deps =
       (* This is cleared after saving the cmt so we have to save is before *)

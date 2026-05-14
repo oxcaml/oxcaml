@@ -215,11 +215,11 @@ val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 (** Check an implementation against an interface *)
 
 val compunit:
-      modes:modes -> Env.t -> mark:bool -> string ->
+      Env.t -> mark:bool -> string -> modes:modes ->
       signature -> string -> signature -> Shape.t -> module_coercion * Shape.t
 
 val compunit_as_argument:
-      modes:modes -> Env.t -> string -> signature ->
+      Env.t -> string -> modes:modes -> signature ->
       string -> signature -> module_coercion
 
 val type_declarations:
