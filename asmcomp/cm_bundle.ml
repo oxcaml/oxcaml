@@ -32,6 +32,9 @@ module CU = Compilation_unit
 type error =
   | Missing_intf_for_quote of CU.Name.t
   | Missing_impl_for_quote of CU.t
+    (* This is currently unused as we can't ensure the cmx files are always
+       available, specifically compiler-libs doesn't ship its cmx files. We
+       should emit this again once all of the compiler artifacts do. *)
 
 exception Error of error
 
@@ -48,32 +51,27 @@ let cmi_bundle ~quoted_cmi =
 (* We can't populate this during scan_file because a cmxa contains less
    information than a cmx. *)
 let cmx_bundle ~quoted_cmx =
-  let rec loop cmxs missing_globals =
-    match missing_globals with
-    | [] -> cmxs
-    | (global, is_alias) :: missing_globals -> (
-      if CU.Map.mem global cmxs
-      then loop cmxs missing_globals
-      else
-        match Load_path.find_normalized (CU.base_filename global ^ ".cmx") with
-        | exception Not_found when is_alias -> loop cmxs missing_globals
-        | exception Not_found -> raise (Error (Missing_impl_for_quote global))
-        | path ->
-          let unit_info, _crc = Compilenv.read_unit_info path in
-          let missing_globals =
-            List.fold_left
-              (fun missing_globals import ->
-                let is_alias = Option.is_none (Import_info.crc import) in
-                (Import_info.cu import, is_alias) :: missing_globals)
-              missing_globals unit_info.ui_imports_cmx
-          in
-          let new_cmxs = CU.Map.add global unit_info cmxs in
-          loop new_cmxs missing_globals)
+  let cmxes = CU.Tbl.create 100 in
+  let visited = CU.Tbl.create 100 in
+  let rec find_all_cmxes cu =
+    if CU.Tbl.mem visited cu
+    then ()
+    else begin
+      CU.Tbl.add visited cu ();
+      match Load_path.find_normalized (CU.base_filename cu ^ ".cmx") with
+      | exception Not_found -> ()
+      | path -> begin
+        let unit_info, _crc = Compilenv.read_unit_info path in
+        CU.Tbl.add cmxes cu unit_info;
+        List.iter
+          (fun import -> find_all_cmxes (Import_info.cu import))
+          unit_info.ui_imports_cmx
+        end
+    end
   in
-  let initial = List.map (fun g -> g, false) (CU.Set.elements quoted_cmx) in
-  let unit_infos = loop CU.Map.empty initial in
-  ListLabels.map (CU.Map.data unit_infos)
-    ~f:(fun (info : Cmx_format.unit_infos) ->
+  CU.Set.iter find_all_cmxes quoted_cmx;
+  ListLabels.map (CU.Tbl.to_list cmxes)
+    ~f:(fun ((_, info) : CU.t * Cmx_format.unit_infos) ->
       let raw_export_info, sections =
         match info.ui_export_info with
         | None -> None, Oxcaml_utils.File_sections.empty
