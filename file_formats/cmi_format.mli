@@ -34,14 +34,13 @@ type 'sg cmi_infos_generic = {
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg;
-    cmi_staticity : Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : Import_info.t array;
     cmi_flags : pers_flags list;
 }
 
-type cmi_infos_lazy = Subst.Lazy.signature cmi_infos_generic
-type cmi_infos = Types.signature cmi_infos_generic
+type cmi_infos_lazy = Subst.Lazy.persistent_signature cmi_infos_generic
+type cmi_infos = Types.persistent_signature cmi_infos_generic
 
 (* write the magic + the cmi information *)
 val output_cmi : string -> out_channel -> cmi_infos_lazy -> Digest.t

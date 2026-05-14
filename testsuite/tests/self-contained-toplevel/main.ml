@@ -29,9 +29,8 @@ let () =
       let
         { Cmi_format.cmi_name;
           cmi_kind;
-          cmi_staticity;
           cmi_params;
-          cmi_sign;
+          cmi_sign = (cmi_sign, cmi_staticity);
           cmi_globals;
           cmi_crcs;
           cmi_flags
@@ -41,9 +40,8 @@ let () =
       let cmi =
         { Cmi_format.cmi_name;
           cmi_kind;
-          cmi_staticity;
           cmi_params;
-          cmi_sign = Subst.Lazy.of_signature cmi_sign;
+          cmi_sign = (Subst.Lazy.of_signature cmi_sign, cmi_staticity);
           cmi_globals;
           cmi_crcs;
           cmi_flags

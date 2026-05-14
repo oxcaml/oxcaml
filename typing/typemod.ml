@@ -4582,8 +4582,8 @@ let type_implementation target modulename initial_env ast =
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature ~alerts ~staticity:Staticity.Dynamic
-                  simple_sg name kind (Unit_info.cmi target))
+                Env.save_signature ~alerts (simple_sg, Staticity.Dynamic)
+                  name kind (Unit_info.cmi target))
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
@@ -4766,10 +4766,13 @@ let package_units initial_env objfiles target_cmi modulename =
       let kind = Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for } in
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
-          ~staticity:Staticity.Dynamic sg name kind target_cmi
+          (sg, Staticity.Dynamic) name kind target_cmi
           (Array.of_list imports)
       in
-      let sign = Subst.Lazy.force_signature cmi.Cmi_format.cmi_sign in
+      let sign =
+        let cmi_sign, _ = cmi.Cmi_format.cmi_sign in
+        Subst.Lazy.force_signature cmi_sign
+      in
       let decl_deps =
         (* This is cleared after saving the cmt so we have to save is before *)
         Cmt_format.get_declaration_dependencies ()

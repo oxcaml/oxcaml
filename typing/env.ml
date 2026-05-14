@@ -1228,7 +1228,7 @@ let mode_unit ~staticity =
     }
     ~hint_monadic:hint ~hint_comonadic:hint
 
-let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags ~staticity =
+let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
   let path = Pident id in
   let alerts =
@@ -3252,7 +3252,7 @@ let persistent_structures_of_dir dir =
   |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
-let save_signature_with_transform cmi_transform ~alerts ~staticity sg modname
+let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
       kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
@@ -3261,7 +3261,7 @@ let save_signature_with_transform cmi_transform ~alerts ~staticity sg modname
         (Subst.with_additional_action Prepare_for_saving Subst.identity)
   in
   let cmi =
-    Persistent_env.make_cmi !persistent_env modname kind sg alerts ~staticity
+    Persistent_env.make_cmi !persistent_env modname kind (sg, staticity) alerts
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
@@ -3273,14 +3273,12 @@ let save_signature_with_transform cmi_transform ~alerts ~staticity sg modname
   Persistent_env.save_cmi !persistent_env pers_sig;
   cmi
 
-let save_signature ~alerts ~staticity sg modname cu cmi =
-  save_signature_with_transform (fun cmi -> cmi) ~alerts ~staticity sg modname
-    cu cmi
+let save_signature ~alerts sg modname cu cmi =
+  save_signature_with_transform (fun cmi -> cmi) ~alerts sg modname cu cmi
 
-let save_signature_with_imports ~alerts ~staticity sg modname cu cmi imports =
+let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
-  save_signature_with_transform with_imports ~alerts ~staticity sg modname cu
-    cmi
+  save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
 (* Make the initial environment. *)
 let initial () =
