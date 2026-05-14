@@ -76,7 +76,7 @@ Line 3, characters 9-10:
              ^
 Error: The value "r" is "local"
        but is expected to be "global"
-         because it is used in an expression (at lines 3-5, characters 2-40).
+         because it is used in a pattern match with effect cases (at lines 3-5, characters 2-40).
 |}]
 
 (* A value clause of [match] cannot capture a local from outside the generated
@@ -92,7 +92,7 @@ Line 4, characters 11-12:
                ^
 Error: The value "r" is "local"
        but is expected to be "global"
-         because it is used in an expression (at lines 3-5, characters 2-40).
+         because it is used in a pattern match with effect cases (at lines 3-5, characters 2-40).
 |}]
 
 (* An effect clause of [match] cannot capture a local from outside the generated
@@ -110,7 +110,7 @@ Line 6, characters 14-15:
                   ^
 Error: The value "r" is "local"
        but is expected to be "global"
-         because it is used in an expression (at lines 3-7, characters 2-19).
+         because it is used in a pattern match with effect cases (at lines 3-7, characters 2-19).
 |}]
 
 (* A [try] continuation result cannot be a local reference escaping globally. *)
@@ -136,7 +136,7 @@ Line 3, characters 7-8:
            ^
 Error: The value "r" is "local"
        but is expected to be "global"
-         because it is used in an expression (at lines 3-4, characters 2-40).
+         because it is used in a try-with with effect cases (at lines 3-4, characters 2-40).
 |}]
 
 (* An exception clause of [try] cannot capture a local from outside the
@@ -152,7 +152,7 @@ Line 4, characters 13-14:
                  ^
 Error: The value "r" is "local"
        but is expected to be "global"
-         because it is used in an expression (at lines 3-5, characters 2-40).
+         because it is used in a try-with with effect cases (at lines 3-5, characters 2-40).
 |}]
 
 (* An effect clause of [try] cannot capture a local from outside the generated
@@ -173,7 +173,7 @@ Line 9, characters 14-15:
                   ^
 Error: The value "r" is "local"
        but is expected to be "global"
-         because it is used in an expression (at lines 3-10, characters 2-19).
+         because it is used in a try-with with effect cases (at lines 3-10, characters 2-19).
 |}]
 
 (* A [match] body uses legacy modes instead of inheriting an enclosing local
@@ -285,6 +285,10 @@ let () =
          f
      | effect Need_unit, _ -> fun () -> ())
 [%%expect {|
+Line 6, characters 9-10:
+6 |          f
+             ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* A [try] result must preserve an enclosing portable expectation while using
@@ -297,6 +301,10 @@ let () =
      with
      | effect Need_unit, _ -> fun () -> ())
 [%%expect {|
+Line 5, characters 7-8:
+5 |        f
+           ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* Can allocate local values inside a [match] body. *)
