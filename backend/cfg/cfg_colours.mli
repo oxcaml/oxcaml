@@ -26,10 +26,10 @@
  ******************************************************************************)
 
 (** A colour directive. Can be passed as an argument to [Format.printf] and
-    frients using the "%t" specifier. Each directive (besides [pop]) acts by
+    friends using the "%t" specifier. Each directive (besides [pop]) acts by
     pushing a new state onto a stack, allowing the previous state to be restored
     using [pop]. *)
-type directive = Format.formatter -> unit
+type directive = Oxcaml_colours.directive
 
 (** Undo the most recent colour directive, restoring the previous state. Raises
     a fatal error if the stack is empty. *)

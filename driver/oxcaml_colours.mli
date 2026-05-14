@@ -25,30 +25,29 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type directive = Oxcaml_colours.directive
+(** Shared infrastructure for ANSI 256-colour pretty-printing. Front-ends such
+    as [Cfg_colours] and [Flambda_colours] define domain-specific directives
+    on top of {!push}; all directives push or pop a state on a single global
+    stack. *)
 
-let pop = Oxcaml_colours.pop
+(** A colour directive. Can be passed as an argument to [Format.printf] and
+    friends using the "%t" specifier. Each directive (besides [pop]) acts by
+    pushing a new state onto a stack, allowing the previous state to be
+    restored using [pop]. *)
+type directive = Format.formatter -> unit
 
-let none = Oxcaml_colours.none
+(** Undo the most recent directive, restoring the previous state. Raises a
+    fatal error if the stack is empty. *)
+val pop : directive
 
-let without_colours = Oxcaml_colours.without_colours
+(** Push a new colour state onto the stack. Each of [fg] and [bg] that is not
+    specified is inherited from the current state. *)
+val push : ?fg:int -> ?bg:int -> directive
 
-let terminator ppf = Oxcaml_colours.push ~fg:111 ppf
+(** Push a copy of the current state onto the stack. Useful when setting a
+    colour conditionally so that a following [pop] will always be matched. *)
+val none : directive
 
-let block_label ppf = Oxcaml_colours.push ~fg:198 ppf
-
-let block_label_exn ppf = Oxcaml_colours.push ~fg:198 ~bg:197 ppf
-
-let instr_id ppf = Oxcaml_colours.push ~fg:43 ppf
-
-let pred_succ ppf = Oxcaml_colours.push ~fg:243 ppf
-
-let liveness ppf = Oxcaml_colours.push ~fg:243 ppf
-
-let function_name ppf = Oxcaml_colours.push ~fg:1 ~bg:169 ppf
-
-let basic ppf = Oxcaml_colours.push ~fg:65 ppf
-
-let result ppf = Oxcaml_colours.push ~fg:220 ppf
-
-let argument ppf = Oxcaml_colours.push ~fg:81 ppf
+(** Run [f] with colour output globally disabled, restoring the previous
+    setting when [f] returns (or raises). *)
+val without_colours : f:(unit -> 'a) -> 'a
