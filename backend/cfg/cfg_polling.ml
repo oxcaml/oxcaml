@@ -334,7 +334,15 @@ let instr_cfg_with_layout :
                (Cfg.successor_labels after ~normal:true ~exn:false),
              after.exn )
          with
-        | 1, None -> DLL.add_end after.body poll
+        | 1, None ->
+          DLL.add_end after.body poll;
+          (* `after` is now safe since it contains a poll instruction. Updating
+             `safe_map` here is a tightening, not a behavioural change: this
+             branch requires `after` to have a single normal successor and no
+             exception handler, so `after` cannot be the source of another back
+             edge, meaning the `not (safe_map src)` check is never re-queried
+             for this label. *)
+          Label.Tbl.replace safe_map after.start true
         | _ ->
           let before = Some (Cfg.get_block_exn cfg dst) in
           let instrs = DLL.of_list [poll] in
