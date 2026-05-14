@@ -235,7 +235,8 @@ module T = struct
           (* rbp is always spilled even without frame pointers *)
           Array.length phys_gpr_regs
         in
-        num_regular_slots + (index * slot_size_in_vals)
+        let gc_regs_kind_slots = 1 in
+        num_regular_slots + gc_regs_kind_slots + (index * slot_size_in_vals)
       else
         (* simd slots are below [gc_regs] pointer *)
         let num_simd_slots =

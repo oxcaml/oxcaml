@@ -382,13 +382,19 @@ tail_call:
 
     if (result) {
       if (tag == Cont_tag) {
+        value *gc_regs = 0;
         CAMLassert(infix_offset == 0);
-        CAMLassert(sz == 2);
+        CAMLassert(sz == 2 || sz == 3);
         struct stack_info* stk = Ptr_val(field0);
         Field(result, 0) = field0;
         Field(result, 1) = Field(v, 1);
+        if (sz == 3) {
+          Field(result, 2) = Field(v, 2);
+          gc_regs = (value *)(Field(result, 2));
+        }
         if (stk != NULL) {
-          caml_scan_stack(&oldify_one, oldify_scanning_flags, st, stk, 0);
+          caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
+                          stk, gc_regs);
         }
       } else if (!Scannable_tag(tag)) {
         CAMLassert (infix_offset == 0);
@@ -603,6 +609,11 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   int remembered_roots = 0;
   scan_roots_hook scan_roots_hook;
   promote_result_s result = { .locked_ephemerons = false, };
+
+  /* We should only have a block in domain->preemption if we've just allocated
+     it and are about to return back to ocaml; once it's initialized it should
+     be reset back to Val_unit, and we should not GC in the meantime. */
+  CAMLassert(!Is_block(domain->preemption));
 
   st.domain = domain;
   st.domain_alone = caml_domain_alone();
@@ -1127,7 +1138,8 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (flags & CAML_FROM_CAML)
       /* In the case of allocations performed from OCaml, execute
          asynchronous callbacks. */
-      (void) caml_raise_async_if_exception(caml_do_pending_actions_exn(),
+      (void) caml_raise_async_if_exception(
+         caml_do_pending_actions_flags_exn(flags),
         "minor GC");
     else {
       /* In the case of allocations performed from C, only perform
@@ -1135,13 +1147,24 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
       caml_handle_gc_interrupt();
     }
 
+    /* If a preemption continuation has just been allocated, we must not enter
+       the GC again, as the continuation mustn't be scanned (and potentially
+       promoted) by the GC before it is initialized. Fortunately, we do not need
+       to maintain the invariant that there is enough room in the minor heap to
+       re-do the allocation in this case, since we are about to preempt anyway,
+       so we can just return. */
+    if (Is_block(Caml_state->preemption)) {
+      /* We should only see this case if we allocated from ocaml */
+      CAMLassert(flags & CAML_FROM_CAML);
+      return;
+    }
+
     /* Now, there might be enough room in the minor heap to do our
        allocation. */
     if (dom_st->young_ptr - whsize >= dom_st->young_start)
       break;
 
-    /* If not, then empty the minor heap, and check again for async
-       callbacks. */
+    /* Otherwise, empty the minor heap, and check again for async callbacks. */
     CAML_EV_COUNTER(EV_C_FORCE_MINOR_ALLOC_SMALL, 1);
     caml_poll_gc_work();
   }
