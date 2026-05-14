@@ -298,11 +298,19 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
     then None
     else
       let single_kind array_kind array_load_kind =
-        let element_kind = ALK.kind_of_loaded_value array_load_kind in
-        Some
-          ( dest,
-            Static_arguments_of_single_kind
-              { array_kind; array_load_kind; element_kind; simples = args } )
+        (* The lookup table is lifted as a static constant. Symbols are OK, but
+           any coercion attached to them must not mention local variables. *)
+        if
+          List.exists
+            (fun arg -> not (NO.no_variables (Simple.free_names arg)))
+            args
+        then None
+        else
+          let element_kind = ALK.kind_of_loaded_value array_load_kind in
+          Some
+            ( dest,
+              Static_arguments_of_single_kind
+                { array_kind; array_load_kind; element_kind; simples = args } )
       in
       let try_tagged_immediates () =
         (* If no arm is a symbol and all [Const]s are tagged immediates, return

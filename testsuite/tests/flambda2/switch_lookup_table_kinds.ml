@@ -189,3 +189,22 @@ match_symbol_tagged_or_null:
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
+
+(* This should not be turned into a static lookup table: the returned closures
+   carry coercions mentioning the recursive group's local depth variable. *)
+
+let rec recursive_symbol x =
+  if x = 0 then 0 else recursive_symbol_from_switch A (x - 1)
+and recursive_symbol' x =
+  if x = 0 then 1 else recursive_symbol (x - 1)
+and recursive_symbol_from_switch (t : t) =
+  match t with
+  | A -> recursive_symbol
+  | B -> recursive_symbol
+  | C -> recursive_symbol'
+  | D -> recursive_symbol'
+[%%expect{|
+val recursive_symbol : int -> int = <fun>
+val recursive_symbol' : int -> int = <fun>
+val recursive_symbol_from_switch : t -> int -> int = <fun>
+|}]
