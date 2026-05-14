@@ -117,10 +117,6 @@ let () =
    `true` indicates the block contains a safe point such as a poll or an alloc
    instruction. *)
 
-(* CR-soon xclerc for xclerc: given how we use the safe map below, it is not
-   clear taking into accounts terminator makes a difference; maybe matching over
-   the terminator to always return `false` would be better. *)
-
 let is_safe_basic : Cfg.basic Cfg.instruction -> bool =
  fun instr -> Cfg.is_alloc instr || Cfg.is_poll instr
 
@@ -132,6 +128,13 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
   | Switch _ ->
     false
   | Raise _ -> false
+  (* `Tailcall_self` can be the source of a back edge (its destination is the
+     tailrec entry, which dominates it). Treating it as safe avoids inserting a
+     redundant poll right before the tail call: `requires_prologue_poll`
+     guarantees a prologue poll, which covers each iteration of the
+     self-recursion. The other constructors here are inert in this analysis:
+     `Return` and `Tailcall_func` have no successors, and `Invalid _` is
+     unreachable. *)
   | Tailcall_self _ | Tailcall_func _ | Return | Invalid _ -> true
   | Call_no_return _ | Call _ | Prim _ -> false
 
