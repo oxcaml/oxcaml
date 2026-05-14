@@ -2182,12 +2182,16 @@ let end_assembly () =
   global_maybe_protected data_end_sym;
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
+  let frametable_section : Asm_targets.Asm_section.t =
+    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
+  in
+  D.switch_to_section frametable_section;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
-  D.define_symbol_label ~section:Data frametable_sym;
+  D.define_symbol_label ~section:frametable_section frametable_sym;
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
   emit_frames
     { efa_code_label =
@@ -2210,15 +2214,12 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Data lbl in
+          let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
       efa_def_label =
         (fun lbl ->
-          (* CR sspies: The frametable lives in the [.data] section on Arm, but
-             in the [.text] section on x86. The frametable should move to the
-             text section on Arm as well. *)
-          let lbl = label_to_asm_label ~section:Data lbl in
+          let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };
