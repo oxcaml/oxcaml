@@ -308,16 +308,21 @@ let unsafe_reachable_from :
   done;
   discovered
 
+(* Returns a pair [(added_poll, block_inserted)]: [added_poll] is [true] iff at
+   least one poll instruction was inserted (either in-place or via a new block);
+   [block_inserted] is [true] iff at least one new block was inserted (in which
+   case dominators and loop infos must be invalidated). *)
 let instr_cfg_with_layout :
     Cfg_with_layout.t ->
     safe_map:bool Label.Tbl.t ->
     back_edges:Cfg_edge.Set.t ->
-    bool =
+    bool * bool =
  fun cfg_with_layout ~safe_map ~back_edges ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let next_instruction_id () =
     InstructionId.get_and_incr cfg.next_instruction_id
   in
+  let block_inserted = ref false in
   (* Group back edges by destination (loop header) so the unsafe-reachable set
      is computed once per header rather than once per back edge. Reusing the set
      across all back edges sharing a header is safe: when we insert a poll for
@@ -381,6 +386,7 @@ let instr_cfg_with_layout :
                 Cfg_with_layout.insert_block cfg_with_layout instrs ~after
                   ~before
               in
+              block_inserted := true;
               (* All the inserted blocks are safe since they contain a poll
                  instruction *)
               List.iter inserted_blocks ~f:(fun block ->
@@ -389,6 +395,7 @@ let instr_cfg_with_layout :
           else added_poll)
         srcs added_poll)
     back_edges_by_dst false
+  |> fun added_poll -> added_poll, !block_inserted
 
 type polling_points = (polling_point * Debuginfo.t) list
 
@@ -491,21 +498,23 @@ let contains_polls : Cfg.t -> bool =
 
 let instrument_fundecl :
     future_funcnames:Misc.Stdlib.String.Set.t ->
-    Cfg_with_layout.t ->
-    Cfg_with_layout.t =
- fun ~future_funcnames:_ cfg_with_layout ->
+    Cfg_with_infos.t ->
+    Cfg_with_infos.t =
+ fun ~future_funcnames:_ cfg_with_infos ->
+  let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   if is_disabled cfg.fun_name
-  then cfg_with_layout
+  then cfg_with_infos
   else
     let safe_map = safe_map_of_cfg cfg in
-    (* CR-soon xclerc for xclerc: consider using `Cfg_with_infos` to cache the
-       computations *)
-    let doms = Cfg_dominators.build cfg in
-    let back_edges = Cfg_loop_infos.compute_back_edges cfg doms in
-    let added_poll =
+    let back_edges =
+      (Cfg_with_infos.loop_infos cfg_with_infos).Cfg_loop_infos.back_edges
+    in
+    let added_poll, block_inserted =
       instr_cfg_with_layout cfg_with_layout ~safe_map ~back_edges
     in
+    if block_inserted
+    then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
     (match cfg.fun_poll with
     | Error_poll -> (
       match find_poll_alloc_or_calls cfg with
@@ -523,8 +532,8 @@ let instrument_fundecl :
          Poll instruction *)
       cfg.fun_contains_calls || added_poll || contains_polls cfg
     in
-    let cfg = { cfg with fun_contains_calls = new_contains_calls } in
-    Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    cfg.fun_contains_calls <- new_contains_calls;
+    cfg_with_infos
 
 let requires_prologue_poll :
     future_funcnames:Misc.Stdlib.String.Set.t ->
