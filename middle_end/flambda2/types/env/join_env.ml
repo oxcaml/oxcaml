@@ -654,9 +654,9 @@ end = struct
   let machine_width { source_env; _ } = TE.machine_width source_env
 
   let exists_in_source_env { source_env } var =
-    if TE.mem source_env (Name.var var)
-    then Some (Variable_in_source_env.create var)
-    else None
+    if TE.variable_definitely_not_in_scope source_env var
+    then None
+    else Some (Variable_in_source_env.create var)
 
   let exists_at_name_mode ~min_name_mode { source_env } var =
     if TE.mem ~min_name_mode source_env (Name.var var)
@@ -1283,15 +1283,15 @@ end = struct
     Index.Map.filter_map
       (fun _index (env, _) ->
         if
-          TE.mem env
-            (Name.var (var : Variable_in_one_joined_env.t :> Variable.t))
-        then
+          TE.variable_definitely_not_in_scope env
+            (var : Variable_in_one_joined_env.t :> Variable.t)
+        then None
+        else
           let canonical =
             get_canonical_simple_ignoring_name_mode env
               (Simple_in_one_joined_env.var var)
           in
-          Some (Type_in_one_joined_env.alias_type_of kind canonical)
-        else None)
+          Some (Type_in_one_joined_env.alias_type_of kind canonical))
       (envs_and_equations t)
 
   let expand_heads t types =
