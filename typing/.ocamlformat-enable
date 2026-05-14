@@ -27,4 +27,3 @@ type_shape.ml
 scalar.ml
 scalar.mli
 ikinds/*
-env.ml

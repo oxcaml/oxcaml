@@ -1074,8 +1074,18 @@ let movq src dst =
   match Arch.Extension.enabled AVX, is_regf src with
   | false, false -> I.simd movq_X_r64m64 [| src; dst |]
   | false, true -> I.simd movq_r64m64_X [| src; dst |]
-  | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
-  | true, true -> I.simd vmovq_r64m64_X [| src; dst |]
+  | true, false ->
+    (* Prefer the shorter XMM/m64 form when the source is memory: it allows the
+       2-byte VEX prefix (VEX.W=0, F3.0F.7E) instead of forcing the 3-byte form
+       (VEX.W=1, 66.0F.6E). *)
+    if is_mem src
+    then I.simd vmovq_X_Xm64 [| src; dst |]
+    else I.simd vmovq_X_r64m64 [| src; dst |]
+  | true, true ->
+    (* Symmetric shortening for stores to memory. *)
+    if is_mem dst
+    then I.simd vmovq_Xm64_X [| src; dst |]
+    else I.simd vmovq_r64m64_X [| src; dst |]
 
 let movss src dst =
   let open Simd_instrs in
@@ -1097,6 +1107,28 @@ let movsd src dst =
   | true, false, true -> I.simd vmovsd_m64_X [| src; dst |]
   | true, true, false -> I.simd vmovsd_X_m64 [| src; dst |]
 
+(* For an XMM-to-XMM register move, prefer the "load" form (reg operand is the
+   destination) when only the destination is a high vector register
+   (XMM8-XMM15). The load form encodes the high register in the VEX-compatible
+   REX.R bit, allowing a 2-byte VEX prefix; the store form would need REX.B and
+   force a 3-byte VEX. Both forms are semantically identical for reg-reg
+   moves. *)
+let regf_index = function X86_ast.XMM n | X86_ast.YMM n | X86_ast.ZMM n -> n
+
+let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
+  match src, dst with
+  | Regf s, Regf d ->
+    (* otherwise store form is already 2-byte *)
+    regf_index d > 7
+    (* otherwise EVEX is needed regardless *)
+    && regf_index d <= 15
+    (* otherwise load form needs 3-byte VEX *)
+    && regf_index s <= 7
+  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Mem _ | Mem64_RIP _ ),
+      _ ) ->
+    false
+
 let movpd ~unaligned src dst =
   let open Simd_instrs in
   match Arch.Extension.enabled AVX, is_mem src, unaligned with
@@ -1104,8 +1136,14 @@ let movpd ~unaligned src dst =
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
-  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
-  | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, false ->
+    if prefer_load_form src dst
+    then I.simd vmovapd_X_Xm128 [| src; dst |]
+    else I.simd vmovapd_Xm128_X [| src; dst |]
+  | true, false, true ->
+    if prefer_load_form src dst
+    then I.simd vmovupd_X_Xm128 [| src; dst |]
+    else I.simd vmovupd_Xm128_X [| src; dst |]
   | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
@@ -1122,7 +1160,14 @@ let move (src : Reg.t) (dst : Reg.t) =
     (* Vec128 stack slots are aligned, domainstate slots are not. *)
     let unaligned = Reg.is_domainstate src || Reg.is_domainstate dst in
     if distinct then movpd ~unaligned (reg src) (reg dst)
-  | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
+  | Vec256, Reg _, Vec256, Reg _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if prefer_load_form (reg src) (reg dst)
+      then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |]
+      else I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
+  | Vec256, Reg _, Vec256, Stack _ ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
   | Vec256, Stack _, Vec256, Reg _ ->
@@ -1610,7 +1655,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct
     then
-      if Reg.is_stack i.arg.(0)
+      if Reg.is_stack i.arg.(0) || prefer_load_form (arg i 0) (res i 0)
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
   | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->

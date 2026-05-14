@@ -152,6 +152,18 @@ ocamlc.byte;
   check-ocamlc.byte-output;
 }
 
+(* Test that a hidden `A` doesn't become visible to -no-alias-deps checking
+   just because the typechecker loaded it earlier. *)
+{
+  flags = "-H liba -I libb -no-alias-deps -nocwd";
+  module = "libc/c6.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/alias_after_hidden_load.ocamlc.reference";
+  check-ocamlc.byte-output;
+}
+
 (* Test that type-directed constructor disambiguation works through -H (at
    least, for now). *)
 {

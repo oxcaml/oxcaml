@@ -1115,7 +1115,7 @@ let transl_declaration env sdecl (id, uid) =
                correct representation is [Record_float], [Record_ufloat], or
                [Record_mixed].  Those cases are fixed up after we can get
                accurate sorts for the fields, in [update_decl_jkind]. *)
-              Record_boxed (Array.make (List.length lbls) Jkind.Sort.Const.void),
+              Record_boxed,
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
@@ -1283,12 +1283,12 @@ let rec shape_has_float_boxed shape =
 
 let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
-  | Record_unboxed | Record_inlined _ | Record_boxed _
+  | Record_unboxed | Record_inlined _ | Record_boxed
   | Record_float | Record_ufloat -> false
 
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed _ -> true
+  | Record_boxed -> true
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1637,9 +1637,9 @@ let narrow_to_manifest_jkind env loc path decl =
           Format.eprintf
             "[ikind-narrow] path=%a branch=ikind_sub_jkind_l@."
             (Format_doc.compat Path.print) path;
-        (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
-           [try_allow_r] returns [None] and we route through Ikind. We also
-           fall back here when [decl.type_jkind] cannot allow-right
+        (* When ikinds are enabled, we keep [decl.type_jkind] in left/Best
+           form, so [try_allow_r] returns [None] and we route through Ikind.
+           We also fall back here when [decl.type_jkind] cannot allow-right
            (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
@@ -1746,34 +1746,23 @@ let check_abbrev env sdecl (id, decl) =
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
-(* [update_label_sorts] additionally returns whether all the jkinds
-   were void, and the jkinds of the labels *)
-(* CR reisenberg: remove all_void return *)
-let update_label_sorts env loc lbls named =
-  (* [named] is [Some sorts] for top-level records (we will update the
-     sorts) and [None] for inlined records. *)
+(* [update_label_sorts] additionally returns the jkinds of the labels *)
+let update_label_sorts env loc lbls =
   (* CR layouts v5: it wouldn't be too hard to support records that are all
      void.  just needs a bit of refactoring in translcore *)
-  let update =
-    match named with
-    | None -> fun _ _ -> ()
-    | Some sorts -> fun idx sort -> sorts.(idx) <- sort
-  in
   let lbls_and_jkinds =
-    List.mapi (fun idx (Types.{ld_type} as lbl) ->
+    List.map (fun (Types.{ld_type} as lbl) ->
       let jkind = Ctype.type_jkind env ld_type in
       (* Next line guaranteed to be safe because of [check_representable] *)
       let sort = Jkind.sort_of_jkind env jkind in
       let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
-      update idx ld_sort;
       {lbl with ld_sort}, jkind
     ) lbls
   in
   let lbls, jkinds = List.split lbls_and_jkinds in
   if List.for_all (fun l -> Jkind.Sort.Const.all_void l.ld_sort) lbls then
     raise (Error (loc, Jkind_empty_record))
-  else lbls, false, jkinds
-(* CR layouts v5: return true for a record with all voids *)
+  else lbls, jkinds
 
 (* In addition to updated constructor arguments, returns whether
    all arguments are void, useful for detecting enumerations that
@@ -1802,11 +1791,9 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
       (fun { ca_sort } -> Jkind_types.Sort.Const.(all_void ca_sort)) args,
     jkinds
   | Types.Cstr_record lbls ->
-    let lbls, all_void, jkinds =
-      update_label_sorts env loc lbls None
-    in
+    let lbls, jkinds = update_label_sorts env loc lbls in
     update 0 Jkind.Sort.Const.scannable;
-    Types.Cstr_record lbls, all_void, jkinds
+    Types.Cstr_record lbls, false, jkinds
 
 let assert_mixed_product_support =
   let required_reserved_header_bits = 8 in
@@ -2062,10 +2049,8 @@ let rec update_decl_jkind env dpath decl =
       let sort = Jkind.sort_of_jkind env jkind in
       let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
-    | _, Record_boxed sorts ->
-      let lbls, _all_void, jkinds =
-        update_label_sorts env loc lbls (Some sorts)
-      in
+    | _, Record_boxed ->
+      let lbls, jkinds = update_label_sorts env loc lbls in
       let jkind = Jkind.for_boxed_record lbls in
       let reprs =
         List.map2
@@ -5193,17 +5178,17 @@ let report_error_doc ppf = function
         Style.inline_code "[@@unpacked]"
   | Cannot_unbox_or_untag_type Unboxed ->
       fprintf ppf "@[Don't know how to unbox this type.@ \
-                   Only %a, %a, %a, %a, vector primitives, and@ \
+                   Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
                    the corresponding unboxed types can be marked unboxed.@]"
         Style.inline_code "float"
+        Style.inline_code "int8"
+        Style.inline_code "int16"
         Style.inline_code "int32"
         Style.inline_code "int64"
         Style.inline_code "nativeint"
   | Cannot_unbox_or_untag_type Untagged ->
-      fprintf ppf "@[Don't know how to untag this type. Only %a, %a, %a, \
+      fprintf ppf "@[Don't know how to untag this type. Only %a \
                    and@ other immediate types can be untagged.@]"
-        Style.inline_code "int8"
-        Style.inline_code "int16"
         Style.inline_code "int"
   | Cannot_unbox_or_untag_type Unpacked ->
       fprintf ppf "@[Don't know how to unpack this type.@ \

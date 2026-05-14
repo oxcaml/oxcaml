@@ -24,6 +24,20 @@ class cls = object method meth () = 42 end;;
 class cls : object method meth : unit -> int end
 |}];;
 
+module Op = struct
+  let (+) x y = x ^ y
+end
+[%%expect {|
+module Op : sig val ( + ) : string -> string -> string end
+|}];;
+
+module Exc = struct
+  exception E
+end
+[%%expect {|
+module Exc : sig exception E end
+|}];;
+
 #mark_toplevel_in_quotations;;
 
 (* Tests *)
@@ -662,62 +676,63 @@ Hint: Label "x" is defined outside any quotations.
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Match_failure ("foo", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Match_failure ("foo", 42, 100))]>
 |}];;
 
 <[ raise Out_of_memory ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Out_of_memory]>
+- : 'a expr = <[Stdlib.raise Stdlib.Out_of_memory]>
 |}];;
 
 <[ raise (Invalid_argument "arg") ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Invalid_argument "arg")]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Invalid_argument "arg")]>
 |}];;
 
 <[ raise (Failure "fail") ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Failure "fail")]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Failure "fail")]>
 |}];;
 
 <[ raise Not_found ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Not_found]>
+- : 'a expr = <[Stdlib.raise Stdlib.Not_found]>
 |}];;
 
 <[ raise (Sys_error "err") ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Sys_error "err")]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Sys_error "err")]>
 |}];;
 
 <[ raise End_of_file ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise End_of_file]>
+- : 'a expr = <[Stdlib.raise Stdlib.End_of_file]>
 |}];;
 
 <[ raise Division_by_zero ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Division_by_zero]>
+- : 'a expr = <[Stdlib.raise Stdlib.Division_by_zero]>
 |}];;
 
 <[ raise Stack_overflow ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stack_overflow]>
+- : 'a expr = <[Stdlib.raise Stdlib.Stack_overflow]>
 |}];;
 
 <[ raise Sys_blocked_io ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Sys_blocked_io]>
+- : 'a expr = <[Stdlib.raise Stdlib.Sys_blocked_io]>
 |}];;
 
 <[ raise (Assert_failure ("assert", 42, 100)) ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Assert_failure ("assert", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Assert_failure ("assert", 42, 100))]>
 |}];;
 
 <[ raise (Undefined_recursive_module ("M", 42, 100)) ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Undefined_recursive_module ("M", 42, 100))]>
+- : 'a expr =
+<[Stdlib.raise (Stdlib.Undefined_recursive_module ("M", 42, 100))]>
 |}];;
 
 <[ let exception E in () ]>;;
@@ -1225,8 +1240,8 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 - : <[bool -> int]> expr =
 <[
   fun x ->
-    match x with | true -> (try Stdlib.raise Exit with  | _ -> 0) | false ->
-      1
+    match x with | true -> (try Stdlib.raise Stdlib.Exit with  | _ -> 0) |
+      false -> 1
 ]>
 |}];;
 
@@ -1552,4 +1567,51 @@ Line 1, characters 31-40:
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
        as seen at line 1, characters 31-40.
+|}];;
+
+(* Correct disambiguation of infix operators. *)
+let open Op in
+<[ "abc" + "def" ]>;;
+[%%expect {|
+- : <[string]> expr = <[Op.( + ) "abc" "def"]>
+|}];;
+
+(* Infix operators are correctly parenthesised when defined in quotations. *)
+<[ let (+) x y = x ^ y in "foo" + "bar" ]>;;
+[%%expect {|
+- : <[string]> expr = <[let ( + ) = (fun x y -> x ^ y) in "foo" + "bar"]>
+|}];;
+
+<[ let (+) x y = x in let f g = g 1 2 in f (+) ]>;;
+[%%expect {|
+- : <[int]> expr =
+<[let ( + ) = (fun x y -> x) in let f = (fun g -> g 1 2) in f ( + )]>
+|}];;
+
+(* Infix operators are correctly named when used in comprehensions. *)
+<[ [2 + 3 for ( + ) in [( + ); ( * )]] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ 2 + 3 for ( + ) in [Stdlib.( + ); Stdlib.( * )] ]
+]>
+|}];;
+
+<[ [( + ) for ( + ) = 1 to 3] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ ( + ) for ( + ) = 1 to 3 ]]>
+|}];;
+
+(* Extension constructors/exceptions *)
+exception E;;
+[%%expect {|
+exception E
+|}];;
+
+<[ raise E ]>;;
+[%%expect {|
+- : 'a expr = <[Stdlib.raise (E : exn)]>
+|}];;
+
+<[ raise Exc.E ]>;;
+[%%expect {|
+- : 'a expr = <[Stdlib.raise Exc.E]>
 |}];;

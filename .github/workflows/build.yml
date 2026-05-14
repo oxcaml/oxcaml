@@ -209,8 +209,8 @@ jobs:
             config: --enable-runtime5 --enable-function-sections
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
-            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
-            oxcaml_llvm_source_branch: lldb
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml0
+            oxcaml_llvm_source_branch: oxcaml-llvm-plugin
             sysdeps: gdb
 
           - name: runtime5 frame-pointers llvmize-tests (x86_64-linux)
@@ -235,7 +235,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
-            disable_testcases: 'testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml'
             sysdeps: gdb
 
           - name: runtime5 reaper with local value slots

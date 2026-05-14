@@ -563,7 +563,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                             Variant_unboxed)
                           | Record_unboxed
                               -> Outval_record_unboxed
-                          | Record_boxed _ | Record_float | Record_ufloat
+                          | Record_boxed | Record_float | Record_ufloat
                           | Record_inlined (_, Constructor_uniform_value, _)
                               -> Outval_record_boxed
                           | Record_inlined (_, Constructor_mixed mixed, _)

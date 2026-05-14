@@ -848,6 +848,16 @@ module With_free_and_bound_vars = struct
     With_free_vars.map With_bound_vars.optional (With_free_vars.optional ts)
 end
 
+(* [Availability of identifiers]
+   Paths for identifiers are fully qualified.
+   These paths will either start with a variable (representing a type, a
+   value, module, or a constructor) or a builtin.
+   Builtins are names that are specified in the Predef module of the compiler.
+   In addition, there are global modules, which are registered during the
+   translation to CamlinternalQuote representations of quoted syntax and then
+   become dependencies of the quoted code during evaluation.
+   We also assume that Stdlib is available in quotations. *)
+
 type raw_ident_module_t =
   | Global_module of string
   | MDot of raw_ident_module_t * string
@@ -901,6 +911,17 @@ let print_op fmt s =
   then Format.fprintf fmt "( %s )" s
   else Format.fprintf fmt "%s" s
 
+let needs_value_parens s =
+  s <> ""
+  && (List.mem s special_infix_strings
+      || List.mem s.[0] special_symbols
+      || s.[0] = '.')
+
+let print_value_var env fmt v =
+  if needs_value_parens (Var.Value.name v)
+  then Format.fprintf fmt "( %a )" (Var.Value.print env) v
+  else Var.Value.print env fmt v
+
 let rec print_raw_ident_module env fmt = function
   | Global_module s -> Format.fprintf fmt "%s" s
   | MDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
@@ -909,7 +930,7 @@ let rec print_raw_ident_module env fmt = function
 let print_raw_ident_value env fmt = function
   | VDot (m, s) ->
     Format.fprintf fmt "%a.%a" (print_raw_ident_module env) m print_op s
-  | VVar (v, _) -> Var.Value.print env fmt v
+  | VVar (v, _) -> print_value_var env fmt v
 
 let print_raw_ident_type env fmt = function
   | TDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
@@ -1273,6 +1294,7 @@ module Ast = struct
     | Poll
     | Loop
     | Tail_mod_cons
+    | Magic_staged_modes
 
   let attribute_as_string = function
     | Inline -> "inline"
@@ -1285,6 +1307,7 @@ module Ast = struct
     | Poll -> "poll"
     | Loop -> "loop"
     | Tail_mod_cons -> "tail_mod_cons"
+    | Magic_staged_modes -> "magic_staged_modes"
 
   type vb_attribute =
     { vb_attr_name : string;
@@ -1413,9 +1436,11 @@ module Ast = struct
     | _ -> `Normal
 
   let view_fixity_of_exp = function
-    (* FIXME: properly check that it is safe to treat the operator as infix
-       within the quotation context *)
-    | { desc = Ident l; attributes = [] } ->
+    | { desc = Ident (VVar _ as l); attributes = [] }
+    (* Stdlib is available inside quotations; if the operator is unambiguous
+       and from Stdlib, it can be written in an infix position *)
+    | { desc = Ident (VDot (Global_module "Stdlib", _) as l);
+        attributes = [] } ->
       fixity_of_string (suffix_string_of_ident_value l)
     | _ -> `Normal
 
@@ -1528,9 +1553,9 @@ module Ast = struct
   and print_pat ?(with_parens = true) env fmt pat =
     match pat with
     | PatAny -> pp fmt "_"
-    | PatVar v -> Var.Value.print env fmt v
+    | PatVar v -> print_value_var env fmt v
     | PatAlias (pat, v) ->
-      pp fmt "%a@ as@ %a" (print_pat env) pat (Var.Value.print env) v
+      pp fmt "%a@ as@ %a" (print_pat env) pat (print_value_var env) v
     | PatConstant c -> print_const fmt c
     | PatUnboxedUnit -> pp fmt "#()"
     | PatUnboxedBool b -> pp fmt "#%a" print_bool b
@@ -1853,7 +1878,7 @@ module Ast = struct
   and print_for_iterator env fmt = function
     | Range (var, exp_start, exp_stop, dir) ->
       pp fmt "@[%a = %a@]@ %a@ %a"
-        (Var.Value.print env) var (print_exp env) exp_start
+        (print_value_var env) var (print_exp env) exp_start
         (print_dir) dir (print_exp env) exp_stop
     | In (pat, exp) ->
       pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
@@ -2362,6 +2387,8 @@ module Exp_attribute = struct
   let loop = Ast.Loop
 
   let tail_mod_cons = Ast.Tail_mod_cons
+
+  let magic_staged_modes = Ast.Magic_staged_modes
 end
 
 module Vb_attribute = struct

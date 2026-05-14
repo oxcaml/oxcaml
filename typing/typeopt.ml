@@ -204,7 +204,7 @@ let classify ~classify_product env ty layout : _ classification =
     if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
   else match get_desc ty with
-  | Tvar _ | Tunivar _ ->
+  | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
   | Tconstr (p, _args, _abbrev) ->
       if Path.same p Predef.path_float then Float
@@ -261,7 +261,7 @@ let classify ~classify_product env ty layout : _ classification =
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
-  | Tof_kind _ | Trepr _ ->
+  | Trepr _ ->
       assert false
   end
   | Base (Float64, _) -> Unboxed_float Unboxed_float64
@@ -1019,7 +1019,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-  | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _ -> begin
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
       let is_mutable =
         List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
           labels
@@ -1033,7 +1033,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
-          | Record_boxed _ | Record_float | Record_ufloat ->
+          | Record_boxed | Record_float | Record_ufloat ->
               let num_nodes_visited, fields =
                 List.fold_left_map
                   (fun num_nodes_visited (label:Types.label_declaration) ->
@@ -1047,7 +1047,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                       | Record_float | Record_ufloat ->
                         num_nodes_visited,
                         non_nullable (Pboxedfloatval Boxed_float64)
-                      | Record_inlined _ | Record_boxed _ ->
+                      | Record_inlined _ | Record_boxed ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
                       | Record_mixed _ | Record_unboxed ->
@@ -1070,7 +1070,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
             [runtime_tag, fields]
           | Record_float | Record_ufloat ->
             [ Obj.double_array_tag, fields ]
-          | Record_boxed _ ->
+          | Record_boxed ->
             [0, fields]
           | Record_inlined (Extension _, _, _) ->
             [0, fields]

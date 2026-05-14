@@ -15,7 +15,10 @@ let _ = f_allocate_string (100, 'x')
 
 (* Test case 2: Nested calls with allocation. In the backtrace, we can see how a
    tagged integer displays in an OCaml frame (e.g., x=50 : int @ value) versus
-   in a C frame (e.g., init=#101L : value, which is 50*2+1 in tagged form). *)
+   in a C frame (e.g., init=101, which is 50*2+1 in tagged form). *)
+
+(* CR sspies: Improve the distinction between C formatting and OCaml formatting
+   in the LLDB plugin. It's easy to mix up when an integer has been untagged. *)
 let[@inline never] [@local never] f_inner (x : int) (y : int) =
   let arr = Array.make x y in
   Array.length arr + y

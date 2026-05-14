@@ -106,6 +106,11 @@ Literals use `s` for `int8` and `S` for `int16`:
 #42S : int16#
 ```
 
+The range of these literals is `-128s` to `128s` for `int8` and `-32768S` to
+`32768S` for `int16`. Note that `128s` overflows to `-128s` since the max
+value of an `int8` is 127. Similarly, `32768S` overflows to `-32768S`. This
+behavior is consistent with the literals for larger integer types.
+
 ### Operations
 
 Operations on small integers are available via the `Stdlib_stable.Int8`,
@@ -114,15 +119,59 @@ libraries.
 
 ### Representation
 
-The boxed `int8` and `int16` types are encoded as tagged immediates, similar to
-regular OCaml `int`s. Similarly, `int8 array` and `int16 array` are not packed.
+The types `int8` and `int16` are encoded as tagged immediates, similar to
+regular OCaml `int`s. They are sign-extended to the full width of a tagged
+immediate, so polymorphic hash and compare work as expected. `int8 array` and
+`int16 array` are not packed.
 
-The unboxed `int8#` and `int16#` types are passed around using general purpose
-registers, but do not have a tag bit, unlike `int8` and `int16`. The ints in
-`int8# array`s and `int16# array`s are packed, but they are not packed in any
-other context. For example, an `int8# array` of length 30 takes up 4 words of
-space, plus the header word, but a `#(int8# * int8#)` takes up 2 words of space
-and requires 2 registers to pass around.
+The types `int8#` and `int16#` are passed around using general purpose
+registers, but do not have a tag bit. They are sign-extended to the width of a
+`nativeint#`. The ints in `int8# array`s and `int16# array`s are packed, but
+they are not packed in any other context. For example, an `int8# array` of
+length 30 takes up 4 words of memory, plus the header word, but a
+`#(int8# * int8#)` takes up 2 words of memory and requires 2 registers to pass
+around.
+
+### Codegen
+
+In general, the compiler only emits 64-bit instructions, even for 32/16/8-bit
+operations, and results are sign-extended after every operation. The peephole
+optimizer can remove some unnecessary sign-extensions, but there is still a
+noticeable performance decrease compared to C.
+
+### C ABI
+
+Both tagged and untagged `int8`s and `int16`s may be passed to C stubs.
+
+```ocaml
+external int16_stub : (int16[@unboxed]) -> (int16[@unboxed]) =
+  "tagged_int16_stub" "untagged_int16_stub"
+
+external int16_hash_stub : int16# -> int16# =
+  "tagged_int16_stub" "untagged_int16_stub"
+
+external int8_stub : (int8[@unboxed]) -> (int8[@unboxed]) =
+  "tagged_int8_stub" "untagged_int8_stub"
+
+external int8_hash_stub : int8# -> int8# =
+  "tagged_int8_stub" "untagged_int8_stub"
+```
+
+The following is also valid, but discouraged:
+```ocaml
+external int16_stub_untagged : (int16[@untagged]) -> (int16[@untagged]) =
+  "tagged_int16_stub" "untagged_int16_stub"
+```
+`[@untagged]` can be applied to any `immediate` type, and it doesn't sign
+extend the stub return value, which is usually zero-extended. On the other
+hand, the behavior of `[@unboxed]` depends on the particular type,
+so the proper sign extensions are applied to the return value.
+
+For example, the following implementation makes `int16_stub` and
+`int16_hash_stub` valid, but `int16_stub_untagged` invalid:
+```c
+signed short untagged_int16_stub (short x) { return -2; }
+```
 
 ## Untagged Char
 
@@ -154,3 +203,14 @@ library.
 
 Untagged chars have the same layout as `int8#`, and `char# array`s are packed
 like `int8# array`s.
+
+### C ABI
+
+Untagged chars may be passed to C stubs:
+```ocaml
+external char_hash_stub : char# -> char# =
+  "tagged_char_stub" "untagged_char_stub"
+```
+
+`char[@unboxed]` is not allowed in external declarations. As a reminder, you may
+use upstream OCaml's `char[@untagged]` in correspondence with `intnat` in C.

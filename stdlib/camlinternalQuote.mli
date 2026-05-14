@@ -480,6 +480,8 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
+
+  val magic_staged_modes : t
 end
 
 module Vb_attribute : sig

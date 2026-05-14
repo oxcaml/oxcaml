@@ -827,7 +827,7 @@ let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
       ~tag:Dwarf_tag.Variant_part ()
   in
   Proto_die.create_ignore ~reference:constructor_discriminant_ref
-    ~parent:(Some complex_constructors_struct) ~tag:Dwarf_tag.Member
+    ~parent:(Some variant_part_constructor) ~tag:Dwarf_tag.Member
     ~attribute_values:
       [ DAH.create_type ~proto_die:complex_constructor_enum_die;
         DAH.create_byte_size_exn ~byte_size:Arch.size_addr;
