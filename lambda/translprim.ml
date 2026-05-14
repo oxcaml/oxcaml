@@ -54,6 +54,10 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Translprim.unboxed_product_uninitialized_array_check: \
+       Punspecializedarray"
 
 (* Insertion of debugging events *)
 
@@ -162,6 +166,8 @@ let clear_used_primitives () = Hashtbl.clear units_with_used_primitives
 let get_units_with_used_primitives () =
   Hashtbl.fold (fun path _ acc -> path :: acc) units_with_used_primitives []
 
+(* For the [%obj_*] primitives, which re-use the array primitives but should
+   not be specialized, we resolve the array kind right away. *)
 let gen_array_kind =
   if Config.flat_float_array then Pgenarray else Paddrarray
 
@@ -753,148 +759,154 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%bytes_safe_set" -> Primitive (Pbytessets, 3)
     | "%bytes_unsafe_get" -> Primitive (Pbytesrefu, 2)
     | "%bytes_unsafe_set" -> Primitive (Pbytessetu, 3)
-    | "%array_length" -> Primitive ((Parraylength gen_array_kind), 1)
+    | "%array_length" -> Primitive ((Parraylength Punspecializedarray), 1)
     | "%array_safe_get" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode, Ptagged_int_index, Mutable)), 2)
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Ptagged_int_index, Mutable)), 2)
     | "%array_safe_set" ->
       Primitive
-        (Parraysets (gen_array_set_kind (get_first_arg_mode ()), Ptagged_int_index),
+        (Parraysets (Punspecializedarray_set (get_first_arg_mode ()),
+                     Ptagged_int_index),
          3)
     | "%array_unsafe_get" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode, Ptagged_int_index, Mutable), 2)
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Ptagged_int_index, Mutable), 2)
     | "%array_unsafe_set" ->
       Primitive
-        ((Parraysetu (gen_array_set_kind (get_first_arg_mode ()), Ptagged_int_index)),
+        ((Parraysetu (Punspecializedarray_set (get_first_arg_mode ()),
+                      Ptagged_int_index)),
         3)
     | "%array_safe_get_indexed_by_int64#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Unboxed_int64,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int64#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int64),
          3)
     | "%array_unsafe_get_indexed_by_int64#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Unboxed_int64,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int64#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int64)),
         3)
     | "%array_safe_get_indexed_by_int32#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Unboxed_int32,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int32#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int32),
          3)
     | "%array_unsafe_get_indexed_by_int32#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Unboxed_int32,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int32#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int32)),
         3)
     | "%array_safe_get_indexed_by_int16#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Untagged_int16,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int16#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int16),
          3)
     | "%array_unsafe_get_indexed_by_int16#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Untagged_int16,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int16#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int16)),
         3)
     | "%array_safe_get_indexed_by_int8#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Untagged_int8,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int8#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int8),
          3)
     | "%array_unsafe_get_indexed_by_int8#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Untagged_int8,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int8#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int8)),
         3)
     | "%array_safe_get_indexed_by_nativeint#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Unboxed_nativeint,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_nativeint#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_nativeint),
          3)
     | "%array_unsafe_get_indexed_by_nativeint#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Unboxed_nativeint,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_nativeint#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_nativeint)),
         3)
     | "%makearray_dynamic" ->
-      Primitive (Pmakearray_dynamic (gen_array_kind, mode, With_initializer), 2)
+      Primitive
+        (Pmakearray_dynamic (Punspecializedarray, mode, With_initializer), 2)
     | "%makearray_dynamic_uninit" ->
-      Primitive (Pmakearray_dynamic (gen_array_kind, mode, Uninitialized), 1)
+      Primitive
+        (Pmakearray_dynamic (Punspecializedarray, mode, Uninitialized), 1)
     | "%arrayblit" ->
       Primitive (Parrayblit {
         src_mutability = Mutable;
-        dst_array_set_kind = gen_array_set_kind (get_third_arg_mode ())
+        dst_array_set_kind = Punspecializedarray_set (get_third_arg_mode ())
       }, 5);
     | "%arrayblit_src_immut" ->
       Primitive (Parrayblit {
         src_mutability = Immutable;
-        dst_array_set_kind = gen_array_set_kind (get_third_arg_mode ())
+        dst_array_set_kind = Punspecializedarray_set (get_third_arg_mode ())
       }, 5);
     | "%array_element_size_in_bytes" ->
       (* The array kind will be filled in later *)
-      Primitive (Parray_element_size_in_bytes Pgenarray, 1)
+      Primitive (Parray_element_size_in_bytes Punspecializedarray, 1)
     | "%obj_size" -> Primitive ((Parraylength gen_array_kind), 1)
     | "%obj_field" ->
       Primitive
@@ -1185,31 +1197,31 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind, Ptagged_int_index,
+        (Punspecializedarray, Ptagged_int_index,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int8#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Untagged_int8,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int16#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Untagged_int16,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int32#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_int32,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int64#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_int64,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_nativeint#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_nativeint,
          Value generic_value, []), 1)
     | "%unsafe_get_ptr_imm" ->
@@ -1280,7 +1292,9 @@ and glb_scannable_kind kind1 kind2 =
 
 (* The following function computes the greatest lower bound of array kinds:
 
-        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint}
+          unspecialized
+          /           \
+        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint,vec*}
          |
       /------\
       |      |
@@ -1290,7 +1304,9 @@ and glb_scannable_kind kind1 kind2 =
       |
     int
 
-   For product kinds, we take the product of this lattice.
+   [unspecialized] sits above every other kind and is the placeholder used
+   for primitives that have not been specialized yet. For product kinds, we
+   take the product of this lattice.
 
    Note that the GLB is not guaranteed to exist.
    In case of array kinds working with layout value, we return
@@ -1306,58 +1322,51 @@ let glb_array_type loc t1 t2 =
       (Printlambda.array_kind t1) (Printlambda.array_kind t2)
   in
   match t1, t2 with
-  (* Handle unboxed array kinds which should only match with themselves.
-
-     However, a cheat is added just for [Pgenarray] to allow the [%array_*]
-     primitives to work with unboxed types.
-
-     WARNING: This trick will stop working when [Config.flat_float_array]
-     becomes [false].*)
+  (* [Punspecializedarray] is the top of the lattice: it is the marker placed
+     on primitives before specialization, and so the GLB with any other
+     array kind is that other kind. *)
+  | Punspecializedarray, x | x, Punspecializedarray -> x
+  (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                  | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
-  | (Pgenarray | Punboxedfloatarray Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
+  | Punboxedfloatarray Unboxed_float64, Punboxedfloatarray Unboxed_float64 ->
     Punboxedfloatarray Unboxed_float64
-  | (Pgenarray | Punboxedfloatarray Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
+  | Punboxedfloatarray Unboxed_float32, Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     unexpected ()
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int),
+  | Punboxedoruntaggedintarray Untagged_int,
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray Untagged_int
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int8),
+  | Punboxedoruntaggedintarray Untagged_int8,
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray Untagged_int8
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int16),
+  | Punboxedoruntaggedintarray Untagged_int16,
     Punboxedoruntaggedintarray Untagged_int16 ->
     Punboxedoruntaggedintarray Untagged_int16
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32),
+  | Punboxedoruntaggedintarray Unboxed_int32,
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray Unboxed_int32
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int64),
+  | Punboxedoruntaggedintarray Unboxed_int64,
     Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray Unboxed_int64
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_nativeint),
+  | Punboxedoruntaggedintarray Unboxed_nativeint,
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray Unboxed_nativeint
   | Punboxedoruntaggedintarray _, _ | _, Punboxedoruntaggedintarray _ ->
     unexpected ()
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec128),
-    Punboxedvectorarray Unboxed_vec128 ->
+  | Punboxedvectorarray Unboxed_vec128, Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray Unboxed_vec128
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec256),
-    Punboxedvectorarray Unboxed_vec256 ->
+  | Punboxedvectorarray Unboxed_vec256, Punboxedvectorarray Unboxed_vec256 ->
     Punboxedvectorarray Unboxed_vec256
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec512),
-    Punboxedvectorarray Unboxed_vec512 ->
+  | Punboxedvectorarray Unboxed_vec512, Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
     unexpected ()
 
-  (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
-  | Pgenarray,
-    ((Pgcignorableproductarray _ | Pgcscannableproductarray _) as k) -> k
+  (* Unboxed product arrays. *)
   | (Pgcignorableproductarray kinds1) as k, Pgcignorableproductarray kinds2 ->
     if List.equal equal_ignorable_product_element_kind kinds1 kinds2
     then k
@@ -1400,61 +1409,58 @@ let glb_array_ref_type loc t1 t2 =
       Printlambda.array_ref_kind t1 (Printlambda.array_kind t2)
   in
   match t1, t2 with
-  (* Handle unboxed array kinds which should only match with themselves.
-
-     However, a cheat is added just for [Pgenarray_ref] to allow the [%array_*]
-     primitives to work with unboxed types.
-
-     WARNING: This trick will stop working when [Config.flat_float_array]
-     becomes [false].*)
+  (* [Punspecializedarray] / [Punspecializedarray_ref] sit above every other
+     kind in the lattice (see [glb_array_type]); the GLB with any other kind
+     is therefore that other kind. *)
+  | Punspecializedarray_ref m, t2 -> Lambda.array_ref_kind m t2
+  | t1, Punspecializedarray -> t1
+  (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                        | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
-  | (Pgenarray_ref _ | Punboxedfloatarray_ref Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
+  | Punboxedfloatarray_ref Unboxed_float64,
+    Punboxedfloatarray Unboxed_float64 ->
     Punboxedfloatarray_ref Unboxed_float64
-  | (Pgenarray_ref _ | Punboxedfloatarray_ref Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
+  | Punboxedfloatarray_ref Unboxed_float32,
+    Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray_ref Unboxed_float32
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     unexpected ()
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int),
+  | Punboxedoruntaggedintarray_ref Untagged_int,
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray_ref Untagged_int
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int8),
+  | Punboxedoruntaggedintarray_ref Untagged_int8,
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray_ref Untagged_int8
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int16),
+  | Punboxedoruntaggedintarray_ref Untagged_int16,
     Punboxedoruntaggedintarray Untagged_int16 ->
     Punboxedoruntaggedintarray_ref Untagged_int16
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32),
+  | Punboxedoruntaggedintarray_ref Unboxed_int32,
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_ref Unboxed_int32
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int64),
+  | Punboxedoruntaggedintarray_ref Unboxed_int64,
     Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray_ref Unboxed_int64
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_nativeint),
+  | Punboxedoruntaggedintarray_ref Unboxed_nativeint,
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_ref Unboxed_nativeint
   | Punboxedoruntaggedintarray_ref _, _ | _, Punboxedoruntaggedintarray _ ->
     unexpected ()
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec128),
+  | Punboxedvectorarray_ref Unboxed_vec128,
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_ref Unboxed_vec128
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec256),
+  | Punboxedvectorarray_ref Unboxed_vec256,
     Punboxedvectorarray Unboxed_vec256 ->
     Punboxedvectorarray_ref Unboxed_vec256
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec512),
+  | Punboxedvectorarray_ref Unboxed_vec512,
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
     unexpected ()
 
-  (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
-  | Pgenarray_ref _, Pgcignorableproductarray kinds ->
-    Pgcignorableproductarray_ref kinds
-  | Pgenarray_ref _, Pgcscannableproductarray kinds ->
-    Pgcscannableproductarray_ref kinds
+  (* Unboxed product arrays. *)
   | (Pgcignorableproductarray_ref kinds1) as k,
     Pgcignorableproductarray kinds2 ->
     if kinds1 = kinds2 then k
@@ -1510,61 +1516,58 @@ let glb_array_set_type loc t1 t2 =
       Printlambda.array_set_kind t1 (Printlambda.array_kind t2)
   in
   match t1, t2 with
-  (* Handle unboxed array kinds which can only match with themselves.
-
-     However, a cheat is added just for [Pgenarray_set] to allow the [%array_*]
-     primitives to work with unboxed types.
-
-     WARNING: This trick will stop working when [Config.flat_float_array]
-     becomes [false].*)
+  (* [Punspecializedarray] / [Punspecializedarray_set] sit above every other
+     kind in the lattice (see [glb_array_type]); the GLB with any other kind
+     is therefore that other kind. *)
+  | Punspecializedarray_set m, t2 -> Lambda.array_set_kind m t2
+  | t1, Punspecializedarray -> t1
+  (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                      | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
-  | (Pgenarray_set _ | Punboxedfloatarray_set Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
+  | Punboxedfloatarray_set Unboxed_float64,
+    Punboxedfloatarray Unboxed_float64 ->
     Punboxedfloatarray_set Unboxed_float64
-  | (Pgenarray_set _ | Punboxedfloatarray_set Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
+  | Punboxedfloatarray_set Unboxed_float32,
+    Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray_set Unboxed_float32
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     unexpected ()
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int),
+  | Punboxedoruntaggedintarray_set Untagged_int,
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray_set Untagged_int
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int8),
+  | Punboxedoruntaggedintarray_set Untagged_int8,
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray_set Untagged_int8
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int16),
+  | Punboxedoruntaggedintarray_set Untagged_int16,
     Punboxedoruntaggedintarray Untagged_int16 ->
     Punboxedoruntaggedintarray_set Untagged_int16
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32),
+  | Punboxedoruntaggedintarray_set Unboxed_int32,
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_set Unboxed_int32
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int64),
+  | Punboxedoruntaggedintarray_set Unboxed_int64,
     Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray_set Unboxed_int64
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_nativeint),
+  | Punboxedoruntaggedintarray_set Unboxed_nativeint,
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_set Unboxed_nativeint
   | Punboxedoruntaggedintarray_set _, _ | _, Punboxedoruntaggedintarray _ ->
     unexpected ()
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec128),
+  | Punboxedvectorarray_set Unboxed_vec128,
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_set Unboxed_vec128
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec256),
+  | Punboxedvectorarray_set Unboxed_vec256,
     Punboxedvectorarray Unboxed_vec256 ->
-  Punboxedvectorarray_set Unboxed_vec256
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec512),
+    Punboxedvectorarray_set Unboxed_vec256
+  | Punboxedvectorarray_set Unboxed_vec512,
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
     unexpected ()
 
-  (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
-  | Pgenarray_set _, Pgcignorableproductarray kinds ->
-    Pgcignorableproductarray_set kinds
-  | Pgenarray_set m, Pgcscannableproductarray kinds ->
-    Pgcscannableproductarray_set (m, kinds)
+  (* Unboxed product arrays. *)
   | (Pgcignorableproductarray_set kinds1) as k,
     Pgcignorableproductarray kinds2 ->
     if kinds1 = kinds2 then k
@@ -2576,6 +2579,10 @@ let lambda_primitive_needs_event_after = function
   | Pbox_vector (_, _)
   | Punbox_unit
     -> false
+  | Pmakearray (Punspecializedarray, _, _)
+  | Pmakearray_dynamic (Punspecializedarray, _, _) ->
+    Misc.fatal_error
+      "Translprim.lambda_primitive_needs_event_after: Punspecializedarray"
 
 (* Determine if a primitive should be surrounded by an "after" debug event *)
 let primitive_needs_event_after = function
