@@ -1,13 +1,13 @@
 (* TEST
- readonly_files = "mli_with_dynamic_default.mli use_mli_dynamic_default_bad.reference";
+ readonly_files = "mli_with_dynamic_default.mli use_mli_dynamic_default_bad_usage.reference";
  setup-ocamlc.byte-build-env;
  module = "mli_with_dynamic_default.mli";
  ocamlc.byte;
- module = "use_mli_dynamic_default_bad.ml";
- compiler_output = "use_mli_dynamic_default_bad.output";
+ module = "use_mli_dynamic_default_bad_usage.ml";
+ compiler_output = "use_mli_dynamic_default_bad_usage.output";
  ocamlc_byte_exit_status = "2";
  ocamlc.byte;
- compiler_reference = "use_mli_dynamic_default_bad.reference";
+ compiler_reference = "use_mli_dynamic_default_bad_usage.reference";
  check-ocamlc.byte-output;
 *)
 
