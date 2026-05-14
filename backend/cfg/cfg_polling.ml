@@ -278,14 +278,14 @@ let potentially_recursive_tailcall :
    which [L_0, ..., L_{n-1}] are all unsafe (the endpoint itself need not
    be). *)
 let unsafe_reachable_from :
-    Cfg.t -> safe_map:bool Label.Tbl.t -> from:Label.t -> Label.Set.t =
+    Cfg.t -> safe_map:bool Label.Tbl.t -> from:Label.t -> unit Label.Tbl.t =
  fun cfg ~safe_map ~from ->
-  let open_ = ref (Label.Set.singleton from) in
-  let closed = ref Label.Set.empty in
-  while not (Label.Set.is_empty !open_) do
-    let label = Label.Set.choose !open_ in
-    open_ := Label.Set.remove label !open_;
-    closed := Label.Set.add label !closed;
+  let discovered = Label.Tbl.create 32 in
+  let open_ = Stack.create () in
+  Label.Tbl.replace discovered from ();
+  Stack.push from open_;
+  while not (Stack.is_empty open_) do
+    let label = Stack.pop open_ in
     match Label.Tbl.find_opt safe_map label with
     | None ->
       Misc.fatal_errorf
@@ -300,12 +300,13 @@ let unsafe_reachable_from :
       in
       Label.Set.iter
         (fun successor_label ->
-          match Label.Set.mem successor_label !closed with
-          | true -> ()
-          | false -> open_ := Label.Set.add successor_label !open_)
+          if not (Label.Tbl.mem discovered successor_label)
+          then (
+            Label.Tbl.replace discovered successor_label ();
+            Stack.push successor_label open_))
         successor_labels
   done;
-  !closed
+  discovered
 
 let instr_cfg_with_layout :
     Cfg_with_layout.t ->
@@ -348,7 +349,7 @@ let instr_cfg_with_layout :
         (fun src added_poll ->
           let needs_poll =
             (not (Label.Tbl.find safe_map src))
-            && Label.Set.mem src unsafe_reachable
+            && Label.Tbl.mem unsafe_reachable src
           in
           if needs_poll
           then (
