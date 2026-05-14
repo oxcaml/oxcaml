@@ -17,9 +17,9 @@
    flags = "-a";
    all_modules = "a.cmx b.cmx";
    ocamlopt.opt;
-   program = "${test_build_directory}/main.exe";
+   program = "${test_build_directory}/indirect.exe";
    flags = "-extension runtime_metaprogramming -uses-metaprogramming";
-   all_modules = "eval.cmxa lib.cmxa available.ml";
+   all_modules = "eval.cmxa lib.cmxa indirect.ml";
    ocamlopt.opt;
    run;
    check-program-output;
