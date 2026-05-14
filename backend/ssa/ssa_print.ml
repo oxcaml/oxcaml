@@ -3,8 +3,10 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-40-41-42"]
 
 (** Block- and graph-level pretty-printers for {!Ssa.Finished_graph}. The
-    instruction-, terminator- and block-id printers live in {!Ssa} itself, so
-    they are shared between the [Graph_builder] and [Finished_graph] views. *)
+    instruction, terminator and block-id printers themselves live on the
+    [Block], [Instruction] and [Terminator] submodules of each graph instance,
+    so they are shared between the [Graph_builder] and [Finished_graph] views.
+*)
 
 module Make (S : Ssa.Finished_graph) = struct
   let print_typed_params ppf (blk : S.Block.t) =

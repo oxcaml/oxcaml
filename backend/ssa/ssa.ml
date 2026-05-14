@@ -4,10 +4,10 @@ open! Int_replace_polymorphic_compare
 
 (** SSA graph implementation; signatures are in {!Ssa_intf}.
 
-    A single underlying module satisfies both [Graph_builder] and
-    [Finished_graph]. During construction the abstract types in [Graph_builder]
-    hide use counts, predecessors and dominator info; at [finish_graph] time the
-    same module is repackaged with the [Finished_graph] view that exposes them.
+    The same underlying [Builder] state supplies both views. During construction
+    it is exposed through [Graph_builder] with the abstract types hiding use
+    counts, predecessors and dominator info; [finish_graph] then repackages that
+    state with the [Finished_graph] view that exposes them.
 
     Construction appends each [emit_*] instruction onto the current block's
     [pending_body] (newest-first); [finish_block] reverses it into program
@@ -328,15 +328,15 @@ let make_builder (function_info : Function_info.t) ~keep_unused_ops :
           block.params.(param_index).name <- Some name
         | _ -> ()
 
-      let make_block_param (block : Block.t) (param_index : int) =
-        if param_index < 0 || param_index >= Array.length block.params
+      let make_block_param (block : Block.t) ~index =
+        if index < 0 || index >= Array.length block.params
         then
           Misc.fatal_errorf
-            "Ssa.Instruction.make_block_param: param_index %d out of range for \
-             block with %d params"
-            param_index
+            "Ssa.Instruction.make_block_param: index %d out of range for block \
+             with %d params"
+            index
             (Array.length block.params);
-        Block_param { block; param_index }
+        Block_param { block; param_index = index }
 
       let result_arity instr =
         match instr with
@@ -345,7 +345,7 @@ let make_builder (function_info : Function_info.t) ~keep_unused_ops :
         | Proj _ | Block_param _ -> 1
         | Name_for_debugger _ | Push_trap _ | Pop_trap _ | Stack_check _ -> 0
 
-      let make_proj ~index src =
+      let make_proj src ~index =
         match src with
         | Tuple elems -> Array.get elems index
         | Op _ ->
@@ -353,7 +353,7 @@ let make_builder (function_info : Function_info.t) ~keep_unused_ops :
           if not (index >= 0 && index < arity)
           then
             Misc.fatal_errorf
-              "Ssa.Instruction.make_proj: output_index %d out of range for \
+              "Ssa.Instruction.make_proj: index %d out of range for \
                instruction with %d results"
               index arity;
           Proj { output_index = index; src }
@@ -490,12 +490,12 @@ let make_builder (function_info : Function_info.t) ~keep_unused_ops :
 
     (* === Builder state === *)
 
-    (* Finished blocks, in reverse order. *)
+    (** Finished blocks, in reverse order. *)
     let finished_blocks_rev : Block.t list ref = ref []
 
-    (* Sentinel terminator used as the initial value of the [terminator] field.
-       [Cursor.is_finished] checks (via physical equality) that the field still
-       holds this sentinel. *)
+    (** Sentinel terminator used as the initial value of the [terminator] field.
+        [Cursor.is_finished] returns [false] (via physical comparison) while the
+        field still holds this sentinel. *)
     let rec pending_terminator : Terminator.t =
       Goto { goto = dummy_block; args = [||] }
 
@@ -607,7 +607,7 @@ let make_builder (function_info : Function_info.t) ~keep_unused_ops :
       let block = create_block ~is_function_start ~params in
       let params_arr =
         Array.init (Array.length params) (fun i ->
-            Instruction.make_block_param block i)
+            Instruction.make_block_param block ~index:i)
       in
       { block; params = params_arr }
 

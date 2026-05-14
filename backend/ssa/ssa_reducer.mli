@@ -22,8 +22,8 @@
     does NOT add the instruction to the output graph, this has to be done
     beforehand using the [Context].
 
-    The new interface keeps input and output graphs in separate modules ([C.In]
-    for the read-only input, [C] itself for the in-progress output), so the type
+    The framework keeps input and output graphs in separate modules ([C.In] for
+    the read-only input, [C] itself for the in-progress output), so the type
     checker prevents accidentally mixing references between them. *)
 
 (** Framework-provided context: bindings to the input and output graphs, builder

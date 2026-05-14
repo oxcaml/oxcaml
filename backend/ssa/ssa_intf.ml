@@ -13,15 +13,15 @@ open! Int_replace_polymorphic_compare
 
     A graph has two views, captured by two module types:
 
-    - {!Graph_builder}: the view during construction. [Block.t] is opaque (only
+    - [Graph_builder]: the view during construction. [Block.t] is opaque (only
       [id], [is_function_start] and [params] accessors are exposed), the
       predecessor / dominator / use-count fields are not yet populated, and the
-      operations are emit/finish_block/new_block, plus the smart constructors
-      {!Instruction.make_op} and {!Instruction.make_proj}. Construction uses the
-      imperative [cursor] interface, to avoid accidentally dropping already
-      emitted parts of the graph.
+      operations are [emit_instruction] / [emit_op] / [finish_block] /
+      [new_block], plus the smart constructors [make_op], [make_block_param] and
+      [make_proj]. Construction uses the imperative [Cursor] interface, to avoid
+      accidentally dropping already emitted parts of the graph.
 
-    - {!Finished_graph}: the view after [finish_graph] has run. The full
+    - [Finished_graph]: the view after [finish_graph] has run. The full
       [Block.t] record is exposed, [predecessors] / [dominator_info] /
       [usage_count] are populated, and graph-level queries ([predecessors],
       [successors], [dominates], [common_dominator]) become available.
@@ -314,7 +314,7 @@ module type Graph_builder = sig
          and module Id = Instruction_id
 
     (** Smart constructor for [Op] instructions. Allocates a fresh
-        [Instruction_id.t]. Use this rather than constructing [Op] directly,
+        [Instruction.Id.t]. Use this rather than constructing [Op] directly,
         since [op_data] is private. *)
     val make_op :
       op:op -> typ:Cmm.machtype -> args:t array -> dbg:Debuginfo.t -> t
@@ -322,15 +322,14 @@ module type Graph_builder = sig
     (** Set the [name] hint on an [Op]. No-op for non-[Op] instructions. *)
     val set_name : t -> string -> unit
 
-    (** Smart constructor for [Block_param]. [index] is bounds-checked against
-        [block]'s param array. The component type is not stored; reach for it
-        via [block.params.(index)] when needed. *)
-    val make_block_param : Block.t -> int -> t
+    (** Smart constructor for [Block_param] that bounds-checks [index] against
+        the block's param array. *)
+    val make_block_param : Block.t -> index:int -> t
 
     (** Smart constructor for [Proj] that short-circuits projections out of a
-        [Tuple]: [make_proj ~index (Tuple elems)] returns [elems.(index)]
+        [Tuple]: [make_proj (Tuple elems) ~index] returns [elems.(index)]
         directly. This is the only supported way to consume a [Tuple]. *)
-    val make_proj : index:int -> t -> t
+    val make_proj : t -> index:int -> t
   end
 
   module Terminator : sig
@@ -349,9 +348,11 @@ module type Graph_builder = sig
     (** Move the given cursor to the given position. As they now point to the
         same block, only one of the two cursors can be finished with
         [finish_block]. Asserts that the modified cursor used to point to a
-        finished block.*)
+        finished block. *)
     val move : t -> new_pos:t -> unit
 
+    (** [true] if the cursor's current block has had its terminator sealed by
+        [finish_block]. *)
     val is_finished : t -> bool
   end
 

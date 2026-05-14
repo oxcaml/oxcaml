@@ -52,12 +52,12 @@ module Make (Builder : Ssa.Graph_builder) = struct
     { env with vars = V.Map.add (VP.var v) instrs env.vars }
 
   let emit_op_res c ?(dbg = Debuginfo.none) op typ args : Instruction.t array =
-    let i = emit_op c ~op ~dbg ~typ ~args in
+    let instr = emit_op c ~op ~dbg ~typ ~args in
     if Array.length typ = 1
-    then [| i |]
+    then [| instr |]
     else
       Array.init (Array.length typ) (fun index ->
-          Instruction.make_proj ~index i)
+          Instruction.make_proj instr ~index)
 
   let bind_let env c v args =
     let env = env_add v args env in
