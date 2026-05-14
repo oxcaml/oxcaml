@@ -7,6 +7,8 @@ open Effect.Deep
 
 let use_unique : 'a @ unique -> unit = fun _ -> ()
 
+let use_portable_function : (unit -> unit) @ portable -> unit = fun _ -> ()
+
 type _ eff += Need_ref : int ref eff
 
 type _ eff += Need_unit : unit eff
@@ -14,6 +16,7 @@ type _ eff += Need_unit : unit eff
 type _ eff += Payload : int ref -> unit eff
 [%%expect {|
 val use_unique : 'a @ unique -> unit = <fun>
+val use_portable_function : (unit -> unit) @ portable -> unit = <fun>
 type _ eff += Need_ref : int ref eff
 type _ eff += Need_unit : unit eff
 type _ eff += Payload : int ref -> unit eff
@@ -270,6 +273,30 @@ Line 9, characters 6-7:
 9 |       r
           ^
 Error: This value is "local" but is expected to be "global".
+|}]
+
+(* A [match] result must preserve an enclosing portable expectation while using
+   legacy modes for the generated handler body. *)
+let () =
+  use_portable_function
+    (match () with
+     | () ->
+         let (f @ nonportable) () = () in
+         f
+     | effect Need_unit, _ -> fun () -> ())
+[%%expect {|
+|}]
+
+(* A [try] result must preserve an enclosing portable expectation while using
+   legacy modes for the generated handler body. *)
+let () =
+  use_portable_function
+    (try
+       let (f @ nonportable) () = () in
+       f
+     with
+     | effect Need_unit, _ -> fun () -> ())
+[%%expect {|
 |}]
 
 (* Can allocate local values inside a [match] body. *)
