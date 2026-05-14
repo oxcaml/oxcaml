@@ -1,0 +1,13 @@
+let code test_0 deleted in
+let code loopify(never) size(0) newer_version_of(test_0)
+      test_0_1 (u : imm tagged, a, b)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  invalid "(Application_result_kind_mismatch\n (result_arity \226\132\149\240\157\159\158\240\157\159\156) (apply_expr\n  (((Some Over_app_kind_check_simplify.camlOver_app_kind_check_simplify__f_3)\227\128\136k21\227\128\137\227\128\138k13\227\128\139(0))\n   (args_arity \240\157\149\141?) (return_arity \240\157\149\141?)\n   (call_kind\n    (Function\n     (function_call (Direct camlOver_app_kind_check_simplify__f_1_3_code))))\n   (alloc_mode Heap) (dbg over_app_kind_check_simplify.ml:16,2--16)\n   (inline Default_inlined) (inlining_state (depth 0, arguments O3))\n   (probe ()) (position Normal))))"
+in
+let $camlOver_app_kind_check_simplify__test_2 = closure test_0_1 @test in
+let $camlOver_app_kind_check_simplify =
+  Block 0 ($camlOver_app_kind_check_simplify__test_2)
+in
+cont done ($camlOver_app_kind_check_simplify)

@@ -125,3 +125,117 @@ let () = bar foo (* prints "foo" *)
 ```
 
 Exceptions also cross statefulness and visibility with identical restrictions.
+
+# Modalities
+Modalities, as described in the [syntax](./syntax) section, can be though of as functions
+from mode to mode. For example, let's imagine one defines a record type with some modality
+`m`:
+
+```ocaml
+type 'a t = { field : 'a @@ m }
+```
+
+Then, if we have a value `(t : _ t @ n)` then what's the mode of `t.field`? The answer:
+apply the `m`. For future axes, the modality acts as a `min` between the record mode and
+the written modality. For example:
+
+```ocaml
+type 'a t = { field : 'a @@ shareable }
+
+let f : 'a t @ nonportable -> 'a @ shareable = fun t -> t.field  (* shareable < nonportable *)
+let g : 'a t @ shareable -> 'a @ shareable = fun t -> t.field    (* shareable = shareable *)
+let h : 'a t @ portable -> 'a @ portable = fun t -> t.field      (* portable < shareable *)
+```
+
+For past axes, the modality acts as a `max`. For example:
+
+```ocaml
+type 'a t = { field : 'a @@ shared }
+
+let f : 'a t @ uncontended -> 'a @ shared = fun t -> t.field   (* uncontended < shared *)
+let g : 'a t @ shared -> 'a @ shared = fun t -> t.field        (* shared = shared *)
+let h : 'a t @ contended -> 'a @ contended = fun t -> t.field  (* shared < contended *)
+```
+
+However, things are more complex for diamond-shaped axes, such as visibility and
+statefulness, contention and portability. In these cases, applying modalities to future
+modes results in the _greatest common submode_, while applying modalities to past modes
+results in the _least common supermode_. Mathematically, this corresponds to the meet
+and join of the two modes, respectively.
+
+For example, the least common supermode of `read` and `write` is `immutable`:
+
+```ocaml
+type 'a t = { field : 'a @@ write }
+
+let f : 'a t @ read -> 'a @ immutable = fun t -> t.field
+```
+
+On the other hand, the greatest common submode of `reading` and `writing` is `stateless`:
+
+```ocaml
+type 'a t = { field : 'a @@ reading }
+
+let f : 'a t @ writing -> 'a @ stateless = fun t -> t.field
+```
+
+Similarly, the least common supermode of `corrupted` and `shared` is `contended`, and
+the greatest common submode of `shareable` and `corruptible` is `portable`.
+
+# Mode crossing
+In the [intro](./intro) to modes, we saw the idea of "mode crossing", in which values of
+types with particular properties can cross from some supermode to some submode for free.
+For example, immutable data crosses most modes: a `string @ immutable` can always be
+treated as a `string @ read_write` (because there are no mutable fields to read or write),
+and a `string @ stateful` can always be treated as a `string @ stateless` (because it
+contains no functions closing over mutable data).
+
+But beyond concrete types, we have a generic facility for capturing mode crossing, using
+`mod` syntax. This allows us to express behavior such as the following:
+
+```ocaml
+let cross_contended : type (a : value mod contended). a @ contended -> a @ uncontended =
+  fun x -> x
+;;
+
+let cross_shared : type (a : value mod shared). a @ shared -> a @ uncontended =
+  fun x -> x
+;;
+
+let cross_portable : type (a : value mod portable). a @ nonportable -> a @ portable =
+  fun x -> x
+;;
+
+let cross_shareable : type (a : value mod shareable). a @ nonportable -> a @ shareable =
+  fun x -> x
+;;
+```
+
+Like modalities, diamond-shape modal axes allow for more interesting kinds of mode
+crossing. In particular, because visibility allows us to cross `read` separately from
+`write`, and statefulness allows us to cross `reading` separately from `writing`, we
+can strengthen `read`-crossing values from `immutable` to `write` (and vice-versa), and
+strengthen `reading`-crossing values from `writing` to `stateless` (and vice-versa):
+
+```ocaml
+let f : type (a : value mod read). a @ immutable -> a @ write =
+  fun x -> x
+;;
+
+let f : type (a : value mod write). a @ immutable -> a @ read =
+  fun x -> x
+;;
+
+let f : type (a : value mod reading). a @ writing -> a @ stateless =
+  fun x -> x
+;;
+
+let f : type (a : value mod writing). a @ reading -> a @ stateless =
+  fun x -> x
+;;
+```
+
+Like statefulness and visibility, contention and portability are also diamond-shaped
+lattices. Mode crossing works analogously: for example, crossing `corrupted` allows
+strengthening from `contended` to `shared` (and vice-versa), and crossing `corruptible`
+allows strengthening from `shareable` to `portable` (and vice-versa).

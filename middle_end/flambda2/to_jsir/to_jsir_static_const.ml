@@ -248,8 +248,7 @@ let prepare_code ~env ~res ~code_id code =
         ~body:_
         ~my_closure:_
         ~is_my_closure_used:_
-        ~my_region:_
-        ~my_ghost_region:_
+        ~my_alloc_mode:_
         ~my_depth:_
         ~free_names_of_body:_
       ->
@@ -294,8 +293,7 @@ let code ~env ~res ~translate_body ~code_id code =
         ~body
         ~my_closure
         ~is_my_closure_used:_
-        ~my_region:_
-        ~my_ghost_region:_
+        ~my_alloc_mode:_
         ~my_depth:_
         ~free_names_of_body:_
       ->

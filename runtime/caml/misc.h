@@ -57,6 +57,10 @@
 #if defined(__GNUC__) || defined(__llvm__) || defined(_MSC_VER)
 
 #define CAML_STRINGIFY(x) #x
+
+/* Like CAML_STRINGIFY, but expands macros in x before stringifying */
+#define CAML_EXPAND_STRINGIFY(x) CAML_STRINGIFY(x)
+
 #ifdef _MSC_VER
 #define CAML_MAKEWARNING1(x) CAML_STRINGIFY(message(x))
 #else

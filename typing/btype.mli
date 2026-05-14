@@ -85,6 +85,13 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
         (* Return a fresh generic node, to be instantiated
            by [Transient_expr.set_stub_desc] *)
 
+val new_quote_ty: type_expr -> type_expr
+        (* Quote a type expression *)
+val new_splice_ty: type_expr -> type_expr
+        (* Splice a type expression *)
+val new_quote_eval_ty: type_expr -> type_expr
+        (* Quote-eval a type expression *)
+
 (**** Types ****)
 
 val is_Tvar: type_expr -> bool
@@ -180,6 +187,7 @@ type 'a type_iterators =
     it_class_declaration: 'a type_iterators -> class_declaration -> unit;
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
+    it_jkind_declaration: 'a type_iterators -> jkind_declaration -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;
@@ -336,32 +344,19 @@ module Jkind0 : sig
   module Mod_bounds : sig
     module Crossing = Mode.Crossing
     module Externality = Jkind_axis.Externality
-    module Nullability = Jkind_axis.Nullability
-    module Separability = Jkind_axis.Separability
 
     type t = mod_bounds =
       { crossing : Mode.Crossing.t;
         externality: Jkind_axis.Externality.t;
-        nullability: Jkind_axis.Nullability.t;
-        separability: Jkind_axis.Separability.t;
       }
 
-    val create :
-      Crossing.t->
-      externality:Externality.t ->
-      nullability:Nullability.t ->
-      separability:Separability.t ->
-      t
+    val create : Crossing.t -> externality:Externality.t -> t
 
     val crossing : t -> Crossing.t
     val externality : t -> Externality.t
-    val nullability : t -> Nullability.t
-    val separability : t -> Separability.t
 
     val set_crossing : Crossing.t -> t -> t
     val set_externality : Externality.t -> t -> t
-    val set_nullability : Nullability.t -> t -> t
-    val set_separability : Separability.t -> t -> t
 
     (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max]
         within [bounds] *)
@@ -382,9 +377,11 @@ module Jkind0 : sig
 
     val equal : t -> t -> bool
     val join : t -> t -> t
+    val to_axis_lattice : t -> Axis_lattice.t
+    val of_axis_lattice : Axis_lattice.t -> t
+    val meet : t -> t -> t
 
     val relevant_axes_of_modality :
-      relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
       modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
 
     val debug_print : Format.formatter -> t -> unit
@@ -396,7 +393,6 @@ module Jkind0 : sig
     include Allow_disallow with type (_, _, 'd) sided = 'd t
 
     val add_modality :
-      relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
       modality:Mode.Modality.Const.t ->
       type_expr:type_expr ->
       (allowed * disallowed) t ->
@@ -466,9 +462,6 @@ module Jkind0 : sig
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
 
-      (** Same kind, not mod external_ *)
-      val void_internal : t
-
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
 
@@ -509,9 +502,6 @@ module Jkind0 : sig
       (** The jkind of unboxed 64-bit floats with no mode crossing. *)
       val float64 : t
 
-      (** Same kind, not mod external_. *)
-      val float64_internal : t
-
       (** The jkind of unboxed 64-bit floats with mode crossing. *)
       val kind_of_unboxed_float : t
 
@@ -524,17 +514,11 @@ module Jkind0 : sig
       (** The jkind of unboxed 32-bit floats with no mode crossing. *)
       val float32 : t
 
-      (** Same kind, not mod external_. *)
-      val float32_internal : t
-
       (** The jkind of unboxed 32-bit floats with mode crossing. *)
       val kind_of_unboxed_float32 : t
 
       (** The jkind of unboxed native-sized integers with no mode crossing. *)
       val word : t
-
-      (** Same kind, not mod external_. *)
-      val word_internal : t
 
       (** The jkind of unboxed native-sized integers with mode crossing. *)
       val kind_of_unboxed_nativeint : t
@@ -542,17 +526,11 @@ module Jkind0 : sig
       (** The jkind of untagged immediates ([int#]) with no mode crossing. *)
       val untagged_immediate : t
 
-      (** Same kind, not mod external_. *)
-      val untagged_immediate_internal : t
-
       (** The jkind of untagged immediates ([int#]) with mode crossing. *)
       val kind_of_untagged_int : t
 
       (** The jkind of unboxed 8-bit integers with no mode crossing. *)
       val bits8 : t
-
-      (** Same kind, not mod external_. *)
-      val bits8_internal : t
 
       (** The jkind of unboxed 8-bit integers with mode crossing. *)
       val kind_of_unboxed_int8 : t
@@ -560,26 +538,17 @@ module Jkind0 : sig
       (** The jkind of unboxed 16-bit integers with no mode crossing. *)
       val bits16 : t
 
-      (** Same kind, not mod external_. *)
-      val bits16_internal : t
-
       (** The jkind of unboxed 16-bit integers with mode crossing. *)
       val kind_of_unboxed_int16 : t
 
       (** The jkind of unboxed 32-bit integers with no mode crossing. *)
       val bits32 : t
 
-      (** Same kind, not mod external_. *)
-      val bits32_internal : t
-
       (** The jkind of unboxed 32-bit integers with mode crossing. *)
       val kind_of_unboxed_int32 : t
 
       (** The jkind of unboxed 64-bit integers with no mode crossing. *)
       val bits64 : t
-
-      (** Same kind, not mod external_. *)
-      val bits64_internal : t
 
       (** The jkind of unboxed 64-bit integers with mode crossing. *)
       val kind_of_unboxed_int64 : t
@@ -595,15 +564,6 @@ module Jkind0 : sig
 
       (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec512 : t
-
-      (** Same kind, not mod external_. *)
-      val vec128_internal : t
-
-      (** Same kind, not mod external_. *)
-      val vec256_internal : t
-
-      (** Same kind, not mod external_. *)
-      val vec512_internal : t
 
       (** The jkind of unboxed 128-bit vectors with mode crossing. *)
       val kind_of_unboxed_128bit_vectors : t
@@ -695,6 +655,8 @@ module Jkind0 : sig
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
 
+    val instance : jkind_lr -> jkind_lr
+
     val has_with_bounds : jkind_l -> bool
 
     module Builtin : sig
@@ -733,6 +695,16 @@ module Jkind0 : sig
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
     val for_boxed_record : label_declaration list -> jkind_l
+    (* Shared type-level implementation of Steps B1-B4 from
+       Note [With-bounds for GADTs].  Callers choose the projection target via
+       [projected_params]: declaration parameters for boxed GADTs, or the
+       already-instantiated head arguments for unboxed GADTs. *)
+    val gadt_payload_subst :
+      projected_params:Types.type_expr list ->
+      res_args:Types.type_expr list ->
+      payload_tys:Types.type_expr list ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      (Types.type_expr * Types.type_expr) list
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->
@@ -741,16 +713,20 @@ module Jkind0 : sig
         Types.type_expr ->
         Types.type_expr list ->
         Types.type_expr) ->
-      free_vars:(Types.type_expr list -> TypeSet.t) ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       Types.constructor_declaration list ->
       Types.jkind_l
 
     val for_or_null_argument : Ident.t -> 'd jkind
+    val for_variant_with_null_result : Path.t -> type_expr -> jkind_l
 
     val for_effect_arg : Ident.t -> 'd jkind
 
     (** The jkind of a float. *)
     val for_float : Ident.t -> jkind_l
+
+    (** The jkind of a quoted expression, [_ expr]. *)
+    val for_expr : Types.jkind_l
 
     (** The jkind for [array] type arguments. *)
     val for_array_argument : jkind_lr

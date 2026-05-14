@@ -356,21 +356,6 @@ let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
 
-exception Cannot_cancel
-
-let rec cancel_quote_splice ty =
-  let rec cancel_once = function
-  | Otyp_quote (Otyp_splice t) -> t
-  | Otyp_splice (Otyp_quote t) -> t
-  | Otyp_quote t -> Otyp_quote (cancel_once t)
-  | Otyp_splice t -> Otyp_splice (cancel_once t)
-  | _ -> raise Cannot_cancel
-  in
-  try
-    let ty' = cancel_once ty in
-    cancel_quote_splice ty'
-  with Cannot_cancel -> ty
-
 let rec print_out_type_0 ppf =
   function
   | Otyp_alias {non_gen; aliased; alias } ->
@@ -379,9 +364,15 @@ let rec print_out_type_0 ppf =
       (ty_var ~non_gen) alias
   | Otyp_poly ([], ty) ->
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
+  | Otyp_newlayout ([], ty) ->
+      print_out_type_0 ppf ty  (* no "." if there are no vars *)
   | Otyp_poly (sl, ty) ->
       fprintf ppf "@[<hov 2>%a.@ %a@]"
         pr_var_jkinds sl
+        print_out_type_0 ty
+  | Otyp_newlayout (sl, ty) ->
+      fprintf ppf "@[<hov 2>layout_ %a.@ %a@]"
+        pr_sort_univars sl
         print_out_type_0 ty
   | Otyp_repr ([], ty) ->
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
@@ -478,6 +469,7 @@ and print_simple_out_type ppf =
         print_fields row_fields
         print_present tags
   | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _ | Otyp_tuple _
+  | Otyp_newlayout _
     as ty ->
       pp_open_box ppf 1;
       pp_print_char ppf '(';
@@ -509,20 +501,8 @@ and print_simple_out_type ppf =
   | Otyp_of_kind jk ->
     fprintf ppf "(type@ :@ %a)" print_out_jkind jk
   | Otyp_ret _ -> assert false
-  | Otyp_quote t -> (
-      let t' = cancel_quote_splice (Otyp_quote t) in
-      match t' with
-      | Otyp_quote t' ->
-        fprintf ppf "@[<1><[@,%a@,]>@]"
-          print_out_type_0 t'
-      | t' -> print_out_type ppf t')
-  | Otyp_splice t -> (
-      let t' = cancel_quote_splice (Otyp_splice t) in
-      match t' with
-      | Otyp_splice t' ->
-        fprintf ppf "@[<1>$@,(%a)@]"
-          print_out_type_0 t'
-      | t' -> print_out_type ppf t')
+  | Otyp_quote t -> fprintf ppf "@[<1><[@,%a@,]>@]" print_out_type_0 t
+  | Otyp_splice t -> fprintf ppf "@[<1>$@,(%a)@]" print_out_type_0 t
 and print_out_type ppf typ =
   print_out_type_0 ppf typ
 and print_package ppf pack =
@@ -636,7 +616,8 @@ and print_out_jkind_const ppf ojkind =
     let base, withs = strip_withs ojkind in
     (match base with
     | Ojkind_const_default -> fprintf ppf "_"
-    | Ojkind_const_abbreviation abbrev -> fprintf ppf "%s" abbrev
+    | Ojkind_const_abbreviation (abbrev, sa) ->
+      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (abbrev :: sa)
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
@@ -659,6 +640,7 @@ and print_out_jkind_const ppf ojkind =
     | [] -> ()
     | withs ->
       pp_print_list
+        ~pp_sep:(fun _ () -> ())
         (fun ppf ->
            fprintf ppf "@ with @[<hv 2>%a@]"
              (pp_print_list ~pp_sep:pp_print_space pp_print_string))
@@ -670,7 +652,8 @@ and print_out_jkind_const ppf ojkind =
 and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =
     match ojkind with
-    | Ojkind_var v -> fprintf ppf "%s" v
+    | Ojkind_var (v, nts) ->
+      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (v :: nts)
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
@@ -689,6 +672,11 @@ and pr_var_jkind ppf (v, l) = match l with
                     print_out_jkind lay
 and pr_var_jkinds jks =
   print_list pr_var_jkind (fun ppf -> fprintf ppf "@ ") jks
+
+and pr_sort_univar = pp_print_string
+
+and pr_sort_univars univars =
+  print_list pr_sort_univar (fun ppf -> fprintf ppf "@ ") univars
 
 and pr_var_repr ppf v =
   fprintf ppf "(repr_@ %a)" pr_var v
@@ -1017,10 +1005,10 @@ and print_out_type_decl kwd ppf td =
   let print_unboxed ppf =
     if td.otype_unboxed then fprintf ppf " [%@%@unboxed]" else ()
   in
-  let print_or_null_reexport ppf =
-    if td.otype_or_null_reexport then
-      fprintf ppf " [%@%@or_null_reexport]"
-    else ()
+  let print_or_null_attr ppf =
+    match td.otype_or_null_attribute with
+    | None -> ()
+    | Some attr -> fprintf ppf " [%@@@%s]" attr
   in
   let print_out_tkind ppf = function
   | Otyp_abstract -> ()
@@ -1055,7 +1043,7 @@ and print_out_type_decl kwd ppf td =
     print_out_tkind ty
     print_constraints
     print_unboxed
-    print_or_null_reexport
+    print_or_null_attr
     print_out_attrs td.otype_attributes
 
 and print_simple_out_gf_type ppf (ty, gf) =

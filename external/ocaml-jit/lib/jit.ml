@@ -25,7 +25,7 @@ external ndl_loadsym : string -> Obj.t
 
 external ndl_existssym : string -> bool
   = "caml_sys_exit" "caml_natdynlink_existssym"
-  [@@noalloc]
+[@@noalloc]
 
 let pagesize = Externals.get_page_size ()
 
@@ -47,13 +47,14 @@ let set_protection ~mprotect ~name address size =
 let extract_text_section (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    (binary_section_map : a String.Map.t) =
+       and type Relocation.t = r) (binary_section_map : a String.Map.t) =
   let name = Jit_text_section.name in
   match String.Map.find_opt name binary_section_map with
   | None -> failwithf "No text section in generated assembler"
   | Some binary_section ->
-      let text = Jit_text_section.from_binary_section (module E) binary_section in
+      let text =
+        Jit_text_section.from_binary_section (module E) binary_section
+      in
       let binary_section_map = String.Map.remove name binary_section_map in
       (binary_section_map, text)
 
@@ -61,8 +62,7 @@ let extract_text_section (type a r)
 let alloc_all (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    jit_text_section
+       and type Relocation.t = r) jit_text_section
     (binary_section_map : a String.Map.t) =
   let text_size =
     round_to_pages (Jit_text_section.in_memory_size (module E) jit_text_section)
@@ -107,8 +107,7 @@ let local_symbol_map (type a r)
 let relocate_text (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    ~symbols text_section =
+       and type Relocation.t = r) ~symbols text_section =
   match Jit_text_section.relocate (module E) ~symbols text_section with
   | Ok text -> text
   | Error msgs ->
@@ -120,14 +119,14 @@ let relocate_text (type a r)
 let relocate_other (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    ~symbols addressed_sections =
+       and type Relocation.t = r) ~symbols addressed_sections =
   String.Map.iter addressed_sections
     ~f:(fun ~key:section_name ~data:binary_section ->
       match
-        Relocate.all (module E) ~symbols
-          ~got_lookup:None ~plt_lookup:None
-          ~section_name binary_section
+        Relocate.all
+          (module E)
+          ~symbols ~got_lookup:None ~plt_lookup:None ~section_name
+          binary_section
       with
       | Ok () -> ()
       | Error msgs ->
@@ -139,8 +138,7 @@ let relocate_other (type a r)
 let load_text (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    { address; value = text_section } =
+       and type Relocation.t = r) { address; value = text_section } =
   let size = Jit_text_section.in_memory_size (module E) text_section in
   let content = Jit_text_section.content (module E) text_section in
   Externals.load_section address content size;
@@ -151,8 +149,7 @@ let load_text (type a r)
 let load_sections (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    addressed_sections =
+       and type Relocation.t = r) addressed_sections =
   String.Map.iter addressed_sections
     ~f:(fun ~key:name ~data:{ address; value = binary_section } ->
       let size = E.Assembled_section.size binary_section in
@@ -166,7 +163,7 @@ let symbol_prefix () =
   | MacOS_like -> "_"
   | Linux | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin | FreeBSD | NetBSD
   | OpenBSD | Generic_BSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
-    ""
+      ""
 
 let entry_points ~phrase_name symbols =
   let separator = (* if Config.runtime5 then "." else *) "__" in
@@ -209,20 +206,24 @@ let jit_run entry_points =
       | Ok x -> Result x
       | Err s -> failwithf "Jit.run: %s" s)
 
-(** Load and run assembled binary sections.
-    This is the main generic JIT entry point that works with any architecture. *)
+(** Load and run assembled binary sections. This is the main generic JIT entry
+    point that works with any architecture. *)
 let jit_load (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r)
-    ~phrase_name
-    ~outcome_ref
+       and type Relocation.t = r) ~phrase_name ~outcome_ref
     (binary_section_map : a String.Map.t) =
   Debug.print_binary_section_map (module E) binary_section_map;
-  let other_sections, text = extract_text_section (module E) binary_section_map in
-  let addressed_text, addressed_sections = alloc_all (module E) text other_sections in
+  let other_sections, text =
+    extract_text_section (module E) binary_section_map
+  in
+  let addressed_text, addressed_sections =
+    alloc_all (module E) text other_sections
+  in
   let other_sections_symbols = local_symbol_map (module E) addressed_sections in
-  let text_section_symbols = Jit_text_section.symbols (module E) addressed_text in
+  let text_section_symbols =
+    Jit_text_section.symbols (module E) addressed_text
+  in
   let local_symbols =
     Symbols.strict_union other_sections_symbols text_section_symbols
   in
@@ -232,21 +233,26 @@ let jit_load (type a r)
   Globals.symbols := symbols;
   if !Globals.debug then (
     Printf.printf "\n=== JIT Sections ===\n";
-    String.Map.iter addressed_sections ~f:(fun ~key:name ~data:{address; value} ->
-      Printf.printf "Section %s at %Lx (size=%d)\n" name
-        (Address.to_int64 address) (E.Assembled_section.size value));
+    String.Map.iter addressed_sections
+      ~f:(fun ~key:name ~data:{ address; value } ->
+        Printf.printf "Section %s at %Lx (size=%d)\n" name
+          (Address.to_int64 address)
+          (E.Assembled_section.size value));
     Printf.printf "=== End JIT Sections ===\n\n";
     Printf.printf "=== JIT Symbols ===\n";
     Symbols.dprint local_symbols;
     Printf.printf "=== End JIT Symbols ===\n\n";
     Printf.printf "=== JIT Relocations ===\n";
-    String.Map.iter addressed_sections ~f:(fun ~key:name ~data:{address; value} ->
-      let relocs = E.Assembled_section.relocations value in
-      Printf.printf "Section %s at %Lx:\n" name (Address.to_int64 address);
-      List.iter (fun r ->
-        Printf.printf "  offset=%d sym=%s\n"
-          (E.Relocation.offset_from_section_beginning r)
-          (Symbols.target_to_string (E.Relocation.target_symbol r))) relocs);
+    String.Map.iter addressed_sections
+      ~f:(fun ~key:name ~data:{ address; value } ->
+        let relocs = E.Assembled_section.relocations value in
+        Printf.printf "Section %s at %Lx:\n" name (Address.to_int64 address);
+        List.iter
+          (fun r ->
+            Printf.printf "  offset=%d sym=%s\n"
+              (E.Relocation.offset_from_section_beginning r)
+              (Symbols.target_to_string (E.Relocation.target_symbol r)))
+          relocs);
     Printf.printf "=== End JIT Relocations ===\n\n%!");
   let relocated_text = relocate_text (module E) ~symbols addressed_text in
   relocate_other (module E) ~symbols addressed_sections;
@@ -260,7 +266,7 @@ let jit_load (type a r)
 
 (* JIT callback that handles architecture-agnostic packed sections *)
 let jit_callback ~phrase_name ~outcome_ref packed =
-  let Jit_backend.Packed { emitter; sections } = packed in
+  let (Jit_backend.Packed { emitter; sections }) = packed in
   (* Convert String_map to our String.Map *)
   let binary_section_map =
     Jit_backend.String_map.fold
@@ -308,11 +314,17 @@ let jit_load_program ~phrase_name ppf program =
   Jit_backend.register (jit_callback ~phrase_name ~outcome_ref:outcome_global);
   match jit_load_lambda ~phrase_name ppf program with
   | result ->
-    Jit_backend.unregister ();
-    result
+      Jit_backend.unregister ();
+      result
   | exception exn ->
-    Jit_backend.unregister ();
-    raise exn
+      Jit_backend.unregister ();
+      raise exn
+
+let jit_load_program_top ~phrase_name ppf program :
+    Opttoploop.evaluation_outcome =
+  match jit_load_program ~phrase_name ppf program with
+  | Result obj -> Result obj
+  | Exception exn -> Exception exn
 
 let jit_lookup_symbol symbol =
   (* Try with symbol prefix first (e.g., "_" on macOS) *)
@@ -320,8 +332,16 @@ let jit_lookup_symbol symbol =
   match Symbols.find !Globals.symbols prefixed_symbol with
   | Some x -> Some (Address.to_obj x)
   | None -> (
-    (* Fall back to unprefixed symbol (for external/runtime symbols) *)
-    match Symbols.find !Globals.symbols symbol with
-    | Some x -> Some (Address.to_obj x)
-    | None -> (
-        match ndl_loadsym symbol with exception _ -> None | obj -> Some obj))
+      (* Fall back to unprefixed symbol (for external/runtime symbols) *)
+      match Symbols.find !Globals.symbols symbol with
+      | Some x -> Some (Address.to_obj x)
+      | None -> (
+          match ndl_loadsym symbol with exception _ -> None | obj -> Some obj))
+
+let init_top () =
+  set_debug ();
+  Opttoploop.register_jit
+    {
+      Opttoploop.Jit.load = jit_load_program_top;
+      lookup_symbol = jit_lookup_symbol;
+    }

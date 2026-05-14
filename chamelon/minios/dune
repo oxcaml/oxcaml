@@ -1,0 +1,11 @@
+(library
+ (name minios)
+ ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
+ ; to be built against the system compiler, which won't work.
+ (flags (:standard -I +unix))
+ (enabled_if (= %{context_name} "default")))
+
+(library
+ (name minios)
+ (libraries unix)
+ (enabled_if (= %{context_name} "main")))

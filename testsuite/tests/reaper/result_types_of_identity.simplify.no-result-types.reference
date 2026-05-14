@@ -1,0 +1,36 @@
+let $camlResult_types_of_identity__immstring16 =
+  "result_types_of_identity.ml"
+in
+let $camlResult_types_of_identity__const_block18 =
+  Block 0 ($camlResult_types_of_identity__immstring16, 30, 2)
+in
+let $camlResult_types_of_identity__Pmakeblock21 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlResult_types_of_identity__const_block18)
+in
+let code always_0_0 deleted in
+let code loopify(never) size(16) newer_version_of(always_0_0)
+      always_0_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(hidden_identity_0) inlined(never)
+    ($Hidden_identity.camlHidden_identity__hidden_identity_1
+     : _ -> imm tagged)
+      (0)
+      -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      let prim = %phys_eq (apply_result, 0) in
+      switch prim
+        | 0 -> k1
+                 pop(regular k1)
+                 ($camlResult_types_of_identity__Pmakeblock21)
+        | 1 -> k (0)
+in
+let $camlResult_types_of_identity__always_0_1 =
+  closure always_0_0_1 @always_0
+in
+let $camlResult_types_of_identity =
+  Block 0 ($camlResult_types_of_identity__always_0_1)
+in
+cont done ($camlResult_types_of_identity)

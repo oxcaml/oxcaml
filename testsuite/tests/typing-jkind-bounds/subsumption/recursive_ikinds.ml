@@ -1,0 +1,239 @@
+(* TEST
+    flags = "-extension layouts_alpha -ikinds";
+    expect;
+*)
+
+type 'a my_list : immutable_data with 'a = Nil | Cons of 'a * 'a my_list
+[%%expect {|
+type 'a my_list = Nil | Cons of 'a * 'a my_list
+|}]
+
+type 'a my_list : immutable_data with 'a = 'a list = [] | ( :: ) of 'a * 'a my_list
+[%%expect {|
+type 'a my_list = 'a list = [] | (::) of 'a * 'a my_list
+|}]
+
+type 'a my_list : immutable_data with 'a = Nil | Cons of 'a * 'a foo
+and 'a foo = 'a my_list
+[%%expect {|
+type 'a my_list = Nil | Cons of 'a * 'a foo
+and 'a foo = 'a my_list
+|}]
+
+type 'a my_list : immutable_data with 'a =
+  | Nil
+  | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list
+[%%expect {|
+type 'a my_list =
+    Nil
+  | Cons of 'a *
+      'a my_list my_list my_list my_list my_list my_list my_list my_list
+      my_list my_list my_list my_list
+|}]
+
+type 'a mutable_list : mutable_data with 'a = Nil | Cons of 'a ref * 'a mutable_list
+[%%expect {|
+type 'a mutable_list = Nil | Cons of 'a ref * 'a mutable_list
+|}]
+
+type 'a mutable_list : mutable_data with 'a = Nil | Cons of { mutable hd : 'a; tl : 'a mutable_list }
+[%%expect {|
+type 'a mutable_list =
+    Nil
+  | Cons of { mutable hd : 'a; tl : 'a mutable_list; }
+|}]
+
+type ('a : immutable_data) immutable_list : immutable_data = Nil | Cons of 'a * 'a immutable_list
+[%%expect {|
+type ('a : immutable_data) immutable_list =
+    Nil
+  | Cons of 'a * 'a immutable_list
+|}]
+
+(* CR layouts v2.8: this should be accepted. Internal ticket 4770. *)
+(* CR layouts v2.8: this error message is bad. Internal ticket 4770. *)
+type 'a degenerate : immutable_data with 'a = Leaf of 'a | Branch of ('a * 'a) degenerate
+[%%expect {|
+type 'a degenerate = Leaf of 'a | Branch of ('a * 'a) degenerate
+|}]
+
+type ('a, 'b) zipped_list : immutable_data with 'a with 'b = Nil | Cons of 'a * 'b * ('a, 'b) zipped_list
+[%%expect {|
+type ('a, 'b) zipped_list = Nil | Cons of 'a * 'b * ('a, 'b) zipped_list
+|}]
+
+module rec My_list : sig
+  type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
+end = My_list
+(* CR layouts v2.8: fix this. Internal ticket 5127 *)
+[%%expect {|
+Line 2, characters 43-70:
+2 |   type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Constructor argument types must have a representable layout.
+       The layout of 'a My_list.t is any
+         because the compiler failed to deduce its exact kind
+         due to with-bound checking limitations.
+       But the layout of 'a My_list.t must be representable
+         because it's the type of a constructor field.
+|}]
+
+module rec My_list : sig
+  type 'a t = Nil | Cons of 'a * 'a My_list.t
+end = My_list
+module My_list = struct
+  type 'a t : immutable_data with 'a = 'a My_list.t
+end
+[%%expect {|
+module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a My_list.t end
+module My_list : sig type 'a t = 'a My_list.t end
+|}]
+
+type my_int_list : immutable_data = Nil | Cons of int * my_int_list
+type my_int_list2 = Nil | Cons of int * my_int_list2
+[%%expect {|
+type my_int_list = Nil | Cons of int * my_int_list
+type my_int_list2 = Nil | Cons of int * my_int_list2
+|}]
+
+module rec My_int_list : sig
+  type t = Nil | Cons of int * My_int_list.t
+end = My_int_list
+[%%expect {|
+module rec My_int_list : sig type t = Nil | Cons of int * My_int_list.t end
+|}]
+
+module rec My_int_list : sig
+  type t : immutable_data = Nil | Cons of int * My_int_list.t
+end = My_int_list
+[%%expect {|
+module rec My_int_list : sig type t = Nil | Cons of int * My_int_list.t end
+|}]
+
+module rec My_list : sig
+  type 'a t = Nil | Cons of 'a * 'a Foo.t
+end = My_list
+
+and Foo : sig
+  type 'a t = 'a My_list.t
+end = Foo
+
+module My_list = struct
+  type 'a t : immutable_data with 'a = 'a My_list.t
+end
+
+module Foo = struct
+  type 'a t : immutable_data with 'a = 'a Foo.t
+end
+[%%expect {|
+module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a Foo.t end
+and Foo : sig type 'a t = 'a My_list.t end
+module My_list : sig type 'a t = 'a My_list.t end
+module Foo : sig type 'a t = 'a Foo.t end
+|}]
+
+type 'a my_list : immutable_data with 'a = Nil | Cons of 'a * 'a foo
+and 'a foo = 'a my_list
+[%%expect {|
+type 'a my_list = Nil | Cons of 'a * 'a foo
+and 'a foo = 'a my_list
+|}]
+
+(* This test was failing at one point due to insufficient fuel and an unnecessary
+   subsumption check when there is both a manifest and a kind. *)
+type info
+
+module Types = struct
+   module rec Ivar : sig
+     type 'a t
+   end =
+     Ivar
+
+   and Forwarding : sig
+     type t =
+       | Parent of Monitor.t
+   end =
+     Forwarding
+
+   and Monitor : sig
+     type t =
+       { name : info
+       ; mutable next_error : exn Ivar.t
+       ; mutable tails_for_all_errors : exn Tail.t
+       ; mutable forwarding : Forwarding.t
+       }
+   end =
+     Monitor
+
+   and Tail : sig
+     type 'a t = {  next : 'a Ivar.t }
+   end =
+     Tail
+
+   type 'a ivar
+   and forwarding = | Parent of monitor
+   and 'a tail = { next : 'a ivar }
+   and monitor = { name : info
+   ; mutable next_error : exn ivar
+   ; mutable tails_for_all_errors : exn tail
+   ; mutable forwarding : forwarding
+   }
+end
+
+type t =
+  { name : info
+  ; mutable next_error : exn Types.Ivar.t
+  ; mutable tails_for_all_errors : exn Types.Tail.t
+  ; mutable forwarding : Types.Forwarding.t
+  }
+[%%expect {|
+type info
+module Types :
+  sig
+    module rec Ivar : sig type 'a t end
+    and Forwarding : sig type t = Parent of Monitor.t end
+    and Monitor :
+      sig
+        type t = {
+          name : info;
+          mutable next_error : exn Ivar.t;
+          mutable tails_for_all_errors : exn Tail.t;
+          mutable forwarding : Forwarding.t;
+        }
+      end
+    and Tail : sig type 'a t = { next : 'a Ivar.t; } end
+    type 'a ivar
+    and forwarding = Parent of monitor
+    and 'a tail = { next : 'a ivar; }
+    and monitor = {
+      name : info;
+      mutable next_error : exn ivar;
+      mutable tails_for_all_errors : exn tail;
+      mutable forwarding : forwarding;
+    }
+  end
+type t = {
+  name : info;
+  mutable next_error : exn Types.Ivar.t;
+  mutable tails_for_all_errors : exn Types.Tail.t;
+  mutable forwarding : Types.Forwarding.t;
+}
+|}]
+
+type 'a t : immutable_data = Leaf | Node of int * 'a t
+[%%expect {|
+type 'a t = Leaf | Node of int * 'a t
+|}]
+
+type 'a mutable_list : mutable_data  = Nil | Cons of int ref * 'a mutable_list
+[%%expect {|
+type 'a mutable_list = Nil | Cons of int ref * 'a mutable_list
+|}]
+
+type t1
+type 'a t2 : immutable_data with 'a with t1 = Leaf of 'a | Node of 'a * t1 t2
+(* CR layouts v2.8: this should be accepted. Internal ticket 4770 *)
+[%%expect {|
+type t1
+type 'a t2 = Leaf of 'a | Node of 'a * t1 t2
+|}]

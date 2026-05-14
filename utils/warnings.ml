@@ -35,8 +35,6 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
-  | Immediate_erasure of string (* example: annotation in
-      [type ('a : immediate) t = int] can't be erased. *)
   | Non_value_sort of string (* example: abstract type
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
@@ -47,6 +45,7 @@ type upstream_compat_warning =
   | Separability_check
       (* example: [type packed = | Mk of 'a t [@@unboxed]]
          where ['a t : value mod non_float]. *)
+  | Unpacked_attribute
 
 type name_out_of_scope_warning =
   | Name of string
@@ -136,6 +135,10 @@ type t =
   | Generative_application_expects_unit     (* 73 *)
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
+  (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Redundant_kind_modifier of string       (* 183 *)
+  | Ignored_kind_modifier of string * string list (* 184 *)
+  | Overridden_kind_modifier of string      (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -154,6 +157,8 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
+  | Useless_lpoly                           (* 217 *)
+  | Lpoly_in_letrec                         (* 218 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -235,6 +240,9 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Redundant_kind_modifier _ -> 183
+  | Ignored_kind_modifier _ -> 184
+  | Overridden_kind_modifier _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Degraded_to_partial_match -> 74
@@ -250,6 +258,8 @@ let number = function
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
+  | Useless_lpoly -> 217
+  | Lpoly_in_letrec -> 218
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -605,6 +615,24 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
+  { number = 183;
+    names = ["redundant-kind-modifier"];
+    (* CR layouts-scannable: As more axes are added, this description (and
+       the following description) should be updated in tandem. *)
+    description = "A nullability or separability axis annotation appears on \
+                   a kind that already implies the annotation.";
+    since = since 5 2 };
+  { number = 184;
+    names = ["ignored-kind-modifier"];
+    (* CR layouts-scannable: As more axes are added, this description (and
+       the following description) should be updated in tandem. *)
+    description = "A nullability or separability axis annotation appears on \
+                   a non-value, non-any layout.";
+    since = since 5 2 };
+  { number = 185;
+    names = ["overridden-kind-modifier"];
+    description = "A kind modifier is present but overridden later.";
+    since = since 5 2 };
   { number = 186;
     names = ["unmutated-mutable"];
     description =
@@ -993,7 +1021,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..185"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1377,6 +1405,17 @@ let message = function
          typically@ occurs@ due@ to@ complex@ matches@ on@ mutable@ fields.@ %a"
         Style.inline_code "Match_failure"
         Misc.print_see_manual ref_manual
+  | Redundant_kind_modifier abbrev ->
+      msg "This kind modifier is already implied by the kind %a."
+        Style.inline_code abbrev
+  | Ignored_kind_modifier (abbrev, modifiers) ->
+      msg "The kind modifier(s) %a have no effect on the kind %a."
+        Style.inline_code (String.concat " " modifiers) Style.inline_code abbrev
+  | Overridden_kind_modifier overridden_by ->
+      msg "This kind modifier is overridden by %a later."
+        Style.inline_code overridden_by
+  | Incompatible_with_upstream Unpacked_attribute ->
+      msg "[@@unpacked] is not supported by upstream OCaml."
   | Unnecessarily_partial_tuple_pattern ->
       msg
         "This tuple pattern@ unnecessarily@ ends in %a,@ as@ it@ explicitly@ \
@@ -1384,9 +1423,6 @@ let message = function
         Style.inline_code ".."
   | Unmutated_mutable v ->
       msg "mutable variable %a was never mutated." Style.inline_code v
-  | Incompatible_with_upstream (Immediate_erasure id) ->
-      msg "Usage of layout immediate/immediate64 in %s@ \
-           can't be erased for compatibility with upstream OCaml." id
   | Incompatible_with_upstream (Non_value_sort layout) ->
       msg "External declaration here is not upstream compatible.@ \
            @[The only types with non-value layouts allowed are@ \
@@ -1445,6 +1481,12 @@ let message = function
         Style.inline_code (Printf.sprintf "[@%s]" implying)
   | Use_during_borrowing ->
       msg "This value is used while being borrowed."
+  | Useless_lpoly ->
+      msg "This binding has no layout variables, so poly_ has no effect. \
+           Consider using a regular let instead."
+  | Lpoly_in_letrec ->
+      msg "poly_ has no effect in recursive bindings, which do not support \
+           layout polymorphism. Consider using a regular let rec instead."
 ;;
 
 let nerrors = ref 0

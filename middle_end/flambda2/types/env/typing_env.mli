@@ -146,6 +146,8 @@ val find_params : t -> Bound_parameters.t -> Type_grammar.t list
 
 val variable_is_from_missing_cmx_file : t -> Name.t -> bool
 
+val variable_definitely_not_in_scope : t -> Variable.t -> bool
+
 val mem : ?min_name_mode:Name_mode.t -> t -> Name.t -> bool
 
 val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool

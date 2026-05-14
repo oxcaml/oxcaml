@@ -1270,8 +1270,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             loc_res;
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
-          SU.insert env sub_cfg (Op (Stackoffset (-stack_ofs))) [||] [||];
-          insert_return env sub_cfg (Ok loc_res) (SU.pop_all_traps env))
+          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | Terminator (Call { op = Direct func; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
@@ -1299,8 +1299,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg term dbg loc_arg loc_res;
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
-          SU.insert env sub_cfg (Op (Stackoffset (-stack_ofs))) [||] [||];
-          insert_return env sub_cfg (Ok loc_res) (SU.pop_all_traps env))
+          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif

@@ -330,13 +330,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as of string (* can't print *)
 
     let print_sort : Jkind.Sort.Const.t -> _ = function
-      | Base Value -> Print_as_value
+      | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
+      | Genvar _ -> Print_as "<genvar>"
 
     let outval_of_value max_steps max_depth check_depth env obj ty =
 
@@ -457,8 +458,25 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               tree_of_polyvariant depth obj row
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
-          | Tquote _ | Tsplice _ | Tof_kind _ ->
+          | Tquote _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                  fatal_error "Ill-staged value of quote type"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tsplice _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                fatal_error "Ill-staged value of splice type"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tquote_eval _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                Oval_stuff "<eval>"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
@@ -654,10 +672,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         |> analyse
       with
       | Datarepr.Constr_not_found | Not_found ->
-        (* If a [Variant_with_null] is not a [Null],
-            it's guaranteed to be [This value]. *)
         match rep with
-        | Variant_with_null -> analyse (List.nth constr_list 1)
+        | Variant_with_null ->
+          (match
+             Datarepr.find_variant_with_null_payload constr_list
+           with
+           | Some { payload_cstr; _ } -> analyse payload_cstr
+           | None -> Oval_stuff "<unknown constructor>")
         | _ -> Oval_stuff "<unknown constructor>"
 
       and tree_of_record depth path type_params ty_list obj lbl_list rep =
@@ -723,7 +744,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   | Outval_record_mixed_block shape ->
                       let fld =
                         match shape.(pos) with
-                        | Value -> `Continue (O.field obj pos)
+                        | Scannable -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate

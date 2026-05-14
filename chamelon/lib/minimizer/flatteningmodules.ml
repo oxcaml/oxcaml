@@ -130,6 +130,15 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
       | O (Tpat_lazy pat) -> Tpat_lazy (replace_in_pat mod_name pat)
       | O (Tpat_variant (lab, Some p, t)) ->
         Tpat_variant (lab, Some (replace_in_pat mod_name p), t)
+      | O (Tpat_fun_layout { id; name; uid; sort; mode; lpoly }) ->
+        Tpat_fun_layout
+          { id = create_local (mod_name ^ "_" ^ Ident.name id);
+            name = { name with txt = mod_name ^ "_" ^ name.txt };
+            uid;
+            sort;
+            mode;
+            lpoly
+          }
       | O (Tpat_value _)
       (* p) -> as_computation_pattern (replace_in_pat mod_name p) *)
       | O

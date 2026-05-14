@@ -43,6 +43,12 @@ module Acc : sig
       continuation handler. *)
   val exit_continuation : Continuation.t -> t -> t
 
+  (** Record that the current expression defines some lifted constants; this is
+      not liked to the current continuation. Note: this should only be called at
+      top-level, where the constants will be placed, and not from the fonction
+      where the constants come from. *)
+  val record_lifted_constants : Lifted_constant_state.t -> t -> t
+
   (** That variable is defined in the current handler *)
   val record_defined_var : Variable.t -> t -> t
 

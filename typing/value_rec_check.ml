@@ -146,6 +146,7 @@ let classify_expression : Typedtree.expression -> sd =
   *)
   let rec classify_expression env e : sd =
     match e.exp_desc with
+    | Texp_apply_layout (exp, _) -> classify_expression env exp
     (* binding and variable cases *)
     | Texp_let (rec_flag, vb, e) ->
         let env = classify_value_bindings rec_flag env vb in
@@ -162,7 +163,7 @@ let classify_expression : Typedtree.expression -> sd =
         let size = classify_module_expression env mexp in
         let env = Ident.add mid size env in
         classify_expression env e
-    | Texp_ident (path, _, _, _, _, _) ->
+    | Texp_ident { path; _ } ->
         classify_path env path
 
     (* non-binding cases *)
@@ -230,7 +231,7 @@ let classify_expression : Typedtree.expression -> sd =
         (* CR vlaviron: Dynamic would probably be a better choice *)
         Static
 
-    | Texp_apply ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)},
+    | Texp_apply ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
         _, _, _, _)
       when is_ref vd ->
         Static
@@ -264,9 +265,6 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-    | Texp_eval _ ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      Static
 
     | Texp_new _
     | Texp_instvar _
@@ -302,7 +300,7 @@ let classify_expression : Typedtree.expression -> sd =
     let old_env = env in
     let add_value_binding env vb =
       match vb.vb_pat.pat_desc with
-      | Tpat_var (id, _loc, _uid, _sort, _mode) ->
+      | Tpat_var { id; _ } ->
           let size = classify_expression old_env vb.vb_expr in
           Ident.add id size env
       | _ ->
@@ -649,7 +647,8 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
 *)
 let rec expression : Typedtree.expression -> term_judg =
   fun exp -> match exp.exp_desc with
-    | Texp_ident (pth, _, _, _, _, _) ->
+    | Texp_apply_layout (exp, _) -> expression exp
+    | Texp_ident { path = pth; _ } ->
       path pth
     | Texp_let (rec_flag, bindings, body) ->
       (*
@@ -716,8 +715,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_mutvar id ->
         single id.txt << Dereference
     | Texp_apply
-        ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)}, [_, Arg (arg, _)],
-         _, _, _)
+        ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
+         [_, Arg (arg, _)], _, _, _)
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -765,14 +764,6 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
-        | Baccess_array
-            { mut = _
-            ; index_kind = _
-            ; index
-            ; base_ty = _
-            ; elt_ty = _
-            ; elt_sort = _ } ->
-          expression index << Dereference
         | Baccess_block (_, idx) ->
           expression idx << Dereference
       in
@@ -802,7 +793,7 @@ let rec expression : Typedtree.expression -> term_judg =
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
-                 | Value | Float_boxed -> Guard
+                 | Scannable | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
                  | Void | Product _ ->
@@ -830,7 +821,7 @@ let rec expression : Typedtree.expression -> term_judg =
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
             (match mixed_shape.(i) with
-             | Value | Float_boxed -> Guard
+             | Scannable | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
              | Void | Product _ ->
@@ -1113,9 +1104,6 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_antiquotation e ->
         expression e << Dereference
-    | Texp_eval _ ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      empty
 
 (* Function bodies.
     G |-{body} b : m
@@ -1542,8 +1530,9 @@ and pattern : type k . k general_pattern -> Env.t -> mode = fun pat env ->
 and is_destructuring_pattern : type k . k general_pattern -> bool =
   fun pat -> match pat.pat_desc with
     | Tpat_any -> false
-    | Tpat_var (_, _, _, _, _) -> false
-    | Tpat_alias (pat, _, _, _, _, _, _) -> is_destructuring_pattern pat
+    | Tpat_var _ -> false
+    | Tpat_fun_layout _ -> false
+    | Tpat_alias { pattern = pat; _ } -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
     | Tpat_unboxed_unit -> true
     | Tpat_unboxed_bool _ -> true

@@ -15,6 +15,8 @@
 
 (* Environment handling *)
 
+module StdlibMap = Map
+
 open Cmi_format
 open Misc
 open Asttypes
@@ -136,6 +138,27 @@ let used_labels : label_usage usage_tbl ref =
 (** Map indexed by the name of module components. *)
 module NameMap = String.Map
 
+(** Runtime metaprogramming stage. Computed as the difference between the
+    number of surrounding quotes minus the number of surrounding splices. *)
+type stage = int
+
+(** Occurence of a path at a specific stage.
+    Used for local constraints, as they are only valid at a fixed stage. *)
+module StagedPath = struct
+  type t = { stage : stage; path : Path.t }
+
+  module T = struct
+    type nonrec t = t
+    let compare { stage; path } { stage = stage'; path = path' } =
+      match Int.compare stage stage' with
+      | 0 -> Path.compare path path'
+      | x -> x
+  end
+
+  module Map = StdlibMap.Make(T)
+end
+
+
 type value_unbound_reason =
   | Val_unbound_instance_variable
   | Val_unbound_self
@@ -181,7 +204,7 @@ type summary =
   | Env_cltype of summary * Ident.t * class_type_declaration
   | Env_open of summary * Path.t
   | Env_functor_arg of summary * Ident.t
-  | Env_constraints of summary * type_declaration Path.Map.t
+  | Env_constraints of summary * type_declaration StagedPath.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
@@ -638,7 +661,6 @@ type type_descr_kind =
 type type_descriptions = type_descr_kind
 
 let in_signature_flag = 0x01
-type stage = int
 
 type t = {
   values: (lock_or_stage, value_entry, value_data) IdTbl.t;
@@ -654,10 +676,11 @@ type t = {
   functor_args: unit Ident.tbl;
   jkinds : (empty, jkind_data, jkind_data) IdTbl.t;
   summary: summary;
-  local_constraints: type_declaration Path.Map.t;
+  local_constraints: type_declaration StagedPath.Map.t;
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
+  toplevel_scope: int
 }
 
 and module_components =
@@ -814,6 +837,10 @@ type no_open_quotations_context =
   | Open_qt
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
+  | Jkind_annotation_qt
+  | Layout_polymorphism_qt
+  | Tconst_pat_qt of Longident.t
+  | Class_type_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -955,13 +982,16 @@ let empty = {
   types = IdTbl.empty;
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
-  summary = Env_empty; local_constraints = Path.Map.empty;
+  summary = Env_empty; local_constraints = StagedPath.Map.empty;
   implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
   jkinds = IdTbl.empty;
   stage = 0;
+  toplevel_scope = Ident.lowest_scope
  }
+
+let path_at_current_stage env path = { StagedPath.stage = env.stage; path }
 
 let in_signature b env =
   let flags =
@@ -973,7 +1003,7 @@ let in_signature b env =
 let is_in_signature env = env.flags land in_signature_flag <> 0
 
 let has_local_constraints env =
-  not (Path.Map.is_empty env.local_constraints)
+  not (StagedPath.Map.is_empty env.local_constraints)
 
 let is_ext cda =
   match cda.cda_description with
@@ -1276,11 +1306,12 @@ let parameters () = Persistent_env.parameters !persistent_env
 let read_pers_mod modname cmi =
   Persistent_env.read !persistent_env modname cmi
 
-let find_pers_mod name ~allow_excess_args =
-  Persistent_env.find !persistent_env read_sign_of_cmi name ~allow_excess_args
+let find_pers_mod ~allow_hidden name ~allow_excess_args =
+  Persistent_env.find ~allow_hidden !persistent_env read_sign_of_cmi name
+    ~allow_excess_args
 
-let check_pers_mod ~loc name =
-  Persistent_env.check !persistent_env read_sign_of_cmi ~loc name
+let check_pers_mod ~allow_hidden ~loc name =
+  Persistent_env.check ~allow_hidden !persistent_env read_sign_of_cmi ~loc name
 
 let crc_of_unit name =
   Persistent_env.crc_of_unit !persistent_env name
@@ -1519,7 +1550,9 @@ let step_find_unboxed_version decl =
         | _ -> Lacks_unboxed_version
 
 let rec find_type_data path env seen =
-  match Path.Map.find path env.local_constraints with
+  match
+    StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
+  with
   | decl ->
     {
       tda_declaration = decl;
@@ -1584,6 +1617,9 @@ and find_type_unboxed_version path env seen =
       type_arity = decl.type_arity;
       type_kind = decl.type_kind;
       type_jkind = jkind;
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf "env unboxed alias path=%a" Path.print path);
       type_private = decl.type_private;
       type_manifest = Some man;
       type_variance = decl.type_variance;
@@ -2248,7 +2284,7 @@ let module_declaration_address env id presence md =
       let open Subst.Lazy in
       match md.md_type with
       | Mty_alias path -> Lazy_backtrack.create (ModAlias {env; path})
-      | _ -> assert false
+      | _ -> Misc.fatal_error "Env.module_declaration_address"
     end
   | Mp_present ->
       Lazy_backtrack.create_forced (Alocal id)
@@ -2919,9 +2955,10 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
 let add_module ?arg ?shape id presence mty ?mode env =
   add_module_declaration ~check:false ?arg ?shape id presence (md mty) ?mode env
 
-let add_local_constraint path info env =
+let add_local_constraint ~stage path info env =
   { env with
-    local_constraints = Path.Map.add path info env.local_constraints }
+    local_constraints =
+      StagedPath.Map.add { stage; path } info env.local_constraints }
 
 let add_implicit_jkind ~loc name jkind env =
   match String.Map.find_opt name env.implicit_jkinds with
@@ -2970,6 +3007,12 @@ let enter_modtype ~scope name mtd env =
   let id = Ident.create_scoped ~scope name in
   let shape = Shape.leaf mtd.mtd_uid in
   let env = store_modtype id (Subst.Lazy.of_modtype_decl mtd) shape env in
+  (id, env)
+
+let enter_jkind ~scope name decl env =
+  let id = Ident.create_scoped ~scope name in
+  let shape = Shape.leaf decl.jkind_uid in
+  let env = store_jkind ~check:false id decl shape env in
   (id, env)
 
 let enter_class ~scope name desc env =
@@ -3032,6 +3075,13 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
+let enter_future env =
+  (* Reuse a very large number *)
+  { env with stage = Ident.highest_scope }
+
+let mark_toplevel_in_quotations ~scope env =
+  { env with toplevel_scope = scope }
+
 let check_no_open_quotations loc env context =
   if env.stage = 0
   then ()
@@ -3045,8 +3095,7 @@ let stage_locks_offset locks =
        match lock with
        | Quotation_lock -> rel_stage + 1
        | Splice_lock -> rel_stage - 1)
-    locks
-    0
+    locks 0
 
 (* Insertion of all components of a signature *)
 
@@ -3213,7 +3262,10 @@ let save_signature_with_transform cmi_transform ~alerts sg modname kind
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
-    Persistent_env.Persistent_signature.{ filename; cmi; visibility = Visible }
+    Persistent_env.Persistent_signature.{
+      filename; cmi;
+      visibility = Visible { cmx_guaranteed = false }
+    }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
   cmi
@@ -3225,7 +3277,7 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
-(* Make the initial environment, without language extensions *)
+(* Make the initial environment. *)
 let initial () =
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
     match !Clflags.shape_format with
@@ -3261,7 +3313,8 @@ let add_language_extension_types env =
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
     |> add Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
+    |> add Layouts Stable Predef.add_or_null
+    |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
@@ -3377,13 +3430,11 @@ let may_lookup_error report_errors loc env err =
   if report_errors then lookup_error loc env err
   else raise Not_found
 
-let rec path_head_is_global_or_predef = function
-    Pident id -> Ident.is_global_or_predef id
-  | Pdot(p, _) | Pextra_ty (p, _) -> path_head_is_global_or_predef p
-  | Papply _ -> false
+let path_is_toplevel_in_quotations env path =
+  Path.scope path <= env.toplevel_scope
 
-let does_not_cross_quotation path locks =
-  if path_head_is_global_or_predef path
+let does_not_cross_quotation env path locks =
+  if path_is_toplevel_in_quotations env path
   then Ok ()
   else
     (match stage_locks_offset locks with
@@ -3392,14 +3443,14 @@ let does_not_cross_quotation path locks =
 
 let check_cross_quotation ~errors ~loc_use ~loc_def env path lid
       locks =
-  match does_not_cross_quotation path locks with
+  match does_not_cross_quotation env path locks with
   | Ok () -> ()
   | Error n ->
     may_lookup_error errors loc_use env
       (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
-let assert_does_not_cross_quotation ~loc_use ~loc_def path locks =
-  match does_not_cross_quotation path locks with
+let assert_does_not_cross_quotation ~loc_use ~loc_def env path locks =
+  match does_not_cross_quotation env path locks with
   | Ok () -> ()
   | Error _ ->
       Misc.fatal_errorf_doc
@@ -3777,7 +3828,7 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
   let lbls_filtered =
     List.filter_map
       (fun (path, lbl, (locks, use_fn)) ->
-         does_not_cross_quotation path locks
+         does_not_cross_quotation env path locks
          |> Result.map (fun () -> (path, lbl, use_fn))
          |> Result.to_option)
       lbls
@@ -3810,7 +3861,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
     List.filter_map
       (fun (path, cda, (locks, use_fn)) ->
          let stage_locks, locks = partition_locks locks in
-         does_not_cross_quotation path stage_locks
+         does_not_cross_quotation env path stage_locks
          |> Result.map (fun () -> (path, cda, (locks, use_fn)))
          |> Result.to_option)
       cstrs
@@ -4279,7 +4330,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       path, mda.mda_declaration.md_loc
   in
   let stage_locks, locks = partition_locks locks in
-  assert_does_not_cross_quotation ~loc_use:loc ~loc_def path stage_locks;
+  assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
   path, locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
@@ -4823,7 +4874,7 @@ let filter_non_loaded_persistent f env =
 (* Return the environment summary *)
 
 let summary env =
-  if Path.Map.is_empty env.local_constraints then env.summary
+  if StagedPath.Map.is_empty env.local_constraints then env.summary
   else Env_constraints (env.summary, env.local_constraints)
 
 let last_env = s_ref empty
@@ -4855,8 +4906,8 @@ let env_of_only_summary env_from_summary env =
 
 (* Forward declartions that must refer to type t *)
 let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
+  ref ((fun ~offender:_ _ _ _ -> assert false)
+       : offender:(Format_doc.formatter -> unit) -> t ->
          Format_doc.formatter -> Jkind.Violation.t -> unit)
 
 (* Error report *)
@@ -4967,6 +5018,15 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
       fprintf ppf "Adding attributes on tags in polymorphic variant types"
+  | Jkind_annotation_qt ->
+      fprintf ppf "Annotating types with kinds"
+  | Layout_polymorphism_qt ->
+      fprintf ppf "Layout polymorphism"
+  | Tconst_pat_qt tconst ->
+      fprintf ppf "Adding type constraint patterns (here #%s)"
+        (Format.asprintf "%a" Pprintast.longident tconst)
+  | Class_type_qt ->
+      fprintf ppf "Using class type annotations"
 
 let print_unbound_in_quotation ppf =
   function
@@ -5213,7 +5273,7 @@ let report_lookup_error_doc loc env = function
         quoted_longident lid
         (fun ppf v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
-           ~level:Btype.generic_level env ppf v)
+           env ppf v)
         err
   | No_unboxed_version (lid, decl) ->
       let sub =

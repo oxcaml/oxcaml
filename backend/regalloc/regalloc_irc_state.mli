@@ -32,6 +32,8 @@ val degree : t -> Reg.t -> int
 
 val set_degree : t -> Reg.t -> int -> unit
 
+val get_max_degree : t -> int
+
 val is_precolored : t -> Reg.t -> bool
 
 val is_precolored_or_colored : t -> Reg.t -> bool

@@ -117,6 +117,16 @@ val module_declaration: scoping -> t -> module_declaration -> module_declaration
      apply (compose s1 s2) x = apply s2 (apply s1 x) **)
 val compose: t -> t -> t
 
+module Ikind_substitution : sig
+  type lookup_result =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of type_expr list * type_expr
+
+  val substitute_decl_ikind_with_lookup :
+    (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
+end
+
 module Unsafe: sig
 
   type t = unsafe subst
@@ -134,6 +144,9 @@ module Unsafe: sig
   val add_type_function:
     Path.t -> params:type_expr list -> body:type_expr -> t -> t
   val add_module_path: Path.t -> Path.t -> t -> t
+
+  val add_jkind_path: Path.t -> Path.t -> t -> t
+  val add_jkind : Path.t -> jkind_const_desc_lr -> t -> t
 
   type error =
     | Fcm_type_substituted_away of Path.t * Types.module_type
@@ -182,4 +195,5 @@ module Lazy : sig
   val force_functor_parameter : functor_parameter -> Types.functor_parameter
   val force_value_description : value_description -> Types.value_description
   val force_type_expr : type_expr wrapped -> type_expr
+  val force_lpoly : Types.Lpoly.t wrapped -> Types.Lpoly.t
 end

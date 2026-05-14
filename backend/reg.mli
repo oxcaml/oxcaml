@@ -61,7 +61,7 @@ type t = private
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Regs.Phys_reg.t
   | Stack of stack_location
 
 and stack_location =
@@ -197,7 +197,7 @@ module For_testing : sig
 end
 
 module For_printing : sig
-  (** The result of [create] will not be aded to the internal lists of
+  (** The result of [create] will not be added to the internal lists of
       registers, and therefore should not be kept around after printing. *)
   val create :
     name:Name.t ->

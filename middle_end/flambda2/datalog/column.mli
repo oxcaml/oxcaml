@@ -31,6 +31,8 @@ open Heterogenous_list
 
 type ('t, 'k, 'v) id
 
+val singleton : ('t, 'k, 'v) id -> 'k -> 'v -> 't
+
 type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist

@@ -1,0 +1,27 @@
+let $camlN_way_join_null__first_const = Block 0 () in
+(let code size(17)
+       main_0 (x)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   (let prim = %is_null (x) in
+    let Pisnull = %tag_imm (prim) in
+    (let untagged = %untag_imm (Pisnull) in
+     switch untagged
+       | 0 -> k4
+       | 1 -> k5)
+      where k5 =
+        cont k3 (1)
+      where k4 =
+        cont k3 (0))
+     where k3 (y) =
+       cont k1 (y)
+ in
+ let main = closure main_0 @main in
+ let Pmakeblock = %block.[`0`] (main) in
+ cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
+    let $camlN_way_join_null = Block 0 (field_0) in
+    cont done ($camlN_way_join_null)

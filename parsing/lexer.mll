@@ -79,6 +79,7 @@ let all_keywords =
     "initializer", INITIALIZER, v1_0;
     "kind_", KIND, oxcaml;
     "kind_of_", KIND_OF, oxcaml;
+    "layout_", LAYOUT, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
     "local_", LOCAL, oxcaml;
@@ -1017,7 +1018,9 @@ and directive already_consumed = parse
         match mode with
         | "quotations" ->
             Syntax_mode.quotations := toggle;
-            token lexbuf
+            let tok = token lexbuf in
+            enqueue_token_from_end_of_lexbuf_window lexbuf SEMISEMI ~len:0;
+            tok
         | _ ->
             directive_error lexbuf ("unknown syntax mode " ^ mode)
               ~already_consumed ~directive:"syntax"

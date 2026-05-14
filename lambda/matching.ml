@@ -180,6 +180,11 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
+let fatal_var_lpoly lpoly =
+  let n = List.length (Types.Lpoly.get_exn lpoly) in
+  Misc.fatal_errorf
+    "Matching: layout-poly patterns not yet supported (%d sort var(s))" n
+
 module General = struct
   include Patterns.General
 
@@ -222,9 +227,11 @@ end = struct
     | Tpat_any
     | Tpat_var _ ->
         p
-    | Tpat_alias (q, id, s, uid, sort, mode, ty) ->
+    | Tpat_alias { pattern = q; id; name = s; uid; sort; mode;
+                   type_expr = ty } ->
         { p with pat_desc =
-            Tpat_alias (simpl_under_orpat q, id, s, uid, sort, mode, ty) }
+            Tpat_alias { pattern = simpl_under_orpat q; id; name = s;
+                         uid; sort; mode; type_expr = ty } }
     | Tpat_or (p1, p2, o) ->
         let p1, p2 = (simpl_under_orpat p1, simpl_under_orpat p2) in
         if le_pat p1 p2 then
@@ -252,6 +259,7 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | `Alias (p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view p, patl),
@@ -368,6 +376,7 @@ end = struct
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -625,6 +634,7 @@ end = struct
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -673,7 +683,7 @@ let rec flatten_pat_line size p k =
   | Tpat_tuple args -> (List.map snd args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
-  | Tpat_alias (p, _, _, _, _, _, _) ->
+  | Tpat_alias { pattern = p; _ } ->
       (* Note: we are only called from flatten_matrix,
          which is itself only ever used in places
          where variables do not matter (default environments,
@@ -767,6 +777,7 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -1485,7 +1496,7 @@ let rec omega_like p =
   | Tpat_any
   | Tpat_var _ ->
       true
-  | Tpat_alias (p, _, _, _, _, _, _) -> omega_like p
+  | Tpat_alias { pattern = p; _ } -> omega_like p
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
 
@@ -4104,8 +4115,8 @@ let rec comp_match_handlers layout comp_fun partial ctx first_match next_matches
 let rec name_pattern default = function
   | ((pat, _), _) :: rem -> (
       match pat.pat_desc with
-      | Tpat_var (id, _, uid, _, _) -> id, uid
-      | Tpat_alias (_, id, _, uid, _, _, _) -> id, uid
+      | Tpat_var { id; uid; _ } -> id, uid
+      | Tpat_alias { id; uid; _ } -> id, uid
       | _ -> name_pattern default rem
     )
   | _ -> Ident.create_local default, Lambda.debug_uid_none
@@ -4578,12 +4589,12 @@ let for_trywith ~scopes ~return_layout loc param pat_act_list =
      It is important to *not* include location information in
      the reraise (hence the [_noloc]) to avoid seeing this
      silent reraise in exception backtraces. *)
-  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
+  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_scannable
     ~arg_layout:layout_block ~return_layout loc ~failer:(Reraise_noloc param)
     None param pat_act_list Partial
 
 let for_handler ~scopes ~return_layout loc param cont cont_tail pat_act_list =
-  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
+  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_scannable
     ~arg_layout:layout_block ~return_layout loc
     ~failer:(Reperform_noloc [param; cont; cont_tail])
     None param pat_act_list Partial
@@ -4677,12 +4688,12 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lsplice _) as l ->
-      (* CR layout poly: I believe this could inhibit some optimisations in the
-         splice case. We should consider moving this after slambda eval.*)
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
+  | Lsplice _ as lam ->
+      fatal_error_invalid_constructor lam
 
 (* The 'opt' reference indicates if the optimization is worthy.
 
@@ -4747,8 +4758,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_var (id, _, duid, _, _)
-  | Tpat_alias ({ pat_desc = Tpat_any }, id, _, duid, _, _, _) ->
+  | Tpat_var { id; uid = duid; _ }
+  | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ } ->
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be

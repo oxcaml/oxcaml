@@ -178,10 +178,10 @@ let construct_joined_level envs_with_levels ~env_at_fork ~allowed ~joined_types
             (TEL.defined_variables_with_kinds t)
         in
         let defined_vars =
-          Variable.Map.union
+          Variable.Map.union_total_shared
             (fun var kind1 kind2 ->
               if K.equal kind1 kind2
-              then Some kind1
+              then kind1
               else
                 Misc.fatal_errorf
                   "Cannot join levels that disagree on the kind of \
@@ -197,8 +197,8 @@ let construct_joined_level envs_with_levels ~env_at_fork ~allowed ~joined_types
             (TEL.variables_by_binding_time t)
         in
         let binding_times =
-          Binding_time.Map.union
-            (fun _bt vars1 vars2 -> Some (Variable.Set.union vars1 vars2))
+          Binding_time.Map.union_total_shared
+            (fun _bt vars1 vars2 -> Variable.Set.union vars1 vars2)
             binding_times binding_times_this_level
         in
         defined_vars, binding_times)

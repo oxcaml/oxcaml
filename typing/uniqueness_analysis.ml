@@ -1682,7 +1682,7 @@ end = struct
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Join_with Aliased, Meet_with Many -> untracked
+    | Join_const Aliased, Meet_const Many -> untracked
     | _ -> child proj t
 
   let tuple_field i t = child (Projection.Tuple_field i) t
@@ -2050,6 +2050,7 @@ and pattern_match_barrier pat paths : UF.t =
   | Tpat_or _ -> no_memory_access ()
   | Tpat_any -> no_memory_access ()
   | Tpat_var _ -> no_memory_access ()
+  | Tpat_fun_layout _ -> no_memory_access ()
   | Tpat_alias _ -> no_memory_access ()
   | Tpat_constant _ ->
     (* This is necessary since we can not guarantee that
@@ -2095,8 +2096,9 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf1 = pattern_match_single pat1 paths in
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
-    | Tpat_var (id, _, _, _, _) -> Ienv.Extension.singleton id paths, UF.unused
-    | Tpat_alias (pat', id, _, _, _, _, _) ->
+    | Tpat_var { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_fun_layout { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_alias { pattern = pat'; id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
@@ -2235,7 +2237,7 @@ let open_variables ienv f =
       expr =
         (fun self e ->
           (match e.exp_desc with
-          | Texp_ident (path, _, _, _, unique_use, _) -> (
+          | Texp_ident { path; unique_use; _ } -> (
             (* We test if a variable is open by looking it up in the current
                [ienv]: the [ienv] does not contain the internally-bound
                variables in the module. In other words, open variables will be
@@ -2348,6 +2350,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_ident _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
+  | Texp_apply_layout (exp, _) -> check_uniqueness_exp ~overwrite:None ienv exp
   | Texp_constant _ -> UF.unused
   | Texp_let (_, vbs, body) ->
     let ext, uf_vbs = check_uniqueness_value_bindings ienv vbs in
@@ -2550,15 +2553,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_idx (ba, _uas) ->
     let block_access = function
       | Baccess_field _ -> UF.unused
-      | Baccess_array
-          { mut = _;
-            index_kind = _;
-            index;
-            base_ty = _;
-            elt_ty = _;
-            elt_sort = _
-          } ->
-        check_uniqueness_exp ~overwrite:None ienv index
       | Baccess_block (_, idx) -> check_uniqueness_exp ~overwrite:None ienv idx
     in
     (* All unboxed accesses are unused, but we include the below match in case
@@ -2685,9 +2679,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_antiquotation e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
-  | Texp_eval _ ->
-    (* CR metaprogramming mshinwell: Make sure this is correct *)
-    UF.unused
 
 and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
   let loc = exp.exp_loc in
@@ -2710,10 +2701,10 @@ and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
     needed *)
 and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
     = function
-  | Texp_ident (p, _, _, _, unique_use, _) ->
+  | Texp_ident { path; unique_use; _ } ->
     let occ = Occurrence.mk loc in
     let value =
-      match value_of_ident ienv unique_use occ p with
+      match value_of_ident ienv unique_use occ path with
       | None ->
         (* cross module access - don't track *)
         Value.untracked unique_use occ

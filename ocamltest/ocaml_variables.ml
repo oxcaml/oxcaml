@@ -248,6 +248,10 @@ let fexpr_dump_files =
   Variables.make ("fexpr_dump_file",
     "Flambda passes dump files suffixes")
 
+let fexpr_reference_suffix =
+  Variables.make ("fexpr_reference_suffix",
+    "Suffix to add to the fexpr reference files")
+
 let init () =
   List.iter register_variable
   [
@@ -314,4 +318,5 @@ let init () =
     sharedobjext;
     use_runtime;
     fexpr_dump_files;
+    fexpr_reference_suffix;
   ]

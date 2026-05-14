@@ -1,0 +1,40 @@
+let code maybe_0 deleted in
+let code shouldn't_alloc_1 deleted in
+let code inline(always) loopify(never) size(18) newer_version_of(maybe_0)
+      maybe_0_1 (b : imm tagged, x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k (0)
+     | 1 -> k2)
+    where k2 =
+      let Pmakeblock = %block.[`0`] (x) in
+      cont k (Pmakeblock)
+in
+let $camlVariant_ah__maybe_2 = closure maybe_0_1 @maybe in
+let code loopify(never) size(33) newer_version_of(shouldn't_alloc_1)
+      shouldn't_alloc_1_1 (f : val, g : val, b : imm tagged, x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k2 (1i, 0)
+     | 1 -> k2 (0i, x))
+    where k2 (is_int : imm, unboxed_field_0_0) =
+      (switch is_int
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply g (0) -> k * k1
+         where k2 =
+           apply f (unboxed_field_0_0) -> k * k1)
+in
+let $camlVariant_ah__shouldn't_alloc_3 =
+  closure shouldn't_alloc_1_1 @shouldn't_alloc
+in
+let $camlVariant_ah =
+  Block 0 ($camlVariant_ah__maybe_2, $camlVariant_ah__shouldn't_alloc_3)
+in
+cont done ($camlVariant_ah)

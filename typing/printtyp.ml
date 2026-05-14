@@ -64,6 +64,9 @@ module Doc = struct
 
   let () = Env.print_path := path
   let () = Env.print_type_expr := type_expr
+  let () =
+    Env.report_jkind_violation_with_offender :=
+      Jkind.Violation.report_with_offender
 
   let type_path ppf p = !Oprint.out_ident ppf (tree_of_type_path p)
 

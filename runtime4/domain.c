@@ -117,6 +117,11 @@ CAMLprim value caml_recommended_domain_count(void)
   caml_failwith("Domains not supported on runtime4");
 }
 
+CAMLprim value caml_max_domain_count(void)
+{
+  return Val_int(1);
+}
+
 CAMLprim value caml_init_domain_self(void)
 {
   caml_failwith("Domains not supported on runtime4");
@@ -158,4 +163,26 @@ CAMLprim value caml_domain_tls_set(value t)
 CAMLprim value caml_domain_tls_get(value unused)
 {
   return Caml_state->tls_state;
+}
+
+/* Unified tick thread */
+
+intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
+
+CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
+
+uintnat caml_effective_tick_interval_usec(void)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
+
+CAMLprim value caml_effective_tick_interval_usec_bytecode(void)
+{
+  caml_failwith("Domains not supported on runtime4");
 }

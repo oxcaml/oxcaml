@@ -32,6 +32,8 @@ module Float32 = Stdlib_stable.Float32
 module Float32_u = Stdlib_stable.Float32_u
 module Int8_u = Stdlib_stable.Int8_u
 module Int16_u = Stdlib_stable.Int16_u
+module Int8 = Stdlib_stable.Int8
+module Int16 = Stdlib_stable.Int16
 
 let test_float () =
   Printf.printf "Testing float#\n";
@@ -171,11 +173,7 @@ let test_float32 () =
   with 
   | Invalid_argument _ ->
     Printf.printf "Out of bounds access raised Invalid_argument\n"
-  
 
-(* CR small-ints: enable when int8 and int16 arrays are supported *)
-
-(*
 let test_int8 () =
   Printf.printf "Testing int8#\n";
   let len = 5 in
@@ -199,10 +197,10 @@ let test_int8 () =
   try
     let _ = get arr len in
     Printf.printf "Out of bounds access did not raise exception\n"
-  with 
+  with
   | Invalid_argument _ ->
     Printf.printf "Out of bounds access raised Invalid_argument\n"
-  
+
 
 let test_int16 () =
   Printf.printf "Testing int16#\n";
@@ -227,13 +225,14 @@ let test_int16 () =
   try
     let _ = get arr len in
     Printf.printf "Out of bounds access did not raise exception\n"
-  with 
+  with
   | Invalid_argument _ ->
     Printf.printf "Out of bounds access raised Invalid_argument\n"
-*)
 
 let () =
   test_float ();
+  test_int8 ();
+  test_int16 ();
   test_int32 ();
   test_int64 ();
   test_nativeint ();

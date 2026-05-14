@@ -66,8 +66,18 @@ val untransl_modality :
 
 val untransl_modalities : modalities -> Parsetree.modalities
 
+(** Interpret modality syntax in with-bound context. Returns the modal modality
+    and the externality modifier (if any). *)
+val transl_with_bound_modifiers :
+  Parsetree.modalities ->
+  Mode.Modality.Const.t * Jkind_axis.Externality.t option
+
 (** Interpret a mod-bounds. *)
-val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
+val transl_mod_bounds :
+  Parsetree.modes ->
+  Jkind.Mod_bounds.t
+  * (Jkind_axis.Nullability.t Location.loc option
+    * Jkind_axis.Separability.t Location.loc option)
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)

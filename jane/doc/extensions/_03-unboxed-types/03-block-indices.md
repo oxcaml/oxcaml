@@ -8,7 +8,7 @@ title: Block indices
 
 This document describes the language feature and implementation for explicit
 _indices_ into a block. Before reading this document, you may wish to read up
-through the [layouts](../01-intro#layouts) section of the main document.
+through the [layouts](../intro#layouts) section of the main document.
 
 As a quick example:
 ```ocaml
@@ -22,16 +22,17 @@ let mk_idx () : (line, int) idx_imm = (.q.#y)
 
 let get_coord (line : line) (i : (line, int) idx_imm) : int =
   (* If [i] is [(.q.#y)], then the below is similar to to [line.q.#y] *)
-  Idx_imm.unsafe_get line i
+  Idx_imm.get line i
 
 (* Creating a block index into an array *)
-let first_x (): (pt# array, int) idx_mut = (.(0).#x)
+let first_int () : (int array, int) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 
 let inc_coord (pts : 'a) (i : ('a, int) idx_mut) =
   (* Equivalent to [pts.(i) <- pts.(i) + 1] when [i] is in bounds and [pts] is
      an [int array]. But this function could also be used update a mutable
      record containing an [int]. *)
-  Idx_mut.unsafe_set pts i (Idx_mut.unsafe_get pts i + 1)
+  Idx_mut.set pts i (Idx_mut.get pts i + 1)
 ```
 
 # Overview
@@ -60,27 +61,28 @@ Specifically, it consists of one "block access" followed by zero or more
 
 Block accesses take the following forms:
 - Record field: `.foo`
-- Array index as an `int`, `int64#`, `int32#`, `int16#`, `int8#`,
-  or `nativeint#`: `.(i)`, `.L(i)`, `.l(i)`, `.S(i)`, `.s(i)`, or `.n(i)`
-- Immutable array index as an `int`, `int64#`, `int32#`, `int16#`, `int8#`,
-  or `nativeint#`: `.:(i)`, `.:L(i)`, `.:l(i)`, `.S(i)`, `.s(i)`, or `.:n(i)`
 - Mutable or immutable block index: `.idx_mut(idx)` or `.idx_imm(idx)`
 
 Unboxed accesses take the following forms:
 - Unboxed record field: `.#bar`
 
-**Index mutability.** If the block access is mutable (mutable record fields,
-arrays, and mutable block indices), then an `idx_mut` is created, and if the
-block access is immutable (immutable record fields, immutable arrays, and
-immutable block indices), then an `idx_imm` is created.
+If the block access is mutable (mutable record fields and mutable block
+indices), then an `idx_mut` is created, and if the block access is immutable
+(immutable record fields and immutable block indices), then an `idx_imm` is
+created.
+
+**Array indices.** Array indices are created via functions in
+`Stdlib_stable`, rather than syntax:
+- `Idx_mut.unsafe_create_into_array : int -> ('a array, 'a) idx_mut`
+- `Idx_imm.unsafe_create_into_iarray : int -> ('a iarray, 'a) idx_imm`
+
+These functions are marked `unsafe` because they cannot check array bounds, so
+using the index later could perform an unchecked out-of-bounds access.
 
 **Using indices.** Naturally, block indices can be used to read and write
-within blocks. This can be done via the `Idx_imm.unsafe_get`,
-`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in [`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable
+within blocks. This can be done via the `Idx_imm.get`, `Idx_mut.get`, and
+`Idx_mut.set` functions in [`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable
 ).
-(These functions are unsafe only for array indices, which may be out of range.
-Uses of block indices built without the use of an array-indexing operation are
-always safe.)
 
 _A key advantage of block indices is that these accessor functions are
 polymorphic in both the base type and element type._ Index reading roughly
@@ -161,7 +163,7 @@ type c = { mutable b : b; s : string }
 The record `c` presents an interesting problem for block indices: the fields of
 its contained unboxed records `a` and `b` are not actually contiguous at runtime
 when using the native code compiler. This problem is caused by the
-[mixed block representation](../01-intro#the-mixed-block-representation),
+[mixed block representation](../intro#the-mixed-block-representation),
 which mandates that we reorder fields so that values come before unboxed types.
 
 While the layout of `c` has the shape

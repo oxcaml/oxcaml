@@ -26,7 +26,7 @@ let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
-let as_has_debug_prefix_map = @as_has_debug_prefix_map@
+let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}
 let bytecode_cflags = {@QS@|@bytecode_cflags@|@QS@}
 let bytecode_cppflags = {@QS@|@bytecode_cppflags@|@QS@}
 let native_cflags = {@QS@|@native_cflags@|@QS@}
@@ -87,6 +87,7 @@ let asm_size_type_directives = @asm_size_type_directives@
 let with_frame_pointers = @frame_pointers@
 let with_address_sanitizer = @address_sanitizer@
 let with_cpp_mangling = @cpp_mangling@
+let name_mangling_scheme_string = {@QS@|@name_mangling_scheme@|@QS@}
 let custom_ops_struct_size = @custom_ops_struct_size@
 
 let ext_exe = {@QS@|@EXEEXT@|@QS@}

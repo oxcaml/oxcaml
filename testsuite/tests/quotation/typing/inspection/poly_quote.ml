@@ -11,7 +11,7 @@
 
 (* This type should be the same as [B.t3''] *)
 let (f : <[
-  ('a 'b. unit -> ('a expr -> 'b expr) -> <[unit -> $('a) -> $('b)]> expr) ->
+  ('a 'b. unit -> ('a expr -> 'b expr @ once) -> <[unit -> $('a) -> $('b)]> expr) ->
   <[unit -> int -> int]> expr * <[unit -> int -> string]> expr
 ]> expr) =
   <[fun f -> (

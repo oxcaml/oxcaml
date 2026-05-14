@@ -31,5 +31,7 @@ touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
 exit_code=0
 $opam_exec dune build @fmt || exit_code=1
-scripts/80ch.sh || exit_code=1
+if [[ -z "${SKIP_80CH+x}" ]]; then # don't use `-v` to accommodate macOS (old bash)
+  scripts/80ch.sh || exit_code=1
+fi
 exit $exit_code

@@ -33,6 +33,7 @@ type result = private
   { body : Flambda.Expr.t;
     free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
+    code_ids_to_remember : Code_id.Set.t;
     slot_offsets : Slot_offsets.t
   }
 
@@ -43,7 +44,7 @@ val rebuild :
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
   Flambda_kind.t Name.Map.t ->
-  Dep_solver.result ->
+  Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
   result

@@ -1,0 +1,32 @@
+let code f_0 deleted in
+let code loopify(never) size(41) newer_version_of(f_0)
+      f_0_1 (t : [ 0 |1 | 0 of imm tagged |1 of imm tagged * imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %is_int (t) in
+   switch prim
+     | 0 -> k4
+     | 1 -> k5)
+    where k5 =
+      let untagged = %untag_imm (t) in
+      switch untagged
+        | 0 -> k (42)
+        | 1 -> k (0)
+    where k4 =
+      let prim = %get_tag (t) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k3
+    where k3 =
+      let Pfield = %block_load.[`1`] (t) in
+      let Pfield_1 = %block_load.[`0`] (t) in
+      let int_add = %int_barith.add (Pfield_1, Pfield) in
+      cont k (int_add)
+    where k2 =
+      let Pfield = %block_load.[`0`] (t) in
+      cont k (Pfield)
+in
+let $camlVariants__f_1 = closure f_0_1 @f in
+let $camlVariants = Block 0 ($camlVariants__f_1) in
+cont done ($camlVariants)

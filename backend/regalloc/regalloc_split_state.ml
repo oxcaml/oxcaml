@@ -51,8 +51,13 @@ let log_renaming_info : t -> unit =
   dedent ();
   dedent ()
 
-(* Optimizes `destructions_at_end` and `definitions_at_beginning`, by moving
-   destructions and definitions outside of loops when possible. *)
+(* Optimizes `destructions_at_end` and `definitions_at_beginning` by moving
+   spills and reloads outside of loops when possible.
+
+   A destroyed register that is not written inside a loop has a loop-invariant
+   stack slot, so its destruction (spill) can be moved before the loop. A
+   destroyed register that is neither read nor written can have both its
+   destruction and definition moved entirely outside the loop. *)
 module ExtractSpillsAndReloadsFromLoops : sig
   val optimize :
     Cfg_with_infos.t ->
@@ -62,12 +67,13 @@ module ExtractSpillsAndReloadsFromLoops : sig
 end = struct
   type loop_sets =
     { destroyed : Reg.Set.t;
-      occurring : Reg.Set.t
+      read : Reg.Set.t;
+      written : Reg.Set.t
     }
 
   let compute_loop_sets cfg loop destructions_at_end =
     Label.Set.fold
-      (fun label { destroyed; occurring } ->
+      (fun label { destroyed; read; written } ->
         let destroyed_here =
           match Label.Map.find_opt label destructions_at_end with
           | None -> Reg.Set.empty
@@ -75,36 +81,42 @@ end = struct
         in
         let destroyed = Reg.Set.union destroyed destroyed_here in
         let block = Cfg.get_block_exn cfg label in
-        let[@inline] update_occuring : type a.
-            Reg.Set.t -> a Cfg.instruction -> Reg.Set.t =
-         fun occurring instr ->
-          let occurring = Reg.add_set_array occurring instr.arg in
-          let occurring = Reg.add_set_array occurring instr.res in
-          occurring
+        let[@inline] update : type a.
+            Reg.Set.t * Reg.Set.t -> a Cfg.instruction -> Reg.Set.t * Reg.Set.t
+            =
+         fun (read, written) instr ->
+          let read = Reg.add_set_array read instr.arg in
+          let written = Reg.add_set_array written instr.res in
+          read, written
         in
-        let occurring =
+        let read, written =
           DLL.fold_left block.body
-            ~init:(update_occuring occurring block.terminator)
-            ~f:update_occuring
+            ~init:(update (read, written) block.terminator)
+            ~f:update
         in
-        { destroyed; occurring })
+        { destroyed; read; written })
       loop
-      { destroyed = Reg.Set.empty; occurring = Reg.Set.empty }
+      { destroyed = Reg.Set.empty;
+        read = Reg.Set.empty;
+        written = Reg.Set.empty
+      }
 
-  (* If a temporary is destroyed/reloaded inside a loop (typically because it is
-     live at a destruction point), but never used in the loop then the
-     destructions/definitions can be moved. *)
   let optimize_loop cfg ~header (loop : Label.Set.t)
       (destructions_at_end, definitions_at_beginning) =
     if debug
     then (
       log "ExtractSpillsAndReloadsFromLoops.optimize_loop";
       indent ());
-    let { destroyed; occurring } =
+    let { destroyed; read; written } =
       compute_loop_sets cfg loop destructions_at_end
     in
-    let to_move = Reg.Set.diff destroyed occurring in
-    match Reg.Set.is_empty to_move with
+    (* [to_move_destructions]: destroyed and not written — stack slot is
+       loop-invariant, so the spill can be moved before the loop.
+       [to_move_definitions]: destroyed and not read or written — the value is
+       not needed in the loop, so the reload can be moved after the loop. *)
+    let to_move_destructions = Reg.Set.diff destroyed written in
+    let to_move_definitions = Reg.Set.diff to_move_destructions read in
+    match Reg.Set.is_empty to_move_destructions with
     | true ->
       if debug
       then (
@@ -113,8 +125,15 @@ end = struct
       destructions_at_end, definitions_at_beginning
     | false ->
       if debug
-      then
-        Reg.Set.iter (fun reg -> log "%a can be moved" Printreg.reg reg) to_move;
+      then (
+        Reg.Set.iter
+          (fun reg -> log "%a spill+unspill moved" Printreg.reg reg)
+          to_move_definitions;
+        Reg.Set.iter
+          (fun reg -> log "%a spill moved" Printreg.reg reg)
+          (Reg.Set.diff to_move_destructions to_move_definitions));
+      (* Remove destructions for not-written and definitions for not-occurring
+         registers from inside the loop. *)
       let (destructions_at_end, definitions_at_beginning) :
           destructions_at_end * definitions_at_beginning =
         Label.Set.fold
@@ -123,13 +142,15 @@ end = struct
               Label.Map.update label
                 (function
                   | None -> None
-                  | Some (kind, regs) -> Some (kind, Reg.Set.diff regs to_move))
+                  | Some (kind, regs) ->
+                    Some (kind, Reg.Set.diff regs to_move_destructions))
                 destructions_at_end
             in
             let definitions_at_beginning =
               Label.Map.update label
                 (function
-                  | None -> None | Some regs -> Some (Reg.Set.diff regs to_move))
+                  | None -> None
+                  | Some regs -> Some (Reg.Set.diff regs to_move_definitions))
                 definitions_at_beginning
             in
             destructions_at_end, definitions_at_beginning)
@@ -138,7 +159,7 @@ end = struct
       in
       (* Add destructions before the loop. *)
       let all_loop_predecessors : Label.Set.t =
-        (Cfg.get_block_exn cfg header).predecessors
+        Label.Set.diff (Cfg.get_block_exn cfg header).predecessors loop
       in
       let destructions_at_end : destructions_at_end =
         Label.Set.fold
@@ -146,10 +167,12 @@ end = struct
             if debug then log "destructions now happen at %a" Label.print label;
             Label.Map.update label
               (function
-                | None -> Some (Destruction_on_all_paths, to_move)
+                | None -> Some (Destruction_on_all_paths, to_move_destructions)
                 | Some (_kind, regs) ->
                   (* CR xclerc for xclerc: double-check the kind is correct. *)
-                  Some (Destruction_on_all_paths, Reg.Set.union regs to_move))
+                  Some
+                    ( Destruction_on_all_paths,
+                      Reg.Set.union regs to_move_destructions ))
               acc)
           all_loop_predecessors destructions_at_end
       in
@@ -170,8 +193,8 @@ end = struct
             if debug then log "definitions now happen at %a" Label.print label;
             Label.Map.update label
               (function
-                | None -> Some to_move
-                | Some regs -> Some (Reg.Set.union regs to_move))
+                | None -> Some to_move_definitions
+                | Some regs -> Some (Reg.Set.union regs to_move_definitions))
               acc)
           all_loop_successors definitions_at_beginning
       in

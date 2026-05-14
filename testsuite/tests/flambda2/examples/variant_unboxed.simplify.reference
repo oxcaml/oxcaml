@@ -1,0 +1,55 @@
+let $camlVariant_unboxed__immstring26 = "variant_unboxed.ml" in
+let $camlVariant_unboxed__const_block28 =
+  Block 0 ($camlVariant_unboxed__immstring26, 32, 14)
+in
+let $camlVariant_unboxed__Pmakeblock31 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlVariant_unboxed__const_block28)
+in
+let code foo_0 deleted in
+let code loopify(never) size(48) newer_version_of(foo_0)
+      foo_0_1
+        (b : imm tagged,
+         b' : imm tagged,
+         x1 : imm tagged,
+         x2 : imm tagged,
+         y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let untagged = %untag_imm (b') in
+      switch untagged
+        | 0 -> k2 (0i, 0x0p+0, 0, x1, x2)
+        | 1 -> k2 (0i, 0x0p+0, 0, x2, x1)
+    where k3 =
+      let unboxed_float = %unbox_num.`float` (y) in
+      cont k2 (1i, unboxed_float, x2, 0, 0)
+    where k2
+            (tag : imm,
+             unboxed_float : float,
+             unboxed_field_1_0,
+             unboxed_field_0_1,
+             unboxed_field_0_0) =
+      (switch tag
+         | 0 -> k2
+         | 1 -> k3
+         | 2 -> k1 pop(regular k1) ($camlVariant_unboxed__Pmakeblock31)
+         where k3 =
+           let prim = %num_conv.[`float`].[`imm`] (unboxed_float) in
+           let int_of_float = %tag_imm (prim) in
+           let int_add = %int_barith.add (unboxed_field_1_0, int_of_float) in
+           cont k (int_add)
+         where k2 =
+           let int_add =
+             %int_barith.add (unboxed_field_0_0, unboxed_field_0_1)
+           in
+           cont k (int_add))
+in
+let $camlVariant_unboxed__foo_1 = closure foo_0_1 @foo in
+let $camlVariant_unboxed = Block 0 ($camlVariant_unboxed__foo_1) in
+cont done ($camlVariant_unboxed)

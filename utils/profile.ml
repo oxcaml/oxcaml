@@ -436,6 +436,5 @@ let options_doc =
     (String.concat " " column_names)
 
 let generate = "generate"
-let static_eval = "static_eval"
 let transl = "transl"
 let typing = "typing"

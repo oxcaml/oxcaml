@@ -25,25 +25,21 @@ type 'a my_list : immutable_data with 'a =
   | Nil
   | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list
 [%%expect {|
-Line 3, characters 17-115:
+Lines 1-3, characters 0-115:
+1 | type 'a my_list : immutable_data with 'a =
+2 |   | Nil
 3 |   | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout mismatch in final type declaration consistency check.
-       This is most often caused by the fact that type inference is not
-       clever enough to propagate layouts through variables in different
-       declarations. It is also not clever enough to produce a good error
-       message, so we'll say this instead:
-         The layout of 'a my_list my_list my_list my_list my_list my_list
-                       my_list my_list my_list my_list my_list is any
-           because the .cmi file for my_list is missing.
-         But the layout of 'a my_list my_list my_list my_list my_list my_list
-                           my_list my_list my_list my_list my_list must be a sublayout of
-           value
-           because it instantiates an unannotated type parameter of my_list,
-           chosen to have layout value.
-         No .cmi file found containing my_list.
-       A good next step is to add a layout annotation on a parameter to
-       the declaration where this error is reported.
+Error: The kind of type "my_list" is
+           immutable_data
+             with 'a
+             with 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list
+                  my_list my_list my_list
+         because it's a boxed variant type.
+       But the kind of type "my_list" must be a subkind of
+           immutable_data with 'a
+         because of the annotation on the declaration of the type my_list.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 type 'a mutable_list : mutable_data with 'a = Nil | Cons of 'a ref * 'a mutable_list
@@ -112,6 +108,20 @@ end
 [%%expect {|
 module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a My_list.t end
 module My_list : sig type 'a t = 'a My_list.t end
+|}]
+
+type my_int_list : immutable_data = Nil | Cons of int * my_int_list
+type my_int_list2 = Nil | Cons of int * my_int_list2
+[%%expect {|
+type my_int_list = Nil | Cons of int * my_int_list
+type my_int_list2 = Nil | Cons of int * my_int_list2
+|}]
+
+module rec My_int_list : sig
+  type t = Nil | Cons of int * My_int_list.t
+end = My_int_list
+[%%expect {|
+module rec My_int_list : sig type t = Nil | Cons of int * My_int_list.t end
 |}]
 
 module rec My_int_list : sig

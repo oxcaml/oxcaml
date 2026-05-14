@@ -1,0 +1,27 @@
+let code main_0 deleted in
+let code loopify(never) size(33) newer_version_of(main_0)
+      main_0_1 (f : val, x : [ 0 |1 | 0 of val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %is_int (x) in
+   switch prim
+     | 0 -> k2 (0i)
+     | 1 -> k3
+     where k3 =
+       ((let untagged = %untag_imm (x) in
+         switch untagged
+           | 0 -> k2 (1i)
+           | 1 -> k3)
+          where k3 =
+            (apply f (0) -> k3 * k1
+               where k3 (param : imm tagged) =
+                 cont k2 (1i))))
+    where k2 (join_param : imm) =
+      let Pisint = %tag_imm (join_param) in
+      let Pnot = %boolean_not (Pisint) in
+      cont k (Pnot)
+in
+let $camlIssue5721__main_1 = closure main_0_1 @main in
+let $camlIssue5721 = Block 0 ($camlIssue5721__main_1) in
+cont done ($camlIssue5721)

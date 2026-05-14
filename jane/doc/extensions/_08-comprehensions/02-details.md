@@ -8,7 +8,7 @@ title: Details
 
 This file covers how comprehensions work in more detail than is necessary on a
 day-to-day level; for a higher-level view, see the [introduction to
-comprehensions](../01-intro).
+comprehensions](../intro).
 
 ## Syntax
 

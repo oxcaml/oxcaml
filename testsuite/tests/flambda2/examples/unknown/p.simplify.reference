@@ -1,0 +1,45 @@
+let code foo_0 deleted in
+let code `fn[p.ml:11,19--31]_2` deleted in
+let code bar_1 deleted in
+let code f_3 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(foo_0)
+      foo_0_1 (k, o, param)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlP__foo_4 = closure foo_0_1 @foo in
+let code loopify(never) size(1) newer_version_of(`fn[p.ml:11,19--31]_2`)
+      `fn[p.ml:11,19--31]_2_1` (x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k (x)
+in
+let $`camlP__fn[p.ml:11,19--31]_6` =
+  closure `fn[p.ml:11,19--31]_2_1` @`fn[p.ml:11,19--31]`
+in
+let code loopify(never) size(4) newer_version_of(bar_1)
+      bar_1_1 (oc, z)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(foo_0_1)
+    ($camlP__foo_4 : _ -> imm tagged)
+      ($`camlP__fn[p.ml:11,19--31]_6`, oc, z)
+      -> k * k1
+in
+let $camlP__bar_5 = closure bar_1_1 @bar in
+let code loopify(never) size(4) newer_version_of(f_3)
+      f_3_1 (z)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(foo_0_1) inlining_state(depth(10))
+    ($camlP__foo_4 : _ -> imm tagged)
+      ($`camlP__fn[p.ml:11,19--31]_6`, 0, z)
+      -> k * k1
+in
+let $camlP__f_7 = closure f_3_1 @f in
+let $camlP = Block 0 ($camlP__foo_4, $camlP__bar_5, $camlP__f_7) in
+cont done ($camlP)

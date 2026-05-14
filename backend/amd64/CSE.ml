@@ -51,7 +51,7 @@ let class_of_operation (op : Operation.t)
                          not using LLVM backend"
         intr
     end
-  | Move | Spill | Reload
+  | Move | Spill | Reload | Dummy_use
   | Floatop _
   | Csel _
   | Reinterpret_cast _ | Static_cast _

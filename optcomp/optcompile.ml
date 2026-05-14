@@ -90,13 +90,18 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Some _, None -> Misc.fatal_error "No argument field"
     | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-  let compile_from_slambda i slambda ~keep_symbol_tables ~as_arg_for =
-    slambda
-    |> Profile.(record generate) (fun (program : SL.program) ->
+  let compile_from_tlambda i tlambda ~keep_symbol_tables ~as_arg_for =
+    tlambda
+    |> Profile.(record generate) (fun (program : Lambda.program) ->
         Builtin_attributes.warn_unused ();
-        program
-        |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
-        |> Slambdaeval.eval
+        program.code
+        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+        |> Slambda.eval
+             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
+        |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+        (* CR layout poly: Drop the comptime part until top-level modules can be
+           static. *)
+        { program with Lambda.code = slv_runtime }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
             Type_shape.print_debug_uid_tables ppf)
         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
@@ -136,7 +141,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     typed
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
-    |> compile_from_slambda i ~keep_symbol_tables ~as_arg_for
+    |> compile_from_tlambda i ~keep_symbol_tables ~as_arg_for
 
   type starting_point =
     | Parsing
@@ -209,7 +214,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           ~main_module_block_repr ~arg_block_idx
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_slambda info impl ~as_arg_for ~keep_symbol_tables
+      compile_from_tlambda info impl ~as_arg_for ~keep_symbol_tables
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
@@ -304,12 +309,14 @@ let native unix
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 
+    (* These are the dependencies of otherlibs/eval. *)
     let extra_libraries_for_eval =
       [ "unix/unix";
         "compiler-libs/ocamlcommon";
         "compiler-libs/ocamloptcomp";
-        "ocaml-jit/jit";
-        "camlinternaleval" ]
+        "dynlink/dynlink";
+        "compiler-libs/ocamlopttoplevel";
+        "ocaml-jit/jit" ]
 
     let support_files_for_eval () =
       List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
@@ -317,7 +324,8 @@ let native unix
     let set_load_path_for_eval () =
       List.iter
         (fun lib ->
-          Load_path.add_dir ~hidden:false
+          Load_path.add_dir
+            (Visible { cmx_guaranteed = true })
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
         extra_load_paths_for_eval
   end) : S)

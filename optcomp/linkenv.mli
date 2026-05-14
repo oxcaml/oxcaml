@@ -100,5 +100,6 @@ type error =
   | Linking_error of int
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
+  | Requires_metaprogramming_without_flag of filepath
 
 exception Error of error

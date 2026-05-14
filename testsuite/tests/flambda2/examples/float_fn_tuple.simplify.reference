@@ -1,0 +1,39 @@
+let code g_0 deleted in
+let code f_1 deleted in
+let code inline(never) loopify(never) size(23) newer_version_of(g_0)
+      g_0_1 (x : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of float boxed * float boxed ] =
+  let prim = %unbox_num.`float` (x) in
+  let prim_1 = %bfloat_arith.add (prim, 0x1p+0) in
+  let float_add = %box_num.`float` (prim_1) in
+  let prim_2 = %bfloat_arith.add (prim, 0x1.5p+5) in
+  let float_add_1 = %box_num.`float` (prim_2) in
+  let Pmakeblock = %block.[`0`] (float_add_1, float_add) in
+  cont k (Pmakeblock)
+in
+let $camlFloat_fn_tuple__g_2 = closure g_0_1 @g in
+let code loopify(never) size(16) newer_version_of(f_1)
+      f_1_1 (b, x : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  apply direct(g_0_1)
+    ($camlFloat_fn_tuple__g_2 : _ -> [ 0 of float boxed * float boxed ])
+      (x)
+      -> k2 * k1
+    where k2 (`*match*` : [ 0 of float boxed * float boxed ]) =
+      let Pfield = %block_load.[`1`] (`*match*`) in
+      let Pfield_1 = %block_load.[`0`] (`*match*`) in
+      let prim = %unbox_num.`float` (Pfield) in
+      let prim_1 = %unbox_num.`float` (Pfield_1) in
+      let prim_2 = %bfloat_arith.add (prim_1, prim) in
+      let float_add = %box_num.`float` (prim_2) in
+      cont k (float_add)
+in
+let $camlFloat_fn_tuple__f_3 = closure f_1_1 @f in
+let $camlFloat_fn_tuple =
+  Block 0 ($camlFloat_fn_tuple__g_2, $camlFloat_fn_tuple__f_3)
+in
+cont done ($camlFloat_fn_tuple)

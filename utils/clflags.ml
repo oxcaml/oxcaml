@@ -65,9 +65,14 @@ type gdwarf_fidelity =
   | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
   | Fidelity_unlimited
 
+type visible_include =
+  { path : string;
+    cmx_guaranteed : bool;
+  }
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
-and include_dirs = ref ([] : string list)  (* -I *)
+and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
@@ -110,9 +115,13 @@ and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
+and requires_metaprogramming = ref false    (* -requires-metaprogramming *)
+and uses_metaprogramming = ref false    (* -uses-metaprogramming *)
 and custom_runtime = ref false          (* -custom *)
 and no_check_prims = ref false          (* -no-check-prims *)
 and bytecode_compatible_32 = ref false  (* -compat-32 *)
+and thunkify_cu_init = ref false
+  (* -thunkify-compilation-unit-initialization *)
 and output_c_object = ref false         (* -output-obj *)
 and output_complete_object = ref false  (* -output-complete-obj *)
 and output_complete_executable = ref false  (* -output-complete-exe *)
@@ -171,6 +180,7 @@ let dump_source = ref false             (* -dsource *)
 let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
+and dump_tlambda = ref false            (* -dtlambda *)
 and dump_slambda = ref false            (* -dslambda *)
 and dump_matchcomp = ref false          (* -dmatchcomp *)
 and dump_rawlambda = ref false          (* -drawlambda *)
@@ -199,6 +209,8 @@ let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
+let ikinds = ref false                  (* -ikinds *)
+let ikinds_debug = ref false            (* -ikinds-debug *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
@@ -661,6 +673,7 @@ module Opt_flag_handler = struct
     set_oclassic : unit -> unit;
     set_o2 : unit -> unit;
     set_o3 : unit -> unit;
+    set_o4 : unit -> unit;
   }
 
   let default =
@@ -682,7 +695,8 @@ module Opt_flag_handler = struct
       use_inlining_arguments_set ~round:1 o2_arguments;
       use_inlining_arguments_set ~round:0 o1_arguments
     in
-    { set_oclassic; set_o2; set_o3 }
+    let set_o4 () = set_o3 () in
+    { set_oclassic; set_o2; set_o3; set_o4 }
 
   let current = ref default
 
@@ -692,6 +706,7 @@ end
 let set_oclassic () = (!Opt_flag_handler.current).set_oclassic ()
 let set_o2 () = (!Opt_flag_handler.current).set_o2 ()
 let set_o3 () = (!Opt_flag_handler.current).set_o3 ()
+let set_o4 () = (!Opt_flag_handler.current).set_o4 ()
 
 (* This is used by the -stop-after option. *)
 module Compiler_pass = struct

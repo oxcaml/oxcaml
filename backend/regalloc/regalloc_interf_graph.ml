@@ -88,12 +88,18 @@ module BitMatrix : S = struct
        before row i) + (position within row i) = [i*n - i*(i-1)/2] + (j-i) *)
     let i = Reg.Stamp.to_int i in
     let j = Reg.Stamp.to_int j in
+    if i >= num_registers || j >= num_registers
+    then fatal "invalid edge: (%d, %d) with num_registers=%d" i j num_registers;
     let bit_offset = (i * num_registers) - ((i * (i - 1)) asr 1) + (j - i) in
     let byte_index = bit_offset lsr 3 in
     let bit_position = bit_offset land 7 in
     byte_index, bit_position
 
+  let extra_room_factor = 10
+
   let make ~num_registers =
+    (* overallocate a bit to try and avoid reallocation *)
+    let num_registers = num_registers + (num_registers / extra_room_factor) in
     let num_edges = (num_registers * (num_registers + 1)) lsr 1 in
     let num_bytes = (num_edges + 7) lsr 3 in
     { bits = Bytes.make num_bytes '\000'; num_registers }
@@ -264,6 +270,12 @@ let[@inline] incr_degree graph reg =
 let[@inline] decr_degree graph reg =
   let deg = degree graph reg in
   if deg <> Degree.infinite then Reg.Tbl.replace graph.degree reg (pred deg)
+
+let[@inline] get_max_degree graph =
+  Reg.Tbl.fold
+    (fun _reg degree acc ->
+      if degree = Degree.infinite then acc else Int.max acc degree)
+    graph.degree 0
 
 let[@inline] init_register graph reg =
   Reg.Tbl.replace graph.adj_list reg [];

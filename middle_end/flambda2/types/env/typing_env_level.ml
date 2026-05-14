@@ -147,7 +147,7 @@ let add_or_replace_equation t name ty =
 
 let concat ~earlier:(t1 : t) ~later:(t2 : t) =
   let defined_vars =
-    Variable.Map.union
+    Variable.Map.union_total
       (fun var _data1 _data2 ->
         Misc.fatal_errorf
           "Cannot concatenate levels that have overlapping defined variables \
@@ -156,7 +156,7 @@ let concat ~earlier:(t1 : t) ~later:(t2 : t) =
       t1.defined_vars t2.defined_vars
   in
   let binding_times =
-    Binding_time.Map.union
+    Binding_time.Map.union_total
       (fun _binding_time vars1 vars2 ->
         (* CR vlaviron: Technically this is feasible, as we can allow several
            variables with the same binding time, but it should only come from
@@ -170,12 +170,10 @@ let concat ~earlier:(t1 : t) ~later:(t2 : t) =
   in
   let equations =
     (* We rely on the fact that equations in later levels are more precise *)
-    Name.Map.union (fun _ _ty1 ty2 -> Some ty2) t1.equations t2.equations
+    Name.Map.union_right_biased t1.equations t2.equations
   in
   let symbol_projections =
-    Variable.Map.union
-      (fun _var _proj1 proj2 -> Some proj2)
-      t1.symbol_projections t2.symbol_projections
+    Variable.Map.union_right_biased t1.symbol_projections t2.symbol_projections
   in
   { defined_vars; binding_times; equations; symbol_projections }
 

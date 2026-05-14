@@ -40,11 +40,11 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
-  | Immediate_erasure of string
   | Non_value_sort of string
   | Unboxed_attribute of string
   | Immediate_void_variant
   | Separability_check
+  | Unpacked_attribute
 
 type name_out_of_scope_warning =
   | Name of string
@@ -140,6 +140,9 @@ type t =
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
 (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Redundant_kind_modifier of string       (* 183 *)
+  | Ignored_kind_modifier of string * string list (* 184 *)
+  | Overridden_kind_modifier of string      (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -157,6 +160,8 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
+  | Useless_lpoly                           (* 217 *)
+  | Lpoly_in_letrec                         (* 218 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

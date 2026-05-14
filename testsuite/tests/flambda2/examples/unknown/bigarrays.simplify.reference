@@ -1,0 +1,56 @@
+let $camlBigarrays__string21 = "index out of bounds" in
+let $camlBigarrays__block23 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlBigarrays__string21)
+in
+(let `region` = %begin_region () in
+ (let Pmakearray = %array.`imm`.mut.`local`[`region`] (3, 3) in
+  apply ccall inlining_state(depth(10))
+    ($`*extern*`.caml_ba_create : val * val * val -> val)
+      (8, 0, Pmakearray)
+      -> k1 * error)
+   where k1 (region_return : val) =
+     let `unit` = %end_region (`region`) in
+     ((let prim = %bigarray_lenght.[`1`] (region_return) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_comp.`nativeint`.unsigned.lt (1n, prim_1) in
+       switch prim_2
+         | 0 -> k1
+         | 1 -> k2)
+        where k2 =
+          ((let prim = %bigarray_lenght.[`2`] (region_return) in
+            let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+            let prim_2 = %int_comp.`nativeint`.unsigned.lt (1n, prim_1) in
+            switch prim_2
+              | 0 -> k1
+              | 1 -> k2)
+             where k2 =
+               let prim = %bigarray_lenght.[`2`] (region_return) in
+               let prim_1 = %tag_imm (prim) in
+               let prim_2 = %int_barith.add (prim_1, 1) in
+               let prim_3 =
+                 %bigarray_load.[`2`].int_width_int (region_return, prim_2)
+               in
+               let i = %tag_imm (prim_3) in
+               let stdout =
+                 %project_value_slot.[`print_int`].[`stdout`]
+                   ($Stdlib.camlStdlib__print_int_136)
+               in
+               (apply ccall inlining_state(depth(20))
+                  ($`*extern*`.caml_format_int : val * val -> val)
+                    ($Stdlib.camlStdlib__immstring191, i)
+                    -> k2 * error
+                  where k2 (apply_result : val) =
+                    let prim_4 = %string_length (apply_result) in
+                    let Pstringlength = %tag_imm (prim_4) in
+                    (apply ccall inlining_state(depth(20))
+                       ($`*extern*`.caml_ml_output
+                        : val * val * val * val -> val)
+                         (stdout, apply_result, 0, Pstringlength)
+                         -> k2 * error
+                       where k2 (param) =
+                         cont k)))
+        where k1 =
+          cont error pop(regular error) ($camlBigarrays__block23)))
+  where k =
+    let $camlBigarrays = Block 0 () in
+    cont done ($camlBigarrays)

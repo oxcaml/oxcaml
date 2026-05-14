@@ -635,7 +635,7 @@ Line 1, characters 0-54:
 1 | type ('a : immutable_data) t = Flat | Nested of 'a t t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of 'a t is value mod non_float
+       The kind of 'a t is value non_float
          because it's a boxed variant type.
        But the kind of 'a t must be a subkind of immutable_data
          because of the annotation on 'a in the declaration of the type t.
@@ -783,6 +783,15 @@ Line 1, characters 50-51:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
+(* Even this is safe because 'a cannot appear in 'a t *)
+let foo (t : (int ref) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 56-57:
+1 | let foo (t : (int ref) t @ contended) = use_uncontended t
+                                                            ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
 let foo (t : int t @ aliased) = use_unique t
 [%%expect {|
 Line 1, characters 43-44:
@@ -805,6 +814,14 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : (int ref) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 56-57:
+1 | let foo (t : (int ref) t @ contended) = use_uncontended t
+                                                            ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 

@@ -112,6 +112,7 @@ let cmx_bundle ~quoted_globals =
           uir_export_info = raw_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
+          uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;
           uir_sections_length = total_length;
           uir_external_symbols = Array.of_list info.ui_external_symbols

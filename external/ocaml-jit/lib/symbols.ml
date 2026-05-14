@@ -16,6 +16,9 @@
 
 open Import
 
+external ndl_loadsym : string -> Obj.t
+  = "caml_sys_exit" "caml_natdynlink_loadsym"
+
 type t = Address.t String.Map.t
 
 let empty = String.Map.empty
@@ -75,9 +78,18 @@ let from_binary_section (type a r)
       acc := String.Map.add ~key:name ~data:(Address.add_int address offset) !acc);
   !acc
 
+let debug =
+  match Sys.getenv_opt "OCAML_JIT_DEBUG" with
+  | Some ("true" | "1") -> true
+  | _ -> false
+
 let find t name =
   match String.Map.find_opt name t with
-  | Some addr -> Some addr
+  | Some addr ->
+    if debug then
+      Printf.eprintf "Symbols.find %s -> map hit at %Lx\n%!"
+        name (Address.to_int64 addr);
+    Some addr
   | None ->
     (* For external symbols (like caml_call_gc), strip the underscore prefix
        on macOS before calling dlsym, since caml_globalsym expects unprefixed
@@ -88,7 +100,36 @@ let find t name =
         String.sub name 1 (String.length name - 1)
       | _ -> name
     in
-    Externals.dlsym dlsym_name
+    if debug && not (String.equal name dlsym_name) then
+      Printf.eprintf
+        "Symbols.find %s -> map miss, stripped to %s\n%!"
+        name dlsym_name;
+    (match Externals.dlsym dlsym_name with
+    | Some addr ->
+      if debug then
+        Printf.eprintf
+          "Symbols.find %s -> dlsym(%s) hit at %Lx\n%!"
+          name dlsym_name (Address.to_int64 addr);
+      Some addr
+    | None ->
+      if debug then
+        Printf.eprintf
+          "Symbols.find %s -> dlsym(%s) miss\n%!"
+          name dlsym_name;
+      (match ndl_loadsym dlsym_name with
+      | exception _ ->
+        if debug then
+          Printf.eprintf
+            "Symbols.find %s -> ndl_loadsym(%s) miss\n%!"
+            name dlsym_name;
+        None
+      | obj ->
+        let addr = Address.of_obj obj in
+        if debug then
+          Printf.eprintf
+            "Symbols.find %s -> ndl_loadsym(%s) hit at %Lx\n%!"
+            name dlsym_name (Address.to_int64 addr);
+        Some addr))
 
 let dprint t =
   Printf.printf "------ Symbols -----\n%!";

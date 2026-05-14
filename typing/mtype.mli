@@ -88,7 +88,8 @@ val no_code_needed_sig: Env.t -> signature -> bool
 val enrich_modtype: Env.t -> Path.t -> module_type -> module_type
 val enrich_typedecl: Env.t -> Path.t -> Ident.t -> type_declaration ->
   type_declaration
-val type_paths: Env.t -> Path.t -> module_type -> Path.t list
+val type_and_jkind_paths:
+  Env.t -> Path.t -> module_type -> types:Path.t list * jkinds:Path.t list
 
 module Contains_type_or_jkind : sig
   type t = Type | Jkind

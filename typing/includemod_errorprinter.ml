@@ -875,7 +875,7 @@ let core env id x =
         (Out_type.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
-           "the left-hand side" "the right-hand side" env) diff.symptom
+           "the first" "the second" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
   | Err.Modalities e ->
       Fmt.dprintf "@[<hv>%s:@;%a@]"
@@ -1234,6 +1234,8 @@ let all env = function
       in
       signature ~expansion_token:true ~env ~before:[first] ~ctx:[] diff.symptom
   | In_Type_declaration (id,reason) ->
+      [Location.msg "%t" (core env.i_env id reason)]
+  | In_Jkind_declaration (id,reason) ->
       [Location.msg "%t" (core env.i_env id reason)]
   | In_Module_type diff ->
       module_type ~expansion_token:true ~eqmode:false ~before:[] ~env ~ctx:[]

@@ -1,0 +1,51 @@
+let $camlGenlex2__immstring32 = "" in
+let code foo_0 deleted in
+let $camlGenlex2__immstring6 = "Genlex2.Error" in
+apply ccall noalloc
+  ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+  where k (Pccall) =
+    let $camlGenlex2__Error40 =
+      Block immutable_unique
+      248 ($camlGenlex2__immstring6, Pccall)
+    in
+    let $camlGenlex2__Pmakeblock65 =
+      Block 0 ($camlGenlex2__Error40, $camlGenlex2__immstring32)
+    in
+    let $camlGenlex2__Pmakeblock64 =
+      Block 0 ($camlGenlex2__Error40, $camlGenlex2__immstring32)
+    in
+    let code loopify(never) size(45) newer_version_of(foo_0)
+          foo_0_1 (f : imm tagged, g : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      let prim = %int_comp.ne (f, 97) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (0)
+        where k2 =
+          let try_region = %begin_try_region () in
+          let try_ghost_region = %begin_try_ghost_region () in
+          (cont k5 push(k3)
+             where k5 =
+               (apply g (0) -> k5 * k3
+                  where k5 (param : val) =
+                    cont k4)
+             where k4 =
+               cont k2 pop(k3)
+             where k3 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let Pfield = %block_load.[`0`] (`exn`) in
+               let prim_1 = %phys_eq (Pfield, $`*predef*`.caml_exn_Failure)
+               in
+               switch prim_1
+                 | 0 -> k1 pop(reraise k1) (`exn`)
+                 | 1 -> k1 pop(regular k1) ($camlGenlex2__Pmakeblock64)
+             where k2 =
+               cont k1 pop(regular k1) ($camlGenlex2__Pmakeblock65))
+    in
+    let $camlGenlex2__foo_1 = closure foo_0_1 @foo in
+    let $camlGenlex2 = Block 0 ($camlGenlex2__Error40, $camlGenlex2__foo_1)
+    in
+    cont done ($camlGenlex2)

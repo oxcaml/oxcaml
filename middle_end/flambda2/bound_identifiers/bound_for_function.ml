@@ -19,45 +19,38 @@ type t =
     exn_continuation : Continuation.t;
     params : Bound_parameters.t;
     my_closure : Variable.t;
-    my_region : Variable.t option;
-    my_ghost_region : Variable.t option;
+    my_alloc_mode : Alloc_mode.For_applications.t;
     my_depth : Variable.t
   }
 
 let[@ocamlformat "disable"] print ppf
-    { return_continuation; exn_continuation; params; my_closure; my_region;
-      my_ghost_region; my_depth } =
+    { return_continuation; exn_continuation; params; my_closure; my_alloc_mode;
+      my_depth } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(return_continuation@ %a)@]@ \
       @[<hov 1>(exn_continuation@ %a)@]@ \
       @[<hov 1>(params@ %a)@]@ \
       @[<hov 1>(my_closure@ %a)@]@ \
-      @[<hov 1>(my_region@ %a)@]@ \
-      @[<hov 1>(my_ghost_region@ %a)@]@ \
+      @[<hov 1>(my_alloc_mode@ %a)@]@ \
       @[<hov 1>(my_depth@ %a)@])@]"
     Continuation.print return_continuation
     Continuation.print exn_continuation
     Bound_parameters.print params
     Variable.print my_closure
-    (Format.pp_print_option Variable.print) my_region
-    (Format.pp_print_option Variable.print) my_ghost_region
+    Alloc_mode.For_applications.print my_alloc_mode
     Variable.print my_depth
 
-let create ~return_continuation ~exn_continuation ~params ~my_closure ~my_region
-    ~my_ghost_region ~my_depth =
+let create ~return_continuation ~exn_continuation ~params ~my_closure
+    ~my_alloc_mode ~my_depth =
   Bound_parameters.check_no_duplicates params;
   (if Flambda_features.check_invariants ()
    then
      let params_set = Bound_parameters.var_set params in
      let my_set, expected_size =
        let regions, num_regions =
-         match my_region, my_ghost_region with
-         | None, None -> [], 0
-         | Some region, Some ghost_region -> [region; ghost_region], 2
-         | None, Some _ | Some _, None ->
-           Misc.fatal_errorf
-             "[my_region] and [my_ghost_region] must be both present or both \
-              absent"
+         match (my_alloc_mode : Alloc_mode.For_applications.t) with
+         | Heap -> [], 0
+         | Local { region; ghost_region } -> [region; ghost_region], 2
        in
        Variable.Set.of_list (my_closure :: my_depth :: regions), 2 + num_regions
      in
@@ -72,8 +65,7 @@ let create ~return_continuation ~exn_continuation ~params ~my_closure ~my_region
     exn_continuation;
     params;
     my_closure;
-    my_region;
-    my_ghost_region;
+    my_alloc_mode;
     my_depth
   }
 
@@ -85,9 +77,15 @@ let params t = t.params
 
 let my_closure t = t.my_closure
 
-let my_region t = t.my_region
+let my_region t =
+  match t.my_alloc_mode with Heap -> None | Local { region; _ } -> Some region
 
-let my_ghost_region t = t.my_ghost_region
+let my_ghost_region t =
+  match t.my_alloc_mode with
+  | Heap -> None
+  | Local { ghost_region; _ } -> Some ghost_region
+
+let my_alloc_mode t = t.my_alloc_mode
 
 let my_depth t = t.my_depth
 
@@ -96,8 +94,7 @@ let free_names
       exn_continuation;
       params;
       my_closure;
-      my_region;
-      my_ghost_region;
+      my_alloc_mode;
       my_depth
     } =
   (* See [bound_continuations.ml] for why [add_traps] is [true]. *)
@@ -116,17 +113,8 @@ let free_names
     Name_occurrences.add_variable free_names my_closure Name_mode.normal
   in
   let free_names =
-    Option.fold ~none:free_names
-      ~some:(fun my_region ->
-        Name_occurrences.add_variable free_names my_region Name_mode.normal)
-      my_region
-  in
-  let free_names =
-    Option.fold ~none:free_names
-      ~some:(fun my_ghost_region ->
-        Name_occurrences.add_variable free_names my_ghost_region
-          Name_mode.normal)
-      my_ghost_region
+    Name_occurrences.union free_names
+      (Alloc_mode.For_applications.free_names my_alloc_mode)
   in
   Name_occurrences.add_variable free_names my_depth Name_mode.normal
 
@@ -135,8 +123,7 @@ let apply_renaming
       exn_continuation;
       params;
       my_closure;
-      my_region;
-      my_ghost_region;
+      my_alloc_mode;
       my_depth
     } renaming =
   let return_continuation =
@@ -147,9 +134,8 @@ let apply_renaming
   in
   let params = Bound_parameters.apply_renaming params renaming in
   let my_closure = Renaming.apply_variable renaming my_closure in
-  let my_region = Option.map (Renaming.apply_variable renaming) my_region in
-  let my_ghost_region =
-    Option.map (Renaming.apply_variable renaming) my_ghost_region
+  let my_alloc_mode =
+    Alloc_mode.For_applications.apply_renaming my_alloc_mode renaming
   in
   let my_depth = Renaming.apply_variable renaming my_depth in
   (* CR mshinwell: this should have a phys-equal check *)
@@ -157,8 +143,7 @@ let apply_renaming
     exn_continuation;
     params;
     my_closure;
-    my_region;
-    my_ghost_region;
+    my_alloc_mode;
     my_depth
   }
 
@@ -167,8 +152,7 @@ let ids_for_export
       exn_continuation;
       params;
       my_closure;
-      my_region;
-      my_ghost_region;
+      my_alloc_mode;
       my_depth
     } =
   let ids =
@@ -178,15 +162,8 @@ let ids_for_export
   let ids = Ids_for_export.union ids (Bound_parameters.ids_for_export params) in
   let ids = Ids_for_export.add_variable ids my_closure in
   let ids =
-    Option.fold ~none:ids
-      ~some:(fun my_region -> Ids_for_export.add_variable ids my_region)
-      my_region
-  in
-  let ids =
-    Option.fold ~none:ids
-      ~some:(fun my_ghost_region ->
-        Ids_for_export.add_variable ids my_ghost_region)
-      my_ghost_region
+    Ids_for_export.union ids
+      (Alloc_mode.For_applications.ids_for_export my_alloc_mode)
   in
   Ids_for_export.add_variable ids my_depth
 
@@ -195,16 +172,14 @@ let rename
       exn_continuation;
       params;
       my_closure;
-      my_region;
-      my_ghost_region;
+      my_alloc_mode;
       my_depth
     } =
   { return_continuation = Continuation.rename return_continuation;
     exn_continuation = Continuation.rename exn_continuation;
     params = Bound_parameters.rename params;
     my_closure = Variable.rename my_closure;
-    my_region = Option.map (Variable.rename ?append:None) my_region;
-    my_ghost_region = Option.map (Variable.rename ?append:None) my_ghost_region;
+    my_alloc_mode = Alloc_mode.For_applications.rename my_alloc_mode;
     my_depth = Variable.rename my_depth
   }
 
@@ -214,9 +189,8 @@ let is_renamed_version_of t t' =
   && Continuation.is_renamed_version_of t.exn_continuation t'.exn_continuation
   && Bound_parameters.is_renamed_version_of t.params t'.params
   && Variable.is_renamed_version_of t.my_closure t'.my_closure
-  && Option.equal Variable.is_renamed_version_of t.my_region t'.my_region
-  && Option.equal Variable.is_renamed_version_of t.my_ghost_region
-       t'.my_ghost_region
+  && Alloc_mode.For_applications.is_renamed_version_of t.my_alloc_mode
+       t'.my_alloc_mode
   && Variable.is_renamed_version_of t.my_depth t'.my_depth
 
 let renaming
@@ -224,8 +198,7 @@ let renaming
       exn_continuation = exn_continuation1;
       params = params1;
       my_closure = my_closure1;
-      my_region = my_region1;
-      my_ghost_region = my_ghost_region1;
+      my_alloc_mode = my_alloc_mode1;
       my_depth = my_depth1
     }
     ~guaranteed_fresh:
@@ -233,8 +206,7 @@ let renaming
         exn_continuation = exn_continuation2;
         params = params2;
         my_closure = my_closure2;
-        my_region = my_region2;
-        my_ghost_region = my_ghost_region2;
+        my_alloc_mode = my_alloc_mode2;
         my_depth = my_depth2
       } =
   let renaming =
@@ -255,21 +227,10 @@ let renaming
       ~guaranteed_fresh:my_closure2
   in
   let renaming =
-    match my_region1, my_region2 with
-    | None, None -> renaming
-    | Some my_region1, Some my_region2 ->
-      Renaming.add_fresh_variable renaming my_region1
-        ~guaranteed_fresh:my_region2
-    | None, Some _ | Some _, None ->
-      Misc.fatal_error "Mismatched [my_region] field in renaming"
-  in
-  let renaming =
-    match my_ghost_region1, my_ghost_region2 with
-    | None, None -> renaming
-    | Some my_ghost_region1, Some my_ghost_region2 ->
-      Renaming.add_fresh_variable renaming my_ghost_region1
-        ~guaranteed_fresh:my_ghost_region2
-    | None, Some _ | Some _, None ->
-      Misc.fatal_error "Mismatched [my_ghost_region] field in renaming"
+    Renaming.compose
+      ~second:
+        (Alloc_mode.For_applications.renaming my_alloc_mode1
+           ~guaranteed_fresh:my_alloc_mode2)
+      ~first:renaming
   in
   Renaming.add_fresh_variable renaming my_depth1 ~guaranteed_fresh:my_depth2

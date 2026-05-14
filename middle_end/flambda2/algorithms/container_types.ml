@@ -36,6 +36,15 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
 
   let of_list l = List.fold_left (fun map (id, v) -> add id v map) empty l
 
+  let union_total f t1 t2 =
+    union (fun key datum1 datum2 -> Some (f key datum1 datum2)) t1 t2
+
+  let union_total_shared f t1 t2 = union_total f t1 t2
+
+  let union_left_biased t1 t2 = union_total (fun _ left _right -> left) t1 t2
+
+  let union_right_biased t1 t2 = union_total (fun _ _left right -> right) t1 t2
+
   let disjoint_union ?eq ?print m1 m2 =
     ignore print;
     union

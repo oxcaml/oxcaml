@@ -1,0 +1,101 @@
+let $camlIncludecore_repro__const_block56 = Block 0 (0, 0) in
+let code f_0 deleted in
+let $camlIncludecore_repro__const_block61 =
+  Block 0 ($camlIncludecore_repro__const_block56)
+in
+let code inline(never) loopify(never) size(160) newer_version_of(f_0)
+      f_0_1
+        (x :
+           [ 0 of [ 0 |1 | 0 of imm tagged * imm tagged |1 of imm tagged ] ],
+         y :
+           [ 0 of [ 0 |1 | 0 of imm tagged * imm tagged |1 of imm tagged ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  let `*match*` = %block_load.[`0`] (x) in
+  let `*match*_1` = %block_load.[`0`] (y) in
+  (let prim = %is_int (`*match*_1`) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let untagged = %untag_imm (`*match*_1`) in
+       switch untagged
+         | 0 -> k (0)
+         | 1 -> k3)
+    where k3 =
+      ((let prim = %is_int (`*match*`) in
+        switch prim
+          | 0 -> k6
+          | 1 -> k7)
+         where k7 =
+           let untagged = %untag_imm (`*match*`) in
+           switch untagged
+             | 0 -> k2
+             | 1 -> k3
+         where k6 =
+           let prim = %get_tag (`*match*`) in
+           switch prim
+             | 0 -> k4
+             | 1 -> k5
+         where k5 =
+           ((let prim = %is_int (`*match*_1`) in
+             switch prim
+               | 0 -> k6
+               | 1 -> k2)
+              where k6 =
+                let prim = %get_tag (`*match*_1`) in
+                switch prim
+                  | 0 -> k2
+                  | 1 -> k5
+              where k5 =
+                let Pfield = %block_load.[`0`] (`*match*_1`) in
+                let Popaque = %opaque (Pfield) in
+                let Pfield_1 = %block_load.[`0`] (`*match*`) in
+                let Popaque_1 = %opaque (Pfield_1) in
+                let Pmakeblock = %block.[`0`] (Popaque_1, Popaque) in
+                let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+                cont k (Pmakeblock_1))
+         where k4 =
+           ((let prim = %is_int (`*match*_1`) in
+             switch prim
+               | 0 -> k5
+               | 1 -> k2)
+              where k5 =
+                let prim = %get_tag (`*match*_1`) in
+                switch prim
+                  | 0 -> k4
+                  | 1 -> k2
+              where k4 =
+                let Pfield = %block_load.[`1`] (`*match*_1`) in
+                let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
+                let int_add = %int_barith.add (Pfield_1, Pfield) in
+                let Popaque = %opaque (int_add) in
+                let Pfield_2 = %block_load.[`1`] (`*match*`) in
+                let Pfield_3 = %block_load.[`0`] (`*match*`) in
+                let int_add_1 = %int_barith.add (Pfield_3, Pfield_2) in
+                let Popaque_1 = %opaque (int_add_1) in
+                let Pmakeblock = %block.[`0`] (Popaque_1, Popaque) in
+                let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+                cont k (Pmakeblock_1))
+         where k3 =
+           let prim = %is_int (`*match*_1`) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k (0))
+    where k2 =
+      let Popaque = %opaque ($camlIncludecore_repro__const_block56) in
+      let Pmakeblock = %block.[`0`] (Popaque) in
+      cont k (Pmakeblock)
+in
+let $camlIncludecore_repro__f_1 = closure f_0_1 @f in
+apply direct(f_0_1)
+  ($camlIncludecore_repro__f_1 : _ -> [ 0 | 0 of val ])
+    ($camlIncludecore_repro__const_block61,
+     $camlIncludecore_repro__const_block61)
+    -> k1 * error
+  where k1 (param : [ 0 | 0 of val ]) =
+    cont k
+  where k =
+    let $camlIncludecore_repro = Block 0 ($camlIncludecore_repro__f_1) in
+    cont done ($camlIncludecore_repro)

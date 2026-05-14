@@ -712,8 +712,10 @@ let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
   match (width : P.string_accessor_width) with
   | Eight | Eight_signed ->
     let addr = C.add_int_ptr ~ptr_out_of_heap bytes index dbg in
+    let new_value = C.low_bits ~bits:8 new_value ~dbg in
     C.store ~dbg Byte_unsigned Assignment ~addr ~new_value
   | Sixteen | Sixteen_signed ->
+    let new_value = C.low_bits ~bits:16 new_value ~dbg in
     C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
   | Thirty_two -> C.unaligned_set_32 ~ptr_out_of_heap bytes index new_value dbg
   | Single -> C.unaligned_set_f32 ~ptr_out_of_heap bytes index new_value dbg
@@ -974,8 +976,13 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
 
+let relevant_bits_for_shift_amount =
+  if Arch.ocaml_shifts_are_wrapping
+  then Misc.log2 (Arch.size_int * 8)
+  else Arch.size_int * 8
+
 let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
-  (* See comments on [binary_int_arity_primitive], above, about sign extension
+  (* See comments on [binary_int_arith_primitive], above, about sign extension
      and use of [C.low_bits]. *)
   match[@warning "-fragile-match"] (kind : K.Standard_int.t) with
   | Tagged_immediate -> (
@@ -1003,6 +1010,7 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
            bits into the high bits of the register. *)
         C.lsl_int, C.Scalar_type.Integer.nativeint
     in
+    let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
     C.Scalar_type.Integral.conjugate ~outer:kind ~inner:(Untagged op_kind) ~dbg
       ~f:(fun x ->
         (* [kind] only applies to [x], the [y] argument is always a bare
@@ -1118,9 +1126,10 @@ let unary_primitive env res dbg f arg =
   | Duplicate_array _ | Duplicate_block _ | Obj_dup ->
     ( None,
       res,
-      C.extcall ~dbg ~alloc:true ~returns:true ~is_c_builtin:false
-        ~effects:No_effects ~coeffects:Has_coeffects ~ty_args:[] "caml_obj_dup"
-        Cmm.typ_val [arg] )
+      (C.extcall ~dbg ~alloc:true ~returns:true ~is_c_builtin:false
+         ~effects:No_effects ~coeffects:Has_coeffects ~ty_args:[] "caml_obj_dup"
+         Cmm.typ_val [arg])
+        .extcall )
   | Is_int _ -> None, res, C.and_int arg (C.int ~dbg 1) dbg
   | Is_null -> None, res, C.eq ~dbg arg (C.nativeint ~dbg 0n)
   | Get_tag -> None, res, C.get_tag arg dbg

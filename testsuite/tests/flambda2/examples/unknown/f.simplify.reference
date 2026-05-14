@@ -1,0 +1,49 @@
+let $camlF__string28 = "index out of bounds" in
+let $camlF__block30 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlF__string28)
+in
+let code maxson_0 deleted in
+let code loopify(never) size(82) newer_version_of(maxson_0)
+      maxson_0_1 (cmp : val, a : float array, l : imm tagged, i : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (i, i) in
+  let int_add_1 = %int_barith.add (int_add, i) in
+  let i31 = %int_barith.add (int_add_1, 1) in
+  let int_add_2 = %int_barith.add (i31, 1) in
+  let prim = %int_comp.lt (int_add_2, l) in
+  switch prim
+    | 0 -> k (0)
+    | 1 -> k2
+    where k2 =
+      ((let prim_1 = %array_length (a) in
+        let prim_2 = %int_comp.unsigned.lt (int_add_2, prim_1) in
+        switch prim_2
+          | 0 -> k2
+          | 1 -> k3 (prim_1))
+         where k3 (prim_1) =
+           let cse_param = prim_1 in
+           let prim_2 = %array_load.`float`.mut (a, int_add_2) in
+           let Parrayrefs = %box_num.`float` (prim_2) in
+           ((let prim_3 = %int_comp.unsigned.lt (i31, cse_param) in
+             switch prim_3
+               | 0 -> k3
+               | 1 -> k4)
+              where k4 =
+                let prim_3 = %array_load.`float`.mut (a, i31) in
+                let Parrayrefs_1 = %box_num.`float` (prim_3) in
+                (apply cmp (Parrayrefs_1, Parrayrefs) -> k4 * k1
+                   where k4 (return_val0 : imm tagged) =
+                     let prim_4 = %int_comp.lt (return_val0, 0) in
+                     switch prim_4
+                       | 0 -> k (0)
+                       | 1 -> k (int_add_2))
+              where k3 =
+                cont k1 pop(regular k1) ($camlF__block30))
+         where k2 =
+           cont k1 pop(regular k1) ($camlF__block30))
+in
+let $camlF__maxson_1 = closure maxson_0_1 @maxson in
+let $camlF = Block 0 ($camlF__maxson_1) in
+cont done ($camlF)

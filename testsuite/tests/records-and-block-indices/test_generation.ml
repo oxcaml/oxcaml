@@ -274,7 +274,7 @@ let test_array_idx_access ~local ty =
     (Type.value_code ty 0);
   line "(* Fill [a] with distinct values using block indices *)";
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
-      line "Idx_mut.unsafe_set a (.(i)) (mk_value i);"
+      line "Idx_mut.set a (Idx_mut.unsafe_create_into_array i) (mk_value i);"
   );
   line "Gc.compact ();";
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
@@ -282,7 +282,8 @@ let test_array_idx_access ~local ty =
   );
   line "(* Also read back those values with block indices *)";
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
-      seq_assert ~debug_exprs "eq (Idx_mut.unsafe_get a (.(i))) (mk_value i)"
+      seq_assert ~debug_exprs
+        "eq (Idx_mut.get a (Idx_mut.unsafe_create_into_array i)) (mk_value i)"
   );
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
       List.iter (Type.unboxed_paths_by_depth ty)
@@ -322,12 +323,13 @@ let test_array_idx_access ~local ty =
                 in
                 line "let el = %s in" reference_update;
                 line
-                  "Idx_mut.unsafe_set a ((.(i)%s) : (%s array, _) idx_mut) \
-                   next_el%s;"
+                  "Idx_mut.set a ((.idx_mut(Idx_mut.unsafe_create_into_array \
+                   i)%s) : (%s array, _) idx_mut) next_el%s;"
                   (Path.to_string unboxed_path)
                   (Type.code ty)
                   (Path.to_string unboxed_path);
-                seq_assert ~debug_exprs "eq (Idx_mut.unsafe_get a (.(i))) el"
+                seq_assert ~debug_exprs
+                  "eq (Idx_mut.get a (Idx_mut.unsafe_create_into_array i)) el"
             )
           )
       );
@@ -348,16 +350,23 @@ let test_array_idx_deepening ty =
   type_section ty;
   List.iter unboxed_paths_by_depth ~f:(fun (depth, unboxed_paths) ->
       List.iter unboxed_paths ~f:(fun unboxed_path ->
-          line "(* Deepening to (.(i)%s) *)" (Path.to_string unboxed_path);
+          line "(* Deepening to array idx with path %s *)"
+            (Path.to_string unboxed_path);
           line "iter indices_in_deepening_tests ~f:(fun i ->";
           with_indent (fun () ->
-              line "let unboxed_path : (%s, _) idx_mut = (.(i)%s) in" ty_array_s
-                (Path.to_string unboxed_path);
+              let base_idx = "Idx_mut.unsafe_create_into_array i" in
+              let mk_array_idx path_s =
+                if path_s = ""
+                then base_idx
+                else sprintf "(.idx_mut(%s)%s)" base_idx path_s
+              in
+              line "let unboxed_path : (%s, _) idx_mut = %s in" ty_array_s
+                (mk_array_idx (Path.to_string unboxed_path));
               for prefix_len = 0 to depth do
                 let prefix, suffix = take_n unboxed_path prefix_len in
-                line "(* from (.(i)%s) *)" (Path.to_string prefix);
-                line "let shallow : (%s, _) idx_mut = (.(i)%s) in" ty_array_s
-                  (Path.to_string prefix);
+                line "(* from array idx with path %s *)" (Path.to_string prefix);
+                line "let shallow : (%s, _) idx_mut = %s in" ty_array_s
+                  (mk_array_idx (Path.to_string prefix));
                 line "let deepened = (.idx_mut(shallow)%s) in"
                   (Path.to_string suffix);
                 seq_assert ~debug_exprs
@@ -472,10 +481,10 @@ let test_record_idx_access ty ~local =
                       )
                   else sprintf "next_r%s" (Path.to_string full_path)
                 in
-                line "Idx_mut.unsafe_set r %s %s;" idx next_r_sub_element_flat;
+                line "Idx_mut.set r %s %s;" idx next_r_sub_element_flat;
                 seq_assert ~debug_exprs "eq r expected";
                 seq_assert ~debug_exprs
-                  (sprintf "sub_eq (Idx_mut.unsafe_get r %s) %s" idx
+                  (sprintf "sub_eq (Idx_mut.get r %s) %s" idx
                      next_r_sub_element_flat
                   )
               in

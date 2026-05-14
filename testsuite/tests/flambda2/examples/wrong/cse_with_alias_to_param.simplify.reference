@@ -1,0 +1,36 @@
+let code id_0 deleted in
+let code foo_1 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(id_0)
+      id_0_1 (lam) my_closure _region _ghost_region my_depth -> k * k1 =
+  cont k (lam)
+in
+let $camlCse_with_alias_to_param__id_2 = closure id_0_1 @`id` in
+let code loopify(never) size(42) newer_version_of(foo_1)
+      foo_1_1 (v : val, opt : [ 0 | 0 of val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 of val ] * [ 0 of val ] ] =
+  (let prim = %is_int (opt) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let Pmakeblock = %block.[`0`] (v) in
+       cont k2 (Pmakeblock)
+     where k3 =
+       let Pmakeblock = %block.[`0`] (v) in
+       apply direct(id_0_1)
+         ($camlCse_with_alias_to_param__id_2 : _ -> [ 0 of val ])
+           (Pmakeblock)
+           -> k2 * k1)
+    where k2 (x : [ 0 of val ]) =
+      let Pmakeblock = %block.[`0`] (v) in
+      let Pmakeblock_1 = %block.[`0`] (Pmakeblock, x) in
+      cont k (Pmakeblock_1)
+in
+let $camlCse_with_alias_to_param__foo_3 = closure foo_1_1 @foo in
+let $camlCse_with_alias_to_param =
+  Block 0 ($camlCse_with_alias_to_param__id_2,
+           $camlCse_with_alias_to_param__foo_3)
+in
+cont done ($camlCse_with_alias_to_param)

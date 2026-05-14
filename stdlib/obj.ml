@@ -62,9 +62,9 @@ let [@inline always] set_double_field x i v =
 external box_int64 : int64# -> int64 @@ portable = "%box_int64"
 external unbox_int64 : int64 -> int64# @@ portable = "%unbox_int64"
 external unsafe_get_int64_field : t -> int64# -> int64# @@ portable
-  = "%unsafe_get_idx"
+  = "%get_idx"
 external unsafe_set_int64_field : t -> int64# -> int64# -> unit @@ portable
-  = "%unsafe_set_idx"
+  = "%set_idx"
 external raw_field_bytecode : t -> int -> raw_data @@ portable
   = "caml_obj_raw_field"
 external set_raw_field_bytecode : t -> int -> raw_data -> unit @@ portable
