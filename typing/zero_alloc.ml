@@ -137,9 +137,8 @@ let print_error ppf error =
        | Opt -> "opt")
   | Arity_mismatch (n1, n2, Signature) ->
     pr "zero_alloc arity mismatch:@ \
-        When using \"zero_alloc\" in a signature, the@ \
-        syntactic arity of the implementation must match the function type in@ \
-        the interface.@ \
+        When using \"zero_alloc\" in a signature, the syntactic arity of@ \
+        the implementation must match the function type in the interface.@ \
         Here the former is %d and the latter is %d."
       n1 n2
   | Arity_mismatch (n1, n2, Type_constraint) ->
@@ -148,7 +147,10 @@ let print_error ppf error =
         Here the arity in the actual parameter term is %d and the arity in@ \
         the type of the function is %d."
       n1 n2
-  | Arity_mismatch (n1, n2, Fun_param)
+  | Arity_mismatch (n1, n2, Fun_param) ->
+    pr "Inconsistent \"zero_alloc\" arity payload for a function parameter:@ \
+        the implementation specifies %d, but it is constrained to be %d."
+      n1 n2
   | Arity_mismatch (n1, n2, Default) ->
     pr "Inconsistent \"zero_alloc\" arity properties: seen both %d and %d.@ \
         This error should never be reported in this context.@ \

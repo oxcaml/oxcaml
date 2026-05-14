@@ -35,9 +35,6 @@ end
 module TestZeroAllocStruct = struct
   type 'a t1 = 'a [@@zero_alloc] (* rejected *)
   type s1 = Foo1 [@zero_alloc] (* rejected *)
-  let x : int = 42 [@@zero_alloc] (* rejected *)
-
-  let[@zero_alloc] w = 42 (* rejected *)
 
   let[@zero_alloc] f x = x (* accepted *)
 
@@ -65,15 +62,6 @@ module TestZeroAllocStruct = struct
     ((boz x)[@zero_alloc assume]) (* rejected *)
   let[@zero_alloc] fuz x =
     ((boz[@zero_alloc assume]) x) (* accepted *)
-
-  (* Triggers w53 on non-function lets *)
-  let[@zero_alloc assume] foo = (* rejected *)
-    let x = 42 in
-    fun z -> z + x
-
-  let[@zero_alloc] bar = (* rejected *)
-    let x = 42 in
-    fun z -> z + x
 end
 
 (* TEST

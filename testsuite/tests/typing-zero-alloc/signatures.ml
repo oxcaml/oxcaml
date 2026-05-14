@@ -558,9 +558,8 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -608,9 +607,8 @@ Error: Signature mismatch:
        is not included in
          val f : t_two_args [@@zero_alloc arity 2]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -645,9 +643,8 @@ Error: Signature mismatch:
        is not included in
          val f : t_two_args [@@zero_alloc arity 1]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -711,9 +708,8 @@ Error: Signature mismatch:
        is not included in
          val f : int -> t [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -756,9 +752,8 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int -> int * int [@@zero_alloc arity 2]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 3 and the latter is 2.
 |}]
 
@@ -1104,9 +1099,8 @@ Error: Signature mismatch:
        is not included in
          val f : int -> t [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -1132,9 +1126,8 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the
-       syntactic arity of the implementation must match the function type in
-       the interface.
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -1831,4 +1824,40 @@ module T3 :
     module M' : S1
     module M'' : S2
   end
+|}]
+
+(*****************************************)
+(* Test 19: Interaction of value aliases *)
+
+module T1 : sig
+  val[@zero_alloc] f : 'a -> 'a
+  val[@zero_alloc] g : 'a -> 'a
+end = struct
+  let (f as g) = fun x -> x
+end
+[%%expect{|
+module T1 :
+  sig val f : 'a -> 'a [@@zero_alloc] val g : 'a -> 'a [@@zero_alloc] end
+|}]
+
+module T1' : sig
+  val[@zero_alloc] f : 'a -> 'a
+  val[@zero_alloc] g : int -> int
+end = struct
+  let (f as g) = fun x -> x
+end
+[%%expect{|
+module T1' :
+  sig val f : 'a -> 'a [@@zero_alloc] val g : int -> int [@@zero_alloc] end
+|}]
+
+module T2 : sig
+  val[@zero_alloc] f : 'a -> 'a
+  val[@zero_alloc] g : int -> int
+end = struct
+  let[@zero_alloc] (f as g) = fun x -> x
+end
+[%%expect{|
+module T2 :
+  sig val f : 'a -> 'a [@@zero_alloc] val g : int -> int [@@zero_alloc] end
 |}]
