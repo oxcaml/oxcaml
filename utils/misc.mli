@@ -1123,12 +1123,6 @@ type (_, _) is_eq =
   | Is_eq : ('a, 'a) is_eq
   | Is_not_eq : ('a, 'b) is_eq
 
-(** Propositional comparison *)
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
-
 (** Utilities for module-level programming *)
 module type T = sig
   type t

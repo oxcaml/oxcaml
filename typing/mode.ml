@@ -22,11 +22,6 @@ open Mode_intf
 module Hint = Mode_hint
 module Fmt = Format_doc
 
-let int_of_comparison : type a b. (a, b) Misc.comparison -> int = function
-  | Less_than -> -1
-  | Equal -> 0
-  | Greater_than -> 1
-
 module Hint_for_solver (* : Solver_intf.Hint *) = struct
   module Pinpoint = struct
     type t = Hint.pinpoint
@@ -1323,59 +1318,38 @@ module Lattices_mono = struct
       | Visibility -> Fmt.fprintf ppf "visibility"
       | Staticity -> Fmt.fprintf ppf "staticity"
 
-    let equal : type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) Misc.eq option
-        =
+    let equal : type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) Misc.is_eq =
      fun ax1 ax2 ->
       match ax1, ax2 with
-      | Areality, Areality -> Some Refl
-      | Linearity, Linearity -> Some Refl
-      | Portability, Portability -> Some Refl
-      | Uniqueness, Uniqueness -> Some Refl
-      | Contention, Contention -> Some Refl
-      | Forkable, Forkable -> Some Refl
-      | Yielding, Yielding -> Some Refl
-      | Statefulness, Statefulness -> Some Refl
-      | Visibility, Visibility -> Some Refl
-      | Staticity, Staticity -> Some Refl
+      | Areality, Areality -> Is_eq
+      | Linearity, Linearity -> Is_eq
+      | Portability, Portability -> Is_eq
+      | Uniqueness, Uniqueness -> Is_eq
+      | Contention, Contention -> Is_eq
+      | Forkable, Forkable -> Is_eq
+      | Yielding, Yielding -> Is_eq
+      | Statefulness, Statefulness -> Is_eq
+      | Visibility, Visibility -> Is_eq
+      | Staticity, Staticity -> Is_eq
       | ( ( Areality | Linearity | Uniqueness | Portability | Contention
           | Forkable | Yielding | Statefulness | Visibility | Staticity ),
           _ ) ->
-        None
+        Is_not_eq
 
-    let compare : type p r1 r2.
-        (p, r1) t -> (p, r2) t -> (r1, r2) Misc.comparison =
-     fun ax1 ax2 ->
-      match ax1, ax2 with
-      | Areality, Areality -> Equal
-      | Areality, _ -> Less_than
-      | _, Areality -> Greater_than
-      | Forkable, Forkable -> Equal
-      | Forkable, _ -> Less_than
-      | _, Forkable -> Greater_than
-      | Yielding, Yielding -> Equal
-      | Yielding, _ -> Less_than
-      | _, Yielding -> Greater_than
-      | Linearity, Linearity -> Equal
-      | Linearity, _ -> Less_than
-      | _, Linearity -> Greater_than
-      | Statefulness, Statefulness -> Equal
-      | Statefulness, _ -> Less_than
-      | _, Statefulness -> Greater_than
-      | Portability, Portability -> Equal
-      | Portability, _ -> .
-      | _, Portability -> .
-      | Uniqueness, Uniqueness -> Equal
-      | Uniqueness, _ -> Less_than
-      | _, Uniqueness -> Greater_than
-      | Visibility, Visibility -> Equal
-      | Visibility, _ -> Less_than
-      | _, Visibility -> Greater_than
-      | Contention, Contention -> Equal
-      | Contention, _ -> Less_than
-      | _, Contention -> Greater_than
-      | Staticity, Staticity -> Equal
-      | Staticity, _ -> .
-      | _, Staticity -> .
+    let ord : type p r. (p, r) t -> int = function
+      | Areality -> 0
+      | Forkable -> 1
+      | Yielding -> 2
+      | Linearity -> 3
+      | Statefulness -> 4
+      | Portability -> 5
+      | Uniqueness -> 6
+      | Visibility -> 7
+      | Contention -> 8
+      | Staticity -> 9
+
+    let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
+     fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
 
     let proj : type p r. (p, r) t -> p -> r =
      fun ax t ->
@@ -1613,13 +1587,6 @@ module Lattices_mono = struct
       let src0 = src dst0 f in
       comonadic_with_obj src0
 
-  let axis_is_eq : type p r1 r2.
-      (p, r1) Axis.t -> (p, r2) Axis.t -> (r1, r2) Misc.is_eq =
-   fun ax1 ax2 ->
-    match Axis.compare ax1 ax2 with
-    | Equal -> Misc.Is_eq
-    | Less_than | Greater_than -> Misc.Is_not_eq
-
   let rec compare_morph : type a1 l1 r1 a2 b l2 r2.
       b obj -> (a1, b, l1 * r1) morph -> (a2, b, l2 * r2) morph -> int =
    fun dst f1 f2 ->
@@ -1633,16 +1600,16 @@ module Lattices_mono = struct
       then c
       else
         match equal_obj src1 src2 with
-        | Misc.Is_eq -> int_of_comparison (Axis.compare ax1 ax2)
+        | Misc.Is_eq -> Axis.compare ax1 ax2
         | Misc.Is_not_eq ->
           Misc.fatal_error
             "Mode.Lattices_mono.compare_morph: inconsistent object equality")
     | Proj _, _ -> -1
     | _, Proj _ -> 1
-    | Max_with ax1, Max_with ax2 -> int_of_comparison (Axis.compare ax1 ax2)
+    | Max_with ax1, Max_with ax2 -> Axis.compare ax1 ax2
     | Max_with _, _ -> -1
     | _, Max_with _ -> 1
-    | Min_with ax1, Min_with ax2 -> int_of_comparison (Axis.compare ax1 ax2)
+    | Min_with ax1, Min_with ax2 -> Axis.compare ax1 ax2
     | Min_with _, _ -> -1
     | _, Min_with _ -> 1
     | Meet_const c1, Meet_const c2 -> compare_total dst c1 c2
@@ -1707,11 +1674,11 @@ module Lattices_mono = struct
       match equal_obj src1 src2 with
       | Misc.Is_not_eq -> Misc.Is_not_eq
       | Misc.Is_eq -> (
-        match Axis.compare ax1 ax2 with
-        | Equal -> Misc.Is_eq
-        | Less_than | Greater_than -> Misc.Is_not_eq))
-    | Max_with ax1, Max_with ax2 -> axis_is_eq ax1 ax2
-    | Min_with ax1, Min_with ax2 -> axis_is_eq ax1 ax2
+        match Axis.equal ax1 ax2 with
+        | Misc.Is_eq -> Misc.Is_eq
+        | Misc.Is_not_eq -> Misc.Is_not_eq))
+    | Max_with ax1, Max_with ax2 -> Axis.equal ax1 ax2
+    | Min_with ax1, Min_with ax2 -> Axis.equal ax1 ax2
     | Meet_const c1, Meet_const c2 ->
       if equal dst c1 c2 then Misc.Is_eq else Misc.Is_not_eq
     | Imply_const c1, Imply_const c2 ->
@@ -1997,8 +1964,8 @@ module Lattices_mono = struct
         | Portability -> Axis Portability)
       | Max_with m_ax, ax | Min_with m_ax, ax -> (
         match Axis.equal m_ax ax with
-        | None -> NoneResponsible
-        | Some Refl -> SourceIsSingle)
+        | Is_not_eq -> NoneResponsible
+        | Is_eq -> SourceIsSingle)
       | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
       | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
       | Comonadic_to_monadic_min _, ax -> handle_comonadic_to_monadic ax
@@ -2048,9 +2015,9 @@ module Lattices_mono = struct
     | Proj (mid, ax), Meet_const c ->
       Some (compose dst (Meet_const (Axis.proj ax c)) (Proj (mid, ax)))
     | Proj (_, ax1), Max_with ax2 -> (
-      match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Id)
+      match Axis.equal ax1 ax2 with Is_not_eq -> None | Is_eq -> Some Id)
     | Proj (_, ax1), Min_with ax2 -> (
-      match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Id)
+      match Axis.equal ax1 ax2 with Is_not_eq -> None | Is_eq -> Some Id)
     | Proj (mid, ax), Map_comonadic f -> (
       let src' = src mid m2 in
       match ax with
@@ -3568,7 +3535,7 @@ module Comonadic_with (Areality : Areality) = struct
         P Forkable;
         P Yielding;
         P Statefulness ]
-      |> List.sort (fun (P ax1) (P ax2) -> int_of_comparison (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3711,7 +3678,7 @@ module Monadic = struct
 
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
-      |> List.sort (fun (P ax1) (P ax2) -> int_of_comparison (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3851,12 +3818,12 @@ module Value_with (Areality : Areality) = struct
       | Comonadic : 'a Comonadic.Axis.t -> 'a t
       | Monadic : 'a Monadic.Axis.t -> 'a t
 
-    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
+    let compare : type a b. a t -> b t -> int =
      fun t1 t2 ->
       match t1, t2 with
       | Comonadic t1, Comonadic t2 -> Axis.compare t1 t2
-      | Comonadic _, _ -> Less_than
-      | _, Comonadic _ -> Greater_than
+      | Comonadic _, _ -> -1
+      | _, Comonadic _ -> 1
       | Monadic t1, Monadic t2 -> Axis.compare t1 t2
 
     type packed = P : 'a t -> packed
@@ -3871,7 +3838,7 @@ module Value_with (Areality : Areality) = struct
       @ List.map
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
-      |> List.sort (fun (P ax1) (P ax2) -> int_of_comparison (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function
@@ -5345,23 +5312,22 @@ module Crossing = struct
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
 
-    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
+    let compare : type a b. a t -> b t -> int =
      fun ax1 ax2 ->
       match ax1, ax2 with
-      | Monadic ax1, Monadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Equal -> Equal
-        | Greater_than -> Greater_than
-        end
-      | Monadic _, _ -> Less_than
-      | _, Monadic _ -> Greater_than
-      | Comonadic ax1, Comonadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Equal -> Equal
-        | Greater_than -> Greater_than
-        end
+      | Monadic ax1, Monadic ax2 -> Axis.compare ax1 ax2
+      | Monadic _, _ -> -1
+      | _, Monadic _ -> 1
+      | Comonadic ax1, Comonadic ax2 -> Axis.compare ax1 ax2
+
+    let equal : type a b. a t -> b t -> (a, b) Misc.is_eq =
+     fun ax1 ax2 ->
+      match ax1, ax2 with
+      | Monadic ax1, Monadic ax2 -> (
+        match Axis.equal ax1 ax2 with Is_eq -> Is_eq | Is_not_eq -> Is_not_eq)
+      | Comonadic ax1, Comonadic ax2 -> (
+        match Axis.equal ax1 ax2 with Is_eq -> Is_eq | Is_not_eq -> Is_not_eq)
+      | (Monadic _ | Comonadic _), _ -> Is_not_eq
 
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
@@ -5410,14 +5376,10 @@ module Crossing = struct
 
     let print_obj = Axis.print
 
-    let compare_obj : type a b. a Axis.t -> b Axis.t -> int =
-     fun ax1 ax2 -> int_of_comparison (Axis.compare ax1 ax2)
+    let compare_obj : type a b. a Axis.t -> b Axis.t -> int = Axis.compare
 
     let equal_obj : type a b. a Axis.t -> b Axis.t -> (a, b) Misc.is_eq =
-     fun ax1 ax2 ->
-      match Axis.compare ax1 ax2 with
-      | Equal -> Misc.Is_eq
-      | Less_than | Greater_than -> Misc.Is_not_eq
+      Axis.equal
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic

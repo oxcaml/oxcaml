@@ -1930,11 +1930,6 @@ type (_, _) is_eq =
   | Is_eq : ('a, 'a) is_eq
   | Is_not_eq : ('a, 'b) is_eq
 
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
-
 (*********************************************)
 (* Fancy modules *)
 
