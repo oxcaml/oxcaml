@@ -6783,8 +6783,7 @@ and type_expect_
         with_local_level_generalize begin fun () ->
           let expected_ty, sort = new_rep_var ~why:Match () in
           let arg =
-            type_expect env arg_expected_mode sarg
-              (mk_expected expected_ty)
+            type_expect env arg_expected_mode sarg (mk_expected expected_ty)
           in
           arg, sort
         end ~before_generalize:(fun (arg, _) ->
