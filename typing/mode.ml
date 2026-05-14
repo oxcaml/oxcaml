@@ -5376,10 +5376,9 @@ module Crossing = struct
 
     let print_obj = Axis.print
 
-    let compare_obj : type a b. a Axis.t -> b Axis.t -> int = Axis.compare
+    let compare_obj = Axis.compare
 
-    let equal_obj : type a b. a Axis.t -> b Axis.t -> (a, b) Misc.is_eq =
-      Axis.equal
+    let equal_obj = Axis.equal
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
