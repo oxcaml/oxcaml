@@ -1279,7 +1279,7 @@ let () =
    interface. *)
 
 let compunit0
-    ~comparison ~modes env ~mark impl_name impl_sig intf_name intf_sig
+    ~comparison env ~mark impl_name ~modes impl_sig intf_name intf_sig
     unit_shape =
   let direction = Directionality.strictly_positive ~mark ~both:false in
   match
@@ -1297,9 +1297,9 @@ let compunit = compunit0 ~comparison:Implementation_vs_interface
 (* Check that the interface of a compilation unit meets the interface of the
    parameter it's declared to be an argument for using [-as-argument-for] *)
 
-let compunit_as_argument ~modes env arg_name arg_sig param_name param_sig =
+let compunit_as_argument env arg_name ~modes arg_sig param_name param_sig =
   let cc, _shape =
-    compunit0 env ~modes arg_name arg_sig param_name param_sig Shape.dummy_mod
+    compunit0 env arg_name ~modes arg_sig param_name param_sig Shape.dummy_mod
       ~comparison:Argument_vs_parameter ~mark:true
   in
   cc
