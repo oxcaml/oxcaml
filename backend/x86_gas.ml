@@ -331,7 +331,7 @@ let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
     (fun line ->
       match[@warning "-4"] line with
       | Directive (D.New_label (D.Label l, _)) ->
-        Hashtbl.add hidden_labels (L.encode l) ();
+        Hashtbl.add hidden_labels (L.encode l) ()
       | Ins _ | Directive _ -> ())
     hidden_gc_jump_pads;
   let rewrite_str s =
