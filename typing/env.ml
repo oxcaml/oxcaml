@@ -1120,6 +1120,7 @@ let rec address_head = function
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
   val get : unit -> Unit_info.t option
+  val get_cu : unit -> Compilation_unit.t option
   val set : Unit_info.t option -> unit
   val is : string -> bool
   val is_ident : Ident.t -> bool
@@ -1150,6 +1151,9 @@ end
 let set_unit_name = Current_unit_name.set
 let get_unit_name = Current_unit_name.get
 
+let in_current_unit_and_stage ~name ~stage =
+  Current_unit_name.is name && stage = 0
+
 let find_same_module id tbl =
   match IdTbl.find_same_without_locks id tbl with
   | x -> x
@@ -1157,10 +1161,10 @@ let find_same_module id tbl =
     when Ident.is_global id && not (Current_unit_name.is_ident id) ->
       Mod_persistent
 
-let find_name_module ~mark name tbl =
+let find_name_module ~mark ~stage name tbl =
   match IdTbl.find_name_and_locks wrap_module ~mark name tbl with
   | Ok x -> x
-  | Error locks when not (Current_unit_name.is name) ->
+  | Error locks when not (in_current_unit_and_stage ~name ~stage) ->
       let path = Pident(Ident.create_persistent name) in
       path, locks, Mod_persistent
   | _ ->
@@ -1856,12 +1860,23 @@ let add_required_global path env =
   add_required_ident (Path.head path) env
 
 let add_required_global_for_quote path env =
-  let address = find_module_address path env in
-  begin match address_head address with
-  | AHlocal _ -> ()
-  | AHunit cu ->
-    add_required_unit cu;
-    Persistent_env.require_impl_for_quote !persistent_env cu
+  begin
+  if Current_unit_name.is (Path.name path)
+  then
+    match Current_unit_name.get_cu () with
+    | Some cu ->
+      Persistent_env.require_impl_for_quote !persistent_env cu
+    | None ->
+      Misc.fatal_error
+        "the current compilation unit was required for a quote \
+        but is unavailable"
+  else
+    let address = find_module_address path env in
+    match address_head address with
+    | AHlocal _ -> ()
+    | AHunit cu ->
+      add_required_unit cu;
+      Persistent_env.require_impl_for_quote !persistent_env cu
   end;
   begin match Ident.to_global (Path.head path) with
   | None -> ()
@@ -3599,7 +3614,7 @@ let lookup_global_name_module_no_locks
 
 let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
-    match find_name_module ~mark:use s env.modules with
+    match find_name_module ~mark:use ~stage:env.stage s env.modules with
     | path, locks, data -> begin
         let stage_locks, locks = partition_locks locks in
         check_cross_quotation ~errors ~loc_use:loc ~loc_def:Location.none env
@@ -4664,7 +4679,7 @@ let bound_module name env =
   match IdTbl.find_name_and_locks wrap_module ~mark:false name env.modules with
   | Ok _ -> true
   | Error _ ->
-      if Current_unit_name.is name then false
+      if in_current_unit_and_stage ~name ~stage:env.stage then false
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
