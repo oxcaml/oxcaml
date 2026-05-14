@@ -6757,7 +6757,6 @@ and type_expect_
       in
       if val_caselist = [] && eff_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
-      let exp_env = env in
       let env, arg_pat_mode, arg_expected_mode, expected_mode =
         match eff_caselist with
         | [] ->
@@ -6800,8 +6799,8 @@ and type_expect_
         match eff_caselist with
         | [] -> []
         | eff_caselist ->
-            type_effect_cases Value env expected_mode ty_expected_explained
-              loc eff_caselist eff_conts
+            type_effect_cases Value env expected_mode ty_expected_explained loc
+              eff_caselist eff_conts
       in
       if
         List.for_all (fun c -> pattern_needs_partial_application_check c.c_lhs)
@@ -6812,7 +6811,7 @@ and type_expect_
         exp_loc = loc; exp_extra;
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env }
+        exp_env = env }
   | Pexp_try(sbody, caselist) ->
       check_dynamic (loc, Expression) (Always_dynamic Try_with) expected_mode;
       let arg_mode = simple_pat_mode Value.legacy in
@@ -6827,7 +6826,6 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
-      let exp_env = env in
       let env, body_mode, expected_mode =
         match eff_caselist with
         | [] -> env, mode_trywith expected_mode, expected_mode
@@ -6850,15 +6848,15 @@ and type_expect_
         match eff_caselist with
         | [] -> []
         | eff_caselist ->
-            type_effect_cases Value env expected_mode ty_expected_explained
-              loc eff_caselist eff_conts
+            type_effect_cases Value env expected_mode ty_expected_explained loc
+              eff_caselist eff_conts
       in
       re {
         exp_desc = Texp_try(body, exn_cases, eff_cases);
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
-        exp_env }
+        exp_env = env }
   | Pexp_tuple sexpl ->
       type_tuple ~overwrite ~loc ~env ~expected_mode ~ty_expected ~explanation
         ~attributes:sexp.pexp_attributes sexpl
