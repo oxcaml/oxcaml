@@ -53,57 +53,37 @@ File "w53_zero_alloc_all.ml", line 37, characters 19-29:
                         ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 38, characters 22-32:
-38 |   let x : int = 42 [@@zero_alloc] (* rejected *)
-                           ^^^^^^^^^^
-Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
-
-File "w53_zero_alloc_all.ml", line 40, characters 7-17:
-40 |   let[@zero_alloc] w = 42 (* rejected *)
-            ^^^^^^^^^^
-Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
-
-File "w53_zero_alloc_all.ml", line 44, characters 39-49:
-44 |   external z : int -> int = "x" "y" [@@zero_alloc] (* rejected *)
+File "w53_zero_alloc_all.ml", line 41, characters 39-49:
+41 |   external z : int -> int = "x" "y" [@@zero_alloc] (* rejected *)
                                             ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 45, characters 12-22:
-45 |   external[@zero_alloc] q : int -> int = "x" "y" (* rejected *)
+File "w53_zero_alloc_all.ml", line 42, characters 12-22:
+42 |   external[@zero_alloc] q : int -> int = "x" "y" (* rejected *)
                  ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 47, characters 9-19:
-47 |   class[@zero_alloc] foo _y = (* rejected *)
+File "w53_zero_alloc_all.ml", line 44, characters 9-19:
+44 |   class[@zero_alloc] foo _y = (* rejected *)
               ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 49, characters 10-20:
-49 |     (fun[@zero_alloc] z -> (* rejected *)
+File "w53_zero_alloc_all.ml", line 46, characters 10-20:
+46 |     (fun[@zero_alloc] z -> (* rejected *)
                ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 51, characters 11-21:
-51 |       val[@zero_alloc] bar = (4, 5) (* rejected *)
+File "w53_zero_alloc_all.ml", line 48, characters 11-21:
+48 |       val[@zero_alloc] bar = (4, 5) (* rejected *)
                 ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 53, characters 14-24:
-53 |       method[@zero_alloc] baz x = (f (z+10), x+1) (* rejected *)
+File "w53_zero_alloc_all.ml", line 50, characters 14-24:
+50 |       method[@zero_alloc] baz x = (f (z+10), x+1) (* rejected *)
                    ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
 
-File "w53_zero_alloc_all.ml", line 65, characters 14-24:
-65 |     ((boz x)[@zero_alloc assume]) (* rejected *)
+File "w53_zero_alloc_all.ml", line 62, characters 14-24:
+62 |     ((boz x)[@zero_alloc assume]) (* rejected *)
                    ^^^^^^^^^^
-Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
-
-File "w53_zero_alloc_all.ml", line 70, characters 7-17:
-70 |   let[@zero_alloc assume] foo = (* rejected *)
-            ^^^^^^^^^^
-Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
-
-File "w53_zero_alloc_all.ml", line 74, characters 7-17:
-74 |   let[@zero_alloc] bar = (* rejected *)
-            ^^^^^^^^^^
 Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context

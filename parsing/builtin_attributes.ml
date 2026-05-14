@@ -23,6 +23,13 @@ type error =
 
 exception Error_builtin of Location.t * error
 
+type zero_alloc_attribute_use =
+  | Value_decl of int
+  | Function_param
+  | Arrow_lhs of int
+  | Function_definition of int
+  | Application of int
+
 module Attribute_table = Hashtbl.Make (struct
   type t = string with_loc
 
@@ -1011,8 +1018,15 @@ let parse_zero_alloc_payload ~loc ~arity ~custom_error_message
     | None -> warn ();  Default_zero_alloc
     | Some ca -> ca arity loc custom_error_message
 
-let parse_zero_alloc_attribute ~in_signature ~on_application
-      ~on_function_argument ~default_arity attr =
+let parse_zero_alloc_attribute usage attr =
+  let in_signature, on_function_argument, on_application =
+    match usage with
+    | Value_decl _ -> true, false, false
+    | Function_param -> false, true, false
+    | Arrow_lhs _ -> false, true, false
+    | Function_definition _ -> false, false, false
+    | Application _ -> false, false, true
+  in
   match attr with
   | None -> Default_zero_alloc
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
@@ -1037,13 +1051,11 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
       Check { strict = false; opt = false; arity; loc; custom_error_msg; }
     in
     let default_arity () = begin
-      match default_arity with
-      | None ->
-        if on_function_argument then
-          raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
-        else
-          raise (Error_builtin (loc, Zero_alloc_attr_non_function))
-      | Some arity -> arity
+      match usage with
+      | Function_param ->
+        raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
+      | Value_decl arity | Arrow_lhs arity
+      | Function_definition arity | Application arity -> arity
     end in
     match get_optional_payload get_ids_and_constants_from_exp payload with
     | Error () -> warn (); Default_zero_alloc
@@ -1118,22 +1130,20 @@ let parse_zero_alloc_attribute ~in_signature ~on_application
             Default_zero_alloc)
 
 
-let get_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument
-      ~default_arity l =
+let get_zero_alloc_attribute usage l =
   let attr = select_attribute is_zero_alloc_attribute l in
-  let res =
-      parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity
-        ~on_function_argument attr
-  in
-  (match attr, res with
-   | None, Default_zero_alloc -> ()
-   | _, Default_zero_alloc -> ()
-   | None, (Check _ | Assume _ | Ignore_assert_all) -> assert false
-   | Some _, Ignore_assert_all -> ()
-   | Some _, Assume _ -> ()
-   | Some attr, Check { opt; _ } ->
-     if not on_function_argument && not in_signature &&
-        is_zero_alloc_check_enabled ~opt && !Clflags.native_code then
+  let res = parse_zero_alloc_attribute usage attr in
+  (match attr, res, usage with
+   | None, Default_zero_alloc, _ -> ()
+   | _, Default_zero_alloc, _ -> ()
+   | None, (Check _ | Assume _ | Ignore_assert_all), _ -> assert false
+   | Some _, Ignore_assert_all, _ -> ()
+   | Some _, Assume _, _ -> ()
+   | Some _, Check _,
+     (Value_decl _ | Function_param | Application _ | Arrow_lhs _) ->
+     ()
+   | Some attr, Check { opt; _ }, Function_definition _ ->
+     if is_zero_alloc_check_enabled ~opt && !Clflags.native_code then
        (* The warning for unchecked functions will not trigger if the check is
           requested through the [@@@zero_alloc all] top-level annotation rather
           than through the function annotation [@zero_alloc]. *)

@@ -309,7 +309,7 @@ type error =
   | Unsupported_arg_zero_alloc
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
-  | Zero_alloc_arity_mismatch of int * int
+  | Zero_alloc_on_nonfunction
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -5916,7 +5916,8 @@ let split_function_ty
         | Error e ->
           raise (Error (loc, env, Incompatible_param_zero_alloc e))
     end
-  | _ -> ()
+  | Tvar _ | Tpoly (_, _, None) -> ()
+  | _ -> fatal_error "split_function_ty: zero_alloc"
   end;
   env,
   { filtered_arrow; arg_sort; ret_sort;
@@ -6125,10 +6126,7 @@ let check_arg_compatible ~loc ~zero_alloc_expected env zero_alloc =
 let add_parsed_zero_alloc_attribute ~default_arity vb =
   let val_attr =
     Builtin_attributes.get_zero_alloc_attribute
-      ~in_signature:false
-      ~on_application:false
-      ~on_function_argument:false
-      ~default_arity:(Some default_arity)
+      (Function_definition default_arity)
       vb.pvb_attributes
   in
   let zero_alloc =
@@ -6852,6 +6850,12 @@ and type_expect_
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
+      let zero_alloc =
+        Builtin_attributes.get_zero_alloc_attribute
+          (Builtin_attributes.Application (List.length args))
+          sfunct.pexp_attributes
+        |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
+      in
       let funct =
         match List.exists (fun (_, _, sch) -> Option.is_some sch) args with
         | true ->
@@ -6860,15 +6864,6 @@ and type_expect_
           { funct with
             exp_extra = (Texp_inspected_type ti, loc, []) :: funct.exp_extra }
         | false -> funct
-      in
-      let zero_alloc =
-        Builtin_attributes.get_zero_alloc_attribute
-          ~in_signature:false
-          ~on_application:true
-          ~on_function_argument:false
-          ~default_arity:(Some (List.length args))
-          sfunct.pexp_attributes
-        |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
@@ -8675,12 +8670,9 @@ and type_function
           | _ -> p.ppat_attributes
         in
         (try
-          Builtin_attributes.get_zero_alloc_attribute
-            ~in_signature:false
-            ~on_application:false
-            ~on_function_argument:true
-            ~default_arity:None
-            (get_pat_attrs pat)
+           Builtin_attributes.get_zero_alloc_attribute
+             Function_param
+             (get_pat_attrs pat)
         with Builtin_attributes.Error_builtin (_, err) ->
           raise (Builtin_attributes.Error_builtin (pparam_loc, err)))
       in
@@ -8809,17 +8801,6 @@ and type_function
         | [ result ], partial -> result, partial
         | ([] | _ :: _ :: _), _ -> assert false
       in
-      (* Check that the annotation arity matches the inferred type's arrow
-         count. We do this after the body is typed so that ty_arg_mono is
-         unified. *)
-      begin match zero_alloc with
-      | Some { arity; _ } ->
-        let type_arity = Ctype.arity ty_arg_mono in
-        if type_arity > 0 && arity <> type_arity then
-          raise (Error (pparam_loc, env,
-                        Zero_alloc_arity_mismatch (arity, type_arity)))
-      | None -> ()
-      end;
       let exp_type =
         instance
           (newgenty
@@ -9657,7 +9638,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let ty_arg', vars, zero_alloc = tpoly_get_poly ty_arg in
       let arg, sch =
-        if vars = [] then begin
+        if vars = [] && Option.is_none zero_alloc then begin
           let ty_arg0' = tpoly_get_inner ty_arg0 in
           if wrapped_in_some then begin
             type_option_some
@@ -9678,6 +9659,11 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
             then Some (Ctype.instance ~partial:true ty_arg)
             else None
           in
+          if !Clflags.principal && Option.is_some zero_alloc &&
+             get_level ty_arg < Btype.generic_level then
+              Location.prerr_warning app_loc
+                (not_principal
+                   "applying a function with zero_alloc requirements here");
           let separate =
             !Clflags.principal || Env.has_local_constraints env
           in
@@ -9863,7 +9849,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
       (fun (label, body) ((_, ty), argument_mode) overwrite ->
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
-        (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
+          (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
       sexpl types_and_modes overwrites
   in
   re {
@@ -9927,7 +9913,7 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
       (fun (label, body) ((_, ty, sort), argument_mode) ->
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
-        (label, type_expect env argument_mode body (mk_expected ty), sort))
+          (label, type_expect env argument_mode body (mk_expected ty), sort))
       sexpl types_sorts_and_modes
   in
   re {
@@ -10674,6 +10660,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
          if vb_is_fun vb then
            let default_arity = vb_fun_arity vb in
            add_parsed_zero_alloc_attribute ~default_arity vb
+         else
+         if Builtin_attributes.has_attribute "zero_alloc" vb.pvb_attributes
+         then raise (Error (vb.pvb_loc, env, Zero_alloc_on_nonfunction))
          else (vb, Zero_alloc.default))
       spat_sexp_list
   in
@@ -11312,10 +11301,7 @@ and type_n_ary_function
     end;
     let zero_alloc =
       Builtin_attributes.get_zero_alloc_attribute
-        ~in_signature:false
-        ~on_application:false
-        ~on_function_argument:false
-        ~default_arity:(Some syntactic_arity)
+        (Function_definition syntactic_arity)
         attributes
     in
     let zero_alloc =
@@ -12861,8 +12847,9 @@ let report_error ~loc env =
          for %s." ctx_str
   | Wrong_arg_zero_alloc err ->
       Location.errorf ~loc
-        "@[Mismatch between the \"zero_alloc\" requirement of the function@ \
+        "@[Mismatch between the %a requirement of the function@ \
          being applied and this argument.@]@ %a"
+        Style.inline_code "zero_alloc"
         Zero_alloc.print_error err
   | Unsupported_arg_zero_alloc ->
       Location.errorf ~loc
@@ -12873,17 +12860,22 @@ let report_error ~loc env =
         Style.inline_code "zero_alloc"
   | Invalid_payload_arg_zero_alloc ->
       Location.errorf ~loc
-        "Invalid zero-alloc payload for a higher-order function argument."
+        "Invalid %a payload for a higher-order function argument."
+        Style.inline_code "zero_alloc"
   | Incompatible_param_zero_alloc err ->
       Location.errorf ~loc
-        "@[The \"zero_alloc\" attribute on this function parameter conflicts@ \
+        "@[The %a attribute on this function parameter conflicts@ \
          with the one on its type.@ %a@]"
+        Style.inline_code "zero_alloc"
         Zero_alloc.print_error err
-  | Zero_alloc_arity_mismatch (annotation_arity, type_arity) ->
+  | Zero_alloc_on_nonfunction ->
       Location.errorf ~loc
-        "The arity in the \"zero_alloc\" attribute (%d) does not match the@ \
-         number of parameters in the argument type (%d)."
-        annotation_arity type_arity
+        "@[The %a attribute placed on a %a-binding can only be@ \
+         used for function definitions.@ \
+         If this defines a function, rewrite it so that its arguments are@ \
+         present in the definition.@]"
+        Style.inline_code "zero_alloc"
+        Style.inline_code "let"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

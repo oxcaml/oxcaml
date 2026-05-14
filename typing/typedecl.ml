@@ -4254,21 +4254,15 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         count_arrows 0 ty
       in
-      let default_arity =
-        if fun_arity = 0 then None else Some fun_arity
-      in
+      let usage = Builtin_attributes.Value_decl fun_arity in
       let zero_alloc =
         (try
-          Builtin_attributes.get_zero_alloc_attribute
-            ~in_signature:true
-            ~on_application:false
-            ~on_function_argument:false
-            ~default_arity
-            valdecl.pval_attributes
-        with
-        | Builtin_attributes.Error_builtin
-            (_, Builtin_attributes.Zero_alloc_attr_non_function) ->
-          raise (Error (valdecl.pval_loc, Zero_alloc_attr_non_function)))
+           Builtin_attributes.get_zero_alloc_attribute usage
+             valdecl.pval_attributes
+         with
+         | Builtin_attributes.Error_builtin
+             (_, Builtin_attributes.Zero_alloc_attr_non_function) ->
+           raise (Error (valdecl.pval_loc, Zero_alloc_attr_non_function)))
       in
       let zero_alloc =
         match zero_alloc with
