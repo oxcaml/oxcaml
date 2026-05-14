@@ -164,7 +164,7 @@ two_element_list:
   subq  $8, %rsp
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rdi
   addq  $24, %rdi
@@ -260,7 +260,7 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   .L1
+  jbe   <hidden GC jump pad>
 .L0:
   movl  $1, %eax
   addq  $8, %rsp
