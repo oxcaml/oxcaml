@@ -109,7 +109,6 @@ type import = {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
-  imp_staticity : Mode.Staticity.Const.t;
 }
 
 (* If a .cmi file is missing (or invalid), we
@@ -126,7 +125,7 @@ type import_info =
 type pers_name = {
   pn_import : import;
   pn_global : Global_module.t;
-  pn_sign : Subst.Lazy.signature;
+  pn_sign : Subst.Lazy.persistent_signature;
 }
 
 (* What a global identifier is actually bound to in Lambda code *)
@@ -337,7 +336,6 @@ let acknowledge_import penv ~check modname pers_sig =
   let params = cmi.cmi_params in
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
-  let staticity = cmi.cmi_staticity in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
   if not (CU.Name.equal modname found_name) then
     error (Illegal_renaming(modname, found_name, filename));
@@ -392,7 +390,6 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_visibility = visibility;
       imp_crcs = crcs;
       imp_flags = flags;
-      imp_staticity = staticity;
     }
   in
   if check then check_consistency penv import;
@@ -788,13 +785,12 @@ type address =
   | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
-  Subst.Lazy.signature
+  Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t
   -> address:address
   -> flags:Cmi_format.pers_flags list
-  -> staticity:Mode.Staticity.Const.t
   -> 'a
 
 (* Add a persistent structure to the hash table and bind it in the [Env].
@@ -810,7 +806,6 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let filename = import.imp_filename in
   let uid = import.imp_uid in
   let flags = import.imp_flags in
-  let staticity = import.imp_staticity in
   begin match is_param, is_registered_parameter_import penv modname with
   | true, false ->
       error (Illegal_import_of_parameter(modname, filename))
@@ -832,7 +827,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
         (* TODO Implement shapes for parameters and parameterised modules *)
         Shape.error ~uid "parameter or parameterised module"
   in
-  let pm = val_of_pers_sig sign modname uid ~shape ~address ~flags ~staticity in
+  let pm = val_of_pers_sig sign modname uid ~shape ~address ~flags in
   let ps =
     { ps_name_info = pers_name;
       ps_binding = binding;
@@ -867,7 +862,7 @@ let read_pers_struct penv check modname cmi =
   let pers_name =
     read_pers_name penv check modname cmi ~allow_excess_args:false
   in
-  pers_name.pn_sign, pers_name.pn_import.imp_staticity
+  pers_name.pn_sign
 
 let find_pers_struct
     ~allow_hidden penv val_of_pers_sig ~check name ~allow_excess_args =
@@ -1057,7 +1052,7 @@ let implemented_parameter penv modname =
   | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
   | None -> None
 
-let make_cmi penv modname kind sign alerts ~staticity =
+let make_cmi penv modname kind sign alerts =
   let flags =
     List.concat [
       if !Clflags.recursive_types then [Cmi_format.Rectypes] else [];
@@ -1090,7 +1085,6 @@ let make_cmi penv modname kind sign alerts ~staticity =
     cmi_kind = kind;
     cmi_globals = globals;
     cmi_sign = sign;
-    cmi_staticity = staticity;
     cmi_params = params;
     cmi_crcs = Array.of_list crcs;
     cmi_flags = flags
