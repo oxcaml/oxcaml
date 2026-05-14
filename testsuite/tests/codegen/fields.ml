@@ -92,7 +92,7 @@ header:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
@@ -138,7 +138,7 @@ make_ref:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)

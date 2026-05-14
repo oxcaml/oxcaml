@@ -83,7 +83,7 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)

@@ -270,7 +270,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L8
+  jl    <hidden GC jump pad>
 .L0:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -282,7 +282,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L7
+  jl    <hidden GC jump pad>
 .L2:
   addq  72(%r14), %rax
   addq  $8, %rax
@@ -294,7 +294,7 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L6
+  jl    <hidden GC jump pad>
 .L4:
   addq  72(%r14), %rax
   addq  $8, %rax

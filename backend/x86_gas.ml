@@ -289,7 +289,7 @@ let generate_asm oc lines =
       Buffer.add_char b '\n';
       Buffer.output_buffer oc b)
 
-let format_asm_for_expect_asm ~name ~body ~hidden =
+let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
   let module D = Asm_targets.Asm_directives.Directive in
   let module L = Asm_targets.Asm_label in
   let tab_stops = [| 2; 8 |] in
@@ -325,10 +325,19 @@ let format_asm_for_expect_asm ~name ~body ~hidden =
         Hashtbl.add label_map old_str new_label;
         incr next_id
       | Ins _ | Directive _ -> ())
-    (body @ hidden);
+    body;
+  let hidden_labels : (string, unit) Hashtbl.t = Hashtbl.create 16 in
+  List.iter
+    (fun line ->
+      match[@warning "-4"] line with
+      | Directive (D.New_label (D.Label l, _)) ->
+        Hashtbl.add hidden_labels (L.encode l) ();
+        incr next_id
+      | Ins _ | Directive _ -> ())
+    hidden_gc_jump_pads;
   let rewrite_str s =
     match Hashtbl.find_opt label_map s with
-    | None -> s
+    | None -> if Hashtbl.mem hidden_labels s then "<hidden GC jump pad>" else s
     | Some new_label -> L.encode new_label
   in
   let rewrite_label l =

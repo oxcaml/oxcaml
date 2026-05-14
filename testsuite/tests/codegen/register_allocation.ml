@@ -357,7 +357,7 @@ double_loop_no_definition_at_beginning:
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    .L6
+  jl    <hidden GC jump pad>
 .L1:
   addq  72(%r14), %rbx
   addq  $8, %rbx

@@ -38,7 +38,7 @@ mutual_recursion:
   subq  $8, %rsp
   subq  $56, %r15
   cmpq  (%r14), %r15
-  jb    .L1
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rdi
   movq  $6391, -8(%rdi)
@@ -97,7 +97,7 @@ f:
   jge   .L1
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L6
+  jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
@@ -110,7 +110,7 @@ f:
 .L1:
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L4
+  jb    <hidden GC jump pad>
 .L2:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)

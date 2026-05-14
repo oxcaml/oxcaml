@@ -399,9 +399,6 @@ let current_output_pos () = DLL.last_cell asm_code
 let next_pos pos =
   match pos with None -> DLL.hd_cell asm_code | Some cell -> DLL.next cell
 
-let output_from pos =
-  DLL.range_to_list ~left_incl:(next_pos pos) ~right_excl:None
-
 let output_range ~from_pos ~to_pos =
   DLL.range_to_list ~left_incl:(next_pos from_pos) ~right_excl:(next_pos to_pos)
 
