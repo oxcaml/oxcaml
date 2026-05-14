@@ -3793,9 +3793,12 @@ let is_upstream_compatible_non_value_unbox env ty =
 
 type sort_or_poly = Sort of Jkind.Sort.Const.t | Poly
 
-let native_repr_of_type env kind ty sort_or_poly =
+let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
   match kind, get_desc (Ctype.expand_head_opt env ty) with
-  | Untagged, Tconstr (_, _, _) ->
+  | Untagged, Tconstr (path, _, _) ->
+    if is_return &&
+       (Path.same path Predef.path_int8 || Path.same path Predef.path_int16)
+    then Location.prerr_warning loc Warnings.Untagged_external_small_int_return;
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
     let is_scannable =
@@ -3902,7 +3905,8 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
     in
     raise(Error (loc, Jkind_sort {env; kloc; typ; err}))
 
-let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
+let make_native_repr
+      env core_type ty ~global_repr ~is_layout_poly ~why ~is_return =
   error_if_has_deep_native_repr_attributes core_type;
   let sort_or_poly =
     match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
@@ -3962,7 +3966,10 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
   | Native_repr_attr_present ((Unboxed | Untagged) as kind),
     (Poly | Sort (Base Scannable))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
-    begin match native_repr_of_type env kind ty sort_or_poly with
+    begin match
+      native_repr_of_type
+        env kind ty sort_or_poly ~loc:core_type.ptyp_loc ~is_return
+    with
     | None ->
       raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
     | Some repr -> repr
@@ -4032,7 +4039,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
     let repr_arg =
       make_native_repr
         env ct1 t1 ~global_repr
-        ~is_layout_poly ~why:External_argument
+        ~is_layout_poly ~why:External_argument ~is_return:false
     in
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
@@ -4056,7 +4063,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
      let repr_res =
        make_native_repr
         env core_type ty ~global_repr
-        ~is_layout_poly ~why:External_result
+        ~is_layout_poly ~why:External_result ~is_return:true
      in
      ([], (rmode, repr_res))
 
