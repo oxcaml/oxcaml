@@ -35,10 +35,10 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jg    .L105
+  jg    .L0
   movq  %rdi, %rax
   ret
-.L105:
+.L0:
   ret
 |}]
 

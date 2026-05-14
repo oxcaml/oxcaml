@@ -69,7 +69,8 @@ let invoke_expect_asm_callbacks () =
   asm_collected_for_expect_asm := [];
   List.iter (fun f -> f output) callbacks
 
-let record_for_expect_asm ~name ~debug_info ~asm_start =
+let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
+    ~gc_jump_pads_start ~gc_jump_pads_end =
   if
     (not (List.is_empty !expect_asm_callbacks))
     && (not (String.ends_with ~suffix:"__entry" name))
@@ -89,7 +90,11 @@ let record_for_expect_asm ~name ~debug_info ~asm_start =
     in
     let output =
       X86_gas.format_asm_for_expect_asm ~name
-        ~body:(X86_proc.output_from asm_start)
+        ~body:
+          (X86_proc.output_range ~from_pos:fun_body_start ~to_pos:fun_body_end)
+        ~hidden_gc_jump_pads:
+          (X86_proc.output_range ~from_pos:gc_jump_pads_start
+             ~to_pos:gc_jump_pads_end)
     in
     asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
 
@@ -2727,10 +2732,12 @@ let fundecl fundecl =
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
-  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~asm_start:fun_body_start;
+  let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~fun_body_start ~fun_body_end ~gc_jump_pads_start:fun_body_end
+    ~gc_jump_pads_end:(current_output_pos ());
   emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
