@@ -8,7 +8,7 @@
 
 let cell = ref 0
 
-let cell_read = Eval.eval <[ !Recursively_ok.cell ]>
+let cell_read = Eval.eval <[ !Eval_before_init_ok.cell ]>
 
 let () = cell := !cell + 1
 

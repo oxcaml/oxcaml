@@ -9,7 +9,7 @@
 (* This file showcases a bug where we can access values from the current unit
    in a top-level [eval] before the rest of the unit is initialized. *)
 
-let x' = Eval.eval <[ Recursively_bad.x ]>
+let x' = Eval.eval <[ Eval_before_init_bad.x ]>
 
 let x = Sys.opaque_identity 42
 
