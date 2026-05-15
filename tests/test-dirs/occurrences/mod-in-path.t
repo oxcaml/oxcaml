@@ -25,59 +25,8 @@ We expect module appearing in paths to be highlighted
       "end": {
         "line": 2,
         "col": 12
-<<<<<<< HEAD
       },
       "stale": false
-||||||| c76379cdae
-      }
-=======
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 6,
-        "col": 12
-      },
-      "end": {
-        "line": 6,
-        "col": 15
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 7,
-        "col": 14
-      },
-      "end": {
-        "line": 7,
-        "col": 17
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 9,
-        "col": 0
-      },
-      "end": {
-        "line": 9,
-        "col": 3
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 12,
-        "col": 24
-      },
-      "end": {
-        "line": 12,
-        "col": 27
-      },
-      "stale": false
->>>>>>> v5.6-504
     }
   ]
 
@@ -104,47 +53,7 @@ We expect module appearing in paths to be highlighted
       "end": {
         "line": 12,
         "col": 20
-<<<<<<< HEAD
       },
       "stale": false
-||||||| c76379cdae
-      }
-=======
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 6,
-        "col": 8
-      },
-      "end": {
-        "line": 6,
-        "col": 11
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 7,
-        "col": 8
-      },
-      "end": {
-        "line": 7,
-        "col": 11
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 8,
-        "col": 8
-      },
-      "end": {
-        "line": 8,
-        "col": 11
-      },
-      "stale": false
->>>>>>> v5.6-504
     }
   ]

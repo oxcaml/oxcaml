@@ -30,7 +30,6 @@
     "class": "return",
     "value": [
       {
-<<<<<<< HEAD
         "file": "$TESTCASE_ROOT/main.ml",
         "start": {
           "line": 1,
@@ -43,21 +42,6 @@
         "stale": false
       },
       {
-||||||| c76379cdae
-=======
-        "file": "$TESTCASE_ROOT/main.ml",
-        "start": {
-          "line": 1,
-          "col": 26
-        },
-        "end": {
-          "line": 1,
-          "col": 29
-        },
-        "stale": false
-      },
-      {
->>>>>>> v5.6-504
         "file": "$TESTCASE_ROOT/lib.ml",
         "start": {
           "line": 1,
