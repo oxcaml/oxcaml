@@ -1896,11 +1896,21 @@ let tree_of_single_constructor ~all_void cd =
   let args, ret =
     extension_constructor_args_and_ret_type_subtree cd.cd_args cd.cd_res
   in
+  let attrs =
+    match Builtin_attributes.immediate_constructor_tag cd.cd_attributes with
+    | Some (Builtin_attributes.Immediate_constructor_tag { txt; _ }) ->
+      [{ oattr_name = Printf.sprintf "immediate %d" txt }]
+    | Some (Builtin_attributes.Invalid_immediate_constructor_tag _)
+    | Some (Builtin_attributes.Duplicate_immediate_constructor_tag _)
+    | None ->
+      []
+  in
   {
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
       ocstr_all_void = all_void;
+      ocstr_attributes = attrs;
   }
 
 (* A constructor takes [@immediate_all_void_constructor] iff it belongs to a

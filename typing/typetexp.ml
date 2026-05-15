@@ -1170,6 +1170,15 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           Hashtbl.add hfields h (l,f)
       in
       let add_field row_context field =
+        begin match
+          Builtin_attributes.immediate_constructor_tag field.prf_attributes
+        with
+        | None -> ()
+        | Some _ ->
+          Location.raise_errorf ~loc:field.prf_loc
+            "The [@immediate] attribute is not supported on polymorphic \
+             variant constructors"
+        end;
         if field.prf_attributes <> [] then
           Env.check_no_open_quotations
             field.prf_loc env Variant_tag_with_attribute_qt;

@@ -120,6 +120,24 @@ type variant_with_null_constructor =
   | Variant_with_null_nullary
   | Variant_with_null_payload of variant_with_null_payload
 
+let immediate_constructor_tag attrs =
+  match Builtin_attributes.immediate_constructor_tag attrs with
+  | None -> None
+  | Some (Builtin_attributes.Immediate_constructor_tag tag) -> Some tag
+  | Some (Builtin_attributes.Invalid_immediate_constructor_tag loc) ->
+    Location.raise_errorf ~loc
+      "Invalid [@immediate] attribute: expected an integer payload"
+  | Some (Builtin_attributes.Duplicate_immediate_constructor_tag loc) ->
+    Location.raise_errorf ~loc
+      "The [@immediate] attribute cannot be repeated"
+
+let reject_immediate_constructor_tag attrs kind =
+  match immediate_constructor_tag attrs with
+  | None -> ()
+  | Some { loc; _ } ->
+    Location.raise_errorf ~loc
+      "The [@immediate] attribute can only be used on %s" kind
+
 let classify_variant_with_null_constructor payload_cstr =
   match payload_cstr.cd_args with
   | Cstr_tuple [] -> Variant_with_null_nullary
@@ -136,6 +154,173 @@ let find_variant_with_null_payload cstrs =
       | Variant_with_null_nullary -> None
       | Variant_with_null_payload payload -> Some payload)
     cstrs
+
+let boxed_constructor_has_no_runtime_fields (layout : cstr_layout) =
+  match layout with
+  | Cstr_layout_variable ->
+    (* Consistent with the [all_void] computation in [constructor_descrs]:
+       unknown sorts are conservatively assumed not to be all void. *)
+    false
+  | Cstr_layout_known { sorts; _ } ->
+    Array.for_all Jkind_types.Sort.Const.all_void sorts
+
+let immediate_constructor_runtime_tags cstrs ~is_constant =
+  let num_cstrs = List.length cstrs in
+  let explicit_tags = Array.make num_cstrs None in
+  if Array.length is_constant <> num_cstrs then
+    Misc.fatal_error
+      "Datarepr.immediate_constructor_runtime_tags: mismatched arrays";
+  let num_consts =
+    Array.fold_left
+      (fun count is_constant -> if is_constant then count + 1 else count)
+      0
+      is_constant
+  in
+  let used_tags = Array.make num_consts false in
+  List.iteri
+    (fun src_index { cd_attributes; _ } ->
+    match immediate_constructor_tag cd_attributes with
+    | None -> ()
+    | Some { txt = tag; loc } ->
+      if not is_constant.(src_index) then
+        Location.raise_errorf ~loc
+          "The [@immediate] attribute can only be used on constructors \
+           without runtime fields";
+      if tag < 0 then
+        Location.raise_errorf ~loc
+          "Negative [@immediate] constructor tags are not supported yet";
+      if tag >= num_consts then
+        Location.raise_errorf ~loc
+          "This [@immediate] constructor tag is sparse; in this version tags \
+           must form the dense range 0 to %d"
+          (num_consts - 1);
+      if not used_tags.(tag) then begin
+        used_tags.(tag) <- true;
+        explicit_tags.(src_index) <- Some tag
+      end else
+        Location.raise_errorf ~loc
+          "Two constructors cannot use the same [@immediate] tag %d" tag
+    )
+    cstrs;
+  let next_implicit_tag = ref 0 in
+  Array.mapi
+    (fun src_index is_constant ->
+      if not is_constant then None
+      else
+        match explicit_tags.(src_index) with
+        | Some _ as tag -> tag
+        | None ->
+          while used_tags.(!next_implicit_tag) do
+            incr next_implicit_tag
+          done;
+          let tag = !next_implicit_tag in
+          used_tags.(tag) <- true;
+          Some tag)
+    is_constant
+
+let constant_constructor_runtime_tags_for_boxed_variant cstrs layouts =
+  immediate_constructor_runtime_tags cstrs
+    ~is_constant:(Array.map boxed_constructor_has_no_runtime_fields layouts)
+
+let immediate_constructor_runtime_tag_overrides_for_boxed_variant cstrs
+    layouts =
+  let is_constant = Array.map boxed_constructor_has_no_runtime_fields layouts in
+  let runtime_tags = immediate_constructor_runtime_tags cstrs ~is_constant in
+  let default_tag = ref 0 in
+  Array.mapi
+    (fun src_index is_constant ->
+      if not is_constant then None
+      else
+        let default = !default_tag in
+        incr default_tag;
+        match runtime_tags.(src_index) with
+        | Some tag when tag <> default -> Some tag
+        | Some _ -> None
+        | None -> Misc.fatal_error "Missing constant constructor tag")
+    is_constant
+
+let first_immediate_constructor_tag_mismatch_for_boxed_variants cstrs1 layouts1
+    cstrs2 layouts2 =
+  let cstrs1 = Array.of_list cstrs1 in
+  let tags1 =
+    constant_constructor_runtime_tags_for_boxed_variant
+      (Array.to_list cstrs1) layouts1
+  in
+  let tags2 =
+    constant_constructor_runtime_tags_for_boxed_variant cstrs2 layouts2
+  in
+  let rec loop i =
+    if i = Array.length tags1 then None
+    else
+      match tags1.(i), tags2.(i) with
+      | Some tag1, Some tag2 when tag1 <> tag2 ->
+        Some (Ident.name cstrs1.(i).cd_id, tag1, tag2)
+      | Some _, Some _ | None, None -> loop (i + 1)
+      | Some _, None | None, Some _ ->
+        Misc.fatal_error
+          "Datarepr: mismatched constant constructors"
+  in
+  loop 0
+
+let first_immediate_constructor_tag_changing_default cstrs rep =
+  match rep with
+  | Variant_boxed layouts ->
+    let immediate_tag_locs =
+      Array.of_list
+        (List.map
+           (fun ({ cd_attributes; _ } : constructor_declaration) ->
+              match Builtin_attributes.immediate_constructor_tag cd_attributes
+              with
+              | None -> None
+              | Some (Builtin_attributes.Immediate_constructor_tag { loc; _ })
+                ->
+                Some loc
+              | Some (Builtin_attributes.Invalid_immediate_constructor_tag loc)
+              | Some
+                  (Builtin_attributes.Duplicate_immediate_constructor_tag loc)
+                ->
+                Some loc)
+           cstrs)
+    in
+    if not (Array.exists Option.is_some immediate_tag_locs) then None
+    else
+      let tag_overrides =
+        immediate_constructor_runtime_tag_overrides_for_boxed_variant cstrs
+          layouts
+      in
+      Array.find_mapi
+        (fun src_index tag_override ->
+          match tag_override with
+          | None -> None
+          | Some _ -> immediate_tag_locs.(src_index))
+        tag_overrides
+  | Variant_unboxed | Variant_with_null | Variant_extensible -> None
+
+let immediate_constructor_tags rep cstrs cstr_constant =
+  begin match rep with
+  | Variant_boxed _ -> ()
+  | Variant_unboxed | Variant_with_null | Variant_extensible ->
+    List.iter
+      (fun { cd_attributes; _ } ->
+        match immediate_constructor_tag cd_attributes with
+        | None -> ()
+        | Some { loc; _ } ->
+          begin match rep with
+          | Variant_boxed _ -> assert false
+          | Variant_unboxed ->
+            Location.raise_errorf ~loc
+              "The [@immediate] attribute is not supported on unboxed variants"
+          | Variant_with_null ->
+            Location.raise_errorf ~loc
+              "The [@immediate] attribute is not supported on or_null variants"
+          | Variant_extensible ->
+            Location.raise_errorf ~loc
+              "The [@immediate] attribute is not supported on extensible \
+               variants"
+          end)
+      cstrs
+  end;
+  immediate_constructor_runtime_tags cstrs ~is_constant:cstr_constant
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
@@ -210,6 +395,9 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          is_const)
       cstr_layouts
   in
+  let constant_runtime_tags =
+    immediate_constructor_tags rep cstrs cstr_constant
+  in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
         {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
     let cstr_name = Ident.name cd_id in
@@ -226,7 +414,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
       if cstr_constant
-      then const_tag, 1 + const_tag, nonconst_tag
+      then
+        (match constant_runtime_tags.(src_index) with
+        | Some tag -> tag, 1 + const_tag, nonconst_tag
+        | None -> Misc.fatal_error "Missing constant constructor tag")
       else nonconst_tag, const_tag, 1 + nonconst_tag
     in
     let cstr_tag =
@@ -270,6 +461,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
   List.rev cstrs
 
 let extension_descr ~current_unit path_ext ext =
+  reject_immediate_constructor_tag ext.ext_attributes
+    "constant constructors of ordinary variant types";
   let ty_res =
     match ext.ext_ret_type with
         Some type_ret -> type_ret

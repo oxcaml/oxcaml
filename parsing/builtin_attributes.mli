@@ -172,6 +172,15 @@ val warning_scope:
     the purposes of misplaced attribute warnings. *)
 val has_attribute : string -> Parsetree.attributes -> bool
 
+(** Result of parsing a constructor-level [@immediate <int>] attribute. *)
+type immediate_constructor_tag_attribute =
+  | Immediate_constructor_tag of int Location.loc
+  | Invalid_immediate_constructor_tag of Location.t
+  | Duplicate_immediate_constructor_tag of Location.t
+
+val immediate_constructor_tag :
+  Parsetree.attributes -> immediate_constructor_tag_attribute option
+
 (** [select_attributes actions attrs] finds the elements of [attrs] that appear
     in [actions] and either returns them or just marks them used, according to
     the corresponding [attr_action].

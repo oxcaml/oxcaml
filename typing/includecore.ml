@@ -416,6 +416,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
+  | Constructor_tag_mismatch of string * int * int
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
@@ -839,6 +840,11 @@ let report_type_mismatch first second decl env ppf err =
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
          "has a fixed representation while the other varies"
+  | Constructor_tag_mismatch (name, tag1, tag2) ->
+      pr
+        "Their internal representations differ:@ constructor %a has \
+         immediate tag %d in %s %s, but immediate tag %d in %s %s."
+        Style.inline_code name tag1 first decl tag2 second decl
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
         env ppf v
@@ -1310,9 +1316,14 @@ module Variant_diffing = struct
     in
     match err, rep1, rep2 with
     | None, Variant_unboxed, Variant_unboxed
-    | None, Variant_boxed _, Variant_boxed _
     | None, Variant_extensible, Variant_extensible
     | None, Variant_with_null, Variant_with_null -> None
+    | None, Variant_boxed layouts1, Variant_boxed layouts2 ->
+        Option.map
+          (fun (name, tag1, tag2) ->
+             Constructor_tag_mismatch (name, tag1, tag2))
+          (Datarepr.first_immediate_constructor_tag_mismatch_for_boxed_variants
+             cstrs1 layouts1 cstrs2 layouts2)
     | Some err, _, _ ->
         Some (Variant_mismatch err)
     | None, Variant_unboxed, Variant_boxed _ ->
