@@ -665,6 +665,17 @@ let mode_partial_application expected_mode =
 let mode_trywith expected_mode =
   { expected_mode with position = RNontail }
 
+(* Effect syntax lowers each handled computation and handler RHS into a
+   generated function body wrapped with [maybe_region_layout]. Type those
+   expressions as tails of the generated handler functions' regions. *)
+let mode_effect_handler_body expected_mode =
+  let mode = as_single_mode expected_mode in
+  { expected_mode with
+    position =
+      RTail
+        ( Regionality.disallow_left (Value.proj_comonadic Areality mode),
+          FTail ) }
+
 let mode_tuple mode tuple_modes =
   let tuple_modes =
     Some (List.map (fun (mode, loc) ->
@@ -6882,28 +6893,6 @@ and type_expect_
       let env, expected_mode, exp_extra =
         enter_region_if is_bor ~region:(loc, Borrow) env expected_mode
       in
-      let arg_pat_mode, arg_expected_mode =
-        match cases_tuple_arity caselist with
-        | Not_local_tuple | Maybe_local_tuple ->
-          let mode = Value.newvar () in
-          simple_pat_mode mode, mode_default mode
-        | Local_tuple locs ->
-          let modes = List.map (fun loc -> Value.newvar (), loc) locs in
-          let modes_pat = List.map fst modes in
-          let mode = Value.newvar () in
-          tuple_pat_mode mode modes_pat, mode_tuple mode modes
-      in
-      let arg, sort =
-        with_local_level_generalize begin fun () ->
-          let expected_ty, sort = new_rep_var ~why:Match () in
-          let arg =
-            type_expect env arg_expected_mode sarg (mk_expected expected_ty)
-          in
-          arg, sort
-        end ~before_generalize:(fun (arg, _) ->
-          may_lower_contravariant env arg;
-          generalize arg.exp_type)
-      in
       let rec split_cases valc effc conts = function
         | [] -> List.rev valc, List.rev effc, List.rev conts
         | {pc_lhs = {ppat_desc=Ppat_effect(p1, p2)}} as c :: rest ->
@@ -6917,16 +6906,57 @@ and type_expect_
       in
       if val_caselist = [] && eff_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
+      let handler_env, arg_pat_mode, arg_expected_mode, rhs_mode =
+        match eff_caselist with
+        | [] ->
+          let arg_pat_mode, arg_expected_mode =
+            match cases_tuple_arity caselist with
+            | Not_local_tuple | Maybe_local_tuple ->
+              let mode = Value.newvar () in
+              simple_pat_mode mode, mode_default mode
+            | Local_tuple locs ->
+              let modes = List.map (fun loc -> Value.newvar (), loc) locs in
+              let modes_pat = List.map fst modes in
+              let mode = Value.newvar () in
+              tuple_pat_mode mode modes_pat, mode_tuple mode modes
+          in
+          env, arg_pat_mode, arg_expected_mode, expected_mode
+        | _ :: _ ->
+          (* In [match f () with | effect ...], [f ()] is the handled
+             computation. It is compiled into the generated handler body
+             function, so reject captures across the handler boundary here,
+             not just inside the effect arms. *)
+          let handler_env =
+            Env.add_const_closure_lock (loc, Expression)
+              Value.Comonadic.Const.legacy env
+          in
+          handler_env,
+          simple_pat_mode Value.legacy,
+          mode_effect_handler_body mode_legacy,
+          mode_effect_handler_body mode_legacy
+      in
+      let arg, sort =
+        with_local_level_generalize begin fun () ->
+          let expected_ty, sort = new_rep_var ~why:Match () in
+          let arg =
+            type_expect handler_env arg_expected_mode sarg
+              (mk_expected expected_ty)
+          in
+          arg, sort
+        end ~before_generalize:(fun (arg, _) ->
+          may_lower_contravariant handler_env arg;
+          generalize arg.exp_type)
+      in
       let val_cases, partial =
-        type_cases Computation env arg_pat_mode expected_mode arg.exp_type
+        type_cases Computation handler_env arg_pat_mode rhs_mode arg.exp_type
           sort ty_expected_explained ~check_if_total:true loc val_caselist
       in
       let eff_cases =
         match eff_caselist with
         | [] -> []
         | eff_caselist ->
-            type_effect_cases Value env expected_mode ty_expected_explained loc
-              eff_caselist eff_conts
+            type_effect_cases Value handler_env rhs_mode ty_expected_explained
+              loc eff_caselist eff_conts
       in
       if
         List.for_all (fun c -> pattern_needs_partial_application_check c.c_lhs)
@@ -6940,10 +6970,6 @@ and type_expect_
         exp_env = env }
   | Pexp_try(sbody, caselist) ->
       check_dynamic (loc, Expression) (Always_dynamic Try_with) expected_mode;
-      let body =
-        type_expect env (mode_trywith expected_mode)
-          sbody ty_expected_explained
-      in
       let arg_mode = simple_pat_mode Value.legacy in
       let rec split_cases exnc effc conts = function
         | [] -> List.rev exnc, List.rev effc, List.rev conts
@@ -6956,8 +6982,23 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
+      let handler_env, body_mode, rhs_mode =
+        match eff_caselist with
+        | [] -> env, mode_trywith expected_mode, expected_mode
+        | _ :: _ ->
+          let handler_env =
+            Env.add_const_closure_lock (loc, Expression)
+              Value.Comonadic.Const.legacy env
+          in
+          handler_env,
+          mode_effect_handler_body mode_legacy,
+          mode_effect_handler_body mode_legacy
+      in
+      let body =
+        type_expect handler_env body_mode sbody ty_expected_explained
+      in
       let exn_cases, _ =
-        type_cases Value env arg_mode expected_mode
+        type_cases Value handler_env arg_mode rhs_mode
           Predef.type_exn Jkind.Sort.(of_const Const.for_exception)
           ty_expected_explained
           ~check_if_total:false loc exn_caselist
@@ -6966,8 +7007,8 @@ and type_expect_
         match eff_caselist with
         | [] -> []
         | eff_caselist ->
-            type_effect_cases Value env expected_mode ty_expected_explained loc
-              eff_caselist eff_conts
+            type_effect_cases Value handler_env rhs_mode ty_expected_explained
+              loc eff_caselist eff_conts
       in
       re {
         exp_desc = Texp_try(body, exn_cases, eff_cases);

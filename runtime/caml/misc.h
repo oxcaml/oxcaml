@@ -86,11 +86,14 @@ extern "C++" {
 #include <atomic>
 typedef std::atomic<uintnat> atomic_uintnat;
 typedef std::atomic<intnat> atomic_intnat;
+typedef std::atomic<bool> atomic_bool;
 }
 #else
 #include <stdatomic.h>
+#include <stdbool.h>
 typedef _Atomic uintnat atomic_uintnat;
 typedef _Atomic intnat atomic_intnat;
+typedef _Atomic bool atomic_bool;
 #endif
 
 #ifndef NULL

@@ -395,19 +395,9 @@ caml_result caml_do_pending_actions_res(void)
   if (caml_result_is_exception(res)) goto exception;
 
   /* Call memprof callbacks */
-<<<<<<< HEAD
-  res = caml_memprof_run_callbacks_res();
+  res = caml_memprof_do_pending_res();
   caml_check_async(res, "memprof callback");
   if (caml_result_is_exception(res)) goto exception;
-||||||| 5.2.0minus-31
-  exn = caml_memprof_run_callbacks_exn();
-  check_async_exn(exn, "memprof callback");
-  if (Is_exception_result(exn)) goto exception;
-=======
-  exn = caml_memprof_do_pending_exn();
-  check_async_exn(exn, "memprof callback");
-  if (Is_exception_result(exn)) goto exception;
->>>>>>> 5.2.0minus-37
 
   /* Call finalisers */
   res = caml_final_do_calls_res();
