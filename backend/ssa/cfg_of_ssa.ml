@@ -530,7 +530,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
   let param_naming_instrs ~fun_arg_locs =
     let idx = ref 0 in
     let param_index = ref (-1) in
-    function_info.args_names
+    function_info.parameters
     |> List.filter_map (fun (var, ty) ->
         param_index := !param_index + 1;
         let provenance = Backend_var.With_provenance.provenance var in
@@ -621,7 +621,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     if
       not
         (Cfg_polling.requires_prologue_poll ~future_funcnames:funcnames
-           ~fun_name:function_info.name
+           ~fun_name:function_info.sym_name
            ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
     then
       let entry = Cfg.get_block_exn cfg (label_of env entry) in
@@ -637,7 +637,7 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     let fun_arg_regs = get_block_params_regs env entry in
     let fun_arg_locs = Proc.loc_parameters (Reg.typv fun_arg_regs) in
     let cfg =
-      Cfg.create ~fun_name:function_info.name ~fun_args:fun_arg_locs
+      Cfg.create ~fun_name:function_info.sym_name ~fun_args:fun_arg_locs
         ~fun_codegen_options:
           (Cfg.of_cmm_codegen_option function_info.codegen_options)
         ~fun_dbg:function_info.dbg ~fun_contains_calls:true
@@ -666,7 +666,8 @@ module Make (Ssa_graph : Ssa.Finished_graph) = struct
     Cfg_simplify.run cfg_with_layout
 end
 
-let convert ~funcnames (m : (module Ssa.Finished_graph)) : Cfg_with_layout.t =
-  let module S = (val m : Ssa.Finished_graph) in
-  let module C = Make (S) in
-  C.convert ~funcnames
+let convert ~funcnames (ssa_graph : (module Ssa.Finished_graph)) :
+    Cfg_with_layout.t =
+  let module Ssa_graph = (val ssa_graph) in
+  let module Cfg_of_ssa = Make (Ssa_graph) in
+  Cfg_of_ssa.convert ~funcnames

@@ -12,7 +12,7 @@ module Make (S : Ssa.Finished_graph) = struct
   let error fmt =
     Format.kasprintf
       (fun s ->
-        Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.name s)
+        Misc.fatal_errorf "SSA validation (%s): %s" S.function_info.sym_name s)
       fmt
 
   let pb = S.Block.print_id
@@ -140,6 +140,6 @@ let validate (m : (module Ssa.Finished_graph)) =
   with exn ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "*** SSA validation failed for %s: %s@.*** SSA:@.%a@."
-      S.function_info.name (Printexc.to_string exn) Ssa_print.print m;
+      S.function_info.sym_name (Printexc.to_string exn) Ssa_print.print m;
     Format.pp_print_flush Format.err_formatter ();
     Printexc.raise_with_backtrace exn bt

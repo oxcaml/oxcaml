@@ -438,8 +438,8 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
         Format.eprintf
           "*** Ssa_reducer.run error for %s while processing block %a: %s@.*** \
            Input SSA:@.%a@."
-          In.function_info.name In.Block.print_id block (Printexc.to_string exn)
-          Ssa_print.print
+          In.function_info.sym_name In.Block.print_id block
+          (Printexc.to_string exn) Ssa_print.print
           (module In : Ssa.Finished_graph);
         Format.pp_print_flush Format.err_formatter ();
         Printexc.raise_with_backtrace exn bt)

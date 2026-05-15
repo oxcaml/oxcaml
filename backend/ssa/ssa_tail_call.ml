@@ -64,7 +64,8 @@ module Tail_call_reducer (C : Context) = struct
       let mapped_args = Array.map C.map_arg args in
       let term : C.Terminator.t =
         match call_op with
-        | Direct func when String.equal func.sym_name C.In.function_info.name ->
+        | Direct func
+          when String.equal func.sym_name C.In.function_info.sym_name ->
           Tailcall_self
             { destination = C.map_block C.In.entry; args = mapped_args }
         | Direct _ | Indirect _ ->
