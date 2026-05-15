@@ -237,10 +237,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           a, Branch (Meet, ahint1, ahint2))
   end
 
-  (* The variable id determines the destination object for all keys that may
-     coexist in a map.  If two equal ids have different destination objects, the
-     comparator below rejects the malformed keys rather than inventing an order
-     that could not be used to compare their morphisms. *)
+  (* All keys in a particular [VarMap] should have the same destination object,
+     but the key type does not encode that invariant.  The comparator orders by
+     variable id first, only checking object equality when equal ids force it to
+     compare morphisms. *)
   type key = Key : 'b C.obj * int * ('a, 'b, 'd) C.morph -> key
 
   module VarMap = Map.Make (struct
@@ -774,7 +774,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else
       match C.equal_morph dst f0 f1 with
       | Misc.Is_not_eq -> false
-      | Misc.Is_eq -> v0 == v1
+      | Misc.Is_eq -> true
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
