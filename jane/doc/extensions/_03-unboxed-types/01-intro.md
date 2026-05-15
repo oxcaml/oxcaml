@@ -685,4 +685,5 @@ Version history:
 - `v3`: automatic flattening of nested unboxed records.
 - `v4`: unboxed arrays are now normal blocks, not custom blocks.
 - `v5`: block indices to mixed products now use 52-bit offsets and 12-bit gaps.
-- `v6`: all value/void records are now uniform blocks.
+- `v6`: all value/void records are now uniform blocks, and (by default)
+  represent all-`float64` records as mixed blocks instead of float array blocks.
