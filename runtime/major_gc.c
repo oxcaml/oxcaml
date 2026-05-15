@@ -1552,6 +1552,40 @@ static bool should_compact_from_stw_single(int compaction_mode)
     return false;
   }
 
+  if (s.global_stats.chunks == 1) {
+    /* If the heap is a single chunk, compaction (at present) will not
+       return any memory to the OS, so is not worth doing.
+
+       This is a stop-gap to prevent the bad case of repeatedly
+       compacting on every major GC after a heap has shrunk to a small
+       fraction of its previous size (such that it fits in a fraction
+       of the largest chunk). Becuase compaction at present always
+       compacts preferentially into the largest chunk, and only ever
+       frees whole chunks, if the heap is much smaller than the
+       largest chunk then (without this stop-gap) the overhead
+       calculation below will always trigger a compaction.
+
+       This means we might miss out on other benefits of compaction
+       (e.g. TLB improvement).
+
+       TODO: choose a better fix. Possibilities include:
+
+       - In compaction, take an early bath (after phase one?) if we
+         won't be able to return any memory to the OS.
+
+       - During compaction, choose an order for chunks so that the
+         live pools fit fairly neatly into a prefix of the chunk list.
+
+       - At the end of compaction, shrinking the partially-full chunk
+         to be a better fit for the pools it contains (with some
+         number of free pools as slack). Have to rewrite the chunk
+         size in each pool.
+     */
+    CAML_GC_MESSAGE (POLICY,
+                     "Heap is a single chunk. Compaction off.\n");
+    return false;
+  }
+
   uintnat live_words = s.heap_stats.pool_live_words + s.heap_stats.large_words;
   uintnat free_words = heap_words - live_words;
   double current_overhead = 100.0 * free_words / live_words;
