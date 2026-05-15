@@ -17,3 +17,5 @@ let[@zero_alloc assume] foo =
 let[@zero_alloc] bar =
   let y = 42 in
   fun z -> z + y
+
+let[@zero_alloc] (x as y) = 42

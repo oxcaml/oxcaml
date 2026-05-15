@@ -974,6 +974,17 @@ Line 2, characters 39-52:
 Error: allocation of 24 bytes
 |}];;
 
+(* Chained aliases: all three names should carry the zero_alloc property. *)
+let _ =
+  let[@zero_alloc] ((f as g) as h) = fun x -> x + 123 in
+  let _ = require_za_arity_1 f in
+  let _ = require_za_arity_1 g in
+  let _ = require_za_arity_1 h in
+  ()
+[%%expect {|
+- : unit = ()
+|}];;
+
 (** `external` declarations and zero_alloc parameters.
     Zero_alloc attributes on parameters of `external` declarations behave
     the same as on `val` declarations in signatures. *)
@@ -1022,7 +1033,7 @@ let _ =
 Line 7, characters 6-67:
 7 |       (fun x -> if x < 0 then raise (Err (string_of_int x)) else x) a;;
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP104._$.(fun) (camlTOP104__fn[:7,6--67]_115_119_code).
+Error: Annotation check for zero_alloc strict failed on function TOP105._$.(fun) (camlTOP105__fn[:7,6--67]_117_121_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:7,41--58)
 Line 7, characters 36-59:
@@ -1071,7 +1082,7 @@ let _ =
 Line 3, characters 2-16:
 3 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP109._$.g (camlTOP109__g_136_139_code).
+Error: Annotation check for zero_alloc failed on function TOP110._$.g (camlTOP110__g_138_141_code).
 Line 3, characters 12-16:
 3 |   and g x = x, x in
                 ^^^^
@@ -1088,7 +1099,7 @@ let _ =
 Line 5, characters 2-16:
 5 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP110._$.g (camlTOP110__g_140_144_code).
+Error: Annotation check for zero_alloc strict failed on function TOP111._$.g (camlTOP111__g_142_146_code).
 Line 5, characters 12-16:
 5 |   and g x = x, x in
                 ^^^^
