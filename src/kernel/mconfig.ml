@@ -1187,7 +1187,6 @@ let source_path config =
     ]
   |> List.filter_dup
 
-<<<<<<< HEAD
 let hidden_source_path config =
   config.merlin.hidden_source_path @ config.ocaml.hidden_dirs
 
@@ -1196,11 +1195,6 @@ let collect_paths ~log_title ~config paths =
     List.map config.ocaml.include_dirs ~f:(fun (vi : Clflags.visible_include) ->
         vi.path)
   in
-||||||| c76379cdae
-let build_path config =
-=======
-let collect_paths ~log_title ~config paths =
->>>>>>> v5.6-504
   let dirs =
     match config.ocaml.threads with
     | `None -> include_dirs
@@ -1258,15 +1252,3 @@ let unitname t =
       |> Option.map ~f:unitname
       |> Option.value ~default:basename
     end
-
-let intf_or_impl t =
-  let extension = Filename.extension t.query.filename in
-  try
-    List.find_map t.merlin.suffixes ~f:(fun (impl, intf) ->
-        if String.equal extension impl then Some Unit_info.Impl
-        else if String.equal extension intf then Some Unit_info.Intf
-        else None)
-  with Not_found -> Unit_info.Impl
-
-let unit_info t =
-  Unit_info.make ~source_file:t.query.filename (intf_or_impl t) (unitname t)

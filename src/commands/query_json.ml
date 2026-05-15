@@ -424,7 +424,6 @@ let json_of_locate resp =
   | `Found (Some file, pos) ->
     `Assoc [ ("file", `String file); ("pos", Lexing.json_of_position pos) ]
 
-<<<<<<< HEAD
 let json_of_locate_types (resp : Locate_types_result.t) =
   (* This function serializes to json differently than json_of_locate to make it easier
      to deserialize. *)
@@ -483,67 +482,6 @@ let json_of_locate_types (resp : Locate_types_result.t) =
   | Success tree -> json_of_type_tree tree
   | Invalid_context -> `String "Invalid context"
 
-||||||| c76379cdae
-=======
-let json_of_locate_types (resp : Locate_types_result.t) =
-  (* This function serializes to json differently than json_of_locate to make it easier
-     to deserialize. *)
-  let json_of_position
-      ({ pos_fname; pos_lnum; pos_bol; pos_cnum } : Lexing.position) =
-    `Assoc
-      [ ("pos_fname", `String pos_fname);
-        ("pos_lnum", `Int pos_lnum);
-        ("pos_bol", `Int pos_bol);
-        ("pos_cnum", `Int pos_cnum)
-      ]
-  in
-  let json_of_option opt ~f =
-    match opt with
-    | None -> `Null
-    | Some x -> f x
-  in
-  let json_of_locate_result result =
-    let variant_name, payload =
-      match result with
-      | `Found (file, pos) ->
-        let file = json_of_option file ~f:(fun file -> `String file) in
-        ("Found", [ file; json_of_position pos ])
-      | `File_not_found msg -> ("File_not_found", [ `String msg ])
-      | `Builtin id -> ("Builtin", [ `String id ])
-      | `Not_found (id, file) ->
-        let file = json_of_option file ~f:(fun file -> `String file) in
-        ("Not_found", [ `String id; file ])
-      | `Not_in_env id -> ("Not_in_env", [ `String id ])
-    in
-    `List (`String variant_name :: payload)
-  in
-  let json_of_node_data :
-      Locate_types_result.(type_ref_payload Tree.node_data) ->
-      _ = function
-    | Arrow -> `List [ `String "Arrow" ]
-    | Tuple -> `List [ `String "Tuple" ]
-    | Object -> `List [ `String "Object" ]
-    | Poly_variant -> `List [ `String "Poly_variant" ]
-    | Type_ref { type_; result } ->
-      `List
-        [ `String "Type_ref";
-          `Assoc
-            [ ("type", `String type_);
-              ("result", json_of_locate_result result)
-            ]
-        ]
-  in
-  let rec json_of_type_tree { Locate_types_result.Tree.data; children } =
-    `Assoc
-      [ ("data", json_of_node_data data);
-        ("children", `List (List.map ~f:json_of_type_tree children))
-      ]
-  in
-  match resp with
-  | Success tree -> json_of_type_tree tree
-  | Invalid_context -> `String "Invalid context"
-
->>>>>>> v5.6-504
 let json_of_inlay_hints hints =
   let json_of_hint (position, label) =
     `Assoc

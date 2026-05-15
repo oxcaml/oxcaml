@@ -15,14 +15,7 @@ let ocamlversion :
   | `OCaml_4_03_0 | `OCaml_4_04_0 | `OCaml_4_05_0 | `OCaml_4_06_0
   | `OCaml_4_07_0 | `OCaml_4_07_1 | `OCaml_4_08_0 | `OCaml_4_09_0
   | `OCaml_4_10_0 | `OCaml_4_11_0 | `OCaml_4_12_0 | `OCaml_4_13_0
-<<<<<<< HEAD
   | `OCaml_4_14_0
   | `OCaml_4_14_1 | `OCaml_5_0_0  | `OCaml_5_1_0 | `OCaml_5_2_0 | `OCaml_5_4_0 ] = %s
-||||||| c76379cdae
-  | `OCaml_4_14_0 | `OCaml_5_0_0  | `OCaml_5_1_0  | `OCaml_5_2_0  ] = %s
-=======
-  | `OCaml_4_14_0 | `OCaml_5_0_0  | `OCaml_5_1_0  | `OCaml_5_2_0
-  | `OCaml_5_3_0  | `OCaml_5_4_0  ] = %s
->>>>>>> v5.6-504
 |}
     ocaml_version_val
