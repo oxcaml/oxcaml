@@ -121,18 +121,11 @@ let pp (fmt : Format.formatter) pl =
     (Uid_map.cardinal pl.approximated)
     pp_partials pl.approximated;
   Format.fprintf fmt "and shapes for CUS %s.@ "
-<<<<<<< HEAD
     (String.concat ";@,"
        (Hashtbl.to_seq_keys pl.cu_shape
        |> List.of_seq
        |> List.map Compilation_unit.full_path_as_string));
   Format.fprintf fmt "and related uids:@[{%a}@]" pp_related_uids pl.related_uids
-||||||| c76379cdae
-    (String.concat ";@," (Hashtbl.to_seq_keys pl.cu_shape |> List.of_seq))
-=======
-    (String.concat ";@," (Hashtbl.to_seq_keys pl.cu_shape |> List.of_seq));
-  Format.fprintf fmt "and related uids:@[{%a}@]" pp_related_uids pl.related_uids
->>>>>>> v5.6-504
 
 let ext = "ocaml-index"
 
@@ -164,7 +157,7 @@ let read ~file =
          let _ = Cmi_format.input_cmi ic in
          file_magic_number := Cms_format.read_magic_number ic);
       if String.equal !file_magic_number cmt_magic_number then
-        Cmt (input_value ic : Cmt_format.cmt_infos)
+        Cmt (Compression.input_value ic : Cmt_format.cmt_infos)
       else if String.equal !file_magic_number cms_magic_number then
         Cms (input_value ic : Cms_format.cms_infos)
       else if String.equal !file_magic_number magic_number then
