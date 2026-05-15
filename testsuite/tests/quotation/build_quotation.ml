@@ -956,12 +956,12 @@ Error: Object definition using "object..end"
 <[ let open List in map ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) list -> $('b) list]> expr =
-<[let open Stdlib.List in Stdlib.List.map]>
+<[let open! Stdlib.List in Stdlib.List.map]>
 |}];;
 
 <[ let open M in M.foo ]>;;
 [%%expect {|
-- : <[int]> expr = <[let open M in M.foo]>
+- : <[int]> expr = <[let open! M in M.foo]>
 |}]
 ;;
 
@@ -1634,26 +1634,27 @@ exception E
 <[ let open List in map length [[1]; [2; 3]] ]>
 [%%expect {|
 - : <[int list]> expr =
-<[let open Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
 ]>
 |}];;
 
 <[ List.(map length [[1]; [2; 3]]) ]>
 [%%expect {|
 - : <[int list]> expr =
-<[let open Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
 ]>
 |}];;
 
 <[ M.(0.1 + 0.2) ]>
 [%%expect {|
-- : <[float]> expr = <[let open M in M.( + ) 0.1 0.2]>
+- : <[float]> expr = <[let open! M in M.( + ) 0.1 0.2]>
 |}];;
 
 <[ M.{ record_field = "open" }, { M.record_field = "path" } ]>
 [%%expect {|
 - : <[string M.record * string M.record]> expr =
 <[
-  ((let open M in { M.record_field = "open"; }), { M.record_field = "path"; })
+  ((let open! M in { M.record_field = "open"; }),
+   { M.record_field = "path"; })
 ]>
 |}];;

@@ -2078,7 +2078,7 @@ module Ast = struct
     | Let_exception (name, exp) ->
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
     | Let_open (id, exp) ->
-      pp fmt "@[<2>let@ open@ %a@ in@ %a@]"
+      pp fmt "@[<2>let@ open!@ %a@ in@ %a@]"
         (print_raw_ident_module env) id (print_exp env) exp
     | Extension_constructor name ->
       pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
