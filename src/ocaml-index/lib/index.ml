@@ -106,7 +106,6 @@ let init_load_path_once ~do_not_use_cmt_loadpath =
       Load_path.(init ~auto_include:no_auto_include ~visible ~hidden);
       loaded := true)
 
-<<<<<<< HEAD
 let index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
@@ -193,14 +192,8 @@ let shape_of_cmt { Cmt_format.cmt_impl_shape; cmt_modname; _ } =
 let shape_of_cms { Cms_format.cms_impl_shape; cms_modname; _ } =
   shape_of_artifact ~impl_shape:cms_impl_shape ~modname:cms_modname
 
-let index_of_cmt ~root ~build_path ~shapes ~store_shapes cmt_infos =
-||||||| c76379cdae
-let index_of_cmt ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
-    cmt_infos =
-=======
-let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
-    ~store_shapes cmt_infos =
->>>>>>> v5.6-504
+let index_of_cmt ~into ~root ~rewrite_root ~build_path
+    ~do_not_use_cmt_loadpath ~shapes ~store_shapes cmt_infos =
   let { Cmt_format.cmt_loadpath;
         cmt_impl_shape;
         cmt_modname;
@@ -214,34 +207,19 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
       } =
     cmt_infos
   in
-<<<<<<< HEAD
   let uid_to_loc =
     Shape.Uid.Tbl.to_list cmt_uid_to_decl
     |> List.map (fun (uid, fragment) ->
         (uid, Typedtree_utils.location_of_declaration ~uid fragment))
     |> Shape.Uid.Tbl.of_list
-||||||| c76379cdae
-  init_load_path_once ~do_not_use_cmt_loadpath ~dirs:build_path cmt_loadpath;
-  let module Reduce = Shape_reduce.Make (Reduce_conf) in
-  let defs =
-    if Option.is_none cmt_impl_shape then Shape.Uid.Map.empty
-    else
-      gather_locs_from_fragments ~root ~rewrite_root Shape.Uid.Map.empty
-        cmt_uid_to_decl
-=======
-  init_load_path_once ~do_not_use_cmt_loadpath ~dirs:build_path cmt_loadpath;
-  let module Reduce = Shape_reduce.Make (Reduce_conf) in
-  let defs =
-    gather_locs_from_fragments ~root ~rewrite_root into.defs cmt_uid_to_decl
->>>>>>> v5.6-504
   in
-<<<<<<< HEAD
-  index_of_artifact ~root ~build_path ~shapes ~store_shapes ~cmt_loadpath
-    ~cmt_impl_shape ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences
-    ~cmt_initial_env ~cmt_sourcefile ~cmt_source_digest
-    ~cmt_declaration_dependencies
+  index_of_artifact ~into ~root ~rewrite_root ~build_path
+    ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
+    ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
+    ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
 
-let index_of_cms ~root ~build_path ~shapes ~store_shapes cms_infos =
+let index_of_cms ~into ~root ~rewrite_root ~build_path
+    ~do_not_use_cmt_loadpath ~shapes ~store_shapes cms_infos =
   let { Cms_format.cms_impl_shape;
         cms_modname;
         cms_uid_to_loc;
@@ -253,124 +231,20 @@ let index_of_cms ~root ~build_path ~shapes ~store_shapes cms_infos =
         _
       } =
     cms_infos
-||||||| c76379cdae
-  (* The list [cmt_ident_occurrences] associate each ident usage location in the
-     module with its (partially) reduced shape. We finish the reduction and
-     group together all the locations that share the same definition uid. *)
-  let defs, approximated =
-    List.fold_left
-      (fun ((acc_defs, acc_apx) as acc) (lid, (item : Shape_reduce.result)) ->
-        let lid = if rewrite_root then add_root ~root lid else lid in
-        let resolved =
-          match item with
-          | Unresolved shape -> Reduce.reduce_for_uid cmt_initial_env shape
-          | Resolved _ when Option.is_none cmt_impl_shape ->
-            (* Right now, without additional information we cannot take the
-               risk to mix uids from interfaces with the ones from
-               implementations. We simply ignore items defined in an interface. *)
-            Internal_error_missing_uid
-          | result -> result
-        in
-        match Locate.uid_of_result ~traverse_aliases:false resolved with
-        | Some uid, false -> (add acc_defs uid (Lid_set.singleton lid), acc_apx)
-        | Some uid, true -> (acc_defs, add acc_apx uid (Lid_set.singleton lid))
-        | None, _ -> acc)
-      (defs, Shape.Uid.Map.empty)
-      cmt_ident_occurrences
-=======
-  (* The list [cmt_ident_occurrences] associate each ident usage location in the
-     module with its (partially) reduced shape. We finish the reduction and
-     group together all the locations that share the same definition uid. *)
-  let defs, approximated =
-    List.fold_left
-      (fun ((acc_defs, acc_apx) as acc) (lid, (item : Shape_reduce.result)) ->
-        let lid = if rewrite_root then add_root ~root lid else lid in
-        let resolved =
-          match item with
-          | Unresolved shape -> Reduce.reduce_for_uid cmt_initial_env shape
-          | result -> result
-        in
-        match Locate.uid_of_result ~traverse_aliases:false resolved with
-        | Some uid, false -> (add_one uid lid acc_defs, acc_apx)
-        | Some uid, true -> (acc_defs, add_one uid lid acc_apx)
-        | None, _ -> acc)
-      (defs, into.approximated) cmt_ident_occurrences
->>>>>>> v5.6-504
   in
-<<<<<<< HEAD
   let uid_to_loc =
     Shape.Uid.Tbl.to_list cms_uid_to_loc
     |> List.map (fun (uid, l) -> (uid, Some l))
     |> Shape.Uid.Tbl.of_list
-||||||| c76379cdae
-  let cu_shape = Hashtbl.create 1 in
-  Option.iter (Hashtbl.add cu_shape cmt_modname) cmt_impl_shape;
-  let stats =
-    match cmt_sourcefile with
-    | None -> Stats.empty
-    | Some src -> (
-      let rooted_src = with_root ?root src in
-      try
-        let stats = Unix.stat rooted_src in
-        let src = if rewrite_root then rooted_src else src in
-        Stats.singleton src
-          { mtime = stats.st_mtime;
-            size = stats.st_size;
-            source_digest = cmt_source_digest
-          }
-      with Unix.Unix_error _ -> Stats.empty)
-=======
-  let cu_shape = into.cu_shape in
-  if store_shapes then
-    Option.iter (Hashtbl.add cu_shape cmt_modname) cmt_impl_shape;
-  let stats =
-    match cmt_sourcefile with
-    | None -> into.stats
-    | Some src -> (
-      let rooted_src = with_root ?root src in
-      try
-        let stats = Unix.stat rooted_src in
-        let src = if rewrite_root then rooted_src else src in
-        Stats.add src
-          { mtime = stats.st_mtime;
-            size = stats.st_size;
-            source_digest = cmt_source_digest
-          }
-          into.stats
-      with Unix.Unix_error _ -> into.stats)
->>>>>>> v5.6-504
   in
-<<<<<<< HEAD
-  index_of_artifact ~root ~build_path ~shapes ~store_shapes
-    ~cmt_loadpath:{ visible = []; hidden = [] }
-    ~cmt_impl_shape:cms_impl_shape ~cmt_modname:cms_modname ~uid_to_loc
+  index_of_artifact ~into ~root ~rewrite_root ~build_path
+    ~do_not_use_cmt_loadpath ~shapes ~store_shapes
+    ~cmt_loadpath:{ visible = []; hidden = [] } ~cmt_impl_shape:cms_impl_shape
+    ~cmt_modname:cms_modname ~uid_to_loc
     ~cmt_ident_occurrences:cms_ident_occurrences
     ~cmt_initial_env:(Option.value cms_initial_env ~default:Env.empty)
     ~cmt_sourcefile:cms_sourcefile ~cmt_source_digest:cms_source_digest
     ~cmt_declaration_dependencies:cms_declaration_dependencies
-||||||| c76379cdae
-  { defs; approximated; cu_shape; stats; root_directory = None }
-=======
-  let related_uids =
-    List.fold_left
-      (fun acc (_, uid1, uid2) ->
-        let union = Union_find.make (Uid_set.of_list [ uid1; uid2 ]) in
-        let map_update uid =
-          Uid_map.update uid (function
-            | None -> Some union
-            | Some union' -> Some (Union_find.union union' union))
-        in
-        acc |> map_update uid1 |> map_update uid2)
-      into.related_uids cmt_declaration_dependencies
-  in
-  { defs;
-    approximated;
-    cu_shape;
-    stats;
-    related_uids;
-    root_directory = into.root_directory
-  }
->>>>>>> v5.6-504
 
 let merge_index ~store_shapes ~into index =
   let defs = merge index.defs into.defs in
@@ -382,16 +256,8 @@ let merge_index ~store_shapes ~into index =
       index.related_uids into.related_uids
   in
   if store_shapes then
-<<<<<<< HEAD
     Hashtbl.add_seq into.cu_shape (Hashtbl.to_seq index.cu_shape);
   { into with defs; approximated; stats; related_uids }
-||||||| c76379cdae
-    Hashtbl.add_seq index.cu_shape (Hashtbl.to_seq into.cu_shape);
-  { into with defs; approximated; stats }
-=======
-    Hashtbl.add_seq index.cu_shape (Hashtbl.to_seq into.cu_shape);
-  { into with defs; approximated; stats; related_uids }
->>>>>>> v5.6-504
 
 let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath files =
@@ -410,7 +276,6 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
     @@ fun () ->
     List.fold_left
       (fun into file ->
-<<<<<<< HEAD
         let store_shapes =
           (* Merlin-jst: We add the shapes into `into` because we need to collect them so
              we can use them for shape reduction, regardless of whether store_shapes is
@@ -472,32 +337,6 @@ let gather_shapes ~output_file files =
         match index with
         | None -> into
         | Some index -> merge_index ~store_shapes:true index ~into)
-||||||| c76379cdae
-        let index =
-          match Cmt_cache.read file with
-          | cmt_item ->
-            index_of_cmt ~root ~rewrite_root ~build_path
-              ~do_not_use_cmt_loadpath cmt_item.cmt_infos
-          | exception _ -> (
-            match read ~file with
-            | Index index -> index
-            | _ ->
-              Log.error "Unknown file type: %s" file;
-              exit 1)
-        in
-        merge_index ~store_shapes index ~into)
-=======
-        match Cmt_cache.read file with
-        | cmt_item ->
-          index_of_cmt ~into ~root ~rewrite_root ~build_path ~store_shapes
-            ~do_not_use_cmt_loadpath cmt_item.cmt_infos
-        | exception _ -> (
-          match read ~file with
-          | Index index -> merge_index ~store_shapes ~into index
-          | _ ->
-            Log.error "Unknown file type: %s" file;
-            exit 1))
->>>>>>> v5.6-504
       initial_index files
   in
   write ~file:output_file final_index
