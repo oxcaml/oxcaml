@@ -38,6 +38,13 @@ open! Int_replace_polymorphic_compare
 
 include Ssa_intf
 
+module Function_info = struct
+  include Function_info
+
+  let flattened_parameters function_info =
+    List.map snd function_info.parameters |> Array.concat
+end
+
 module Make
     (Options : sig
       val function_info : Function_info.t
@@ -375,14 +382,18 @@ struct
       | Op ({ op; args; _ } as od) ->
         if result_arity instr <> 0
         then Format.fprintf ppf "%a = " print_op_id od;
-        let op_str = Format.asprintf "%a" Operation.dump op in
-        if Array.length args = 0
-        then Format.pp_print_string ppf op_str
-        else
-          let formatted_op =
-            if String.contains op_str ' ' then "(" ^ op_str ^ ")" else op_str
-          in
-          Format.fprintf ppf "%s(%a)" formatted_op print_args args
+        let arg_regs =
+          Array.mapi
+            (fun i _ ->
+              Reg.For_printing.create ~name:Reg.dummy.name ~typ:Cmm.Val
+                ~stamp:(Reg.Stamp.of_int_unsafe i)
+                ~preassigned:false ~loc:Reg.Unknown)
+            args
+        in
+        let print_reg ppf (r : Reg.t) =
+          print_as_ref ppf args.(Reg.Stamp.to_int r.stamp)
+        in
+        Printoperation.operation ~print_reg op arg_regs ppf [||]
       | Push_trap { handler } ->
         Format.fprintf ppf "push_trap %a" Block.print_id handler
       | Pop_trap { handler } ->
@@ -623,7 +634,8 @@ struct
 
   let entry, entry_params =
     let { block; params } =
-      new_block_impl ~is_function_start:true ~params:function_info.args
+      new_block_impl ~is_function_start:true
+        ~params:(Function_info.flattened_parameters function_info)
     in
     (* Initialize names from the function's argument names, when known. *)
     List.iteri
@@ -632,7 +644,7 @@ struct
         then
           Block.set_param_name block.params.(i)
             (Backend_var.name (Backend_var.With_provenance.var var)))
-      function_info.args_names;
+      function_info.parameters;
     block, params
 
   (* === Compute metadata: predecessors, traps, dominators, use counts === *)

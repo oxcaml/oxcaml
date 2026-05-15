@@ -24,12 +24,12 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 module Sel = Cfg_selectgen.Make (Cfg_selection)
 
-module Make (Builder : Ssa.Graph_builder) = struct
+module Make (Builder : Ssa.Make_builder_result) = struct
   open Builder
 
   let current_function_is_check_enabled =
     Zero_alloc_checker.is_check_enabled function_info.codegen_options
-      function_info.name function_info.dbg
+      function_info.sym_name function_info.dbg
 
   type 'a or_never_returns =
     | Ok of 'a
@@ -644,25 +644,10 @@ module Make (Builder : Ssa.Graph_builder) = struct
         results;
       Cursor.move c ~new_pos:(Cursor.start join_block);
       Ok join_params
-end
 
-let convert (f : Cmm.fundecl) ~keep_unused_ops : (module Ssa.Finished_graph) =
-  try
-    let fun_arg_types = List.map snd f.fun_args |> Array.concat in
-    let fi : Ssa.Function_info.t =
-      { name = f.fun_name.sym_name;
-        args = fun_arg_types;
-        args_names = f.fun_args;
-        codegen_options = f.fun_codegen_options;
-        dbg = f.fun_dbg;
-        poll = f.fun_poll;
-        ret_type = f.fun_ret_type
-      }
-    in
-    let module Builder = (val Ssa.make_builder fi ~keep_unused_ops) in
-    let module M = Make (Builder) in
+  let convert (cmm : Cmm.fundecl) : (module Ssa.Finished_graph) =
     let env =
-      { M.vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
+      { vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
     in
     let env, _offset =
       List.fold_left
@@ -671,18 +656,35 @@ let convert (f : Cmm.fundecl) ~keep_unused_ops : (module Ssa.Finished_graph) =
           let projs =
             Array.init n (fun i -> Array.get Builder.entry_params (offset + i))
           in
-          M.env_add id projs env, offset + n)
-        (env, 0) f.fun_args
+          env_add id projs env, offset + n)
+        (env, 0) cmm.fun_args
     in
     let r =
-      M.emit env (Builder.Cursor.start Builder.entry) f.fun_body ~tail:true
+      emit env (Builder.Cursor.start Builder.entry) cmm.fun_body ~tail:true
     in
     assert (match r with Never_returns -> true | Ok _ -> false);
     let result = Builder.finish_graph () in
     Ssa_validate.validate result;
     result
+end
+
+let convert (cmm : Cmm.fundecl) ~keep_unused_ops : (module Ssa.Finished_graph) =
+  try
+    let function_info : Ssa.Function_info.t =
+      { sym_name = cmm.fun_name.sym_name;
+        parameters = cmm.fun_args;
+        codegen_options = cmm.fun_codegen_options;
+        dbg = cmm.fun_dbg;
+        poll = cmm.fun_poll;
+        ret_type = cmm.fun_ret_type
+      }
+    in
+    let module Builder = (val Ssa.make_builder function_info ~keep_unused_ops)
+    in
+    let module M = Make (Builder) in
+    M.convert cmm
   with Misc.Fatal_error as exn ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "*** Ssa_of_cmm error for %s: %s@.*** CMM:@.%a@."
-      f.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl f;
+      cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl cmm;
     Printexc.raise_with_backtrace exn bt

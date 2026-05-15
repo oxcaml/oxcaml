@@ -36,9 +36,8 @@ type call_op =
 
 module Function_info = struct
   type t =
-    { name : string;
-      args : Cmm.machtype;
-      args_names : (Backend_var.With_provenance.t * Cmm.machtype) list;
+    { sym_name : string;
+      parameters : (Backend_var.With_provenance.t * Cmm.machtype) list;
       codegen_options : Cmm.codegen_option list;
       dbg : Debuginfo.t;
       poll : Lambda.poll_attribute;
@@ -379,7 +378,7 @@ module type Graph_builder = sig
     params:(Cmm.machtype_component * string option) array -> Block.t
 
   (** The function-start block, created at [make_builder] time using
-      [function_info.args] as its parameters. *)
+      [function_info.parameters] as its parameters. *)
   val entry : Block.t
 
   (** [Block_param] instructions referring to [entry]'s parameters, in order. *)
@@ -395,7 +394,11 @@ end
 module type Intf = sig
   type nonrec call_op = call_op
 
-  module Function_info = Function_info
+  module Function_info : sig
+    type t = Function_info.t
+
+    val flattened_parameters : t -> Cmm.machtype
+  end
 
   module type Graph_builder = Graph_builder
 

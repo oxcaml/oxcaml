@@ -43,10 +43,16 @@ module Make (S : Ssa.Finished_graph) = struct
     | Some h -> Format.fprintf ppf " trap_successor=%a" S.Block.print_id h);
     Format.fprintf ppf "@.@."
 
+  let print_parameter ppf (var, typ) =
+    Format.fprintf ppf "%a : %a" Backend_var.With_provenance.print var
+      Printcmm.machtype typ
+
   let print ppf =
-    Format.fprintf ppf "ssa %s(%a)@." S.function_info.name Printcmm.machtype
-      S.function_info.args;
-    Format.fprintf ppf "  entry = %a@.@." S.Block.print_id S.entry;
+    Format.fprintf ppf "SSA for %s(%a) : %a@.@." S.function_info.sym_name
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+         print_parameter)
+      S.function_info.parameters Printcmm.machtype S.function_info.ret_type;
     List.iter (print_block ppf) S.blocks;
     Format.fprintf ppf "@."
 end
