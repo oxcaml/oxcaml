@@ -140,6 +140,58 @@ repeat_comparisons:
   ret
 |}]
 
+(* CR ttebbi: We first compute the boolean result of the || predicate, instead
+   of jumping directly. *)
+let bad_min a b =
+  let i = ref 0 in
+  while !i < a || !i < b do incr i done;
+  !i
+[%%expect_asm X86_64{|
+bad_min:
+  movq  %rax, %rdi
+  movl  $1, %esi
+  cmpq  %rdi, %rsi
+  jge   .L1
+.L0:
+  movl  $1, %eax
+  jmp   .L2
+.L1:
+  xorl  %eax, %eax
+  cmpq  %rbx, %rsi
+  setl  %al
+  testq %rax, %rax
+  je    .L3
+.L2:
+  addq  $2, %rsi
+  cmpq  %rdi, %rsi
+  jge   .L1
+  jmp   .L0
+.L3:
+  movq  %rsi, %rax
+  ret
+|}]
+
+let int_compare x y =
+  let[@inline never] opaque _ = 0 in
+  match Stdlib.Int.compare x y with
+  | 0 -> opaque x
+  | r -> r
+[%%expect_asm X86_64{|
+int_compare:
+  movq  %rax, %rdi
+  cmpq  %rbx, %rdi
+  je    .L0
+  movq  $-1, %rsi
+  xorl  %eax, %eax
+  cmpq  %rbx, %rdi
+  setg  %al
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
+  ret
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize the boolean needlessly. *)
 let branch_and_return o =
@@ -329,7 +381,7 @@ let is_int_constant () : bool =
    Obj.repr (Some 3) |> Obj.is_int
 [%%expect_asm X86_64{|
 is_int_constant:
-  movq  camlTOP25__const_block785@GOTPCREL(%rip), %rax
+  movq  camlTOP27__const_block922@GOTPCREL(%rip), %rax
   andl  $1, %eax
   leaq  1(%rax,%rax), %rax
   ret
@@ -376,13 +428,13 @@ let branch_or_tailcall x =
 branch_or_tailcall:
   cmpq  $5, %rax
   jbe   .L0
-  movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
+  movq  camlTOP30__Pmakeblock1055@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
 .L0:
-  movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
+  movq  camlTOP30__switch_block1056@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
