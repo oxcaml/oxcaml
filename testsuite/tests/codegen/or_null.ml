@@ -10,9 +10,8 @@
  expect.opt;
 *)
 
-module Or_null = Stdlib_stable.Or_null
-
-let is_null (x : int Or_null.t) = Or_null.is_null x
+let is_null (x : int or_null) =
+  match x with Null -> true | This _ -> false
 [%%expect_asm X86_64{|
 is_null:
   cmpq  $0, %rax
@@ -22,7 +21,8 @@ is_null:
   ret
 |}]
 
-let is_this (x : int Or_null.t) = Or_null.is_this x
+let is_this (x : int or_null) =
+  match x with Null -> false | This _ -> true
 [%%expect_asm X86_64{|
 is_this:
   cmpq  $0, %rax
@@ -33,11 +33,8 @@ is_this:
 |}]
 
 
-let get_or (x : int Or_null.t) ~default =
-  let value t ~default =
-    match t with Null -> default | This v -> v
-  in
-  value x ~default
+let get_or (x : int or_null) ~default =
+    match x with Null -> default | This v -> v
 [%%expect_asm X86_64{|
 get_or:
   testq %rax, %rax
@@ -49,7 +46,7 @@ get_or:
 |}]
 
 (* CR ttebbi: This should simplify to a single comparison. *)
-let equal_int (a : int Or_null.t) (b : int Or_null.t) =
+let equal_int (a : int or_null) (b : int or_null) =
   let equal eq t0 t1 =
     match t0, t1 with
     | Null, Null -> true
