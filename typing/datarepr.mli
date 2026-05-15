@@ -44,6 +44,8 @@ type variant_with_null_payload =
 val find_variant_with_null_payload :
   constructor_declaration list -> variant_with_null_payload option
 
+(** Runtime integer tags for constant constructors of boxed variants.
+    Non-constant constructors return [None]. *)
 val constant_constructor_runtime_tags_for_boxed_variant :
   constructor_declaration list ->
   (constructor_representation * Jkind_types.Sort.Const.t array) array ->

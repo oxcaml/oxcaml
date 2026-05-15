@@ -8,8 +8,12 @@
 (lldb) b Test_datatypes_dwarf.f_immediate_tag_variant
 (lldb) c
 (lldb) c
+(lldb) c
 (lldb) b Test_datatypes_dwarf.f_immediate_tag_mixed_variant
 (lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_immediate_tag_boundary_variant
 (lldb) c
 (lldb) c
 (lldb) b Test_datatypes_dwarf.f_complex_variant

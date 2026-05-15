@@ -3047,16 +3047,69 @@ let sort_int_lambda_list l =
         0)
     l
 
-let as_interval fail low high l =
+let as_interval ?edges fail low high l =
   let l = sort_int_lambda_list l in
-  ( get_edges low high l,
+  let edges =
+    match edges with
+    | Some edges -> edges
+    | None -> get_edges low high l
+  in
+  ( edges,
     match fail with
     | None -> as_interval_nofail l
     | Some act -> as_interval_canfail act low high l )
 
-let call_switcher kind loc fail arg low high int_lambda_list =
-  let edges, (cases, actions) = as_interval fail low high int_lambda_list in
+let call_switcher ?edges kind loc fail arg low high int_lambda_list =
+  let edges, (cases, actions) =
+    as_interval ?edges fail low high int_lambda_list
+  in
   Switcher.zyva loc kind edges arg cases actions
+
+let int_bounds = function
+  | [] -> None
+  | tag :: tags ->
+    Some
+      (List.fold_left
+         (fun (low, high) tag -> min low tag, max high tag)
+         (tag, tag) tags)
+
+let call_switcher_on_constructor_tags kind loc fail arg ~all_constant_tags
+    int_lambda_list =
+  (* When [fail] is present, it represents valid constructors missing from
+     [int_lambda_list], so the switch bounds must cover the full constructor
+     tag domain. Without [fail], holes in the numeric range are impossible
+     values, and the present cases are enough. *)
+  let bounds =
+    match fail with
+    | None -> List.map fst int_lambda_list
+    | Some _ -> all_constant_tags @ List.map fst int_lambda_list
+  in
+  match int_bounds bounds with
+  | Some (low, high) ->
+    let edges = low, high in
+    call_switcher ~edges kind loc fail arg low high int_lambda_list
+  | None -> (
+      match fail with
+      | Some fail -> fail
+      | None ->
+        Misc.fatal_error
+          "Matching.call_switcher_on_constructor_tags: empty switch")
+
+let can_use_raw_const_lswitch ~num_consts tags =
+  (* A raw [Lswitch] over constant constructors is only valid for the dense
+     default domain [0..num_consts-1].  Bytecode and Flambda table indexing
+     interpret holes as missing cases in that exact domain, not as arbitrary
+     sparse immediate values. *)
+  let seen = Array.make num_consts false in
+  List.length tags = num_consts
+  && List.for_all
+       (fun tag ->
+         if tag < 0 || tag >= num_consts || seen.(tag) then false
+         else begin
+           seen.(tag) <- true;
+           true
+         end)
+       tags
 
 let rec list_as_pat = function
   | [] -> fatal_error "Matching.list_as_pat"
@@ -3098,7 +3151,7 @@ let mk_failaction_neg partial ctx def =
   | Total -> (None, Jumps.empty)
 
 (* In line with the article and simpler than before *)
-let mk_failaction_pos partial seen ctx defs =
+let mk_failaction_pos partial fail_pats ctx defs =
   let rec scan_def env to_test defs =
     match (to_test, Default_environment.pop defs) with
     | [], _
@@ -3124,7 +3177,6 @@ let mk_failaction_pos partial seen ctx defs =
         | _ -> scan_def ((idef, List.map fst now) :: env) later rem
       )
   in
-  let fail_pats = complete_pats_constrs seen in
   if List.length fail_pats < !Clflags.match_context_rows then (
     let fail, jmps =
       scan_def []
@@ -3318,6 +3370,31 @@ let split_variant_cases (tag_lambda_list : ((int * bool) * lambda) list) =
   in
   (sort_int_lambda_list const, sort_int_lambda_list nonconst)
 
+let constant_constructor_tag = function
+  | { cstr_tag = Ordinary { runtime_tag };
+      cstr_repr = Variant_boxed _;
+      cstr_constant = true;
+      _
+    } ->
+    Some runtime_tag
+  | { cstr_tag = Ordinary _;
+      cstr_repr = (Variant_unboxed | Variant_with_null);
+      _
+    }
+  | { cstr_tag = Ordinary _;
+      cstr_repr = Variant_boxed _;
+      cstr_constant = false;
+      _
+    }
+  | { cstr_tag = Null; cstr_repr = Variant_with_null; _ } ->
+    None
+  | { cstr_tag = Null; cstr_repr = (Variant_boxed _ | Variant_unboxed); _ } ->
+    assert false
+  | { cstr_repr = Variant_extensible; _ } ->
+    assert false
+  | { cstr_tag = Extension _; _ } ->
+    assert false
+
 let split_extension_cases tag_lambda_list =
   List.partition_map
     (fun ({cstr_constant; cstr_tag}, act) ->
@@ -3394,14 +3471,25 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
       let ncases = List.length descr_lambda_list
       and nconstrs = cstr.cstr_consts + cstr.cstr_nonconsts in
       let sig_complete = ncases = nconstrs in
-      let fail_opt, fails, local_jumps =
+      let fail_pats =
         if sig_complete then
-          (None, [], Jumps.empty)
+          []
         else
           let constrs =
             List.map2 (fun (constr, _act) p -> { p with pat_desc = constr })
               descr_lambda_list pats in
-          mk_failaction_pos partial constrs ctx def
+          complete_pats_constrs constrs
+      in
+      let fail_opt, fails, local_jumps =
+        if sig_complete then
+          (None, [], Jumps.empty)
+        else
+          mk_failaction_pos partial fail_pats ctx def
+      in
+      let all_constant_tags =
+        let present = List.map fst descr_lambda_list in
+        let missing = List.map get_key_constr fail_pats in
+        List.filter_map constant_constructor_tag (missing @ present)
       in
       let descr_lambda_list = fails @ descr_lambda_list in
       let consts, nonconsts, null = split_cases descr_lambda_list in
@@ -3427,6 +3515,59 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
          switcher directly can result in more compact code. This is
          a reason to deviate from the one-instruction policy.
       *)
+      let failaction_for_side total cases =
+        (* [fail_opt] is needed only on the side whose constructors are not all
+           covered by [cases].  Sparse constant tags may additionally require a
+           wider numeric switch domain, tracked separately by
+           [all_constant_tags]. *)
+        match fail_opt with
+        | Some _ when List.length cases < total -> fail_opt
+        | Some _ | None -> None
+      in
+      let make_lswitch sw =
+        let hs, sw = share_actions_sw value_kind sw in
+        let sw = reintroduce_fail sw in
+        hs (Lswitch (arg, sw, loc, value_kind))
+      in
+      let make_raw_block_switch failaction =
+        match nonconsts, failaction with
+        | [], Some fail -> fail
+        | [], None ->
+          Misc.fatal_error "Matching.combine_constructor: empty block switch"
+        | _ ->
+          make_lswitch
+            { sw_numconsts = 0;
+              sw_consts = [];
+              sw_numblocks = cstr.cstr_nonconsts;
+              sw_blocks = nonconsts;
+              sw_failaction = failaction
+            }
+      in
+      let make_int_or_block_switch const_lam block_lam =
+        Lifthenelse
+          ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
+            const_lam,
+            block_lam,
+            value_kind )
+      in
+      let make_custom_mixed_switch () =
+        let const_fail = failaction_for_side cstr.cstr_consts consts in
+        let block_fail = failaction_for_side cstr.cstr_nonconsts nonconsts in
+        let make_const_switch () =
+          call_switcher_on_constructor_tags value_kind loc const_fail arg
+            ~all_constant_tags consts
+        in
+        let make_block_switch () = make_raw_block_switch block_fail in
+        match consts, nonconsts, const_fail, block_fail with
+        | [], _, None, _ -> make_block_switch ()
+        | [], _, Some fail, _ ->
+          make_int_or_block_switch fail (make_block_switch ())
+        | _, [], _, None -> make_const_switch ()
+        | _, [], _, Some fail ->
+          make_int_or_block_switch (make_const_switch ()) fail
+        | _ :: _, _ :: _, _, _ ->
+          make_int_or_block_switch (make_const_switch ()) (make_block_switch ())
+      in
       let lambda1 =
         match (fail_opt, same_actions descr_lambda_list) with
         | None, Some act ->
@@ -3451,7 +3592,9 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                    (typically the constant cases are dense, so
                    call_switcher will generate a Lswitch, still one
                    instruction.) *)
-                call_switcher value_kind loc fail_opt arg 0 (n - 1) consts
+                call_switcher_on_constructor_tags value_kind loc
+                  (failaction_for_side n consts) arg ~all_constant_tags
+                  consts
             | n, _, _, _, None -> (
                 let act0 =
                   (* = Some act when all non-const constructors match to act *)
@@ -3480,23 +3623,32 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
 
                        (The type of tokens has more than 120 constructors.)
                     *)
-                    Lifthenelse
-                      ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
-                        call_switcher value_kind loc fail_opt arg 0 (n - 1) consts,
-                        act, value_kind )
+                    let const_fail = failaction_for_side n consts in
+                    begin match consts, const_fail with
+                    | [], None -> act
+                    | [], Some fail -> make_int_or_block_switch fail act
+                    | _ :: _, _ ->
+                      make_int_or_block_switch
+                        (call_switcher_on_constructor_tags value_kind loc
+                           const_fail arg ~all_constant_tags consts)
+                        act
+                    end
                 | None ->
-                    (* In the general case, emit a switch. *)
-                    let sw =
-                      { sw_numconsts = cstr.cstr_consts;
-                        sw_consts = consts;
-                        sw_numblocks = cstr.cstr_nonconsts;
-                        sw_blocks = nonconsts;
-                        sw_failaction = fail_opt
-                      }
-                    in
-                    let hs, sw = share_actions_sw value_kind sw in
-                    let sw = reintroduce_fail sw in
-                    hs (Lswitch (arg, sw, loc, value_kind))))
+                    if
+                      can_use_raw_const_lswitch ~num_consts:cstr.cstr_consts
+                        all_constant_tags
+                    then
+                      (* In the general default-representation case, emit a
+                         combined raw switch. *)
+                      make_lswitch
+                        { sw_numconsts = cstr.cstr_consts;
+                          sw_consts = consts;
+                          sw_numblocks = cstr.cstr_nonconsts;
+                          sw_blocks = nonconsts;
+                          sw_failaction = fail_opt
+                        }
+                    else
+                      make_custom_mixed_switch ()))
       in
       (lambda1, Jumps.union local_jumps total1)
 

@@ -1013,11 +1013,20 @@ and lambda_apply =
   }
 
 and lambda_switch =
-  { sw_numconsts: int;                  (* Number of integer cases *)
-    sw_consts: (int * lambda) list;     (* Integer cases *)
-    sw_numblocks: int;                  (* Number of tag block cases *)
-    sw_blocks: (int * lambda) list;     (* Tag block cases *)
+  { sw_numconsts: int;
+        (* Dense zero-based integer domain size. *)
+    sw_consts: (int * lambda) list;
+        (* Integer cases.  Case keys must be in [0, sw_numconsts). *)
+    sw_numblocks: int;
+        (* Dense zero-based block-tag domain size. *)
+    sw_blocks: (int * lambda) list;
+        (* Tag block cases.  Case keys must be in [0, sw_numblocks). *)
     sw_failaction : lambda option}      (* Action to take if failure *)
+
+(** Missing keys inside a dense domain dispatch to [sw_failaction] when it is
+    present; otherwise they are assumed unreachable by switch consumers.  Sparse
+    integer domains must be lowered through tests or switcher-generated
+    remapping before being placed in [lambda_switch]. *)
 
 and lambda_event =
   { lev_loc: scoped_location;
