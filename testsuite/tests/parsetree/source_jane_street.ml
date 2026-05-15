@@ -658,7 +658,7 @@ module type S =
 module type S' =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a @@ portable end
+    module M : sig val foo : 'a -> 'a end @@ portable
   end
 |}]
 

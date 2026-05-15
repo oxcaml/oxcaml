@@ -181,10 +181,12 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
     Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
     Mode.Modality.infer ~md_mode ~mode
 
-(** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
-[M] with [modalities] on it, calculate the modalities on the [item] to be used
-in the enclosing structure which is at [md_mode] and [loc_md]. *)
-let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
+(** For an [include M] clause where [M] is at [mode_with_locks] and [loc], and
+an [item] in [M] with [modalities] on it, calculate the modalities on the
+[item] to be used in the enclosing structure which is at [md_mode] and
+[loc_md]. *)
+let rebase_modalities ~loc ~loc_md (item_kind, id as item) ~md_mode ~env
+    ~mode_with_locks ?(crossing = Mode.Crossing.max) modalities =
   let pp : Hint.pinpoint = (loc, Structure_item item) in
   let is_contained_by : Hint.is_contained_by =
     { containing = Structure (item, Modality);
@@ -194,23 +196,57 @@ let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
     { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
       comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
   in
+  (* We apply modalities before walking locks, so that the locks are walked on
+     the item's effective mode rather than the module's mode. See the analogous
+     reasoning in [Typecore.type_ident]. *)
+  let (mode, held_locks) = mode_with_locks in
   let mode = Modality.apply ~hint modalities mode in
+  (* Apply type-based mode crossing before lock walking, following
+     [Typecore.type_ident]. This allows e.g. [int ref] to cross portability. *)
+  let mode = Mode.Crossing.apply_left crossing mode in
+  let mode =
+    match held_locks with
+    | None -> mode
+    | Some (locks, lid, hloc) ->
+        let lid = Longident.Ldot (lid, Ident.name id) in
+        Env.walk_locks ~env ~loc:hloc lid ~item:item_kind None (mode, locks)
+  in
+  (* Apply crossing again after lock walking, as locks may weaken the monadic
+     fragment. See [Typecore.type_ident] for the same pattern. *)
+  let mode = Mode.Crossing.apply_left crossing mode in
   infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
-let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
+let rebase_modalities_sg ~loc ~loc_md ~md_mode ~env ~mode_with_locks sg =
+  (* Walk locks for the structure's memory block itself to trigger any errors
+     (e.g. accessing a structure through a closure lock). This is analogous to
+     how [Includemod] checks [mode_crossing_structure_memaddr] before
+     descending into signature items. The resulting mode is discarded; the
+     original [mode_with_locks] is used for the items. *)
+  let (mode, held_locks) = mode_with_locks in
+  (match held_locks with
+  | None -> ()
+  | Some (locks, lid, hloc) ->
+      let mode =
+        Mode.Crossing.apply_left Ctype.mode_crossing_structure_memaddr mode
+      in
+      ignore
+        (Env.walk_locks ~env ~loc:hloc lid ~item:Module None (mode, locks)));
   List.map (function
     | Sig_value (id, vd, vis) ->
+        let crossing = Ctype.crossing_of_ty env vd.val_type in
         let val_modalities =
           vd.val_modalities
-          |> rebase_modalities ~loc ~loc_md (Value, id) ~md_mode ~mode
+          |> rebase_modalities ~loc ~loc_md (Value, id) ~md_mode ~env
+               ~mode_with_locks ~crossing
         in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
         let md_modalities =
           md.md_modalities
-          |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~mode
+          |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~env
+               ~mode_with_locks
         in
         let md = {md with md_modalities} in
         Sig_module (id, pres, md, rec_, vis)
@@ -1358,8 +1394,7 @@ let map_ext fn exts =
   | [] -> []
   | d1 :: dl -> fn Text_first d1 :: List.map (fn Text_next) dl
 
-let rec apply_modalities_signature ~recursive env modalities sg =
-  let env = Env.add_signature sg env in
+let apply_modalities_signature ~recursive modalities sg =
   List.map (function
   | Sig_value (id, vd, vis) ->
       let val_modalities =
@@ -1371,25 +1406,16 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let vd = {vd with val_modalities} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
-      let md_type = apply_modalities_module_type env modalities md.md_type in
-      let md = {md with md_type} in
+      let md_modalities =
+        md.md_modalities
+        |> Mode.Modality.to_const_exn
+        |> (fun then_ -> Mode.Modality.Const.concat ~then_ modalities)
+        |> Mode.Modality.of_const
+      in
+      let md = {md with md_modalities} in
       Sig_module (id, pres, md, rec_, vis)
   | item -> item
   ) sg
-
-and apply_modalities_module_type env modalities = function
-  | Mty_ident p ->
-      let mtd = Env.find_modtype p env in
-      begin match mtd.mtd_type with
-      | None -> Mty_ident p
-      | Some mty -> apply_modalities_module_type env modalities mty
-      end
-  | Mty_strengthen (mty, p, alias) ->
-      Mty_strengthen (apply_modalities_module_type env modalities mty, p, alias)
-  | Mty_signature sg ->
-      let sg = apply_modalities_signature ~recursive:true env modalities sg in
-      Mty_signature sg
-  | (Mty_functor _ | Mty_alias _) as mty -> mty
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
@@ -1399,35 +1425,6 @@ let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
     Typemode.transl_modalities_with_default
       ~default:default_modalities ~maturity:Stable modalities
 
-let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
-  let modalities = transl_modalities ~default_modalities pmd_modalities in
-  (*
-  Workaround for pmd_modalities
-
-  Let [f] be the mapping representing [pmd_modalities].
-
-  In the future with proper modal modules, let [m] be the mode of the enclosing
-  structure. This module will be of mode [f m], and a value inside the module
-  will of mode [g (f m)] where [g] is the modalities on the value. Note that [m]
-  itself is of the form [f0 (f1 .. (fn legacy))] where [legacy] is the mode of
-  the file-level structure, and [fi] is the sequence of [pmd_modalities] that
-  corresponds to the enclosing structure nested inside layers of structures.
-  Therefore, the aforementioned value will be of mode
-  [g (f (f0 (f1 .. (fn legacy))))].
-
-  Currently, all modules are legacy. To simulate the above effect, we apply each
-  [pmd_modalities] of a structure deeply to all [val_modalities] in that
-  structure.
-
-  We still don't support [pmd_modalities] on functors.
-  *)
-  let mty =
-    match Mode.Modality.Const.is_id modalities.moda_modalities with
-    | true -> mty
-    | false ->
-        apply_modalities_module_type env modalities.moda_modalities mty
-  in
-  mty, { modalities with moda_modalities = Mode.Modality.Const.id }
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1626,7 +1623,7 @@ and approx_sig_items env ssg=
                   let recursive =
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
                   in
-                  apply_modalities_signature ~recursive env modalities sg
+                  apply_modalities_signature ~recursive modalities sg
               in
               let sg, newenv = Env.enter_signature ~scope sg env in
               sg @ approx_sig_items newenv srem
@@ -2204,7 +2201,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let sg =
           sg
           |> rebase_modalities_sg ~loc:smty.pmty_loc ~loc_md:psg_loc
-              ~md_mode ~mode
+              ~md_mode ~env ~mode_with_locks:(Value.disallow_right mode, None)
           |> remove_modality_and_zero_alloc_variables_sg env ~zap_modality
         in
         incl_kind, sg
@@ -2224,7 +2221,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       match Mode.Modality.Const.is_id modalities.moda_modalities with
       | true -> sg
       | false ->
-        apply_modalities_signature ~recursive env modalities.moda_modalities sg
+        apply_modalities_signature ~recursive modalities.moda_modalities sg
     in
     let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
     Signature_group.iter
@@ -2325,13 +2322,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env pmd.pmd_type)
         in
-        let mty_type, md_modalities =
-          apply_pmd_modalities
-            env
+        let md_modalities =
+          transl_modalities
             ~default_modalities:sig_modalities.moda_modalities
-            pmd.pmd_modalities tmty.mty_type
+            pmd.pmd_modalities
         in
-        let tmty = {tmty with mty_type} in
         let pres =
           match tmty.mty_type with
           | Mty_alias _ -> Mp_absent
@@ -2615,11 +2610,10 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env_c pmd.pmd_type)
         in
-        let mty_type, md_modalities =
-          apply_pmd_modalities env ~default_modalities:sig_modalities
-            pmd.pmd_modalities tmty.mty_type
+        let md_modalities =
+          transl_modalities ~default_modalities:sig_modalities
+            pmd.pmd_modalities
         in
-        let tmty = {tmty with mty_type} in
         let md =
           { md with
             Types.md_type = tmty.mty_type;
@@ -2655,10 +2649,12 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
-         let md_type, md_modalities =
+         let md_type =
           approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
-          |> apply_pmd_modalities env ~default_modalities:sig_modalities
-              pmd.pmd_modalities
+         in
+         let md_modalities =
+          transl_modalities ~default_modalities:sig_modalities
+            pmd.pmd_modalities
          in
          let md_modalities = Modality.of_const md_modalities.moda_modalities in
          let md =
@@ -3620,10 +3616,12 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
     let smodl = sincl.pincl_mod in
     let modl, modl_shape =
       Builtin_attributes.warning_scope sincl.pincl_attributes
-        (fun () -> type_module true funct_body None env smodl)
+        (fun () ->
+           type_module_maybe_hold_locks ~hold_locks:true
+             true funct_body None env smodl)
     in
     let scope = Ctype.create_scope () in
-    let incl_kind, sg, mode =
+    let incl_kind, sg, mode_with_locks =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
@@ -3631,18 +3629,21 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           extract_sig_functor_open funct_body env smodl.pmod_loc
             modl.mod_type sig_acc md_mode
         in
-        incl_kind, sg, Value.disallow_right mode
+        incl_kind, sg, (Value.disallow_right mode, None)
       | Structure ->
-        Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
-          (Typedtree.mode_without_locks_exn modl.mod_mode)
+        let sg = extract_sig_open env smodl.pmod_loc modl.mod_type in
+        Tincl_structure, sg, modl.mod_mode
     in
+    let sg =
+      rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~env
+        ~mode_with_locks sg
+    in
+    (* [rebase_modalities_sg] adjusted modalities relative to [md_mode], so
+       [sg] items are now based on [md_mode]. *)
     (* Rename all identifiers bound by this signature to avoid clashes *)
     let sg, shape, new_env =
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
-        modl_shape sg ~mode env
-    in
-    let sg =
-      rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
+        modl_shape sg ~mode:md_mode env
     in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
@@ -3969,7 +3970,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         in
         let sg =
           rebase_modalities_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
-            ~md_mode ~mode sg
+            ~md_mode ~env ~mode_with_locks:(mode, None) sg
         in
         Tstr_open od, sg, shape_map, newenv
     | Pstr_class cl ->
