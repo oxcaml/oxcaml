@@ -7,10 +7,24 @@
 
 (* Preamble types for use in tests *)
 
+module M = struct
+  let ( + ) = ( +. )
+  let foo = 42
+  type 'a record = { record_field : 'a }
+  type 'a variant = Variant_tag of 'a
+end
+
 module E = struct
   type existential = Exists : 'a -> existential
 end
 [%%expect {|
+module M :
+  sig
+    val ( + ) : float -> float -> float
+    val foo : int
+    type 'a record = { record_field : 'a; }
+    type 'a variant = Variant_tag of 'a
+  end
 module E : sig type existential = Exists : 'a -> existential end
 |}];;
 
@@ -941,25 +955,24 @@ Error: Object definition using "object..end"
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 1, characters 3-23:
-1 | <[ let open List in map ]>;;
-       ^^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at line 1, characters 3-23.
+- : <[($('a) -> $('b)) -> $('a) list -> $('b) list]> expr =
+<[let open Stdlib.List in Stdlib.List.map]>
 |}];;
-
-module M = struct
-  let foo = 42
-end;;
 
 <[ let open M in M.foo ]>;;
 [%%expect {|
-module M : sig val foo : int end
-Line 5, characters 3-22:
-5 | <[ let open M in M.foo ]>;;
-       ^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at line 5, characters 3-22.
+- : <[int]> expr = <[let open M in M.foo]>
+|}]
+;;
+
+<[ let open struct let foo = 42 end in foo ]>;;
+[%%expect {|
+Line 1, characters 3-42:
+1 | <[ let open struct let foo = 42 end in foo ]>;;
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Opening non-trivial modules
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 3-42.
 |}]
 ;;
 
@@ -1614,4 +1627,33 @@ exception E
 <[ raise Exc.E ]>;;
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Exc.E]>
+|}];;
+
+(* Opening modules *)
+
+<[ let open List in map length [[1]; [2; 3]] ]>
+[%%expect {|
+- : <[int list]> expr =
+<[let open Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+]>
+|}];;
+
+<[ List.(map length [[1]; [2; 3]]) ]>
+[%%expect {|
+- : <[int list]> expr =
+<[let open Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+]>
+|}];;
+
+<[ M.(0.1 + 0.2) ]>
+[%%expect {|
+- : <[float]> expr = <[let open M in M.( + ) 0.1 0.2]>
+|}];;
+
+<[ M.{ record_field = "open" }, { M.record_field = "path" } ]>
+[%%expect {|
+- : <[string M.record * string M.record]> expr =
+<[
+  ((let open M in { M.record_field = "open"; }), { M.record_field = "path"; })
+]>
 |}];;

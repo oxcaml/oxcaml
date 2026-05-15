@@ -655,6 +655,8 @@ and Exp_desc : sig
 
   val let_op : Identifier.Value.t list -> Exp.t list -> Case.t -> t
 
+  val let_open : Identifier.Module.t -> Exp.t -> t
+
   val exclave : Exp.t -> t
 
   val list_comprehension : Comprehension.t -> t
