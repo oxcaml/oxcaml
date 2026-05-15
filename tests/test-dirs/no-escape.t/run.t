@@ -243,7 +243,7 @@ Syntax errors also shouldn't escape:
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "Syntax error: invalid package type: parametrized types are not supported"
+        "message": "invalid package type: parametrized types are not supported"
       }
     ],
     "notifications": []

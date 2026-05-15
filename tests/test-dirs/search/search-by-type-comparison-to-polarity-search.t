@@ -81,40 +81,16 @@ a list.
     "type": "'a array list -> 'a array"
   }
   {
-<<<<<<< HEAD
     "name": "Iarray.concat",
     "type": "'a iarray list -> 'a iarray"
-||||||| c76379cdae
-    "name": "Seq.concat",
-    "type": "'a Stdlib__Seq.t Stdlib__Seq.t -> 'a Stdlib__Seq.t"
-=======
-    "name": "Seq.concat",
-    "type": "'a Seq.t Seq.t -> 'a Seq.t"
-  }
-  {
-    "name": "Iarray.concat",
-    "type": "'a iarray list -> 'a iarray"
->>>>>>> v5.6-504
   }
   {
     "name": "Option.join",
     "type": "'a option option -> 'a option"
   }
   {
-<<<<<<< HEAD
     "name": "Result.join",
     "type": "(('a, 'e) result, 'e) result -> ('a, 'e) result"
-||||||| c76379cdae
-    "name": "Seq.transpose",
-    "type": "'a Stdlib__Seq.t Stdlib__Seq.t -> 'a Stdlib__Seq.t Stdlib__Seq.t"
-  }
-  {
-    "name": "Result.join",
-    "type": "(('a, 'e) result, 'e) result -> ('a, 'e) result"
-=======
-    "name": "Seq.transpose",
-    "type": "'a Seq.t Seq.t -> 'a Seq.t Seq.t"
->>>>>>> v5.6-504
   }
   {
     "name": "Seq.concat",
@@ -153,18 +129,6 @@ map).
     "type": "f:(int -> 'a -> 'b) -> 'a list -> 'b list"
   }
   {
-<<<<<<< HEAD
-||||||| c76379cdae
-    "name": "Seq.map",
-    "type": "('a -> 'b) -> 'a Stdlib__Seq.t -> 'b Stdlib__Seq.t"
-  }
-  {
-=======
-    "name": "Seq.map",
-    "type": "('a -> 'b) -> 'a Seq.t -> 'b Seq.t"
-  }
-  {
->>>>>>> v5.6-504
     "name": "List.concat_map",
     "type": "('a -> 'b list) -> 'a list -> 'b list"
   }
@@ -214,40 +178,16 @@ a list.
     "type": "'a array list -> 'a array"
   }
   {
-<<<<<<< HEAD
     "name": "Iarray.concat",
     "type": "'a iarray list -> 'a iarray"
-||||||| c76379cdae
-    "name": "Seq.concat",
-    "type": "'a Stdlib__Seq.t Stdlib__Seq.t -> 'a Stdlib__Seq.t"
-=======
-    "name": "Seq.concat",
-    "type": "'a Seq.t Seq.t -> 'a Seq.t"
-  }
-  {
-    "name": "Iarray.concat",
-    "type": "'a iarray list -> 'a iarray"
->>>>>>> v5.6-504
   }
   {
     "name": "Option.join",
     "type": "'a option option -> 'a option"
   }
   {
-<<<<<<< HEAD
     "name": "Result.join",
     "type": "(('a, 'e) result, 'e) result -> ('a, 'e) result"
-||||||| c76379cdae
-    "name": "Seq.transpose",
-    "type": "'a Stdlib__Seq.t Stdlib__Seq.t -> 'a Stdlib__Seq.t Stdlib__Seq.t"
-  }
-  {
-    "name": "Result.join",
-    "type": "(('a, 'e) result, 'e) result -> ('a, 'e) result"
-=======
-    "name": "Seq.transpose",
-    "type": "'a Seq.t Seq.t -> 'a Seq.t Seq.t"
->>>>>>> v5.6-504
   }
   {
     "name": "Seq.concat",
