@@ -27,7 +27,6 @@
       "end": {
         "line": 1,
         "col": 7
-<<<<<<< HEAD
       },
       "stale": false
     },
@@ -48,67 +47,11 @@
       "start": {
         "line": 2,
         "col": 22
-||||||| c76379cdae
-      }
-    },
-    {
-      "file": "$TESTCASE_ROOT/lib.ml",
-      "start": {
-        "line": 2,
-        "col": 22
-=======
->>>>>>> v5.6-504
-      },
-<<<<<<< HEAD
-      "end": {
-        "line": 2,
-        "col": 25
-||||||| c76379cdae
-      "end": {
-        "line": 2,
-        "col": 25
-      }
-    },
-    {
-      "file": "$TESTCASE_ROOT/main.ml",
-      "start": {
-        "line": 1,
-        "col": 26
-=======
-      "stale": false
-    },
-    {
-      "file": "$TESTCASE_ROOT/main.ml",
-      "start": {
-        "line": 1,
-        "col": 26
->>>>>>> v5.6-504
-      },
-<<<<<<< HEAD
-      "stale": false
-||||||| c76379cdae
-      "end": {
-        "line": 1,
-        "col": 29
-      }
-=======
-      "end": {
-        "line": 1,
-        "col": 29
-      },
-      "stale": false
-    },
-    {
-      "file": "$TESTCASE_ROOT/lib.ml",
-      "start": {
-        "line": 2,
-        "col": 22
       },
       "end": {
         "line": 2,
         "col": 25
       },
       "stale": false
->>>>>>> v5.6-504
     }
   ]
