@@ -3391,7 +3391,9 @@ module Lattices_mono = struct
         Max_with_simple
           (ax1, Simple_morph.compose obj0 (Core_imply_const (m0, c0)) m1)
       | Const_max_core -> Const_max a_obj
-      | And_max_id ax1 -> Max_with_simple (ax1, m1)
+      | And_max_id ax1 ->
+        let obj0 = proj_obj ax1 dst in
+        Max_with_simple (ax1, Simple_morph.compose obj0 (Imply_const c0) m1)
       | Disallowed -> Compose (Simple sm0, Max_with_simple (ax1, m1))
       end
     | Meet_const_core _ -> Compose (Simple sm0, Max_with_simple (ax1, m1))
@@ -3430,7 +3432,10 @@ module Lattices_mono = struct
         Min_with_simple
           (ax1, Simple_morph.compose obj0 (Meet_const_core (c0, m0)) m1)
       | Const_min_core -> Const_min a_obj
-      | And_min_id ax1 -> Min_with_simple (ax1, m1)
+      | And_min_id ax1 ->
+        let obj0 = proj_obj ax1 dst in
+        let c0 = Axis.proj ax1 c0 in
+        Min_with_simple (ax1, Simple_morph.compose obj0 (Meet_const c0) m1)
       | Disallowed -> Compose (Simple sm0, Min_with_simple (ax1, m1))
       end
     | Imply_const _ -> Compose (Simple sm0, Min_with_simple (ax1, m1))
