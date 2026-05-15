@@ -13,10 +13,6 @@ module M = struct
   type 'a record = { record_field : 'a }
   type 'a variant = Variant_tag of 'a
 end
-
-module E = struct
-  type existential = Exists : 'a -> existential
-end
 [%%expect {|
 module M :
   sig
@@ -25,6 +21,19 @@ module M :
     type 'a record = { record_field : 'a; }
     type 'a variant = Variant_tag of 'a
   end
+|}];;
+
+module type T = sig
+  val foo : int
+end
+[%%expect {|
+module type T = sig val foo : int end
+|}];;
+
+module E = struct
+  type existential = Exists : 'a -> existential
+end
+[%%expect {|
 module E : sig type existential = Exists : 'a -> existential end
 |}];;
 
@@ -1657,4 +1666,42 @@ exception E
   ((let open! M in { M.record_field = "open"; }),
    { M.record_field = "path"; })
 ]>
+|}];;
+
+(* Cross-stage open *)
+<[ let open List in $(hd [ <[ 0 ]>; <[ 1 ]> ]) ]>
+[%%expect {|
+- : <[int]> expr = <[let open! Stdlib.List in 0]>
+|}];;
+let open List in <[ length [1; 2; 3] ]>
+[%%expect {|
+- : <[int]> expr = <[Stdlib.List.length ([1; 2; 3])]>
+|}];;
+
+module M1 = struct let foo1 = 42 end;;
+let open M1 in <[ foo1 ]>
+[%%expect {|
+module M1 : sig val foo1 : int end
+Line 2, characters 18-22:
+2 | let open M1 in <[ foo1 ]>
+                      ^^^^
+Error: Identifier "foo1" is used at line 2, characters 18-22,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 23-27, outside any quotations.
+|}];;
+
+(* Opening packed module *)
+<[ fun (module M : T) -> let open M in foo + 1 ]>
+[%%expect {|
+- : <[(module T) -> int]> expr =
+<[fun (module M : T) -> let open! M in M.foo + 1]>
+|}];;
+<[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+[%%expect {|
+Line 1, characters 56-59:
+1 | <[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+                                                            ^^^
+Error: Identifier "foo" is used at line 1, characters 56-59,
+       outside any quotations; it is introduced at line 2, characters 2-15,
+       inside a quotation (<[ ... ]>).
 |}];;
