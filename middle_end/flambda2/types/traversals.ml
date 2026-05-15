@@ -1273,6 +1273,7 @@ struct
       =
     let base_env =
       TE.create ~resolver:(TE.resolver env)
+        ~get_imported_names:(TE.get_imported_names env)
         ~machine_width:(TE.machine_width env)
     in
     let base_env =
@@ -1375,6 +1376,7 @@ struct
        [rewrite_env_extension_with_extra_variables] above. *)
     let base_env =
       TE.create ~resolver:(TE.resolver env)
+        ~get_imported_names:(TE.get_imported_names env)
         ~machine_width:(TE.machine_width env)
     in
     let base_env =

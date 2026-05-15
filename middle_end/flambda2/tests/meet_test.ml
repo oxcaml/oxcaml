@@ -10,7 +10,8 @@ module TE = T.Typing_env
 
 let create_env () =
   let resolver _ = None in
-  TE.create ~resolver ~machine_width:Sixty_four
+  let get_imported_names () = Name.Set.empty in
+  TE.create ~resolver ~get_imported_names ~machine_width:Sixty_four
 
 let test_meet_chains_two_vars () =
   let env = create_env () in
