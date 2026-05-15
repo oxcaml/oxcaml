@@ -22,7 +22,6 @@ exception Ex of char
 
 type ('a, 'b) eithery = Lefty of 'a | Righty of 'b
 
-<<<<<<< HEAD
 type 'a point =
   { x : 'a
   ; y : 'a
@@ -48,14 +47,6 @@ module type S = sig
     end
   end
 end
-||||||| c76379cdae
-type 'a point =
-  { x : 'a
-  ; y : 'a
-  ; z : 'a
-  }
-=======
-type 'a point = { x : 'a; y : 'a; z : 'a }
 
 class a = object end
 
@@ -104,4 +95,3 @@ let final_let =
     end
   in
   c
->>>>>>> v5.6-504
