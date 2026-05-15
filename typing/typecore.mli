@@ -358,6 +358,7 @@ type error =
   | Unsupported_arg_zero_alloc
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
+  | Zero_alloc_on_non_var_pattern
 
 and invalid_layout_poly_inst_context =
   | Binding_op

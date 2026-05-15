@@ -309,6 +309,7 @@ type error =
   | Unsupported_arg_zero_alloc
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
+  | Zero_alloc_on_non_var_pattern
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -3139,17 +3140,20 @@ and type_pat_aux
       let lbl_a_list = List.map type_label_pat lbl_a_list in
       rvp @@ solve_expected (make_record_pat lbl_a_list ambiguity)
   in
-  let verify_zero_alloc desc zero_alloc =
+  let rec verify_zero_alloc desc zero_alloc =
     match desc with
-    | Ppat_var _ | Ppat_alias _ | Ppat_constraint _ -> ()
+    | Ppat_var _ -> ()
+    | Ppat_alias (p, _) | Ppat_constraint (p, _, _) ->
+      verify_zero_alloc p.ppat_desc zero_alloc
     | Ppat_any | Ppat_constant _ | Ppat_interval _ | Ppat_unboxed_unit
     | Ppat_unboxed_bool _ | Ppat_unboxed_tuple _ | Ppat_variant _
     | Ppat_construct _ | Ppat_type _ | Ppat_unpack _ | Ppat_extension _
     | Ppat_exception _ | Ppat_lazy _ | Ppat_open _ | Ppat_tuple _ | Ppat_array _
     | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_or _ ->
-      (match Zero_alloc.sub ~context:Default zero_alloc Zero_alloc.default with
-       | Ok () -> ()
-       | Error _ -> fatal_error "type_pat_aux: zero_alloc")
+      (match Zero_alloc.get zero_alloc with
+       | Default_zero_alloc -> ()
+       | Check _ | Assume _ | Ignore_assert_all ->
+         raise (Error (sp.ppat_loc, !!penv, Zero_alloc_on_non_var_pattern)))
   in
   verify_zero_alloc sp.ppat_desc zero_alloc;
   match sp.ppat_desc with
@@ -12908,6 +12912,11 @@ let report_error ~loc env =
          with the one on its type.@ %a@]"
         Style.inline_code "zero_alloc"
         Zero_alloc.print_error err
+  | Zero_alloc_on_non_var_pattern ->
+      Location.errorf ~loc
+        "@[The %a attribute is only supported on patterns that bind@ \
+         a variable.@]"
+        Style.inline_code "zero_alloc"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env
