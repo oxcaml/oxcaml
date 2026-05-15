@@ -300,6 +300,10 @@ let create_byte_size_exn ~byte_size =
   let spec = AS.create Byte_size Data8 in
   AV.create spec (V.int64 ~comment:"byte size" (Int64.of_int byte_size))
 
+let create_byte_size_description loc_desc =
+  let spec = AS.create Byte_size Exprloc in
+  AV.create spec (V.single_location_description loc_desc)
+
 let create_bit_size bit_size =
   let spec = AS.create Bit_size Data1 in
   AV.create spec (V.int8 ~comment:"bit size" bit_size)
@@ -397,6 +401,10 @@ let create_count_const i =
   let spec = AS.create Count Data8 in
   AV.create spec (V.int64 i)
 
+let create_count_description loc_desc =
+  let spec = AS.create Count Exprloc in
+  AV.create spec (V.single_location_description loc_desc)
+
 let create_ocaml_compiler_version version =
   let spec = AS.create (Ocaml_specific Compiler_version) Strp in
   AV.create spec (V.indirect_string ~comment:"OCaml compiler version" version)
@@ -428,7 +436,3 @@ let create_ocaml_cmt_file_digest digest =
   let hex = Digest.to_hex digest in
   let spec = AS.create (Ocaml_specific Cmt_file_digest) Strp in
   AV.create spec (V.indirect_string ~comment:".cmt file digest" hex)
-
-let create_ocaml_offset_record_from_pointer ~value =
-  let spec = AS.create (Ocaml_specific Offset_record_from_pointer) Data8 in
-  AV.create spec (V.int64 value)
