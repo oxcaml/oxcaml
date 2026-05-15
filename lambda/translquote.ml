@@ -2047,7 +2047,8 @@ and Exp_desc : sig
     Case.t ->
     t'
 
-  val let_open : Debuginfo.Scoped_location.t -> Identifier.Module.t -> Exp.t -> t'
+  val let_open :
+    Debuginfo.Scoped_location.t -> Identifier.Module.t -> Exp.t -> t'
 
   val exclave : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
@@ -3907,8 +3908,10 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       let meth = quote_method loc meth in
       Exp_desc.send loc obj meth
     | Texp_open
-        ({ open_expr = { mod_desc = Tmod_ident (path, _) }; open_attributes = [] }, exp)
-      ->
+        ( { open_expr = { mod_desc = Tmod_ident (path, _) };
+            open_attributes = []
+          },
+          exp ) ->
       let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.let_open loc (module_for_path loc path) exp
     | Texp_open _ ->
