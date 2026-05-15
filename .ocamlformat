@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 version=0.29.0
+||||||| c76379cdae
+version=0.26.2
+=======
+version=0.27.0
+>>>>>>> v5.6-504
 disable=false
 
 break-cases=fit-or-vertical

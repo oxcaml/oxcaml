@@ -43,10 +43,17 @@
             version = "dev";
             src = self;
             duneVersion = "3";
+<<<<<<< HEAD
             propagatedBuildInputs = with ocamlPackages; [
               csexp
               alcotest
             ];
+||||||| c76379cdae
+            propagatedBuildInputs = with ocamlPackages; [ csexp ];
+=======
+            propagatedBuildInputs = with ocamlPackages; [ csexp ];
+            checkInputs = with ocamlPackages; [ alcotest ];
+>>>>>>> v5.6-504
             doCheck = true;
           };
 

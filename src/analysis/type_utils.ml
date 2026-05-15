@@ -28,6 +28,9 @@
 
 open Std
 
+let log_section = "type-utils"
+let { Logger.log } = Logger.for_section log_section
+
 module Verbosity = Mconfig.Verbosity
 
 let protect expr =
@@ -113,8 +116,15 @@ module Printtyp = struct
   let expand_sig env mty = Env.with_cmis @@ fun () -> Mtype.scrape_alias env mty
 
   let verbose_type_scheme env ppf t =
+<<<<<<< HEAD
     Out_type.Compat.type_scheme_for_merlin ppf (expand_type env t)
       ~print_non_value_jkind_on_type_variables:true
+||||||| c76379cdae
+    Printtyp.type_scheme ppf (expand_type env t)
+=======
+    let t = expand_type env t in
+    Printtyp.type_scheme ppf t
+>>>>>>> v5.6-504
 
   let verbose_type_declaration ~print_non_value_inferred_jkind env id ppf t =
     Out_type.Compat.type_declaration_for_merlin id ppf (expand_type_decl env t)
@@ -138,6 +148,10 @@ module Printtyp = struct
        ~verbose:(verbose_type_scheme env))
       ppf ty
 
+  let tree_of_typ_scheme te =
+    Out_type.prepare_for_printing [ te ];
+    Out_type.tree_of_typexp Type_scheme te
+
   let type_declaration env id ppf =
     (select_by_verbosity
        ~default:
@@ -156,7 +170,7 @@ module Printtyp = struct
       ppf mty
 
   let wrap_printing_env env ~verbosity:v f =
-    let_ref verbosity v (fun () -> wrap_printing_env env f)
+    let_ref verbosity v (fun () -> wrap_printing_env ~error:true env f)
 end
 
 let si_modtype_opt : Subst.Lazy.signature_item -> _ = function
@@ -251,12 +265,26 @@ let print_exn ppf exn =
 
 let print_type ppf verbosity env lid =
   let p, t = Env.find_type_by_name lid.Asttypes.txt env in
+<<<<<<< HEAD
   Printtyp.wrap_printing_env env ~verbosity begin fun () ->
       Printtyp.type_declaration env
         (Ident.create_persistent (* Incorrect, but doesn't matter. *)
            (Path.last p))
         ppf t
     end
+||||||| c76379cdae
+  Printtyp.type_declaration env
+    (Ident.create_persistent (* Incorrect, but doesn't matter. *) (Path.last p))
+    ppf t
+=======
+  match t.type_manifest with
+  | None ->
+    Printtyp.type_declaration env
+      (Ident.create_persistent
+         (* Incorrect, but doesn't matter. *) (Path.last p))
+      ppf t
+  | Some type_expr -> Printtyp.type_expr ppf type_expr
+>>>>>>> v5.6-504
 
 let print_modtype ppf verbosity env lid =
   let _p, mtd = Env.find_modtype_by_name_lazy lid.Asttypes.txt env in
@@ -275,7 +303,7 @@ let print_cstr_desc ppf cstr_desc =
 let print_constr ppf env lid =
   let cstr_desc = Env.find_constructor_by_name lid.Asttypes.txt env in
   (* FIXME: support Reader printer *)
-  print_cstr_desc ppf cstr_desc
+  (Format_doc.compat print_cstr_desc) ppf cstr_desc
 
 exception Fallback
 let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
@@ -317,6 +345,7 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
         | Label (lbl_des, _) ->
           (* We use information from the context because `Env.find_label_by_name`
                can fail *)
+<<<<<<< HEAD
           Printtyp.Compat.type_expr ppf lbl_des.lbl_arg
         | Type -> print_type ppf verbosity env longident
         (* TODO: special processing for module aliases ? *)
@@ -324,6 +353,25 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
         | Module_path -> print_modpath ppf verbosity env longident
         | Constructor _ -> print_constr ppf env longident
         | _ -> raise Fallback
+||||||| c76379cdae
+            Printtyp.type_expr ppf lbl_des.lbl_arg
+          | Type -> print_type ppf env longident
+          (* TODO: special processing for module aliases ? *)
+          | Module_type -> print_modtype ppf verbosity env longident
+          | Module_path -> print_modpath ppf verbosity env longident
+          | Constructor _ -> print_constr ppf env longident
+          | _ -> raise Fallback
+=======
+            Printtyp.type_expr ppf lbl_des.lbl_arg
+          | Type ->
+            log ~title:"type_in_env" "Type type";
+            print_type ppf env longident
+          (* TODO: special processing for module aliases ? *)
+          | Module_type -> print_modtype ppf verbosity env longident
+          | Module_path -> print_modpath ppf verbosity env longident
+          | Constructor _ -> print_constr ppf env longident
+          | _ -> raise Fallback
+>>>>>>> v5.6-504
         end;
         true
       with _ -> (
@@ -358,7 +406,8 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
         false))
 
 let print_constr ~verbosity env ppf cd =
-  Printtyp.wrap_printing_env env ~verbosity @@ fun () -> print_cstr_desc ppf cd
+  Printtyp.wrap_printing_env env ~verbosity @@ fun () ->
+  (Format_doc.compat print_cstr_desc) ppf cd
 
 (* From doc-ock
    https://github.com/lpw25/doc-ock/blob/master/src/docOckAttrs.ml *)

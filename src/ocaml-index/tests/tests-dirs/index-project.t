@@ -138,6 +138,24 @@
   and related uids:{}
 
   $ ocaml-index stats foo.uideps test.uideps
+<<<<<<< HEAD
+||||||| c76379cdae
+  Index "test.uideps" contains:
+  - 13 definitions
+  - 29 locations
+  - 0 approximated definitions
+  - 0 compilation units shapes
+  - root dir: none
+  
+=======
+  Index "test.uideps" contains:
+  - 14 definitions
+  - 36 locations
+  - 0 approximated definitions
+  - 0 compilation units shapes
+  - root dir: none
+  
+>>>>>>> v5.6-504
   Index "foo.uideps" contains:
   - 6 definitions
   - 8 locations

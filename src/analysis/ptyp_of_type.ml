@@ -36,6 +36,7 @@ let rec module_type =
 and core_type type_expr =
   let open Ast_helper in
   match Types.get_desc type_expr with
+<<<<<<< HEAD
   | Tvar { name = None; jkind = _ } | Tunivar { name = None; jkind = _ } ->
     (* CR modes: do something better here with the jkind *)
     Typ.any None
@@ -68,6 +69,20 @@ and core_type type_expr =
       List.map ~f:(fun (lbl, ty) -> (lbl, core_type ty)) type_exprs
     in
     Typ.unboxed_tuple labeled_type_exprs
+||||||| c76379cdae
+  | Tvar None | Tunivar None -> Typ.any ()
+  | Tvar (Some s) | Tunivar (Some s) -> Typ.var s
+  | Tarrow (label, type_expr, type_expr_out, _commutable) ->
+    Typ.arrow label (core_type type_expr) (core_type type_expr_out)
+  | Ttuple type_exprs -> Typ.tuple @@ List.map ~f:core_type type_exprs
+=======
+  | Tvar None | Tunivar None -> Typ.any ()
+  | Tvar (Some s) | Tunivar (Some s) -> Typ.var s
+  | Tarrow (label, type_expr, type_expr_out, _commutable) ->
+    Typ.arrow label (core_type type_expr) (core_type type_expr_out)
+  | Ttuple type_exprs ->
+    Typ.tuple @@ List.map ~f:(fun (label, ty) -> label, core_type ty) type_exprs
+>>>>>>> v5.6-504
   | Tconstr (path, type_exprs, _abbrev) ->
     let loc = Untypeast.lident_of_path path |> Location.mknoloc in
     Typ.constr loc @@ List.map ~f:core_type type_exprs
@@ -90,7 +105,13 @@ and core_type type_expr =
       | _ ->
         failwith
         @@ Format.asprintf "Unexpected type constructor in fields list: %a"
+<<<<<<< HEAD
              Printtyp.Compat.type_expr type_expr
+||||||| c76379cdae
+             Printtyp.type_expr type_expr
+=======
+          Printtyp.type_expr type_expr
+>>>>>>> v5.6-504
     in
     let fields, closed = aux [] type_expr in
     Typ.object_ fields closed
@@ -119,15 +140,26 @@ and core_type type_expr =
     let names =
       List.map
         ~f:(fun v ->
+<<<<<<< HEAD
           match get_desc v with
           | Tunivar { name = Some name; jkind = _ }
           | Tvar { name = Some name; jkind = _ } ->
             (* CR modes: do something  *)
             (mknoloc name, None)
           | _ -> failwith "poly: not a var")
+||||||| c76379cdae
+          match get_desc v with
+          | Tunivar (Some name) | Tvar (Some name) -> mknoloc name
+          | _ -> failwith "poly: not a var")
+=======
+            match get_desc v with
+            | Tunivar (Some name) | Tvar (Some name) -> mknoloc name
+            | _ -> failwith "poly: not a var")
+>>>>>>> v5.6-504
         type_exprs
     in
     Typ.poly names @@ core_type type_expr
+<<<<<<< HEAD
   | Tof_kind _jkind ->
     (* CR modes: this is terrible. Internal ticket 6599 *)
     Typ.any None
@@ -141,8 +173,28 @@ and core_type type_expr =
     let args =
       List.map lids_type_exprs ~f:(fun (id, t) ->
           (mknoloc (Longident.unflatten id |> Option.get), core_type t))
+||||||| c76379cdae
+  | Tpackage (path, lids_type_exprs) ->
+    let loc = mknoloc (Untypeast.lident_of_path path) in
+    let args =
+      List.map lids_type_exprs ~f:(fun (id, t) -> (mknoloc id, core_type t))
+=======
+  | Tpackage { pack_path; pack_cstrs = lids_type_exprs } ->
+    let lid = mknoloc (Untypeast.lident_of_path pack_path) in
+    let package_type =
+      Typ.package_type lid @@
+      List.map lids_type_exprs ~f:(fun (id, t) ->
+          let lid = Longident.unflatten id |> Option.get in
+          (mknoloc lid, core_type t))
+>>>>>>> v5.6-504
     in
+<<<<<<< HEAD
     Typ.package (Typ.package_type loc args)
+||||||| c76379cdae
+    Typ.package loc args
+=======
+    Typ.package package_type
+>>>>>>> v5.6-504
 
 and modtype_declaration id { mtd_type; mtd_attributes; _ } =
   Ast_helper.Mtd.mk ~attrs:mtd_attributes
@@ -173,6 +225,7 @@ and extension_constructor id { ext_args; ext_ret_type; ext_attributes; _ } =
     ?res:(Option.map ~f:core_type ext_ret_type)
     (var_of_id id)
 
+<<<<<<< HEAD
 and modes mode =
   let snapshot = Btype.snapshot () in
   let mode = Mode.Alloc.zap_to_legacy mode in
@@ -187,6 +240,13 @@ and const_modalities ~mut modality =
 
 and value_description id
     { val_type; val_kind = _; val_loc; val_attributes; val_modalities; _ } =
+||||||| c76379cdae
+and value_description id { val_type; val_kind = _; val_loc; val_attributes; _ }
+    =
+=======
+and value_description id { val_type; val_kind = _; val_loc; val_attributes; _ }
+  =
+>>>>>>> v5.6-504
   let type_ = core_type val_type in
   let snap = Btype.snapshot () in
   let modalities = Mode.Modality.zap_to_id val_modalities in
@@ -309,11 +369,23 @@ and signature_item (str_item : Types.signature_item) =
     in
     Sig.text [ Docstrings.docstring str Location.none ] |> List.hd
 
+<<<<<<< HEAD
 and signature (items : Types.signature) =
   Ast_helper.Sg.mk
     (List.map (group_items items) ~f:(function
       | Item item -> signature_item item
       | Type (rec_flag, type_decls) -> Ast_helper.Sig.type_ rec_flag type_decls))
+||||||| c76379cdae
+and signature (items : Types.signature_item list) =
+  List.map (group_items items) ~f:(function
+    | Item item -> signature_item item
+    | Type (rec_flag, type_decls) -> Ast_helper.Sig.type_ rec_flag type_decls)
+=======
+and signature (items : Types.signature_item list) =
+  List.map (group_items items) ~f:(function
+      | Item item -> signature_item item
+      | Type (rec_flag, type_decls) -> Ast_helper.Sig.type_ rec_flag type_decls)
+>>>>>>> v5.6-504
 
 and group_items (items : Types.signature_item list) =
   let rec read_type type_acc items =

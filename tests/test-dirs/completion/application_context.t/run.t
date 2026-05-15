@@ -4,7 +4,13 @@
   [
     "application",
     {
+<<<<<<< HEAD
       "argument_type": "'b",
+||||||| c76379cdae
+      "argument_type": "'_weak1",
+=======
+      "argument_type": "'a",
+>>>>>>> v5.6-504
       "labels": [
         {
           "name": "~j",

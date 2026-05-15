@@ -67,7 +67,13 @@
     structure_item (test.ml[1,0+0]..test.ml[1,0+14])
       Tstr_type Rec
       [
+<<<<<<< HEAD
         type_declaration t (test.ml[1,0+0]..test.ml[1,0+14])
+||||||| c76379cdae
+        type_declaration t/276 (test.ml[1,0+0]..test.ml[1,0+14])
+=======
+        type_declaration t/280 (test.ml[1,0+0]..test.ml[1,0+14])
+>>>>>>> v5.6-504
           ptype_params =
             []
           ptype_cstrs =
@@ -76,11 +82,23 @@
             Ttype_variant
               [
                 (test.ml[1,0+9]..test.ml[1,0+10])
+<<<<<<< HEAD
                   A
+||||||| c76379cdae
+                  A/277
+=======
+                  A/281
+>>>>>>> v5.6-504
                   []
                   None
                 (test.ml[1,0+11]..test.ml[1,0+14])
+<<<<<<< HEAD
                   B
+||||||| c76379cdae
+                  B/278
+=======
+                  B/282
+>>>>>>> v5.6-504
                   []
                   None
               ]
@@ -93,9 +111,15 @@
       [
         <def>
           pattern (test.ml[2,15+4]..test.ml[2,15+5])
+<<<<<<< HEAD
             Tpat_var \"f\"
             sort value
             value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+||||||| c76379cdae
+            Tpat_var \"f/279\"
+=======
+            Tpat_var \"f/283\"
+>>>>>>> v5.6-504
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
             alloc_mode map_comonadic(regional_to_global)(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
@@ -108,8 +132,15 @@
                   extra (test.ml[2,15+6]..test.ml[2,15+13])
                     Tpat_extra_constraint
                     core_type (test.ml[2,15+11]..test.ml[2,15+12])
+<<<<<<< HEAD
                       Ttyp_constr \"t\"
+||||||| c76379cdae
+                      Ttyp_constr \"t/276\"
+=======
+                      Ttyp_constr \"t/280\"
+>>>>>>> v5.6-504
                       []
+<<<<<<< HEAD
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_var \"x\"
@@ -117,13 +148,32 @@
                   value_mode global,many,portable,forkable,unyielding,stateless;imply_const(aliased,contended,immutable,static)(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
+||||||| c76379cdae
+                  Tpat_alias \"x/281\"
+                  pattern (test.ml[2,15+7]..test.ml[2,15+8]) ghost
+                    attribute \"merlin.hide\"
+                      []
+                    Tpat_any
+=======
+                  Tpat_alias \"x/285\"
+                  pattern (test.ml[2,15+7]..test.ml[2,15+8]) ghost
+                    attribute \"merlin.hide\"
+                      []
+                    Tpat_any
+>>>>>>> v5.6-504
             ]
             Tfunction_body
               expression (test.ml[3,31+2]..test.ml[6,69+12])
                 Texp_match
                 expression (test.ml[3,31+8]..test.ml[3,31+9])
+<<<<<<< HEAD
                   Texp_ident \"x\"
                 value
+||||||| c76379cdae
+                  Texp_ident \"x/281\"
+=======
+                  Texp_ident \"x/285\"
+>>>>>>> v5.6-504
                 [
                   <case>
                     pattern (test.ml[4,46+4]..test.ml[4,46+5])
@@ -170,7 +220,13 @@
                         ]
                       attribute \"merlin.loc\"
                         []
+<<<<<<< HEAD
                       Texp_ident \"*type-error*\"
+||||||| c76379cdae
+                      Texp_ident \"*type-error*/282\"
+=======
+                      Texp_ident \"*type-error*/286\"
+>>>>>>> v5.6-504
                   <case>
                     pattern (test.ml[6,69+4]..test.ml[6,69+5])
                       Tpat_value
@@ -192,7 +248,13 @@
                         ]
                       attribute \"merlin.loc\"
                         []
+<<<<<<< HEAD
                       Texp_ident \"*type-error*\"
+||||||| c76379cdae
+                      Texp_ident \"*type-error*/283\"
+=======
+                      Texp_ident \"*type-error*/287\"
+>>>>>>> v5.6-504
                 ]
                 []
       ]
@@ -252,7 +314,13 @@
     structure_item (test2.ml[1,0+0]..test2.ml[1,0+14])
       Tstr_type Rec
       [
+<<<<<<< HEAD
         type_declaration t (test2.ml[1,0+0]..test2.ml[1,0+14])
+||||||| c76379cdae
+        type_declaration t/276 (test2.ml[1,0+0]..test2.ml[1,0+14])
+=======
+        type_declaration t/280 (test2.ml[1,0+0]..test2.ml[1,0+14])
+>>>>>>> v5.6-504
           ptype_params =
             []
           ptype_cstrs =
@@ -261,11 +329,23 @@
             Ttype_variant
               [
                 (test2.ml[1,0+9]..test2.ml[1,0+10])
+<<<<<<< HEAD
                   A
+||||||| c76379cdae
+                  A/277
+=======
+                  A/281
+>>>>>>> v5.6-504
                   []
                   None
                 (test2.ml[1,0+11]..test2.ml[1,0+14])
+<<<<<<< HEAD
                   B
+||||||| c76379cdae
+                  B/278
+=======
+                  B/282
+>>>>>>> v5.6-504
                   []
                   None
               ]
@@ -278,9 +358,15 @@
       [
         <def>
           pattern (test2.ml[2,15+4]..test2.ml[2,15+5])
+<<<<<<< HEAD
             Tpat_var \"f\"
             sort value
             value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+||||||| c76379cdae
+            Tpat_var \"f/279\"
+=======
+            Tpat_var \"f/283\"
+>>>>>>> v5.6-504
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
             alloc_mode map_comonadic(regional_to_global)(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
@@ -295,7 +381,13 @@
                   extra (test2.ml[2,15+6]..test2.ml[2,15+13])
                     Tpat_extra_constraint
                     core_type (test2.ml[2,15+11]..test2.ml[2,15+12])
+<<<<<<< HEAD
                       Ttyp_constr \"t\"
+||||||| c76379cdae
+                      Ttyp_constr \"t/276\"
+=======
+                      Ttyp_constr \"t/280\"
+>>>>>>> v5.6-504
                       []
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
@@ -321,7 +413,13 @@
                   core_type (test2.ml[2,15+16]..test2.ml[2,15+19])
                     Ttyp_constr \"int!\"
                     []
+<<<<<<< HEAD
                 Texp_ident \"*type-error*\"
+||||||| c76379cdae
+                Texp_ident \"*type-error*/281\"
+=======
+                Texp_ident \"*type-error*/285\"
+>>>>>>> v5.6-504
       ]
   ]
   
@@ -370,7 +468,13 @@ First a simple case:
     "value": "[
     signature_item (test.mli[1,0+0]..test.mli[1,0+14])
       Tsig_value
+<<<<<<< HEAD
       value_description foo1 (test.mli[1,0+0]..test.mli[1,0+14])
+||||||| c76379cdae
+      value_description foo1/276 (test.mli[1,0+0]..test.mli[1,0+14])
+=======
+      value_description foo1/280 (test.mli[1,0+0]..test.mli[1,0+14])
+>>>>>>> v5.6-504
         core_type (test.mli[1,0+11]..test.mli[1,0+14])
           Ttyp_constr \"int!\"
           []
@@ -379,7 +483,13 @@ First a simple case:
         []
     signature_item (test.mli[3,16+0]..test.mli[3,16+21])
       Tsig_value
+<<<<<<< HEAD
       value_description foo2 (test.mli[3,16+0]..test.mli[3,16+21])
+||||||| c76379cdae
+      value_description foo2/277 (test.mli[3,16+0]..test.mli[3,16+21])
+=======
+      value_description foo2/281 (test.mli[3,16+0]..test.mli[3,16+21])
+>>>>>>> v5.6-504
         core_type (test.mli[3,16+11]..test.mli[3,16+21])
           Ttyp_tuple
           [
@@ -397,7 +507,13 @@ First a simple case:
         []
     signature_item (test.mli[5,39+0]..test.mli[5,39+21])
       Tsig_value
+<<<<<<< HEAD
       value_description foo3 (test.mli[5,39+0]..test.mli[5,39+21])
+||||||| c76379cdae
+      value_description foo3/278 (test.mli[5,39+0]..test.mli[5,39+21])
+=======
+      value_description foo3/282 (test.mli[5,39+0]..test.mli[5,39+21])
+>>>>>>> v5.6-504
         core_type (test.mli[5,39+11]..test.mli[5,39+21])
           Ttyp_tuple
           [
@@ -465,7 +581,13 @@ And now, with an error deep in a submodule:
     "value": "[
     signature_item (test2.mli[1,0+0]..test2.mli[1,0+14])
       Tsig_value
+<<<<<<< HEAD
       value_description foo1 (test2.mli[1,0+0]..test2.mli[1,0+14])
+||||||| c76379cdae
+      value_description foo1/276 (test2.mli[1,0+0]..test2.mli[1,0+14])
+=======
+      value_description foo1/280 (test2.mli[1,0+0]..test2.mli[1,0+14])
+>>>>>>> v5.6-504
         core_type (test2.mli[1,0+11]..test2.mli[1,0+14])
           Ttyp_constr \"int!\"
           []
@@ -473,6 +595,7 @@ And now, with an error deep in a submodule:
         join_const(unique,uncontended,read_write,static);meet_const(local,once,nonportable,unforkable,yielding,stateful)
         []
     signature_item (test2.mli[3,16+0]..test2.mli[10,149+3])
+<<<<<<< HEAD
       Tsig_module (Present)
       M
         module_type (test2.mli[3,16+11]..test2.mli[10,149+3])
@@ -484,7 +607,31 @@ And now, with an error deep in a submodule:
                 core_type (test2.mli[4,31+14]..test2.mli[4,31+17])
                   Ttyp_constr \"int!\"
                   []
+||||||| c76379cdae
+      Tsig_module \"M/282\"
+      module_type (test2.mli[3,16+11]..test2.mli[10,149+3])
+        Tmty_signature
+        [
+          signature_item (test2.mli[4,31+2]..test2.mli[4,31+17])
+            Tsig_value
+            value_description foo21/277 (test2.mli[4,31+2]..test2.mli[4,31+17])
+              core_type (test2.mli[4,31+14]..test2.mli[4,31+17])
+                Ttyp_constr \"int/1!\"
+=======
+      Tsig_module (Present)
+      M/286
+        module_type (test2.mli[3,16+11]..test2.mli[10,149+3])
+          Tmty_signature
+          [
+            signature_item (test2.mli[4,31+2]..test2.mli[4,31+17])
+              Tsig_value
+              value_description foo21/281 (test2.mli[4,31+2]..test2.mli[4,31+17])
+                core_type (test2.mli[4,31+14]..test2.mli[4,31+17])
+                  Ttyp_constr \"int/1!\"
+                  []
+>>>>>>> v5.6-504
                 []
+<<<<<<< HEAD
                 join_const(unique,uncontended,read_write,static);meet_const(local,once,nonportable,unforkable,yielding,stateful)
                 []
             signature_item (test2.mli[5,49+2]..test2.mli[9,143+5])
@@ -498,7 +645,43 @@ And now, with an error deep in a submodule:
                       value_description foo211 (test2.mli[6,66+4]..test2.mli[6,66+20])
                         core_type (test2.mli[6,66+17]..test2.mli[6,66+20])
                           Ttyp_constr \"int!\"
+||||||| c76379cdae
+              []
+          signature_item (test2.mli[5,49+2]..test2.mli[9,143+5])
+            Tsig_module \"N/281\"
+            module_type (test2.mli[5,49+13]..test2.mli[9,143+5])
+              Tmty_signature
+              [
+                signature_item (test2.mli[6,66+4]..test2.mli[6,66+20])
+                  Tsig_value
+                  value_description foo211/278 (test2.mli[6,66+4]..test2.mli[6,66+20])
+                    core_type (test2.mli[6,66+17]..test2.mli[6,66+20])
+                      Ttyp_constr \"int/1!\"
+                      []
+                    []
+                signature_item (test2.mli[7,87+4]..test2.mli[7,87+27])
+                  Tsig_value
+                  value_description foo212/279 (test2.mli[7,87+4]..test2.mli[7,87+27])
+                    core_type (test2.mli[7,87+17]..test2.mli[7,87+27])
+                      Ttyp_tuple
+                      [
+                        core_type (test2.mli[7,87+17]..test2.mli[7,87+20])
+                          Ttyp_constr \"int/1!\"
+=======
+            signature_item (test2.mli[5,49+2]..test2.mli[9,143+5])
+              Tsig_module (Present)
+              N/285
+                module_type (test2.mli[5,49+13]..test2.mli[9,143+5])
+                  Tmty_signature
+                  [
+                    signature_item (test2.mli[6,66+4]..test2.mli[6,66+20])
+                      Tsig_value
+                      value_description foo211/282 (test2.mli[6,66+4]..test2.mli[6,66+20])
+                        core_type (test2.mli[6,66+17]..test2.mli[6,66+20])
+                          Ttyp_constr \"int/1!\"
+>>>>>>> v5.6-504
                           []
+<<<<<<< HEAD
                         []
                         join_const(unique,uncontended,read_write,static);meet_const(local,once,nonportable,unforkable,yielding,stateful)
                         []
@@ -544,9 +727,72 @@ And now, with an error deep in a submodule:
           ]
           join_const(unique,uncontended,read_write,static);meet_const(local,once,nonportable,unforkable,yielding,stateful)
           []
+||||||| c76379cdae
+                        core_type (test2.mli[7,87+23]..test2.mli[7,87+27])
+                          Ttyp_any
+                      ]
+                    []
+                signature_item (test2.mli[8,115+4]..test2.mli[8,115+27])
+                  Tsig_value
+                  value_description foo213/280 (test2.mli[8,115+4]..test2.mli[8,115+27])
+                    core_type (test2.mli[8,115+17]..test2.mli[8,115+27])
+                      Ttyp_tuple
+                      [
+                        core_type (test2.mli[8,115+17]..test2.mli[8,115+20])
+                          Ttyp_constr \"int/1!\"
+                          []
+                        core_type (test2.mli[8,115+23]..test2.mli[8,115+27])
+                          Ttyp_constr \"char/2!\"
+                          []
+                      ]
+                    []
+              ]
+        ]
+=======
+                        []
+                    signature_item (test2.mli[7,87+4]..test2.mli[7,87+27])
+                      Tsig_value
+                      value_description foo212/283 (test2.mli[7,87+4]..test2.mli[7,87+27])
+                        core_type (test2.mli[7,87+17]..test2.mli[7,87+27])
+                          Ttyp_tuple
+                          [
+                            Label: None
+                            core_type (test2.mli[7,87+17]..test2.mli[7,87+20])
+                              Ttyp_constr \"int/1!\"
+                              []
+                            Label: None
+                            core_type (test2.mli[7,87+23]..test2.mli[7,87+27])
+                              Ttyp_any
+                          ]
+                        []
+                    signature_item (test2.mli[8,115+4]..test2.mli[8,115+27])
+                      Tsig_value
+                      value_description foo213/284 (test2.mli[8,115+4]..test2.mli[8,115+27])
+                        core_type (test2.mli[8,115+17]..test2.mli[8,115+27])
+                          Ttyp_tuple
+                          [
+                            Label: None
+                            core_type (test2.mli[8,115+17]..test2.mli[8,115+20])
+                              Ttyp_constr \"int/1!\"
+                              []
+                            Label: None
+                            core_type (test2.mli[8,115+23]..test2.mli[8,115+27])
+                              Ttyp_constr \"char/2!\"
+                              []
+                          ]
+                        []
+                  ]
+          ]
+>>>>>>> v5.6-504
     signature_item (test2.mli[12,154+0]..test2.mli[12,154+21])
       Tsig_value
+<<<<<<< HEAD
       value_description foo3 (test2.mli[12,154+0]..test2.mli[12,154+21])
+||||||| c76379cdae
+      value_description foo3/283 (test2.mli[12,154+0]..test2.mli[12,154+21])
+=======
+      value_description foo3/287 (test2.mli[12,154+0]..test2.mli[12,154+21])
+>>>>>>> v5.6-504
         core_type (test2.mli[12,154+11]..test2.mli[12,154+21])
           Ttyp_tuple
           [
@@ -618,13 +864,33 @@ make sure we also handle that correctly in structures:
               core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
                 Ttyp_constr \"int!\"
                 []
+<<<<<<< HEAD
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo1\"
             sort value
             value_mode global,many,portable,forkable,unyielding,stateless;imply_const(aliased,contended,immutable,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+||||||| c76379cdae
+            Tpat_alias \"foo1/276\"
+            pattern (test_ct.ml[1,0+4]..test_ct.ml[1,0+8]) ghost
+              attribute \"merlin.hide\"
+                []
+              Tpat_any
+=======
+            Tpat_alias \"foo1/280\"
+            pattern (test_ct.ml[1,0+4]..test_ct.ml[1,0+8]) ghost
+              attribute \"merlin.hide\"
+                []
+              Tpat_any
+>>>>>>> v5.6-504
           expression (test_ct.ml[1,0+17]..test_ct.ml[1,0+18])
+<<<<<<< HEAD
             extra (test_ct.ml[1,0+4]..test_ct.ml[1,0+18]) ghost
+||||||| c76379cdae
+            extra
+=======
+            extra (test_ct.ml[1,0+17]..test_ct.ml[1,0+18]) ghost
+>>>>>>> v5.6-504
               Texp_constraint
               core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
                 Ttyp_constr \"int!\"
@@ -650,13 +916,33 @@ make sure we also handle that correctly in structures:
                     Ttyp_var _
                     None
                 ]
+<<<<<<< HEAD
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo2\"
             sort value
             value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+||||||| c76379cdae
+            Tpat_alias \"foo2/277\"
+            pattern (test_ct.ml[3,20+4]..test_ct.ml[3,20+8]) ghost
+              attribute \"merlin.hide\"
+                []
+              Tpat_any
+=======
+            Tpat_alias \"foo2/281\"
+            pattern (test_ct.ml[3,20+4]..test_ct.ml[3,20+8]) ghost
+              attribute \"merlin.hide\"
+                []
+              Tpat_any
+>>>>>>> v5.6-504
           expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+28])
+<<<<<<< HEAD
             extra (test_ct.ml[3,20+4]..test_ct.ml[3,20+28]) ghost
+||||||| c76379cdae
+            extra
+=======
+            extra (test_ct.ml[3,20+24]..test_ct.ml[3,20+28]) ghost
+>>>>>>> v5.6-504
               Texp_constraint
               core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+21])
                 Ttyp_tuple
@@ -700,13 +986,33 @@ make sure we also handle that correctly in structures:
                     Ttyp_constr \"int!\"
                     []
                 ]
+<<<<<<< HEAD
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo3\"
             sort value
             value_mode global,many,portable,forkable,unyielding,stateless;imply_const(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+||||||| c76379cdae
+            Tpat_alias \"foo3/278\"
+            pattern (test_ct.ml[5,50+4]..test_ct.ml[5,50+8]) ghost
+              attribute \"merlin.hide\"
+                []
+              Tpat_any
+=======
+            Tpat_alias \"foo3/282\"
+            pattern (test_ct.ml[5,50+4]..test_ct.ml[5,50+8]) ghost
+              attribute \"merlin.hide\"
+                []
+              Tpat_any
+>>>>>>> v5.6-504
           expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+27])
+<<<<<<< HEAD
             extra (test_ct.ml[5,50+4]..test_ct.ml[5,50+27]) ghost
+||||||| c76379cdae
+            extra
+=======
+            extra (test_ct.ml[5,50+23]..test_ct.ml[5,50+27]) ghost
+>>>>>>> v5.6-504
               Texp_constraint
               core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+20])
                 Ttyp_tuple
@@ -787,6 +1093,7 @@ FIXME
           "col": 15
         },
         "type": "typer",
+<<<<<<< HEAD
         "sub": [
           {
             "start": {
@@ -800,6 +1107,23 @@ FIXME
             "message": "Hint:    Did you mean List?"
           }
         ],
+||||||| c76379cdae
+        "sub": [],
+=======
+        "sub": [
+          {
+            "start": {
+              "line": 8,
+              "col": 11
+            },
+            "end": {
+              "line": 8,
+              "col": 15
+            },
+            "message": "Hint: Did you mean List?"
+          }
+        ],
+>>>>>>> v5.6-504
         "valid": true,
         "message": "Unbound module Lsit"
       }

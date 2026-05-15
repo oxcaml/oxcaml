@@ -1,7 +1,15 @@
 open Browse_raw
 open Std
 
+<<<<<<< HEAD
 type syntax_info = Query_protocol.Syntax_doc_result.t option
+||||||| c76379cdae
+type syntax_info = Query_protocol.syntax_doc_result option
+=======
+let { Logger.log } = Logger.for_section "syntax-doc"
+
+type syntax_info = Query_protocol.syntax_doc_result option
+>>>>>>> v5.6-504
 
 module Doc_website_base = struct
   type t = Ocaml | Oxcaml
@@ -806,7 +814,16 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
             | _ -> None))
 
 let get_syntax_doc cursor_loc node : syntax_info =
+<<<<<<< HEAD
   let syntax_doc_url = syntax_doc_url Ocaml in
+||||||| c76379cdae
+=======
+  log ~title:"get" "Looking for syntax doc of a node %a" Logger.fmt (fun fmt ->
+      Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (fun fmt (_, node) ->
+          Format.fprintf fmt "%s" (Browse_raw.string_of_node node))
+        fmt node);
+>>>>>>> v5.6-504
   match node with
   | (_, Type_kind _)
     :: (_, Type_declaration _)
@@ -841,8 +858,14 @@ let get_syntax_doc cursor_loc node : syntax_info =
     :: ( _,
          Module_type_constraint
            (Tmodtype_explicit
+<<<<<<< HEAD
               ({ mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }, _))
        )
+||||||| c76379cdae
+             { mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }) )
+=======
+              { mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }) )
+>>>>>>> v5.6-504
     :: _ ->
     Some
       { name = "Module substitution";

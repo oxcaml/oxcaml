@@ -66,6 +66,7 @@ end
 val uid_of_result :
   traverse_aliases:bool -> Shape_reduce.result -> Shape.Uid.t option * bool
 
+<<<<<<< HEAD
 (** Lookup the declaration of the given Uid in the appropriate cmt file *)
 val lookup_uid_loc_of_decl :
   config:Mconfig.t -> Shape.Uid.t -> string Location.loc option
@@ -76,6 +77,19 @@ val lookup_uid_loc_of_decl :
 val get_linked_uids :
   config:config -> comp_unit:string -> Shape.Uid.t -> Shape.Uid.t list
 
+||||||| c76379cdae
+=======
+(** Lookup the delcaration of the given Uid in the appropriate cmt file *)
+val lookup_uid_decl :
+  config:Mconfig.t -> Shape.Uid.t -> Typedtree.item_declaration option
+
+(** [get_linked_uids] queries the [cmt_declaration_dependencies] table and
+  returns udis related to the one passed as argument. TODO right now this
+  function only returns simple links tagged with [Definition_to_declaration] *)
+val get_linked_uids :
+  config:config -> comp_unit:string -> Shape.Uid.t -> Shape.Uid.t list
+
+>>>>>>> v5.6-504
 val find_source :
   config:Mconfig.t ->
   Warnings.loc ->

@@ -35,6 +35,7 @@ let setup_reader_config config =
   let open Mconfig in
   let open Clflags in
   let ocaml = config.ocaml in
+<<<<<<< HEAD
   let guessed_file_type : Unit_info.intf_or_impl =
     (* We guess the file type based on the suffix of the file. This isn't very important
        because we'll override the value that we use here later in Mpipeline, where we set
@@ -54,6 +55,11 @@ let setup_reader_config config =
       ~source_file:config.query.filename guessed_file_type "" compilation_unit
   in
   Env.set_current_unit unit_info;
+||||||| c76379cdae
+  Env.set_unit_name (Mconfig.unitname config);
+=======
+  Env.set_current_unit (Mconfig.unit_info config);
+>>>>>>> v5.6-504
   Location.input_name := config.query.filename;
   fast := ocaml.unsafe;
   classic := ocaml.classic;

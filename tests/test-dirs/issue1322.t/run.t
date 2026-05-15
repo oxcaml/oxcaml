@@ -23,7 +23,7 @@
   Their parameters differ:
   The type int is not equal to the type 'a
   File \"foo.ml\", line 2, characters 2-11: Expected declaration
-  File \"foo.ml\", line 6, characters 9-54: Actual declaration"
+  File \"foo.ml\", lines 6-7, characters 9-23: Actual declaration"
       }
     ],
     "notifications": []
