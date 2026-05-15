@@ -309,7 +309,6 @@ type error =
   | Unsupported_arg_zero_alloc
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
-  | Zero_alloc_on_nonfunction
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -10677,10 +10676,13 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
          if vb_is_fun vb then
            let default_arity = vb_fun_arity vb in
            add_parsed_zero_alloc_attribute ~default_arity vb
-         else
-         if Builtin_attributes.has_attribute "zero_alloc" vb.pvb_attributes
-         then raise (Error (vb.pvb_loc, env, Zero_alloc_on_nonfunction))
-         else (vb, Zero_alloc.default))
+         else begin
+           if Builtin_attributes.has_attribute "zero_alloc" vb.pvb_attributes
+           then
+             Location.prerr_warning vb.pvb_loc
+               Warnings.Zero_alloc_on_nonfunction;
+           (vb, Zero_alloc.default)
+         end)
       spat_sexp_list
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
@@ -12885,14 +12887,6 @@ let report_error ~loc env =
          with the one on its type.@ %a@]"
         Style.inline_code "zero_alloc"
         Zero_alloc.print_error err
-  | Zero_alloc_on_nonfunction ->
-      Location.errorf ~loc
-        "@[The %a attribute placed on a %a-binding can only be@ \
-         used for function definitions.@ \
-         If this defines a function, rewrite it so that its arguments are@ \
-         present in the definition.@]"
-        Style.inline_code "zero_alloc"
-        Style.inline_code "let"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

@@ -1,0 +1,25 @@
+File "w181.ml", line 9, characters 0-23:
+9 | let[@zero_alloc] w = 42
+    ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
+
+File "w181.ml", line 11, characters 0-31:
+11 | let x : int = 42 [@@zero_alloc]
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
+
+File "w181.ml", lines 13-15, characters 0-16:
+13 | let[@zero_alloc assume] foo =
+14 |   let y = 42 in
+15 |   fun z -> z + y
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
+
+File "w181.ml", lines 17-19, characters 0-16:
+17 | let[@zero_alloc] bar =
+18 |   let y = 42 in
+19 |   fun z -> z + y
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
