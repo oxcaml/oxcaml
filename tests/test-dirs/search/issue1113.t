@@ -14,6 +14,18 @@
     "desc": "CamlinternalOO.params"
   }
   {
+    "name": "Compiler_owee__Owee_elf_relocation.rela_entry_size",
+    "desc": "int"
+  }
+  {
+    "name": "Compiler_owee__Owee_elf_relocation.sym_entry_size",
+    "desc": "int"
+  }
+  {
+    "name": "Compiler_owee__Owee_location.none",
+    "desc": "Compiler_owee__Owee_location.t"
+  }
+  {
     "name": "__FILE__",
     "desc": "string"
   }
@@ -32,18 +44,6 @@
   {
     "name": "__LINE__",
     "desc": "int"
-  }
-  {
-    "name": "__LINE__",
-    "desc": "int"
-  }
-  {
-    "name": "__LOC__",
-    "desc": "string"
-  }
-  {
-    "name": "__LOC__",
-    "desc": "string"
   }
 
   $ $MERLIN single search-by-type -filename ./main.ml \
@@ -75,6 +75,11 @@
     "cost": 13
   }
   {
+    "name": "Eval.eval",
+    "type": "'a expr @ once -> 'a eval",
+    "cost": 13
+  }
+  {
     "name": "flush_all",
     "type": "unit -> unit",
     "cost": 13
@@ -92,10 +97,5 @@
   {
     "name": "read_line",
     "type": "unit -> string",
-    "cost": 13
-  }
-  {
-    "name": "Bytes.copy",
-    "type": "bytes -> bytes",
     "cost": 13
   }

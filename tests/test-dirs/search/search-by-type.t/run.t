@@ -103,22 +103,6 @@
     "doc": null
   }
   {
-<<<<<<< HEAD
-||||||| c76379cdae
-    "name": "Seq.map",
-    "type": "('a -> 'b) -> 'a Stdlib__Seq.t -> 'b Stdlib__Seq.t",
-    "cost": 10,
-    "doc": null
-  }
-  {
-=======
-    "name": "Seq.map",
-    "type": "('a -> 'b) -> 'a Seq.t -> 'b Seq.t",
-    "cost": 10,
-    "doc": null
-  }
-  {
->>>>>>> v5.6-504
     "name": "List.concat_map",
     "type": "('a -> 'b list) -> 'a list -> 'b list",
     "cost": 10,
@@ -152,238 +136,75 @@
       {
         "file": "hashtbl.mli",
         "start": {
-<<<<<<< HEAD
           "line": 122,
-||||||| c76379cdae
-          "line": 116,
-=======
-          "line": 117,
->>>>>>> v5.6-504
           "col": 0
         },
         "end": {
-<<<<<<< HEAD
           "line": 122,
-||||||| c76379cdae
-          "line": 116,
-=======
-          "line": 117,
->>>>>>> v5.6-504
           "col": 40
         },
         "name": "Hashtbl.add",
-<<<<<<< HEAD
         "type": "('a, 'b) Hashtbl.t -> 'a -> 'b -> unit",
         "cost": 33,
-||||||| c76379cdae
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> 'a -> 'b -> unit",
-        "cost": 1,
-=======
-        "type": "('a, 'b) Hashtbl.t -> 'a -> 'b -> unit",
-        "cost": 1,
->>>>>>> v5.6-504
         "doc": null,
         "constructible": "Hashtbl.add _ _ _"
       },
       {
         "file": "hashtbl.mli",
         "start": {
-<<<<<<< HEAD
           "line": 157,
-||||||| c76379cdae
-          "line": 151,
-=======
-          "line": 152,
->>>>>>> v5.6-504
           "col": 0
         },
         "end": {
-<<<<<<< HEAD
           "line": 157,
-||||||| c76379cdae
-          "line": 151,
-=======
-          "line": 152,
->>>>>>> v5.6-504
           "col": 44
         },
         "name": "Hashtbl.replace",
-<<<<<<< HEAD
         "type": "('a, 'b) Hashtbl.t -> 'a -> 'b -> unit",
         "cost": 34,
-||||||| c76379cdae
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> 'a -> 'b -> unit",
-        "cost": 2,
-=======
-        "type": "('a, 'b) Hashtbl.t -> 'a -> 'b -> unit",
-        "cost": 2,
->>>>>>> v5.6-504
         "doc": null,
         "constructible": "Hashtbl.replace _ _ _"
       },
       {
         "file": "hashtbl.mli",
         "start": {
-<<<<<<< HEAD
           "line": 307,
-||||||| c76379cdae
-          "line": 301,
-=======
-          "line": 302,
->>>>>>> v5.6-504
           "col": 0
         },
         "end": {
-<<<<<<< HEAD
           "line": 307,
-||||||| c76379cdae
-          "line": 301,
-=======
-          "line": 302,
->>>>>>> v5.6-504
           "col": 50
         },
         "name": "Hashtbl.add_seq",
-<<<<<<< HEAD
         "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
         "cost": 46,
-||||||| c76379cdae
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 24,
-=======
-        "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 24,
->>>>>>> v5.6-504
         "doc": null,
         "constructible": "Hashtbl.add_seq _ _"
       },
       {
         "file": "hashtbl.mli",
         "start": {
-<<<<<<< HEAD
           "line": 311,
-||||||| c76379cdae
-          "line": 305,
-=======
-          "line": 306,
->>>>>>> v5.6-504
           "col": 0
         },
         "end": {
-<<<<<<< HEAD
           "line": 311,
-||||||| c76379cdae
-          "line": 305,
-=======
-          "line": 306,
->>>>>>> v5.6-504
           "col": 54
         },
         "name": "Hashtbl.replace_seq",
-<<<<<<< HEAD
         "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
         "cost": 47,
-||||||| c76379cdae
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 25,
-=======
-        "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 25,
->>>>>>> v5.6-504
         "doc": null,
         "constructible": "Hashtbl.replace_seq _ _"
       },
       {
-<<<<<<< HEAD
-||||||| c76379cdae
-        "file": "either.mli",
-        "start": {
-          "line": 86,
-          "col": 0
-        },
-        "end": {
-          "line": 87,
-          "col": 73
-        },
-        "name": "Either.map",
-        "type": "left:('a1 -> 'a2) ->
-  right:('b1 -> 'b2) ->
-  ('a1, 'b1) Stdlib__Either.t -> ('a2, 'b2) Stdlib__Either.t",
-        "cost": 44,
-        "doc": null,
-        "constructible": "Either.map ~left:_ ~right:_ _"
-      },
-      {
-=======
-        "file": "either.mli",
-        "start": {
-          "line": 100,
-          "col": 0
-        },
-        "end": {
-          "line": 101,
-          "col": 73
-        },
-        "name": "Either.map",
-        "type": "left:('a1 -> 'a2) ->
-  right:('b1 -> 'b2) -> ('a1, 'b1) Either.t -> ('a2, 'b2) Either.t",
-        "cost": 44,
-        "doc": null,
-        "constructible": "Either.map ~left:_ ~right:_ _"
-      },
-      {
->>>>>>> v5.6-504
         "file": "moreLabels.mli",
         "start": {
-<<<<<<< HEAD
           "line": 326,
-||||||| c76379cdae
-          "line": 133,
-=======
-          "line": 134,
->>>>>>> v5.6-504
           "col": 2
         },
         "end": {
-<<<<<<< HEAD
           "line": 326,
-||||||| c76379cdae
-          "line": 133,
-          "col": 51
-        },
-        "name": "MoreLabels.Hashtbl.add",
-        "type": "('a, 'b) Stdlib__MoreLabels.Hashtbl.t -> key:'a -> data:'b -> unit",
-        "cost": 47,
-        "doc": null,
-        "constructible": "MoreLabels.Hashtbl.add _ ~key:_ ~data:_"
-      },
-      {
-        "file": "moreLabels.mli",
-        "start": {
-          "line": 318,
-          "col": 2
-        },
-        "end": {
-          "line": 318,
-=======
-          "line": 134,
-          "col": 51
-        },
-        "name": "MoreLabels.Hashtbl.add",
-        "type": "('a, 'b) MoreLabels.Hashtbl.t -> key:'a -> data:'b -> unit",
-        "cost": 47,
-        "doc": null,
-        "constructible": "MoreLabels.Hashtbl.add _ ~key:_ ~data:_"
-      },
-      {
-        "file": "moreLabels.mli",
-        "start": {
-          "line": 319,
-          "col": 2
-        },
-        "end": {
-          "line": 319,
->>>>>>> v5.6-504
           "col": 52
         },
         "name": "MoreLabels.Hashtbl.add_seq",
@@ -395,55 +216,11 @@
       {
         "file": "moreLabels.mli",
         "start": {
-<<<<<<< HEAD
           "line": 330,
-||||||| c76379cdae
-          "line": 168,
-=======
-          "line": 169,
->>>>>>> v5.6-504
           "col": 2
         },
         "end": {
-<<<<<<< HEAD
           "line": 330,
-||||||| c76379cdae
-          "line": 168,
-          "col": 55
-        },
-        "name": "MoreLabels.Hashtbl.replace",
-        "type": "('a, 'b) Stdlib__MoreLabels.Hashtbl.t -> key:'a -> data:'b -> unit",
-        "cost": 48,
-        "doc": null,
-        "constructible": "MoreLabels.Hashtbl.replace _ ~key:_ ~data:_"
-      },
-      {
-        "file": "moreLabels.mli",
-        "start": {
-          "line": 322,
-          "col": 2
-        },
-        "end": {
-          "line": 322,
-=======
-          "line": 169,
-          "col": 55
-        },
-        "name": "MoreLabels.Hashtbl.replace",
-        "type": "('a, 'b) MoreLabels.Hashtbl.t -> key:'a -> data:'b -> unit",
-        "cost": 48,
-        "doc": null,
-        "constructible": "MoreLabels.Hashtbl.replace _ ~key:_ ~data:_"
-      },
-      {
-        "file": "moreLabels.mli",
-        "start": {
-          "line": 323,
-          "col": 2
-        },
-        "end": {
-          "line": 323,
->>>>>>> v5.6-504
           "col": 56
         },
         "name": "MoreLabels.Hashtbl.replace_seq",
@@ -494,19 +271,9 @@
           "line": 158,
           "col": 75
         },
-<<<<<<< HEAD
         "name": "Result.Syntax.and*",
         "type": "('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result",
         "cost": 62,
-||||||| c76379cdae
-        "name": "Ephemeron.K2.query",
-        "type": "('k1, 'k2, 'd) Stdlib__Ephemeron.K2.t -> 'k1 -> 'k2 -> 'd option",
-        "cost": 53,
-=======
-        "name": "Ephemeron.K2.query",
-        "type": "('k1, 'k2, 'd) Ephemeron.K2.t -> 'k1 -> 'k2 -> 'd option",
-        "cost": 53,
->>>>>>> v5.6-504
         "doc": null,
         "constructible": "Result.Syntax.and* _ _"
       },

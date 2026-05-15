@@ -189,7 +189,6 @@ reference.  With no liba, we also can't see Libb.t is int.
           "col": 12
         },
         "type": "typer",
-<<<<<<< HEAD
         "sub": [
           {
             "start": {
@@ -203,23 +202,6 @@ reference.  With no liba, we also can't see Libb.t is int.
             "message": "Hint:    Did you mean Libb?"
           }
         ],
-||||||| c76379cdae
-        "sub": [],
-=======
-        "sub": [
-          {
-            "start": {
-              "line": 4,
-              "col": 8
-            },
-            "end": {
-              "line": 4,
-              "col": 12
-            },
-            "message": "Hint: Did you mean Libb?"
-          }
-        ],
->>>>>>> v5.6-504
         "valid": true,
         "message": "Unbound module Liba"
       }
@@ -256,7 +238,6 @@ reference.  With no liba, we also can't see Libb.t is int.
           "col": 12
         },
         "type": "typer",
-<<<<<<< HEAD
         "sub": [
           {
             "start": {
@@ -270,23 +251,6 @@ reference.  With no liba, we also can't see Libb.t is int.
             "message": "Hint:    Did you mean Libb?"
           }
         ],
-||||||| c76379cdae
-        "sub": [],
-=======
-        "sub": [
-          {
-            "start": {
-              "line": 4,
-              "col": 8
-            },
-            "end": {
-              "line": 4,
-              "col": 12
-            },
-            "message": "Hint: Did you mean Libb?"
-          }
-        ],
->>>>>>> v5.6-504
         "valid": true,
         "message": "Unbound module Liba"
       }

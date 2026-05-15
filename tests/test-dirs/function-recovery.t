@@ -9,16 +9,8 @@
     "class": "return",
     "value": "[
     structure_item (test.ml[1,0+0]..test.ml[3,104+28])
-<<<<<<< HEAD
       Tstr_module (Present)
       ERROR_locate_from_inside_function_literal_used_as_non_function
-||||||| c76379cdae
-      Tstr_module
-      ERROR_locate_from_inside_function_literal_used_as_non_function/279
-=======
-      Tstr_module (Present)
-      ERROR_locate_from_inside_function_literal_used_as_non_function/283
->>>>>>> v5.6-504
         module_expr (test.ml[1,0+72]..test.ml[3,104+28])
           Tmod_structure
           [
@@ -27,15 +19,9 @@
               [
                 <def>
                   pattern (test.ml[2,79+6]..test.ml[2,79+13])
-<<<<<<< HEAD
                     Tpat_var \"problem\"
                     sort value
                     value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-||||||| c76379cdae
-                    Tpat_var \"problem/276\"
-=======
-                    Tpat_var \"problem/280\"
->>>>>>> v5.6-504
                   expression (test.ml[2,79+16]..test.ml[2,79+24])
                     Texp_variant \"Problem\"
                     None
@@ -71,13 +57,7 @@
                                 constant (_none_[0,0+-1]..[0,0+-1]) ghost
                                   PConst_int (1,None)
                           ]
-<<<<<<< HEAD
                         Texp_ident \"*type-error*\"
-||||||| c76379cdae
-                        Texp_ident \"*type-error*/277\"
-=======
-                        Texp_ident \"*type-error*/281\"
->>>>>>> v5.6-504
               ]
           ]
   ]
@@ -97,26 +77,12 @@
       [
         <def>
           pattern (type.ml[1,0+4]..type.ml[1,0+5])
-<<<<<<< HEAD
             Tpat_var \"f\"
             sort value
             value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-||||||| c76379cdae
-            Tpat_var \"f/276\"
-=======
-            Tpat_var \"f/280\"
->>>>>>> v5.6-504
           expression (type.ml[1,0+8]..type.ml[1,0+61])
-<<<<<<< HEAD
             extra (type.ml[1,0+18]..type.ml[1,0+19])
               Texp_newtype  t
-||||||| c76379cdae
-            extra
-              Texp_newtype' \"t/278\"
-=======
-            extra (type.ml[1,0+18]..type.ml[1,0+19])
-              Texp_newtype' \"t/282\"
->>>>>>> v5.6-504
             Texp_function
             alloc_mode map_comonadic(regional_to_global)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
@@ -128,25 +94,12 @@
                   extra (type.ml[1,0+21]..type.ml[1,0+35])
                     Tpat_extra_constraint
                     core_type (type.ml[1,0+28]..type.ml[1,0+34])
-<<<<<<< HEAD
                       Ttyp_constr \"list!\"
-||||||| c76379cdae
-                      Ttyp_constr \"list/9!\"
-=======
-                      Ttyp_constr \"list/11!\"
->>>>>>> v5.6-504
                       [
                         core_type (type.ml[1,0+28]..type.ml[1,0+29])
-<<<<<<< HEAD
                           Ttyp_constr \"t\"
-||||||| c76379cdae
-                          Ttyp_constr \"t/278\"
-=======
-                          Ttyp_constr \"t/282\"
->>>>>>> v5.6-504
                           []
                       ]
-<<<<<<< HEAD
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_var \"foo\"
@@ -154,19 +107,6 @@
                   value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 id(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
-||||||| c76379cdae
-                  Tpat_alias \"foo/279\"
-                  pattern (type.ml[1,0+22]..type.ml[1,0+25]) ghost
-                    attribute \"merlin.hide\"
-                      []
-                    Tpat_any
-=======
-                  Tpat_alias \"foo/283\"
-                  pattern (type.ml[1,0+22]..type.ml[1,0+25]) ghost
-                    attribute \"merlin.hide\"
-                      []
-                    Tpat_any
->>>>>>> v5.6-504
             ]
             Tfunction_body
               expression (type.ml[1,0+39]..type.ml[1,0+61])
@@ -177,13 +117,7 @@
                       extra (type.ml[1,0+43]..type.ml[1,0+50])
                         Tpat_extra_constraint
                         core_type (type.ml[1,0+48]..type.ml[1,0+49])
-<<<<<<< HEAD
                           Ttyp_constr \"t\"
-||||||| c76379cdae
-                          Ttyp_constr \"t/278\"
-=======
-                          Ttyp_constr \"t/282\"
->>>>>>> v5.6-504
                           []
                         global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                         []
@@ -200,13 +134,7 @@
                               constant (_none_[0,0+-1]..[0,0+-1]) ghost
                                 PConst_int (1,None)
                         ]
-<<<<<<< HEAD
                       Texp_ident \"*type-error*\"
-||||||| c76379cdae
-                      Texp_ident \"*type-error*/280\"
-=======
-                      Texp_ident \"*type-error*/284\"
->>>>>>> v5.6-504
                 ]
                 expression (type.ml[1,0+59]..type.ml[1,0+61])
                   attribute \"merlin.loc\"
@@ -289,15 +217,9 @@
                     "ghost": false,
                     "attrs": [],
                     "kind": "pattern (test.ml[1,0+4]..test.ml[1,0+5])
-<<<<<<< HEAD
     Tpat_var \"f\"
     sort value
     value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-||||||| c76379cdae
-    Tpat_var \"f/276\"
-=======
-    Tpat_var \"f/280\"
->>>>>>> v5.6-504
   ",
                     "children": []
                   },
@@ -328,15 +250,9 @@
                         "ghost": false,
                         "attrs": [],
                         "kind": "pattern (test.ml[1,0+6]..test.ml[1,0+9])
-<<<<<<< HEAD
     Tpat_var \"x\"
     sort '_representable_layout_1
     value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-||||||| c76379cdae
-    Tpat_var \"x/278\"
-=======
-    Tpat_var \"x/282\"
->>>>>>> v5.6-504
   ",
                         "children": []
                       },
@@ -578,19 +494,12 @@
     Tpat_construct \"Some\"
     [
       pattern (test.ml[4,57+9]..test.ml[4,57+12])
-<<<<<<< HEAD
         Tpat_var \"_aa\"
         sort value
         value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
-||||||| c76379cdae
-        Tpat_var \"_aa/279\"
-=======
-        Tpat_var \"_aa/283\"
->>>>>>> v5.6-504
     ]
     None
   ",
-<<<<<<< HEAD
                                     "children": [
                                       {
                                         "filename": "test.ml",
@@ -608,39 +517,6 @@
     Tpat_var \"_aa\"
     sort value
     value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
-||||||| c76379cdae
-                            "children": [
-                              {
-                                "filename": "test.ml",
-                                "start": {
-                                  "line": 4,
-                                  "col": 9
-                                },
-                                "end": {
-                                  "line": 4,
-                                  "col": 12
-                                },
-                                "ghost": false,
-                                "attrs": [],
-                                "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
-    Tpat_var \"_aa/279\"
-=======
-                            "children": [
-                              {
-                                "filename": "test.ml",
-                                "start": {
-                                  "line": 4,
-                                  "col": 9
-                                },
-                                "end": {
-                                  "line": 4,
-                                  "col": 12
-                                },
-                                "ghost": false,
-                                "attrs": [],
-                                "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
-    Tpat_var \"_aa/283\"
->>>>>>> v5.6-504
   ",
                                         "children": []
                                       }

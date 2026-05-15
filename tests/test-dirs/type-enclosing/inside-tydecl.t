@@ -15,7 +15,7 @@ test
   node = core_type
   exprs = [t1]
   source = t1; context = type
-  typed t1 : t1
+  typed t1
   result = [ File "inside_decl.ml", line 1, characters 18-20 ]
   {
     "class": "return",
