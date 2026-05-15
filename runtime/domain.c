@@ -1095,17 +1095,13 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     caml_plat_mutex_init(&dom->backup_thread_lock);
     caml_plat_cond_init(&dom->backup_thread_cond);
     dom->backup_thread_msg = BT_INIT;
-<<<<<<< HEAD
     dom->domain_canceled = false;
-||||||| 5.2.0minus-31
-=======
 
     /* Start out with the tick interval at 0, because we start out not ticking.
 
        [caml_domain_set_tick_interval_usec] will start the tick thread as soon
        as this is changed to a nonzero value by any domain. */
     dom->tick_interval_usec = 0;
->>>>>>> 5.2.0minus-37
   }
 
   domain_create(minor_heap_wsz, NULL);
@@ -2430,7 +2426,7 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
 
   if (enable && !was_enabled) {
     int err = caml_start_tick_thread();
-    sync_check_error(err, "caml_enable_tick_thread");
+    caml_check_error(err, "caml_enable_tick_thread");
   } else {
     caml_stop_tick_thread();
   }
