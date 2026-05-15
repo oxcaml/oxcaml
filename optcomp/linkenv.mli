@@ -70,7 +70,9 @@ val add_quoted_cmi : t -> CU.Name.t list -> unit
 
 val add_quoted_cmx : t -> CU.t list -> unit
 
-val get_quoted_globals : t -> CU.Name.Set.t * CU.Set.t
+val get_quoted_cmi : t -> CU.Name.Set.t
+
+val get_quoted_cmx : t -> CU.Set.t
 
 val extract_missing_globals : t -> (CU.t * filepath list) list
 

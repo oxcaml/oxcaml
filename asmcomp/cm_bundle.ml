@@ -32,9 +32,9 @@ module CU = Compilation_unit
 type error =
   | Missing_intf_for_quote of CU.Name.t
   | Missing_impl_for_quote of CU.t
-    (* This is currently unused as we can't ensure the cmx files are always
-       available, specifically compiler-libs doesn't ship its cmx files. We
-       should emit this again once all of the compiler artifacts do. *)
+(* This is currently unused as we can't ensure the cmx files are always
+   available, specifically compiler-libs doesn't ship its cmx files. We should
+   emit this again once all of the compiler artifacts do. *)
 
 exception Error of error
 
@@ -103,8 +103,8 @@ let cmx_bundle ~quoted_cmx =
       in
       raw_info, serialized_sections)
 
-let make_bundled_cm_file unix ~ppf_dump ~quoted_globals:(quoted_cmi, quoted_cmx)
-    ~output_name ~named_startup_file =
+let make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx ~output_name
+    ~named_startup_file =
   let bundled_cm =
     if named_startup_file
     then output_name ^ ".bundled_cm" ^ Config.ext_asm

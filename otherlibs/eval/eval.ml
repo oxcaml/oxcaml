@@ -133,6 +133,9 @@ let eval (expr : 'a expr) =
   Clflags.dlcode := false;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
+  (* We need this in case the quote contains unused module aliases that point to
+     modules we don't have the CMI for. It's weird but it would compile if the
+     initial compile also had this set, and setting this doesn't hurt. *)
   Clflags.transparent_modules := true;
   (* ensure Stdlib is linked during eval *)
   Clflags.nopervasives := false;

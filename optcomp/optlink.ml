@@ -375,7 +375,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               cached_genfns_imports,
               genfns )
         in
-        let quoted_globals = Linkenv.get_quoted_globals linkenv in
+        let quoted_cmi = Linkenv.get_quoted_cmi linkenv in
+        let quoted_cmx = Linkenv.get_quoted_cmx linkenv in
         let stdlib_and_support_files_for_eval =
           if !Clflags.nopervasives
           then []
@@ -402,7 +403,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
         (* put user's opts first *)
         Backend.link linkenv ml_objfiles output_name ~ppf_dump ~genfns
-          ~units_tolink ~uses_eval ~quoted_globals ~cached_genfns_imports)
+          ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx
+          ~cached_genfns_imports)
 
   (* Exported version for Asmlibrarian / Asmpackager *)
   let check_consistency linkenv file_name u crc =

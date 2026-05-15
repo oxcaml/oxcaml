@@ -308,7 +308,9 @@ let write_unit_info info filename =
 
 let save_unit_info filename ~main_module_block_format ~arg_descr =
   current_unit.ui_imports_cmi <- Env.imports();
-  current_unit.ui_quoted_cmi <- CU.Name.Set.to_list (Env.quoted_intfs ());
+  let quoted_intfs = Env.quoted_intfs () in
+  let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
+  current_unit.ui_quoted_cmi <- CU.Name.Set.to_list quoted_intfs_and_deps;
   current_unit.ui_quoted_cmx <- CU.Set.to_list (Env.quoted_impls ());
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
      of passing these in as arguments but, unlike most of the state that this

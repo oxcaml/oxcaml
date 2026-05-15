@@ -1016,10 +1016,9 @@ let imports {imported_units; crc_units; _} =
 let require_intf_for_quote {quoted_intfs; _} name =
   quoted_intfs := CU.Name.Set.add name !quoted_intfs
 
-let quoted_intfs ({ quoted_intfs; _ } as penv) =
-  (* Also grab everything that the direct dependencies transitively depend on
-     as right now we know which ones are actually needed (by whether we had to
-     load them). *)
+let quoted_intfs { quoted_intfs; _ } = !quoted_intfs
+
+let loaded_transitive_dependencies penv intfs =
   let names = ref Compilation_unit.Name.Set.empty in
   let rec add_loaded_deps name =
     match find_import_info_in_cache penv name with
@@ -1032,7 +1031,7 @@ let quoted_intfs ({ quoted_intfs; _ } as penv) =
           (fun import_info -> add_loaded_deps (Import_info.name import_info))
           imp_crcs)
   in
-  Compilation_unit.Name.Set.iter add_loaded_deps !quoted_intfs;
+  Compilation_unit.Name.Set.iter add_loaded_deps intfs;
   !names
 
 let require_impl_for_quote {quoted_impls; _} name =

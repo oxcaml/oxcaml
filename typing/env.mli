@@ -181,6 +181,11 @@ val add_required_global_for_quote: Path.t -> t -> unit
 (* Return the set of interfaces referenced by quotes *)
 val quoted_intfs: unit -> Compilation_unit.Name.Set.t
 
+(* Compute the transitive closure of the dependencies of these interfaces that
+   have been loaded by typing. Always includes the input interfaces. *)
+val loaded_transitive_dependencies:
+  Compilation_unit.Name.Set.t -> Compilation_unit.Name.Set.t
+
 (* Return the set of implementations referenced by quotes *)
 val quoted_impls: unit -> Compilation_unit.Set.t
 

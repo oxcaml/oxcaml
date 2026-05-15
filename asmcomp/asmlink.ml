@@ -405,7 +405,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
 (* Main entry point *)
 
 let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
-    ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
+    ~genfns ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
   let named_startup_file = named_startup_file () in
@@ -421,7 +421,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     then ml_objfiles
     else
       match
-        Cm_bundle.make_bundled_cm_file unix ~ppf_dump ~quoted_globals
+        Cm_bundle.make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx
           ~named_startup_file ~output_name
       with
       | exception Cm_bundle.Error error -> raise (Error (Cm_bundle_error error))
@@ -484,10 +484,10 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
       cleanup_dissector_temp_dir ())
 
 let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
-    ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
+    ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump : unit =
   Profile.record_call "link" (fun () ->
       link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
-        ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump)
+        ~genfns ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump)
 
 (* Error report *)
 

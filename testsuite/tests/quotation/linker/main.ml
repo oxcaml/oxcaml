@@ -31,5 +31,8 @@
 
    [Dep] is referenced only inside [Compile]'s [<[ ... ]>] quote, never directly.
    Both units are archived into [lib.cmxa]; only [Compile] is reachable from the
-   executable's call graph. *)
+   executable's call graph.
+
+   If [Dep] doesn't get linked then the Eval call wil crash with an error like
+   "Symbol camlDep__foo_0_1_code refered to by the PLT is unknown". *)
 let () = Printf.printf "%d\n" (Compile.get_result ())

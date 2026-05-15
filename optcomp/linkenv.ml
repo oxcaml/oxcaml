@@ -91,7 +91,9 @@ let add_quoted_cmx t cus =
   t.quoted_cmx
     <- List.fold_left (fun cus cu -> CU.Set.add cu cus) t.quoted_cmx cus
 
-let get_quoted_globals t = t.quoted_cmi, t.quoted_cmx
+let get_quoted_cmi t = t.quoted_cmi
+
+let get_quoted_cmx t = t.quoted_cmx
 
 (* Consistency check between interfaces and implementations: *)
 

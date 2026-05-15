@@ -1872,6 +1872,9 @@ let add_required_global_for_quote path env =
 
 let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
 
+let loaded_transitive_dependencies intfs =
+  Persistent_env.loaded_transitive_dependencies !persistent_env intfs
+
 let quoted_impls () = Persistent_env.quoted_impls !persistent_env
 
 let rec normalize_module_path lax env = function

@@ -36,7 +36,8 @@ exception Error of error
 val make_bundled_cm_file :
   (module Compiler_owee.Unix_intf.S) ->
   ppf_dump:Format.formatter ->
-  quoted_globals:Compilation_unit.Name.Set.t * Compilation_unit.Set.t ->
+  quoted_cmi:Compilation_unit.Name.Set.t ->
+  quoted_cmx:Compilation_unit.Set.t ->
   output_name:string ->
   named_startup_file:bool ->
   string
