@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-FROM ocaml/opam:ubuntu-20.04-ocaml-5.4
-||||||| c76379cdae
-FROM ocaml/opam:ubuntu-20.04-ocaml-5.2
-=======
 FROM ocaml/opam:ubuntu-20.04-ocaml-5.3
 
 WORKDIR /app
@@ -44,4 +39,3 @@ WORKDIR /projects/big-bertha
 RUN opam exec -- dune build
 
 WORKDIR /app
->>>>>>> v5.6-504
