@@ -97,7 +97,7 @@ val is_fixed_type : Parsetree.type_declaration -> bool
 
 val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
 
-type native_repr_kind = Unboxed | Untagged | Unpacked
+type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
@@ -179,7 +179,7 @@ type error =
   | Unavailable_type_constructor of Path.t
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
-  | Multiple_native_repr_attributes
+  | Incompatible_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t

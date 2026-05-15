@@ -420,14 +420,51 @@ Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
 
-external f10_6 : (int16#[@unboxed]) -> bool -> string  = "foo" "bar";;
+external f10_6 : (int16#[@unboxed][@unsafe_unextended]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-external f10_6 : int16# -> bool -> string = "foo" "bar"
+external f10_6 : (int16# [@unsafe_unextended]) -> bool -> string = "foo"
+  "bar"
+|}];;
+
+external f10_6_1 : (int16#[@unboxed]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 19-55:
+1 | external f10_6_1 : (int16#[@unboxed]) -> bool -> string  = "foo" "bar";;
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Arguments with layout bits8 or bits16 are not allowed in C stubs
+      except in "[@@builtin]"s. You may also annotate such an argument with
+      "[@unsafe_unextended]" if you are absolutely sure your C stub does not read
+      the garbage upper bits.
+|}];;
+
+external f10_6_2 : (#(int16# * int)[@unpacked]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 19-65:
+1 | external f10_6_2 : (#(int16# * int)[@unpacked]) -> bool -> string  = "foo" "bar";;
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Arguments with layout bits8 or bits16 are not allowed in C stubs
+      except in "[@@builtin]"s. You may also annotate such an argument with
+      "[@unsafe_unextended]" if you are absolutely sure your C stub does not read
+      the garbage upper bits.
 |}];;
 
 external f10_7 : string -> (int16#[@unboxed])  = "foo" "bar";;
 [%%expect{|
 external f10_7 : string -> int16# = "foo" "bar"
+|}];;
+
+external f10_7_1 : string -> (int16#[@unboxed][@unsafe_unextended])  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 19-67:
+1 | external f10_7_1 : string -> (int16#[@unboxed][@unsafe_unextended])  = "foo" "bar";;
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: The "[@unsafe_unextended]" attribute is not allowed on C stub returns.
 |}];;
 
 external f10_8 : int16 -> int16#  = "foo" "bar" [@@unboxed];;

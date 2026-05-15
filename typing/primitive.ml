@@ -42,6 +42,8 @@ type native_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
+  | Unextended_int8
+  | Unextended_int16
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -73,6 +75,8 @@ type wrong_repr_error =
   | Expected_value_prim
   | Product_return
   | Unpacked_product_return
+  | Unextended_return
+  | Small_int_arg
   | Repr_mismatch
 [@@immediate]
 
@@ -102,7 +106,9 @@ let check_ocaml_value = function
   | _, Unboxed_float _
   | _, Unboxed_vector _
   | _, Unboxed_or_untagged_integer _
-  | _, Unpacked_product _ -> Bad_attribute
+  | _, Unpacked_product _
+  | _, Unextended_int8
+  | _, Unextended_int16 -> Bad_attribute
 
 let is_builtin_prim_name name = String.length name > 0 && name.[0] = '%'
 
@@ -257,6 +263,7 @@ let rec add_native_repr_attributes ty attrs =
 let oattr_unboxed = { oattr_name = "unboxed" }
 let oattr_untagged = { oattr_name = "untagged" }
 let oattr_unpacked = { oattr_name = "unpacked" }
+let oattr_unsafe_unextended = { oattr_name = "unsafe_unextended" }
 let oattr_noalloc = { oattr_name = "noalloc" }
 let oattr_builtin = { oattr_name = "builtin" }
 let oattr_no_effects = { oattr_name = "no_effects" }
@@ -286,6 +293,8 @@ let print p osig_val_decl =
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint) ->
       true
+    | _, Unextended_int8
+    | _, Unextended_int16
     | _, Same_as_ocaml_repr (Base Void) -> false
       (* The [@unboxed] attribute is not supported on void in our compiler
          or the upstream compiler. *)
@@ -306,6 +315,8 @@ let print p osig_val_decl =
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint)
     | _, Unpacked_product _
+    | _, Unextended_int8
+    | _, Unextended_int16
     | _, Repr_poly -> false
   in
   let all_unboxed = for_all needs_unboxed_attribute in
@@ -352,6 +363,7 @@ let print p osig_val_decl =
                                    | Untagged_int16) ->
        if all_untagged then [] else [oattr_untagged]
      | Unpacked_product _ -> [oattr_unpacked]
+     | Unextended_int8 | Unextended_int16 -> [oattr_unsafe_unextended]
      | Same_as_ocaml_repr _->
        if all_unboxed || not (needs_unboxed_attribute (m, repr))
        then []
@@ -431,35 +443,50 @@ let equal_native_repr nr1 nr2 =
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
                | Unboxed_vector _ | Same_as_ocaml_repr _
-               | Unpacked_product _)
+               | Unpacked_product _ | Unextended_int8 | Unextended_int16)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
     | Unboxed_vector _ | Same_as_ocaml_repr _
-    | Unpacked_product _), Repr_poly
+    | Unpacked_product _ | Unextended_int8 | Unextended_int16), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unpacked_product _ |
+     Unextended_int8 | Unextended_int16) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unpacked_product _ |
+     Unextended_int8 | Unextended_int16) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_or_untagged_integer _ | Unpacked_product _) -> false
+     Unboxed_or_untagged_integer _ | Unpacked_product _ |
+     Unextended_int8 | Unextended_int16) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unpacked_product _ |
+     Unextended_int8 | Unextended_int16) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unboxed_or_untagged_integer _) -> false
+     Unboxed_vector _ | Unboxed_or_untagged_integer _ |
+     Unextended_int8 | Unextended_int16) -> false
+  | Unextended_int8, Unextended_int8 -> true
+  | Unextended_int8,
+    (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_or_untagged_integer _ |
+     Unpacked_product _ | Unextended_int16) -> false
+  | Unextended_int16, Unextended_int16 -> true
+  | Unextended_int16,
+    (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_or_untagged_integer _ |
+     Unpacked_product _ | Unextended_int8) -> false
 
 let equal_effects ef1 ef2 =
   match ef1, ef2 with
@@ -502,7 +529,8 @@ module Repr_check = struct
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
-    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
+    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_int8
+    | Unextended_int16 -> false
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
@@ -510,17 +538,34 @@ module Repr_check = struct
     | Univar _ -> Misc.fatal_error "sort_is_product: univar"
     | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
 
-  let c_stub_arg_errors = function
+  let rec sort_contains_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
+    function
+    | Product sorts -> List.exists sort_contains_bits8_or_bits16 sorts
+    | Base (Bits8 | Bits16) -> true
+    | Base _ -> false
+    | Univar _ -> Misc.fatal_error "sort_contains_bits8_or_bits16: univar"
+    | Genvar _ -> Misc.fatal_error "sort_contains_bits8_or_bits16: genvar"
+
+  let c_stub_arg_errors ~builtin = function
     | Same_as_ocaml_repr s ->
-      if sort_is_product s then [Product_arg] else []
+      (if sort_is_product s then [Product_arg] else []) @
+      (if not builtin && sort_contains_bits8_or_bits16 s
+       then [Small_int_arg]
+       else [])
+    | Unpacked_product s ->
+      if not builtin && sort_contains_bits8_or_bits16 s
+      then [Small_int_arg]
+      else []
+    | Unextended_int8 | Unextended_int16
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unpacked_product _ | Repr_poly -> []
+    | Repr_poly -> []
 
   let c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
+    | Unextended_int8 | Unextended_int16 -> [Unextended_return]
     | Same_as_ocaml_repr (Product [s1; s2]) ->
       if (sort_is_product s1) ||
          (sort_is_product s2)
@@ -570,12 +615,13 @@ module Repr_check = struct
             else [Expected_value_prim]))
       prim
 
-  let check_c_stub prim =
+  let check_c_stub ~builtin prim =
     (* C externals are allowed to return a tuple, but may not take products as
        arguments or return products with more than two elements. *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
-      (List.init arity (fun _ -> c_stub_arg_errors))
+      (List.init arity
+         (fun _ -> c_stub_arg_errors ~builtin))
       @ [c_stub_return_errors]
     in
     check checks prim
@@ -1068,7 +1114,8 @@ let prim_has_valid_reprs ~loc prim =
                        | "%sendcache"
                      |}
                   *)
-                else check_c_stub)
+                else
+                  check_c_stub ~builtin:prim.prim_c_builtin)
   in
   match check prim with
   | Success -> ()
@@ -1173,6 +1220,20 @@ let report_error ppf err =
           "@.@{<hint>Hint@}: @[<v>\
            The %a attribute is not allowed on C stub returns.@]"
           Style.inline_code "[@unpacked]"
+      | Unextended_return ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           The %a attribute is not allowed on C stub returns.@]"
+          Style.inline_code "[@unsafe_unextended]"
+      | Small_int_arg ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           Arguments with layout bits8 or bits16 are not allowed in C stubs@ \
+           except in %as. You may also annotate such an argument with@ \
+           %a if you are absolutely sure your C stub does not read@ \
+           the garbage upper bits.@]"
+          Style.inline_code "[@@builtin]"
+          Style.inline_code "[@unsafe_unextended]"
       | Repr_mismatch -> ()
         (* The error message already says "wrong layout", so a hint here would
            be redundant. *))

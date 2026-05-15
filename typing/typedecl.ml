@@ -24,7 +24,7 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged | Unpacked
+type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -111,7 +111,7 @@ type error =
   | Unavailable_type_constructor of Path.t
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
-  | Multiple_native_repr_attributes
+  | Incompatible_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
@@ -3763,17 +3763,25 @@ let get_native_repr_attribute attrs ~global_repr =
     Attr_helper.get_no_payload_attribute "unboxed"  attrs,
     Attr_helper.get_no_payload_attribute "untagged" attrs,
     Attr_helper.get_no_payload_attribute "unpacked" attrs,
+    Attr_helper.get_no_payload_attribute "unsafe_unextended" attrs,
     global_repr
   with
-  | None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None -> Native_repr_attr_present Unpacked
-  | Some { Location.loc }, _, _, _
-  | _, Some { Location.loc }, _, _
-  | _, _, Some { Location.loc }, _ ->
-    raise (Error (loc, Multiple_native_repr_attributes))
+  | None, None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, None, Some repr -> Native_repr_attr_present repr
+  | None, None, None, Some _, None
+  | Some _, None, None, Some _, None
+  | None, Some _, None, Some _, None ->
+    (* We allow declarations like [int8#[@unboxed][@unsafe_unextended]], in
+       which case we ignore the [[@unboxed]]/[[@untagged]] attribute. *)
+    Native_repr_attr_present Unsafe_unextended
+  | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None, None -> Native_repr_attr_present Unpacked
+  | Some { Location.loc }, _, _, _, _
+  | _, Some { Location.loc }, _, _, _
+  | _, _, Some { Location.loc }, _, _
+  | _, _, _, Some { Location.loc }, _ ->
+    raise (Error (loc, Incompatible_native_repr_attributes))
 
 let is_upstream_compatible_non_value_unbox env ty =
   (* CR layouts v2.5: This needs to be updated when we support unboxed
@@ -4018,6 +4026,17 @@ let make_native_repr
   | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Unsafe_unextended, Sort (Base Bits8) ->
+    Unextended_int8
+  | Native_repr_attr_present Unsafe_unextended, Sort (Base Bits16) ->
+    Unextended_int16
+  | Native_repr_attr_present Unsafe_unextended,
+    (Poly | Sort (Product _ | Base (Scannable | Void | Bits32 | Bits64 | Word |
+      Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 | Vec512))) ->
+    raise
+      (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unsafe_unextended))
+  | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 
 let prim_const_mode m =
@@ -5178,11 +5197,12 @@ let report_error_doc ppf = function
         "cannot be checked"
   | Val_in_structure ->
       fprintf ppf "Value declarations are only allowed in signatures"
-  | Multiple_native_repr_attributes ->
-      fprintf ppf "Too many %a/%a/%a attributes"
+  | Incompatible_native_repr_attributes ->
+      fprintf ppf "Incompatible %a/%a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
+        Style.inline_code "[@@unsafe_unextended]"
   | Cannot_unbox_or_untag_type Unboxed ->
       fprintf ppf "@[Don't know how to unbox this type.@ \
                    Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
@@ -5201,6 +5221,10 @@ let report_error_doc ppf = function
       fprintf ppf "@[Don't know how to unpack this type.@ \
                    Only types with product layouts can be marked %a.@]"
         Style.inline_code "unpacked"
+  | Cannot_unbox_or_untag_type Unsafe_unextended ->
+      fprintf ppf "@[Don't know how to unextend this type.@ \
+                   Only types with layout bits8 or bits16 can be marked %a.@]"
+        Style.inline_code "unsafe_unextended"
   | Deep_unbox_or_untag_attribute kind ->
       fprintf ppf
         "@[The attribute %a should be attached to@ \
@@ -5210,7 +5234,8 @@ let report_error_doc ppf = function
         (match kind with
          | Unboxed -> "@unboxed"
          | Untagged -> "@untagged"
-         | Unpacked -> "@unpacked")
+         | Unpacked -> "@unpacked"
+         | Unsafe_unextended -> "@unsafe_unextended")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)
