@@ -135,13 +135,11 @@ let drop_last_to_y_axis (s : line Stack.t) =
 
 1. For block indices to arrays, the array type parameter must be `mod
    non_float`.
-2. Indices to `[@@unboxed]` records cannot be taken.
-3. An index to a `float` in a flattened float record has an element type
-   `float#`.
-4. Indices to some records containing both values and non-values, and occupying
+2. Indices cannot be taken to `[@@unboxed]` records, `[@@represent_as_float_array]` records, `float` records, or `private` records.
+3. Indices to some records containing both values and non-values, and occupying
    over 2^12 bytes, cannot be created. See [Representation of block
    indices](#representation-of-block-indices) for details.
-5. Indices to structures with non-default modalities are not supported.
+4. Indices to structures with non-default modalities are not supported.
    Specifically, the composition of modalities of the accesses of an `idx_imm`
    must have the identity modality, while the composition of modalities of the
    accesses of an `idx_mut` must the the modality

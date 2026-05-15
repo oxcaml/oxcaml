@@ -95,7 +95,7 @@ let record_form_to_wrong_kind_sort
   | Unboxed_product -> Record_unboxed_product
 
 type type_block_access_result =
-  { ba : block_access; base_ty: type_expr; el_ty: type_expr; flat_float : bool;
+  { ba : block_access; base_ty: type_expr; el_ty: type_expr;
     modality : Modality.Const.t }
 
 type contains_gadt =
@@ -272,9 +272,7 @@ type error =
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_record_unboxed
-  | Block_access_private_record
-  | Block_index_flattened_record of type_expr
+  | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Block_index_atomic_unsupported
@@ -5897,7 +5895,7 @@ let may_lower_contravariant_then_generalize env exp =
   generalize exp.exp_type
 
 let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; flat_float = _ } =
+      { ba; base_ty; el_ty; modality = _ } =
   generalize_structure base_ty;
   generalize_structure el_ty;
   match ba with
@@ -7082,7 +7080,7 @@ and type_expect_
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
-    let { ba; base_ty; el_ty; flat_float; modality } =
+    let { ba; base_ty; el_ty; modality } =
       with_local_level_if_principal
         ~post:generalize_structure_type_block_access_result
         (fun () ->
@@ -7140,24 +7138,6 @@ and type_expect_
       | Error err ->
         raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
     end;
-    let el_ty =
-      if flat_float then
-        let has_unboxed_version p =
-          not (Path.is_unboxed_version p) &&
-          try
-            ignore (Env.find_type (Path.unboxed_version p) env);
-            true
-          with Not_found ->
-            false
-        in
-        match get_desc (expand_head env el_ty) with
-        | Tconstr(p, args, _) when has_unboxed_version p ->
-          newconstr (Path.unboxed_version p) args
-        | _ ->
-          raise (Error(loc, env, Block_index_flattened_record el_ty))
-      else
-        el_ty
-    in
     let ty =
       if mut then
         Predef.type_idx_mut base_ty el_ty
@@ -8113,35 +8093,26 @@ and type_block_access env expected_base_ty principal
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     if mut then Env.mark_label_used Mutation label.lbl_uid;
     let ba = Baccess_field (lid, label) in
-    let flat_float  =
-      (* whether we change the final el ty to [float#]. we don't set [el_ty]
-          to [float#] here because it could be a singleton unboxed record
-          containing a float, and thus be followed by an unboxed access *)
-      match label.lbl_repres with
-      | Record_boxed -> false
-      | Record_mixed mixed ->
-        begin match mixed.(label.lbl_pos) with
-        | Float_boxed -> true
-        | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word | Product _ | Void
-        | Untagged_immediate ->
-          false
-        end
-      | Record_float -> true
-      | Record_ufloat -> false
-      | Record_unboxed ->
-        raise (Error (lid.loc, env, Block_access_record_unboxed))
-      | Record_inlined _ ->
-        Misc.fatal_error "Typecore.type_block_access: inlined record"
+    let bad_record_error reason =
+      raise (Error (lid.loc, env, Block_access_bad_record reason))
     in
-    let () =
-      match label.lbl_private with
-      | Public -> ()
-      | Private ->
-        raise (Error (lid.loc, env, Block_access_private_record))
-    in
+    (match label.lbl_repres with
+     | Record_boxed -> ()
+     | Record_mixed shape ->
+       if Array.exists (function Float_boxed -> true | _ -> false) shape then
+         bad_record_error "[@@flatten_floats]"
+       else
+         ()
+     | Record_float -> bad_record_error "float"
+     | Record_ufloat -> bad_record_error "[@@represent_as_float_array]"
+     | Record_unboxed -> bad_record_error "[@@unboxed]"
+     | Record_inlined _ ->
+       Misc.fatal_error "Typecore.type_block_access: inlined record");
+    (match label.lbl_private with
+     | Public -> ()
+     | Private -> bad_record_error "private");
     let modality = label.lbl_modalities in
-    { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
+    { ba; base_ty = ty_res; el_ty = ty_arg; modality }
   | Baccess_block (mut, idx) ->
     let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
     let el_ty =
@@ -8158,7 +8129,7 @@ and type_block_access env expected_base_ty principal
     let ba = Baccess_block (mut, idx) in
     let mut = match mut with Immutable -> false | Mutable -> true in
     let modality = Typemode.idx_expected_modalities ~mut in
-    { ba; base_ty; el_ty; flat_float = false; modality }
+    { ba; base_ty; el_ty; modality }
 
 and type_unboxed_access env loc el_ty ua =
   match ua with
@@ -12382,18 +12353,9 @@ let report_error ~loc env =
           (Style.as_inline_code Printtyp.type_expr) prev_el_type
           (Style.as_inline_code longident) lid
       end
-  | Block_access_record_unboxed ->
-    Location.error ~loc
-      "Block indices do not support [@@unboxed] records."
-  | Block_access_private_record ->
-    Location.error ~loc
-      "Block indices do not support private records."
-  | Block_index_flattened_record el_ty ->
+  | Block_access_bad_record kind ->
     Location.errorf ~loc
-      "This block index points to an element stored as a flattened float.@ \
-       Such block indices require the element type to have an unboxed@ \
-       version, but %a does not."
-      (Style.as_inline_code Printtyp.type_expr) el_ty
+      "Block indices do not support %s records." kind
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality_doc id =

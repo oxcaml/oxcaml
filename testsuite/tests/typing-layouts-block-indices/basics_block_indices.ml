@@ -134,12 +134,14 @@ Error: This unboxed access is expected to have base type "y#"
 (*****************)
 (* Float records *)
 
-(* Indicies to flattened float always have element type [float#] *)
 type t = { f : float }
 let f () = (.f)
 [%%expect{|
 type t = { f : float; }
-val f : unit -> (t, float#) idx_imm = <fun>
+Line 2, characters 13-14:
+2 | let f () = (.f)
+                 ^
+Error: Block indices do not support float records.
 |}]
 
 (* Unboxed float record *)
@@ -159,75 +161,71 @@ type t = { t_float64 : t_float64; }
 val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
 |}]
 
-(* Singleton unboxed records containing floats can appear in float records *)
+(* We can't create an index to float records *)
 type fr = #{ f : float }
 type t = { f : float; fr : fr  }
 let fr_f () = (.fr.#f)
 [%%expect{|
 type fr = #{ f : float; }
 type t = { f : float; fr : fr; }
-val fr_f : unit -> (t, float#) idx_imm = <fun>
+Line 3, characters 16-18:
+3 | let fr_f () = (.fr.#f)
+                    ^^
+Error: Block indices do not support float records.
 |}]
 
-(* But we can't create a pointer to a flattened [fr], because it has no unboxed
-   version *)
 let bad () = (.fr)
 [%%expect{|
-Line 1, characters 13-18:
+Line 1, characters 15-17:
 1 | let bad () = (.fr)
-                 ^^^^^
-Error: This block index points to an element stored as a flattened float.
-       Such block indices require the element type to have an unboxed
-       version, but "fr" does not.
+                   ^^
+Error: Block indices do not support float records.
 |}]
 
 (* Mixed float record *)
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
+[@@flatten_floats]
 let f () = (.f)
 let fu () = (.fu)
 let t_float64 () = (.t_float64)
 let fr_f () = (.fr.#f)
 [%%expect{|
 type t_float64 : float64
-Line 2, characters 0-68:
-2 | type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This record type mixes boxed and unboxed float fields,
-       which causes the flat float record optimization.
-       You must annotate it with "[@@flatten_floats]".
+type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
+Line 4, characters 13-14:
+4 | let f () = (.f)
+                 ^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
-(* Can't take a block index to a flattened [fr] because it doesn't have an
-   unboxed version *)
 let bad () = (.fr)
 [%%expect{|
-Line 1, characters 13-18:
+Line 1, characters 15-17:
 1 | let bad () = (.fr)
-                 ^^^^^
-Error: This block index points to an element stored as a flattened float.
-       Such block indices require the element type to have an unboxed
-       version, but "fr" does not.
+                   ^^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
-type pfa = private float
-type r = { mutable pfa : pfa }
-let f () : (r, pfa#) idx_mut = (.pfa)
+type t = { f : float# } [@@represent_as_float_array]
+let f () = (.f)
 [%%expect{|
-type pfa = private float
-type r = { mutable pfa : pfa; }
-val f : unit -> (r, pfa#) idx_mut = <fun>
+type t = { f : float#; }
+Line 2, characters 13-14:
+2 | let f () = (.f)
+                 ^
+Error: Block indices do not support [@@represent_as_float_array] records.
 |}]
 
-(* Cannot bypass private float aliases *)
-let bad () : (r, float#) idx_mut = (.pfa)
+type t = { f : float; f' : float# } [@@flatten_floats]
+let f () = (.f)
+let f' () = (.f')
 [%%expect{|
-Line 1, characters 35-41:
-1 | let bad () : (r, float#) idx_mut = (.pfa)
-                                       ^^^^^^
-Error: This expression has type "(r, pfa#) idx_mut"
-       but an expression was expected of type "(r, float#) idx_mut"
-       Type "pfa#" is not compatible with type "float#"
+type t = { f : float; f' : float#; }
+Line 2, characters 13-14:
+2 | let f () = (.f)
+                 ^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 (***************)

@@ -379,16 +379,9 @@ let test_array_idx_deepening ty =
   );
   print_newline ()
 
-(* If it's represented as a flattened float, then we can only create an idx if
-   the type is [float] (rather than a singleton unboxed record containing a
-   float *)
-let path_is_valid_block_idx ty path =
-  let flattened_float =
-    Type_structure.is_flat_float_record (Type.structure ty)
-    && Type_structure.layout (Type.structure (Type.follow_path ty path))
-       = Value { ignorable = false; non_float = false }
-  in
-  (not flattened_float) || Type.follow_path ty path = Type.Float
+(* Block indices are not supported on records that flatten floats. *)
+let path_is_valid_block_idx ty _path =
+  not (Type_structure.is_flat_float_record (Type.structure ty))
 
 let test_record_idx_access ty ~local =
   type_section ty;
@@ -494,6 +487,8 @@ let test_record_idx_access ty ~local =
                 line
                   "(* Note: skipping test as this is not a valid block index,";
                 line "   due to the float record optimization *)";
+                line "let _ = eq in";
+                line "let _ = r in";
                 line "let _ = next_r in"
               )
           )
