@@ -6930,7 +6930,7 @@ and type_expect_
       let cases, partial =
         type_cases Computation env arg_pat_mode expected_mode
           arg.exp_type sort ty_expected_explained
-          ~check_if_total:true loc caselist in
+          ~check_if_total:true ~zero_alloc:None loc caselist in
       if
         List.for_all (fun c -> pattern_needs_partial_application_check c.c_lhs)
           cases
@@ -6952,7 +6952,7 @@ and type_expect_
         type_cases Value env arg_mode expected_mode
           Predef.type_exn Jkind.Sort.(of_const Const.for_exception)
           ty_expected_explained
-          ~check_if_total:false loc caselist in
+          ~check_if_total:false ~zero_alloc:None loc caselist in
       re {
         exp_desc = Texp_try(body, cases);
         exp_loc = loc; exp_extra = [];
@@ -7906,7 +7906,7 @@ and type_expect_
         type_cases Value body_env
           (simple_pat_mode Value.legacy) (mode_return Value.legacy)
           ty_params param_sort (mk_expected ty_func_result)
-          ~check_if_total:true loc [scase]
+          ~check_if_total:true ~zero_alloc:None loc [scase]
       in
       let body =
         match cases with
@@ -10495,10 +10495,12 @@ and type_newtype_expr
 (* Typing of match cases *)
 and type_cases
     : type k . k pattern_category ->
-           _ -> _ -> _ -> _ -> _ -> _ -> check_if_total:bool -> _ ->
+           _ -> _ -> _ -> _ -> _ -> _ -> check_if_total:bool ->
+           zero_alloc:Zero_alloc.check option -> _ ->
            Parsetree.case list -> k case list * partial
   = fun category env pat_mode expr_mode
-        ty_arg sort_arg ty_res_explained ~check_if_total loc caselist ->
+        ty_arg sort_arg ty_res_explained ~check_if_total ~zero_alloc loc
+        caselist ->
   let { ty = ty_res; explanation } = ty_res_explained in
   let caselist =
     List.map (fun case -> Parmatch.untyped_case case, case) caselist
@@ -10543,7 +10545,7 @@ and type_cases
           c_rhs = {exp with exp_type = ty_infer}
         }
     end
-    ~zero_alloc:None
+    ~zero_alloc
     ~additional_checks_for_split_cases:(fun cases ->
       let cases =
         List.map
@@ -10563,13 +10565,32 @@ and type_cases
 and type_function_cases_expect
     env expected_mode ty_expected loc cases attrs ~first ~in_function =
   Builtin_attributes.warning_scope attrs begin fun () ->
+    let zero_alloc =
+      match cases with
+      | [] -> None
+      | first_case :: _ ->
+        let pat = first_case.pc_lhs in
+        let attr_result =
+          try
+            Builtin_attributes.get_zero_alloc_attribute
+              Function_param
+              (get_pat_attrs pat)
+          with Builtin_attributes.Error_builtin (_, err) ->
+            raise (Builtin_attributes.Error_builtin (pat.ppat_loc, err))
+        in
+        match attr_result with
+        | Default_zero_alloc | Ignore_assert_all -> None
+        | Assume _ ->
+          raise (Error (pat.ppat_loc, env, Invalid_payload_arg_zero_alloc))
+        | Check check -> Some check
+    in
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
           arg_sort; ret_sort;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
-        ~in_function ~has_poly:Mono ~zero_alloc:None
+        ~in_function ~has_poly:Mono ~zero_alloc
         ~mode_annots:Mode.Alloc.Const.Option.none
         ~ret_mode_annots:Mode.Alloc.Const.Option.none
         ~is_first_val_param:first ~is_final_val_param:true
@@ -10577,7 +10598,7 @@ and type_function_cases_expect
     let cases, partial =
       type_cases Value env
         expected_pat_mode expected_inner_mode ty_arg_mono arg_sort
-        (mk_expected ty_ret) ~check_if_total:true loc cases
+        (mk_expected ty_ret) ~check_if_total:true ~zero_alloc loc cases
     in
     let ty_fun =
       instance

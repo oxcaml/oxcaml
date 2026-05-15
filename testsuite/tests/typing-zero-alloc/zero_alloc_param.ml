@@ -74,6 +74,25 @@ let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
 val f : ((int -> int) [@zero_alloc arity 1]) -> int [@@zero_alloc] = <fun>
 |}];;
 
+let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
+  function (g [@zero_alloc arity 1]) -> g 42;; (* should succeed *)
+[%%expect {|
+val f : ((int -> int) [@zero_alloc arity 1]) -> int [@@zero_alloc] = <fun>
+|}];;
+
+let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
+  function g -> g 42;; (* should fail in the backend *)
+[%%expect {|
+Line 1, characters 5-15:
+1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP13.f (camlTOP13__f_18_19_code).
+Line 2, characters 16-20:
+2 |   function g -> g 42;; (* should fail in the backend *)
+                    ^^^^
+Error: called function may allocate (indirect tailcall)
+|}];;
+
 let[@zero_alloc] f : ((int -> int -> int) [@zero_alloc]) -> int =
   fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
 [%%expect {|
@@ -98,7 +117,7 @@ let[@zero_alloc] f (g [@zero_alloc arity 2]) x = g x;; (* should fail in the bac
 Line 1, characters 5-15:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x = g x;; (* should fail in the backend *)
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP14.f (camlTOP14__f_18_19_code).
+Error: Annotation check for zero_alloc failed on function TOP16.f (camlTOP16__f_22_23_code).
 Line 1, characters 49-52:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x = g x;; (* should fail in the backend *)
                                                      ^^^
@@ -110,7 +129,7 @@ let[@zero_alloc] f (g [@zero_alloc arity 2]) x y z = g x y z;; (* should fail in
 Line 1, characters 5-15:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x y z = g x y z;; (* should fail in the backend *)
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP15.f (camlTOP15__f_20_21_code).
+Error: Annotation check for zero_alloc failed on function TOP17.f (camlTOP17__f_24_25_code).
 Line 1, characters 53-60:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x y z = g x y z;; (* should fail in the backend *)
                                                          ^^^^^^^
@@ -171,7 +190,7 @@ let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
 Line 1, characters 5-15:
 1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP21.f (camlTOP21__f_28_29_code).
+Error: Annotation check for zero_alloc failed on function TOP23.f (camlTOP23__f_32_33_code).
 Line 2, characters 39-43:
 2 |   fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
                                            ^^^^
@@ -252,7 +271,7 @@ let _ = require_za_arity_1 (fun[@zero_alloc] x -> (x, 123));; (* should fail in 
 Line 1, characters 33-43:
 1 | let _ = require_za_arity_1 (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                      ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP28._$.(fun) (camlTOP28__fn[:1,27--59]_34_35_code).
+Error: Annotation check for zero_alloc failed on function TOP30._$.(fun) (camlTOP30__fn[:1,27--59]_38_39_code).
 Line 1, characters 50-58:
 1 | let _ = require_za_arity_1 (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                                       ^^^^^^^^
@@ -280,7 +299,7 @@ let _ = require_za_arity_1 (fun x -> [x]);; (* should fail in the backend *)
 Line 1, characters 27-41:
 1 | let _ = require_za_arity_1 (fun x -> [x]);; (* should fail in the backend *)
                                ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP32._$.(fun) (camlTOP32__fn[:1,27--41]_42_43_code).
+Error: Annotation check for zero_alloc failed on function TOP34._$.(fun) (camlTOP34__fn[:1,27--41]_46_47_code).
 Line 1, characters 37-40:
 1 | let _ = require_za_arity_1 (fun x -> [x]);; (* should fail in the backend *)
                                          ^^^
@@ -361,7 +380,7 @@ let _ =
 Line 4, characters 7-17:
 4 |   let[@zero_alloc] id' x = (id x, x) in
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP38._$.id' (camlTOP38__id'_53_55_code).
+Error: Annotation check for zero_alloc failed on function TOP40._$.id' (camlTOP40__id'_57_59_code).
 Line 4, characters 27-36:
 4 |   let[@zero_alloc] id' x = (id x, x) in
                                ^^^^^^^^^
@@ -498,7 +517,7 @@ end;;
 Line 4, characters 7-17:
 4 |   let[@zero_alloc] f' (g' [@zero_alloc arity 1]) = g' 123 456 (* should fail in the backend *)
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP50.Nonsense_matching_arity.f' (camlTOP50__f'_60_61_code).
+Error: Annotation check for zero_alloc failed on function TOP52.Nonsense_matching_arity.f' (camlTOP52__f'_64_65_code).
 Line 4, characters 51-61:
 4 |   let[@zero_alloc] f' (g' [@zero_alloc arity 1]) = g' 123 456 (* should fail in the backend *)
                                                        ^^^^^^^^^^
@@ -747,7 +766,7 @@ let _ =
 Line 3, characters 2-72:
 3 |   let f_nonstrict x = if x < 0 then raise (Err (string_of_int x)) else x in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP74._$.f_nonstrict (camlTOP74__f_nonstrict_78_79_code).
+Error: Annotation check for zero_alloc strict failed on function TOP76._$.f_nonstrict (camlTOP76__f_nonstrict_82_83_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:3,47--64)
 Line 3, characters 42-65:
@@ -771,7 +790,7 @@ module type S = sig val f : ((int -> int) [@zero_alloc arity 1]) -> int end
 Line 6, characters 17-50:
 6 |   let g () = X.f (fun x -> Format.printf "foo"; x)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP76.F.g.(fun) (camlTOP76__fn[:6,17--50]_82_85_code).
+Error: Annotation check for zero_alloc failed on function TOP78.F.g.(fun) (camlTOP78__fn[:6,17--50]_86_89_code).
 my specific error
 
 File "format.ml", lines 1498-1500, characters 2-18:
@@ -827,7 +846,7 @@ let _ =
 Line 3, characters 7-17:
 3 |   let[@zero_alloc] (f | f) = fun x -> (x, x) in
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP82._$.f (camlTOP82__*match*_91_93_code).
+Error: Annotation check for zero_alloc failed on function TOP84._$.f (camlTOP84__*match*_95_97_code).
 Line 3, characters 38-44:
 3 |   let[@zero_alloc] (f | f) = fun x -> (x, x) in
                                           ^^^^^^
@@ -842,7 +861,7 @@ let _ =
 Line 3, characters 2-31:
 3 |   let (f | f) = fun x -> (x, x) in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP83._$.f (camlTOP83__*match*_93_95_code).
+Error: Annotation check for zero_alloc failed on function TOP85._$.f (camlTOP85__*match*_97_99_code).
 Line 3, characters 25-31:
 3 |   let (f | f) = fun x -> (x, x) in
                              ^^^^^^
@@ -967,7 +986,7 @@ let _ =
 Line 2, characters 7-17:
 2 |   let[@zero_alloc] (f as g) = fun x -> (x + 123, 42) in
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP99._$.f (camlTOP99__g_111_113_code).
+Error: Annotation check for zero_alloc failed on function TOP101._$.f (camlTOP101__g_115_117_code).
 Line 2, characters 39-52:
 2 |   let[@zero_alloc] (f as g) = fun x -> (x + 123, 42) in
                                            ^^^^^^^^^^^^^
@@ -1033,7 +1052,7 @@ let _ =
 Line 7, characters 6-67:
 7 |       (fun x -> if x < 0 then raise (Err (string_of_int x)) else x) a;;
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP105._$.(fun) (camlTOP105__fn[:7,6--67]_117_121_code).
+Error: Annotation check for zero_alloc strict failed on function TOP107._$.(fun) (camlTOP107__fn[:7,6--67]_121_125_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:7,41--58)
 Line 7, characters 36-59:
@@ -1082,7 +1101,7 @@ let _ =
 Line 3, characters 2-16:
 3 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP110._$.g (camlTOP110__g_138_141_code).
+Error: Annotation check for zero_alloc failed on function TOP112._$.g (camlTOP112__g_142_145_code).
 Line 3, characters 12-16:
 3 |   and g x = x, x in
                 ^^^^
@@ -1099,7 +1118,7 @@ let _ =
 Line 5, characters 2-16:
 5 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP111._$.g (camlTOP111__g_142_146_code).
+Error: Annotation check for zero_alloc strict failed on function TOP113._$.g (camlTOP113__g_146_150_code).
 Line 5, characters 12-16:
 5 |   and g x = x, x in
                 ^^^^
