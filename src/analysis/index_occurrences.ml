@@ -47,17 +47,8 @@ let should_ignore_lid (lid : Longident.t Location.loc) =
 let iterator ~current_buffer_path ~index ~reduce_for_uid =
   let add uid loc = index := Shape.Uid.Map.add_to_list uid loc !index in
   let f ~namespace env path (lid : Longident.t Location.loc) =
-<<<<<<< HEAD
     log ~title:"index_buffer" "Path: %a" Logger.fmt
       (Fun.flip (Format_doc.compat Path.print) path);
-||||||| c76379cdae
-    log ~title:"index_buffer" "Path: %a" Logger.fmt (Fun.flip Path.print path);
-    let not_ghost { Location.loc = { loc_ghost; _ }; _ } = not loc_ghost in
-=======
-    log ~title:"index_buffer" "Path: %a" Logger.fmt
-      (Fun.flip (Format_doc.compat Path.print) path);
-    let not_ghost { Location.loc = { loc_ghost; _ }; _ } = not loc_ghost in
->>>>>>> v5.6-504
     let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
     let index_decl () =
       begin match decl_of_path_or_lid env namespace path lid.txt with
@@ -69,13 +60,7 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
         add decl.uid lid
       end
     in
-<<<<<<< HEAD
     if not (should_ignore_lid lid) then
-||||||| c76379cdae
-    if not_ghost lid then
-=======
-    let reduce_and_store ~namespace lid path = if not_ghost lid then
->>>>>>> v5.6-504
       match Env.shape_of_path ~namespace env path with
       | exception Not_found -> ()
       | path_shape ->
@@ -100,26 +85,6 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
           log ~title:"index_buffer" "Reduction failed: missing uid";
           index_decl ()
         end
-    in
-    (* Shape reduction can be expensive, but the persistent memoization tables
-       should make these successive reductions fast. *)
-    let rec index_components namespace lid path  =
-      let module_ = Shape.Sig_component_kind.Module in
-      match lid.Location.txt, path with
-      | Longident.Ldot (lid', _), Path.Pdot (path', _)
-      | Ldot (lid', _), Pextra_ty (Pdot(path', _), Pcstr_ty _)->
-        reduce_and_store ~namespace lid path;
-        index_components module_ lid' path'
-      | Lapply (lid', lid''), Papply (path', path'')
-      | Lapply (lid', lid''),
-        Pextra_ty (Papply (path', path''), Pcstr_ty _) ->
-        index_components module_ lid'' path'';
-        index_components module_ lid' path'
-      | Longident.Lident _, _ ->
-        reduce_and_store ~namespace lid path;
-      | _, _ -> ()
-    in
-    index_components namespace lid path
   in
   Ast_iterators.iterator_on_usages ~include_hidden:true ~f
 

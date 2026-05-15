@@ -29,20 +29,12 @@ let let_bound_vars bindings =
       | Tpat_var { id; name; _ } | Tpat_fun_layout { id; name; _ } ->
         Some (id, name)
       | Typedtree.Tpat_any
-<<<<<<< HEAD
       | Typedtree.Tpat_alias _
       | Typedtree.Tpat_constant _
       | Typedtree.Tpat_tuple _
       | Typedtree.Tpat_unboxed_tuple _
       | Typedtree.Tpat_unboxed_bool _
       | Typedtree.Tpat_unboxed_unit
-||||||| c76379cdae
-      | Typedtree.Tpat_alias (_, _, _, _)
-      | Typedtree.Tpat_constant _ | Typedtree.Tpat_tuple _
-=======
-      | Typedtree.Tpat_alias (_, _, _, _, _)
-      | Typedtree.Tpat_constant _ | Typedtree.Tpat_tuple _
->>>>>>> v5.6-504
       | Typedtree.Tpat_construct (_, _, _, _)
       | Typedtree.Tpat_variant (_, _, _)
       | Typedtree.Tpat_record (_, _)
@@ -83,41 +75,6 @@ let pat_var_id_and_loc = function
   | _ -> None
 
 let pat_alias_pat_id_and_loc = function
-<<<<<<< HEAD
   | Typedtree.{ pat_desc = Tpat_alias { pattern = pat; id; name; _ }; _ } ->
     Some (pat, id, name)
-||||||| c76379cdae
-  | Typedtree.{ pat_desc = Tpat_alias (pat, id, loc, _); _ } ->
-    Some (pat, id, loc)
-=======
-  | Typedtree.{ pat_desc = Tpat_alias (pat, id, loc, _, _); _ } ->
-    Some (pat, id, loc)
->>>>>>> v5.6-504
-  | _ -> None
-
-open Typedtree
-
-type texp_match =
-  { expr : expression;
-    computation_cases : computation case list;
-    value_cases : value case list;
-    partial : partial
-  }
-
-type texp_try =
-  { expr : expression;
-    value_cases : value case list;
-    effect_cases : value case list
-  }
-
-let texp_match_of_expr expr =
-  match expr.exp_desc with
-  | Texp_match (expr, computation_cases, value_cases, partial) ->
-    Some { expr; computation_cases; value_cases; partial }
-  | _ -> None
-
-let texp_try_of_expr expr =
-  match expr.exp_desc with
-  | Texp_try (expr, value_cases, effect_cases) ->
-    Some { expr; value_cases; effect_cases }
   | _ -> None

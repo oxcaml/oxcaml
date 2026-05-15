@@ -119,13 +119,7 @@ let rec skip_non_moving pos = function
 
 let get_cases_from_match node =
   match node with
-<<<<<<< HEAD
   | Expression { exp_desc = Texp_match (_, _, cases, _, _); _ } -> cases
-||||||| c76379cdae
-  | Expression { exp_desc = Texp_match (_, cases, _); _ } -> cases
-=======
-  | Expression { exp_desc = Texp_match (_, cases, _, _); _ } -> cases
->>>>>>> v5.6-504
   | _ -> []
 
 let find_case_pos cases pos direction =

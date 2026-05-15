@@ -17,16 +17,8 @@ module Namespace = struct
 
   type inferred =
     [ inferred_basic
-<<<<<<< HEAD
     | `This_label of packed_label_description
     | `This_cstr of Data_types.constructor_description ]
-||||||| c76379cdae
-    | `This_label of Types.label_description
-    | `This_cstr of Types.constructor_description ]
-=======
-    | `This_label of Data_types.label_description
-    | `This_cstr of Data_types.constructor_description ]
->>>>>>> v5.6-504
 
   let from_context : Context.t -> inferred list = function
     | Type -> [ `Type; `Mod; `Modtype; `Constr; `Labels; `Vals ]
@@ -81,24 +73,16 @@ exception
 
 let path_and_loc_of_cstr (desc : Data_types.constructor_description) _ =
   let open Types in
-<<<<<<< HEAD
   match desc.cstr_tag with
   | Extension path -> (path, desc.cstr_loc)
-||||||| c76379cdae
-  match desc.cstr_tag with
-  | Cstr_extension (path, _) -> (path, desc.cstr_loc)
-=======
-  match desc.Data_types.cstr_tag with
-  | Cstr_extension (path, _) -> (path, desc.cstr_loc)
->>>>>>> v5.6-504
   | _ -> (
-      match get_desc desc.cstr_res with
-      | Tconstr (path, _, _) -> (path, desc.cstr_loc)
-      | _ -> assert false)
+    match get_desc desc.cstr_res with
+    | Tconstr (path, _, _) -> (path, desc.cstr_loc)
+    | _ -> assert false)
 
 let path_and_loc_from_label (desc : _ Data_types.gen_label_description) env =
   let open Types in
-  match get_desc desc.Data_types.lbl_res with
+  match get_desc desc.lbl_res with
   | Tconstr (path, _, _) ->
     let typ_decl = Env.find_type path env in
     (path, typ_decl.Types.type_loc)
@@ -110,13 +94,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
     List.iter nss ~f:(fun namespace ->
         try
           match namespace with
-<<<<<<< HEAD
           | `This_cstr ({ Data_types.cstr_tag = Extension _; _ } as cd) ->
-||||||| c76379cdae
-          | `This_cstr ({ Types.cstr_tag = Cstr_extension _; _ } as cd) ->
-=======
-          | `This_cstr ({ Data_types.cstr_tag = Cstr_extension _; _ } as cd) ->
->>>>>>> v5.6-504
             log ~title:"lookup" "got extension constructor";
             let path, loc = path_and_loc_of_cstr cd env in
             (* TODO: Use [`Constr] here instead of [`Type] *)
@@ -126,22 +104,14 @@ let by_longident (nss : Namespace.inferred list) ident env =
               "got constructor, fetching path and loc in type namespace";
             let path, loc = path_and_loc_of_cstr cd env in
             log ~title:"lookup" "found path: %a" Logger.fmt (fun fmt ->
-<<<<<<< HEAD
                 (Format_doc.compat Path.print) fmt path);
             let path = Path.Pdot (path, cd.cstr_name) in
-||||||| c76379cdae
-                Path.print fmt path);
-            let path = Path.Pdot (path, cd.cstr_name) in
-=======
-                (Format_doc.compat Path.print) fmt path);
-            let path = Path.Pextra_ty (path, Pcstr_ty cd.cstr_name) in
->>>>>>> v5.6-504
             raise (Found (path, Constructor, cd.cstr_uid, loc))
           | `Constr ->
             log ~title:"lookup" "lookup in constructor namespace";
             let cd = Env.find_constructor_by_name ident env in
             let path, loc = path_and_loc_of_cstr cd env in
-            let path = Path.Pextra_ty (path, Pcstr_ty cd.cstr_name) in
+            let path = Path.Pdot (path, cd.cstr_name) in
             (* TODO: Use [`Constr] here instead of [`Type] *)
             raise (Found (path, Constructor, cd.cstr_uid, loc))
           | `Mod ->
@@ -166,7 +136,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
             log ~title:"lookup"
               "got label, fetching path and loc in type namespace";
             let path, loc = path_and_loc_from_label lbl env in
-            let path = Path.Pextra_ty (path, Pcstr_ty lbl.lbl_name) in
+            let path = Path.Pdot (path, lbl.lbl_name) in
             raise (Found (path, Label, lbl.lbl_uid, loc))
           | `Labels ->
             log ~title:"lookup" "lookup in label namespace";

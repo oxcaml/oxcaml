@@ -16,7 +16,6 @@ let rec normalize_path env path =
   match Env.find_type path env with
   | exception Not_found -> path
   | decl -> (
-<<<<<<< HEAD
     match decl.Types.type_manifest with
     | Some body
       when decl.Types.type_private = Asttypes.Public
@@ -26,33 +25,6 @@ let rec normalize_path env path =
       | _ -> path
       end
     | _ -> path)
-||||||| c76379cdae
-    match decl.Types.type_manifest with
-    | Some body
-      when decl.Types.type_private = Asttypes.Public
-           ||
-           match decl.Types.type_kind with
-           | Types.Type_abstract _ -> false
-           | _ -> true -> begin
-      match Types.get_desc body with
-      | Types.Tconstr (path, _, _) -> normalize_path env path
-      | _ -> path
-    end
-    | _ -> path)
-=======
-      match decl.Types.type_manifest with
-      | Some body
-        when decl.Types.type_private = Asttypes.Public
-             ||
-             match decl.Types.type_kind with
-             | Types.Type_abstract _ -> false
-             | _ -> true -> begin
-          match Types.get_desc body with
-          | Types.Tconstr (path, _, _) -> normalize_path env path
-          | _ -> path
-        end
-      | _ -> path)
->>>>>>> v5.6-504
 
 let match_query env query t =
   let cost = ref 0 in
@@ -81,15 +53,8 @@ let match_query env query t =
       in
       traverse neg neg_fun pos pos_fun t2;
       traverse pos pos_fun neg neg_fun t1
-<<<<<<< HEAD
     | Types.Ttuple ts ->
       List.iter ~f:(fun (_label, t) -> traverse neg neg_fun pos pos_fun t) ts
-||||||| c76379cdae
-    | Types.Ttuple ts -> List.iter ~f:(traverse neg neg_fun pos pos_fun) ts
-=======
-    | Types.Ttuple ts ->
-      List.iter ~f:(fun (_, t) -> traverse neg neg_fun pos pos_fun t) ts
->>>>>>> v5.6-504
     | Types.Tvar _ | Types.Tunivar _ -> decr cost (* Favor polymorphic defs *)
     | _ -> ()
   in
@@ -144,36 +109,16 @@ let directories ~global_modules env =
       match md.md_type with
       | Mty_alias _ -> l
       | _ ->
-<<<<<<< HEAD
         Trie (name, lident, lazy (explore lident env)) :: l
-||||||| c76379cdae
-        let lident = Longident.Ldot (lident, name) in
-        Trie (name, lident, lazy (explore lident env)) :: l
-=======
-        let lident = Longident.Ldot (lident, Location.mknoloc name) in
-        Trie (name, lident, lazy (explore (Location.mknoloc lident) env)) :: l
->>>>>>> v5.6-504
     in
-    Env.fold_modules add_module (Some lident.txt) env []
+    Env.fold_modules add_module (Some lident) env []
   in
   List.fold_left
     ~f:(fun l name ->
-<<<<<<< HEAD
       let lident = Longident.Lident name in
       match Env.find_module_by_name_lazy lident env with
       | exception _ -> l
       | _ -> Trie (name, lident, lazy (explore lident env)) :: l)
-||||||| c76379cdae
-      let lident = Longident.Lident name in
-      match Env.find_module_by_name lident env with
-      | exception _ -> l
-      | _ -> Trie (name, lident, lazy (explore lident env)) :: l)
-=======
-        let lident = Longident.Lident name in
-        match Env.find_module_by_name lident env with
-        | exception _ -> l
-        | _ -> Trie (name, lident, lazy (explore (Location.mknoloc lident) env)) :: l)
->>>>>>> v5.6-504
     ~init:[] global_modules
 (*Env.fold_modules (fun name _ _ l ->
     ignore (seen name);
@@ -185,23 +130,11 @@ let execute_query query env dirs =
   let direct dir acc =
     (* TODO: Merlin modes *)
     Env.fold_values
-<<<<<<< HEAD
       (fun _ path desc _mode acc ->
         let desc = Subst.Lazy.force_value_description desc in
         match match_query env query desc.Types.val_type with
         | Some cost -> (cost, path, desc) :: acc
         | None -> acc)
-||||||| c76379cdae
-      (fun _ path desc acc ->
-        match match_query env query desc.Types.val_type with
-        | Some cost -> (cost, path, desc) :: acc
-        | None -> acc)
-=======
-      (fun _ path desc acc ->
-         match match_query env query desc.Types.val_type with
-         | Some cost -> (cost, path, desc) :: acc
-         | None -> acc)
->>>>>>> v5.6-504
       dir env acc
   in
   let rec recurse acc (Trie (_, dir, children)) =
@@ -223,7 +156,6 @@ let execute_query query env dirs =
 let execute_query_as_type_search ?(limit = 100) ~env ~query ~modules () =
   execute_query query env modules
   |> List.map ~f:(fun (cost, path, desc) ->
-<<<<<<< HEAD
       let name =
         Printtyp.wrap_printing_env env @@ fun () ->
         let path = Out_type.rewrite_double_underscore_paths env path in
@@ -234,28 +166,5 @@ let execute_query_as_type_search ?(limit = 100) ~env ~query ~modules () =
       let typ = desc.Types.val_type in
       let constructible = Type_search.make_constructible name typ in
       Query_protocol.{ cost; name; typ; loc; doc; constructible })
-||||||| c76379cdae
-         let name =
-           Printtyp.wrap_printing_env env @@ fun () ->
-           let path = Printtyp.rewrite_double_underscore_paths env path in
-           Format.asprintf "%a" Printtyp.path path
-         in
-         let doc = None in
-         let loc = desc.Types.val_loc in
-         let typ = desc.Types.val_type in
-         let constructible = Type_search.make_constructible name typ in
-         Query_protocol.{ cost; name; typ; loc; doc; constructible })
-=======
-      let name =
-        Printtyp.wrap_printing_env env @@ fun () ->
-        let path = Out_type.rewrite_double_underscore_paths env path in
-        Format.asprintf "%a" Printtyp.path path
-      in
-      let doc = None in
-      let loc = desc.Types.val_loc in
-      let typ = desc.Types.val_type in
-      let constructible = Type_search.make_constructible name typ in
-      Query_protocol.{ cost; name; typ; loc; doc; constructible })
->>>>>>> v5.6-504
   |> List.sort ~cmp:Type_search.compare_result
   |> List.take_n limit
