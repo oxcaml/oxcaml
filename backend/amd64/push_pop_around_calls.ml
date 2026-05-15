@@ -27,12 +27,21 @@ let unsupported_after_push (instr : Cfg.basic Cfg.instruction) =
       | Domain_index | Pause ) ->
     Array.exists Reg.is_stack instr.arg || Array.exists Reg.is_stack instr.res
 
-(* Collect consecutive reload instructions from the start of a block body, as
-   long as no destination register is repeated. Returns a map from spill slot to
-   reload instruction. *)
-let collect_leading_reloads cfg_with_infos (body : Cfg.basic_instruction_list) =
+(* Collect reload instructions following a call that can be moved and reordered
+   to right after the call. We walk past non-reload instructions, but a reload
+   is collectible only if its source and destination have not been accessed by
+   any prior instruction in this walk so that all the reloads can both be moved
+   to the front and reordered realtive to each other. *)
+let collect_reloads cfg_with_infos (body : Cfg.basic_instruction_list) =
   let reloads = ref Reg.Map.empty in
-  let seen_regs = ref Reg.Set.empty in
+  (* Reg.UsingLocEquality means this is effectively a set of machine registers
+     and stack slots. *)
+  let module Loc_tbl = Reg.UsingLocEquality.Tbl in
+  let disallowed_locations = Loc_tbl.create 8 in
+  let is_disallowed r = Loc_tbl.mem disallowed_locations r in
+  let disallow arr =
+    arr |> Array.iter (fun r -> Loc_tbl.replace disallowed_locations r ())
+  in
   let rec loop (cell : Cfg.basic Cfg.instruction DLL.cell) =
     let instr = DLL.value cell in
     if Cfg.is_reload instr
@@ -42,13 +51,17 @@ let collect_leading_reloads cfg_with_infos (body : Cfg.basic_instruction_list) =
       let live_across =
         (Cfg_with_infos.liveness_find cfg_with_infos instr.id).across
       in
-      if
-        (not (Reg.Set.mem spill_slot live_across))
-        && not (Reg.Set.mem r !seen_regs)
-      then reloads := Reg.Map.add spill_slot instr !reloads;
-      seen_regs := Reg.Set.add r !seen_regs;
-      Option.iter loop (DLL.next cell)
-    end
+      let slot_unused_afterwards = not (Reg.Set.mem spill_slot live_across) in
+      let can_be_moved = not (is_disallowed r || is_disallowed spill_slot) in
+      if slot_unused_afterwards && can_be_moved
+      then reloads := Reg.Map.add spill_slot instr !reloads
+    end;
+    (* Track every reg the instruction reads or writes, regardless of whether it
+       is a reload. *)
+    disallow instr.arg;
+    disallow instr.res;
+    disallow (Proc.destroyed_at_basic instr.desc);
+    Option.iter loop (DLL.next cell)
   in
   Option.iter loop (DLL.hd_cell body);
   !reloads
@@ -76,9 +89,8 @@ let collect_spills_backwards cfg_with_infos (block : Cfg.basic_block) =
   let add_args args = used_after := Reg.add_set_array !used_after args in
   let rec loop cell =
     let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
-    if unsupported_after_push instr
-    then ()
-    else begin
+    if not (unsupported_after_push instr)
+    then begin
       if
         Cfg.is_spill instr
         && (not (Reg.Set.mem instr.res.(0) !used_after))
@@ -217,7 +229,6 @@ let replace_reloads_with_pops (cfg : Cfg.t)
   let n_to_remove = List.length reloads in
   let rec remove_reloads remaining cell =
     let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
-    assert (Cfg.is_reload instr);
     let next = DLL.next cell in
     let remaining =
       if InstructionId.Set.mem instr.id selected_reload_ids
@@ -230,8 +241,8 @@ let replace_reloads_with_pops (cfg : Cfg.t)
   in
   remove_reloads n_to_remove (DLL.hd_cell after_block.body |> Option.get);
   let stack_offset = ref base_stack_offset in
-  List.iter
-    (fun (reload : Cfg.basic Cfg.instruction) ->
+  reloads
+  |> List.iter (fun (reload : Cfg.basic Cfg.instruction) ->
       stack_offset := !stack_offset + Arch.size_addr;
       let pop =
         Cfg.make_instruction ~desc:(Cfg.Op (Specific Arch.Ipop_from_stack))
@@ -242,30 +253,27 @@ let replace_reloads_with_pops (cfg : Cfg.t)
           ()
       in
       DLL.add_begin after_block.body pop)
-    reloads
 
 let process_call cfg_with_infos (block : Cfg.basic_block) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  match label_after_call block with
-  | None -> ()
-  | Some label_after -> (
-    match find_reload_block cfg label_after with
-    | None -> ()
-    | Some after_block -> (
-      let reloads_map =
-        collect_leading_reloads cfg_with_infos after_block.body
-      in
-      let spills, reloads =
-        match_spills_to_reloads
-          (collect_spills_backwards cfg_with_infos block)
-          reloads_map
-      in
-      match spills with
-      | [] -> ()
-      | _ :: _ ->
-        let base_stack_offset = block.terminator.stack_offset in
-        replace_spills_with_pushes cfg ~spills ~base_stack_offset after_block;
-        replace_reloads_with_pops cfg ~reloads ~base_stack_offset after_block))
+  label_after_call block
+  |> Option.iter (fun label_after ->
+      find_reload_block cfg label_after
+      |> Option.iter (fun (after_block : Cfg.basic_block) ->
+          let reloads_map = collect_reloads cfg_with_infos after_block.body in
+          let spills, reloads =
+            match_spills_to_reloads
+              (collect_spills_backwards cfg_with_infos block)
+              reloads_map
+          in
+          match spills with
+          | [] -> ()
+          | _ :: _ ->
+            let base_stack_offset = block.terminator.stack_offset in
+            replace_spills_with_pushes cfg ~spills ~base_stack_offset
+              after_block;
+            replace_reloads_with_pops cfg ~reloads ~base_stack_offset
+              after_block))
 
 let run (cfg_with_infos : Cfg_with_infos.t) =
   if !Oxcaml_flags.cfg_push_pop_around_calls

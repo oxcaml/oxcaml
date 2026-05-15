@@ -470,16 +470,6 @@ let postlude : type s.
  fun (module State : State with type t = s) (module Utils) state ~f
      cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  Profile.record ~accumulate:true "push_pop_around_calls"
-    (fun () -> Push_pop_around_calls.run cfg_with_infos)
-    ();
-  (* note: slots need to be updated before prologue removal *)
-  Profile.record ~accumulate:true "stack_slots_optimize"
-    (fun () ->
-      Regalloc_stack_slots.optimize (State.stack_slots state) cfg_with_infos)
-    ();
-  Regalloc_stack_slots.update_cfg_with_layout (State.stack_slots state)
-    cfg_with_layout;
   if debug
   then (
     Utils.indent ();
@@ -491,6 +481,17 @@ let postlude : type s.
     Utils.dedent ());
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
+  Profile.record ~accumulate:true "push_pop_around_calls"
+    (fun () -> Push_pop_around_calls.run cfg_with_infos)
+    ();
+  (* note: slots need to be updated before prologue removal *)
+  Profile.record ~accumulate:true "stack_slots_optimize"
+    (fun () ->
+      Regalloc_stack_slots.optimize (State.stack_slots state) cfg_with_infos)
+    ();
+  Regalloc_stack_slots.update_cfg_with_layout (State.stack_slots state)
+    cfg_with_layout;
+  update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   (Cfg_with_layout.cfg cfg_with_layout).register_locations_are_set <- true;
   if debug && Lazy.force invariants
   then (
