@@ -130,6 +130,7 @@ type t =
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Zero_alloc_on_nonfunction               (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
@@ -234,6 +235,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Zero_alloc_on_nonfunction -> 181
   | Untagged_external_small_int_return -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
@@ -598,6 +600,11 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 181;
+    names = ["zero-alloc-on-nonfunction"];
+    description = "A @zero_alloc attribute is placed on a let-binding \
+                   that does not define a function.";
+    since = since 5 2 };
   { number = 182;
     names = ["untagged-external-small-int-return"];
     description = "An external declaration returns an (int8[@untagged]) or \
@@ -1291,6 +1298,9 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Zero_alloc_on_nonfunction ->
+      "The [@zero_alloc] attribute has no effect on a non-function binding;\n\
+       rewrite the binding with explicit parameters or remove the attribute."
   | Untagged_external_small_int_return ->
       "Using (int8[@untagged]) or (int16[@untagged]) on C stub returns is not\n\
        recommended since [@untagged] does not perform a sign-extension. Use\n\

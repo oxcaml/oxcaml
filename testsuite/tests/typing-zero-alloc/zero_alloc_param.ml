@@ -230,10 +230,16 @@ let _ =
 Line 3, characters 2-29:
 3 |   let[@zero_alloc] f' = f 123 in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "zero_alloc" attribute placed on a "let"-binding can only be
-       used for function definitions.
-       If this defines a function, rewrite it so that its arguments are
-       present in the definition.
+Warning 182 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
+
+Line 4, characters 21-23:
+4 |   require_za_arity_1 f';; (* should fail *)
+                         ^^
+Error: Mismatch between the "zero_alloc" requirement of the function
+       being applied and this argument.
+       The former provides a weaker "zero_alloc" guarantee than the latter.
+       Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
 
 let _ = require_za_arity_1 (fun[@zero_alloc] x -> 42);; (* should succeed *)
@@ -289,10 +295,16 @@ let _ =
 Line 3, characters 2-30:
 3 |   let[@zero_alloc] id' = id id in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "zero_alloc" attribute placed on a "let"-binding can only be
-       used for function definitions.
-       If this defines a function, rewrite it so that its arguments are
-       present in the definition.
+Warning 182 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
+
+Line 4, characters 21-24:
+4 |   require_za_arity_1 id';; (* should fail; id' is not "syntactically" a function in the let-binding; there is a warning emitted *)
+                         ^^^
+Error: Mismatch between the "zero_alloc" requirement of the function
+       being applied and this argument.
+       The former provides a weaker "zero_alloc" guarantee than the latter.
+       Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
 
 let _ =
