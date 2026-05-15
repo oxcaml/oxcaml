@@ -23,18 +23,10 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
   let rec longident ppf : Longident.t -> unit = function
     | Lident s -> Format.fprintf ppf "%s" (Misc_utils.parenthesize_name s)
     | Ldot (p, s) ->
-<<<<<<< HEAD
       Format.fprintf ppf "%a.%s" longident p.txt
         (Misc_utils.parenthesize_name s.txt)
     | Lapply (p1, p2) ->
       Format.fprintf ppf "%a(%a)" longident p1.txt longident p2.txt
-||||||| c76379cdae
-      Format.fprintf ppf "%a.%s" longident p (Misc_utils.parenthesize_name s)
-    | Lapply (p1, p2) -> Format.fprintf ppf "%a(%a)" longident p1 longident p2
-=======
-      Format.fprintf ppf "%a.%s" longident p.txt (Misc_utils.parenthesize_name s.txt)
-    | Lapply (p1, p2) -> Format.fprintf ppf "%a(%a)" longident p1.txt longident p2.txt
->>>>>>> v5.6-504
   in
   match exp_desc with
   | Texp_ident { lid = { txt = li; _ }; _ } ->
@@ -113,21 +105,11 @@ let separate_function_signature ~args (e : Typedtree.expression) =
         print_parameter_offset ~arg ppf buffer e.exp_env label ty1
       in
       separate args ty2 ~parameters:(parameter :: parameters)
-<<<<<<< HEAD
     | [], Tarrow ((label, _, _), ty1, ty2, _) ->
       let parameter =
         print_parameter_offset ~arg:(Omitted omitted) ppf buffer e.exp_env label
           ty1
       in
-||||||| c76379cdae
-    | [], Tarrow (label, ty1, ty2, _) ->
-      let parameter = print_parameter_offset ppf buffer e.exp_env label ty1 in
-=======
-    | [], Tarrow (label, ty1, ty2, _) ->
-      let parameter =
-        print_parameter_offset ~arg:(Omitted ()) ppf buffer e.exp_env label ty1
-      in
->>>>>>> v5.6-504
       separate args ty2 ~parameters:(parameter :: parameters)
     (* end of function type, print remaining type without recording offsets *)
     | _ ->
@@ -143,49 +125,31 @@ let separate_function_signature ~args (e : Typedtree.expression) =
 
 let active_parameter_by_arg ~arg params =
   let find_by_arg = function
-<<<<<<< HEAD
     | { argument = Arg (a, _); _ } when a == arg -> true
-||||||| c76379cdae
-    | { argument = Some a; _ } when a == arg -> true
-=======
-    | { argument = Arg a; _ } when a == arg -> true
->>>>>>> v5.6-504
     | _ -> false
   in
   try Some (List.index params ~f:find_by_arg) with Not_found -> None
 
 let first_unassigned_argument params =
   let positional = function
-<<<<<<< HEAD
     | { argument = Omitted _; label = Typedtree.Nolabel; _ } -> true
-||||||| c76379cdae
-    | { argument = None; label = Asttypes.Nolabel; _ } -> true
-=======
-    | { argument = Omitted (); label = Asttypes.Nolabel; _ } -> true
->>>>>>> v5.6-504
     | _ -> false
   in
   let labelled = function
-<<<<<<< HEAD
     | { argument = Omitted _; label = Typedtree.Labelled _ | Optional _; _ } ->
       true
-||||||| c76379cdae
-    | { argument = None; label = Asttypes.Labelled _ | Optional _; _ } -> true
-=======
-    | { argument = Omitted (); label = Asttypes.Labelled _ | Optional _; _ } -> true
->>>>>>> v5.6-504
     | _ -> false
   in
   try Some (List.index params ~f:positional)
   with Not_found -> (
-      try Some (List.index params ~f:labelled) with Not_found -> None)
+    try Some (List.index params ~f:labelled) with Not_found -> None)
 
 let active_parameter_by_prefix ~prefix params =
   let common = function
     | Typedtree.Nolabel -> Some 0
     | l
       when String.is_prefixed ~by:"~" prefix
-        || String.is_prefixed ~by:"?" prefix ->
+           || String.is_prefixed ~by:"?" prefix ->
       Some (String.common_prefix_len (Btype.prefixed_label_name l) prefix)
     | _ -> None
   in
@@ -195,7 +159,6 @@ let active_parameter_by_prefix ~prefix params =
   in
   let rec find_by_prefix ?(i = 0) ?longest_len ?longest_i = function
     | [] -> longest_i
-<<<<<<< HEAD
     | p :: ps when is_omitted p.argument -> (
       (* The search is performed only on the arguments not already given in the parameters. *)
       match (common p.label, longest_len) with
@@ -205,23 +168,6 @@ let active_parameter_by_prefix ~prefix params =
         find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
       | _ -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i)
     | _ :: ps -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i
-||||||| c76379cdae
-    | p :: ps -> (
-      match (common p.label, longest_len) with
-      | Some common_len, Some longest_len when common_len > longest_len ->
-        find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
-      | Some common_len, None ->
-        find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
-      | _ -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i)
-=======
-    | p :: ps -> (
-        match (common p.label, longest_len) with
-        | Some common_len, Some longest_len when common_len > longest_len ->
-          find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
-        | Some common_len, None ->
-          find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
-        | _ -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i)
->>>>>>> v5.6-504
   in
   find_by_prefix params
 

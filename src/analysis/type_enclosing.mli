@@ -38,13 +38,8 @@ type type_info =
   | Modtype of Env.t * Types.module_type
   | Type of Env.t * Types.type_expr
   | Type_decl of Env.t * Ident.t * Types.type_declaration
-<<<<<<< HEAD
   | Type_constr of Env.t * Data_types.constructor_description
   | Jkind of Env.t * Types.jkind_lr
-||||||| c76379cdae
-=======
-  | Type_constr of Env.t * Data_types.constructor_description
->>>>>>> v5.6-504
   | String of string
 
 type typed_enclosings =

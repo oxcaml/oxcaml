@@ -33,24 +33,12 @@ open Browse_raw
 
 open Extend_protocol.Reader
 
-open Data_types
-
 let { Logger.log } = Logger.for_section "Completion"
 
 type raw_info =
-<<<<<<< HEAD
   [ `Constructor of Data_types.constructor_description
   | `Modtype of Subst.Lazy.module_type
   | `Modtype_declaration of Ident.t * Subst.Lazy.modtype_declaration
-||||||| c76379cdae
-  [ `Constructor of Types.constructor_description
-  | `Modtype of Types.module_type
-  | `Modtype_declaration of Ident.t * Types.modtype_declaration
-=======
-  [ `Constructor of constructor_description
-  | `Modtype of Types.module_type
-  | `Modtype_declaration of Ident.t * Types.modtype_declaration
->>>>>>> v5.6-504
   | `None
   | `String of string
   | `Type_declaration of Ident.t * Types.type_declaration
@@ -59,30 +47,17 @@ type raw_info =
 
 let raw_info_printer : raw_info -> _ = function
   | `Constructor c -> `Print (Out_type (Browse_misc.print_constructor c))
-<<<<<<< HEAD
   | `Modtype mt ->
     let mt = Subst.Lazy.force_modtype mt in
     `Print (Out_module_type (Out_type.tree_of_modtype mt))
-||||||| c76379cdae
-  | `Modtype mt -> `Print (Out_module_type (Printtyp.tree_of_modtype mt))
-=======
-  | `Modtype mt -> `Print (Out_module_type (Out_type.tree_of_modtype mt))
->>>>>>> v5.6-504
   | `Modtype_declaration (id, mtd) ->
-<<<<<<< HEAD
     let mtd = Subst.Lazy.force_modtype_decl mtd in
     `Print (Out_sig_item (Out_type.tree_of_modtype_declaration id mtd))
-||||||| c76379cdae
-    `Print (Out_sig_item (Printtyp.tree_of_modtype_declaration id mtd))
-=======
-    `Print (Out_sig_item (Out_type.tree_of_modtype_declaration id mtd))
->>>>>>> v5.6-504
   | `None -> `String ""
   | `String s -> `String s
   | `Type_declaration (id, tdecl) ->
     `Print
       (Out_sig_item
-<<<<<<< HEAD
          (Out_type.tree_of_type_declaration id tdecl Types.Trec_first))
   | `Type_scheme te -> `Print (Out_type (Out_type.tree_of_type_scheme te))
   | `Variant (label, arg) ->
@@ -91,27 +66,6 @@ let raw_info_printer : raw_info -> _ = function
     | Some te ->
       `Concat (label ^ " of ", Out_type (Out_type.tree_of_type_scheme te))
     end
-||||||| c76379cdae
-         (Printtyp.tree_of_type_declaration id tdecl Types.Trec_first))
-  | `Type_scheme te -> `Print (Out_type (Printtyp.tree_of_type_scheme te))
-  | `Variant (label, arg) -> begin
-    match arg with
-    | None -> `String label
-    | Some te ->
-      `Concat (label ^ " of ", Out_type (Printtyp.tree_of_type_scheme te))
-  end
-=======
-         (Out_type.tree_of_type_declaration id tdecl Types.Trec_first))
-  | `Type_scheme te ->
-    `Print (Out_type (Type_utils.Printtyp.tree_of_typ_scheme te))
-  | `Variant (label, arg) -> begin
-      match arg with
-      | None -> `String label
-      | Some te ->
-        `Concat
-          (label ^ " of ", Out_type (Type_utils.Printtyp.tree_of_typ_scheme te))
-    end
->>>>>>> v5.6-504
 
 (* List methods of an object.
    Code taken from [uTop](https://github.com/diml/utop
@@ -126,28 +80,12 @@ let rec methods_of_type env ?(acc = []) type_expr =
     methods_of_type env ~acc type_expr
   | Tfield (name, _, ty, rest) ->
     methods_of_type env ~acc:((name, ty) :: acc) rest
-<<<<<<< HEAD
   | Tconstr (path, _, _) ->
     begin match lookup_env Env.find_type path env with
     | None | Some { type_manifest = None; _ } -> acc
     | Some { type_manifest = Some type_expr; _ } ->
       methods_of_type env ~acc type_expr
     end
-||||||| c76379cdae
-  | Tconstr (path, _, _) -> begin
-    match lookup_env Env.find_type path env with
-    | None | Some { type_manifest = None; _ } -> acc
-    | Some { type_manifest = Some type_expr; _ } ->
-      methods_of_type env ~acc type_expr
-  end
-=======
-  | Tconstr (path, _, _) -> begin
-      match lookup_env Env.find_type path env with
-      | None | Some { type_manifest = None; _ } -> acc
-      | Some { type_manifest = Some type_expr; _ } ->
-        methods_of_type env ~acc type_expr
-    end
->>>>>>> v5.6-504
   | _ -> acc
 
 let classify_node = function
@@ -251,7 +189,6 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
               commu_ok ))
       in
       (`Label, `Type_scheme (Btype.newgenty desc))
-<<<<<<< HEAD
     | `Mod m ->
       begin try
         if not exact then raise Exit;
@@ -263,31 +200,6 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
         (`Module, `Modtype m)
       with Exit -> (`Module, `None)
       end
-||||||| c76379cdae
-    | `Mod m -> begin
-      try
-        if not exact then raise Exit;
-        let verbosity =
-          Mconfig.Verbosity.to_int !Type_utils.verbosity ~for_smart:1
-        in
-        if Type_utils.mod_smallerthan (1000 * verbosity) m = None then
-          raise Exit;
-        (`Module, `Modtype m)
-      with Exit -> (`Module, `None)
-    end
-=======
-    | `Mod m -> begin
-        try
-          if not exact then raise Exit;
-          let verbosity =
-            Mconfig.Verbosity.to_int !Type_utils.verbosity ~for_smart:1
-          in
-          if Type_utils.mod_smallerthan (1000 * verbosity) m = None then
-            raise Exit;
-          (`Module, `Modtype m)
-        with Exit -> (`Module, `None)
-      end
->>>>>>> v5.6-504
     | `ModType m ->
       if exact then
         (`Modtype, `Modtype_declaration (ident, (*verbose_sig env*) m))
@@ -317,7 +229,6 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
     | None, _, (`Module | `Modtype) -> text
     | None, None, _ -> `None
     | None, Some get_doc, kind -> (
-<<<<<<< HEAD
       match (path, loc) with
       | Some p, Some loc ->
         let namespace =
@@ -333,41 +244,6 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
         | exception _ -> `None
         end
       | _, _ -> `None)
-||||||| c76379cdae
-      match (path, loc) with
-      | Some p, Some loc ->
-        let namespace =
-          (* FIXME: that's just terrible *)
-          match kind with
-          | `Value -> Shape.Sig_component_kind.Value
-          | `Type -> Type
-          | _ -> assert false
-        in
-        begin
-          match get_doc (`Completion_entry (namespace, p, loc)) with
-          | `Found str -> `String str
-          | _ -> `None
-          | exception _ -> `None
-        end
-      | _, _ -> `None)
-=======
-        match (path, loc) with
-        | Some p, Some loc ->
-          let namespace =
-            (* FIXME: that's just terrible *)
-            match kind with
-            | `Value -> Shape.Sig_component_kind.Value
-            | `Type -> Type
-            | _ -> assert false
-          in
-          begin
-            match get_doc (`Completion_entry (namespace, p, loc)) with
-            | `Found str -> `String str
-            | _ -> `None
-            | exception _ -> `None
-          end
-        | _, _ -> `None)
->>>>>>> v5.6-504
   in
   let deprecated = Type_utils.is_deprecated attrs in
   let ppx_template_generated = Type_utils.is_ppx_template_generated attrs in
@@ -436,30 +312,12 @@ let fold_sumtype_constructors ~env ~init ~f t =
 
 let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
     branch =
-<<<<<<< HEAD
   let cstr_attributes c = c.Data_types.cstr_attributes in
   let val_attributes v = v.Subst.Lazy.val_attributes in
-||||||| c76379cdae
-  let cstr_attributes c = c.Types.cstr_attributes in
-  let val_attributes v = v.Types.val_attributes in
-=======
-  let cstr_attributes c = c.cstr_attributes in
-  let val_attributes v = v.Types.val_attributes in
->>>>>>> v5.6-504
   let type_attributes t = t.Types.type_attributes in
-<<<<<<< HEAD
   let lbl_attributes l = l.Data_types.lbl_attributes in
   let mtd_attributes t = t.Subst.Lazy.mtd_attributes in
   let md_attributes t = t.Subst.Lazy.md_attributes in
-||||||| c76379cdae
-  let lbl_attributes l = l.Types.lbl_attributes in
-  let mtd_attributes t = t.Types.mtd_attributes in
-  let md_attributes t = t.Types.md_attributes in
-=======
-  let lbl_attributes l = l.lbl_attributes in
-  let mtd_attributes t = t.Types.mtd_attributes in
-  let md_attributes t = t.Types.md_attributes in
->>>>>>> v5.6-504
   let make_candidate ~attrs ~exact name ?loc ?path ty =
     make_candidate ~get_doc ~prefix_path ~attrs ~exact name ?loc ?path ty
   in
@@ -501,8 +359,8 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
          - head_arrows is 0 if types unified, or the number of arrows which
            have been skipped to make them unify (i.e types would unify if the
            user apply the function to head_arrows arguments).
-           Note that if no type is expected (context was not inferred), 0 will be
-           returned. *)
+         Note that if no type is expected (context was not inferred), 0 will be
+         returned. *)
       match target_type with
       | None -> fun _ -> 0
       | Some ty ->
@@ -558,7 +416,6 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
         let type_check { Types.val_type; _ } = type_check val_type in
         (* TODO: Merlin modes *)
         Env.fold_values
-<<<<<<< HEAD
           (fun name path v _mode candidates ->
             if not (validate `Lident `Value name) then candidates
             else
@@ -570,40 +427,11 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
                 ~path ~attrs:(val_attributes v) (`Value v)
                 ~loc:v.Subst.Lazy.val_loc
               :: candidates)
-||||||| c76379cdae
-          (fun name path v candidates ->
-            if not (validate `Lident `Value name) then candidates
-            else
-              let priority = if is_internal name then 0 else type_check v in
-              make_weighted_candidate ~exact:(name = prefix) name ~priority
-                ~path ~attrs:(val_attributes v) (`Value v) ~loc:v.Types.val_loc
-              :: candidates)
-=======
-          (fun name path v candidates ->
-             if not (validate `Lident `Value name) then candidates
-             else
-               let priority = if is_internal name then 0 else type_check v in
-               make_weighted_candidate ~exact:(name = prefix) name ~priority
-                 ~path ~attrs:(val_attributes v) (`Value v) ~loc:v.Types.val_loc
-               :: candidates)
->>>>>>> v5.6-504
           prefix_path env []
       | `Constructor ->
-<<<<<<< HEAD
         let type_check { Data_types.cstr_res; _ } = type_check cstr_res in
-||||||| c76379cdae
-        let type_check { Types.cstr_res; _ } = type_check cstr_res in
-=======
-        let type_check { cstr_res; _ } = type_check cstr_res in
->>>>>>> v5.6-504
         let consider_constr constr candidates =
-<<<<<<< HEAD
           let name = constr.Data_types.cstr_name in
-||||||| c76379cdae
-          let name = constr.Types.cstr_name in
-=======
-          let name = constr.cstr_name in
->>>>>>> v5.6-504
           if not @@ validate `Lident `Cons name then candidates
           else
             let priority = if is_internal name then 0 else type_check constr in
@@ -623,17 +451,16 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
       | `Types ->
         Env.fold_types
           (fun name path decl candidates ->
-             if not @@ validate `Lident `Typ name then candidates
-             else
-               make_weighted_candidate ~exact:(name = prefix) name ~path
-                 (`Typ decl) ~loc:decl.Types.type_loc
-                 ~attrs:(type_attributes decl)
-               :: candidates)
+            if not @@ validate `Lident `Typ name then candidates
+            else
+              make_weighted_candidate ~exact:(name = prefix) name ~path
+                (`Typ decl) ~loc:decl.Types.type_loc
+                ~attrs:(type_attributes decl)
+              :: candidates)
           prefix_path env []
       | `Modules ->
         Env.fold_modules
           (fun name path v candidates ->
-<<<<<<< HEAD
             let attrs = md_attributes v in
             let v = v.Subst.Lazy.md_type in
             if not @@ validate `Uident `Mod name then candidates
@@ -641,35 +468,17 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               make_weighted_candidate ~exact:(name = prefix) name ~path (`Mod v)
                 ~attrs
               :: candidates)
-||||||| c76379cdae
-            let attrs = md_attributes v in
-            let v = v.Types.md_type in
-            if not @@ validate `Uident `Mod name then candidates
-            else
-              make_weighted_candidate ~exact:(name = prefix) name ~path (`Mod v)
-                ~attrs
-              :: candidates)
-=======
-             let attrs = md_attributes v in
-             let v = v.Types.md_type in
-             if not @@ validate `Uident `Mod name then candidates
-             else
-               make_weighted_candidate ~exact:(name = prefix) name ~path (`Mod v)
-                 ~attrs
-               :: candidates)
->>>>>>> v5.6-504
           prefix_path env []
       | `Modules_type ->
         Env.fold_modtypes
           (fun name path v candidates ->
-             if not @@ validate `Uident `Mod name then candidates
-             else
-               make_weighted_candidate ~exact:(name = prefix) name ~path
-                 (`ModType v) ~attrs:(mtd_attributes v)
-               :: candidates)
+            if not @@ validate `Uident `Mod name then candidates
+            else
+              make_weighted_candidate ~exact:(name = prefix) name ~path
+                (`ModType v) ~attrs:(mtd_attributes v)
+              :: candidates)
           prefix_path env []
       | `Labels ->
-<<<<<<< HEAD
         let step ({ Data_types.lbl_name = name; _ } as l) candidates =
           if not (validate `Lident `Label name) then candidates
           else
@@ -679,25 +488,6 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
         in
         Env.fold_labels Legacy step prefix_path env []
         @ Env.fold_labels Unboxed_product step prefix_path env []
-||||||| c76379cdae
-        Env.fold_labels
-          (fun ({ Types.lbl_name = name; _ } as l) candidates ->
-            if not (validate `Lident `Label name) then candidates
-            else
-              make_weighted_candidate ~exact:(name = prefix) name (`Label l)
-                ~attrs:(lbl_attributes l)
-              :: candidates)
-          prefix_path env []
-=======
-        Env.fold_labels
-          (fun ({ lbl_name = name; _ } as l) candidates ->
-             if not (validate `Lident `Label name) then candidates
-             else
-               make_weighted_candidate ~exact:(name = prefix) name (`Label l)
-                 ~attrs:(lbl_attributes l)
-               :: candidates)
-          prefix_path env []
->>>>>>> v5.6-504
     in
     let of_kind_group = function
       | #Query_protocol.Compl.kind as k -> of_kind k
@@ -762,22 +552,10 @@ let complete_methods ~env ~prefix obj =
       })
 
 type is_label =
-<<<<<<< HEAD
   | No
   | Maybe
   | Description : 'rep Data_types.gen_label_description list -> is_label
   | Declaration of Types.type_expr * Types.label_declaration list
-||||||| c76379cdae
-  [ `No
-  | `Maybe
-  | `Description of Types.label_description list
-  | `Declaration of Types.type_expr * Types.label_declaration list ]
-=======
-  [ `No
-  | `Maybe
-  | `Description of label_description list
-  | `Declaration of Types.type_expr * Types.label_declaration list ]
->>>>>>> v5.6-504
 
 let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
     ~is_label config (env, node) branch =
@@ -813,13 +591,7 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
        else name <> "_")
       && valid tag name
     in
-<<<<<<< HEAD
     let add_label_description ({ Data_types.lbl_name = name; _ } as l) candidates =
-||||||| c76379cdae
-    let add_label_description ({ Types.lbl_name = name; _ } as l) candidates =
-=======
-    let add_label_description ({ lbl_name = name; _ } as l) candidates =
->>>>>>> v5.6-504
       if not (valid `Label name) then candidates
       else
         make_candidate ~prefix_path ~exact:(name = prefix) name (`Label l)
@@ -864,14 +636,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
   in
   try
     match prefix with
-<<<<<<< HEAD
     | Longident.Ldot (prefix_path, prefix) ->
       find ~prefix_path:prefix_path.txt ~is_label prefix.txt
-||||||| c76379cdae
-    | Longident.Ldot (prefix_path, prefix) -> find ~prefix_path ~is_label prefix
-=======
-    | Longident.Ldot ({txt=prefix_path;_}, prefix) -> find ~prefix_path ~is_label prefix.txt
->>>>>>> v5.6-504
     | Longident.Lident prefix ->
       (* Regular completion *)
       let compl = find ~is_label prefix in
@@ -894,7 +660,6 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
       (* Add modules on path but not loaded *)
       List.fold_left (Mconfig.global_modules config) ~init:compl
         ~f:(fun candidates name ->
-<<<<<<< HEAD
           if not (String.no_double_underscore name) then candidates
           else
             let default =
@@ -918,53 +683,6 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
             else if String.is_prefixed ~by:prefix name && uniq (`Mod, name) then
               default :: candidates
             else candidates)
-||||||| c76379cdae
-          if not (String.no_double_underscore name) then candidates
-          else
-            let default =
-              { name;
-                kind = `Module;
-                desc = `None;
-                info = `None;
-                deprecated = false
-              }
-            in
-            if name = prefix && uniq (`Mod, name) then
-              try
-                let path, md, attrs =
-                  Type_utils.lookup_module (Longident.Lident name) env
-                in
-                make_candidate ~prefix_path:(Some prefix) ~exact:true ~path name
-                  (`Mod md) ~attrs
-                :: candidates
-              with Not_found -> default :: candidates
-            else if String.is_prefixed ~by:prefix name && uniq (`Mod, name) then
-              default :: candidates
-            else candidates)
-=======
-            if not (String.no_double_underscore name) then candidates
-            else
-              let default =
-                { name;
-                  kind = `Module;
-                  desc = `None;
-                  info = `None;
-                  deprecated = false
-                }
-              in
-              if name = prefix && uniq (`Mod, name) then
-                try
-                  let path, md, attrs =
-                    Type_utils.lookup_module (Longident.Lident name) env
-                  in
-                  make_candidate ~prefix_path:(Some prefix) ~exact:true ~path name
-                    (`Mod md) ~attrs
-                  :: candidates
-                with Not_found -> default :: candidates
-              else if String.is_prefixed ~by:prefix name && uniq (`Mod, name) then
-                default :: candidates
-              else candidates)
->>>>>>> v5.6-504
     | _ -> find ~is_label (String.concat ~sep:"." @@ Longident.flatten prefix)
   with Not_found -> []
 
@@ -973,7 +691,6 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
     _ -> raw_info raw_entry list = function
   | [] -> []
   | (env, node) :: branch -> (
-<<<<<<< HEAD
     match node with
     | Method_call (obj, _, _) -> complete_methods ~env ~prefix obj
     | Pattern { Typedtree.pat_desc = Typedtree.Tpat_record _; pat_type = t; _ }
@@ -1035,90 +752,8 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
         | lbls -> Description (Array.to_list lbls)
       in
       let result =
-||||||| c76379cdae
-    match node with
-    | Method_call (obj, _, _) -> complete_methods ~env ~prefix obj
-    | Pattern { Typedtree.pat_desc = Typedtree.Tpat_record _; pat_type = t; _ }
-    | Expression
-        { Typedtree.exp_desc = Typedtree.Texp_record _; exp_type = t; _ } ->
-      let is_label =
-        try
-          match Types.get_desc t with
-          | Types.Tconstr (p, _, _) -> (
-            match (Env.find_type p env).Types.type_kind with
-            | Types.Type_record (labels, _) -> `Declaration (t, labels)
-            | _ -> `Maybe)
-          | _ -> `Maybe
-        with _ -> `Maybe
-      in
-      let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
-      complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix ~is_label
-        buffer (env, node) branch
-    | Record_field (parent, lbl, _) ->
-      let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
-      let snap = Btype.snapshot () in
-      let is_label =
-        match lbl.Types.lbl_all with
-        | [||] -> begin
-          match
-            let ty =
-              match parent with
-              | `Expression e -> e.Typedtree.exp_type
-              | `Pattern p -> p.Typedtree.pat_type
-            in
-            let decl = Ctype.extract_concrete_typedecl env ty in
-            (ty, decl)
-          with
-          | ty, Typedecl (p, _, decl) -> begin
-            try
-              let lbls = Datarepr.labels_of_type p decl in
-              let labels =
-                List.map lbls ~f:(fun (_, lbl) ->
-                    try
-                      let _, lbl_arg, lbl_res =
-                        Ctype.instance_label ~fixed:false lbl
-                      in
-                      begin
-                        try Ctype.unify_var env ty lbl_res with _ -> ()
-                      end;
-                      (* FIXME: the two subst can lose some sharing between types *)
-                      let lbl_res = Subst.type_expr Subst.identity lbl_res in
-                      let lbl_arg = Subst.type_expr Subst.identity lbl_arg in
-                      { lbl with Types.lbl_res; lbl_arg }
-                    with _ -> lbl)
-              in
-              `Description labels
-            with _ -> (
-              match decl.Types.type_kind with
-              | Types.Type_record (lbls, _) -> `Declaration (ty, lbls)
-              | _ -> `Maybe)
-          end
-          | _ | (exception _) -> `Maybe
-        end
-        | lbls -> `Description (Array.to_list lbls)
-      in
-      let result =
-=======
-      match node with
-      | Method_call (obj, _, _) -> complete_methods ~env ~prefix obj
-      | Pattern { Typedtree.pat_desc = Typedtree.Tpat_record _; pat_type = t; _ }
-      | Expression
-          { Typedtree.exp_desc = Typedtree.Texp_record _; exp_type = t; _ } ->
-        let is_label =
-          try
-            match Types.get_desc t with
-            | Types.Tconstr (p, _, _) -> (
-                match (Env.find_type p env).Types.type_kind with
-                | Types.Type_record (labels, _) -> `Declaration (t, labels)
-                | _ -> `Maybe)
-            | _ -> `Maybe
-          with _ -> `Maybe
-        in
-        let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
->>>>>>> v5.6-504
         complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix ~is_label
           buffer (env, node) branch
-<<<<<<< HEAD
       in
       Btype.backtrack snap;
       result
@@ -1127,71 +762,6 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
       complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix buffer
         ~is_label:(if is_label then Maybe else No)
         (env, node) branch)
-||||||| c76379cdae
-      in
-      Btype.backtrack snap;
-      result
-    | _ ->
-      let prefix, is_label = Longident.(keep_suffix @@ parse prefix) in
-      complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix buffer
-        ~is_label:(if is_label then `Maybe else `No)
-        (env, node) branch)
-=======
-      | Record_field (parent, lbl, _) ->
-        let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
-        let snap = Btype.snapshot () in
-        let is_label =
-          match lbl.lbl_all with
-          | [||] -> begin
-              match
-                let ty =
-                  match parent with
-                  | `Expression e -> e.Typedtree.exp_type
-                  | `Pattern p -> p.Typedtree.pat_type
-                in
-                let decl = Ctype.extract_concrete_typedecl env ty in
-                (ty, decl)
-              with
-              | ty, Typedecl (p, _, decl) -> begin
-                  try
-                    let lbls = Datarepr.labels_of_type p decl in
-                    let labels =
-                      List.map lbls ~f:(fun (_, lbl) ->
-                          try
-                            let _, lbl_arg, lbl_res =
-                              Ctype.instance_label ~fixed:false lbl
-                            in
-                            begin
-                              try Ctype.unify_var env ty lbl_res with _ -> ()
-                            end;
-                            (* FIXME: the two subst can lose some sharing between types *)
-                            let lbl_res = Subst.type_expr Subst.identity lbl_res in
-                            let lbl_arg = Subst.type_expr Subst.identity lbl_arg in
-                            { lbl with lbl_res; lbl_arg }
-                          with _ -> lbl)
-                    in
-                    `Description labels
-                  with _ -> (
-                      match decl.Types.type_kind with
-                      | Types.Type_record (lbls, _) -> `Declaration (ty, lbls)
-                      | _ -> `Maybe)
-                end
-              | _ | (exception _) -> `Maybe
-            end
-          | lbls -> `Description (Array.to_list lbls)
-        in
-        let result =
-          complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix ~is_label
-            buffer (env, node) branch
-        in
-        Btype.backtrack snap;
-        result
-      | _ ->
-        let prefix, is_label = Longident.(keep_suffix @@ parse prefix) in
-        complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix buffer
-          ~is_label:(if is_label then `Maybe else `No)
-          (env, node) branch)
->>>>>>> v5.6-504
 
 let expand_prefix ~global_modules ?(kinds = []) env prefix =
   Env.with_cmis @@ fun () ->
@@ -1252,28 +822,15 @@ let labels_of_application ~prefix = function
     let labels = labels f.exp_type in
     let is_application_of label (label', expr) =
       match expr with
-<<<<<<< HEAD
       | Arg ({ exp_loc = { Location.loc_ghost; loc_start; loc_end }; _ }, _) ->
-||||||| c76379cdae
-      | Some { exp_loc = { Location.loc_ghost; loc_start; loc_end }; _ } ->
-=======
-      | Arg { exp_loc = { Location.loc_ghost; loc_start; loc_end }; _ } ->
->>>>>>> v5.6-504
         label = label'
         && Btype.prefixed_label_name label <> prefix
         && (not loc_ghost)
         && not (loc_start = loc_end)
-<<<<<<< HEAD
       | Omitted _ -> false
-||||||| c76379cdae
-      | None -> false
-=======
-      | Omitted () -> false
->>>>>>> v5.6-504
     in
     List.filter_map
       ~f:(fun (label, ty) ->
-<<<<<<< HEAD
         match label with
         | Nolabel -> None
         | label when List.exists ~f:(is_application_of label) args -> None
@@ -1286,33 +843,6 @@ let labels_of_application ~prefix = function
             | _ -> ty
           in
           Some ("?" ^ str, ty))
-||||||| c76379cdae
-        match label with
-        | Asttypes.Nolabel -> None
-        | label when List.exists ~f:(is_application_of label) args -> None
-        | Asttypes.Labelled str -> Some ("~" ^ str, ty)
-        | Asttypes.Optional str ->
-          let ty =
-            match Types.get_desc ty with
-            | Types.Tconstr (path, [ ty ], _)
-              when Path.same path Predef.path_option -> ty
-            | _ -> ty
-          in
-          Some ("?" ^ str, ty))
-=======
-          match label with
-          | Asttypes.Nolabel -> None
-          | label when List.exists ~f:(is_application_of label) args -> None
-          | Asttypes.Labelled str -> Some ("~" ^ str, ty)
-          | Asttypes.Optional str ->
-            let ty =
-              match Types.get_desc ty with
-              | Types.Tconstr (path, [ ty ], _)
-                when Path.same path Predef.path_option -> ty
-              | _ -> ty
-            in
-            Some ("?" ^ str, ty))
->>>>>>> v5.6-504
       labels
   | _ -> []
 
@@ -1321,9 +851,9 @@ let application_context ~prefix path =
   let target_type =
     ref
       (match snd (List.hd path) with
-       | Expression { exp_type = ty; _ } | Pattern { pat_type = ty; _ } ->
-         Some ty
-       | _ -> None)
+      | Expression { exp_type = ty; _ } | Pattern { pat_type = ty; _ } ->
+        Some ty
+      | _ -> None)
   in
   let context =
     match path with

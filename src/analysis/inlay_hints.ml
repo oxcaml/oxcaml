@@ -59,58 +59,26 @@ let structure_iterator hint_let_binding hint_pattern_binding
       | Texp_letop { body; _ } ->
         let () = log ~title:"expression" "on let-op" in
         case_iterator hint_let_binding iterator body
-<<<<<<< HEAD
       | Texp_match (expr, _, cases, _, _) ->
-||||||| c76379cdae
-      | Texp_match (expr, cases, _) ->
-=======
-      | Texp_match (expr, cases, _, _) ->
->>>>>>> v5.6-504
         let () = log ~title:"expression" "on match" in
         let () = iterator.expr iterator expr in
         List.iter ~f:(case_iterator hint_pattern_binding iterator) cases
-<<<<<<< HEAD
-      | Texp_function
-          { body =
-              Tfunction_cases
-                { fc_cases =
-                    [ { c_rhs =
-                          { exp_desc = Texp_let (_, [ { vb_pat; _ } ], body);
-                            _
-                          };
-                        _
-                      }
-                    ];
-                  _
-                };
-            _
-          } ->
-||||||| c76379cdae
-      | Texp_function
-          ( _,
-            Tfunction_cases
-              { cases =
-                  [ { c_rhs =
-                        { exp_desc = Texp_let (_, [ { vb_pat; _ } ], body); _ };
-                      _
-                    }
-                  ];
-                _
-              } ) ->
-=======
-      | Texp_function (args, body) -> (
->>>>>>> v5.6-504
+      | Texp_function { params; body; _ } ->
         let () = log ~title:"expression" "on function" in
-        if hint_function_params then
-          List.iter args ~f:(fun Typedtree.{ fp_kind; _ } ->
-              match fp_kind with
-              | Tparam_pat pat | Tparam_optional_default (pat, _) ->
-                iterator.pat iterator pat);
-        match body with
-        | Tfunction_cases { cases; _ } ->
-          List.iter cases ~f:(fun case ->
-              case_iterator hint_pattern_binding iterator case)
-        | Tfunction_body body -> iterator.expr iterator body)
+        let () =
+          if hint_function_params then
+            List.iter
+              ~f:(fun param ->
+                match param.Typedtree.fp_kind with
+                | Tparam_pat pat | Tparam_optional_default (pat, _, _) ->
+                  iterator.pat iterator pat)
+              params
+        in
+        begin match body with
+        | Tfunction_body body -> iterator.expr iterator body
+        | Tfunction_cases { fc_cases; _ } ->
+          List.iter ~f:(case_iterator hint_pattern_binding iterator) fc_cases
+        end
       | _ when is_ghost_location avoid_ghost_location expr.exp_loc ->
         (* Stop iterating when we see a ghost location to avoid
            annotating generated code *)
@@ -166,7 +134,7 @@ type hint = Lexing.position * string
 
 let create_hint env typ loc =
   let label =
-    Printtyp.wrap_printing_env ~error:true env (fun () ->
+    Printtyp.wrap_printing_env env (fun () ->
         Format.asprintf "%a" Printtyp.type_scheme typ)
   in
   let position = loc.Location.loc_end in

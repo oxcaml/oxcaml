@@ -25,7 +25,6 @@ end
 (** [parse_identifier] attempts to re-parse a longident so that we get
     the location of each of its components. *)
 val parse_identifier :
-<<<<<<< HEAD
   Mconfig.t * Msource.t ->
   Lexing.position ->
   Unit_info.modname Location.loc list
@@ -43,16 +42,3 @@ val parenthesize_name : string -> string
 
 (* [is_current_unit cu] returns true if [cu] is the current compilation unit *)
 val is_current_unit : string -> bool
-||||||| c76379cdae
-  Mconfig.t * Msource.t -> Lexing.position -> modname Location.loc list
-=======
-  Mconfig.t * Msource.t -> Lexing.position -> modname Location.loc list
-
-(** [reconstruct_identifier pipeline pos] returns growing ranges around [pos] and the
-  associated identifier. *)
-val reconstruct_identifier :
-  Mpipeline.t ->
-  Lexing.position ->
-  (string * int) option ->
-  string Location.loc list
->>>>>>> v5.6-504
