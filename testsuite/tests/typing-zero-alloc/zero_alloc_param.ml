@@ -249,7 +249,7 @@ let _ =
 Line 3, characters 2-29:
 3 |   let[@zero_alloc] f' = f 123 in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 182 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
 rewrite the binding with explicit parameters or remove the attribute.
 
 Line 4, characters 21-23:
@@ -314,7 +314,7 @@ let _ =
 Line 3, characters 2-30:
 3 |   let[@zero_alloc] id' = id id in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 182 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
 rewrite the binding with explicit parameters or remove the attribute.
 
 Line 4, characters 21-24:
@@ -843,14 +843,11 @@ let _ =
   let[@zero_alloc] (f | f) = fun x -> (x, x) in
   needs_za_1 f;;
 [%%expect {|
-Line 3, characters 7-17:
+Line 3, characters 19-26:
 3 |   let[@zero_alloc] (f | f) = fun x -> (x, x) in
-           ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP84._$.f (camlTOP84__*match*_95_97_code).
-Line 3, characters 38-44:
-3 |   let[@zero_alloc] (f | f) = fun x -> (x, x) in
-                                          ^^^^^^
-Error: allocation of 24 bytes
+                       ^^^^^^^
+Error: The "zero_alloc" attribute is only supported on patterns that bind
+       a variable.
 |}];;
 
 let _ =
@@ -861,7 +858,7 @@ let _ =
 Line 3, characters 2-31:
 3 |   let (f | f) = fun x -> (x, x) in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP85._$.f (camlTOP85__*match*_97_99_code).
+Error: Annotation check for zero_alloc failed on function TOP85._$.f (camlTOP85__*match*_95_97_code).
 Line 3, characters 25-31:
 3 |   let (f | f) = fun x -> (x, x) in
                              ^^^^^^
@@ -873,7 +870,11 @@ let _ =
   let[@zero_alloc] (f | f) = fun x -> x - 1 in
   needs_za_1 f;;
 [%%expect {|
-- : int = 41
+Line 3, characters 19-26:
+3 |   let[@zero_alloc] (f | f) = fun x -> x - 1 in
+                       ^^^^^^^
+Error: The "zero_alloc" attribute is only supported on patterns that bind
+       a variable.
 |}];;
 
 
@@ -986,7 +987,7 @@ let _ =
 Line 2, characters 7-17:
 2 |   let[@zero_alloc] (f as g) = fun x -> (x + 123, 42) in
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP101._$.f (camlTOP101__g_115_117_code).
+Error: Annotation check for zero_alloc failed on function TOP101._$.f (camlTOP101__g_111_113_code).
 Line 2, characters 39-52:
 2 |   let[@zero_alloc] (f as g) = fun x -> (x + 123, 42) in
                                            ^^^^^^^^^^^^^
@@ -1052,7 +1053,7 @@ let _ =
 Line 7, characters 6-67:
 7 |       (fun x -> if x < 0 then raise (Err (string_of_int x)) else x) a;;
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP107._$.(fun) (camlTOP107__fn[:7,6--67]_121_125_code).
+Error: Annotation check for zero_alloc strict failed on function TOP107._$.(fun) (camlTOP107__fn[:7,6--67]_117_121_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:7,41--58)
 Line 7, characters 36-59:
@@ -1101,7 +1102,7 @@ let _ =
 Line 3, characters 2-16:
 3 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP112._$.g (camlTOP112__g_142_145_code).
+Error: Annotation check for zero_alloc failed on function TOP112._$.g (camlTOP112__g_138_141_code).
 Line 3, characters 12-16:
 3 |   and g x = x, x in
                 ^^^^
@@ -1118,9 +1119,44 @@ let _ =
 Line 5, characters 2-16:
 5 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP113._$.g (camlTOP113__g_146_150_code).
+Error: Annotation check for zero_alloc strict failed on function TOP113._$.g (camlTOP113__g_142_146_code).
 Line 5, characters 12-16:
 5 |   and g x = x, x in
                 ^^^^
 Error: allocation of 24 bytes
+|}];;
+
+(* Error if zero_alloc is placed on a function parameter that is . *)
+type a = A
+let _ = fun (A [@zero_alloc arity 1]) -> A;;
+[%%expect {|
+type a = A
+Line 2, characters 12-37:
+2 | let _ = fun (A [@zero_alloc arity 1]) -> A;;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute is only supported on patterns that bind
+       a variable.
+|}];;
+
+type b = X | Y
+let _ = function
+  | (X [@zero_alloc arity 1]) -> 1
+  | (Y [@zero_alloc arity 1]) -> 2;;
+[%%expect {|
+type b = X | Y
+Line 3, characters 4-29:
+3 |   | (X [@zero_alloc arity 1]) -> 1
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute is only supported on patterns that bind
+       a variable.
+|}];;
+
+let _ = function
+  | ((X | Y) as g) [@zero_alloc arity 1] -> g
+[%%expect {|
+Line 2, characters 4-18:
+2 |   | ((X | Y) as g) [@zero_alloc arity 1] -> g
+        ^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute is only supported on patterns that bind
+       a variable.
 |}];;
