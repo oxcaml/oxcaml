@@ -12,7 +12,7 @@
    cmi_crcs as an alias-only entry. *)
 
 let () =
-  Printf.printf "\nTest alias to missing cmi\n";
+  Printf.printf "Test alias to missing cmi\n";
   let result : int = Eval.eval <[ Alias_lib.useful_value + 1 ]> in
   Printf.printf "Output: %d\n" result;
 ;;
