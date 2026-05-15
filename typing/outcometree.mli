@@ -163,6 +163,7 @@ and out_constructor = {
   ocstr_name: string;
   ocstr_args: (out_type * out_modality list) list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
+  ocstr_attributes: out_attribute list;
 }
 
 and out_variant =

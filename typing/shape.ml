@@ -568,6 +568,7 @@ and 'a complex_constructors = 'a complex_constructor list
 and 'a complex_constructor =
   { name : string;
     constr_uid: Uid.t option;
+    constant_runtime_tag : int option;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }
@@ -587,14 +588,15 @@ let poly_variant_constructors_map f pvs =
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
     pvs
 
-let complex_constructor_map f { name; constr_uid; kind; args } =
+let complex_constructor_map f
+      { name; constr_uid; constant_runtime_tag; kind; args } =
   let args =
     List.map
       (fun { field_name; field_uid; field_value } ->
         { field_name; field_uid; field_value = f field_value })
       args
   in
-  { name; constr_uid; kind; args }
+  { name; constr_uid; constant_runtime_tag; kind; args }
 
 let complex_constructors_map f = List.map (complex_constructor_map f)
 
@@ -605,9 +607,12 @@ let equal_complex_constructor_arguments eq
   eq field_value1 field_value2
 
 let equal_complex_constructor eq
-    { name = name1; kind = kind1; args = args1 }
-    { name = name2; kind = kind2; args = args2 } =
+    { name = name1; constant_runtime_tag = runtime_tag1; kind = kind1;
+      args = args1 }
+    { name = name2; constant_runtime_tag = runtime_tag2; kind = kind2;
+      args = args2 } =
   String.equal name1 name2 &&
+  Option.equal Int.equal runtime_tag1 runtime_tag2 &&
   Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
@@ -876,16 +881,23 @@ and print_one_entry print_value ppf { field_name; field_uid; field_value } =
   | None -> Format.fprintf ppf "%a%a" print_value field_value print_uid_opt
       field_uid
 
-and print_constructor print_value ppf { name; constr_uid; kind = _; args } =
+and print_constructor print_value ppf
+      { name; constr_uid; constant_runtime_tag; kind = _; args } =
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in
+  let print_constant_runtime_tag fmt =
+    Format.pp_print_option
+      (fun fmt tag -> Format.fprintf fmt "[@constant_runtime_tag %d]" tag)
+      fmt
+      constant_runtime_tag
+  in
   if List.length args = 0 then
-    Format.fprintf ppf "%a%a" Format.pp_print_string name print_uid_opt
-      constr_uid
+    Format.fprintf ppf "%a%a%t" Format.pp_print_string name print_uid_opt
+      constr_uid print_constant_runtime_tag
   else
-    Format.fprintf ppf "@[%a%a of @[%a@]@]" Format.pp_print_string name
-      print_uid_opt constr_uid
+    Format.fprintf ppf "@[%a%a%t of @[%a@]@]" Format.pp_print_string name
+      print_uid_opt constr_uid print_constant_runtime_tag
       (Format.pp_print_list ~pp_sep:(print_sep_string " * ")
           (print_one_entry print_value))
       args

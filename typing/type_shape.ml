@@ -408,7 +408,7 @@ module Type_decl_shape = struct
       Layout.Product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
-  let of_complex_constructor type_subst name
+  let of_complex_constructor type_subst name ~constant_runtime_tag
       (cstr_args : Types.constructor_declaration)
       ((constructor_repr, _) : Types.constructor_representation * _)
       shape_for_constr =
@@ -478,6 +478,7 @@ module Type_decl_shape = struct
     in
     { Shape.name;
       constr_uid = Some cstr_args.cd_uid;
+      constant_runtime_tag;
       kind = constructor_repr;
       args
     }
@@ -526,13 +527,19 @@ module Type_decl_shape = struct
           let cstrs_with_layouts =
             List.combine cstr_list (Array.to_list layouts)
           in
+          let constant_runtime_tags =
+            Datarepr.constant_constructor_runtime_tags_for_boxed_variant
+              cstr_list layouts
+          in
           let constructors =
             List.map
-              (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
+              (fun (((cstr, arg_layouts), constant_runtime_tag) :
+                     (Types.constructor_declaration * _) * _) ->
                 let name = Ident.name cstr.cd_id in
-                of_complex_constructor type_subst name cstr arg_layouts
-                  shape_for_constr)
-              cstrs_with_layouts
+                of_complex_constructor type_subst name ~constant_runtime_tag
+                  cstr arg_layouts shape_for_constr)
+              (List.combine cstrs_with_layouts
+                 (Array.to_list constant_runtime_tags))
           in
           Shape.variant constructors
         | Type_variant ([cstr], Variant_unboxed, _unsafe_mode_crossing)
@@ -653,7 +660,12 @@ module Type_decl_shape = struct
         constrs
     | Variant constructors ->
       List.for_all
-        (fun { name = _; constr_uid = _; kind = _; args } ->
+        (fun { name = _;
+               constr_uid = _;
+               constant_runtime_tag = _;
+               kind = _;
+               args
+             } ->
           List.for_all
             (fun { field_name = _; field_uid = _; field_value = sh, _ } ->
               is_closed_type_shape sh)
