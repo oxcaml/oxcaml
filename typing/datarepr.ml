@@ -166,41 +166,26 @@ let boxed_constructor_has_no_runtime_fields (layout : cstr_layout) =
 
 let immediate_constructor_runtime_tags cstrs ~is_constant =
   let num_cstrs = List.length cstrs in
-  let explicit_tags = Array.make num_cstrs None in
   if Array.length is_constant <> num_cstrs then
     Misc.fatal_error
       "Datarepr.immediate_constructor_runtime_tags: mismatched arrays";
-  let num_consts =
-    Array.fold_left
-      (fun count is_constant -> if is_constant then count + 1 else count)
-      0
-      is_constant
-  in
-  let used_tags = Array.make num_consts false in
+  let explicit_tags = Array.make num_cstrs None in
+  let used_tags = ref Numbers.Int.Set.empty in
   List.iteri
     (fun src_index { cd_attributes; _ } ->
-    match immediate_constructor_tag cd_attributes with
-    | None -> ()
-    | Some { txt = tag; loc } ->
-      if not is_constant.(src_index) then
-        Location.raise_errorf ~loc
-          "The [@tag] attribute can only be used on constructors \
-           without runtime fields";
-      if tag < 0 then
-        Location.raise_errorf ~loc
-          "Negative [@tag] constructor tags are not supported yet";
-      if tag >= num_consts then
-        Location.raise_errorf ~loc
-          "This [@tag] constructor tag is sparse; in this version tags \
-           must form the dense range 0 to %d"
-          (num_consts - 1);
-      if not used_tags.(tag) then begin
-        used_tags.(tag) <- true;
-        explicit_tags.(src_index) <- Some tag
-      end else
-        Location.raise_errorf ~loc
-          "Two constructors cannot use the same [@tag] value %d" tag
-    )
+      match immediate_constructor_tag cd_attributes with
+      | None -> ()
+      | Some { txt = tag; loc } ->
+        if not is_constant.(src_index) then
+          Location.raise_errorf ~loc
+            "The [@tag] attribute can only be used on constructors \
+             without runtime fields";
+        if not (Numbers.Int.Set.mem tag !used_tags) then begin
+          used_tags := Numbers.Int.Set.add tag !used_tags;
+          explicit_tags.(src_index) <- Some tag
+        end else
+          Location.raise_errorf ~loc
+            "Two constructors cannot use the same [@tag] value %d" tag)
     cstrs;
   let next_implicit_tag = ref 0 in
   Array.mapi
@@ -210,11 +195,11 @@ let immediate_constructor_runtime_tags cstrs ~is_constant =
         match explicit_tags.(src_index) with
         | Some _ as tag -> tag
         | None ->
-          while used_tags.(!next_implicit_tag) do
+          while Numbers.Int.Set.mem !next_implicit_tag !used_tags do
             incr next_implicit_tag
           done;
           let tag = !next_implicit_tag in
-          used_tags.(tag) <- true;
+          used_tags := Numbers.Int.Set.add tag !used_tags;
           Some tag)
     is_constant
 

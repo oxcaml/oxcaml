@@ -29,6 +29,21 @@ module RL = Runtime_shape.Runtime_layout
 
 type base_layout = Sort.base
 
+type constant_constructor =
+  { name : string;
+    immediate_tag : int option
+  }
+
+let constructor_runtime_tag { immediate_tag; _ } =
+  match immediate_tag with
+  | Some tag -> tag
+  | None ->
+    Misc.fatal_error
+      "Dwarf_type: missing immediate tag for constant boxed variant constructor"
+
+let tagged_immediate_value_of_constructor_tag tag =
+  Int64.(add (mul (of_int tag) 2L) 1L)
+
 module Debugging_the_compiler = struct
   let enabled () = !Dwarf_flags.ddwarf_types
 
@@ -401,7 +416,8 @@ let create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
 
 let create_simple_variant_die ~reference ~parent_proto_die ?name
     simple_constructors =
-  Debugging_the_compiler.add_enum ~reference simple_constructors;
+  Debugging_the_compiler.add_enum ~reference
+    (List.map (fun { name; _ } -> name) simple_constructors);
   let enum =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Enumeration_type
@@ -410,11 +426,13 @@ let create_simple_variant_die ~reference ~parent_proto_die ?name
         |> attribute_list_with_optional_name name)
       ()
   in
-  List.iteri
-    (fun tag constructor ->
+  List.iter
+    (fun ({ name = constructor; _ } as simple_constructor) ->
+      let tag = constructor_runtime_tag simple_constructor in
       Proto_die.create_ignore ~parent:(Some enum) ~tag:Dwarf_tag.Enumerator
         ~attribute_values:
-          [ DAH.create_const_value ~value:(Int64.of_int ((2 * tag) + 1));
+          [ DAH.create_const_value
+              ~value:(tagged_immediate_value_of_constructor_tag tag);
             DAH.create_name constructor ]
         ())
     simple_constructors
@@ -495,7 +513,8 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
     List.map (fun (name, _) -> name) complex_constructors
   in
   Debugging_the_compiler.add_enum ~reference
-    (simple_constructors @ complex_constructors_names);
+    (List.map (fun { name; _ } -> name) simple_constructors
+    @ complex_constructors_names);
   let value_size = Arch.size_addr in
   let variant_part_immediate_or_pointer =
     let int_or_ptr_structure =
@@ -560,13 +579,15 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
     in
     Debugging_the_compiler.add_enum
       ~reference:(Proto_die.reference enum_die)
-      simple_constructors;
-    List.iteri
-      (fun tag name ->
+      (List.map (fun { name; _ } -> name) simple_constructors);
+    List.iter
+      (fun ({ name; _ } as simple_constructor) ->
+        let tag = constructor_runtime_tag simple_constructor in
         Proto_die.create_ignore ~parent:(Some enum_die)
           ~tag:Dwarf_tag.Enumerator
           ~attribute_values:
-            [ DAH.create_const_value ~value:(Int64.of_int tag);
+            [ DAH.create_const_value
+                ~value:(tagged_immediate_value_of_constructor_tag tag);
               DAH.create_name name ]
           ())
       simple_constructors;
@@ -581,9 +602,9 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
         ~tag:Dwarf_tag.Member
         ~attribute_values:
           [ DAH.create_type ~proto_die:enum_die;
-            DAH.create_bit_size (Int8.of_int_exn ((value_size * 8) - 1));
-            DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0);
-            DAH.create_data_bit_offset ~bit_offset:(Int8.of_int_exn 1) ]
+            DAH.create_byte_size_exn ~byte_size:value_size;
+            DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0)
+          ]
         ()
     in
     Debugging_the_compiler.add_alias
@@ -1260,9 +1281,10 @@ let partition_constructors constructors ~f =
   List.partition_map
     (fun (constr : RS.constructor) ->
       let constr_name = RS.constructor_name constr in
+      let immediate_tag = RS.constructor_immediate_tag constr in
       let args = RS.constructor_args constr in
       match args with
-      | [] -> Left constr_name
+      | [] -> Left { name = constr_name; immediate_tag }
       | _ :: _ ->
         let args =
           List.map (fun { RS.label; field_type } -> f label field_type) args
@@ -1358,6 +1380,9 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
     let simple_constructors, complex_constructors =
       partition_constructors constructors ~f:(fun _label field_type ->
           die field_type)
+    in
+    let simple_constructors =
+      List.map (fun { name; immediate_tag = _ } -> name) simple_constructors
     in
     create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
       ~simple_constructors ~complex_constructors ()

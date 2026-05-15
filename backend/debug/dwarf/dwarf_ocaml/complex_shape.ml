@@ -557,29 +557,28 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
             let constr_args =
               lay_out_into_mixed_block_exn ~source_level_fields
             in
-            let constructor =
-              if is_tuple_constructor
-              then
-                (* We clear the field names for tuple constructors. *)
-                RS.constructor_with_tuple_arg ~name
-                  ~args:
-                    (List.map
-                       (RS.map_mixed_block_field_label (fun _ -> ()))
-                       constr_args)
-              else RS.constructor_with_record_arg ~name ~args:constr_args
+            let immediate_tag =
+              match constr_args, constant_runtime_tag with
+              | [], immediate_tag -> immediate_tag
+              | _ :: _, None -> None
+              | _ :: _, Some _ ->
+                Misc.fatal_error
+                  "Complex_shape: immediate constructor tag on constructor \
+                   with runtime arguments"
             in
-            constant_runtime_tag, constructor)
+            if is_tuple_constructor
+            then
+              (* We clear the field names for tuple constructors. *)
+              RS.constructor_with_tuple_arg ~name ?immediate_tag
+                ~args:
+                  (List.map
+                     (RS.map_mixed_block_field_label (fun _ -> ()))
+                     constr_args)
+                ()
+            else
+              RS.constructor_with_record_arg ~name ?immediate_tag
+                ~args:constr_args ())
           constructors
-      in
-      let constructors =
-        constructors
-        |> List.stable_sort (fun (tag1, _) (tag2, _) ->
-            match tag1, tag2 with
-            | Some tag1, Some tag2 -> Int.compare tag1 tag2
-            | Some _, None -> -1
-            | None, Some _ -> 1
-            | None, None -> 0)
-        |> List.map snd
       in
       runtime (RS.variant constructors)
     with Layout_missing ->
@@ -611,7 +610,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
               ~args:
                 (List.map
                    (RS.map_mixed_block_field_label (fun _ -> ()))
-                   constr_args))
+                   constr_args)
+              ())
           constructors
       in
       runtime (RS.polymorphic_variant constructors)
