@@ -29,13 +29,7 @@ test
           "line": 1,
           "col": 20
         },
-<<<<<<< HEAD
         "type": "type t1 = t1",
-||||||| c76379cdae
-        "type": "type t1 = 'a",
-=======
-        "type": "t1",
->>>>>>> v5.6-504
         "tail": "no"
       },
       {
