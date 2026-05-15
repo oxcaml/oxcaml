@@ -4,16 +4,8 @@
 
 (menhir
  (modules type_parser)
-<<<<<<< HEAD
  (enabled_if (<> %{profile} "release"))
  (mode promote)
  (flags :standard --explain --lalr))
-||||||| c76379cdae
- (flags --explain))
-=======
- (enabled_if (<> %{profile} "release"))
- (mode promote)
- (flags :standard --explain))
->>>>>>> v5.6-504
 
 (ocamllex type_lexer)
