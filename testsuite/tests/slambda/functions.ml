@@ -8,11 +8,11 @@ let poly_ id x = x
 [%%expect{|
 (let (id =
    { c =
-     (template layout!2 ->
+     (template layout_2 ->
        { c = (missing)
        ; r =
          ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout!2] : $layout!2 x))⟫ })
+            (function {nlocal = 0} x[$layout_2] : $layout_2 x))⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (id = $id) (apply (field_imm 1 (global Toploop!)) "id" id))⟫ })
@@ -47,19 +47,19 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
         #body =
           (let (captures =
              { c =
-               (template layout!15 ->
+               (template layout_15 ->
                  { c = (missing)
                  ; r =
                    ⟪(function {nlocal = 0} closure
                       (let
                         (foo =a[value<int>] (field_imm 1 closure)
                          bool =a[value<int>] (field_imm 0 closure))
-                        (function {nlocal = 0} x[$layout!15] y[$layout!15]
-                          : #($layout!15, ?)
+                        (function {nlocal = 0} x[$layout_15] y[$layout_15]
+                          : #($layout_15, ?)
                           (if bool
-                            (make_unboxed_product #($layout!15, value<int>) x
+                            (make_unboxed_product #($layout_15, value<int>) x
                               foo)
-                            (make_unboxed_product #($layout!15, value<int>) y
+                            (make_unboxed_product #($layout_15, value<int>) y
                               2)))))⟫ })
              ; r = ⟪(makeblock 0 (value<int>,value<int>) bool foo)⟫ })
             { c = (missing)
@@ -76,13 +76,13 @@ let poly_ f x y = #(x, y)
 [%%expect{|
 (let (f =
    { c =
-     (template layout!28 layout!29 ->
+     (template layout_28 layout_29 ->
        { c = (missing)
        ; r =
          ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout!28] y[$layout!29]
-              : #($layout!28, $layout!29)
-              (make_unboxed_product #($layout!28, $layout!29) x y)))⟫ })
+            (function {nlocal = 0} x[$layout_28] y[$layout_29]
+              : #($layout_28, $layout_29)
+              (make_unboxed_product #($layout_28, $layout_29) x y)))⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (f = $f) (apply (field_imm 1 (global Toploop!)) "f" f))⟫ })
@@ -99,19 +99,17 @@ let _ =
    (let
      (f =
         { c =
-          (template layout!36 ->
+          (template layout_36 ->
             { c = (missing)
             ; r =
               ⟪(function[L] {nlocal = 1} closure[L] : local
-                 (function[L] {nlocal = 1} x[$layout!36] : $layout!36 x))⟫ })
+                 (function[L] {nlocal = 1} x[$layout_36] : $layout_36 x))⟫ })
         ; r = ⟪(makelocalblock 0)⟫ }
       #body =
         { c = (missing)
         ; r =
           ⟪(apply
-             $(let
-                (#arg0 = { c = ⟪layout ?⟫; r = ⟪(unbox_unit 0)⟫ }
-                 #app = (f.c #arg0.c))
+             $(let (#app = (f.c ⟪layout ?⟫))
                 { c = #app.c; r = ⟪(apply[L] $#app f)⟫ })
              0)⟫ })
      { c = #body.c; r = ⟪(let (f = $f) $#body)⟫ }))
@@ -129,19 +127,17 @@ let _ =
    (let
      (f =
         { c =
-          (template layout!42 ->
+          (template layout_42 ->
             { c = [ (missing); (missing); ]
             ; r =
               ⟪(function[L] {nlocal = 1} closure[L]
                  : (consts ()) (non_consts ([0: value<int>, *]))
                  (makelocalblock 0 (value<int>,*) 2
-                   (function[L] {nlocal = 1} x[$layout!42] : $layout!42 x)))⟫ })
+                   (function[L] {nlocal = 1} x[$layout_42] : $layout_42 x)))⟫ })
         ; r = ⟪(makelocalblock 0)⟫ }
       #body =
         (let (*match* =
-           (let
-             (#arg0 = { c = ⟪layout int64⟫; r = ⟪(unbox_unit 0)⟫ }
-              #app = (f.c #arg0.c))
+           (let (#app = (f.c ⟪layout int64⟫))
              { c = #app.c; r = ⟪(apply[L] $#app f)⟫ }))
           { c = (missing)
           ; r =
@@ -152,10 +148,7 @@ let _ =
                 b =a? (field_imm 1 *match*)
                 a =a? (field_imm 0 *match*))
                (make_unboxed_product #(value<int>, int64) a (apply b #3L)))⟫ }))
-     { c = #body.c
-     ; r =
-       ⟪(let (f =[value<(consts ()) (non_consts ([0: value<int>, *]))>] $f)
-          $#body)⟫ }))
+     { c = #body.c; r = ⟪(let (f = $f) $#body)⟫ }))
   { c = #body.c; r = ⟪(region $#body)⟫ })
 - : #(int * int64#) = #(2, <abstr>)
 |}]

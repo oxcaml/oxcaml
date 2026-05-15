@@ -39,13 +39,6 @@ let create_dynamic sval_runtime =
   SLhalves { sval_comptime = SLmissing; sval_runtime }
 
 let fracture_const lambda = function
-  | Const_layout layout ->
-    SLhalves
-      { sval_comptime = SLlayout layout;
-        sval_runtime =
-          Lprim
-            (Punbox_unit, [lambda_unit], Debuginfo.Scoped_location.Loc_unknown)
-      }
   | Const_block _ | Const_mixed_block _
   (* There's currently no way to get layouts into a block so we don't need to
      fracture these. *)
@@ -338,10 +331,15 @@ let rec fracture_lam lambda : slambda =
     (* [Lsplice] can't exist because we're matching on tlambda (and producing
        slambda) and Lsplice only exists in slambda. *)
     fatal_error_invalid_constructor lambda
-  | Ltemplate
-      ({ kind = _; params; return; body; attr; loc; mode; ret_mode }, free_vars)
-    ->
-    let free_vars = Ident.Map.to_list free_vars in
+  | Lkindtemplate
+      { ktmpl_params;
+        ktmpl_return;
+        ktmpl_body;
+        ktmpl_mode;
+        ktmpl_free_vars;
+        ktmpl_loc
+      } ->
+    let free_vars = Ident.Map.to_list ktmpl_free_vars in
     let free_vars_shape_locality_mode =
       Misc.Stdlib.Array.of_list_map
         (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
@@ -359,14 +357,14 @@ let rec fracture_lam lambda : slambda =
         fun i -> Pmixedfield ([i], free_vars_shape_locality_mode, Reads_agree)
     in
     let templated_function_body =
-      slet_local "body" body (fun body_c body_r ->
+      slet_local "body" ktmpl_body (fun body_c body_r ->
           let closure_id = Ident.create_local "closure" in
           let closure_param =
             { name = closure_id;
               debug_uid = debug_uid_none;
               layout = layout_block;
               attributes = default_param_attribute;
-              mode
+              mode = ktmpl_mode
             }
           in
           let _, body =
@@ -378,7 +376,7 @@ let rec fracture_lam lambda : slambda =
                       layout,
                       ident,
                       debug_uid_none,
-                      Lprim (get_free_var_prim i, [Lvar closure_id], loc),
+                      Lprim (get_free_var_prim i, [Lvar closure_id], ktmpl_loc),
                       lam ) ))
               (0, body_r) free_vars
           in
@@ -392,52 +390,57 @@ let rec fracture_lam lambda : slambda =
                   ~kind:
                     (Curried
                        { nlocal =
-                           (match mode with
+                           (match ktmpl_mode with
                            | Alloc_heap -> 0
                            | Alloc_local -> 1)
                        })
-                  ~params:[closure_param] ~return ~body ~attr ~loc ~mode
-                  ~ret_mode
+                  ~params:[closure_param] ~return:ktmpl_return ~body
+                  ~attr:default_function_attribute ~loc:ktmpl_loc
+                  ~mode:ktmpl_mode ~ret_mode:ktmpl_mode
             })
     in
     let free_var_capture = List.map (fun (ident, _) -> Lvar ident) free_vars in
-    let sfun_params =
-      Misc.Stdlib.Array.of_list_map
-        (fun param -> Slambdaident.of_ident param.name)
-        params
-    in
     SLhalves
       { sval_comptime =
-          SLtemplate { sfun_params; sfun_body = templated_function_body };
+          SLtemplate
+            { sfun_params = ktmpl_params |> Array.of_list;
+              sfun_body = templated_function_body
+            };
         sval_runtime =
           Lprim
-            ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, mode),
+            ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, ktmpl_mode),
               free_var_capture,
-              loc )
+              ktmpl_loc )
       }
-  | Linstantiate ({ ap_func; ap_args; ap_loc } as app) ->
-    slet_local "fun" ap_func (fun fun_c fun_r ->
-        slet_local_list "arg" ap_args (fun args_c args_r ->
-            (* Currently all instantiation args are erased kinds. *)
-            ignore args_r;
-            let app_id = Slambdaident.create_local "app" in
-            let app_var = SLvar app_id in
-            SLlet
-              { slet_name = app_id;
-                slet_value =
-                  SLinstantiate
-                    { sapp_func = fun_c; sapp_args = Array.of_list args_c };
-                slet_body =
-                  SLhalves
-                    { sval_comptime = SLproj_comptime app_var;
-                      sval_runtime =
-                        Lapply
-                          { app with
-                            ap_func = Lsplice (ap_loc, app_var);
-                            ap_args = [fun_r]
-                          }
-                    }
-              }))
+  | Lkindinstantiate
+      { kinst_func; kinst_args; kinst_result_layout; kinst_mode; kinst_loc } ->
+    slet_local "fun" kinst_func (fun fun_c fun_r ->
+        let app_id = Slambdaident.create_local "app" in
+        let app_var = SLvar app_id in
+        let sapp_args =
+          Misc.Stdlib.Array.of_list_map (fun arg -> SLlayout arg) kinst_args
+        in
+        SLlet
+          { slet_name = app_id;
+            slet_value = SLinstantiate { sapp_func = fun_c; sapp_args };
+            slet_body =
+              SLhalves
+                { sval_comptime = SLproj_comptime app_var;
+                  sval_runtime =
+                    Lapply
+                      { ap_func = Lsplice (kinst_loc, app_var);
+                        ap_args = [fun_r];
+                        ap_result_layout = kinst_result_layout;
+                        ap_region_close = Rc_normal;
+                        ap_mode = kinst_mode;
+                        ap_loc = kinst_loc;
+                        ap_tailcall = Default_tailcall;
+                        ap_inlined = Default_inlined;
+                        ap_specialised = Default_specialise;
+                        ap_probe = None
+                      }
+                }
+          })
 
 (** Fracture an [lfun]. Currently, functions only have a dynamic part so this
     can always return an [lfun]. *)
@@ -587,32 +590,6 @@ and slet_local_slam name value value_lam body =
         slet_body =
           body (SLproj_comptime (SLvar name)) (Lsplice (loc, SLvar name))
       }
-
-(** [slet_local_list name values body] binds each item of [values] to [name0],
-    [name1], etc in [body] in slambda.
-
-    Note this will omit all the [SLlet]s that it can, however if the elements of
-    [values] have compile-time effects they are guaranteed to be run in reverse
-    order before (the slambda produced by) [body] is evaluated.
-
-    [body] is a function, called as [body values_c values_r], where the elements
-    of [values_c] and [values_r] evaluate to the compile-time and run-time
-    halves of each element of [values] respectively. The elements of [values_c]
-    are guaranteed to not contain any effects and [values_r] is physically equal
-    to [values] where possible. *)
-and slet_local_list name values body =
-  let rec slet_local_list_loop unchanged i values_c values_r = function
-    | [] -> body values_c (if unchanged then values else values_r)
-    | value :: values ->
-      slet_local
-        (name ^ string_of_int i)
-        value
-        (fun value_c value_r ->
-          let unchanged = unchanged && value_r == value in
-          slet_local_list_loop unchanged (i - 1) (value_c :: values_c)
-            (value_r :: values_r) values)
-  in
-  slet_local_list_loop true (List.length values - 1) [] [] (List.rev values)
 
 (** Helper function fracture [lambda] where we only need the dynamic part of the
     result. *)

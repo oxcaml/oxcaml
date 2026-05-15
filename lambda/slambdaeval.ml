@@ -291,7 +291,7 @@ and eval_lam_shallow env lam =
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
-  | Ltemplate _ | Linstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ ->
     (* These constructors only exist in tlambda, fracturing has removed them
        (and replaced them with SLtemplate and SLinstantiate). *)
     Lambda.fatal_error_invalid_constructor lam
@@ -329,8 +329,6 @@ and eval_structured_const env const =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
     if new_consts == old_consts then const else Const_block (n, new_consts)
-  | Const_layout _ ->
-    Misc.fatal_error "layout constants should not exist after fracturing"
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const
@@ -352,8 +350,8 @@ and eval_mixed_block_element :
  fun env element ->
   match element with
   | Splice_variable id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
+    eval_var env id |> expect_not_missing |> expect Tlayout
+    |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
@@ -365,9 +363,7 @@ and eval_mixed_block_element :
 
 and eval_layout env layout =
   match layout with
-  | Psplicevar id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout
+  | Psplicevar id -> eval_var env id |> expect_not_missing |> expect Tlayout
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -585,7 +581,8 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lsplice _ -> raise Found_a_splice
-  | Ltemplate _ | Linstantiate _ -> Lambda.fatal_error_invalid_constructor lam);
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval slam =

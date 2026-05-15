@@ -179,7 +179,7 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
-  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
+  | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -243,7 +243,7 @@ let rec layout ppf lay_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
-  | Psplicevar id -> fprintf ppf "$%a" Ident.print id
+  | Psplicevar id -> fprintf ppf "$%a" Slambdaident.print id
 
 let layout_annotation ppf lay_ =
   match lay_ with
@@ -283,7 +283,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
-  | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
+  | Psplicevar id -> fprintf ppf ": $%a@ " Slambdaident.print id
 
 let locality_kind = function
   | Alloc_heap -> ""
@@ -340,7 +340,7 @@ let rec mixed_block_element
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
-  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
+  | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
 
 and mixed_block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
@@ -1248,7 +1248,6 @@ let rec struct_const ppf = function
         List.iter (fun f -> fprintf ppf "@ %s" f) fl in
       fprintf ppf "@[<1>[|@[%s%a@]|]@]" f1 floats fl
   | Const_null -> fprintf ppf "<null>"
-  | Const_layout l -> fprintf ppf "@[<2><layout@ %a>]" layout l
 
 and struct_consts ppf (hd, tl) =
   let sconsts ppf scl =
@@ -1263,16 +1262,10 @@ let rec lam ppf = function
       fprintf ppf "*%a" Ident.print id
   | Lconst cst ->
       struct_const ppf cst
-  | Lapply ap | Linstantiate ap as l->
+  | Lapply ap ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      let name =
-        match l with
-        | Lapply _ -> "apply"
-        | Linstantiate _ -> "instantiate"
-        | _ -> assert false
-      in
-      let form = apply_kind name ap.ap_region_close ap.ap_mode in
+      let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args
         apply_tailcall_attribute ap.ap_tailcall
@@ -1281,8 +1274,6 @@ let rec lam ppf = function
         apply_probe ap.ap_probe
   | Lfunction lfun ->
       lfunction ppf lfun
-  | Ltemplate (lfun, _) ->
-      function_like "template" ppf lfun
   | Llet _ | Lmutlet _ as expr ->
       let let_kind = begin function
         | Llet(str,_,_,_,_,_) ->
@@ -1442,6 +1433,18 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice (_, slambda) ->
       fprintf ppf "$%a" slam slambda
+  | Lkindtemplate {ktmpl_params; ktmpl_body; ktmpl_mode; ktmpl_free_vars = _;
+                   ktmpl_loc = _} ->
+      let pr_params ppf params =
+        List.iter (fun l -> fprintf ppf "@ %a" Slambdaident.print l) params in
+      fprintf ppf "@[<2>(ktemplate%s%a@ %a)]"
+        (locality_kind ktmpl_mode) pr_params ktmpl_params lam ktmpl_body
+  | Lkindinstantiate {kinst_func; kinst_args; kinst_result_layout = _;
+                      kinst_mode = _; kinst_loc = _} ->
+      let lams ppf largs =
+        List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
+      fprintf ppf "@[<2>(kinstantiate@ %a@%a)]"
+        lam kinst_func lams kinst_args
 
 and slam ppf = function
   | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
@@ -1495,7 +1498,7 @@ and sequence ppf = function
   | l ->
       lam ppf l
 
-and function_like name ppf {kind; params; return; body; attr; ret_mode; mode} =
+and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
   let pr_params ppf params =
     match kind with
     | Curried {nlocal} ->
@@ -1522,12 +1525,9 @@ and function_like name ppf {kind; params; return; body; attr; ret_mode; mode} =
           )
           params;
         fprintf ppf ")" in
-  fprintf ppf "@[<2>(%s%s%a@ %a%a%a)@]"
-    name
+  fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
     (locality_kind mode) pr_params params
     function_attribute attr return_kind (ret_mode, return) lam body
-
-and lfunction ppf lfun = function_like "function" ppf lfun
 
 let structured_constant = struct_const
 

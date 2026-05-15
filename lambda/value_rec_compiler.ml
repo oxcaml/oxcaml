@@ -184,9 +184,9 @@ let compute_static_size lam =
       assert false
     | Lsplice _ ->
       fatal_error_invalid_constructor lam
-    | Ltemplate (_, free_vars) ->
+    | Lkindtemplate { ktmpl_free_vars; _ } ->
       let shape =
-        Ident.Map.data free_vars
+        Ident.Map.data ktmpl_free_vars
         |> Misc.Stdlib.Array.of_list_map Lambda.mixed_block_element_of_layout
       in
       (match Lambda.mixed_block_of_block_shape (Shape shape) with
@@ -194,7 +194,7 @@ let compute_static_size lam =
          let size = all_value_mixed_block_size shape in
          Block (Regular_block size)
        | Some arr -> Block (Mixed_record arr))
-    | Linstantiate _ -> dynamic_size lam
+    | Lkindinstantiate _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -738,8 +738,8 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lsend _
   | Lifused _
   | Lexclave _
-  | Ltemplate _
-  | Linstantiate _ ->
+  | Lkindtemplate _
+  | Lkindinstantiate _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun

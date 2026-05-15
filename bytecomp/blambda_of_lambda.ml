@@ -248,7 +248,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ | Ltemplate _ | Linstantiate _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
     Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst

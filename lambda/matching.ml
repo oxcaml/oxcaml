@@ -4320,7 +4320,8 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Ltemplate _ | Linstantiate _ )
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lkindtemplate _
+    | Lkindinstantiate _ )
     as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
@@ -4396,36 +4397,9 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
     assert (mutable_flag == Asttypes.Immutable);
     let layout = Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type in
     let params =
-      List.map
-        (fun var ->
-          let id = (Jkind_types.Sort.Var.get_id var :> int) in
-          let name = Ident.create_sort_var id in
-          (* Most of this isn't particularly applicable for kinds as they get
-             erased, if we support more complex functions with static or erased
-              arguments this will be more sensible. *)
-          { name;
-            debug_uid = debug_uid_none;
-            layout = layout_unboxed_unit;
-            attributes = default_param_attribute;
-            mode = alloc_heap
-          })
-        (Lpoly.get_exn lpoly)
+      List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
     let env_alloc_mode = Translmode.transl_alloc_mode env_alloc_mode in
-    let kind =
-      Curried
-        { nlocal =
-            (match env_alloc_mode with
-            | Alloc_heap -> 0
-            | Alloc_local -> List.length params)
-        }
-    in
-    let f =
-      lfunction' ~kind ~params ~return:layout ~body:param
-        ~attr:default_function_attribute
-        ~loc:(Scoped_location.of_location ~scopes loc)
-        ~mode:env_alloc_mode ~ret_mode:env_alloc_mode
-    in
     let free_vars =
       Lambda.free_variables param
       |> Ident.Set.to_list
@@ -4455,7 +4429,16 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
               Some (ident, layout_any_value))
       |> Ident.Map.of_list
     in
-    Llet (Strict, layout, id, duid, Ltemplate (f, free_vars), body)
+    let f =
+      { ktmpl_params = params;
+        ktmpl_return = layout;
+        ktmpl_body = param;
+        ktmpl_mode = env_alloc_mode;
+        ktmpl_free_vars = free_vars;
+        ktmpl_loc = Scoped_location.of_location ~scopes loc;
+      }
+    in
+    Llet (Strict, layout_block, id, duid, Lkindtemplate f, body)
   | Tpat_var { id; uid = duid; _ }
   | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }
   | Tpat_fun_layout { id; uid = duid; _ } ->

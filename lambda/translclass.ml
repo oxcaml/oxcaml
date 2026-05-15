@@ -768,7 +768,7 @@ let free_methods l =
     | Lsend(Self, Lvar meth, _, _, _, _, _, _) ->
         fv := Ident.Set.add meth !fv
     | Lsend _ -> ()
-    | Lfunction{params} | Ltemplate ({params}, _) ->
+    | Lfunction{params} ->
         List.iter (fun p -> fv := Ident.Set.remove p.name !fv) params
     | Llet(_, _k, id, _duid, _arg, _body)
     | Lmutlet(_k, id, _duid, _arg, _body) ->
@@ -782,10 +782,11 @@ let free_methods l =
     | Lfor {for_id} ->
         fv := Ident.Set.remove for_id !fv
     | Lassign _
-    | Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Linstantiate _
+    | Lvar _ | Lmutvar _ | Lconst _ | Lapply _
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
-    | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
+    | Levent _ | Lifused _ | Lregion _ | Lexclave _
+    | Lkindtemplate _ | Lkindinstantiate _ -> ()
     | Lsplice _ ->
       fatal_error_invalid_constructor l
   in free l; !fv

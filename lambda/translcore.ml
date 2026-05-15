@@ -389,22 +389,16 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_apply_layout (func, args) ->
-      Linstantiate {
-        ap_func = (transl_exp ~scopes Jkind.Sort.Const.for_function func);
-        ap_args = List.map
+      Lkindinstantiate {
+        kinst_func = (transl_exp ~scopes Jkind.Sort.Const.for_function func);
+        kinst_args = List.map
           (fun var ->
             let layout = Jkind.Sort.var_default_to_scannable_and_get var in
-            let layout = Typeopt.layout_of_sort e.exp_loc layout in
-            Lconst (Const_layout layout))
+            Typeopt.layout_of_sort e.exp_loc layout)
           args;
-        ap_result_layout = layout_exp sort e;
-        ap_region_close = Rc_normal;
-        ap_mode = alloc_local;
-        ap_loc = (of_location ~scopes e.exp_loc);
-        ap_tailcall = Default_tailcall;
-        ap_inlined = Default_inlined;
-        ap_specialised = Default_specialise;
-        ap_probe = None;
+        kinst_result_layout = layout_exp sort e;
+        kinst_mode = alloc_local;
+        kinst_loc = (of_location ~scopes e.exp_loc);
       }
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
