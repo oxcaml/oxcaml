@@ -455,6 +455,9 @@ and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
   | Polymorphic_parameter param ->
     line i ppf "Polymorphic_parameter\n";
     poly_param (i+1) ppf param;
+  | Module_pack pty ->
+    line i ppf "Module_pack %a\n"
+      (Format_doc.compat Printtyp.raw_type_expr) pty;
 
 and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   line i ppf "pattern %a\n" fmt_location x.pat_loc;
