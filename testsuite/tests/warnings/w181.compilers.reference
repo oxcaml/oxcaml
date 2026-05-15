@@ -23,3 +23,14 @@ File "w181.ml", lines 17-19, characters 0-16:
 19 |   fun z -> z + y
 Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
 rewrite the binding with explicit parameters or remove the attribute.
+
+File "w181.ml", line 21, characters 0-30:
+21 | let[@zero_alloc] (x as y) = 42
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [zero-alloc-on-nonfunction]: The [@zero_alloc] attribute has no effect on a non-function binding;
+rewrite the binding with explicit parameters or remove the attribute.
+
+File "w181.ml", line 11, characters 4-5:
+11 | let x : int = 42 [@@zero_alloc]
+         ^
+Warning 32 [unused-value-declaration]: unused value x.
