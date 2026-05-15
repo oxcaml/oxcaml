@@ -1118,13 +1118,10 @@ end
 (** Propositional equality *)
 type (_, _) eq = Refl : ('a, 'a) eq
 
-(** Propositional comparison *)
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
-
-val comparison_result : ('a, 'b) comparison -> int
+(** Propositional equality test *)
+type (_, _) is_eq =
+  | Is_eq : ('a, 'a) is_eq
+  | Is_not_eq : ('a, 'b) is_eq
 
 (** Utilities for module-level programming *)
 module type T = sig
