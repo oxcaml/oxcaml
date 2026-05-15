@@ -5231,6 +5231,14 @@ let rec approx_type env sty =
       end
   | _ -> approx_type_default ()
 
+let rec get_pat_attrs p =
+  match p.ppat_desc with
+  | Ppat_constraint (inner, _, _) when p.ppat_attributes = [] ->
+    get_pat_attrs inner
+  | Ppat_alias (inner, _) when p.ppat_attributes = [] ->
+    get_pat_attrs inner
+  | _ -> p.ppat_attributes
+
 let type_pattern_approx env spat ty_expected =
   match spat.ppat_desc with
   | Ppat_constraint(_, Some sty, arg_type_mode) ->
@@ -5284,11 +5292,28 @@ let type_approx_fun_one_param
           raise(Error(spat.ppat_loc, env, Optional_poly_param));
         Some mode_annots, has_poly
   in
+  let zero_alloc =
+    match spato with
+    | None -> None
+    | Some spat ->
+      (* If the zero_alloc attribute is malformed, we should only warn once.
+      The `without_warnings` mutes a potential duplicate warning. *)
+      match
+        Warnings.without_warnings (fun () ->
+          Builtin_attributes.get_zero_alloc_attribute
+            Function_param
+            (get_pat_attrs spat))
+      with
+      | Check c -> Some c
+      | Default_zero_alloc | Assume _ | Ignore_assert_all -> None
+  in
   let loc_fun, ty_fun = in_function in
   let { ty_arg; arg_mode; ty_ret; _ } =
     try
       filter_arrow env ty_expected label
-        ~has_poly:(match has_poly with Mono -> Poly None | Poly _ -> Mono)
+        ~has_poly:(match has_poly with
+                   | Mono -> Poly zero_alloc
+                   | Poly _ -> Mono)
     with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
@@ -8849,14 +8874,6 @@ and type_function
            Ppat_constraint (e.g. [(f[@zero_alloc arity 1] : t)]) or
            Ppat_alias (e.g. [(f[@zero_alloc arity 1]) as g]), so look
            through those wrappers when the outer pattern has no attrs. *)
-        let rec get_pat_attrs p =
-          match p.ppat_desc with
-          | Ppat_constraint (inner, _, _) when p.ppat_attributes = [] ->
-            get_pat_attrs inner
-          | Ppat_alias (inner, _) when p.ppat_attributes = [] ->
-            get_pat_attrs inner
-          | _ -> p.ppat_attributes
-        in
         (try
            Builtin_attributes.get_zero_alloc_attribute
              Function_param

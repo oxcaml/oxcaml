@@ -1049,3 +1049,36 @@ Warning 18 [not-principal]: applying a function with zero_alloc requirements her
 val non_principal : bool -> ((('a -> 'a) [@zero_alloc arity 1]) -> 'b) -> 'b =
   <fun>
 |}];;
+
+(* Recursion with zero_alloc on parameters *)
+let _ =
+  let rec f (g[@zero_alloc arity 1]) = g 42
+  and g x = x, x in
+  f g;;  (* fails in the backend *)
+[%%expect {|
+Line 3, characters 2-16:
+3 |   and g x = x, x in
+      ^^^^^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP109._$.g (camlTOP109__g_136_139_code).
+Line 3, characters 12-16:
+3 |   and g x = x, x in
+                ^^^^
+Error: allocation of 24 bytes
+|}];;
+
+let _ =
+  let exception Err of string in
+  let rec f (g[@zero_alloc strict arity 1]) p x =
+    if p then g x else raise (Err (string_of_int x))
+  and g x = x, x in
+  fun r x -> f g r x;;  (* fails in the backend *)
+[%%expect {|
+Line 5, characters 2-16:
+5 |   and g x = x, x in
+      ^^^^^^^^^^^^^^
+Error: Annotation check for zero_alloc strict failed on function TOP110._$.g (camlTOP110__g_140_144_code).
+Line 5, characters 12-16:
+5 |   and g x = x, x in
+                ^^^^
+Error: allocation of 24 bytes
+|}];;
