@@ -11,31 +11,13 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
-<<<<<<< HEAD
-  "ocaml" {>= "5.4" & < "5.5"}
-||||||| c76379cdae
-  "ocaml" {>= "5.2" & < "5.3"}
-=======
   "ocaml" {>="5.4" & <"5.5"}
->>>>>>> v5.6-504
   "dune" {>= "3.0.0"}
   "csexp" {>= "1.5.1"}
-<<<<<<< HEAD
-  "alcotest" {with-test}
-  "menhir"    {dev & = "20231231"}
-  "menhirLib" {dev & = "20231231"}
-  "menhirSdk" {dev & = "20231231"}
-||||||| c76379cdae
-  "alcotest" {with-test}
-  "menhir"    {dev & >= "20201216"}
-  "menhirLib" {dev & >= "20201216"}
-  "menhirSdk" {dev & >= "20201216"}
-=======
   "alcotest" {with-test & >= "1.3.0" }
   "menhir"    {dev & >= "20201216"}
   "menhirLib" {dev & >= "20201216"}
   "menhirSdk" {dev & >= "20201216"}
->>>>>>> v5.6-504
 ]
 synopsis:
   "Merlin's libraries"

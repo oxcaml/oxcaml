@@ -12,12 +12,6 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 depends: [
-<<<<<<< HEAD
-  "ocaml" {>= "5.4" & < "5.5"}
-||||||| c76379cdae
-  "ocaml" {>= "5.2" & < "5.3"}
-=======
->>>>>>> v5.6-504
   "dune" {>= "3.0.0"}
   "merlin-lib" {= version}
   "dot-merlin-reader" {= version}
