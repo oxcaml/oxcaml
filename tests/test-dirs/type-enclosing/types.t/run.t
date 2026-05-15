@@ -139,13 +139,7 @@ Shows kind with increased verbosity:
         "line": 11,
         "col": 19
       },
-<<<<<<< HEAD
       "type": "type 'a l : immutable_data with 'a = 'a l",
-||||||| c76379cdae
-      "type": "type 'a l = 'a l",
-=======
-      "type": "type 'a l = 'a list",
->>>>>>> v5.6-504
       "tail": "no"
     }
   ]

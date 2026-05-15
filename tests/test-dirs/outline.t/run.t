@@ -5,153 +5,11 @@
     "value": [
       {
         "start": {
-<<<<<<< HEAD
-          "line": 39,
+          "line": 91,
           "col": 0
         },
         "end": {
-          "line": 48,
-          "col": 3
-        },
-        "name": "S",
-        "kind": "Signature",
-        "type": null,
-        "children": [
-          {
-            "start": {
-              "line": 45,
-              "col": 6
-            },
-            "end": {
-              "line": 45,
-              "col": 20
-            },
-            "name": "y",
-            "kind": "Value",
-            "type": "string",
-            "children": [],
-            "deprecated": false
-          },
-          {
-            "start": {
-              "line": 44,
-              "col": 6
-            },
-            "end": {
-              "line": 44,
-              "col": 12
-            },
-            "name": "u",
-            "kind": "Type",
-            "type": null,
-            "children": [],
-            "deprecated": false
-          },
-          {
-            "start": {
-              "line": 42,
-              "col": 4
-            },
-            "end": {
-              "line": 42,
-              "col": 15
-            },
-            "name": "x",
-            "kind": "Value",
-            "type": "int",
-            "children": [],
-            "deprecated": false
-          },
-          {
-            "start": {
-              "line": 41,
-              "col": 4
-            },
-            "end": {
-              "line": 41,
-              "col": 10
-            },
-            "name": "t",
-            "kind": "Type",
-            "type": null,
-            "children": [],
-            "deprecated": false
-          }
-        ],
-        "deprecated": false
-      },
-      {
-        "start": {
-          "line": 35,
-          "col": 4
-        },
-        "end": {
-          "line": 35,
-          "col": 15
-        },
-        "name": "y",
-        "kind": "Value",
-        "type": "string",
-        "children": [],
-        "deprecated": false
-      },
-      {
-        "start": {
-          "line": 34,
-          "col": 4
-        },
-        "end": {
-          "line": 34,
-          "col": 10
-        },
-        "name": "u",
-        "kind": "Type",
-        "type": null,
-        "children": [],
-        "deprecated": false
-      },
-      {
-        "start": {
-          "line": 32,
-          "col": 2
-        },
-        "end": {
-          "line": 32,
-          "col": 11
-        },
-        "name": "x",
-        "kind": "Value",
-        "type": "int",
-        "children": [],
-        "deprecated": false
-      },
-      {
-        "start": {
-          "line": 31,
-          "col": 2
-        },
-        "end": {
-          "line": 31,
-          "col": 8
-        },
-        "name": "t",
-        "kind": "Type",
-        "type": null,
-        "children": [],
-        "deprecated": false
-      },
-      {
-        "start": {
-          "line": 24,
-||||||| c76379cdae
-          "line": 24,
-=======
-          "line": 67,
->>>>>>> v5.6-504
-          "col": 0
-        },
-        "end": {
-          "line": 73,
+          "line": 97,
           "col": 3
         },
         "name": "final_let",
@@ -160,11 +18,11 @@
         "children": [
           {
             "start": {
-              "line": 68,
+              "line": 92,
               "col": 2
             },
             "end": {
-              "line": 71,
+              "line": 95,
               "col": 7
             },
             "name": "c",
@@ -173,11 +31,11 @@
             "children": [
               {
                 "start": {
-                  "line": 70,
+                  "line": 94,
                   "col": 6
                 },
                 "end": {
-                  "line": 70,
+                  "line": 94,
                   "col": 21
                 },
                 "name": "foo",
@@ -187,11 +45,11 @@
                 "deprecated": false,
                 "selection": {
                   "start": {
-                    "line": 70,
+                    "line": 94,
                     "col": 13
                   },
                   "end": {
-                    "line": 70,
+                    "line": 94,
                     "col": 16
                   }
                 }
@@ -200,11 +58,11 @@
             "deprecated": false,
             "selection": {
               "start": {
-                "line": 68,
+                "line": 92,
                 "col": 6
               },
               "end": {
-                "line": 68,
+                "line": 92,
                 "col": 7
               }
             }
@@ -213,22 +71,22 @@
         "deprecated": false,
         "selection": {
           "start": {
-            "line": 67,
+            "line": 91,
             "col": 4
           },
           "end": {
-            "line": 67,
+            "line": 91,
             "col": 13
           }
         }
       },
       {
         "start": {
-          "line": 65,
+          "line": 89,
           "col": 0
         },
         "end": {
-          "line": 65,
+          "line": 89,
           "col": 19
         },
         "name": "tb",
@@ -238,22 +96,22 @@
         "deprecated": false,
         "selection": {
           "start": {
-            "line": 65,
+            "line": 89,
             "col": 4
           },
           "end": {
-            "line": 65,
+            "line": 89,
             "col": 6
           }
         }
       },
       {
         "start": {
-          "line": 61,
+          "line": 85,
           "col": 0
         },
         "end": {
-          "line": 63,
+          "line": 87,
           "col": 3
         },
         "name": "ta",
@@ -262,11 +120,11 @@
         "children": [
           {
             "start": {
-              "line": 62,
+              "line": 86,
               "col": 2
             },
             "end": {
-              "line": 62,
+              "line": 86,
               "col": 35
             },
             "name": "baz",
@@ -276,11 +134,11 @@
             "deprecated": false,
             "selection": {
               "start": {
-                "line": 62,
+                "line": 86,
                 "col": 2
               },
               "end": {
-                "line": 62,
+                "line": 86,
                 "col": 35
               }
             }
@@ -289,11 +147,315 @@
         "deprecated": false,
         "selection": {
           "start": {
-            "line": 61,
+            "line": 85,
             "col": 11
           },
           "end": {
+            "line": 85,
+            "col": 13
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 79,
+          "col": 0
+        },
+        "end": {
+          "line": 83,
+          "col": 5
+        },
+        "name": "b",
+        "kind": "Class",
+        "type": null,
+        "children": [
+          {
+            "start": {
+              "line": 82,
+              "col": 4
+            },
+            "end": {
+              "line": 82,
+              "col": 36
+            },
+            "name": "bar",
+            "kind": "Method",
+            "type": null,
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 82,
+                "col": 11
+              },
+              "end": {
+                "line": 82,
+                "col": 14
+              }
+            }
+          },
+          {
+            "start": {
+              "line": 81,
+              "col": 4
+            },
+            "end": {
+              "line": 81,
+              "col": 16
+            },
+            "name": "foo",
+            "kind": "Value",
+            "type": null,
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 81,
+                "col": 8
+              },
+              "end": {
+                "line": 81,
+                "col": 11
+              }
+            }
+          }
+        ],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 79,
+            "col": 4
+          },
+          "end": {
+            "line": 79,
+            "col": 5
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 69,
+          "col": 0
+        },
+        "end": {
+          "line": 77,
+          "col": 5
+        },
+        "name": "a",
+        "kind": "Class",
+        "type": null,
+        "children": [
+          {
+            "start": {
+              "line": 71,
+              "col": 4
+            },
+            "end": {
+              "line": 76,
+              "col": 9
+            },
+            "name": "b",
+            "kind": "Value",
+            "type": null,
+            "children": [
+              {
+                "start": {
+                  "line": 73,
+                  "col": 8
+                },
+                "end": {
+                  "line": 75,
+                  "col": 32
+                },
+                "name": "inside_a_b",
+                "kind": "Method",
+                "type": null,
+                "children": [],
+                "deprecated": false,
+                "selection": {
+                  "start": {
+                    "line": 73,
+                    "col": 15
+                  },
+                  "end": {
+                    "line": 73,
+                    "col": 25
+                  }
+                }
+              }
+            ],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 71,
+                "col": 8
+              },
+              "end": {
+                "line": 71,
+                "col": 9
+              }
+            }
+          }
+        ],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 69,
+            "col": 6
+          },
+          "end": {
+            "line": 69,
+            "col": 7
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 67,
+          "col": 0
+        },
+        "end": {
+          "line": 67,
+          "col": 18
+        },
+        "name": "c",
+        "kind": "Class",
+        "type": null,
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 67,
+            "col": 4
+          },
+          "end": {
+            "line": 67,
+            "col": 5
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 61,
+          "col": 0
+        },
+        "end": {
+          "line": 65,
+          "col": 5
+        },
+        "name": "b",
+        "kind": "Class",
+        "type": null,
+        "children": [
+          {
+            "start": {
+              "line": 64,
+              "col": 4
+            },
+            "end": {
+              "line": 64,
+              "col": 39
+            },
+            "name": "bar",
+            "kind": "Method",
+            "type": null,
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 64,
+                "col": 11
+              },
+              "end": {
+                "line": 64,
+                "col": 14
+              }
+            }
+          },
+          {
+            "start": {
+              "line": 63,
+              "col": 4
+            },
+            "end": {
+              "line": 63,
+              "col": 16
+            },
+            "name": "foo",
+            "kind": "Value",
+            "type": null,
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 63,
+                "col": 8
+              },
+              "end": {
+                "line": 63,
+                "col": 11
+              }
+            }
+          }
+        ],
+        "deprecated": false,
+        "selection": {
+          "start": {
             "line": 61,
+            "col": 6
+          },
+          "end": {
+            "line": 61,
+            "col": 7
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 59,
+          "col": 0
+        },
+        "end": {
+          "line": 59,
+          "col": 19
+        },
+        "name": "tb",
+        "kind": "ClassType",
+        "type": null,
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 59,
+            "col": 4
+          },
+          "end": {
+            "line": 59,
+            "col": 6
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 57,
+          "col": 0
+        },
+        "end": {
+          "line": 57,
+          "col": 26
+        },
+        "name": "ta",
+        "kind": "ClassType",
+        "type": null,
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 57,
+            "col": 11
+          },
+          "end": {
+            "line": 57,
             "col": 13
           }
         }
@@ -304,64 +466,13 @@
           "col": 0
         },
         "end": {
-          "line": 59,
-          "col": 5
+          "line": 55,
+          "col": 18
         },
-        "name": "b",
+        "name": "c",
         "kind": "Class",
         "type": null,
-        "children": [
-          {
-            "start": {
-              "line": 58,
-              "col": 4
-            },
-            "end": {
-              "line": 58,
-              "col": 36
-            },
-            "name": "bar",
-            "kind": "Method",
-            "type": null,
-            "children": [],
-            "deprecated": false,
-            "selection": {
-              "start": {
-                "line": 58,
-                "col": 11
-              },
-              "end": {
-                "line": 58,
-                "col": 14
-              }
-            }
-          },
-          {
-            "start": {
-              "line": 57,
-              "col": 4
-            },
-            "end": {
-              "line": 57,
-              "col": 16
-            },
-            "name": "foo",
-            "kind": "Value",
-            "type": null,
-            "children": [],
-            "deprecated": false,
-            "selection": {
-              "start": {
-                "line": 57,
-                "col": 8
-              },
-              "end": {
-                "line": 57,
-                "col": 11
-              }
-            }
-          }
-        ],
+        "children": [],
         "deprecated": false,
         "selection": {
           "start": {
@@ -376,290 +487,11 @@
       },
       {
         "start": {
-          "line": 45,
+          "line": 53,
           "col": 0
         },
         "end": {
           "line": 53,
-          "col": 5
-        },
-        "name": "a",
-        "kind": "Class",
-        "type": null,
-        "children": [
-          {
-            "start": {
-              "line": 47,
-              "col": 4
-            },
-            "end": {
-              "line": 52,
-              "col": 9
-            },
-            "name": "b",
-            "kind": "Value",
-            "type": null,
-            "children": [
-              {
-                "start": {
-                  "line": 49,
-                  "col": 8
-                },
-                "end": {
-                  "line": 51,
-                  "col": 32
-                },
-                "name": "inside_a_b",
-                "kind": "Method",
-                "type": null,
-                "children": [
-                  {
-                    "start": {
-                      "line": 50,
-                      "col": 10
-                    },
-                    "end": {
-                      "line": 50,
-                      "col": 31
-                    },
-                    "name": "x_inside_a_b",
-                    "kind": "Value",
-                    "type": "int",
-                    "children": [],
-                    "deprecated": false,
-                    "selection": {
-                      "start": {
-                        "line": 50,
-                        "col": 14
-                      },
-                      "end": {
-                        "line": 50,
-                        "col": 26
-                      }
-                    }
-                  }
-                ],
-                "deprecated": false,
-                "selection": {
-                  "start": {
-                    "line": 49,
-                    "col": 15
-                  },
-                  "end": {
-                    "line": 49,
-                    "col": 25
-                  }
-                }
-              }
-            ],
-            "deprecated": false,
-            "selection": {
-              "start": {
-                "line": 47,
-                "col": 8
-              },
-              "end": {
-                "line": 47,
-                "col": 9
-              }
-            }
-          }
-        ],
-        "deprecated": false,
-        "selection": {
-          "start": {
-            "line": 45,
-            "col": 6
-          },
-          "end": {
-            "line": 45,
-            "col": 7
-          }
-        }
-      },
-      {
-        "start": {
-          "line": 43,
-          "col": 0
-        },
-        "end": {
-          "line": 43,
-          "col": 18
-        },
-        "name": "c",
-        "kind": "Class",
-        "type": null,
-        "children": [],
-        "deprecated": false,
-        "selection": {
-          "start": {
-            "line": 43,
-            "col": 4
-          },
-          "end": {
-            "line": 43,
-            "col": 5
-          }
-        }
-      },
-      {
-        "start": {
-          "line": 37,
-          "col": 0
-        },
-        "end": {
-          "line": 41,
-          "col": 5
-        },
-        "name": "b",
-        "kind": "Class",
-        "type": null,
-        "children": [
-          {
-            "start": {
-              "line": 40,
-              "col": 4
-            },
-            "end": {
-              "line": 40,
-              "col": 39
-            },
-            "name": "bar",
-            "kind": "Method",
-            "type": null,
-            "children": [],
-            "deprecated": false,
-            "selection": {
-              "start": {
-                "line": 40,
-                "col": 11
-              },
-              "end": {
-                "line": 40,
-                "col": 14
-              }
-            }
-          },
-          {
-            "start": {
-              "line": 39,
-              "col": 4
-            },
-            "end": {
-              "line": 39,
-              "col": 16
-            },
-            "name": "foo",
-            "kind": "Value",
-            "type": null,
-            "children": [],
-            "deprecated": false,
-            "selection": {
-              "start": {
-                "line": 39,
-                "col": 8
-              },
-              "end": {
-                "line": 39,
-                "col": 11
-              }
-            }
-          }
-        ],
-        "deprecated": false,
-        "selection": {
-          "start": {
-            "line": 37,
-            "col": 6
-          },
-          "end": {
-            "line": 37,
-            "col": 7
-          }
-        }
-      },
-      {
-        "start": {
-          "line": 35,
-          "col": 0
-        },
-        "end": {
-          "line": 35,
-          "col": 19
-        },
-        "name": "tb",
-        "kind": "ClassType",
-        "type": null,
-        "children": [],
-        "deprecated": false,
-        "selection": {
-          "start": {
-            "line": 35,
-            "col": 4
-          },
-          "end": {
-            "line": 35,
-            "col": 6
-          }
-        }
-      },
-      {
-        "start": {
-          "line": 33,
-          "col": 0
-        },
-        "end": {
-          "line": 33,
-          "col": 26
-        },
-        "name": "ta",
-        "kind": "ClassType",
-        "type": null,
-        "children": [],
-        "deprecated": false,
-        "selection": {
-          "start": {
-            "line": 33,
-            "col": 11
-          },
-          "end": {
-            "line": 33,
-            "col": 13
-          }
-        }
-      },
-      {
-        "start": {
-          "line": 31,
-          "col": 0
-        },
-        "end": {
-          "line": 31,
-          "col": 18
-        },
-        "name": "c",
-        "kind": "Class",
-        "type": null,
-        "children": [],
-        "deprecated": false,
-        "selection": {
-          "start": {
-            "line": 31,
-            "col": 4
-          },
-          "end": {
-            "line": 31,
-            "col": 5
-          }
-        }
-      },
-      {
-        "start": {
-          "line": 29,
-          "col": 0
-        },
-        "end": {
-          "line": 29,
           "col": 18
         },
         "name": "b",
@@ -669,22 +501,22 @@
         "deprecated": false,
         "selection": {
           "start": {
-            "line": 29,
+            "line": 53,
             "col": 4
           },
           "end": {
-            "line": 29,
+            "line": 53,
             "col": 5
           }
         }
       },
       {
         "start": {
-          "line": 27,
+          "line": 51,
           "col": 0
         },
         "end": {
-          "line": 27,
+          "line": 51,
           "col": 20
         },
         "name": "a",
@@ -694,12 +526,238 @@
         "deprecated": false,
         "selection": {
           "start": {
-            "line": 27,
+            "line": 51,
             "col": 6
           },
           "end": {
-            "line": 27,
+            "line": 51,
             "col": 7
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 40,
+          "col": 0
+        },
+        "end": {
+          "line": 49,
+          "col": 3
+        },
+        "name": "S",
+        "kind": "Signature",
+        "type": null,
+        "children": [
+          {
+            "start": {
+              "line": 46,
+              "col": 6
+            },
+            "end": {
+              "line": 46,
+              "col": 20
+            },
+            "name": "y",
+            "kind": "Value",
+            "type": "string",
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 46,
+                "col": 10
+              },
+              "end": {
+                "line": 46,
+                "col": 11
+              }
+            }
+          },
+          {
+            "start": {
+              "line": 45,
+              "col": 6
+            },
+            "end": {
+              "line": 45,
+              "col": 12
+            },
+            "name": "u",
+            "kind": "Type",
+            "type": null,
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 45,
+                "col": 11
+              },
+              "end": {
+                "line": 45,
+                "col": 12
+              }
+            }
+          },
+          {
+            "start": {
+              "line": 43,
+              "col": 4
+            },
+            "end": {
+              "line": 43,
+              "col": 15
+            },
+            "name": "x",
+            "kind": "Value",
+            "type": "int",
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 43,
+                "col": 8
+              },
+              "end": {
+                "line": 43,
+                "col": 9
+              }
+            }
+          },
+          {
+            "start": {
+              "line": 42,
+              "col": 4
+            },
+            "end": {
+              "line": 42,
+              "col": 10
+            },
+            "name": "t",
+            "kind": "Type",
+            "type": null,
+            "children": [],
+            "deprecated": false,
+            "selection": {
+              "start": {
+                "line": 42,
+                "col": 9
+              },
+              "end": {
+                "line": 42,
+                "col": 10
+              }
+            }
+          }
+        ],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 40,
+            "col": 12
+          },
+          "end": {
+            "line": 40,
+            "col": 13
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 36,
+          "col": 4
+        },
+        "end": {
+          "line": 36,
+          "col": 15
+        },
+        "name": "y",
+        "kind": "Value",
+        "type": "string",
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 36,
+            "col": 8
+          },
+          "end": {
+            "line": 36,
+            "col": 9
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 35,
+          "col": 4
+        },
+        "end": {
+          "line": 35,
+          "col": 10
+        },
+        "name": "u",
+        "kind": "Type",
+        "type": null,
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 35,
+            "col": 9
+          },
+          "end": {
+            "line": 35,
+            "col": 10
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 33,
+          "col": 2
+        },
+        "end": {
+          "line": 33,
+          "col": 11
+        },
+        "name": "x",
+        "kind": "Value",
+        "type": "int",
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 33,
+            "col": 6
+          },
+          "end": {
+            "line": 33,
+            "col": 7
+          }
+        }
+      },
+      {
+        "start": {
+          "line": 32,
+          "col": 2
+        },
+        "end": {
+          "line": 32,
+          "col": 8
+        },
+        "name": "t",
+        "kind": "Type",
+        "type": null,
+        "children": [],
+        "deprecated": false,
+        "selection": {
+          "start": {
+            "line": 32,
+            "col": 7
+          },
+          "end": {
+            "line": 32,
+            "col": 8
           }
         }
       },
@@ -709,8 +767,8 @@
           "col": 0
         },
         "end": {
-          "line": 25,
-          "col": 42
+          "line": 29,
+          "col": 3
         },
         "name": "point",
         "kind": "Type",
@@ -718,12 +776,12 @@
         "children": [
           {
             "start": {
-              "line": 25,
-              "col": 34
+              "line": 28,
+              "col": 4
             },
             "end": {
-              "line": 25,
-              "col": 40
+              "line": 28,
+              "col": 10
             },
             "name": "z",
             "kind": "Label",
@@ -732,23 +790,23 @@
             "deprecated": false,
             "selection": {
               "start": {
-                "line": 25,
-                "col": 34
+                "line": 28,
+                "col": 4
               },
               "end": {
-                "line": 25,
-                "col": 35
+                "line": 28,
+                "col": 5
               }
             }
           },
           {
             "start": {
-              "line": 25,
-              "col": 26
+              "line": 27,
+              "col": 4
             },
             "end": {
-              "line": 25,
-              "col": 33
+              "line": 28,
+              "col": 3
             },
             "name": "y",
             "kind": "Label",
@@ -757,23 +815,23 @@
             "deprecated": false,
             "selection": {
               "start": {
-                "line": 25,
-                "col": 26
+                "line": 27,
+                "col": 4
               },
               "end": {
-                "line": 25,
-                "col": 27
+                "line": 27,
+                "col": 5
               }
             }
           },
           {
             "start": {
-              "line": 25,
-              "col": 18
+              "line": 26,
+              "col": 4
             },
             "end": {
-              "line": 25,
-              "col": 25
+              "line": 27,
+              "col": 3
             },
             "name": "x",
             "kind": "Label",
@@ -782,12 +840,12 @@
             "deprecated": false,
             "selection": {
               "start": {
-                "line": 25,
-                "col": 18
+                "line": 26,
+                "col": 4
               },
               "end": {
-                "line": 25,
-                "col": 19
+                "line": 26,
+                "col": 5
               }
             }
           }
@@ -1790,7 +1848,6 @@
     ],
     "notifications": []
   }
-<<<<<<< HEAD
   $ $MERLIN single outline < path.ml | jq '.value[].type'
   "A.a"
   null
@@ -1825,12 +1882,27 @@ Check that when we pass "-include-types false", every "type" is null.
   null
   null
   null
-||||||| c76379cdae
-  $ $MERLIN single outline < path.ml | jq '.value[].type'
-  "A.a"
   null
-  $ $MERLIN single outline -short-paths < path.ml | jq '.value[].type'
-  "a"
   null
-=======
->>>>>>> v5.6-504
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null

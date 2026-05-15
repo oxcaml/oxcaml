@@ -21,13 +21,7 @@ provide better result.
           "line": 1,
           "col": 25
         },
-<<<<<<< HEAD
         "type": "type b : any = b",
-||||||| c76379cdae
-        "type": "type b = 'a",
-=======
-        "type": "b",
->>>>>>> v5.6-504
         "tail": "no"
       },
       {
