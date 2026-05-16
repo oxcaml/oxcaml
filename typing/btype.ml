@@ -2531,12 +2531,12 @@ module Jkind0 = struct
     let for_or_null_payload path =
       for_or_null_payload_with_history (Or_null_payload path)
 
-    let for_variant_with_null_result path param =
+    let for_variant_with_null_result path payload_ty =
       let why : Jkind_intf.History.value_or_null_creation_reason =
         Or_null_payload path
       in
       Builtin.value_or_null ~why
-      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
+      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:payload_ty
       |> mark_best
   end
 

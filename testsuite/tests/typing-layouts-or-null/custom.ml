@@ -273,6 +273,44 @@ type ('a, 'b) multi_param_succeeds_nonfloat =
     ('a, 'b) multi_param accepts_nonfloat
 |}]
 
+type ('a, 'b) second_param =
+  | Nope_second
+  | Yep_second of 'b
+[@@or_null]
+
+[%%expect{|
+type ('a, 'b) second_param = Nope_second | Yep_second of 'b [@@or_null]
+|}]
+
+type second_param_succeeds_sep =
+  (float, t_non_float) second_param accepts_sep
+
+type second_param_succeeds_nonfloat =
+  (float, t_non_float) second_param accepts_nonfloat
+
+[%%expect{|
+type second_param_succeeds_sep =
+    (float, t_non_float) second_param accepts_sep
+type second_param_succeeds_nonfloat =
+    (float, t_non_float) second_param accepts_nonfloat
+|}]
+
+type second_param_fails_nonfloat =
+  (t_non_float, float) second_param accepts_nonfloat
+
+[%%expect{|
+Line 2, characters 2-36:
+2 |   (t_non_float, float) second_param accepts_nonfloat
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "(t_non_float, float) second_param" should be an instance of type
+         "('a : value_or_null non_float)"
+       The layout of (t_non_float, float) second_param is value_or_null
+         because of the definition of second_param at lines 1-4, characters 0-11.
+       But the layout of (t_non_float, float) second_param must be a sublayout
+           of value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
 type bad_payload =
   | Nope_bad
   | Yep_bad of int t
@@ -496,6 +534,40 @@ end
 
 [%%expect{|
 module M : sig type 'a t = Nope | Yep of 'a [@@or_null] end
+|}]
+
+module New_shape_inclusion : sig
+  type t : value_or_null mod non_float =
+    | New_shape_null
+    | New_shape_payload of t_non_float
+  [@@or_null]
+
+  type ('a, 'b) multi : value_or_null mod non_float =
+    | New_shape_multi_null
+    | New_shape_multi_payload of ('a list * 'b)
+  [@@or_null]
+end = struct
+  type t : value_or_null mod non_float =
+    | New_shape_null
+    | New_shape_payload of t_non_float
+  [@@or_null]
+
+  type ('a, 'b) multi : value_or_null mod non_float =
+    | New_shape_multi_null
+    | New_shape_multi_payload of ('a list * 'b)
+  [@@or_null]
+end
+
+[%%expect{|
+module New_shape_inclusion :
+  sig
+    type t =
+        New_shape_null
+      | New_shape_payload of t_non_float [@@or_null]
+    type ('a, 'b) multi =
+        New_shape_multi_null
+      | New_shape_multi_payload of ('a list * 'b) [@@or_null]
+  end
 |}]
 
 module M : sig
