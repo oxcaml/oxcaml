@@ -2593,12 +2593,12 @@ module Jkind0 = struct
       in
       Builtin.value ~why
 
-    let for_variant_with_null_result path payload_ty =
+    let for_variant_with_null_result path ~modality payload_ty =
       let why : Jkind_intf.History.value_or_null_creation_reason =
         Or_null_payload path
       in
       Builtin.value_or_null ~why
-      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:payload_ty
+      |> add_with_bounds ~modality ~type_expr:payload_ty
       |> mark_best
   end
 

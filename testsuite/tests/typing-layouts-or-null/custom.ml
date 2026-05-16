@@ -153,8 +153,7 @@ Lines 1-5, characters 0-11:
 Error: Invalid [@or_null] declaration: it must have exactly two constructors.
 |}]
 
-(* CR or-null: allow non-parameterized custom [@@or_null] types.
-   Internal ticket 6853. *)
+(* Non-parameterized custom [@@or_null] types. *)
 
 type no_param =
   | A
@@ -238,8 +237,7 @@ Error: The layout of type "probe_result" is value_or_null non_pointer
          because of the annotation on the declaration of the type probe_result.
 |}]
 
-(* CR or-null: allow custom [@@or_null] types with unused type parameters.
-   Internal ticket 6853. *)
+(* Custom [@@or_null] types with unused type parameters. *)
 
 type 'a unused_param =
   | A
@@ -299,15 +297,15 @@ type second_param_fails_nonfloat =
   (t_non_float, float) second_param accepts_nonfloat
 
 [%%expect{|
-Line 2, characters 2-36:
+Line 2, characters 2-35:
 2 |   (t_non_float, float) second_param accepts_nonfloat
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type "(t_non_float, float) second_param" should be an instance of type
-         "('a : value_or_null non_float)"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "(t_non_float, float) second_param"
+       should be an instance of type "('a : value_or_null non_float)"
        The layout of (t_non_float, float) second_param is value_or_null
          because of the definition of second_param at lines 1-4, characters 0-11.
-       But the layout of (t_non_float, float) second_param must be a sublayout
-           of value_or_null non_float
+       But the layout of (t_non_float, float) second_param must be a sublayout of
+         value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
@@ -569,9 +567,7 @@ end
 [%%expect{|
 module New_shape_inclusion :
   sig
-    type t =
-        New_shape_null
-      | New_shape_payload of t_non_float [@@or_null]
+    type t = New_shape_null | New_shape_payload of t_non_float [@@or_null]
     type ('a, 'b) multi =
         New_shape_multi_null
       | New_shape_multi_payload of ('a list * 'b) [@@or_null]
