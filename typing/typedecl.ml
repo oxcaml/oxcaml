@@ -222,9 +222,11 @@ let check_or_null_constructors bad = function
     bad "it must have exactly two constructors"
 
 let check_or_null_variant_shape sdecl scstrs =
-  let bad msg = Error (sdecl.ptype_loc, Bad_or_null_attribute msg) in
-  check_or_null_decl (fun msg -> raise (bad msg)) sdecl;
-  check_or_null_constructors (fun msg -> raise (bad msg)) scstrs
+  let bad msg =
+    raise (Error (sdecl.ptype_loc, Bad_or_null_attribute msg))
+  in
+  check_or_null_decl bad sdecl;
+  check_or_null_constructors bad scstrs
 
 let get_or_null_payload_arg cstrs : Types.constructor_argument =
   match Datarepr.find_variant_with_null_payload cstrs with
@@ -1066,8 +1068,9 @@ let transl_declaration env sdecl (id, uid) =
           match or_null_payload_arg with
           | Some payload_arg ->
             let payload_ty = payload_arg.Types.ca_type in
+            let modality = payload_arg.Types.ca_modalities in
             Variant_with_null,
-            Btype.Jkind0.for_variant_with_null_result path payload_ty
+            Btype.Jkind0.for_variant_with_null_result path ~modality payload_ty
           | None ->
             if unbox then
               Variant_unboxed,
