@@ -34,6 +34,7 @@ struct stack_handler {
   value handle_value;
   value handle_exn;
   value handle_effect;
+  value handle_tick; /* tick handler callback, NULL if not preemptible */
   struct stack_info* parent; /* parent OCaml stack if any */
 };
 
@@ -91,7 +92,9 @@ struct stack_info {
 #define Stack_handle_value(stk) (stk)->handler->handle_value
 #define Stack_handle_exception(stk) (stk)->handler->handle_exn
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
+#define Stack_handle_tick(stk) (stk)->handler->handle_tick
 #define Stack_parent(stk) (stk)->handler->parent
+#define Stack_is_preemptible(stk) (Stack_handle_tick(stk) != Val_null)
 
 /* Stack layout for native code. Stack grows downwards.
  *
@@ -290,6 +293,12 @@ extern value caml_global_data;
 #define Trap_pc(tp) (((code_t *)(tp))[0])
 #define Trap_link(tp) ((tp)[1])
 
+/* type tick_outcome in stdlib/effect.ml */
+enum tick_outcome {
+  TICK_RESULT_PREEMPT = 0,
+  TICK_RESULT_CONTINUE = 1
+};
+
 struct stack_cache {
   _Atomic(struct stack_info*) head;
   _Atomic(uintnat) len;
@@ -309,6 +318,11 @@ void caml_scan_stack(
 value caml_alloc_stack(value hval, value hexn, value heff);
 value caml_alloc_stack_bind(value hval, value hexn, value heff, value dyn,
                             value bind);
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
+                                   value htick);
+value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
+                                        value htick, value dyn,
+                                        value bind);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
                                           value hexn, value heff,
                                           value dyn, value bind,
@@ -367,6 +381,8 @@ bool caml_continuation_is_preemption(value cont);
 /* If the given continuation is a preeempted continuation, returns a pointer to
    its [gc_regs] struct, or NULL otherwise */
 value* caml_continuation_gc_regs(value cont);
+
+value caml_tick_fiber_exn(struct stack_info* stack);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 
