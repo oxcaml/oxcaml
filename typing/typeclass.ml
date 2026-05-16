@@ -832,7 +832,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                    in
                    Ctype.unify val_env (Ctype.newmono ty') ty;
                    Typecore.type_approx val_env sbody ty'
-               | Tpoly (ty1, tl) ->
+               | Tpoly (ty1, tl, _) ->
                    let ty1' = Ctype.instance_poly tl ty1 in
                    Typecore.type_approx val_env sbody ty1'
                | _ -> assert false
@@ -965,7 +965,7 @@ and class_field_second_pass cl_num sign met_env field =
            let ty = Btype.method_type label.txt sign in
            let self_type = sign.Types.csig_self in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
-           let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
+           let self_param_type = Btype.newgenty (Tpoly(self_type, [], None)) in
            let meth_type =
              Typecore.mk_expected (Btype.newgenty
                 (Tarrow(arrow_desc, self_param_type, ty, commu_ok)))
@@ -983,7 +983,9 @@ and class_field_second_pass cl_num sign met_env field =
       Warnings.with_state warning_state
         (fun () ->
            let unit_type = Ctype.instance Predef.type_unit in
-           let self_param_type = Ctype.newmono sign.Types.csig_self in
+           let self_param_type =
+             Ctype.newmono sign.Types.csig_self
+           in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
            let meth_type =
              Typecore.mk_expected (Ctype.newty
@@ -1200,7 +1202,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           cl_attributes = scl.pcl_attributes;
          }
   | Pcl_fun (l, Some default, spat, sbody) ->
-      if Typecore.has_poly_constraint spat then
+      if Btype.is_explicitly_poly (Typecore.has_poly_constraint spat) then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let loc = default.pexp_loc in
       let open Ast_helper in
@@ -1240,7 +1242,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       class_expr cl_num val_env met_env virt self_scope sfun
   | Pcl_fun (l, None, spat, scl') ->
       let l, spat = Typetexp.transl_label_from_pat l spat in
-      if Typecore.has_poly_constraint spat then
+      if Btype.is_explicitly_poly (Typecore.has_poly_constraint spat) then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let (pat, pv, val_env', met_env) =
         Ctype.with_local_level_if_principal
@@ -1489,7 +1491,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                 val_kind = Val_ivar (Immutable, cl_num);
                 val_lpoly = Lpoly.determined [];
                 val_attributes = [];
-                val_zero_alloc = Zero_alloc.default;
+                val_zero_alloc = vd.val_zero_alloc;
                 Types.val_loc = vd.val_loc;
                 val_uid = vd.val_uid;
                }

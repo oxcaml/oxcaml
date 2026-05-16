@@ -595,8 +595,12 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
   let lbls' =
     List.map
       (fun ld ->
-         let ty = ld.ld_type.ctyp_type in
-         let ty = match get_desc ty with Tpoly(t,[]) -> t | _ -> ty in
+         let ty =
+           match get_desc ld.ld_type.ctyp_type with
+           | Tpoly(t,[],None) -> t
+           | Tpoly(_,[],Some _) -> fatal_error "transl_labels (zero_alloc)"
+           | _ -> ld.ld_type.ctyp_type
+         in
          check_representable ~why:(Label_declaration ld.ld_id)
            env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
@@ -1471,7 +1475,7 @@ let rec check_constraints_rec env loc visited ty =
         | All_good -> ()
       end;
       List.iter (check_constraints_rec env loc visited) args
-  | Tpoly (ty, tl) ->
+  | Tpoly (ty, tl, _za) ->
       let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
   | _ ->
@@ -2968,7 +2972,7 @@ let check_regularity ~abs_env env loc path decl to_check =
             with Not_found -> ()
           end;
           List.iter (check_subtype cpath args prev_exp trace ty env) args'
-      | Tpoly (ty, tl) ->
+      | Tpoly (ty, tl, _) ->
           let ty = Ctype.instance_poly ~keep_names:true tl ty in
           check_regular cpath args prev_exp trace env ty
       | _ ->
@@ -4035,7 +4039,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
-    let t1, _ = Btype.tpoly_get_poly t1 in
+    let t1, _, _ = Btype.tpoly_get_poly t1 in
     let repr_arg =
       make_native_repr
         env ct1 t1 ~global_repr
@@ -4076,7 +4080,7 @@ let check_unboxable env loc ty =
         if tydecl.type_unboxed_default then
           Path.Set.add p acc
         else acc
-      | Tpoly (ty, []) -> check_type acc ty
+      | Tpoly (ty, [], _za) -> check_type acc ty
       | _ -> acc
     with Not_found -> acc
   in
@@ -4242,7 +4246,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
   let v =
   match valdecl.pval_prim with
     [] when Env.is_in_signature env ->
-      let default_arity =
+      let fun_arity =
         let rec count_arrows n ty =
           match get_desc ty with
           | Tarrow (_, _, t2, _) -> count_arrows (n+1) t2
@@ -4250,24 +4254,29 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         count_arrows 0 ty
       in
+      let usage = Builtin_attributes.Value_decl fun_arity in
       let zero_alloc =
-        Builtin_attributes.get_zero_alloc_attribute ~in_signature:true
-          ~on_application:false
-          ~default_arity valdecl.pval_attributes
+        (try
+           Builtin_attributes.get_zero_alloc_attribute usage
+             valdecl.pval_attributes
+         with
+         | Builtin_attributes.Error_builtin
+             (_, Builtin_attributes.Zero_alloc_attr_non_function) ->
+           raise (Error (valdecl.pval_loc, Zero_alloc_attr_non_function)))
       in
       let zero_alloc =
         match zero_alloc with
         | Default_zero_alloc ->
           (* We fabricate a "Check" attribute if a top-level annotation
              specifies that all functions should be checked for zero alloc. *)
-          if default_arity = 0 then begin
+          if fun_arity = 0 then begin
             check_for_hidden_arrow env loc ty;
             Zero_alloc.default
           end else
             let create_const ~opt =
               Zero_alloc.create_const
                 (Check { strict = false;
-                         arity = default_arity;
+                         arity = fun_arity;
                          custom_error_msg = None;
                          loc;
                          opt })
@@ -4277,10 +4286,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
              | Assert_all -> create_const ~opt:false
              | Assert_all_opt -> create_const ~opt:true)
         | Ignore_assert_all -> Zero_alloc.ignore_assert_all
-        | Check za ->
-          if default_arity = 0 && za.arity <= 0 then
+        | Check {arity; _} ->
+          if fun_arity = 0 && arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_non_function));
-          if za.arity <= 0 then
+          if arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_bad_user_arity));
           Zero_alloc.create_const zero_alloc
         | Assume _ ->
@@ -4979,7 +4988,8 @@ let report_error_doc ppf = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
-      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _ -> None
+      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
+      | Incompatible_zero_alloc _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->

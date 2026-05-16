@@ -69,6 +69,20 @@
     marshalled ast files if no ppx is being used, ensuring we don't miss
     attributes in that case.
 *)
+type error =
+  | Must_provide_zero_alloc_arity
+  | Zero_alloc_attr_non_function
+
+exception Error_builtin of Location.t * error
+
+type zero_alloc_attribute_use =
+  (* any int payload is the default arity from the usage location *)
+  | Value_decl of int
+  | Function_param
+  | Arrow_lhs of int
+  | Function_definition of int
+  | Application of int
+
 type current_phase = Parser | Invariant_check
 val register_attr : current_phase -> string Location.loc -> unit
 
@@ -320,12 +334,12 @@ type zero_alloc_attribute =
 
 val is_zero_alloc_check_enabled : opt:bool -> bool
 
-(* Gets a zero_alloc attribute.  [~in_signature] controls both whether the
-   "arity n" field is allowed, and whether we track this attribute for
-   warning 199. *)
+(* Gets a zero_alloc attribute.  The [zero_alloc_attribute_use]-typed argument
+   tells us about the context in which this attribute is used, which as the
+   effect on deciding whether the "arity n" field is allowed, and whether we
+   track this attribute for warning 199. *)
 val get_zero_alloc_attribute :
-  in_signature:bool -> on_application:bool-> default_arity:int -> Parsetree.attributes ->
-  zero_alloc_attribute
+  zero_alloc_attribute_use -> Parsetree.attributes -> zero_alloc_attribute
 
 (* This returns the [zero_alloc_assume] if the input is an assume.  Otherwise,
    it returns None. If the input attribute is [Check], this issues a warning. *)

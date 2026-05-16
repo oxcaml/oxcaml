@@ -1313,13 +1313,20 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
   let f id sloc _ _uid mode sort =
     Ident.Tbl.add modes_and_sorts id (sloc.loc, mode, sort)
   in
+  let rec idents_of_pat pat =
+    match pat.pat_desc with
+    | Tpat_var { id; _ } -> [id]
+    | Tpat_alias { pattern; id; _ } -> id :: idents_of_pat pattern
+    | Tpat_or (p1, _, _) -> idents_of_pat p1
+    | _ -> []
+  in
   let checks =
     List.fold_left (fun checks vb ->
       for_typing iter_pattern_full
         ~both_sides_of_or:true
         f vb.vb_pat;
-       match vb.vb_pat.pat_desc, vb.vb_expr.exp_desc with
-       | Tpat_var { id; _ }, Texp_function fn ->
+       match idents_of_pat vb.vb_pat, vb.vb_expr.exp_desc with
+       | (_ :: _ as ids), Texp_function fn ->
          let zero_alloc =
            match Zero_alloc.get fn.zero_alloc with
            | Default_zero_alloc ->
@@ -1346,7 +1353,9 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
                 | Assert_all_opt -> create_const ~opt:true)
            | Ignore_assert_all | Check _ | Assume _ -> fn.zero_alloc
          in
-         Ident.Map.add id zero_alloc checks
+         List.fold_left
+           (fun checks id -> Ident.Map.add id zero_alloc checks)
+           checks ids
          (* CR ccasinghino: To keep the zero-alloc annotation info aliases, it
             may be enough to copy it if the vb_expr is an ident. *)
        | _ -> checks

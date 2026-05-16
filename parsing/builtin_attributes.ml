@@ -17,6 +17,18 @@ open Asttypes
 open Parsetree
 open Ast_helper
 
+type error =
+  | Must_provide_zero_alloc_arity
+  | Zero_alloc_attr_non_function
+
+exception Error_builtin of Location.t * error
+
+type zero_alloc_attribute_use =
+  | Value_decl of int
+  | Function_param
+  | Arrow_lhs of int
+  | Function_definition of int
+  | Application of int
 
 module Attribute_table = Hashtbl.Make (struct
   type t = string with_loc
@@ -1006,7 +1018,15 @@ let parse_zero_alloc_payload ~loc ~arity ~custom_error_message
     | None -> warn ();  Default_zero_alloc
     | Some ca -> ca arity loc custom_error_message
 
-let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr =
+let parse_zero_alloc_attribute usage attr =
+  let in_signature, on_function_argument, on_application =
+    match usage with
+    | Value_decl _ -> true, false, false
+    | Function_param -> false, true, false
+    | Arrow_lhs _ -> false, true, false
+    | Function_definition _ -> false, false, false
+    | Application _ -> false, false, true
+  in
   match attr with
   | None -> Default_zero_alloc
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
@@ -1030,9 +1050,16 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
     let empty arity custom_error_msg =
       Check { strict = false; opt = false; arity; loc; custom_error_msg; }
     in
+    let default_arity () = begin
+      match usage with
+      | Function_param ->
+        raise (Error_builtin (loc, Must_provide_zero_alloc_arity))
+      | Value_decl arity | Arrow_lhs arity
+      | Function_definition arity | Application arity -> arity
+    end in
     match get_optional_payload get_ids_and_constants_from_exp payload with
     | Error () -> warn (); Default_zero_alloc
-    | Ok None -> empty default_arity None
+    | Ok None -> empty (default_arity ()) None
     | Ok (Some payload) ->
       let custom_error_message, payload =
         match filter_custom_error_message payload with
@@ -1049,17 +1076,21 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
           else
             Some custom_error_message, payload
       in
+      if List.filter_map
+           (function (Ident, s) -> Some s | _ -> None) payload
+         = ["ignore"] then Ignore_assert_all
+      else
       let arity, payload =
         match filter_arity payload with
-        | None -> default_arity, payload
+        | None -> default_arity (), payload
         | Some (user_arity, payload) ->
-          if in_signature then
+          if in_signature || on_function_argument then
             user_arity, payload
           else
             (warn_payload loc txt
                "The \"arity\" field is only supported on \"zero_alloc\" in \
-                signatures";
-             default_arity, payload)
+                signatures or on function arguments";
+             default_arity (), payload)
       in
       let _, payload = List.split payload in
       let parse p =
@@ -1099,20 +1130,20 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
             Default_zero_alloc)
 
 
-let get_zero_alloc_attribute ~in_signature ~on_application ~default_arity l =
+let get_zero_alloc_attribute usage l =
   let attr = select_attribute is_zero_alloc_attribute l in
-  let res =
-      parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity
-        attr
-  in
-  (match attr, res with
-   | None, Default_zero_alloc -> ()
-   | _, Default_zero_alloc -> ()
-   | None, (Check _ | Assume _ | Ignore_assert_all) -> assert false
-   | Some _, Ignore_assert_all -> ()
-   | Some _, Assume _ -> ()
-   | Some attr, Check { opt; _ } ->
-     if not in_signature && is_zero_alloc_check_enabled ~opt && !Clflags.native_code then
+  let res = parse_zero_alloc_attribute usage attr in
+  (match attr, res, usage with
+   | None, Default_zero_alloc, _ -> ()
+   | _, Default_zero_alloc, _ -> ()
+   | None, (Check _ | Assume _ | Ignore_assert_all), _ -> assert false
+   | Some _, Ignore_assert_all, _ -> ()
+   | Some _, Assume _, _ -> ()
+   | Some _, Check _,
+     (Value_decl _ | Function_param | Application _ | Arrow_lhs _) ->
+     ()
+   | Some attr, Check { opt; _ }, Function_definition _ ->
+     if is_zero_alloc_check_enabled ~opt && !Clflags.native_code then
        (* The warning for unchecked functions will not trigger if the check is
           requested through the [@@@zero_alloc all] top-level annotation rather
           than through the function annotation [@zero_alloc]. *)
@@ -1186,3 +1217,23 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
   Ok { name; name_loc; enabled_at_init; arg }
 
 let has_atomic attrs = has_attribute "atomic" attrs
+
+let report_error ~loc =
+  function
+  | Must_provide_zero_alloc_arity ->
+      Location.errorf ~loc
+        "Zero-alloc annotations on function arguments must specify arity."
+  | Zero_alloc_attr_non_function ->
+      Location.errorf ~loc
+        "%a attributes on function arguments require the argument@ \
+         to be a function type."
+        Style.inline_code "zero_alloc"
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error_builtin (loc, err) ->
+        Some (report_error ~loc err)
+      | _ ->
+        None
+    )

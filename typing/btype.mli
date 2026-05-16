@@ -122,10 +122,19 @@ val proxy: type_expr -> type_expr
 
 (* Poly types. *)
 
-(* These three functions can only be called on [Tpoly] nodes. *)
+(* These four functions can only be called on [Tpoly] nodes. *)
 val tpoly_is_mono : type_expr -> bool
 val tpoly_get_mono : type_expr -> type_expr
-val tpoly_get_poly : type_expr -> type_expr * type_expr list
+val tpoly_get_inner : type_expr -> type_expr
+val tpoly_get_poly :
+  type_expr -> type_expr * type_expr list * Zero_alloc.check option
+
+(* zero_alloc. *)
+
+type explicit_poly =
+  | Mono
+  | Poly of Zero_alloc.check option
+val is_explicitly_poly : explicit_poly -> bool
 
 (**** Utilities for private abbreviations with fixed rows ****)
 val row_of_type: type_expr -> type_expr

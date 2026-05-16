@@ -74,6 +74,7 @@ type pattern_variable =
     pv_lpoly: Types.Lpoly.t;
     (** Not yet determined; gets determined during generalization in
         [type_let]. *)
+    pv_zero_alloc: Zero_alloc.t;
   }
 
 val mk_expected:
@@ -176,7 +177,7 @@ val force_delayed_checks: unit -> unit
 val reset_allocations: unit -> unit
 val optimise_allocations: unit -> unit
 
-val has_poly_constraint : Parsetree.pattern -> bool
+val has_poly_constraint : Parsetree.pattern -> Btype.explicit_poly
 
 
 val name_pattern : string -> Typedtree.pattern list -> Ident.t * Uid.t
@@ -353,6 +354,11 @@ type error =
   | Let_poly_not_yet_implemented
   | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Wrong_arg_zero_alloc of Zero_alloc.error
+  | Unsupported_arg_zero_alloc
+  | Invalid_payload_arg_zero_alloc
+  | Incompatible_param_zero_alloc of Zero_alloc.error
+  | Zero_alloc_on_non_var_pattern
 
 and invalid_layout_poly_inst_context =
   | Binding_op
