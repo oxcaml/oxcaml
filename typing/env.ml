@@ -1274,11 +1274,6 @@ let imports () = Persistent_env.imports !persistent_env
 let import_crcs ~source crcs =
   Persistent_env.import_crcs !persistent_env ~source crcs
 
-let require_global_for_quote name =
-  Persistent_env.require_global_for_quote !persistent_env name
-
-let quoted_globals () = Persistent_env.quoted_globals !persistent_env
-
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
 
@@ -1859,6 +1854,28 @@ let add_required_ident id env =
     | AHunit cu -> add_required_unit cu
 let add_required_global path env =
   add_required_ident (Path.head path) env
+
+let add_required_global_for_quote path env =
+  let address = find_module_address path env in
+  begin match address_head address with
+  | AHlocal _ -> ()
+  | AHunit cu ->
+    add_required_unit cu;
+    Persistent_env.require_impl_for_quote !persistent_env cu
+  end;
+  begin match Ident.to_global (Path.head path) with
+  | None -> ()
+  | Some global ->
+    Persistent_env.require_intf_for_quote !persistent_env
+      (Compilation_unit.Name.of_head_of_global_name global)
+  end
+
+let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
+
+let loaded_transitive_dependencies intfs =
+  Persistent_env.loaded_transitive_dependencies !persistent_env intfs
+
+let quoted_impls () = Persistent_env.quoted_impls !persistent_env
 
 let rec normalize_module_path lax env = function
   | Pident id as path when lax && Ident.is_global id ->

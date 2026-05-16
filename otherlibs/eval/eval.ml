@@ -85,7 +85,8 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_arg_descr = uir.uir_arg_descr;
             ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
             ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
-            ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
+            ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
+            ui_quoted_cmx = uir.uir_quoted_cmx |> Array.to_list;
             ui_generic_fns = uir.uir_generic_fns;
             ui_export_info = export_info;
             ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
@@ -132,6 +133,10 @@ let eval (expr : 'a expr) =
   Clflags.dlcode := false;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
+  (* We need this in case the quote contains unused module aliases that point to
+     modules we don't have the CMI for. It's weird but it would compile if the
+     initial compile also had this set, and setting this doesn't hurt. *)
+  Clflags.transparent_modules := true;
   (* ensure Stdlib is linked during eval *)
   Clflags.nopervasives := false;
   Clflags.no_std_include := false;

@@ -176,6 +176,18 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
 val add_required_global: Path.t -> t -> unit
+val add_required_global_for_quote: Path.t -> t -> unit
+
+(* Return the set of interfaces referenced by quotes *)
+val quoted_intfs: unit -> Compilation_unit.Name.Set.t
+
+(* Compute the transitive closure of the dependencies of these interfaces that
+   have been loaded by typing. Always includes the input interfaces. *)
+val loaded_transitive_dependencies:
+  Compilation_unit.Name.Set.t -> Compilation_unit.Name.Set.t
+
+(* Return the set of implementations referenced by quotes *)
+val quoted_impls: unit -> Compilation_unit.Set.t
 
 val reset_probes: unit -> unit
 val add_probe: string -> unit
@@ -608,13 +620,6 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
-
-(* Require that the provided compilation unit will be available at quotation
-   compile time. *)
-val require_global_for_quote: Compilation_unit.Name.t -> unit
-
-(* Return the set of compilation units referenced by quotes *)
-val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
