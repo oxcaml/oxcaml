@@ -1,5 +1,9 @@
 (* TEST
-  readonly_files = "gen-native.sh test_byte.ml test_native.ml";
+  readonly_files = "\
+    gen-native.sh \
+    test_byte.ml test_native.ml \
+    test_functorize_byte.ml test_functorize_native.ml \
+  ";
 
   setup-ocamlc.byte-build-env;
 

@@ -28,6 +28,15 @@ val instance:
   arg_descr:Lambda.arg_descr option ->
   keep_symbol_tables:bool -> unit
 
+val functorize:
+  source_file:string -> output_prefix:string ->
+  compilation_unit:Compilation_unit.t ->
+  initial_env:Env.t ->
+  all_params:Global_module.t list ->
+  modules_cu:Compilation_unit.t list ->
+  modules:(Compilation_unit.t * Lambda.main_module_block_format) list ->
+  unit
+
 (** {2 Internal functions} **)
 
 val to_bytecode :
