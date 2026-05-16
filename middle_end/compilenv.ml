@@ -65,6 +65,7 @@ let current_unit =
     ui_zero_alloc_info = Zero_alloc_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
+    ui_static_data = Slambdaeval.Or_missing.Missing;
   }
 
 let reset unit_info =
@@ -87,7 +88,8 @@ let reset unit_info =
   Zero_alloc_info.reset current_unit.ui_zero_alloc_info;
   Hashtbl.clear exported_constants;
   current_unit.ui_export_info <- None;
-  current_unit.ui_external_symbols <- []
+  current_unit.ui_external_symbols <- [];
+  current_unit.ui_static_data <- Slambdaeval.Or_missing.Missing
 
 let record_external_symbols () =
   current_unit.ui_external_symbols <- (List.filter_map (fun prim ->
@@ -130,6 +132,7 @@ let read_unit_info filename =
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+      ui_static_data = uir.uir_static_data;
     }
     in
     (ui, crc)
@@ -158,53 +161,68 @@ let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
   && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
 
-let get_unit_export_info comp_unit =
+let get_unit comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
+  let name = CU.to_global_name_without_prefix comp_unit in
+  try
+    Infos_table.find global_infos_table name
+  with Not_found ->
+    let (infos, crc) =
+      if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
+      else begin
+        let missing_extension =
+          match !Clflags.jsir with
+          | false -> "cmx"
+          | true -> "cmjx"
+        in
+        try
+          let filename =
+            Load_path.find_normalized
+              (CU.base_filename comp_unit ^ "." ^ missing_extension) in
+          let (ui, crc) = read_unit_info filename in
+          if not (CU.equal ui.ui_unit comp_unit) then
+            raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
+          cache_zero_alloc_info ui.ui_zero_alloc_info;
+          (Some ui, Some crc)
+        with Not_found ->
+          let warn =
+            Warnings.No_cmx_file
+              { missing_extension
+              ; module_name = Global_module.Name.to_string name }
+          in
+          Location.prerr_warning Location.none warn;
+          (None, None)
+        end
+    in
+    let import = Import_info.create_normal comp_unit ~crc in
+    current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
+    Infos_table.add global_infos_table name infos;
+    infos
+
+let get_unit_export_info comp_unit =
   (* CR lmaurer: Surely this should just compare [comp_unit] to
-     [current_unit.ui_unit], but doing so seems to break Closure. We should fix
-     that. *)
+    [current_unit.ui_unit], but doing so seems to break Closure. We should fix
+    that. *)
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
   then
     current_unit.ui_export_info
   else begin
-    let name = CU.to_global_name_without_prefix comp_unit in
-    try
-      let ui = Infos_table.find global_infos_table name in
-      Option.bind ui (fun ui -> ui.ui_export_info)
-    with Not_found ->
-      let (infos, crc) =
-        if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
-        else begin
-          let missing_extension =
-            match !Clflags.jsir with
-            | false -> "cmx"
-            | true -> "cmjx"
-          in
-          try
-            let filename =
-              Load_path.find_normalized
-                (CU.base_filename comp_unit ^ "." ^ missing_extension) in
-            let (ui, crc) = read_unit_info filename in
-            if not (CU.equal ui.ui_unit comp_unit) then
-              raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
-            cache_zero_alloc_info ui.ui_zero_alloc_info;
-            (Some ui, Some crc)
-          with Not_found ->
-            let warn =
-              Warnings.No_cmx_file
-                { missing_extension
-                ; module_name = Global_module.Name.to_string name }
-            in
-            Location.prerr_warning Location.none warn;
-            (None, None)
-          end
-      in
-      let import = Import_info.create_normal comp_unit ~crc in
-      current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
-      Infos_table.add global_infos_table name infos;
-      Option.bind infos (fun ui -> ui.ui_export_info)
+    Option.bind (get_unit comp_unit) (fun ui -> ui.ui_export_info)
+  end
+
+let get_static_data comp_unit =
+  assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
+  if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
+  then
+    Misc.fatal_errorf_doc
+      "Compilenv.get_static_data: requested data of the current unit (%a)"
+      CU.print comp_unit
+  else begin
+    match get_unit comp_unit with
+    | Some ui -> ui.ui_static_data
+    | None -> Slambdaeval.Or_missing.Missing
   end
 
 let which_cmx_file comp_unit =
@@ -293,6 +311,7 @@ let write_unit_info info filename =
     uir_section_toc = toc;
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
+    uir_static_data = info.ui_static_data;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -302,15 +321,16 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let save_unit_info filename ~main_module_block_format ~arg_descr =
+let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
   current_unit.ui_imports_cmi <- Env.imports();
   current_unit.ui_quoted_globals <- Env.quoted_globals();
-  (* We could have [set_main_module_block_format] and [set_arg_descr] instead
-     of passing these in as arguments but, unlike most of the state that this
-     module keeps track of, they're not values that get accumulated over time,
-     they just get computed once. (Arguably we should remove [set_export_info]
-     by the same reasoning.) *)
+  (* We could have [set_main_module_block_format], [set_arg_descr] and
+     [set_static_data] instead of passing these in as arguments but, unlike
+     most of the state that this module keeps track of, they're not values
+     that get accumulated over time, they just get computed once. (Arguably we
+     should remove [set_export_info] by the same reasoning.) *)
   current_unit.ui_arg_descr <- arg_descr;
+  current_unit.ui_static_data <- static_data;
   write_unit_info
     { current_unit with ui_format = main_module_block_format } filename
 
