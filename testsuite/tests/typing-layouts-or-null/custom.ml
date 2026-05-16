@@ -153,6 +153,21 @@ Lines 1-5, characters 0-11:
 Error: Invalid [@or_null] declaration: it must have exactly two constructors.
 |}]
 
+type multi_arg_payload =
+  | A
+  | B of int * int
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type multi_arg_payload =
+2 |   | A
+3 |   | B of int * int
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one nullary constructor and one unary constructor.
+|}]
+
 (* Non-parameterized custom [@@or_null] types. *)
 
 type no_param =
@@ -280,6 +295,12 @@ type ('a, 'b) second_param =
 type ('a, 'b) second_param = Nope_second | Yep_second of 'b [@@or_null]
 |}]
 
+type ('a, 'b) swapped = ('b, 'a) second_param
+
+[%%expect{|
+type ('a, 'b) swapped = ('b, 'a) second_param
+|}]
+
 type second_param_succeeds_sep =
   (float, t_non_float) second_param accepts_sep
 
@@ -306,6 +327,31 @@ Error: This type "(t_non_float, float) second_param"
          because of the definition of second_param at lines 1-4, characters 0-11.
        But the layout of (t_non_float, float) second_param must be a sublayout of
          value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type swapped_succeeds_nonfloat =
+  (t_non_float, float) swapped accepts_nonfloat
+
+[%%expect{|
+type swapped_succeeds_nonfloat =
+    (t_non_float, float) swapped accepts_nonfloat
+|}]
+
+type swapped_fails_nonfloat =
+  (float, t_non_float) swapped accepts_nonfloat
+
+[%%expect{|
+Line 2, characters 2-30:
+2 |   (float, t_non_float) swapped accepts_nonfloat
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type
+         "(float, t_non_float) swapped" = "(t_non_float, float) second_param"
+       should be an instance of type "('a : value_or_null non_float)"
+       The layout of (float, t_non_float) swapped is value_or_null
+         because of the definition of second_param at lines 1-4, characters 0-11.
+       But the layout of (float, t_non_float) swapped must be a sublayout of
+           value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
@@ -564,6 +610,88 @@ module New_shape_inclusion :
         New_shape_multi_null
       | New_shape_multi_payload of ('a list * 'b) [@@or_null]
   end
+|}]
+
+module New_shape_abstract_inclusion : sig
+  type t : value_or_null mod non_float
+
+  type 'a unused : value_or_null mod non_float
+
+  type ('a, 'b) multi : value_or_null mod non_float
+end = struct
+  type t =
+    | New_shape_abstract_null
+    | New_shape_abstract_payload of t_non_float
+  [@@or_null]
+
+  type 'a unused =
+    | New_shape_abstract_unused_null
+    | New_shape_abstract_unused_payload of int
+  [@@or_null]
+
+  type ('a, 'b) multi =
+    | New_shape_abstract_multi_null
+    | New_shape_abstract_multi_payload of ('a list * 'b)
+  [@@or_null]
+end
+
+[%%expect{|
+module New_shape_abstract_inclusion :
+  sig
+    type t : value_or_null non_float
+    type 'a unused : value_or_null non_float
+    type ('a, 'b) multi : value_or_null non_float
+  end
+|}]
+
+module New_shape_second_param_inclusion : sig
+  type ('a, 'b : value mod non_float) second :
+    value_or_null mod non_float
+end = struct
+  type ('a, 'b : value mod non_float) second =
+    | New_shape_second_null
+    | New_shape_second_payload of 'b
+  [@@or_null]
+end
+
+[%%expect{|
+module New_shape_second_param_inclusion :
+  sig type ('a, 'b : value non_float) second : value_or_null non_float end
+|}]
+
+module Bad_second_param_inclusion : sig
+  type ('a, 'b) second : value_or_null mod non_float
+end = struct
+  type ('a, 'b) second =
+    | Bad_null
+    | Bad_payload of 'b
+  [@@or_null]
+end
+
+[%%expect{|
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 |   type ('a, 'b) second =
+5 |     | Bad_null
+6 |     | Bad_payload of 'b
+7 |   [@@or_null]
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type ('a, 'b) second = Bad_null | Bad_payload of 'b [@@or_null]
+         end
+       is not included in
+         sig type ('a, 'b) second : value_or_null non_float end
+       Type declarations do not match:
+         type ('a, 'b) second = Bad_null | Bad_payload of 'b [@@or_null]
+       is not included in
+         type ('a, 'b) second : value_or_null non_float
+       The layout of the first is value_or_null
+         because of the definition of second at lines 4-7, characters 2-13.
+       But the layout of the first must be a sublayout of
+           value_or_null non_float
+         because of the definition of second at line 2, characters 2-52.
 |}]
 
 module M : sig
