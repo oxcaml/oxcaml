@@ -26,5 +26,13 @@
 (lldb) c
 (lldb) b Test_closures_dwarf.f_closure_factory
 (lldb) c
+(lldb) b Test_closures_dwarf.f_captured_var_test
+(lldb) b Test_closures_dwarf.f_captured_var_test.use_captured
+(lldb) c
+(lldb) c
+(lldb) frame variable
+(lldb) c
+(lldb) c
+(lldb) frame variable
 (lldb) c
 (lldb) quit
