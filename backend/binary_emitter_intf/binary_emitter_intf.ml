@@ -128,6 +128,32 @@ module type Internal_assembler_hook = sig
   val get : unit -> hook option
 end
 
+(** GDB JIT symfile production. Produces an in-memory ELF object file describing
+    the JIT'd code, suitable for registration via GDB's JIT-Interface protocol.
+
+    The returned buffer is a contiguous byte array whose address can be passed
+    directly to GDB as [symfile_addr]. The implementation is allowed to return
+    [None] on architectures where it is not yet supported. *)
+module type Gdb_jit_symfile = sig
+  type assembled_section
+
+  (** [build ~sections ~section_address ~section_runtime_size] returns an ELF
+      object whose loadable sections have [sh_addr] set to the runtime address
+      reported by [section_address]. Section bytes are taken verbatim from
+      [sections] and are assumed to be post-relocation.
+
+      [section_runtime_size] returns an override for [sh_size] when the
+      section's runtime extent is larger than the assembled bytes (e.g. the JIT
+      appends GOT/PLT padding after [.text]). The trailing bytes inside the
+      symfile are zero-padded. Returning [None] uses the natural assembled size.
+  *)
+  val build :
+    sections:(string * assembled_section) list ->
+    section_address:(string -> int64 option) ->
+    section_runtime_size:(string -> int option) ->
+    Compiler_owee.Owee_buf.t option
+end
+
 (** Combined signature that each architecture's binary emitter provides. *)
 module type S = sig
   module Relocation : Relocation
@@ -149,4 +175,8 @@ module type S = sig
   (** Internal assembler hook for JIT support *)
   module Internal_assembler :
     Internal_assembler_hook with type assembled_section = Assembled_section.t
+
+  (** GDB JIT symfile builder *)
+  module Gdb_jit_symfile :
+    Gdb_jit_symfile with type assembled_section = Assembled_section.t
 end
