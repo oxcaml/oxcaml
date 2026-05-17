@@ -585,6 +585,9 @@ let find_comparison_result t var =
 
 let with_cse t cse = { t with cse }
 
+let clear_cse_equations_on_coeffectful_primitives t =
+  { t with cse = CSE.clear_equations_on_coeffectful_primitives t.cse }
+
 let set_do_not_rebuild_terms_and_disable_inlining t disable_inlining_reason =
   { t with
     are_rebuilding_terms = Are_rebuilding_terms.are_not_rebuilding;

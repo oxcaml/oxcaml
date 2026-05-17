@@ -436,6 +436,20 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
       let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
+      (* If the defining expression is a primitive that has arbitrary effects,
+         it may invalidate any CSE equation whose left-hand side has coeffects.
+         (Generative-only effects do not need to invalidate such equations
+         since fresh allocations are not aliased with anything pre-existing.) *)
+      let dacc =
+        match defining_expr with
+        | Prim (prim, _dbg) -> (
+          match P.effects_and_coeffects prim with
+          | Arbitrary_effects, _, _, _ ->
+            DA.map_denv dacc
+              ~f:DE.clear_cse_equations_on_coeffectful_primitives
+          | (No_effects | Only_generative_effects _), _, _, _ -> dacc)
+        | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> dacc
+      in
       (* Simplify the body of the let-expression and make the new [Let] bindings
          around the simplified body. [Simplify_named] will already have prepared
          [dacc] with the necessary bindings for the simplification of the
