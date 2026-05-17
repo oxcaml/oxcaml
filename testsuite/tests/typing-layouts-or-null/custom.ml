@@ -317,6 +317,23 @@ type ('a, 'b) multi_param_succeeds_nonfloat =
     ('a, 'b) multi_param accepts_nonfloat
 |}]
 
+type ('a, 'b) eq = unit constraint 'a = 'b
+
+[%%expect{|
+type ('b, 'a) eq = unit constraint 'a = 'b
+|}]
+
+type ('a, 'b) inferred_constraint =
+  | Nope_inferred_constraint
+  | Yep_inferred_constraint of ('a, 'b) eq
+[@@or_null]
+
+[%%expect{|
+type ('a, 'b) inferred_constraint =
+    Nope_inferred_constraint
+  | Yep_inferred_constraint of ('a, 'a) eq constraint 'b = 'a [@@or_null]
+|}]
+
 type ('a, 'b) second_param =
   | Nope_second
   | Yep_second of 'b
