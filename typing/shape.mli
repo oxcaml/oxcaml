@@ -59,9 +59,9 @@ type base_layout = Jkind_types.Sort.base
     stored to that effect in the [uid_to_decl] table of cmt files. *)
 module Uid : sig
   type t = private
-    | Compilation_unit of string
+    | Compilation_unit of Global_module.Name.t
     | Item of {
-        comp_unit: string;
+        comp_unit: Global_module.Name.t;
         id: int;
         from: Unit_info.intf_or_impl }
     | Internal
@@ -239,7 +239,7 @@ and desc =
   | Alias of t
   | Leaf
   | Proj of t * Item.t
-  | Comp_unit of string
+  | Comp_unit of Global_module.Name.t
   | Error of string
 
   (* constructors for types *)
@@ -363,7 +363,7 @@ val error : ?uid:Uid.t -> string -> t
 val proj : ?uid:Uid.t -> t -> Item.t -> t
 val leaf : Uid.t -> t
 val leaf' : Uid.t option -> t
-val comp_unit : ?uid:Uid.t -> string -> t
+val comp_unit : ?uid:Uid.t -> Global_module.Name.t -> t
 
 (* constructors for types  *)
 val constr : ?uid:Uid.t -> Ident.t -> t list -> t
@@ -396,8 +396,7 @@ val abs_list : t -> Ident.t list -> t
 
 val decompose_abs : t -> (var * t) option
 
-(* CR lmaurer: Should really take a [Compilation_unit.t] *)
-val for_persistent_unit : string -> t
+val for_persistent_unit : Global_module.Name.t -> t
 val leaf_for_unpack : t
 
 val poly_variant_constructors_map :

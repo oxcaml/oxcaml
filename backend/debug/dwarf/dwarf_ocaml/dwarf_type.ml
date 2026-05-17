@@ -1467,8 +1467,9 @@ module With_cms_reduce = Shape_reduce.Make (struct
       | _, Some cmt_infos -> Some cmt_infos.cmt_impl_shape
       | _ -> Some None)
 
-  let read_unit_shape ~diagnostics ~unit_name =
-    match String.Tbl.find_opt cms_file_cache unit_name with
+  let read_unit_shape ~diagnostics ~(unit_name : Global_module.Name.t) =
+    let base_name = unit_name.head in
+    match String.Tbl.find_opt cms_file_cache base_name with
     | Some shape ->
       Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
       shape
@@ -1479,7 +1480,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
       if MB.is_out_of_bounds !cms_files_read_counter max_cms_files
       then None
       else
-        let filename = String.uncapitalize_ascii unit_name in
+        let filename = String.uncapitalize_ascii base_name in
         let cms_file = filename ^ ".cms" in
         let cmt_file = filename ^ ".cmt" in
         let shape_opt_opt =
@@ -1499,7 +1500,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
         in
         (* Note: [shape_opt] is an option, and we are also caching the [None]
            case. *)
-        String.Tbl.add cms_file_cache unit_name shape_opt;
+        String.Tbl.add cms_file_cache base_name shape_opt;
         shape_opt
 end)
 

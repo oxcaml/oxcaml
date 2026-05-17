@@ -125,7 +125,7 @@ module Make(Params : sig
   val max_shape_reduce_steps_per_variable : unit -> MB.t
   val max_compilation_unit_depth : unit -> MB.t
   val read_unit_shape :
-    diagnostics:Diagnostics.t -> unit_name:string -> t option
+    diagnostics:Diagnostics.t -> unit_name:Global_module.Name.t -> t option
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
@@ -139,7 +139,7 @@ end) = struct
     | NAlias of delayed_nf
     | NProj of nf * Item.t
     | NLeaf
-    | NComp_unit of string
+    | NComp_unit of Global_module.Name.t
     | NError of string
     | NMu of nf
     | NRec_var of Shape.DeBruijn_index.t
@@ -224,7 +224,7 @@ end) = struct
     | NProj (t1, i1), NProj (t2, i2) ->
       if Item.compare i1 i2 <> 0 then false
       else equal_nf t1 t2
-    | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
+    | NComp_unit c1, NComp_unit c2 -> Global_module.Name.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
     | NMu (nf1), NMu (nf2) -> equal_nf nf1 nf2

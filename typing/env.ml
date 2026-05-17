@@ -1802,7 +1802,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Module ->
       begin match IdTbl.find_same_without_locks id env.modules with
       | Mod_local ({ mda_shape; _ }, _) -> mda_shape
-      | Mod_persistent -> Shape.for_persistent_unit (Ident.name id)
+      | Mod_persistent -> Shape.for_persistent_unit (Ident.to_global_exn id)
       | Mod_unbound _ ->
           (* Only present temporarily while approximating the environment for
              recursive modules.
@@ -1811,7 +1811,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
           assert false
       | exception Not_found
         when Ident.is_global id && not (Current_unit_name.is_ident id) ->
-          Shape.for_persistent_unit (Ident.name id)
+          Shape.for_persistent_unit (Ident.to_global_exn id)
       end
   | Module_type ->
       let modtype =  IdTbl.find_same_without_locks id env.modtypes in
