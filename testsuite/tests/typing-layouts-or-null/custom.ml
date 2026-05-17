@@ -234,6 +234,37 @@ Error: This type "float_payload" should be an instance of type
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
+type portable_payload : value_or_null mod portable =
+  | Portable_none
+  | Portable_some of (unit -> unit) @@ portable
+[@@or_null]
+
+[%%expect{|
+type portable_payload =
+    Portable_none
+  | Portable_some of (unit -> unit) @@ portable [@@or_null]
+|}]
+
+type nonportable_payload : value_or_null mod portable =
+  | Nonportable_none
+  | Nonportable_some of (unit -> unit)
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type nonportable_payload : value_or_null mod portable =
+2 |   | Nonportable_none
+3 |   | Nonportable_some of (unit -> unit)
+4 | [@@or_null]
+Error: The kind of type "nonportable_payload" is
+           value_or_null non_float mod aliased immutable
+         because an [@@or_null] type gets its kind by applying or_null to its
+         payload kind.
+       But the kind of type "nonportable_payload" must be a subkind of
+           value_or_null mod portable
+         because of the annotation on the declaration of the type nonportable_payload.
+|}]
+
 type probe_result : value =
   | Probe_none
   | Probe_some of int
