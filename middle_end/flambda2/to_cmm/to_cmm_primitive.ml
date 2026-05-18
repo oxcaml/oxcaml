@@ -1119,7 +1119,8 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->
   match block_access_kind with Any_value -> Pointer | Immediate -> Immediate
 
-let unary_primitive env res dbg f arg =
+let unary_primitive env res dbg f (_arg_simple : Simple.t option)
+    (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
@@ -1250,7 +1251,8 @@ let unary_primitive env res dbg f arg =
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
-let binary_primitive env dbg f x y =
+let binary_primitive env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression) =
   match (f : P.binary_primitive) with
   | Block_set { kind; init; field } ->
     block_set ~dbg kind init ~field ~block:x ~new_value:y
@@ -1287,7 +1289,9 @@ let binary_primitive env dbg f x y =
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
-let ternary_primitive _env dbg f x y z =
+let ternary_primitive _env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (_z_simple : Simple.t option)
+    (x : Cmm.expression) (y : Cmm.expression) (z : Cmm.expression) =
   match (f : P.ternary_primitive) with
   | Array_set (array_kind, array_set_kind) ->
     array_set ~dbg array_kind array_set_kind ~arr:x ~index:y ~new_value:z
@@ -1345,7 +1349,10 @@ let ternary_primitive _env dbg f x y z =
     in
     C.return_unit dbg store
 
-let quaternary_primitive _env dbg f x y z w =
+let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (_z_simple : Simple.t option)
+    (_w_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression)
+    (z : Cmm.expression) (w : Cmm.expression) =
   match (f : P.quaternary_primitive) with
   | Atomic_compare_and_set_field block_access_kind ->
     C.atomic_compare_and_set_field ~dbg
@@ -1394,20 +1401,25 @@ let arg_list' ?consider_inlining_effectful_expressions ~dbg env res l =
   in
   List.rev args, env, res, effs
 
+(* CR mshinwell: For the moment we don't provide the [Simple]s to the above
+   translation functions for splittable primitives. This is ok for now but may
+   require revisiting in future. *)
 let trans_prim : To_cmm_env.t To_cmm_env.trans_prim =
   { nullary = nullary_primitive;
-    unary = unary_primitive;
+    unary = (fun env res dbg prim x -> unary_primitive env res dbg prim None x);
     binary =
       (fun env res dbg prim x y ->
-        let cmm = binary_primitive env dbg prim x y in
+        let cmm = binary_primitive env dbg prim None None x y in
         None, res, cmm);
     ternary =
       (fun env res dbg prim x y z ->
-        let cmm = ternary_primitive env dbg prim x y z in
+        let cmm = ternary_primitive env dbg prim None None None x y z in
         None, res, cmm);
     quaternary =
       (fun env res dbg prim x y z w ->
-        let cmm = quaternary_primitive env dbg prim x y z w in
+        let cmm =
+          quaternary_primitive env dbg prim None None None None x y z w
+        in
         None, res, cmm);
     variadic =
       (fun env res dbg prim args ->
@@ -1463,43 +1475,49 @@ let prim_simple env res dbg p =
     let extra, res, expr = nullary_primitive env res dbg prim in
     Env.simple expr free_vars, extra, env, res, Ece.pure
   | Unary (unary, x) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let extra, res, expr = unary_primitive env res dbg unary x.cmm in
-    Env.simple expr x.free_vars, extra, env, res, x.effs
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let extra, res, expr = unary_primitive env res dbg unary (Some x) x'.cmm in
+    Env.simple expr x'.free_vars, extra, env, res, x'.effs
   | Binary (binary, x, y) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let free_vars = Backend_var.Set.union x.free_vars y.free_vars in
-    let effs = Ece.join x.effs y.effs in
-    let expr = binary_primitive env dbg binary x.cmm y.cmm in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let free_vars = Backend_var.Set.union x'.free_vars y'.free_vars in
+    let effs = Ece.join x'.effs y'.effs in
+    let expr =
+      binary_primitive env dbg binary (Some x) (Some y) x'.cmm y'.cmm
+    in
     Env.simple expr free_vars, None, env, res, effs
   | Ternary (ternary, x, y, z) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let To_cmm_env.{ env; res; expr = z } = arg env res z in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let To_cmm_env.{ env; res; expr = z' } = arg env res z in
     let free_vars =
       Backend_var.Set.union
-        (Backend_var.Set.union x.free_vars y.free_vars)
-        z.free_vars
+        (Backend_var.Set.union x'.free_vars y'.free_vars)
+        z'.free_vars
     in
-    let effs = Ece.join (Ece.join x.effs y.effs) z.effs in
-    let expr = ternary_primitive env dbg ternary x.cmm y.cmm z.cmm in
+    let effs = Ece.join (Ece.join x'.effs y'.effs) z'.effs in
+    let expr =
+      ternary_primitive env dbg ternary (Some x) (Some y) (Some z) x'.cmm y'.cmm
+        z'.cmm
+    in
     Env.simple expr free_vars, None, env, res, effs
   | Quaternary (quaternary, x, y, z, w) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let To_cmm_env.{ env; res; expr = z } = arg env res z in
-    let To_cmm_env.{ env; res; expr = w } = arg env res w in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let To_cmm_env.{ env; res; expr = z' } = arg env res z in
+    let To_cmm_env.{ env; res; expr = w' } = arg env res w in
     let free_vars =
       Backend_var.Set.union
         (Backend_var.Set.union
-           (Backend_var.Set.union x.free_vars y.free_vars)
-           z.free_vars)
-        w.free_vars
+           (Backend_var.Set.union x'.free_vars y'.free_vars)
+           z'.free_vars)
+        w'.free_vars
     in
-    let effs = Ece.join (Ece.join (Ece.join x.effs y.effs) z.effs) w.effs in
+    let effs = Ece.join (Ece.join (Ece.join x'.effs y'.effs) z'.effs) w'.effs in
     let expr =
-      quaternary_primitive env dbg quaternary x.cmm y.cmm z.cmm w.cmm
+      quaternary_primitive env dbg quaternary (Some x) (Some y) (Some z)
+        (Some w) x'.cmm y'.cmm z'.cmm w'.cmm
     in
     Env.simple expr free_vars, None, env, res, effs
   | Variadic (variadic, l) ->
