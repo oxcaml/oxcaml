@@ -659,6 +659,21 @@ let mode_partial_application expected_mode =
 let mode_trywith expected_mode =
   { expected_mode with position = RNontail }
 
+(* Effect syntax lowers each handled computation and handler RHS into a
+   generated function body wrapped with [maybe_region_layout]. Type those
+   expressions as tails of the generated handler functions' regions, while
+   preserving outer expectations that are stricter than legacy modes. *)
+let mode_effect_handler_body expected_mode =
+  let expected_mode =
+    mode_coerce (Value.of_const Value.Const.legacy) expected_mode
+  in
+  let mode = as_single_mode expected_mode in
+  { expected_mode with
+    position =
+      RTail
+        ( Regionality.disallow_left (Value.proj_comonadic Areality mode),
+          FTail ) }
+
 let mode_tuple mode tuple_modes =
   let tuple_modes =
     Some (List.map (fun (mode, loc) ->
@@ -726,6 +741,13 @@ let tuple_pat_mode mode tuple_modes =
   let mode = Value.disallow_right mode in
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
   { mode; tuple_modes }
+
+let effect_handler_modes loc pinpoint env expected_mode =
+  let env =
+    Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
+  in
+  env, simple_pat_mode Value.legacy, mode_effect_handler_body mode_legacy,
+  mode_effect_handler_body expected_mode
 
 let global_pat_mode {mode; _}=
   let mode =
@@ -6717,28 +6739,6 @@ and type_expect_
       let env, expected_mode, exp_extra =
         enter_region_if is_bor ~region:(loc, Borrow) env expected_mode
       in
-      let arg_pat_mode, arg_expected_mode =
-        match cases_tuple_arity caselist with
-        | Not_local_tuple | Maybe_local_tuple ->
-          let mode = Value.newvar () in
-          simple_pat_mode mode, mode_default mode
-        | Local_tuple locs ->
-          let modes = List.map (fun loc -> Value.newvar (), loc) locs in
-          let modes_pat = List.map fst modes in
-          let mode = Value.newvar () in
-          tuple_pat_mode mode modes_pat, mode_tuple mode modes
-      in
-      let arg, sort =
-        with_local_level_generalize begin fun () ->
-          let expected_ty, sort = new_rep_var ~why:Match () in
-          let arg =
-            type_expect env arg_expected_mode sarg (mk_expected expected_ty)
-          in
-          arg, sort
-        end ~before_generalize:(fun (arg, _) ->
-          may_lower_contravariant env arg;
-          generalize arg.exp_type)
-      in
       let rec split_cases valc effc conts = function
         | [] -> List.rev valc, List.rev effc, List.rev conts
         | {pc_lhs = {ppat_desc=Ppat_effect(p1, p2)}} as c :: rest ->
@@ -6752,6 +6752,35 @@ and type_expect_
       in
       if val_caselist = [] && eff_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
+      let env, arg_pat_mode, arg_expected_mode, expected_mode =
+        match eff_caselist with
+        | [] ->
+          let arg_pat_mode, arg_expected_mode =
+            match cases_tuple_arity caselist with
+            | Not_local_tuple | Maybe_local_tuple ->
+              let mode = Value.newvar () in
+              simple_pat_mode mode, mode_default mode
+            | Local_tuple locs ->
+              let modes = List.map (fun loc -> Value.newvar (), loc) locs in
+              let modes_pat = List.map fst modes in
+              let mode = Value.newvar () in
+              tuple_pat_mode mode modes_pat, mode_tuple mode modes
+          in
+          env, arg_pat_mode, arg_expected_mode, expected_mode
+        | _ :: _ ->
+          effect_handler_modes loc Effect_match env expected_mode
+      in
+      let arg, sort =
+        with_local_level_generalize begin fun () ->
+          let expected_ty, sort = new_rep_var ~why:Match () in
+          let arg =
+            type_expect env arg_expected_mode sarg (mk_expected expected_ty)
+          in
+          arg, sort
+        end ~before_generalize:(fun (arg, _) ->
+          may_lower_contravariant env arg;
+          generalize arg.exp_type)
+      in
       let val_cases, partial =
         type_cases Computation env arg_pat_mode expected_mode arg.exp_type
           sort ty_expected_explained ~check_if_total:true loc val_caselist
@@ -6775,11 +6804,6 @@ and type_expect_
         exp_env = env }
   | Pexp_try(sbody, caselist) ->
       check_dynamic (loc, Expression) (Always_dynamic Try_with) expected_mode;
-      let body =
-        type_expect env (mode_trywith expected_mode)
-          sbody ty_expected_explained
-      in
-      let arg_mode = simple_pat_mode Value.legacy in
       let rec split_cases exnc effc conts = function
         | [] -> List.rev exnc, List.rev effc, List.rev conts
         | {pc_lhs = {ppat_desc=Ppat_effect(p1, p2)}} as c :: rest ->
@@ -6790,6 +6814,20 @@ and type_expect_
       in
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
+      in
+      let env, arg_mode, body_mode, expected_mode =
+        match eff_caselist with
+        | [] ->
+          env, simple_pat_mode Value.legacy, mode_trywith expected_mode,
+          expected_mode
+        | _ :: _ ->
+          let env, arg_mode, _, expected_mode =
+            effect_handler_modes loc Effect_try env expected_mode
+          in
+          env, arg_mode, expected_mode, expected_mode
+      in
+      let body =
+        type_expect env body_mode sbody ty_expected_explained
       in
       let exn_cases, _ =
         type_cases Value env arg_mode expected_mode

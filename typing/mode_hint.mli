@@ -35,6 +35,8 @@ type pinpoint_desc =
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Effect_match  (** A pattern match with effect cases *)
+  | Effect_try  (** A try-with expression with effect cases *)
   | Class  (** A class declaration *)
   | Object  (** An object declaration *)
   | Loop  (** A loop *)

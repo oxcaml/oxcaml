@@ -2062,6 +2062,10 @@ module Report = struct
     | Functor -> Some (print_article_noun Consonant "functor")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
     | Expression -> Some (print_article_noun Vowel "expression")
+    | Effect_match ->
+      Some (print_article_noun Consonant "pattern match with effect cases")
+    | Effect_try ->
+      Some (print_article_noun Consonant "try-with with effect cases")
     | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
     | Object -> Some (print_article_noun Vowel "object")
