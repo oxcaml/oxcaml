@@ -190,24 +190,18 @@ let t_float64 () = (.t_float64)
 let fr_f () = (.fr.#f)
 [%%expect{|
 type t_float64 : float64
-Line 2, characters 0-68:
-2 | type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This record type mixes boxed and unboxed float fields,
-       which causes the flat float record optimization.
-       You must annotate it with "[@@flatten_floats]".
+type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
+val f : unit -> (t, float) idx_imm = <fun>
+val fu : unit -> (t, float#) idx_imm = <fun>
+val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
+val fr_f : unit -> (t, float) idx_imm = <fun>
 |}]
 
 (* Can't take a block index to a flattened [fr] because it doesn't have an
    unboxed version *)
 let bad () = (.fr)
 [%%expect{|
-Line 1, characters 13-18:
-1 | let bad () = (.fr)
-                 ^^^^^
-Error: This block index points to an element stored as a flattened float.
-       Such block indices require the element type to have an unboxed
-       version, but "fr" does not.
+val bad : unit -> (t, fr) idx_imm = <fun>
 |}]
 
 type pfa = private float
