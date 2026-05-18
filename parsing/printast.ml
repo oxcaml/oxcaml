@@ -234,6 +234,9 @@ let rec core_type i ppf x =
   | Ptyp_splice t ->
       line i ppf "Ptyp_splice\n";
       core_type i ppf t
+  | Ptyp_box t ->
+      line i ppf "Ptyp_box\n";
+      core_type i ppf t
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i + 1)) jkind
   | Ptyp_repr (lvars, ct) ->
