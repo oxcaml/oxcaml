@@ -153,7 +153,7 @@ module Describe : sig
   val param3 :
     'a param_cons -> 'b param_cons -> 'c param_cons -> ('a * 'b * 'c) param_cons
 
-  (** Triple of constructions. *)
+  (** Quadruple of constructions. *)
   val param4 :
     'a param_cons ->
     'b param_cons ->
@@ -161,7 +161,7 @@ module Describe : sig
     'd param_cons ->
     ('a * 'b * 'c * 'd) param_cons
 
-  (** Triple of constructions. *)
+  (** Quintuple of constructions. *)
   val param5 :
     'a param_cons ->
     'b param_cons ->
