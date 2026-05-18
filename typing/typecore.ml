@@ -744,11 +744,6 @@ type expected_pat_mode =
 let simple_pat_mode mode =
   { mode = Value.disallow_right mode; tuple_modes = None }
 
-let effect_handler_pat_mode loc pinpoint =
-  Value.of_const ~hint_monadic:(Is_used_in (loc, pinpoint))
-    Value.Const.legacy
-  |> simple_pat_mode
-
 let tuple_pat_mode mode tuple_modes =
   let mode = Value.disallow_right mode in
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
@@ -6776,8 +6771,7 @@ and type_expect_
           let env, body_mode, expected_mode =
             effect_handler_modes loc Effect_match env expected_mode
           in
-          env, effect_handler_pat_mode loc Effect_match, body_mode,
-          expected_mode
+          env, simple_pat_mode Value.legacy, body_mode, expected_mode
       in
       let arg, sort =
         with_local_level_generalize begin fun () ->

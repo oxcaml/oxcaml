@@ -34,9 +34,7 @@ let () =
 Line 3, characters 20-21:
 3 |   | r -> use_unique r
                         ^
-Error: This value is "aliased"
-         because it is used in a pattern match with effect cases (at lines 2-4, characters 2-44).
-       However, the highlighted expression is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* A continuation result cannot be a local reference escaping globally. *)
