@@ -690,6 +690,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 Oval_stuff "<eval>"
               | ty -> tree_of_val depth obj ty
               end
+          | Tbox _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                Oval_stuff "<box>"
+              | ty -> tree_of_val depth obj ty
+              end
           | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->

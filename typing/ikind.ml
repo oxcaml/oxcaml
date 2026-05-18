@@ -452,6 +452,9 @@ module Solver = struct
         kind ~check_principality:false ~use_tables:true ctx ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
+      | Types.Tbox t ->
+        let base = Ldd.const Axis_lattice.immutable_data in
+        Ldd.join base (kind ~use_tables:true ctx t)
       | Types.Tfield _ ->
         failwith "Tfield shouldn't appear in kind"
       | Types.Tnil ->

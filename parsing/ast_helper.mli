@@ -92,6 +92,7 @@ module Typ :
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
+    val box : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
     val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val newlayout:
