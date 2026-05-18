@@ -133,7 +133,7 @@
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type t = M.t but an expression was expected of type unit"
+        "message": "The value x has type t = M.t but an expression was expected of type unit"
       },
       {
         "start": {
@@ -170,7 +170,7 @@
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type int but an expression was expected of type Dep.M.t"
+        "message": "The constant 5 has type int but an expression was expected of type Dep.M.t"
       }
     ],
     "notifications": []
@@ -309,7 +309,7 @@
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type N.O.t but an expression was expected of type unit"
+        "message": "The value x has type N.O.t but an expression was expected of type unit"
       },
       {
         "start": {
@@ -325,9 +325,12 @@
         "valid": true,
         "message": "Modules do not match: sig type t = int val foo : 'a -> string end
   is not included in S
-  Values do not match: val foo : 'a -> string is not included in val foo : t -> t
-  The type t -> string is not compatible with the type t -> t
-  Type string is not compatible with type t
+  Values do not match:
+  val foo : 'a -> string
+  is not included in
+  val foo : int -> t
+  The type int -> string is not compatible with the type int -> t
+  Type string is not compatible with type t = int
   File \"test.ml\", line 72, characters 2-20: Expected declaration
   File \"test.ml\", line 85, characters 8-11: Actual declaration"
       },
@@ -343,7 +346,7 @@
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type int but an expression was expected of type Dep.t"
+        "message": "The constant 5 has type int but an expression was expected of type Dep.t"
       }
     ],
     "notifications": []

@@ -443,6 +443,7 @@ let ocaml_ignored_flags =
     "-compat-32";
     "-config";
     "-custom";
+    "-dcanonical-ids";
     "-dclambda";
     "-dcmm";
     "-dcse";
@@ -453,7 +454,10 @@ let ocaml_ignored_flags =
     "-dlambda";
     "-dblambda";
     "-dlinear";
+    "-dmatchcomp";
+    "-dno-canonical-ids";
     "-dparsetree";
+    "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
     "-dslambda";
@@ -471,6 +475,7 @@ let ocaml_ignored_flags =
     "-fPIC";
     "-g";
     "-i";
+    "-i-variance";
     "-inlining-report";
     "-keep-docs";
     "-no-keep-docs";
@@ -775,6 +780,7 @@ let ocaml_ignored_parametrized_flags =
     "-intf";
     "-intf_suffix";
     "-intf-suffix";
+    "-keywords";
     "-o";
     "-rounds";
     "-runtime-variant";

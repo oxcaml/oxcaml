@@ -95,6 +95,7 @@ logic.
   -davail
   -dblambda
   -dcamlprimc
+  -dcanonical-ids
   -dcfg
   -dcfg-invariants
   -dclambda
@@ -149,10 +150,13 @@ logic.
   -dllpath
   -dllvmir
   -dlocations
+  -dmatchcomp
   -dno-asm-comments
+  -dno-canonical-ids
   -dno-locations
   -dno-unique-ids
   -dparsetree
+  -dparsetree-loc-ghost-invariants
   -dprofile
   -dprofile-output
   -dranges
@@ -290,6 +294,7 @@ logic.
   -heap-reduction-threshold
   -help
   -i
+  -i-variance
   -ikinds
   -ikinds-debug
   -impl
@@ -314,6 +319,7 @@ logic.
   -keep-docs
   -keep-llvmir
   -keep-locs
+  -keywords
   -kind-verbosity
   -labels
   -linkall
