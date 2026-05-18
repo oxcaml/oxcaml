@@ -27,6 +27,7 @@
    )* }}} *)
 
 open Std
+open Data_types
 
 let dummy_type_scheme desc =
   Types.create_expr desc ~level:0 ~id:0 ~scope:Btype.generic_level

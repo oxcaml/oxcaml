@@ -344,14 +344,14 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
          (* When we loaded the configuration in Mocaml, we guessed whether we're working
             with an intf or impl file based on the suffix of the filename. But now we know
             based on the contents of the file, so we update the value we wrote before. *)
-         Env.get_unit_name ()
+         Env.get_current_unit ()
          |> Option.map
               ~f:
                 (Unit_info.modify_kind ~f:(fun _ ->
                      match result.parsetree with
                      | `Interface _ -> Intf
                      | `Implementation _ -> Impl))
-         |> Env.set_unit_name;
+         |> Option.iter ~f:Env.set_current_unit;
          { Reader.result; config; cache_version = version; cache_disabling }))
   in
   let ppx =

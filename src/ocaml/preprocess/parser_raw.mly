@@ -3889,11 +3889,11 @@ pattern_no_exn:
       self AS mkrhs(val_ident)
         { Ppat_alias($1, $3) }
     | self AS error
-        { expecting $loc($3) "identifier" }
+        { expecting $loc($3) "identifier"; assert false }
     | labeled_tuple_pattern(self)
         { $1 }
     | self COLONCOLON error
-        { expecting $loc($3) "pattern" }
+        { expecting $loc($3) "pattern"; assert false }
     | self BAR pattern
         { Ppat_or($1, $3) }
     (*| self BAR error
@@ -4088,68 +4088,6 @@ simple_delimited_pattern:
           Ppat_unboxed_tuple (List.rev fields, closed) }
   ) { $1 }
 
-(* Parsing labeled tuple patterns:
-
-   Here we play essentially the same game we did for expressions - see the
-   comment beginning "Parsing labeled tuple expressions".
-
-   One difference is that we would need to manually inline the definition of
-   individual elements in two places: Once in the base case for lists 2 or more
-   elements, and once in the special case for open patterns with just one
-   element (e.g., [~x, ..]).  Rather than manually inlining
-   [labeled_tuple_pat_element] twice, we simply define it twice: once with the
-   [%prec] annotations needed for its occurrences in tail position, and once
-   without them suitable for use in other locations.
-*)
-%inline labeled_tuple_pat_element(self):
-  | self { None, $1 }
-  | LABEL simple_pattern %prec COMMA
-      { Some $1, $2 }
-  | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
-  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label,
-        mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
-;
-(* If changing this, don't forget to change its copy just above. *)
-%inline labeled_tuple_pat_element_noprec(self):
-  | self { None, $1 }
-  | LABEL simple_pattern
-      { Some $1, $2 }
-  | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
-  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
-;
-labeled_tuple_pat_element_list(self):
-  | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
-      { $3 :: $1 }
-  | labeled_tuple_pat_element_noprec(self) COMMA labeled_tuple_pat_element(self)
-      { [ $3; $1 ] }
-  | self COMMA error
-      { expecting $loc($3) "pattern" }
-;
-reversed_labeled_tuple_pattern(self):
-  | labeled_tuple_pat_element_list(self) %prec below_COMMA
-      { Closed, $1 }
-  | labeled_tuple_pat_element_list(self) COMMA DOTDOT
-      { Open, $1 }
-  | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
-      { Open, [ $1 ] }
-;
-labeled_tuple_pattern(self):
-  | reversed_labeled_tuple_pattern(self)
-      { let closed, pat = $1 in
-        Ppat_tuple(List.rev pat, closed) }
-;
 %inline pattern_semi_list:
   ps = separated_or_terminated_nonempty_list(SEMI, pattern)
     { ps }
@@ -4491,13 +4429,13 @@ type_variance:
         if $1 = "-+" then Bivariant, NoInjectivity else
         if $1 = "+-!" then Bivariant, Injective else
         if $1 = "-+!" then Bivariant, Injective else
-        expecting $loc($1) "type_variance" }
+        (expecting $loc($1) "type_variance"; assert false) }
   | PREFIXOP
       { if $1 = "!+" then Covariant, Injective else
         if $1 = "!-" then Contravariant, Injective else
         if $1 = "!+-" then Bivariant, Injective else
         if $1 = "!-+" then Bivariant, Injective else
-        expecting $loc($1) "type_variance" }
+        (expecting $loc($1) "type_variance"; assert false) }
 ;
 
 (* A sequence of constructor declarations is either a single BAR, which

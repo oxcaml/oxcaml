@@ -30,7 +30,10 @@ type attrs = attribute list
 
 let default_loc = ref Location.none
 
-let const_string s = Pconst_string (s, !default_loc, None)
+let const_string s =
+  { pconst_desc = Pconst_string (s, !default_loc, None);
+    pconst_loc = !default_loc;
+  }
 
 let with_default_loc l f =
   Misc.protect_refs [Misc.R (default_loc, l)] f
@@ -790,7 +793,8 @@ let no_label = Nolabel
 let extract_str_payload = function
   | PStr [{ pstr_desc = Pstr_eval (
       {Parsetree. pexp_loc; pexp_desc =
-         Parsetree.Pexp_constant (Parsetree.Pconst_string (msg, _, _)) ; _ }, _
+         Parsetree.Pexp_constant
+           { pconst_desc = Parsetree.Pconst_string (msg, _, _); _ }; _ }, _
     ); _ }] ->
     Some (msg, pexp_loc)
   | _ -> None

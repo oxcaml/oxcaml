@@ -14,12 +14,16 @@ let gensym =
 
 let store parts =
   let id = string_of_int (gensym ()) in
-  let key = Parsetree.Pconst_integer (id, None) in
+  let key =
+    { Parsetree.pconst_desc = Pconst_integer (id, None);
+      pconst_loc = Location.none;
+    }
+  in
   H.add table id parts;
   key
 
 let find = function
-  | Parsetree.Pconst_integer (id, None) ->
+  | { Parsetree.pconst_desc = Pconst_integer (id, None); _ } ->
     begin
       try H.find table id
       with Not_found -> []

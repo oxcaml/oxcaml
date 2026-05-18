@@ -28,14 +28,26 @@ module Override = struct
     match pexp_desc with
     | Pexp_record
         ( [ ( { txt = Lident "pos_fname"; _ },
-              { pexp_desc = Pexp_constant (Pconst_string (pos_fname, _, _)); _ }
+              { pexp_desc =
+                  Pexp_constant { pconst_desc = Pconst_string (pos_fname, _, _); _ };
+                _
+              }
             );
             ( { txt = Lident "pos_lnum"; _ },
-              { pexp_desc = Pexp_constant (Pconst_integer (lnum, None)); _ } );
+              { pexp_desc =
+                  Pexp_constant { pconst_desc = Pconst_integer (lnum, None); _ };
+                _
+              } );
             ( { txt = Lident "pos_bol"; _ },
-              { pexp_desc = Pexp_constant (Pconst_integer (bol, None)); _ } );
+              { pexp_desc =
+                  Pexp_constant { pconst_desc = Pconst_integer (bol, None); _ };
+                _
+              } );
             ( { txt = Lident "pos_cnum"; _ },
-              { pexp_desc = Pexp_constant (Pconst_integer (cnum, None)); _ } )
+              { pexp_desc =
+                  Pexp_constant { pconst_desc = Pconst_integer (cnum, None); _ };
+                _
+              } )
           ],
           None ) -> (
       match
@@ -54,7 +66,9 @@ module Override = struct
     let of_expression (type a) ~(attribute_name : a Attribute_name.t)
         (expr : Parsetree.expression) : (a t, string) result =
       match (attribute_name, expr.pexp_desc) with
-      | Document, Pexp_constant (Pconst_string (documentation, _, _)) ->
+      | ( Document,
+          Pexp_constant { pconst_desc = Pconst_string (documentation, _, _); _ }
+        ) ->
         Ok (Document documentation)
       | Locate, Pexp_record _ ->
         Result.map (expr_to_pos expr) ~f:(fun pos -> Locate pos)

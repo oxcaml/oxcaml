@@ -103,10 +103,10 @@ let prepare_query env query =
 let directories ~global_modules env =
   let rec explore lident env =
     let add_module name _ (md : Subst.Lazy.module_declaration) l =
+      let lident = Longident.Ldot (Location.mknoloc lident, Location.mknoloc name) in
       match md.md_type with
       | Mty_alias _ -> l
       | _ ->
-        let lident = Longident.Ldot (lident, name) in
         Trie (name, lident, lazy (explore lident env)) :: l
     in
     Env.fold_modules add_module (Some lident) env []

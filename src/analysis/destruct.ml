@@ -104,11 +104,11 @@ let rec gen_patterns ?(recurse = true) env type_expr =
     | Type_record (labels, _, _) ->
       let lst =
         List.map labels ~f:(fun lbl_descr ->
-            let lidloc = mk_id lbl_descr.lbl_name in
+            let lidloc = mk_id lbl_descr.Data_types.lbl_name in
             ( lidloc,
               lbl_descr,
               Tast_helper.Pat.var Uid.internal_not_actually_unique env type_expr
-                (mk_var lbl_descr.lbl_name) ))
+                (mk_var lbl_descr.Data_types.lbl_name) ))
       in
       [ Tast_helper.Pat.record env type_expr lst Asttypes.Closed ]
     | Type_variant (constructors, _, _) ->
@@ -125,14 +125,14 @@ let rec gen_patterns ?(recurse = true) env type_expr =
             ignore
               (let pattern_env =
                  Ctype.Pattern_env.make env ~equations_scope:0
-                   ~allow_recursive_equations:true
+                   ~in_counterexample:false
                in
                (* This function is run within a [Printtyp.wrap_printing_env] (this happens
                   in query_commands.ml), which calls [Env.without_cmis] to avoid loading
                   cmis for printing. But we may need to load cmis during this unification,
                   so we wrap in a [Env.with_cmis]. *)
                Env.with_cmis (fun () ->
-                   Ctype.unify_gadt pattern_env type_expr typ));
+                   Ctype.unify_gadt pattern_env ~pat:type_expr ~expected:typ));
             true
           with Ctype.Unify _trace -> false
         in
@@ -141,8 +141,8 @@ let rec gen_patterns ?(recurse = true) env type_expr =
       in
       List.filter_map constructors ~f:(fun cstr_descr ->
           if
-            cstr_descr.cstr_generalized
-            && not (are_types_unifiable cstr_descr.cstr_res)
+            cstr_descr.Data_types.cstr_generalized
+            && not (are_types_unifiable cstr_descr.Data_types.cstr_res)
           then (
             log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
                 Format.fprintf fmt
@@ -223,7 +223,7 @@ let rec get_match = function
       get_match parents
     | Expression m -> (
       match m.Typedtree.exp_desc with
-      | Typedtree.Texp_match (e, _, _, _) -> (m, e.exp_type)
+      | Typedtree.Texp_match (e, _, _, _, _) -> (m, e.exp_type)
       | Typedtree.Texp_function _ ->
         let typ = m.exp_type in
         (* Function must have arrow type. This arrow type
@@ -460,8 +460,8 @@ let rec qualify_constructors ~unmangling_tables f pat =
   let open Typedtree in
   let qualify_constructors = qualify_constructors ~unmangling_tables in
   let qualify_in_record (type rep)
-      (labels : (_ * rep Types.gen_label_description * _) list) lable_table
-      closed (record_form : rep Types.record_form) =
+      (labels : (_ * rep Data_types.gen_label_description * _) list) lable_table
+      closed (record_form : rep Data_types.record_form) =
     let labels =
       let open Longident in
       List.map labels ~f:(fun ((Location.{ txt; _ } as lid), lbl_des, pat) ->
@@ -470,13 +470,13 @@ let rec qualify_constructors ~unmangling_tables f pat =
           (* Un-mangle *)
           match Hashtbl.find_opt lable_table lid_name with
           | Some lbl_des ->
-            ({ lid with txt = Lident lbl_des.Types.lbl_name }, lbl_des, pat)
+            ({ lid with txt = Lident lbl_des.Data_types.lbl_name }, lbl_des, pat)
           | None -> (lid, lbl_des, pat))
     in
     let closed =
       if List.length labels > 0 then
         let _, lbl_des, _ = List.hd labels in
-        if List.length labels = Array.length lbl_des.Types.lbl_all then
+        if List.length labels = Array.length lbl_des.Data_types.lbl_all then
           Asttypes.Closed
         else Asttypes.Open
       else closed
@@ -510,7 +510,7 @@ let rec qualify_constructors ~unmangling_tables f pat =
           let name =
             let constrs, _, _ = unmangling_tables in
             match Hashtbl.find_opt constrs name with
-            | Some cstr_des -> cstr_des.Types.cstr_name
+            | Some cstr_des -> cstr_des.Data_types.cstr_name
             | None -> name
           in
           begin match Types.get_desc pat.pat_type with
@@ -586,7 +586,7 @@ let print_pretty ?punned_field config source subject =
   let result = Mreader.print_pretty config source subject in
   match punned_field with
   | None -> result
-  | Some label -> label.Types.lbl_name ^ " = " ^ result
+  | Some label -> label.Data_types.lbl_name ^ " = " ^ result
 
 (* conversion from Typedtree.pattern to Parsetree.pattern list *)
 module Conv = struct
@@ -608,13 +608,13 @@ module Conv = struct
     let unboxed_labels = Hashtbl.create 7 in
     let rec loop pat =
       let conv_record (type rep)
-          (label_table : (_, rep gen_label_description) Hashtbl.t)
-          (subpatterns : (_ * rep gen_label_description * _) list)
-          (record_form : rep Types.record_form) =
+          (label_table : (_, rep Data_types.gen_label_description) Hashtbl.t)
+          (subpatterns : (_ * rep Data_types.gen_label_description * _) list)
+          (record_form : rep Data_types.record_form) =
         let fields =
           List.map
             ~f:(fun (_, lbl, p) ->
-              let id = fresh lbl.lbl_name in
+              let id = fresh lbl.Data_types.lbl_name in
               Hashtbl.add label_table id lbl;
               (mknoloc (Longident.Lident id), loop p))
             subpatterns

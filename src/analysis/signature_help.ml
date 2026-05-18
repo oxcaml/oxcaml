@@ -23,8 +23,10 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
   let rec longident ppf : Longident.t -> unit = function
     | Lident s -> Format.fprintf ppf "%s" (Misc_utils.parenthesize_name s)
     | Ldot (p, s) ->
-      Format.fprintf ppf "%a.%s" longident p (Misc_utils.parenthesize_name s)
-    | Lapply (p1, p2) -> Format.fprintf ppf "%a(%a)" longident p1 longident p2
+      Format.fprintf ppf "%a.%s" longident p.txt
+        (Misc_utils.parenthesize_name s.txt)
+    | Lapply (p1, p2) ->
+      Format.fprintf ppf "%a(%a)" longident p1.txt longident p2.txt
   in
   match exp_desc with
   | Texp_ident { lid = { txt = li; _ }; _ } ->

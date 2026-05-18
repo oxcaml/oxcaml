@@ -125,7 +125,9 @@ let values_from_module query env lident acc =
           match mdl.md_type with
           | Mty_alias _ -> acc
           | _ ->
-            let lident = Longident.Ldot (lident, name) in
+            let lident =
+              Longident.Ldot (Location.mknoloc lident, Location.mknoloc name)
+            in
             aux acc lident)
         (Some lident) env acc
   in

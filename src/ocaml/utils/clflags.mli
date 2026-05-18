@@ -64,3 +64,9 @@ val gdwarf_config_max_evaluation_steps_per_variable : int option ref
 val locs : bool ref
 val locations            : bool ref
 val ikinds_debug : bool ref
+val no_alias_deps : bool ref
+val unique_ids : bool ref
+val dump_dir : string option ref
+val verbose_types : bool ref
+val canonical_ids : bool ref
+val print_variance : bool ref

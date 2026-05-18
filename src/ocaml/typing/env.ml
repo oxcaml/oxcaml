@@ -2774,7 +2774,7 @@ and store_type ~check ~long_path ~predef id info shape env =
   if check then
     check_usage loc id info.type_uid
       (fun s -> Warnings.Unused_type_declaration (s, Warnings.Declaration))
-      !type_declarations;
+      type_declarations;
   let store_decl path info env =
     match info.type_kind with
     | Type_variant (_,repr,umc) ->
@@ -5546,24 +5546,7 @@ let () =
   Location.register_error_of_exn
     (function
       | Error err ->
-          let loc =
-            match err with
-            | Missing_module (loc, _, _)
-            | Illegal_value_name (loc, _)
-            | Implicit_jkind_already_defined { loc; _ }
-            | Toplevel_splice loc
-            | Unsupported_inside_quotation (loc, _)
-            | Lookup_error(loc, _, _) -> loc
-            | Incomplete_instantiation _ -> Location.none
-          in
-          let error_of_printer =
-            if loc = Location.none
-            then Location.error_of_printer_file
-            else Location.error_of_printer ~loc ?sub:None
-          in
-          Some
-            (error_of_printer
-               report_error_doc err)
+          Some (report_error_doc err)
       | _ ->
           None
     )
@@ -5573,10 +5556,6 @@ let () =
     Option.map Unit_info.modname (get_current_unit ())
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-
-let report_lookup_error loc t =
-  Format_doc.compat (report_lookup_error_doc loc t)
-let report_error = Format_doc.compat report_error_doc
 
 (* helper for merlin *)
 
@@ -5898,10 +5877,6 @@ let fold_all_labels f ident env init =
 
 let () =
   let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_unit_name ())
+    Option.map Unit_info.modname (get_current_unit ())
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-
-let report_lookup_error loc t =
-  Format_doc.compat (report_lookup_error_doc loc t)
-let report_error = Format_doc.compat report_error_doc

@@ -369,8 +369,9 @@ let deep_copy () =
         | Tfield (s,fk,t1,t2) -> Tfield (s, fk, copy t1, copy t2)
         | Tpoly (t,tl) -> Tpoly (copy t, List.map copy tl)
         | Trepr (t,tl) -> Trepr (copy t, tl)
-        | Tpackage (p,ltl) ->
-          Tpackage (p, List.map (fun (l, tl) -> l, copy tl) ltl)
+        | Tpackage { pack_path; pack_cstrs } ->
+          Tpackage
+            { pack_path; pack_cstrs = List.map (fun (l, tl) -> l, copy tl) pack_cstrs }
         | Tquote t -> Tquote (copy t)
         | Tquote_eval t -> Tquote_eval (copy t)
         | Tsplice t -> Tsplice (copy t)
@@ -8832,6 +8833,19 @@ and type_newtype
     (result, ety, id, uid)
   end
    ~before_generalize:(fun (_,ety,_,_) -> enforce_current_level env ety)
+
+(** [type_newtype] where the "body" is just an expression. *)
+and type_newtype_expr
+    ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
+  let body, ety, id, uid =
+    type_newtype env name jkind_annot_opt (fun env ->
+      let expr = type_exp env expected_mode sbody in
+      expr, expr.exp_type)
+  in
+  rue { body with exp_loc = loc; exp_type = ety;
+        exp_extra =
+        (Texp_newtype (id, name, jkind_annot_opt, uid),
+         loc, attributes) :: body.exp_extra }
 
 and type_ident env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
