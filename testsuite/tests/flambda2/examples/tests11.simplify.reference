@@ -26,7 +26,7 @@ let code loopify(never) size(7) newer_version_of(`fn[tests11.ml:23,2--70]_1`)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
   let map_foo =
-    %project_value_slot.[`fn[tests11.ml:23,2--70]`].[`map_foo`] (my_closure)
+    %project_value_slot.[`fn[tests11.ml:23,2--70]`].[map_foo] (my_closure)
   in
   apply inlined(never)
     map_foo

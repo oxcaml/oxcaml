@@ -202,12 +202,8 @@ type alloc_mode_for_assignments =
   | Local
 
 type prim_param =
-  | Labeled of
-      { label : string;
-        value : string located
-      }
-  | Positional of string located
-  | Flag of string
+  | Labeled of string located * prim_param list
+  | Anonymous of prim_param list
 
 type prim_op =
   { prim : string;

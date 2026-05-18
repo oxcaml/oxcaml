@@ -63,7 +63,7 @@ and code rec loopify(never) size(31) newer_version_of(map_local_1)
              apply f (Pfield) -> k2 * k1)
               where k2 (apply_result_1 : val) =
                 let Pmakeblock =
-                  %block.[`0`].`local`[`my_region`]
+                  %block.[`0`].`local`[my_region]
                     (apply_result_1, apply_result)
                 in
                 cont k (Pmakeblock)))
@@ -165,7 +165,7 @@ apply direct(length_2_1)
                        where k2 =
                          let Pfield = %block_load.[`0`] (l1_1) in
                          let Pmakeblock =
-                           %block.[`0`].`local`[`my_region`] (Pfield, l2_1)
+                           %block.[`0`].`local`[my_region] (Pfield, l2_1)
                          in
                          let Pfield_1 = %block_load.[`1`] (l1_1) in
                          cont self (Pfield_1, Pmakeblock))
@@ -189,14 +189,13 @@ apply direct(length_2_1)
                   | 0 -> k2
                   | 1 -> k3
                   where k3 =
-                    let Pmakeblock =
-                      %block.[`0`].`local`[`my_region`] (acc, 0)
+                    let Pmakeblock = %block.[`0`].`local`[my_region] (acc, 0)
                     in
                     cont k (Pmakeblock)
                   where k2 =
                     let l_1 = %block_load.[`1`] (l) in
                     let a = %block_load.[`0`] (l) in
-                    let acc_1 = %block.[`0`].`local`[`my_region`] (a, acc) in
+                    let acc_1 = %block.[`0`].`local`[my_region] (a, acc) in
                     (apply break_here (a) -> k3 * k1
                        where k3 (param : imm tagged) =
                          let unboxed_field = %untag_imm (param) in
@@ -208,8 +207,7 @@ apply direct(length_2_1)
                             | 1 -> k3
                             where k3 =
                               let Pmakeblock =
-                                %block.[`0`].`local`[`my_region`]
-                                  (acc_1, l_1)
+                                %block.[`0`].`local`[my_region] (acc_1, l_1)
                               in
                               cont k (Pmakeblock)
                             where k2 =
@@ -278,7 +276,7 @@ apply direct(length_2_1)
                                             | 0 of val *
                                                 [ 0 | 0 of val * val ] ]) =
                                    let Pmakeblock =
-                                     %block.[`0`].`local`[`my_region`]
+                                     %block.[`0`].`local`[my_region]
                                        (apply_result_1, apply_result)
                                    in
                                    cont k (Pmakeblock))))

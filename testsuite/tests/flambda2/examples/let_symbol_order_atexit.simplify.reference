@@ -18,7 +18,7 @@ and code loopify(never) size(8) newer_version_of(do_at_exit_1)
         -> k * k1
         : imm tagged =
   let exit_function_1 =
-    %project_value_slot.[`do_at_exit`].[`exit_function`]
+    %project_value_slot.[do_at_exit].[exit_function]
       ($camlLet_symbol_order_atexit__do_at_exit_5)
   in
   let Pfield = %block_load.mut.[`0`] (exit_function_1) in
@@ -31,7 +31,7 @@ let code loopify(never) size(19) newer_version_of(exit_3)
         -> k * k1
         : val =
   (let exit_function_1 =
-     %project_value_slot.[`do_at_exit`].[`exit_function`]
+     %project_value_slot.[do_at_exit].[exit_function]
        ($camlLet_symbol_order_atexit__do_at_exit_5)
    in
    let Pfield = %block_load.mut.[`0`] (exit_function_1) in

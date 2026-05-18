@@ -27,8 +27,7 @@ and code loopify(done) size(15) newer_version_of(aux_1)
   cont self
     where rec self =
       let env_2 =
-        %project_value_slot.[`aux`].[`env_1`]
-          ($camlDeleted_code_printing__aux_3)
+        %project_value_slot.[aux].[env_1] ($camlDeleted_code_printing__aux_3)
       in
       let Popaque = %opaque (0) in
       ((let untagged = %untag_imm (Popaque) in
