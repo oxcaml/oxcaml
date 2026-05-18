@@ -92,9 +92,6 @@ logand_branch:
 |}]
 
 
-(* CR ttebbi: We materialize comparison result bits despite
-   only using them for a single branch. Also, the `_ -> 0`
-   case is duplicated for no good reason. *)
 let combine_comparisons r f =
   match !r > 5, !r < 20 with
   | true, true -> !r
@@ -102,15 +99,11 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $41, %rbx
-  setl  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
-  movq  %rbx, %rax
+  cmpq  $41, %rax
+  jge   .L0
   ret
 .L0:
   movl  $1, %eax
@@ -125,14 +118,11 @@ let repeat_comparisons r _f =
   if a && b then 1 else 2
 [%%expect_asm X86_64{|
 repeat_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $11, %rbx
-  setg  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
+  cmpq  $11, %rax
+  jle   .L0
   movl  $3, %eax
   ret
 .L0:
@@ -140,8 +130,6 @@ repeat_comparisons:
   ret
 |}]
 
-(* CR ttebbi: We first compute the boolean result of the || predicate, instead
-   of jumping directly. *)
 let bad_max a b =
   let i = ref 0 in
   while !i < a || !i < b do incr i done;

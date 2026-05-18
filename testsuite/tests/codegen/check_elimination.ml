@@ -77,9 +77,8 @@ arr_sum:
   ret
 |}]
 
-(* CR ttebbi: The generated control flow branches three (!) times on
-   should_continue. In block 123, we can even statically know that the bit is 1.
-   Additionally, we materialise the should_continue bit. *)
+(* CR ttebbi: We check [target < x] twice, even though the second branch is
+   redundant. *)
 let search ~target (start : int list) =
   let node = ref start in
   while
@@ -95,31 +94,25 @@ let search ~target (start : int list) =
 [%%expect_asm X86_64{|
 search:
   movq  %rax, %rdi
-  testb $1, %bl
+  movq  %rbx, %rax
+  testb $1, %al
   je    .L1
+  jmp   .L3
 .L0:
-  movq  %rbx, %rax
-  jmp   .L4
-.L1:
-  movq  (%rbx), %rdx
-  xorl  %esi, %esi
-  cmpq  %rdx, %rdi
-  setl  %sil
-  jge   .L2
-  movq  8(%rbx), %rax
-  testq %rsi, %rsi
+  testb $1, %al
   jne   .L3
-  jmp   .L4
-.L2:
-  movq  %rbx, %rax
-  testq %rsi, %rsi
-  je    .L4
-.L3:
-  movq  %rax, %rbx
-  testb $1, %bl
-  je    .L1
+.L1:
+  movq  (%rax), %rbx
+  cmpq  %rbx, %rdi
+  jge   .L2
+  movq  8(%rax), %rax
+  cmpq  %rbx, %rdi
+  jge   .L3
   jmp   .L0
-.L4:
+.L2:
+  cmpq  %rbx, %rdi
+  jl    .L0
+.L3:
   ret
 |}]
 
