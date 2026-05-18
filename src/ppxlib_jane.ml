@@ -28,7 +28,7 @@ type arrow_argument = Shim.arrow_argument =
 
 type jkind_annotation_desc = Shim.jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of Longident.t Ppxlib_ast.Asttypes.loc
+  | Pjk_abbreviation of Longident.t Ppxlib_ast.Asttypes.loc * string Location.loc list
   | Pjk_mod of Shim.jkind_annotation * Shim.Modes.t
   | Pjk_with of Shim.jkind_annotation * Ppxlib_ast.Parsetree.core_type * Shim.Modalities.t
   | Pjk_kind_of of Ppxlib_ast.Parsetree.core_type

@@ -19,6 +19,7 @@ module Language_feature_name = struct
     | Ptyp_splice _ -> "spliced type"
     | Ptyp_of_kind _ -> "type of a fixed kind"
     | Ptyp_repr _ -> "kind-polymorphic type"
+    | Ptyp_newlayout _ -> "new-layout type"
     | Ptyp_extension _ -> "extension point as a type"
   ;;
 
@@ -203,6 +204,7 @@ module Constructor_name = struct
     | Ptyp_splice _ -> "Ptyp_splice"
     | Ptyp_of_kind _ -> "Ptyp_of_kind"
     | Ptyp_repr _ -> "Ptyp_repr"
+    | Ptyp_newlayout _ -> "Ptyp_newlayout"
     | Ptyp_extension _ -> "Ptyp_extension"
   ;;
 

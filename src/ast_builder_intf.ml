@@ -10,7 +10,6 @@ module type S = sig
   type modalities := Shim.Modalities.t
   type modes := Shim.Modes.t
   type include_kind := Shim.Include_kind.t
-  type index_kind = Shim.index_kind
   type jkind_annotation := Shim.jkind_annotation
   type unboxed_access := Shim.unboxed_access
 

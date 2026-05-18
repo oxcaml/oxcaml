@@ -65,30 +65,26 @@
 ---
 >   type function_body =
 223c218
-< type nonrec index_kind = index_kind =
----
-> type index_kind =
-231c226
 < type nonrec block_access = block_access =
 ---
 > type block_access =
-236c231
+227c222
 < type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
 ---
 > type unboxed_access = Uaccess_unboxed_field of Longident.t loc
-239c234
+230c225
 <   type t = core_type_desc =
 ---
 >   type t =
-263c258
+255c250
 <   type t = core_type =
 ---
 >   type t =
-275c270
+267c262
 <   type t = pattern_desc =
 ---
 >   type t =
-305c300,306
+297c292,298
 <   type t = expression_desc =
 ---
 >
@@ -97,42 +93,42 @@
 >     | Pcomp_array_comprehension of unit
 > 
 >   type t =
-365c366
+357c358
 <   type t = type_kind =
 ---
 >   type t =
-391c392
+383c384
 <   type 'a t = 'a include_infos =
 ---
 >   type 'a t =
-403c404
+395c396
 <   type t = signature_item_desc =
 ---
 >   type t =
-427c428
+419c420
 <   type t = signature =
 ---
 >   type t =
-438c439
+430c431
 <   type t = structure_item_desc =
 ---
 >   type t =
-461c462
+453c454
 <   type t = functor_parameter =
 ---
 >   type t =
-470c471
+462c463
 <   type t = module_type_desc =
 ---
 >   type t =
-485c486,490
+477c478,482
 <   type t = module_expr_desc =
 ---
 >
 >   type module_instance = private Module_instance
 > 
 >   type t =
-500,505c505,523
+492,497c497,515
 <   class virtual map : Ppxlib_ast.Ast.map
 <   class virtual iter : Ppxlib_ast.Ast.iter
 <   class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
@@ -159,7 +155,7 @@
 >       method signature_items : signature_item list T.t
 >     end
 >   end
-507,508c525,648
+499,500c517,640
 <   class virtual ['ctx, 'res] lift_map_with_context :
 <     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
 ---

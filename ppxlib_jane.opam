@@ -15,7 +15,7 @@ depends: [
   "dune"   {>= "3.17.0"}
   "ppxlib_ast" {= "0.33.0+ox"}
 ]
-available: arch != "arm32" & arch != "x86_32"
+available: arch != "x86_32"
 synopsis: "Utilities for working with Jane Street AST constructs"
 description: "
 Part of the Jane Street's PPX rewriters collection.

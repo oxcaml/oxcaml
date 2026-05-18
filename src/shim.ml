@@ -172,17 +172,8 @@ module Pexp_function = struct
   ;;
 end
 
-type nonrec index_kind = index_kind =
-  | Index_int
-  | Index_unboxed_int64
-  | Index_unboxed_int32
-  | Index_unboxed_int16
-  | Index_unboxed_int8
-  | Index_unboxed_nativeint
-
 type nonrec block_access = block_access =
   | Baccess_field of Longident.t loc
-  | Baccess_array of mutable_flag * index_kind * expression
   | Baccess_block of mutable_flag * expression
 
 type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
@@ -200,6 +191,7 @@ module Core_type_desc = struct
     | Ptyp_alias of core_type * string loc option * jkind_annotation option
     | Ptyp_variant of row_field list * closed_flag * label list option
     | Ptyp_poly of (string loc * jkind_annotation option) list * core_type
+    | Ptyp_newlayout of string loc list * core_type
     | Ptyp_package of package_type
     | Ptyp_quote of core_type
     | Ptyp_splice of core_type
@@ -366,7 +358,7 @@ end
 
 type nonrec jkind_annotation_desc = jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of Longident.t loc
+  | Pjk_abbreviation of Longident.t loc * string loc list
   | Pjk_mod of jkind_annotation * Modes.t
   | Pjk_with of jkind_annotation * core_type * Modality.t loc list
   | Pjk_kind_of of core_type
