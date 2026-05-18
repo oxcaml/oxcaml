@@ -10,23 +10,24 @@
  }
 *)
 
-(* Mixed float-float# blocks require [@@flatten_floats]. *)
+(* Mixed float-float# records typecheck without [@@flatten_floats], producing
+   a non-flat mixed block (and thus get an unboxed version). *)
 type t =
   { a : float;
     b : float#;
   }
 
 [%%expect{|
-Lines 1-4, characters 0-3:
-1 | type t =
-2 |   { a : float;
-3 |     b : float#;
-4 |   }
-Error: This record type mixes boxed and unboxed float fields,
-       which causes the flat float record optimization.
-       You must annotate it with "[@@flatten_floats]".
+type t = { a : float; b : float#; }
 |}];;
 
+(* The non-flat representation gives [t] an unboxed version [t#]. *)
+let _f (x : t#) = x.#b
+[%%expect{|
+val _f : t# -> float# = <fun>
+|}];;
+
+(* Opt in to flat storage with [@@flatten_floats]. *)
 type t =
   { a : float;
     b : float#;
@@ -43,6 +44,101 @@ type t =
 
 [%%expect{|
 type t = { a : float#; b : float; }
+|}];;
+
+(* [@@flatten_floats] records don't get unboxed versions. *)
+type bad = t#
+[%%expect{|
+Line 1, characters 11-13:
+1 | type bad = t#
+               ^^
+Error: The type "t" has no unboxed version.
+Hint: Float records don't get unboxed versions.
+|}]
+
+(* A mismatch in [@@flatten_floats] is caught in the representation check*)
+module M : sig
+  type t = { a : float; b : float#; } [@@flatten_floats]
+end = struct
+  type t = { a : float; b : float#; }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { a : float; b : float#; }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float; b : float#; } end
+       is not included in
+         sig type t = { a : float; b : float#; } end
+       Type declarations do not match:
+         type t = { a : float; b : float#; }
+       is not included in
+         type t = { a : float; b : float#; }
+       Their internal representations differ:
+       the second declaration uses a mixed representation where boxed floats are stored flat.
+|}]
+
+module M : sig
+  type t = { a : float; b : float#; }
+end = struct
+  type t = { a : float; b : float#; } [@@flatten_floats]
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { a : float; b : float#; } [@@flatten_floats]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float; b : float#; } end
+       is not included in
+         sig type t = { a : float; b : float#; } end
+       Type declarations do not match:
+         type t = { a : float; b : float#; }
+       is not included in
+         type t = { a : float; b : float#; }
+       Their internal representations differ:
+       the first declaration uses a mixed representation where boxed floats are stored flat.
+|}]
+
+(* [@@flatten_floats] is rejected on records that don't mix [float] and
+   [float#]. *)
+type bad = { f : float } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-43:
+1 | type bad = { f : float } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+type bad = { f : float# } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-44:
+1 | type bad = { f : float# } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+type bad = { a : float; b : float#; c : int } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-64:
+1 | type bad = { a : float; b : float#; c : int } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+type bad = A | B [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-35:
+1 | type bad = A | B [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
 |}];;
 
 (* When a non-float/float# field appears, [float]
