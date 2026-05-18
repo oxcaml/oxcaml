@@ -371,7 +371,8 @@ let iter_on_occurrences
           f ~namespace:Module sig_env ms_manifest ms_txt
       | Tsig_typext { tyext_path; tyext_txt } ->
           f ~namespace:Type sig_env tyext_path tyext_txt
-      | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_exception _
+      | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_jkindsubst _
+      | Tsig_exception _
       | Tsig_module _ | Tsig_recmodule _ | Tsig_modtype _ | Tsig_modtypesubst _
       | Tsig_open _ | Tsig_include _ | Tsig_class _ | Tsig_class_type _
       | Tsig_attribute _ | Tsig_jkind _ -> ());

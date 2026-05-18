@@ -35,6 +35,8 @@ let empty_type loc = err loc "Type declarations cannot be empty."
 let complex_id loc = err loc "Functor application not allowed here."
 let module_type_substitution_missing_rhs loc =
   err loc "Module type substitution with no right hand side"
+let jkind_substitution_missing_rhs loc =
+  err loc "Kind substitution with no right hand side"
 let empty_comprehension loc = err loc "Comprehension with no clauses"
 let function_without_value_parameters loc =
   err loc "Function without any value parameters"
@@ -209,6 +211,8 @@ let iterator =
     | Psig_type (_, []) -> empty_type loc
     | Psig_modtypesubst {pmtd_type=None; _ } ->
         module_type_substitution_missing_rhs loc
+    | Psig_jkindsubst {pjkind_manifest=None; _ } ->
+        jkind_substitution_missing_rhs loc
     | _ -> ()
   in
   let row_field self field =

@@ -947,6 +947,9 @@ and signature_item i ppf x =
   | Psig_typesubst l ->
       line i ppf "Psig_typesubst\n";
       list i type_declaration ppf l;
+  | Psig_jkindsubst d ->
+      line i ppf "Psig_jkindsubst\n";
+      jkind_declaration i ppf d;
   | Psig_typext te ->
       line i ppf "Psig_typext\n";
       type_extension i ppf te

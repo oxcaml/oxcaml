@@ -536,6 +536,7 @@ let signature_item sub {sig_loc; sig_desc; sig_env; _} =
   | Tsig_value v -> sub.value_description sub v
   | Tsig_type (rf, tdl)  -> sub.type_declarations sub (rf, tdl)
   | Tsig_typesubst list -> sub.type_declarations sub (Nonrecursive, list)
+  | Tsig_jkindsubst d -> sub.jkind_declaration sub d
   | Tsig_typext te -> sub.type_extension sub te
   | Tsig_exception ext -> sub.type_exception sub ext
   | Tsig_module x -> sub.module_declaration sub x

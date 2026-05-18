@@ -341,6 +341,7 @@ module Sig:
     val value: ?loc:loc -> value_description -> signature_item
     val type_: ?loc:loc -> rec_flag -> type_declaration list -> signature_item
     val type_subst: ?loc:loc -> type_declaration list -> signature_item
+    val jkind_subst: ?loc:loc -> jkind_declaration -> signature_item
     val type_extension: ?loc:loc -> type_extension -> signature_item
     val exception_: ?loc:loc -> type_exception -> signature_item
     val module_: ?loc:loc -> module_declaration -> signature_item

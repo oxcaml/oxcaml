@@ -328,6 +328,7 @@ module MT = struct
     | Psig_type (_, l)
     | Psig_typesubst l ->
       List.iter (sub.type_declaration sub) l
+    | Psig_jkindsubst x -> sub.jkind_declaration sub x
     | Psig_typext te -> sub.type_extension sub te
     | Psig_exception ed -> sub.type_exception sub ed
     | Psig_module x -> sub.module_declaration sub x
