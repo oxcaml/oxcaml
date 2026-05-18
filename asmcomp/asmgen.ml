@@ -413,8 +413,10 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
     ++ cfg_with_layout_profile ~accumulate:true "vectorize"
          (Vectorize.cfg ppf_dump)
     ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
-  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+  ++ Cfg_with_infos.make
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_polling"
        (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ Cfg_with_infos.cfg_with_layout
   ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
        (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
@@ -484,9 +486,10 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
 
 let compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout =
   (* missing pass: stack checks *)
-  cfg_with_layout
-  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+  cfg_with_layout ++ Cfg_with_infos.make
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_polling"
        (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ Cfg_with_infos.cfg_with_layout
   ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
        (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
