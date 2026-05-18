@@ -2257,11 +2257,41 @@ module Lattices_mono = struct
         (q, c comonadic_with, disallowed * r) compose_and_max_result =
      fun lm1 ax0 ->
       match ax0 with
-      | Forkable -> And_max_id Forkable
-      | Yielding -> And_max_id Yielding
-      | Linearity -> And_max_id Linearity
-      | Statefulness -> And_max_id Statefulness
-      | Portability -> And_max_id Portability
+      | Forkable -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Forkable)
+      | Yielding -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Yielding)
+      | Linearity -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Linearity)
+      | Statefulness -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Statefulness)
+      | Portability -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Portability)
       | Areality -> And_max_core (Areality, Locality_restricted lm1)
 
     let compose_max_with_simple_core : type b c q r.
@@ -3284,6 +3314,30 @@ module Lattices_mono = struct
       Simple_proj (Simple_morph.left_adjoint mid m, ax, dst)
     | Const_max _ -> Const_min dst
 
+  let const_max_or_apply : type a c p r.
+      c obj ->
+      (p, c, disallowed * r) Simple_morph.t ->
+      a obj ->
+      (a, c, disallowed * r) morph =
+   fun dst m obj ->
+    match Simple_morph.maybe_allowed_right m with
+    | Allowed_right _ -> Const_max obj
+    | Not_allowed_right ->
+      let src = Simple_morph.src dst m in
+      Const (obj, Simple_morph.apply dst m (max src))
+
+  let const_min_or_apply : type a c p l.
+      c obj ->
+      (p, c, l * disallowed) Simple_morph.t ->
+      a obj ->
+      (a, c, l * disallowed) morph =
+   fun dst m obj ->
+    match Simple_morph.maybe_allowed_left m with
+    | Allowed_left _ -> Const_min obj
+    | Not_allowed_left ->
+      let src = Simple_morph.src dst m in
+      Const (obj, Simple_morph.apply dst m (min src))
+
   let compose_simple_proj_core : type a c p d.
       c obj ->
       (p, c, d) Simple_morph.t ->
@@ -3294,8 +3348,8 @@ module Lattices_mono = struct
     | Proj_core (m1, ax1, obj1) ->
       Simple_proj (Simple_morph.compose dst m0 (Core m1), ax1, obj1)
     | Proj_id (ax1, obj1) -> Simple_proj (m0, ax1, obj1)
-    | Proj_const_max obj1 -> Const_max obj1
-    | Proj_const_min obj1 -> Const_min obj1
+    | Proj_const_max obj1 -> const_max_or_apply dst m0 obj1
+    | Proj_const_min obj1 -> const_min_or_apply dst m0 obj1
 
   let compose_simple_proj_meet_const_core : type a c p l.
       c obj ->
@@ -3310,8 +3364,8 @@ module Lattices_mono = struct
         (Simple_morph.compose dst m0 (Meet_const_core (c1, m1)), ax1, obj1)
     | Proj_id (ax1, obj1) ->
       Simple_proj (Simple_morph.compose dst m0 (Meet_const c1), ax1, obj1)
-    | Proj_const_max obj1 -> Const_max obj1
-    | Proj_const_min obj1 -> Const_min obj1
+    | Proj_const_max obj1 -> Const (obj1, Simple_morph.apply dst m0 c1)
+    | Proj_const_min obj1 -> const_min_or_apply dst m0 obj1
 
   let compose_simple_proj_core_imply_const : type a c p r.
       c obj ->
@@ -3328,8 +3382,8 @@ module Lattices_mono = struct
     | Proj_id (ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
       Simple_proj (Simple_morph.compose dst m0 (Imply_const c1), ax1, obj1)
-    | Proj_const_max obj1 -> Const_max obj1
-    | Proj_const_min obj1 -> Const_min obj1
+    | Proj_const_max obj1 -> const_max_or_apply dst m0 obj1
+    | Proj_const_min obj1 -> const_min_or_apply dst m0 obj1
 
   let compose_simple_proj_with_simple : type a b c p d.
       c obj ->
@@ -3487,7 +3541,7 @@ module Lattices_mono = struct
       | Misc.Is_not_eq ->
         let b_obj = src dst (Simple_proj (m0, ax0, obj1)) in
         let a_obj = src b_obj (Max_with_simple (ax1, m1)) in
-        Const_max a_obj
+        const_max_or_apply dst m0 a_obj
       end
     | Simple_proj (m0, ax0, obj1), Min_with_simple (ax1, m1) ->
       begin match Axis.equal ax0 ax1 with
@@ -3495,7 +3549,7 @@ module Lattices_mono = struct
       | Misc.Is_not_eq ->
         let b_obj = src dst (Simple_proj (m0, ax0, obj1)) in
         let a_obj = src b_obj (Min_with_simple (ax1, m1)) in
-        Const_min a_obj
+        const_min_or_apply dst m0 a_obj
       end
     | (Max_with_simple (ax0, m0) as m0'), (Simple_proj (m1, ax1, obj1) as m1')
       ->
@@ -3519,22 +3573,12 @@ module Lattices_mono = struct
         allow_left (Simple (Simple_morph.lift_min a_obj dst m0m1 ax1 ax0))
       | Not_allowed_left -> Compose (m0', m1')
       end
-    | Simple m0, Const_max a_obj ->
-      begin match Simple_morph.maybe_allowed_right m0 with
-      | Allowed_right _ -> Const_max a_obj
-      | Not_allowed_right ->
-        let b_obj = Simple_morph.src dst m0 in
-        Const (a_obj, Simple_morph.apply dst m0 (max b_obj))
-      end
-    | Simple m0, Const_min a_obj ->
-      begin match Simple_morph.maybe_allowed_left m0 with
-      | Allowed_left _ -> Const_min a_obj
-      | Not_allowed_left ->
-        let b_obj = Simple_morph.src dst m0 in
-        Const (a_obj, Simple_morph.apply dst m0 (min b_obj))
-      end
-    | Simple_proj (_m0, _ax0, _obj0), Const_max obj1 -> Const_max obj1
-    | Simple_proj (_m0, _ax0, _obj0), Const_min obj1 -> Const_min obj1
+    | Simple m0, Const_max a_obj -> const_max_or_apply dst m0 a_obj
+    | Simple m0, Const_min a_obj -> const_min_or_apply dst m0 a_obj
+    | Simple_proj (m0, _ax0, _obj0), Const_max obj1 ->
+      const_max_or_apply dst m0 obj1
+    | Simple_proj (m0, _ax0, _obj0), Const_min obj1 ->
+      const_min_or_apply dst m0 obj1
     | Min_with_simple (ax0, m0), Const_max obj1 ->
       let q_obj = proj_obj ax0 dst in
       let b_obj = Simple_morph.src q_obj m0 in
