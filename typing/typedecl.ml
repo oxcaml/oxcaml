@@ -154,7 +154,6 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
@@ -930,6 +929,9 @@ let transl_declaration env sdecl (id, uid) =
   let represent_as_float_array =
     Builtin_attributes.has_represent_as_float_array sdecl.ptype_attributes
   in
+  let flatten_floats =
+    Builtin_attributes.has_flatten_floats sdecl.ptype_attributes
+  in
   let unbox, unboxed_default =
     (* [unboxed_default] is [true] iff the user did not specify an explicit
        representation attribute ([@@unboxed] or [@@represent_as_float_array]) *)
@@ -948,6 +950,11 @@ let transl_declaration env sdecl (id, uid) =
     | Ptype_record _ when not unbox -> ()
     | _ ->
       raise (Error (sdecl.ptype_loc, Bad_represent_as_float_array_attribute))
+  end;
+  if flatten_floats then begin
+    match sdecl.ptype_kind with
+    | Ptype_record _ when not unbox -> ()
+    | _ -> raise (Error (sdecl.ptype_loc, Misplaced_flatten_floats))
   end;
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
@@ -1122,7 +1129,8 @@ let transl_declaration env sdecl (id, uid) =
               Record_unboxed,
               Jkind.Builtin.any ~why:Old_style_unboxed_type
             else
-              Record_dummy { represent_as_float_array },
+              (* See Note [Record_dummy] in [typing/types.mli] *)
+              Record_dummy { represent_as_float_array; flatten_floats },
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
@@ -1258,9 +1266,9 @@ let transl_declaration env sdecl (id, uid) =
    1. In the temporary environment computed by [enter_type], all types get an
       unboxed version.
 
-   2. After translating declarations, [derive_unboxed_versions] gives all
-      [Record_dummy { represent_as_float_array = false }] records unboxed
-      versions.
+   2. After translating declarations, [derive_unboxed_versions] gives unboxed
+      versions to all [Record_dummy]s whose [represent_as_float_array] and
+      [flatten_floats] flags are both false.
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
@@ -1306,8 +1314,8 @@ let record_gets_unboxed_version lbls repr =
   match repr with
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed | Record_variable -> true
-  | Record_dummy { represent_as_float_array } ->
-    not represent_as_float_array
+  | Record_dummy { represent_as_float_array; flatten_floats } ->
+    not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 
 let gets_unboxed_version decl =
@@ -2050,6 +2058,7 @@ let compute_record_repr
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
     ~represent_as_float_array
+    ~flatten_floats
   =
   let mixed_record () =
     let shape =
@@ -2069,30 +2078,33 @@ let compute_record_repr
       ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
       ~first_any )
   with
-  (* We store floats flatly in mixed records if all fields are
-      float/float64/void. *)
+  (* If all fields are float/float64/void, we flatten the floats only when
+     opted in via [@@flatten_floats]. *)
   | ~refining_block_with_any:false, ~values:false, ~floats:true,
       ~atomic_floats:false, ~float64s:true,
       ~non_float64_unboxed_fields:false, ~atomic_fields:false,
       ~first_any:None, ..  ->
-    let shape =
-      List.map
-        (fun ((repr : Element_repr.t option), _lbl) ->
-          match repr with
-          | Some Float_element -> Float_boxed
-          | Some (Unboxed_element Float64) -> Float64
-          | Some Void -> Void
-          | Some (Unboxed_element (Float32
-                                  | Bits8 | Bits16 | Bits32 | Bits64
-                                  | Vec128 | Vec256 | Vec512 | Word
-                                  | Untagged_immediate | Product _))
-          | Some Value_element _ | None ->
-              Misc.fatal_error "Expected only floats and float64s")
-        reprs
-      |> Array.of_list
-    in
-    assert_mixed_product_support loc Record ~value_prefix_len:0;
-    Ok (Record_mixed shape)
+    if flatten_floats then
+      let shape =
+        List.map
+          (fun ((repr : Element_repr.t option), _lbl) ->
+            match repr with
+            | Some Float_element -> Float_boxed
+            | Some (Unboxed_element Float64) -> Float64
+            | Some Void -> Void
+            | Some (Unboxed_element (Float32
+                                    | Bits8 | Bits16 | Bits32 | Bits64
+                                    | Vec128 | Vec256 | Vec512 | Word
+                                    | Untagged_immediate | Product _))
+            | Some Value_element _ | None ->
+                Misc.fatal_error "Expected only floats and float64s")
+          reprs
+        |> Array.of_list
+      in
+      assert_mixed_product_support loc Record ~value_prefix_len:0;
+      Ok (Record_mixed shape)
+    else
+      mixed_record ()
   (* Forbid atomic fields in mixed (or potentially mixed) blocks *)
   | ~values:true, ~voids:true, ~atomic_fields:true, ..
   | ~floats:true, ~voids:true, ~atomic_fields:true, ..
@@ -2296,19 +2308,25 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       let refining_block_with_any = false in
       match form with
       | Legacy ->
-        let represent_as_float_array =
+        let ~represent_as_float_array, ~flatten_floats =
           match rep with
-          | Record_dummy { represent_as_float_array } ->
-            represent_as_float_array
+          | Record_dummy { represent_as_float_array; flatten_floats } ->
+            ~represent_as_float_array, ~flatten_floats
           | _ -> assert false (* outer match *)
         in
         let rep =
-          compute_record_repr loc reprs lbls ~represent_as_float_array ~warn
-            ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
-            ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
+          compute_record_repr loc reprs lbls ~represent_as_float_array
+            ~flatten_floats ~warn ~refining_block_with_any ~values ~floats
+            ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
+            ~voids ~first_any
         in
         if represent_as_float_array && rep <> Ok Record_ufloat then
           raise (Error (loc, Bad_represent_as_float_array_attribute));
+        if flatten_floats then begin
+          match rep with
+          | Ok rep when record_has_float_boxed rep -> ()
+          | _ -> raise (Error (loc, Misplaced_flatten_floats));
+        end;
         rep
       | Unboxed_product ->
         (match first_any with
@@ -2345,7 +2363,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     | Legacy ->
       let rep =
         compute_record_repr loc reprs lbls
-          ~represent_as_float_array:false ~warn
+          ~represent_as_float_array:false ~flatten_floats:false ~warn
           ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
@@ -2655,24 +2673,6 @@ let update_decls_jkind env decls =
          end;
 
          let new_decl = update_decl_jkind env (Pident id) decl in
-         let has_flatten_floats =
-           Builtin_attributes.has_flatten_floats decl.type_attributes
-         in
-         let is_mixed_float_float64 =
-           match new_decl.type_kind with
-           | Type_record (_, (Record_unboxed | Record_inlined _ | Record_boxed
-                            | Record_float | Record_ufloat | Record_mixed _
-                            | Record_dummy _ as rep), _) ->
-             record_has_float_boxed rep
-           | _ -> false
-         in
-         begin match has_flatten_floats, is_mixed_float_float64 with
-         | false, true ->
-           raise (Error (decl.type_loc, Missing_flatten_floats))
-         | true, false ->
-           raise (Error (decl.type_loc, Misplaced_flatten_floats))
-         | true, true | false, false -> ()
-         end;
          (id, decl, allow_any_crossing, new_decl)))
     decls
 
@@ -5643,12 +5643,6 @@ let report_error_doc ppf = function
   | Layout_poly_unsupported ->
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
-  | Missing_flatten_floats ->
-    fprintf ppf
-      "@[This record type mixes boxed and unboxed float fields,@ \
-       which causes the flat float record optimization.@ \
-       You must annotate it with %a.@]"
-      Style.inline_code "[@@flatten_floats]"
   | Misplaced_flatten_floats ->
     fprintf ppf
       "@[The %a attribute is only allowed on record types@ \
