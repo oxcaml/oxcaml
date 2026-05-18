@@ -440,7 +440,7 @@ and subst_apply env apply =
   let exn_continuation = Apply_expr.exn_continuation apply in
   let args = List.map (subst_simple env) (Apply_expr.args apply) in
   let call_kind = subst_call_kind env (Apply_expr.call_kind apply) in
-  let alloc_mode = Apply_expr.alloc_mode apply in
+  let alloc_mode = Apply_expr.return_mode apply in
   let dbg = Apply_expr.dbg apply in
   let inlined = Apply_expr.inlined apply in
   let inlining_state = Apply_expr.inlining_state apply in
@@ -1032,8 +1032,8 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Flambda_arity.equal_exact
          (Apply.return_arity apply1)
          (Apply.return_arity apply2)
-    && Alloc_mode.For_applications.compare (Apply.alloc_mode apply1)
-         (Apply.alloc_mode apply2)
+    && Alloc_mode.For_applications.compare (Apply.return_mode apply1)
+         (Apply.return_mode apply2)
        = 0
   in
   let ok = ref atomic_things_equal in
@@ -1059,7 +1059,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             ~continuation:(Apply.continuation apply1)
             (Apply.exn_continuation apply1)
             ~args:args1' ~call_kind:call_kind1'
-            ~alloc_mode:(Apply.alloc_mode apply1) (Apply.dbg apply1)
+            ~alloc_mode:(Apply.return_mode apply1) (Apply.dbg apply1)
             ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
