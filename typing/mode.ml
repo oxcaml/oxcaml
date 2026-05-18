@@ -3809,29 +3809,72 @@ module For_testing = struct
   let values_for_check_staticity_op = [Staticity.Static; Staticity.Dynamic]
 
   let values_for_check_monadic_op =
-    let* uniqueness = values_for_check_uniqueness_op in
-    let* contention = values_for_check_contention_op in
-    let* visibility = values_for_check_visibility_op in
-    let+ staticity = values_for_check_staticity_op in
-    { uniqueness; contention; visibility; staticity }
+    let with_base base =
+      List.concat
+        [ List.map
+            (fun uniqueness -> { base with uniqueness })
+            values_for_check_uniqueness_op;
+          List.map
+            (fun contention -> { base with contention })
+            values_for_check_contention_op;
+          List.map
+            (fun visibility -> { base with visibility })
+            values_for_check_visibility_op;
+          List.map
+            (fun staticity -> { base with staticity })
+            values_for_check_staticity_op ]
+    in
+    with_base Monadic_op.min @ with_base Monadic_op.max
 
   let values_for_check_comonadic_with_locality =
-    let* areality = values_for_check_locality in
-    let* linearity = values_for_check_linearity in
-    let* portability = values_for_check_portability in
-    let* forkable = values_for_check_forkable in
-    let* yielding = values_for_check_yielding in
-    let+ statefulness = values_for_check_statefulness in
-    { areality; linearity; portability; forkable; yielding; statefulness }
+    let with_base base =
+      List.concat
+        [ List.map
+            (fun areality -> { base with areality })
+            values_for_check_locality;
+          List.map
+            (fun linearity -> { base with linearity })
+            values_for_check_linearity;
+          List.map
+            (fun portability -> { base with portability })
+            values_for_check_portability;
+          List.map
+            (fun forkable -> { base with forkable })
+            values_for_check_forkable;
+          List.map
+            (fun yielding -> { base with yielding })
+            values_for_check_yielding;
+          List.map
+            (fun statefulness -> { base with statefulness })
+            values_for_check_statefulness ]
+    in
+    with_base Comonadic_with_locality.min
+    @ with_base Comonadic_with_locality.max
 
   let values_for_check_comonadic_with_regionality =
-    let* areality = values_for_check_regionality in
-    let* linearity = values_for_check_linearity in
-    let* portability = values_for_check_portability in
-    let* forkable = values_for_check_forkable in
-    let* yielding = values_for_check_yielding in
-    let+ statefulness = values_for_check_statefulness in
-    { areality; linearity; portability; forkable; yielding; statefulness }
+    let with_base base =
+      List.concat
+        [ List.map
+            (fun areality -> { base with areality })
+            values_for_check_regionality;
+          List.map
+            (fun linearity -> { base with linearity })
+            values_for_check_linearity;
+          List.map
+            (fun portability -> { base with portability })
+            values_for_check_portability;
+          List.map
+            (fun forkable -> { base with forkable })
+            values_for_check_forkable;
+          List.map
+            (fun yielding -> { base with yielding })
+            values_for_check_yielding;
+          List.map
+            (fun statefulness -> { base with statefulness })
+            values_for_check_statefulness ]
+    in
+    with_base Comonadic_with_regionality.min
+    @ with_base Comonadic_with_regionality.max
 
   let all_values_for_check : type a. a obj -> a list = function
     | Locality -> values_for_check_locality
@@ -4148,62 +4191,21 @@ module For_testing = struct
           failwith msg)
       (all_values_for_check src)
 
-  let domain_count_for_jobs job_count =
-    Int.min (Domain.recommended_domain_count ()) job_count
-
-  let run_jobs_in_parallel jobs =
-    let job_count = Array.length jobs in
-    let domain_count = domain_count_for_jobs job_count in
-    if domain_count <= 1
-    then Array.iter (fun job -> job ()) jobs
-    else
-      let worker worker_index =
-        let rec loop job_index =
-          if job_index < job_count
-          then (
-            jobs.(job_index) ();
-            loop (job_index + domain_count))
-        in
-        match loop worker_index with
-        | () -> None
-        | exception exn -> Some (exn, Printexc.get_raw_backtrace ())
-      in
-      let domains =
-        Array.init (domain_count - 1) (fun worker_index ->
-            (Domain.spawn
-            [@ocaml.alert "-do_not_spawn_domains"]
-            [@ocaml.alert "-unsafe_multidomain"]) (fun () ->
-                worker (worker_index + 1)))
-      in
-      let first_error =
-        Array.fold_left
-          (fun first_error domain ->
-            match first_error, Domain.join domain with
-            | Some _, _ -> first_error
-            | None, error -> error)
-          (worker 0) domains
-      in
-      match first_error with
-      | None -> ()
-      | Some (exn, backtrace) -> Printexc.raise_with_backtrace exn backtrace
+  let run_jobs jobs = List.iter (fun job -> job ()) jobs
 
   let check_jobs () =
-    let jobs =
-      let* (Obj dst) = all_objs in
-      let+ (Morph_to (mid, f)) = morphs_to dst in
-      let morphs_to_mid = morphs_to mid in
-      fun () ->
-        List.iter
-          (fun (Morph_to (src, g)) -> check_compose src mid dst f g)
-          morphs_to_mid
-    in
-    Array.of_list jobs
+    let* (Obj dst) = all_objs in
+    let+ (Morph_to (mid, f)) = morphs_to dst in
+    let morphs_to_mid = morphs_to mid in
+    fun () ->
+      List.iter
+        (fun (Morph_to (src, g)) -> check_compose src mid dst f g)
+        morphs_to_mid
 
   let check_all_allowed_compositions () =
     let jobs = check_jobs () in
-    Printf.printf "allowed checks running on %d domain(s)\n%!"
-      (domain_count_for_jobs (Array.length jobs));
-    run_jobs_in_parallel jobs
+    Printf.printf "running allowed composition checks\n%!";
+    run_jobs jobs
 end
 
 module C = Lattices_mono
