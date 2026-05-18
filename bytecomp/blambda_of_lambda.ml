@@ -834,6 +834,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
+    | Pisimmediate -> unary (Ccall "caml_is_immediate")
     | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
     | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
     | Pfloat_array_load_vec _ | Pint_array_load_vec _

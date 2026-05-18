@@ -85,11 +85,18 @@ let simplify_atomic_set_field ~original_prim dacc ~original_term _dbg ~arg1:_
     (P.result_kind' original_prim)
     ~original_term
 
-let simplify_atomic_exchange_field ~original_prim dacc ~original_term _dbg
-    ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var =
-  SPR.create_unknown dacc ~result_var
-    (P.result_kind' original_prim)
-    ~original_term
+let simplify_atomic_exchange_field
+    (block_access_field_kind : P.Block_access_field_kind.t) ~original_prim dacc
+    ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_
+    ~arg3_ty:_ ~result_var =
+  match block_access_field_kind with
+  | Immediate ->
+    let dacc = DA.add_variable dacc result_var T.any_tagged_immediate_or_null in
+    SPR.create original_term ~try_reify:false dacc
+  | Any_value ->
+    SPR.create_unknown dacc ~result_var
+      (P.result_kind' original_prim)
+      ~original_term
 
 let simplify_write_offset ~original_prim dacc ~original_term _dbg ~arg1:_
     ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var =
@@ -110,7 +117,8 @@ let simplify_ternary_primitive dacc original_prim (prim : P.ternary_primitive)
     | Atomic_field_int_arith op ->
       simplify_atomic_field_int_arith op ~original_prim
     | Atomic_set_field _ -> simplify_atomic_set_field ~original_prim
-    | Atomic_exchange_field _ -> simplify_atomic_exchange_field ~original_prim
+    | Atomic_exchange_field access_kind ->
+      simplify_atomic_exchange_field access_kind ~original_prim
     | Write_offset _ -> simplify_write_offset ~original_prim
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3

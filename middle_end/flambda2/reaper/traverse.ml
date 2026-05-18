@@ -205,9 +205,9 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
   | Unary
       ( ( Duplicate_block _ | Duplicate_array _
         | Is_int { variant_only = false }
-        | Is_null | Array_length _ | Bigarray_length _ | String_length _
-        | Int_as_pointer _ | Opaque_identity _ | Int_arith _ | Float_arith _
-        | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+        | Is_null | Is_immediate | Array_length _ | Bigarray_length _
+        | String_length _ | Int_as_pointer _ | Opaque_identity _ | Int_arith _
+        | Float_arith _ | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
         | Reinterpret_boxed_vector | Unbox_number _ | Box_number _
         | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
         | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _

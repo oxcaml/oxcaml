@@ -621,6 +621,7 @@ let primitive ppf = function
   | Pisint { variant_only } ->
       fprintf ppf (if variant_only then "isint" else "obj_is_int")
   | Pisnull -> fprintf ppf "isnull"
+  | Pisimmediate -> fprintf ppf "isimmediate"
   | Pisout -> fprintf ppf "isout"
   | Pbigarrayref(unsafe, _n, kind, layout) ->
       print_bigarray "get" unsafe kind ppf layout
@@ -980,6 +981,7 @@ let name_of_primitive = function
   | Pctconst _ -> "Pctconst"
   | Pisint _ -> "Pisint"
   | Pisnull -> "Pisnull"
+  | Pisimmediate -> "Pisimmediate"
   | Pisout -> "Pisout"
   | Pbigarrayref _ -> "Pbigarrayref"
   | Pbigarrayset _ -> "Pbigarrayset"

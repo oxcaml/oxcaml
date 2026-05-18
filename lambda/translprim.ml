@@ -912,6 +912,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       Primitive ((Parraysetu (Pfloatarray_set, Ptagged_int_index)), 3)
     | "%obj_is_int" -> Primitive (Pisint { variant_only = false }, 1)
     | "%is_null" -> Primitive (Pisnull, 1)
+    | "%is_immediate" -> Primitive (Pisimmediate, 1)
     | "%lazy_force" -> Lazy_force pos
     | "%nativeint_of_int" -> static_cast ~dst:(i nativeint) ~src:(i int)
     | "%nativeint_to_int" -> static_cast ~src:(i nativeint) ~dst:(i int)
@@ -2539,7 +2540,8 @@ let lambda_primitive_needs_event_after = function
        | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _
-  | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pisnull | Pisout
+  | Parraylength _ | Parrayrefu _ | Parraysetu _
+  | Pisint _ | Pisnull | Pisimmediate | Pisout
   | Pprobe_is_enabled _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field

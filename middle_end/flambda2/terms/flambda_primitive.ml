@@ -1208,6 +1208,7 @@ type unary_primitive =
       }
   | Is_int of { variant_only : bool }
   | Is_null
+  | Is_immediate
   | Get_tag
   | Array_length of Array_kind_for_length.t
   | Bigarray_length of { dimension : int }
@@ -1254,7 +1255,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Block_load _ -> false
   | Duplicate_array _ -> false
   | Duplicate_block { kind = _ } -> false
-  | Is_int _ | Is_null | Get_tag | Get_header -> true
+  | Is_int _ | Is_null | Is_immediate | Get_tag | Get_header -> true
   | Array_length _ -> true
   | Bigarray_length _ -> false
   | String_length _ -> true
@@ -1315,6 +1316,7 @@ let compare_unary_primitive p1 p2 =
     | Peek _ -> 28
     | Make_lazy _ -> 29
     | Reinterpret_boxed_vector -> 30
+    | Is_immediate -> 31
   in
   match p1, p2 with
   | ( Block_load { kind = kind1; mut = mut1; field = field1 },
@@ -1348,6 +1350,7 @@ let compare_unary_primitive p1 p2 =
   | ( Is_int { variant_only = variant_only1 },
       Is_int { variant_only = variant_only2 } ) ->
     Bool.compare variant_only1 variant_only2
+  | Is_immediate, Is_immediate -> 0
   | Get_tag, Get_tag -> 0
   | String_length kind1, String_length kind2 -> Stdlib.compare kind1 kind2
   | Int_arith (kind1, op1), Int_arith (kind2, op2) ->
@@ -1401,7 +1404,7 @@ let compare_unary_primitive p1 p2 =
   | Make_lazy lazy_tag1, Make_lazy lazy_tag2 ->
     Lazy_block_tag.compare lazy_tag1 lazy_tag2
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
-      | Is_null | Get_tag | String_length _ | Int_as_pointer _
+      | Is_null | Is_immediate | Get_tag | String_length _ | Int_as_pointer _
       | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
       | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
       | Array_length _ | Bigarray_length _ | Unbox_number _ | Box_number _
@@ -1430,6 +1433,7 @@ let print_unary_primitive ppf p =
   | Is_int { variant_only } ->
     if variant_only then fprintf ppf "Is_int" else fprintf ppf "Is_int_generic"
   | Is_null -> fprintf ppf "Is_null"
+  | Is_immediate -> fprintf ppf "Is_immediate"
   | Get_tag -> fprintf ppf "Get_tag"
   | String_length _ -> fprintf ppf "String_length"
   | Int_as_pointer alloc_mode ->
@@ -1485,6 +1489,7 @@ let arg_kind_of_unary_primitive p =
   | Duplicate_array _ | Duplicate_block _ -> K.value
   | Is_int _ -> K.value
   | Is_null -> K.value
+  | Is_immediate -> K.value
   | Get_tag -> K.value
   | String_length _ -> K.value
   | Int_as_pointer _ -> K.value
@@ -1520,7 +1525,7 @@ let result_kind_of_unary_primitive p : result_kind =
   | Block_load { kind; _ } ->
     Singleton (Block_access_kind.element_kind_for_load kind)
   | Duplicate_array _ | Duplicate_block _ -> Singleton K.value
-  | Is_int _ | Is_null | Get_tag -> Singleton K.naked_immediate
+  | Is_int _ | Is_null | Is_immediate | Get_tag -> Singleton K.naked_immediate
   | String_length _ -> Singleton K.naked_immediate
   | Int_as_pointer _ ->
     (* This primitive is *only* to be used when the resulting pointer points at
@@ -1589,7 +1594,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
       Has_coeffects,
       Strict,
       Can't_move_before_any_branch )
-  | Is_int _ | Is_null ->
+  | Is_int _ | Is_null | Is_immediate ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Get_tag ->
     (* [Obj.truncate] has now been removed. *)
@@ -1682,9 +1687,9 @@ let unary_classify_for_printing p =
   match p with
   | Duplicate_array _ | Duplicate_block _ | Obj_dup -> Constructive
   | String_length _ | Get_tag -> Destructive
-  | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
-  | Float_arith _ ->
+  | Is_int _ | Is_null | Is_immediate | Opaque_identity _ | Int_arith _
+  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Reinterpret_boxed_vector | Float_arith _ ->
     Neither
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate ->
     Destructive
@@ -1711,11 +1716,12 @@ let free_names_unary_primitive p =
          value_slot Name_mode.normal)
       project_from Name_mode.normal
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
-  | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
-  | Float_arith _ | Array_length _ | Bigarray_length _ | Unbox_number _
-  | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
-  | End_region _ | End_try_region _ | Obj_dup | Get_header
+  | Is_immediate | Get_tag | String_length _ | Opaque_identity _ | Int_arith _
+  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Reinterpret_boxed_vector | Float_arith _ | Array_length _
+  | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
+  | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
+  | Obj_dup | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t)
   | Make_lazy _ ->
     Name_occurrences.empty
@@ -1733,12 +1739,12 @@ let apply_renaming_unary_primitive p renaming =
     in
     if alloc_mode == alloc_mode' then p else Int_as_pointer alloc_mode'
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
-  | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
-  | Float_arith _ | Array_length _ | Bigarray_length _ | Unbox_number _
-  | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
-  | End_region _ | End_try_region _ | Project_function_slot _
-  | Project_value_slot _ | Obj_dup | Get_header
+  | Is_immediate | Get_tag | String_length _ | Opaque_identity _ | Int_arith _
+  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Reinterpret_boxed_vector | Float_arith _ | Array_length _
+  | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
+  | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
+  | Project_function_slot _ | Project_value_slot _ | Obj_dup | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t)
   | Make_lazy _ ->
     p
@@ -1748,12 +1754,12 @@ let ids_for_export_unary_primitive p =
   | Box_number (_, alloc_mode) | Int_as_pointer alloc_mode ->
     Alloc_mode.For_allocations.ids_for_export alloc_mode
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
-  | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
-  | Float_arith _ | Array_length _ | Bigarray_length _ | Unbox_number _
-  | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
-  | End_region _ | End_try_region _ | Project_function_slot _
-  | Project_value_slot _ | Obj_dup | Get_header
+  | Is_immediate | Get_tag | String_length _ | Opaque_identity _ | Int_arith _
+  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Reinterpret_boxed_vector | Float_arith _ | Array_length _
+  | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
+  | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
+  | Project_function_slot _ | Project_value_slot _ | Obj_dup | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t)
   | Make_lazy _ ->
     Ids_for_export.empty

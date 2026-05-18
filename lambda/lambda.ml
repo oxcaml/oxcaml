@@ -220,6 +220,8 @@ type primitive =
   | Pisint of { variant_only : bool }
   (* Test if the argument is a null pointer *)
   | Pisnull
+  (* Test if the argument is an immediate (integer or null pointer) *)
+  | Pisimmediate
   (* Test if the (integer) argument is outside an interval *)
   | Pisout
   (* Operations on Bigarrays: (unsafe, #dimensions, kind, layout) *)
@@ -2470,7 +2472,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
       | Pgcignorableproductarray_ref _), _, _) -> None
   | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
   | Parrayrefs ((Pgenarray_ref m | Pfloatarray_ref m), _, _) -> Some m
-  | Pisint _ | Pisnull | Pisout -> None
+  | Pisint _ | Pisnull | Pisimmediate | Pisout -> None
   | Pbigarrayset _ | Pbigarraydim _ -> None
   | Pbigarrayref (_, _, _, _) ->
      (* Boxes arising from Bigarray access are always Alloc_heap *)
@@ -2663,7 +2665,7 @@ let primitive_can_raise prim =
   | Poffsetref _
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu | Pbytessetu
   | Pmakearray _ | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
-  | Pisint _ | Pisout | Pisnull
+  | Pisint _ | Pisout | Pisnull | Pisimmediate
   | Pbigarraydim _
   | Pbigarrayref
       ( true,
@@ -3056,7 +3058,7 @@ let primitive_result_layout (p : primitive) =
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pstringrefs
   | Pbyteslength | Pbytesrefu | Pbytesrefs
-  | Parraylength _ | Pisint _ | Pisnull | Pisout
+  | Parraylength _ | Pisint _ | Pisnull | Pisimmediate | Pisout
   | Pstring_load_i8 { tagged = true; _ } | Pbytes_load_i8 { tagged = true; _ }
   | Pbigstring_load_i8 { tagged = true; _ }
   | Pstring_load_i16 { tagged = true; _ } | Pbytes_load_i16 { tagged = true; _ }

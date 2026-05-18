@@ -969,6 +969,26 @@ let simplify_is_null dacc ~original_term ~arg:scrutinee ~arg_ty:scrutinee_ty
   simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
     ~result_var ~add_relation:TE.add_is_null_relation
 
+let simplify_is_immediate dacc ~original_term ~arg:_ ~arg_ty:scrutinee_ty
+    ~result_var =
+  match T.prove_is_not_a_pointer (DA.typing_env dacc) scrutinee_ty with
+  | Proved true ->
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    let ty =
+      T.this_naked_immediate (Target_ocaml_int.bool machine_width true)
+    in
+    let dacc = DA.add_variable dacc result_var ty in
+    SPR.create original_term ~try_reify:false dacc
+  | Proved false ->
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    let ty =
+      T.this_naked_immediate (Target_ocaml_int.bool machine_width false)
+    in
+    let dacc = DA.add_variable dacc result_var ty in
+    SPR.create original_term ~try_reify:false dacc
+  | Unknown ->
+    SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
+
 let simplify_peek ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
     ~result_var =
   SPR.create_unknown dacc ~result_var
@@ -997,6 +1017,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Untag_immediate -> simplify_untag_immediate
     | Is_int { variant_only } -> simplify_is_int ~variant_only
     | Is_null -> simplify_is_null
+    | Is_immediate -> simplify_is_immediate
     | Get_tag -> simplify_get_tag
     | Array_length array_kind -> simplify_array_length array_kind
     | String_length _ -> simplify_string_length
