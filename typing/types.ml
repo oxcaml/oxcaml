@@ -844,18 +844,21 @@ type constructor_description =
     cstr_uid: Uid.t;
    }
 
-let equal_tag t1 t2 =
+let equal_tag (t1 : tag) (t2 : tag) =
   match (t1, t2) with
-  | Ordinary {src_index=i1}, Ordinary {src_index=i2} ->
-    i2 = i1 (* If i1 = i2, the runtime_tags will also be equal *)
+  | ( Ordinary { src_index = i1; runtime_tag = r1 },
+      Ordinary { src_index = i2; runtime_tag = r2 } ) ->
+    i1 = i2 && r1 = r2
   | Extension path1, Extension path2 -> Path.same path1 path2
   | Null, Null -> true
   | (Ordinary _ | Extension _ | Null), _ -> false
 
 let compare_tag t1 t2 =
   match (t1, t2) with
-  | Ordinary {src_index=i1}, Ordinary {src_index=i2} ->
-    Int.compare i1 i2
+  | ( Ordinary { src_index = i1; runtime_tag = r1 },
+      Ordinary { src_index = i2; runtime_tag = r2 } ) ->
+    let c = Int.compare i1 i2 in
+    if c <> 0 then c else Int.compare r1 r2
   | Extension path1, Extension path2 -> Path.compare path1 path2
   | Null, Null -> 0
   | Ordinary _, (Extension _ | Null) -> -1

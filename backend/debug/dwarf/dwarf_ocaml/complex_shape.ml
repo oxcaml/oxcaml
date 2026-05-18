@@ -535,7 +535,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     try
       let constructors =
         List.map
-          (fun { S.name; kind = _; args; constr_uid = _ } ->
+          (fun { S.name; kind = _; args; constr_uid = _; constant_runtime_tag }
+             ->
             (* We first compute complex shapes for the fields. Then we unarize
                using the mixed block helpers defined above. *)
             let is_tuple_constructor =
@@ -556,16 +557,29 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
             let constr_args =
               lay_out_into_mixed_block_exn ~source_level_fields
             in
-            if is_tuple_constructor
-            then
-              (* We clear the field names for tuple constructors. *)
-              RS.constructor_with_tuple_arg ~name
-                ~args:
-                  (List.map
-                     (RS.map_mixed_block_field_label (fun _ -> ()))
-                     constr_args)
-            else RS.constructor_with_record_arg ~name ~args:constr_args)
+            let constructor =
+              if is_tuple_constructor
+              then
+                (* We clear the field names for tuple constructors. *)
+                RS.constructor_with_tuple_arg ~name
+                  ~args:
+                    (List.map
+                       (RS.map_mixed_block_field_label (fun _ -> ()))
+                       constr_args)
+              else RS.constructor_with_record_arg ~name ~args:constr_args
+            in
+            constant_runtime_tag, constructor)
           constructors
+      in
+      let constructors =
+        constructors
+        |> List.stable_sort (fun (tag1, _) (tag2, _) ->
+            match tag1, tag2 with
+            | Some tag1, Some tag2 -> Int.compare tag1 tag2
+            | Some _, None -> -1
+            | None, Some _ -> 1
+            | None, None -> 0)
+        |> List.map snd
       in
       runtime (RS.variant constructors)
     with Layout_missing ->

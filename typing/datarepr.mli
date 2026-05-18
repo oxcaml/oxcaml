@@ -44,6 +44,21 @@ type variant_with_null_payload =
 val find_variant_with_null_payload :
   constructor_declaration list -> variant_with_null_payload option
 
+val constant_constructor_runtime_tags_for_boxed_variant :
+  constructor_declaration list ->
+  (constructor_representation * Jkind_types.Sort.Const.t array) array ->
+  int option array
+
+val first_immediate_constructor_tag_mismatch_for_boxed_variants :
+  constructor_declaration list ->
+  (constructor_representation * Jkind_types.Sort.Const.t array) array ->
+  constructor_declaration list ->
+  (constructor_representation * Jkind_types.Sort.Const.t array) array ->
+  (string * int * int) option
+
+val first_immediate_constructor_tag_changing_default :
+  constructor_declaration list -> variant_representation -> Location.t option
+
 val find_constr_by_tag:
   constant:bool -> int -> ((constructor_description * 'a) * 'b) list ->
     constructor_description
