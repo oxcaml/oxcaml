@@ -19,10 +19,10 @@ let f1 : 'a s -> 'a r or_null = function
 [%%expect_asm X86_64{|
 f1:
   testb $1, %al
-  je    .L105
+  je    .L0
   xorl  %eax, %eax
   ret
-.L105:
+.L0:
   ret
 |}]
 
@@ -44,13 +44,13 @@ f2:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L111:
+.L0:
   testb $1, %al
-  je    .L107
+  je    .L1
   xorl  %eax, %eax
   addq  $8, %rsp
   ret
-.L107:
+.L1:
   addq  $8, %rsp
   ret
 |}]
