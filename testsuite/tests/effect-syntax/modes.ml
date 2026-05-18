@@ -9,6 +9,8 @@ let use_unique : 'a @ unique -> unit = fun _ -> ()
 
 let use_portable_function : (unit -> unit) @ portable -> unit = fun _ -> ()
 
+type record = { a : int }
+
 type _ eff += Need_ref : int ref eff
 
 type _ eff += Need_unit : unit eff
@@ -17,6 +19,7 @@ type _ eff += Payload : int ref -> unit eff
 [%%expect {|
 val use_unique : 'a @ unique -> unit = <fun>
 val use_portable_function : (unit -> unit) @ portable -> unit = <fun>
+type record = { a : int; }
 type _ eff += Need_ref : int ref eff
 type _ eff += Need_unit : unit eff
 type _ eff += Payload : int ref -> unit eff
@@ -62,6 +65,38 @@ Line 5, characters 17-18:
 Error: This value is "aliased"
          because it is contained (via constructor "Payload") in the value at line 4, characters 11-22
          which is "aliased".
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* A scrutinee of [match] cannot capture a unique value from outside the
+   generated handler boundary. *)
+let () =
+  let r = { a = 42 } in
+  match use_unique r with
+  | () -> ()
+  | effect Need_unit, k -> continue k ()
+[%%expect {|
+Line 3, characters 19-20:
+3 |   match use_unique r with
+                       ^
+Error: This value is "aliased"
+         because it is used in a pattern match with effect cases (at lines 3-5, characters 2-40).
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* A value clause of [match] cannot capture a unique value from outside the
+   generated handler boundary. *)
+let () =
+  let r = { a = 42 } in
+  match () with
+  | n -> use_unique r
+  | effect Need_unit, k -> continue k ()
+[%%expect {|
+Line 4, characters 20-21:
+4 |   | n -> use_unique r
+                        ^
+Error: This value is "aliased"
+         because it is used in a pattern match with effect cases (at lines 3-5, characters 2-40).
        However, the highlighted expression is expected to be "unique".
 |}]
 
