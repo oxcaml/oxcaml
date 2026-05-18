@@ -498,11 +498,6 @@ let indexing_primitives =
 let array_vec_primitives =
   let array_types_and_primitives =
     [
-      ("float_array",
-       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed }),
-       (fun ~size ~unsafe ~index_kind ~boxed ->
-         Pfloat_array_set_vec { size; unsafe; index_kind; boxed }));
       ("floatarray",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
          Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed }),
@@ -2530,12 +2525,12 @@ let lambda_primitive_needs_event_after = function
   | Pbigstring_load_vec _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
   | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
   | Punboxed_nativeint_array_load_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _

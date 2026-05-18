@@ -1155,13 +1155,6 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
       ~load:(fun _ ->
         L.Pfloatarray_load_vec { desc with size = Boxed_vec128; boxed = false })
-  | ( Pfloat_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
-      [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
-      ~load:(fun _ ->
-        L.Pfloat_array_load_vec { desc with size = Boxed_vec128; boxed = false })
   | ( Pint_array_load_vec
         ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
@@ -1251,13 +1244,6 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
       ~store:(fun _ ->
         L.Pfloatarray_set_vec { desc with size = Boxed_vec128; boxed = false })
-  | ( Pfloat_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
-      [arr; idx; value] )
-    when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
-        L.Pfloat_array_set_vec { desc with size = Boxed_vec128; boxed = false })
   | ( Pint_array_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
       [arr; idx; value] )
     when L.split_vectors ->

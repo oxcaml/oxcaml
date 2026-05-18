@@ -772,10 +772,6 @@ let primitive ppf = function
      fprintf ppf "floatarray.%sget%s%s%s"
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
-  | Pfloat_array_load_vec {size; unsafe; mode; boxed} ->
-     fprintf ppf "float_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (vector_width size)
-      (if boxed then "" else "#") (locality_kind mode)
   | Pint_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "int_array.%sget%s%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
@@ -810,10 +806,6 @@ let primitive ppf = function
       (if boxed then "" else "#") (locality_kind mode)
   | Pfloatarray_set_vec {size; unsafe; boxed} ->
      fprintf ppf "floatarray.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (vector_width size)
-      (if boxed then "" else "#")
-  | Pfloat_array_set_vec {size; unsafe; boxed} ->
-     fprintf ppf "float_array.%sset%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Pint_array_set_vec {size; unsafe; boxed} ->
@@ -1025,7 +1017,6 @@ let name_of_primitive = function
   | Pbigstring_set_64 _ -> "Pbigstring_set_64"
   | Pbigstring_set_vec _ -> "Pbigstring_set_vec"
   | Pfloatarray_load_vec _ -> "Pfloatarray_load_vec"
-  | Pfloat_array_load_vec _ -> "Pfloat_array_load_vec"
   | Pint_array_load_vec _ -> "Pint_array_load_vec"
   | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
   | Punboxed_float32_array_load_vec _ -> "Punboxed_float32_array_load_vec"
@@ -1035,7 +1026,6 @@ let name_of_primitive = function
   | Punboxed_int64_array_load_vec _ -> "Punboxed_int64_array_load_vec"
   | Punboxed_nativeint_array_load_vec _ -> "Punboxed_nativeint_array_load_vec"
   | Pfloatarray_set_vec _ -> "Pfloatarray_set_vec"
-  | Pfloat_array_set_vec _ -> "Pfloat_array_set_vec"
   | Pint_array_set_vec _ -> "Pint_array_set_vec"
   | Punboxed_float_array_set_vec _ -> "Punboxed_float_array_set_vec"
   | Punboxed_float32_array_set_vec _ -> "Punboxed_float32_array_set_vec"

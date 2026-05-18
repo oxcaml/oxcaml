@@ -850,12 +850,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pisnull -> unary (Ccall "caml_is_null")
     | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
     | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _ | Pint_array_load_vec _
-    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
-    | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
-    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
-    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _ | Pint_array_set_vec _
+    | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
+    | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
+    | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+    | Pfloatarray_set_vec _ | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
     | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
