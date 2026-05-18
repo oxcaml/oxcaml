@@ -975,7 +975,7 @@ end
     the same width class. *)
 module LDP_STP_width = struct
   type (_, _) t =
-    | X : ([< `X | `LR], [< `X | `LR]) t
+    | X : ([< `X | `LR | `FP], [< `X | `LR | `FP]) t
     | W : ([< `W], [< `W]) t
 end
 
