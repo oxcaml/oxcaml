@@ -19,8 +19,6 @@ open! Flambda.Import
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
 
-type get_imported_names = unit -> Name.Set.t
-
 type get_imported_code = unit -> Exported_code.t
 
 type t
@@ -34,7 +32,6 @@ val create :
   round:int ->
   machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
-  get_imported_names:get_imported_names ->
   get_imported_code:get_imported_code ->
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
