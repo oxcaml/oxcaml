@@ -944,13 +944,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         in
         (is_mutable, num_nodes_visited), fields
     in
-    let is_constant (cstr: Types.constructor_declaration) =
-      match cstr.cd_args with
-      | Cstr_tuple [] -> true
-      | Cstr_tuple args ->
-        List.for_all (fun ca -> Jkind.Sort.Const.all_void ca.ca_sort) args
-      | Cstr_record lbls ->
-        List.for_all (fun lbl -> Jkind.Sort.Const.all_void lbl.ld_sort) lbls
+    let constant_runtime_tags =
+      Datarepr.constant_constructor_runtime_tags_for_boxed_variant cstrs
+        cstrs_and_sorts
     in
     let rec mixed_block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
@@ -960,16 +956,22 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | _ -> false
     in
     let num_nodes_visited, raw_kind =
-    if List.for_all is_constant cstrs then
+    if Array.for_all Option.is_some constant_runtime_tags then
       (num_nodes_visited, Pintval)
     else
+      let add_const idx num_nodes_visited consts next_tag non_consts =
+        match constant_runtime_tags.(idx) with
+        | Some tag ->
+          let consts = tag :: consts in
+          Some (num_nodes_visited, consts, next_tag, non_consts)
+        | None -> Misc.fatal_error "Missing constant constructor tag"
+      in
       let _idx, result =
         List.fold_left (fun (idx, result) constructor ->
           idx+1,
           match result with
           | None -> None
-          | Some (num_nodes_visited,
-                  next_const, consts, next_tag, non_consts) ->
+          | Some (num_nodes_visited, consts, next_tag, non_consts) ->
             let cstr_shape, _ = cstrs_and_sorts.(idx) in
             let (is_mutable, num_nodes_visited), fields =
               for_one_constructor constructor ~depth ~num_nodes_visited
@@ -978,27 +980,22 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
             if is_mutable then None
             else match fields with
             | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
+              add_const idx num_nodes_visited consts next_tag non_consts
             | Constructor_mixed shape when mixed_block_shape_is_empty shape ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
+              add_const idx num_nodes_visited consts next_tag non_consts
             | Constructor_mixed _ | Constructor_uniform _ ->
               let non_consts =
                 (next_tag, fields) :: non_consts
               in
-              Some (num_nodes_visited,
-                    next_const, consts, next_tag + 1, non_consts))
-          (0, Some (num_nodes_visited, 0, [], 0, []))
+              Some (num_nodes_visited, consts, next_tag + 1, non_consts))
+          (0, Some (num_nodes_visited, [], 0, []))
           cstrs
       in
       begin match result with
-      | None -> (num_nodes_visited, Pgenval)
-      | Some (num_nodes_visited, _, consts, _, non_consts) ->
+        | None -> (num_nodes_visited, Pgenval)
+      | Some (num_nodes_visited, consts, _, non_consts) ->
         match non_consts with
-        | [] -> assert false  (* See [List.for_all is_constant], above *)
+        | [] -> assert false
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
       end

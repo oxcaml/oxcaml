@@ -13,8 +13,9 @@ let _ = f_simple_variant (D 3.14)
 
 (* Variants with explicitly assigned immediate constructor tags *)
 type immediate_tag_variant =
-  | IA [@immediate 1]
+  | IA [@immediate (-1)]
   | IB
+  | IC [@immediate 4]
 
 let[@inline never] [@local never] f_immediate_tag_variant
     (x : immediate_tag_variant) =
@@ -22,11 +23,12 @@ let[@inline never] [@local never] f_immediate_tag_variant
 
 let _ = f_immediate_tag_variant IA
 let _ = f_immediate_tag_variant IB
+let _ = f_immediate_tag_variant IC
 
 type immediate_tag_mixed_variant =
-  | MI0 [@immediate 1]
+  | MI0 [@immediate (-2)]
   | MBlock of int
-  | MI1
+  | MI1 [@immediate 5]
 
 let[@inline never] [@local never] f_immediate_tag_mixed_variant
     (x : immediate_tag_mixed_variant) =
@@ -35,6 +37,17 @@ let[@inline never] [@local never] f_immediate_tag_mixed_variant
 let _ = f_immediate_tag_mixed_variant MI0
 let _ = f_immediate_tag_mixed_variant MI1
 let _ = f_immediate_tag_mixed_variant (MBlock 42)
+
+type immediate_tag_boundary_variant =
+  | Boundary_min [@immediate (-4611686018427387904)]
+  | Boundary_max [@immediate 4611686018427387903]
+
+let[@inline never] [@local never] f_immediate_tag_boundary_variant
+    (x : immediate_tag_boundary_variant) =
+  x
+
+let _ = f_immediate_tag_boundary_variant Boundary_min
+let _ = f_immediate_tag_boundary_variant Boundary_max
 
 (* Complex variants with records *)
 type complex_variant =

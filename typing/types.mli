@@ -874,19 +874,12 @@ and ('lbl, 'lbl_flat, 'cstr) type_kind =
   | Type_variant of 'cstr list * variant_representation * unsafe_mode_crossing option
   | Type_open
 
-(* CR layouts: after removing the void translation from lambda, we could get rid of
-   this src_index / runtime_tag distinction.  But I am leaving it in because it
-   may not be long before we need it again.
-
-   In particular, lambda will need to do something about computing offsets for
-   block projections when not everything is one word wide, whether that's
-   because of void or because of other jkinds.  One option is to change these
-   projections to be more abstract and pass the jkind information to other
-   stages of the compiler, as is currently done for unboxed projection
-   operations, but at the moment our plan is to do this math in lambda in the
-   case of normal projections from boxes. *)
+(* [src_index] is the constructor's source-order identity.  For boxed variants,
+   [runtime_tag] is the untagged immediate integer for constant constructors or
+   the heap block tag for non-constant constructors. *)
 and tag = Ordinary of {src_index: int;  (* Unique name (per type) *)
-                       runtime_tag: int}    (* The runtime tag *)
+                       runtime_tag: int}
+                         (* Untagged immediate or block tag *)
         | Extension of Path.t
         | Null (* Null pointer *)
 
@@ -1246,7 +1239,7 @@ type constructor_description =
     cstr_existentials: type_expr list;  (* list of existentials *)
     cstr_args: constructor_argument list; (* Type of the arguments *)
     cstr_arity: int;                    (* Number of arguments *)
-    cstr_tag: tag;                      (* Tag for heap blocks *)
+    cstr_tag: tag;                      (* Untagged immediate or block tag *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
     cstr_shape: constructor_representation; (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if all args are void *)

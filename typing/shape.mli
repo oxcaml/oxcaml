@@ -319,6 +319,8 @@ and 'a complex_constructors = 'a complex_constructor list
 and 'a complex_constructor =
   { name : string;
     constr_uid: Uid.t option;
+    (** Runtime tag for a constant constructor.  [None] means this constructor
+        has runtime fields. *)
     constant_runtime_tag : int option;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list

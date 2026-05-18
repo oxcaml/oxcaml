@@ -210,10 +210,12 @@ and 'label mixed_block_field =
 and constructor =
   | Constructor_with_tuple_arg of
       { name : string;
+        immediate_tag : int option;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        immediate_tag : int option;
         args : string mixed_block_field list
       }
 
@@ -407,10 +409,18 @@ let hash_mixed_block_field (type label) (hash_label : label -> int)
   Hashtbl.hash (hash field_type, hash_label label)
 
 let hash_constructor = function
-  | Constructor_with_tuple_arg { name; args } ->
-    Hashtbl.hash (0, name, List.map (hash_mixed_block_field (fun () -> 0)) args)
-  | Constructor_with_record_arg { name; args } ->
-    Hashtbl.hash (1, name, List.map (hash_mixed_block_field Hashtbl.hash) args)
+  | Constructor_with_tuple_arg { name; immediate_tag; args } ->
+    Hashtbl.hash
+      ( 0,
+        name,
+        immediate_tag,
+        List.map (hash_mixed_block_field (fun () -> 0)) args )
+  | Constructor_with_record_arg { name; immediate_tag; args } ->
+    Hashtbl.hash
+      ( 1,
+        name,
+        immediate_tag,
+        List.map (hash_mixed_block_field Hashtbl.hash) args )
 
 let hash_array_kind = function
   | Regular s -> Hashtbl.hash (0, hash s)
@@ -474,11 +484,21 @@ let tuple args =
       Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
   }
 
-let constructor_with_tuple_arg ~name ~args =
-  Constructor_with_tuple_arg { name; args }
+let check_immediate_tag_has_no_runtime_args ~immediate_tag ~args =
+  match immediate_tag, args with
+  | None, _ | Some _, [] -> ()
+  | Some _, _ :: _ ->
+    Misc.fatal_error
+      "Runtime_shape: immediate constructor tag on constructor with runtime \
+       arguments"
 
-let constructor_with_record_arg ~name ~args =
-  Constructor_with_record_arg { name; args }
+let constructor_with_tuple_arg ~name ?immediate_tag ~args () =
+  check_immediate_tag_has_no_runtime_args ~immediate_tag ~args;
+  Constructor_with_tuple_arg { name; immediate_tag; args }
+
+let constructor_with_record_arg ~name ?immediate_tag ~args () =
+  check_immediate_tag_has_no_runtime_args ~immediate_tag ~args;
+  Constructor_with_record_arg { name; immediate_tag; args }
 
 let variant constructors =
   let desc = Variant { constructors; kind = Variant_boxed } in
@@ -510,11 +530,13 @@ let variant_attribute_unboxed ~constructor_name
     | None ->
       Constructor_with_tuple_arg
         { name = constructor_name;
+          immediate_tag = None;
           args = [{ field_type = constructor_arg.field_type; label = () }]
         }
     | Some label ->
       Constructor_with_record_arg
         { name = constructor_name;
+          immediate_tag = None;
           args = [{ field_type = constructor_arg.field_type; label }]
         }
   in
@@ -634,7 +656,12 @@ let rec print fmt { desc } =
       | Variant_polymorphic -> "poly"
     in
     let print_constructor fmt = function
-      | Constructor_with_tuple_arg { name; args } ->
+      | Constructor_with_tuple_arg { name; immediate_tag; args } ->
+        let name =
+          match immediate_tag with
+          | None -> name
+          | Some tag -> Printf.sprintf "%s[@immediate %d]" name tag
+        in
         Format.fprintf fmt "%s (%a)" name
           (Format.pp_print_list
              ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
@@ -643,7 +670,12 @@ let rec print fmt { desc } =
                  print_runtime_layout
                  (runtime_layout field_type)))
           args
-      | Constructor_with_record_arg { name; args } ->
+      | Constructor_with_record_arg { name; immediate_tag; args } ->
+        let name =
+          match immediate_tag with
+          | None -> name
+          | Some tag -> Printf.sprintf "%s[@immediate %d]" name tag
+        in
         Format.fprintf fmt "%s { %a }" name
           (Format.pp_print_list
              ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
@@ -810,12 +842,20 @@ and equal_record_field { field_type = type1; label = label1 }
 
 and equal_constructor c1 c2 =
   match c1, c2 with
-  | ( Constructor_with_tuple_arg { name = name1; args = args1 },
-      Constructor_with_tuple_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_tuple_field args1 args2
-  | ( Constructor_with_record_arg { name = name1; args = args1 },
-      Constructor_with_record_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_record_field args1 args2
+  | ( Constructor_with_tuple_arg
+        { name = name1; immediate_tag = immediate_tag1; args = args1 },
+      Constructor_with_tuple_arg
+        { name = name2; immediate_tag = immediate_tag2; args = args2 } ) ->
+    String.equal name1 name2
+    && Option.equal Int.equal immediate_tag1 immediate_tag2
+    && List.equal equal_tuple_field args1 args2
+  | ( Constructor_with_record_arg
+        { name = name1; immediate_tag = immediate_tag1; args = args1 },
+      Constructor_with_record_arg
+        { name = name2; immediate_tag = immediate_tag2; args = args2 } ) ->
+    String.equal name1 name2
+    && Option.equal Int.equal immediate_tag1 immediate_tag2
+    && List.equal equal_record_field args1 args2
   | Constructor_with_tuple_arg _, Constructor_with_record_arg _ -> false
   | Constructor_with_record_arg _, Constructor_with_tuple_arg _ -> false
 
@@ -855,6 +895,11 @@ and equal_predef p1 p2 =
 let constructor_name = function
   | Constructor_with_tuple_arg { name; _ } -> name
   | Constructor_with_record_arg { name; _ } -> name
+
+let constructor_immediate_tag = function
+  | Constructor_with_tuple_arg { immediate_tag; _ }
+  | Constructor_with_record_arg { immediate_tag; _ } ->
+    immediate_tag
 
 let constructor_args = function
   | Constructor_with_tuple_arg { args; _ } ->
