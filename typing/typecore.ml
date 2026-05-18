@@ -674,13 +674,6 @@ let mode_effect_handler_body expected_mode =
         ( Regionality.disallow_left (Value.proj_comonadic Areality mode),
           FTail ) }
 
-let effect_handler_modes loc pinpoint env expected_mode =
-  let env =
-    Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
-  in
-  env, mode_effect_handler_body mode_legacy,
-  mode_effect_handler_body expected_mode
-
 let mode_tuple mode tuple_modes =
   let tuple_modes =
     Some (List.map (fun (mode, loc) ->
@@ -748,6 +741,13 @@ let tuple_pat_mode mode tuple_modes =
   let mode = Value.disallow_right mode in
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
   { mode; tuple_modes }
+
+let effect_handler_modes loc pinpoint env expected_mode =
+  let env =
+    Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
+  in
+  env, simple_pat_mode Value.legacy, mode_effect_handler_body mode_legacy,
+  mode_effect_handler_body expected_mode
 
 let global_pat_mode {mode; _}=
   let mode =
@@ -6768,10 +6768,7 @@ and type_expect_
           in
           env, arg_pat_mode, arg_expected_mode, expected_mode
         | _ :: _ ->
-          let env, body_mode, expected_mode =
-            effect_handler_modes loc Effect_match env expected_mode
-          in
-          env, simple_pat_mode Value.legacy, body_mode, expected_mode
+          effect_handler_modes loc Effect_match env expected_mode
       in
       let arg, sort =
         with_local_level_generalize begin fun () ->
@@ -6807,7 +6804,6 @@ and type_expect_
         exp_env = env }
   | Pexp_try(sbody, caselist) ->
       check_dynamic (loc, Expression) (Always_dynamic Try_with) expected_mode;
-      let arg_mode = simple_pat_mode Value.legacy in
       let rec split_cases exnc effc conts = function
         | [] -> List.rev exnc, List.rev effc, List.rev conts
         | {pc_lhs = {ppat_desc=Ppat_effect(p1, p2)}} as c :: rest ->
@@ -6819,14 +6815,16 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
-      let env, body_mode, expected_mode =
+      let env, arg_mode, body_mode, expected_mode =
         match eff_caselist with
-        | [] -> env, mode_trywith expected_mode, expected_mode
+        | [] ->
+          env, simple_pat_mode Value.legacy, mode_trywith expected_mode,
+          expected_mode
         | _ :: _ ->
-          let env, _, expected_mode =
+          let env, arg_mode, _, expected_mode =
             effect_handler_modes loc Effect_try env expected_mode
           in
-          env, expected_mode, expected_mode
+          env, arg_mode, expected_mode, expected_mode
       in
       let body =
         type_expect env body_mode sbody ty_expected_explained
