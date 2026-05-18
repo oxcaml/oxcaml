@@ -143,7 +143,11 @@ val find_code_exn : t -> Code_id.t -> Code_or_metadata.t
 
 val set_inlined_debuginfo : t -> from:t -> t
 
-val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
+val merge_inlined_debuginfo_and_forward_inlined_attribute :
+  t ->
+  from_apply_expr:Inlined_debuginfo.t ->
+  inlined_attribute:Inlined_attribute.t ->
+  t
 
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
@@ -188,6 +192,8 @@ module Disable_inlining : sig
 end
 
 val disable_inlining : t -> Disable_inlining.t
+
+val forward_inlined : t -> Inlined_attribute.t option
 
 val enter_set_of_closures : t -> in_stub:bool -> t
 

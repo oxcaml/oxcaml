@@ -36,7 +36,7 @@ File "w47_inline.ml", line 23, characters 15-22:
 23 | let k x = (a [@inlined malformed]) x (* rejected *)
                     ^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'inlined'.
-It must be either 'never', 'always', 'hint' or empty
+It must be either 'never', 'always', 'hint', 'forward' or empty
 
 File "w47_inline.ml", line 31, characters 7-12:
 31 |   let[@local malformed] f3 x = x (* bad payload *) in

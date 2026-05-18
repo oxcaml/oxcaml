@@ -651,6 +651,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       match Apply_expr.inlined app with
       | Default_inlined -> Some Default_inlined
       | Hint_inlined -> Some Hint_inlined
+      | Forward_inlined -> Some Forward_inlined
       | Always_inlined _ -> Some Always_inlined
       | Unroll (n, _) -> Some (Unroll n)
       | Never_inlined -> Some Never_inlined

@@ -1,0 +1,75 @@
+let $camlForward_inlined_always_inline__first_const = Block 0 () in
+(let code inline(always) size(1)
+       f_0 (x) my_closure _region _ghost_region my_depth -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   cont k1 (x)
+ in
+ let code inline(always) size(5)
+       g_1 (x) my_closure _region _ghost_region my_depth -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let f = %project_value_slot.[`g`].[`f`] (my_closure) in
+   apply direct(f_0) inlined(forward) f (x) -> k1 * k2
+ in
+ let code size(5)
+       call_g_with_default_inlined_2 (x)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let g =
+     %project_value_slot.[`call_g_with_default_inlined`].[`g`] (my_closure)
+   in
+   apply direct(g_1) g (x) -> k1 * k2
+ in
+ let code size(5)
+       call_g_with_always_inlined_3 (x)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let g =
+     %project_value_slot.[`call_g_with_always_inlined`].[`g_1`] (my_closure)
+   in
+   apply direct(g_1) inlined(always) g (x) -> k1 * k2
+ in
+ let code size(5)
+       call_g_with_never_inlined_4 (x)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let g =
+     %project_value_slot.[`call_g_with_never_inlined`].[`g_2`] (my_closure)
+   in
+   apply direct(g_1) inlined(never) g (x) -> k1 * k2
+ in
+ let f = closure f_0 @f in
+ let g = closure g_1 @g with { f = f } in
+ let call_g_with_default_inlined =
+   closure call_g_with_default_inlined_2 @call_g_with_default_inlined
+ with { g = g }
+ in
+ let call_g_with_always_inlined =
+   closure call_g_with_always_inlined_3 @call_g_with_always_inlined
+ with { g_1 = g }
+ in
+ let call_g_with_never_inlined =
+   closure call_g_with_never_inlined_4 @call_g_with_never_inlined
+ with { g_2 = g }
+ in
+ let Pmakeblock =
+   %block.[`0`]
+     (f,
+      g,
+      call_g_with_default_inlined,
+      call_g_with_always_inlined,
+      call_g_with_never_inlined)
+ in
+ cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`5`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`5`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
+    let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
+    let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
+    let $camlForward_inlined_always_inline =
+      Block 0 (field_0, field_1, field_2, field_3, field_4)
+    in
+    cont done ($camlForward_inlined_always_inline)
