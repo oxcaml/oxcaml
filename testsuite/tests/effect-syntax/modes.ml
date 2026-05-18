@@ -49,6 +49,19 @@ Line 4, characters 37-53:
 Error: This value is "local" but is expected to be "global".
 |}]
 
+(* An effect payload passed to [perform] must be legacy. *)
+let () =
+  perform (Payload (stack_ (ref 0)))
+[%%expect {|
+Line 2, characters 19-35:
+2 |   perform (Payload (stack_ (ref 0)))
+                       ^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is contained (via constructor "Payload") in the value at line 2, characters 10-36
+         which is expected to be "global".
+|}]
+
 (* A payload captured by an effect pattern is aliased, not unique. *)
 let () =
   match perform (Payload (ref 0)) with
