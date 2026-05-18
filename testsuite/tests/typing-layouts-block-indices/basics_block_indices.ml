@@ -186,45 +186,72 @@ Error: Block indices do not support float records.
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
 [@@flatten_floats]
-let f () = (.f)
-let fu () = (.fu)
-let t_float64 () = (.t_float64)
-let fr_f () = (.fr.#f)
+let bad_f () = (.f)
 [%%expect{|
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
-Line 4, characters 13-14:
-4 | let f () = (.f)
-                 ^
+Line 4, characters 17-18:
+4 | let bad_f () = (.f)
+                     ^
 Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
-let bad () = (.fr)
+let bad_fu () = (.fu)
 [%%expect{|
-Line 1, characters 15-17:
-1 | let bad () = (.fr)
-                   ^^
+Line 1, characters 18-20:
+1 | let bad_fu () = (.fu)
+                      ^^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+
+let bad_t_float64 () = (.t_float64)
+[%%expect{|
+Line 1, characters 25-34:
+1 | let bad_t_float64 () = (.t_float64)
+                             ^^^^^^^^^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+
+let bad_fr_f () = (.fr.#f)
+[%%expect{|
+Line 1, characters 20-22:
+1 | let bad_fr_f () = (.fr.#f)
+                        ^^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+
+let bad_fr () = (.fr)
+[%%expect{|
+Line 1, characters 18-20:
+1 | let bad_fr () = (.fr)
+                      ^^
 Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 type t = { f : float# } [@@represent_as_float_array]
-let f () = (.f)
+let bad_f () = (.f)
 [%%expect{|
 type t = { f : float#; }
-Line 2, characters 13-14:
-2 | let f () = (.f)
-                 ^
+Line 2, characters 17-18:
+2 | let bad_f () = (.f)
+                     ^
 Error: Block indices do not support [@@represent_as_float_array] records.
 |}]
 
 type t = { f : float; f' : float# } [@@flatten_floats]
-let f () = (.f)
-let f' () = (.f')
+let bad_f () = (.f)
 [%%expect{|
 type t = { f : float; f' : float#; }
-Line 2, characters 13-14:
-2 | let f () = (.f)
-                 ^
+Line 2, characters 17-18:
+2 | let bad_f () = (.f)
+                     ^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+let bad_f' () = (.f')
+[%%expect{|
+Line 1, characters 18-20:
+1 | let bad_f' () = (.f')
+                      ^^
 Error: Block indices do not support [@@flatten_floats] records.
 |}]
 

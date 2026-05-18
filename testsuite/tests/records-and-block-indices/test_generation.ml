@@ -478,44 +478,27 @@ let test_record_idx_deepening ty =
                     for prefix_len = 0 to depth do
                       let prefix, suffix = take_n unboxed_path prefix_len in
                       let prefix = Path.Field lbl :: prefix in
-                      let from_flattened_float =
-                        Type_structure.flattens_floats (Type.structure ty)
-                        && Type_structure.layout
-                             (Type.structure (Type.follow_path ty prefix))
-                           = Value { ignorable = false; non_float = false }
-                      in
                       let to_void =
                         Type_structure.layout
                           (Type.structure (Type.follow_path ty full_path))
                         = Void
                       in
-                      if (not from_flattened_float) || suffix = []
+                      line "(* from (%s) *)" (Path.to_string prefix);
+                      line "let shallow : (%s, _) idx_mut = (%s) in"
+                        (Type.code ty) (Path.to_string prefix);
+                      line "let deepened = (.idx_mut(shallow)%s) in"
+                        (Path.to_string suffix);
+                      if to_void
                       then (
-                        line "(* from (%s) *)" (Path.to_string prefix);
-                        line "let shallow : (%s, _) idx_mut = (%s) in"
-                          (Type.code ty) (Path.to_string prefix);
-                        line "let deepened = (.idx_mut(shallow)%s) in"
-                          (Path.to_string suffix);
-                        if to_void
-                        then (
-                          line
-                            "(* No guarantees on representation of idx to void \
-                             *)";
-                          line "let _ignore = #(idx, deepened) in";
-                          line "();"
-                        )
-                        else
-                          seq_assert ~debug_exprs
-                            "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
-                             (Idx_repr.of_idx_mut deepened)"
-                      )
-                      else (
                         line
-                          "(* Note: can't deepen (%s) because it's a path to a \
-                           flattened"
-                          (Path.to_string prefix);
-                        line "   float, making its element type [float#] *)"
+                          "(* No guarantees on representation of idx to void *)";
+                        line "let _ignore = #(idx, deepened) in";
+                        line "();"
                       )
+                      else
+                        seq_assert ~debug_exprs
+                          "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
+                           (Idx_repr.of_idx_mut deepened)"
                     done
                 );
                 line ");"
