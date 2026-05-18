@@ -27,7 +27,7 @@ module M = struct
 end
 
 [%%expect{|
-module M : sig val f : ('elt : value_maybe_null). 'elt -> 'elt array end
+module M : sig val f : ('elt : bits64). 'elt -> 'elt array end
 |}]
 
 (* File-level structure attributes affect later declarations only. *)
@@ -41,9 +41,9 @@ external file_ignore : 'file_ext -> unit = "%ignore"
 
 [%%expect{|
 val file_before : 'file_before -> 'file_before = <fun>
-val file_after :
-  ('file_after : value_maybe_null). 'file_after -> 'file_after array = <fun>
-external file_ignore : 'file_ext -> unit = "%ignore"
+val file_after : ('file_after : bits64). 'file_after -> 'file_after array =
+  <fun>
+external file_ignore : ('file_ext : word). 'file_ext -> unit = "%ignore"
 |}]
 
 (* Module structure attributes affect later declarations only. *)
@@ -66,9 +66,9 @@ module Structure_order :
     val before : 'before -> 'before
     type 'box before_box
     external before_ignore : 'ext -> unit = "%ignore"
-    val after : ('after : value_maybe_null). 'after -> 'after array
-    type 'box after_box
-    external after_ignore : 'ext -> unit = "%ignore"
+    val after : ('after : bits64). 'after -> 'after array
+    type ('box : word) after_box
+    external after_ignore : ('ext : word). 'ext -> unit = "%ignore"
   end
 |}]
 
@@ -81,12 +81,11 @@ module Structure_external = struct
 end
 
 [%%expect{|
-Line 4, characters 38-54:
-4 |   external[@layout_poly] ignore_any : 'ext_any -> unit = "%ignore"
-                                          ^^^^^^^^^^^^^^^^
-Error: "[@layout_poly]" on this external declaration has no
-       effect. Consider removing it or adding a type
-       variable for it to operate on.
+module Structure_external :
+  sig
+    external ignore_any : ('ext_any : any). 'ext_any -> unit = "%ignore"
+      [@@layout_poly]
+  end
 |}]
 
 (* Nested structures inherit and can shadow implicit kinds. *)
@@ -111,12 +110,10 @@ end
 module Nested_structures :
   sig
     module Inherits :
-      sig
-        val inherited :
-          ('nested : value_maybe_null). 'nested -> 'nested array
-      end
-    module Shadows : sig val shadowed : 'nested -> 'nested end
-    val outer_after : ('nested : value_maybe_null). 'nested -> 'nested array
+      sig val inherited : ('nested : bits64). 'nested -> 'nested array end
+    module Shadows :
+      sig val shadowed : ('nested : immediate). 'nested -> 'nested end
+    val outer_after : ('nested : bits64). 'nested -> 'nested array
   end
 |}]
 
@@ -132,7 +129,9 @@ end
 
 [%%expect{|
 module Mto_struct :
-  sig module type T = sig val id : 'mto -> 'mto @@ stateless end end
+  sig
+    module type T = sig val id : ('mto : word). 'mto -> 'mto @@ stateless end
+  end
 |}]
 
 (* Conflicting explicit annotations in structures fail like signatures. *)
@@ -144,7 +143,14 @@ module Structure_conflict = struct
 end
 
 [%%expect{|
-module Structure_conflict : sig val bad : 'conflict -> 'conflict end
+Line 4, characters 28-41:
+4 |   let bad (x : ('conflict : value_or_null)) = x
+                                ^^^^^^^^^^^^^
+Error: Bad layout annotation:
+         The layout of "'conflict" is word
+           because of the annotation on the implicit kind of type variables named conflict.
+         But the layout of "'conflict" must be a value layout
+           because of the annotation on the type variable 'conflict.
 |}]
 
 (* Lexical defaults do not cross module boundaries as ambient defaults. *)
@@ -166,10 +172,11 @@ end
 [%%expect{|
 module Boundary :
   sig
-    module Source : sig val baked : 'boundary -> 'boundary end
+    module Source :
+      sig val baked : ('boundary : word). 'boundary -> 'boundary end
     module Consumer :
       sig
-        val baked : 'boundary -> 'boundary
+        val baked : ('boundary : word). 'boundary -> 'boundary
         val fresh : 'boundary -> 'boundary
       end
   end
@@ -672,7 +679,9 @@ end
 
 [%%expect{|
 module type S28 =
-  sig module type Evil = sig val x : 'w -> 'w @@ stateless end end
+  sig
+    module type Evil = sig val x : ('w : word). 'w -> 'w @@ stateless end
+  end
 |}]
 
 (* [module type of struct] and unification. *)
@@ -878,7 +887,7 @@ end
 [%%expect{|
 module type S37 =
   sig
-    module type Inner = sig val id : 't -> unit @@ stateless end
+    module type Inner = sig val id : ('t : word). 't -> unit @@ stateless end
     val f : ('t : word). 't -> 't
   end
 |}]
