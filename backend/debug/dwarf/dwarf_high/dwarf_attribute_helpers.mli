@@ -120,6 +120,9 @@ val create_encoding :
 val create_byte_size_exn :
   byte_size:int -> Dwarf_attribute_values.Attribute_value.t
 
+val create_byte_size_description :
+  Single_location_description.t -> Dwarf_attribute_values.Attribute_value.t
+
 val create_bit_size : Numbers.Int8.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_data_member_location_offset :
@@ -189,7 +192,7 @@ val create_language :
 val create_declaration : unit -> Dwarf_attribute_values.Attribute_value.t
 
 val create_byte_stride :
-  bytes:Numbers.Int8.t -> Dwarf_attribute_values.Attribute_value.t
+  bytes:Int64.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_count :
   Single_location_description.t -> Dwarf_attribute_values.Attribute_value.t
@@ -214,6 +217,3 @@ val create_ocaml_linker_dirs :
 
 val create_ocaml_cmt_file_digest :
   Digest.t -> Dwarf_attribute_values.Attribute_value.t
-
-val create_ocaml_offset_record_from_pointer :
-  value:Int64.t -> Dwarf_attribute_values.Attribute_value.t

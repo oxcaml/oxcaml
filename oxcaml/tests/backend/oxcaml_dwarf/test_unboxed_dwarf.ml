@@ -151,3 +151,175 @@ let _ = f_mixed_small_record
     #{ i8 = (Int8_u.of_int (-25)); flag = true; i16 = (Int16_u.of_int (-2000)) }
 let _ = f_poly_product #(#4L, 4L)
 let _ = f_poly_product #(#100L, true)
+
+(* Arrays of int64# *)
+let[@inline never] [@local never] f_int64_array (arr: int64# array) = arr
+let _ = f_int64_array [|#0L; #100L; #200L; #300L; #400L|]
+let _ = f_int64_array [|#0L; #1L; #42L; #9999L|]
+let _ = f_int64_array [|#0x123456789abcdefL; #1L; #0L|]
+
+(* Arrays of int32# *)
+let[@inline never] [@local never] f_int32_array (arr: int32# array) = arr
+let _ = f_int32_array [|#0l; #10l; #20l; #30l|]
+let _ = f_int32_array [|#0l; #42l; #123l; #1000l|]
+let _ = f_int32_array [|#0x12345678l; #456l; #0l|]
+
+(* Arrays of unboxed records *)
+type array_record = #{ a: int64#; b: int32#; c: float# } [@@warning "-69"]
+
+let[@inline never] [@local never] f_array_record_array
+    (arr: array_record array) = arr
+
+let _ = f_array_record_array [|#{ a = #1L; b = #2l; c = #3.0 }|]
+let _ = f_array_record_array
+  [|#{ a = #10L;
+       b = #200l;
+       c = #3.14 };
+    #{ a = #5L;
+       b = #1000l;
+       c = #2.71 };
+    #{ a = #0L;
+       b = #0l;
+       c = #0.0 }|]
+
+(* Arrays of float# *)
+let[@inline never] [@local never] f_float_array (arr: float# array) = arr
+let _ = f_float_array [|#1.0; #2.5; #3.14; #0.0; #1e10|]
+let _ = f_float_array [|#1.0; #2.0; #3.0|]
+
+(* Arrays of unboxed tuples with mixed types *)
+type mixed_tuple_for_array = #(int32# * float# * bool)
+
+let[@inline never] [@local never] f_mixed_tuple_array
+    (arr: mixed_tuple_for_array array) = arr
+
+let _ = f_mixed_tuple_array
+  [|#(#42l, #3.14, true);
+    #(#0l, #0.0, false);
+    #(#100l, #2.5, true)|]
+
+(* Arrays of nativeint# *)
+let[@inline never] [@local never] f_nativeint_array
+    (arr: nativeint# array) = arr
+let _ = f_nativeint_array [|#123n; #0n; #456n; #0x7fffffffn|]
+let _ = f_nativeint_array [|#0n; #1n; #4n|]
+
+(* Nested - array of unboxed products containing int64# pairs *)
+type int64_pair_for_array = #(int64# * int64#)
+
+let[@inline never] [@local never] f_int64_pair_array
+    (arr: int64_pair_for_array array) = arr
+
+let _ = f_int64_pair_array
+  [|#(#100L, #200L);
+    #(#0L, #0L);
+    #(#42L, #9999L)|]
+
+(* Arrays of float32# *)
+let[@inline never] [@local never] f_float32_array (arr: float32# array) = arr
+let _ = f_float32_array [|#1.5s; #0.0s; #2.5s; #100.0s|]
+let _ = f_float32_array [|#0.0s; #1.0s; #2.0s; #3.0s|]
+
+(* Edge cases: empty and large arrays *)
+let[@inline never] [@local never] f_empty_int64_array
+    (arr: int64# array) = arr
+let _ = f_empty_int64_array [||]
+
+let[@inline never] [@local never] f_large_int64_array
+    (arr: int64# array) = arr
+let _ = f_large_int64_array
+  [|#0L; #3L; #6L; #9L; #12L; #15L; #18L; #21L; #24L; #27L;
+    #30L; #33L; #36L; #39L; #42L; #45L; #48L; #51L; #54L; #57L|]
+
+(* Corner cases for sub-word elements. These exercise the bytes/halfwords
+   that are likely to be mishandled if the backend ever changes how small
+   unboxed integers are packed into arrays or unboxed records. Element
+   counts that are not a multiple of (word_size / element_size) exercise
+   the tag-aware count expression emitted in
+   [backend/debug/dwarf/dwarf_ocaml/dwarf_type.ml]. *)
+let[@inline never] [@local never] f_int8_array (arr: int8# array) = arr
+let _ = f_int8_array
+  [|(Int8_u.of_int 1); (Int8_u.of_int 2);
+    (Int8_u.of_int 3); (Int8_u.of_int 127)|]
+let _ = f_int8_array
+  [|(Int8_u.of_int 0); (Int8_u.of_int (-128)); (Int8_u.of_int 50)|]
+
+let[@inline never] [@local never] f_int16_array (arr: int16# array) = arr
+let _ = f_int16_array
+  [|(Int16_u.of_int 100); (Int16_u.of_int 200); (Int16_u.of_int 32767)|]
+let _ = f_int16_array
+  [|(Int16_u.of_int 0); (Int16_u.of_int (-32768));
+    (Int16_u.of_int 1000); (Int16_u.of_int (-2000))|]
+
+let[@inline never] [@local never] f_int32_array_packed_corner
+    (arr: int32# array) = arr
+let _ = f_int32_array_packed_corner [|#10l; #20l; #30l|]
+let _ = f_int32_array_packed_corner [|#7l; #8l; #9l; #10l; #11l|]
+
+let[@inline never] [@local never] f_float32_array_packed_corner
+    (arr: float32# array) = arr
+let _ = f_float32_array_packed_corner [|#1.0s; #2.0s; #3.0s|]
+let _ = f_float32_array_packed_corner [|#0.5s; #1.5s; #2.5s; #3.5s; #4.5s|]
+
+(* Unboxed record of two int8# fields - tests whether sub-word fields inside
+   a record are word-extended in arrays (16 bytes/record) or kept dense
+   (2 bytes/record). The current implementation word-extends each field. *)
+type record_2xint8 = #{ a: int8#; b: int8# } [@@warning "-69"]
+
+let[@inline never] [@local never] f_record_2xint8_array
+    (arr: record_2xint8 array) = arr
+let _ = f_record_2xint8_array
+  [|#{ a = (Int8_u.of_int 1); b = (Int8_u.of_int 2) };
+    #{ a = (Int8_u.of_int 3); b = (Int8_u.of_int 4) };
+    #{ a = (Int8_u.of_int 5); b = (Int8_u.of_int 6) }|]
+
+(* Unboxed record with a single int64# field (8 bytes when densely packed). *)
+type record_one_int64 = #{ x: int64# } [@@warning "-69"]
+
+let[@inline never] [@local never] f_record_one_int64_array
+    (arr: record_one_int64 array) = arr
+let _ = f_record_one_int64_array
+  [|#{ x = #1L }; #{ x = #100L }; #{ x = #0x123456789abcdefL }|]
+
+(* Unboxed record of four 16-bit integers (8 bytes when densely packed,
+   32 bytes when each field is word-extended). *)
+type record_4xint16 = #{ a: int16#; b: int16#; c: int16#; d: int16# }
+  [@@warning "-69"]
+
+let[@inline never] [@local never] f_record_4xint16_array
+    (arr: record_4xint16 array) = arr
+let _ = f_record_4xint16_array
+  [|#{ a = (Int16_u.of_int 1); b = (Int16_u.of_int 2);
+       c = (Int16_u.of_int 3); d = (Int16_u.of_int 4) };
+    #{ a = (Int16_u.of_int 100); b = (Int16_u.of_int 200);
+       c = (Int16_u.of_int 300); d = (Int16_u.of_int 400) }|]
+
+(* Unboxed record summing to 72 bits (9 bytes when densely packed) mixing
+   32-bit, 16-bit, and 8-bit integers: 32 + 16 + 8 + 8 + 8 = 72. *)
+type record_72bit =
+  #{ a: int32#; b: int16#; c: int8#; d: int8#; e: int8# } [@@warning "-69"]
+
+let[@inline never] [@local never] f_record_72bit_array
+    (arr: record_72bit array) = arr
+let _ = f_record_72bit_array
+  [|#{ a = #1l; b = (Int16_u.of_int 2); c = (Int8_u.of_int 3);
+       d = (Int8_u.of_int 4); e = (Int8_u.of_int 5) };
+    #{ a = #100l; b = (Int16_u.of_int 200); c = (Int8_u.of_int 30);
+       d = (Int8_u.of_int 40); e = (Int8_u.of_int 50) }|]
+
+(* Element stride beyond a byte: 16 int64# fields word-extend to 128 bytes
+   per element, which exceeds the range of a [Data1] byte_stride attribute. *)
+type record_16xint64 =
+  #{ f01: int64#; f02: int64#; f03: int64#; f04: int64#;
+     f05: int64#; f06: int64#; f07: int64#; f08: int64#;
+     f09: int64#; f10: int64#; f11: int64#; f12: int64#;
+     f13: int64#; f14: int64#; f15: int64#; f16: int64# }
+  [@@warning "-69"]
+
+let[@inline never] [@local never] f_record_16xint64_array
+    (arr: record_16xint64 array) = arr
+let _ = f_record_16xint64_array
+  [|#{ f01 = #1L; f02 = #2L; f03 = #3L; f04 = #4L;
+       f05 = #5L; f06 = #6L; f07 = #7L; f08 = #8L;
+       f09 = #9L; f10 = #10L; f11 = #11L; f12 = #12L;
+       f13 = #13L; f14 = #14L; f15 = #15L; f16 = #16L }|]
