@@ -124,3 +124,12 @@ Error: Signature mismatch:
        Their internal representations differ:
        the first declaration uses float# representation.
 |}]
+
+(* The below test requires that [type_unboxed_default] was computed correctly
+   https://github.com/oxcaml/oxcaml/pull/6035#discussion_r3253683496 *)
+type r = { f : float# } [@@represent_as_float_array]
+external id : r -> r = "%identity"
+[%%expect{|
+type r = { f : float#; }
+external id : r -> r = "%identity"
+|}]

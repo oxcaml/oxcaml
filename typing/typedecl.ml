@@ -937,7 +937,7 @@ let transl_declaration env sdecl (id, uid) =
     | Ptype_record [{pld_mutable=Immutable; _}] ->
       Option.value unboxed_attr
         ~default:(!Clflags.unboxed_types && not represent_as_float_array),
-      Option.is_none unboxed_attr
+      Option.is_none unboxed_attr && not represent_as_float_array
     | Ptype_record_unboxed_product _ -> false, false
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
