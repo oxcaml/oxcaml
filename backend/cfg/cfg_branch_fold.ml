@@ -19,48 +19,64 @@ let apply_fold (block : C.basic_block) (result : fold_result) =
   | Replace { desc; arg } ->
     block.terminator <- { block.terminator with desc; arg; res = [||] }
 
-(* [find_reaching_def reg blocks] searches for the most recent non-move
-   definition of [reg], walking backwards from the given position in a basic
-   block.
+let predecessor_if_unique (block : C.basic_block) ~cfg =
+  if Label.Set.cardinal block.predecessors = 1
+  then Some (Cfg.get_block_exn cfg (Label.Set.choose block.predecessors))
+  else None
 
-   [Move] instructions defining the current target are chased through: when we
-   encounter [target = src], the search continues for [src]. A register is
-   considered clobbered if it has been written to between the candidate
-   definition and the use point. The function returns the defining instruction
-   only when none of its arguments has been clobbered after it, so that the
-   arguments can be still be used at the use point. *)
-let find_reaching_def ~(reg : Reg.t)
-    ~(pos : C.basic C.instruction DLL.cell option) :
+(** [find_reaching_def reg blocks] searches for the most recent non-move
+    definition of [reg], walking backwards from the end of the given basic
+    block, right before the termintor. It can walk multiple blocks as long as
+    there is a single predecessor.
+
+    [Move] instructions defining the current target are chased through: when we
+    encounter [target = src], the search continues for [src]. A register is
+    considered clobbered if it has been written to between the candidate
+    definition and the use point. The function returns the defining instruction
+    only when none of its arguments has been clobbered after it, so that the
+    arguments can be still be used at the use point. *)
+let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
     C.basic C.instruction option =
   let clobbered = ref Reg.Set.empty in
   let add_to_clobbered arr =
     clobbered := Array.fold_right Reg.Set.add arr !clobbered
   in
-  let rec loop pos ~reg : C.basic C.instruction option =
-    Option.bind pos (fun cell ->
-        let instr : C.basic C.instruction = DLL.value cell in
-        if Array.length instr.res = 1 && Reg.same reg instr.res.(0)
-        then
-          begin match[@ocaml.warning "-4"] instr.desc with
-          | Op Move
-            when Array.length instr.arg = 1
-                 && Array.length instr.res = 1
-                 && Cmm.equal_machtype_component instr.res.(0).typ
-                      instr.arg.(0).typ ->
-            loop (DLL.prev cell) ~reg:instr.arg.(0)
-          | _ ->
-            let inputs_safe =
-              Array.for_all (fun a -> not (Reg.Set.mem a !clobbered)) instr.arg
-            in
-            if inputs_safe then Some instr else None
-          end
-        else if Array.exists (Reg.same reg) instr.res
-        then None
-        else (
-          add_to_clobbered instr.res;
-          loop (DLL.prev cell) ~reg))
+  let rec loop ~pos ~(next_block : C.basic_block option) ~reg :
+      C.basic C.instruction option =
+    match pos, next_block with
+    | None, Some next_block
+      when not (Array.exists (Reg.same reg) block.terminator.res) ->
+      add_to_clobbered block.terminator.res;
+      loop
+        ~pos:(DLL.last_cell next_block.body)
+        ~next_block:(predecessor_if_unique next_block ~cfg)
+        ~reg
+    | Some cell, _ ->
+      let instr : C.basic C.instruction = DLL.value cell in
+      add_to_clobbered instr.res;
+      if Array.length instr.res = 1 && Reg.same reg instr.res.(0)
+      then
+        begin match[@ocaml.warning "-4"] instr.desc with
+        | Op Move
+          when Array.length instr.arg = 1
+               && Array.length instr.res = 1
+               && not (Reg.is_preassigned instr.arg.(0)) ->
+          assert (Reg.is_unknown instr.arg.(0));
+          loop ~pos:(DLL.prev cell) ~next_block ~reg:instr.arg.(0)
+        | _ ->
+          let inputs_safe =
+            Array.for_all (fun a -> not (Reg.Set.mem a !clobbered)) instr.arg
+          in
+          if inputs_safe then Some instr else None
+        end
+      else if Array.exists (Reg.same reg) instr.res
+      then None
+      else loop ~pos:(DLL.prev cell) ~next_block ~reg
+    | _ -> None
   in
-  loop pos ~reg
+  loop ~pos:(DLL.last_cell block.body)
+    ~next_block:(predecessor_if_unique block ~cfg)
+    ~reg
 
 let int_test_of_compare (cmp : Operation.integer_comparison) ~imm ~ifso ~ifnot :
     C.terminator =
@@ -104,18 +120,20 @@ let float_test_of_compare (cmp : Operation.float_comparison) ~width ~ifso ~ifnot
       test.
     - For tests whose arguments are known constants, produces a [Goto] to the
       statically determined arm. *)
-let evaluate_terminator ~(pos : C.basic C.instruction DLL.cell option)
-    (term : C.terminator C.instruction) : fold_result option =
+let evaluate_terminator ~block (term : C.terminator C.instruction) ~cfg :
+    fold_result option =
   let constant_arg arg_idx =
     match[@ocaml.warning "-4"]
-      find_reaching_def ~reg:term.arg.(arg_idx) ~pos
+      find_reaching_def ~reg:term.arg.(arg_idx) ~block ~cfg
     with
     | Some { desc = Op (Const_int c); _ } -> Some c
     | Some _ | None -> None
   in
   match term.desc with
   | Truth_test { ifso; ifnot } -> (
-    match[@ocaml.warning "-4"] find_reaching_def ~reg:term.arg.(0) ~pos with
+    match[@ocaml.warning "-4"]
+      find_reaching_def ~reg:term.arg.(0) ~block ~cfg
+    with
     | Some { desc = Op (Const_int c); _ } ->
       if Nativeint.equal c 0n then Some (Goto ifnot) else Some (Goto ifso)
     | Some ({ desc = Op (Intop (Icomp cmp)); _ } as def) ->
@@ -186,9 +204,7 @@ let process_block ~(is_loop_header : Label.t -> bool) (cfg : C.t)
   (* 1. Fold the block's own terminator (e.g. [Truth_test] → [Int_test] when the
      test argument is a comparison computed in this block). *)
   let reduced_terminator =
-    match
-      evaluate_terminator ~pos:(DLL.last_cell block.body) block.terminator
-    with
+    match evaluate_terminator ~block block.terminator ~cfg with
     | None -> false
     | Some result -> apply_and_check_change block result
   in
@@ -203,10 +219,7 @@ let process_block ~(is_loop_header : Label.t -> bool) (cfg : C.t)
       if not (DLL.is_empty successor_block.body)
       then false
       else
-        match
-          evaluate_terminator ~pos:(DLL.last_cell block.body)
-            successor_block.terminator
-        with
+        match evaluate_terminator ~block successor_block.terminator ~cfg with
         | None -> false
         | Some result -> apply_and_check_change block result)
     | _ -> false
