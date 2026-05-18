@@ -101,7 +101,9 @@ module Type_structure : sig
   (** [None] if the tree is a [Leaf] (thus will always produce a boxed record *)
   val boxed_record_containing_unboxed_records : t Tree.t -> t option
 
-  val is_flat_float_record : t -> bool
+  val flattens_floats : t -> bool
+
+  val is_mixed_float_float64_record : t -> bool
 
   (** [None] if block indices to arrays of [nested_unboxed_record t] are not
       supported *)

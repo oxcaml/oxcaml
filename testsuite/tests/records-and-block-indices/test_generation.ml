@@ -381,7 +381,7 @@ let test_array_idx_deepening ty =
 
 (* Block indices are not supported on records that flatten floats. *)
 let path_is_valid_block_idx ty _path =
-  not (Type_structure.is_flat_float_record (Type.structure ty))
+  not (Type_structure.flattens_floats (Type.structure ty))
 
 let test_record_idx_access ty ~local =
   type_section ty;
@@ -402,20 +402,7 @@ let test_record_idx_access ty ~local =
               line "(* .%s%s *)" lbl (Path.to_string unboxed_path);
               let full_path = Path.Field lbl :: unboxed_path in
               let test_deepening () =
-                let flattened_float =
-                  Type_structure.is_flat_float_record (Type.structure ty)
-                  && Type_structure.layout
-                       (Type.structure (Type.follow_path ty full_path))
-                     = Value { ignorable = false; non_float = false }
-                in
-                let sub_ty =
-                  if flattened_float
-                  then (
-                    line "(* ff *)";
-                    Type.Float_u
-                  )
-                  else Type.follow_path ty full_path
-                in
+                let sub_ty = Type.follow_path ty full_path in
                 line "let sub_eq = %s in" (Type.eq_code sub_ty);
                 let reference_update =
                   (* To perform our reference update (without block indices) to
@@ -446,33 +433,7 @@ let test_record_idx_access ty ~local =
                     (Type.code ty)
                 in
                 let next_r_sub_element_flat =
-                  if flattened_float
-                  then
-                    (* next_r at some path must be a float(#) or nested
-                       singleton unboxed records to one *)
-                    let ty' = ty in
-                    let rec path_to_float (ty : Type.t) =
-                      match ty with
-                      | Float | Float_u -> []
-                      | Record
-                          { fields = [(lbl, ty)]; boxing = Unboxed; name = _ }
-                        ->
-                        Path.Unboxed_field lbl :: path_to_float ty
-                      | Tuple (_, Unboxed) -> failwith "unimplemented"
-                      | _ ->
-                        failwith
-                          (sprintf "ty %s; %s; subty %s; stuck at %s"
-                             (Type.code ty') (Path.to_string full_path)
-                             (Type.code (Type.follow_path ty' full_path))
-                             (Type.code ty)
-                          )
-                    in
-                    sprintf "(Float_u.of_float next_r%s%s)"
-                      (Path.to_string full_path)
-                      (Path.to_string
-                         (path_to_float (Type.follow_path ty full_path))
-                      )
-                  else sprintf "next_r%s" (Path.to_string full_path)
+                  sprintf "next_r%s" (Path.to_string full_path)
                 in
                 line "Idx_mut.set r %s %s;" idx next_r_sub_element_flat;
                 seq_assert ~debug_exprs "eq r expected";
@@ -518,7 +479,7 @@ let test_record_idx_deepening ty =
                       let prefix, suffix = take_n unboxed_path prefix_len in
                       let prefix = Path.Field lbl :: prefix in
                       let from_flattened_float =
-                        Type_structure.is_flat_float_record (Type.structure ty)
+                        Type_structure.flattens_floats (Type.structure ty)
                         && Type_structure.layout
                              (Type.structure (Type.follow_path ty prefix))
                            = Value { ignorable = false; non_float = false }
