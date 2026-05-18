@@ -142,12 +142,12 @@ repeat_comparisons:
 
 (* CR ttebbi: We first compute the boolean result of the || predicate, instead
    of jumping directly. *)
-let bad_min a b =
+let bad_max a b =
   let i = ref 0 in
   while !i < a || !i < b do incr i done;
   !i
 [%%expect_asm X86_64{|
-bad_min:
+bad_max:
   movq  %rax, %rdi
   movl  $1, %esi
   cmpq  %rdi, %rsi
