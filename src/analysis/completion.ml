@@ -49,22 +49,22 @@ let raw_info_printer : raw_info -> _ = function
   | `Constructor c -> `Print (Out_type (Browse_misc.print_constructor c))
   | `Modtype mt ->
     let mt = Subst.Lazy.force_modtype mt in
-    `Print (Out_module_type (Printtyp.tree_of_modtype mt))
+    `Print (Out_module_type (Out_type.tree_of_modtype mt))
   | `Modtype_declaration (id, mtd) ->
     let mtd = Subst.Lazy.force_modtype_decl mtd in
-    `Print (Out_sig_item (Printtyp.tree_of_modtype_declaration id mtd))
+    `Print (Out_sig_item (Out_type.tree_of_modtype_declaration id mtd))
   | `None -> `String ""
   | `String s -> `String s
   | `Type_declaration (id, tdecl) ->
     `Print
       (Out_sig_item
-         (Printtyp.tree_of_type_declaration id tdecl Types.Trec_first))
-  | `Type_scheme te -> `Print (Out_type (Printtyp.tree_of_type_scheme te))
+         (Out_type.tree_of_type_declaration id tdecl Types.Trec_first))
+  | `Type_scheme te -> `Print (Out_type (Out_type.tree_of_type_scheme te))
   | `Variant (label, arg) ->
     begin match arg with
     | None -> `String label
     | Some te ->
-      `Concat (label ^ " of ", Out_type (Printtyp.tree_of_type_scheme te))
+      `Concat (label ^ " of ", Out_type (Out_type.tree_of_type_scheme te))
     end
 
 (* List methods of an object.
@@ -866,7 +866,7 @@ let application_context ~prefix path =
          type, but not across different invocations.
          [reset] followed by calls to [mark_loops] and [type_sch] provide
          that *)
-      Printtyp.reset ();
+      Out_type.reset ();
       let pr t =
         let ppf, to_string = Format.to_string () in
         Printtyp.Compat.shared_type_scheme ppf t;

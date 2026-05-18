@@ -137,7 +137,7 @@ type hint = Lexing.position * string
 let create_hint env typ loc =
   let label =
     Printtyp.wrap_printing_env env (fun () ->
-        Format_doc.asprintf "%a" Printtyp.type_scheme typ)
+        Format.asprintf "%a" Printtyp.type_scheme typ)
   in
   let position = loc.Location.loc_end in
   (position, label)

@@ -63,6 +63,7 @@ val same_path: type_expr -> type_expr -> bool
 (** Simple heuristic to rewrite Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
+val shorten_type_path: Env.t -> Path.t -> Path.t
 
 (** {1 Printing type expressions} *)
 
@@ -102,6 +103,8 @@ val tree_of_type_scheme: type_expr -> out_type
 val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
+val tree_of_modes:
+  Mode.Alloc.Const.t -> Outcometree.out_mode list
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
@@ -160,6 +163,11 @@ val tree_of_type_declaration:
 val add_type_declaration_to_preparation :
   Ident.t -> type_declaration -> unit
 val prepared_type_declaration: Ident.t -> type_declaration printer
+val type_declaration_for_merlin:
+  print_non_value_inferred_jkind:bool ->
+  Ident.t -> type_declaration printer
+val type_scheme_for_merlin:
+  print_non_value_jkind_on_type_variables:bool -> type_expr printer
 
 val tree_of_value_description: Ident.t -> value_description -> out_sig_item
 val tree_of_modtype_declaration:
@@ -200,6 +208,14 @@ type typvariant_repr = {
 }
 val tree_of_typobject_repr : type_expr -> typobject_repr
 val tree_of_typvariant_repr : row_desc -> typvariant_repr
+
+module Compat: sig
+  type 'a printer := Format.formatter -> 'a -> unit
+  val type_declaration_for_merlin:
+    print_non_value_inferred_jkind:bool -> Ident.t -> type_declaration printer
+  val type_scheme_for_merlin:
+    print_non_value_jkind_on_type_variables:bool -> type_expr printer
+end
 
 (** {1 Toplevel printing}  *)
 val print_items: (Env.t -> signature_item -> 'a option) ->

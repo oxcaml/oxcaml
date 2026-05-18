@@ -458,17 +458,9 @@ let scrape env mty =
   | _ -> mty
 
 let () =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-  Printtyp.expand_module_type := expand ;
+  Out_type.expand_module_type := expand ;
   Env.scrape_alias := scrape_alias_lazy ;
   Env.scrape_lazy := scrape_lazy
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-  Printtyp.expand_module_type := expand ;
-  Env.scrape_alias := scrape_alias_lazy
-=======
-  Out_type.expand_module_type := expand ;
-  Env.scrape_alias := scrape_alias_lazy
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let find_type_of_module ~strengthen ~aliasable env path =
   if strengthen then

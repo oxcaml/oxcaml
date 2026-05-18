@@ -617,16 +617,12 @@ let tree_of_rec = function
 
 type param_subst = Id | Nth of int | Map of int list
 
-let is_nth = function
-    Nth _ -> true
-  | _ -> false
-
 let compose l1 = function
   | Id -> Map l1
   | Map l2 -> Map (List.map (List.nth l1) l2)
   | Nth n  -> Nth (List.nth l1 n)
 
-let apply_subst s1 tyl =
+let _apply_subst s1 tyl =
   if tyl = [] then []
   (* cf. PR#7543: Typemod.type_package doesn't respect type constructor arity *)
   else
@@ -741,11 +737,11 @@ let wrap_mutation f =
 
 let wrap_printing_env ~reset_names env f =
   let old_env = !printing_env in
-  set_printing_env env;
+  set_printing_env (Env.update_short_paths env);
   if reset_names then reset_naming_context ();
   try_finally f ~always:(fun () -> set_printing_env old_env)
 
-let wrap_printing_env ~error env f =
+let wrap_printing_env ?(error = false) env f =
   if error then Env.without_cmis (wrap_printing_env ~reset_names:true env) f
   else wrap_printing_env ~reset_names:true env f
 
@@ -829,7 +825,9 @@ let rec get_best_path r env =
         (List.rev l);
       get_best_path r env
 
-let best_type_path p =
+let _ = get_best_path
+
+let best_type_path_original p =
   if !printing_env == Env.empty
   then (p, Id)
   else if !Clflags.real_paths
@@ -850,6 +848,68 @@ let best_type_path p =
     let p'' = get_path () in
     (* Format.eprintf "%a = %a -> %a@." path p path p' path p''; *)
     (p'', s)
+
+type type_result = Short_paths.type_result =
+  | Nth of int
+  | Path of int list option * Path.t
+
+type type_resolution = Short_paths.type_resolution =
+  | Nth of int
+  | Subst of int list
+  | Id
+
+let apply_subst ns args =
+  List.map (List.nth args) ns
+
+let apply_subst_opt nso args =
+  match nso with
+  | None -> args
+  | Some ns -> apply_subst ns args
+
+let apply_nth n args =
+  List.nth args n
+
+let best_type_path p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then Path(None, p)
+  else Short_paths.find_type (Env.short_paths !printing_env) p
+
+let best_type_path_resolution p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then Id
+  else Short_paths.find_type_resolution (Env.short_paths !printing_env) p
+
+let best_type_path_simple p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then p
+  else Short_paths.find_type_simple (Env.short_paths !printing_env) p
+
+let best_module_type_path p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then p
+  else Short_paths.find_module_type (Env.short_paths !printing_env) p
+
+let best_module_path p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then p
+  else Short_paths.find_module (Env.short_paths !printing_env) p
+
+let best_class_type_path p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then None, p
+  else Short_paths.find_class_type (Env.short_paths !printing_env) p
+
+let best_class_type_path_simple p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then p
+  else Short_paths.find_class_type_simple (Env.short_paths !printing_env) p
+
+(* When building a tree for a best type path, we should not disambiguate
+   identifiers whenever the short-path algorithm detected a better path than
+   the original one. *)
+let tree_of_best_type_path p p' =
+  if Path.same p p' then tree_of_path (Some Type) p'
+  else tree_of_path None p'
 
 (* Print a type expression *)
 
@@ -879,9 +939,15 @@ let nameable_row row =
    subterms that would be printed by the type printer. *)
 let printer_iter_type_expr f ty =
   match get_desc ty with
-  | Tconstr(p, tyl, _) ->
-      let (_p', s) = best_type_path p in
-      List.iter f (apply_subst s tyl)
+  | Tconstr(p, tyl, _) -> begin
+      match best_type_path_resolution p with
+      | Nth n ->
+          f (apply_nth n tyl)
+      | Subst ns ->
+          List.iter f (apply_subst ns tyl)
+      | Id ->
+          List.iter f tyl
+    end
   | Tvariant row -> begin
       match row_name row with
       | Some(_p, tyl) when nameable_row row ->
@@ -1179,33 +1245,75 @@ module Aliases = struct
   let aliasable ty =
     match get_desc ty with
       Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
-    | Tconstr (p, _, _) ->
-        not (is_nth (snd (best_type_path p)))
+    | Tconstr (p, _, _) -> begin
+        match best_type_path_resolution p with
+        | Nth _ -> false
+        | Subst _ | Id -> true
+      end
     | _ -> true
-
-  let should_visit_object ty =
-    match get_desc ty with
-    | Tvariant row -> not (static_row row)
-    | Tobject _ -> opened_object ty
-    | _ -> false
 
   let rec mark_loops_rec visited ty =
     let px = proxy ty in
     if List.memq px visited && aliasable ty then add_proxy px else
-      let tty = Transient_expr.repr ty in
       let visited = px :: visited in
-      match tty.desc with
-      | Tvariant _ | Tobject _ ->
+      match get_desc ty with
+      | Tvar _ -> Variable_names.reserve ty
+      | Tarrow(_, ty1, ty2, _) ->
+          mark_loops_rec visited ty1; mark_loops_rec visited ty2
+      | Ttuple tyl | Tunboxed_tuple tyl ->
+          List.iter (fun (_, ty) -> mark_loops_rec visited ty) tyl
+      | Tconstr(p, tyl, _) -> begin
+          match best_type_path_resolution p with
+          | Nth n ->
+              mark_loops_rec visited (apply_nth n tyl)
+          | Subst ns ->
+              List.iter (mark_loops_rec visited) (apply_subst ns tyl)
+          | Id ->
+              List.iter (mark_loops_rec visited) tyl
+        end
+      | Tpackage { pack_cstrs; _ } ->
+          List.iter (fun (_n, ty) -> mark_loops_rec visited ty) pack_cstrs
+      | Tvariant row ->
           if List.memq px !visited_objects then add_proxy px else begin
-            if should_visit_object ty then
+            if not (static_row row) then
               visited_objects := px :: !visited_objects;
-            printer_iter_type_expr (mark_loops_rec visited) ty
+            match row_name row with
+            | Some(_p, tyl) when nameable_row row ->
+                List.iter (mark_loops_rec visited) tyl
+            | _ ->
+                iter_row (mark_loops_rec visited) row
           end
+      | Tobject (fi, nm) ->
+          if List.memq px !visited_objects then add_proxy px else begin
+            if opened_object ty then
+              visited_objects := px :: !visited_objects;
+            match !nm with
+            | None ->
+                let fields, _ = flatten_fields fi in
+                List.iter
+                  (fun (_, kind, ty) ->
+                    if field_kind_repr kind = Fpublic then
+                      mark_loops_rec visited ty)
+                  fields
+            | Some (_, l) ->
+                List.iter (mark_loops_rec visited) (List.tl l)
+          end
+      | Tfield(_, kind, ty1, ty2) when field_kind_repr kind = Fpublic ->
+          mark_loops_rec visited ty1; mark_loops_rec visited ty2
+      | Tfield(_, _, _, ty2) ->
+          mark_loops_rec visited ty2
+      | Tnil -> ()
+      | Tquote ty | Tsplice ty | Tquote_eval ty ->
+          mark_loops_rec visited ty
+      | Trepr (ty, _) ->
+          mark_loops_rec visited ty
+      | Tof_kind _ -> ()
+      | Tsubst _ -> ()
+      | Tlink _ -> fatal_error "Printtyp.mark_loops_rec (2)"
       | Tpoly(ty, tyl) ->
           List.iter add tyl;
           mark_loops_rec visited ty
-      | _ ->
-          printer_iter_type_expr (mark_loops_rec visited) ty
+      | Tunivar _ -> Variable_names.reserve ty
 
   let mark_loops ty =
     mark_loops_rec [] ty
@@ -1450,26 +1558,29 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
         Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
-    | Tconstr(p, tyl, _abbrev) ->
-        let p', s = best_type_path p in
-        let tyl' = apply_subst s tyl in
-        if is_nth s && not (tyl'=[])
-        then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
-        else begin
-          Internal_names.add p';
-          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
-        end
+    | Tconstr(p, tyl, _abbrev) -> begin
+        match best_type_path p with
+        | Nth n ->
+            tree_of_typexp mode Alloc.Const.legacy (apply_nth n tyl)
+        | Path (nso, p') ->
+            Internal_names.add p';
+            let tyl' = apply_subst_opt nso tyl in
+            Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+      end
     | Tvariant row ->
         let { fields; name; closed; present; all_present; tags } =
           tree_of_typvariant_repr row
         in
         begin match name with
         | Some(p, tyl) when nameable_row row ->
-            let (p', s) = best_type_path p in
-            let id = tree_of_path (Some Type) p' in
-            let args = tree_of_typlist mode (apply_subst s tyl) in
             let out_variant =
-              if is_nth s then List.hd args else Otyp_constr (id, args) in
+              match best_type_path p with
+              | Nth n -> tree_of_typexp mode Alloc.Const.legacy (apply_nth n tyl)
+              | Path (s, p) ->
+                  let id = tree_of_path (Some Type) p in
+                  let args = tree_of_typlist mode (apply_subst_opt s tyl) in
+                  Otyp_constr (id, args)
+            in
             if closed && all_present then
               out_variant
             else
@@ -1495,15 +1606,19 @@ let rec tree_of_modal_typexp mode modal ty =
           (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
     | Tquote_eval ty ->
         let ty = newgenty (Tquote ty) in
-        let p', s = best_type_path Predef.path_eval in
-        let tyl = apply_subst s [ty] in
-        Internal_names.add p';
-        let tyl =
-          wrap_printing_env_unguarded
-            (Env.enter_quotation !printing_env)
-            (fun () -> tree_of_typlist mode tyl)
-        in
-        Otyp_constr (tree_of_path (Some Type) p', tyl)
+        begin match best_type_path Predef.path_eval with
+        | Nth n ->
+            tree_of_typexp mode Alloc.Const.legacy (apply_nth n [ty])
+        | Path (s, p') ->
+            Internal_names.add p';
+            let tyl = apply_subst_opt s [ty] in
+            let tyl =
+              wrap_printing_env_unguarded
+                (Env.enter_quotation !printing_env)
+                (fun () -> tree_of_typlist mode tyl)
+            in
+            Otyp_constr (tree_of_path (Some Type) p', tyl)
+        end
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -1718,9 +1833,8 @@ and tree_of_typobject mode fi nm =
       Otyp_object {fields; open_row}
   | Some (p, _ty :: tyl) ->
       let args = tree_of_typlist mode tyl in
-      let (p', s) = best_type_path p in
-      assert (s = Id);
-      Otyp_class (tree_of_path (Some Type) p', args)
+      let p' = best_type_path_simple p in
+      Otyp_class (tree_of_best_type_path p p', args)
   | _ -> fatal_error "Out_type.tree_of_typobject"
 
 and tree_of_typfields rest = function
@@ -1948,7 +2062,7 @@ let prepare_decl id decl =
   end;
   ty_manifest, params
 
-let tree_of_type_decl id decl =
+let tree_of_type_decl ?(print_non_value_inferred_jkind = false) id decl =
   let ty_manifest, params = prepare_decl id decl in
   let type_param ot_variance ot_jkind =
     function
@@ -2060,8 +2174,9 @@ let tree_of_type_decl id decl =
     Jkind.is_value_for_printing ~ignore_null:false !printing_env decl.type_jkind
   in
   let otype_jkind =
-    match ty, is_value, unsafe_mode_crossing with
-    | (Otyp_abstract, false, _) | (_, _, true) ->
+    match ty, is_value, unsafe_mode_crossing, print_non_value_inferred_jkind with
+    | (Otyp_abstract, false, _, _) | (_, _, true, _)
+    | (_, false, _, true) ->
         (* The two cases of (C1) from the Note correspond to Otyp_abstract.
            Anything but the default must be user-written, so we print the
            user-written annotation. *)
@@ -2090,9 +2205,9 @@ let add_type_decl_to_preparation id decl =
 let tree_of_prepared_type_decl id decl =
   tree_of_type_decl id decl
 
-let tree_of_type_decl id decl =
+let tree_of_type_decl ?print_non_value_inferred_jkind id decl =
   reset_except_conflicts();
-  tree_of_type_decl id decl
+  tree_of_type_decl ?print_non_value_inferred_jkind id decl
 
 let add_constructor_to_preparation c =
   prepare_type_constructor_arguments c.cd_args;
@@ -2102,8 +2217,9 @@ let prepared_constructor ppf c =
   !Oprint.out_constr ppf (tree_of_single_constructor c)
 
 
-let tree_of_type_declaration id decl rs =
-  Osig_type (tree_of_type_decl id decl, tree_of_rec rs)
+let tree_of_type_declaration ?print_non_value_inferred_jkind id decl rs =
+  Osig_type
+    (tree_of_type_decl ?print_non_value_inferred_jkind id decl, tree_of_rec rs)
 
 let tree_of_prepared_type_declaration id decl rs =
   Osig_type (tree_of_prepared_type_decl id decl, tree_of_rec rs)
@@ -2114,6 +2230,38 @@ let add_type_declaration_to_preparation id decl =
 let prepared_type_declaration id ppf decl =
   !Oprint.out_sig_item ppf
     (tree_of_prepared_type_declaration id decl Trec_first)
+
+let type_declaration_for_merlin ~print_non_value_inferred_jkind id ppf decl =
+  !Oprint.out_sig_item ppf
+    (tree_of_type_declaration ~print_non_value_inferred_jkind id decl
+       Trec_first)
+
+let print_annotated_qtvs_as_comment ppf qtvs =
+  let qtvs =
+    List.filter_map
+      (function
+        | _, None -> None
+        | name, Some annot -> Some (name, annot))
+      qtvs
+  in
+  match qtvs with
+  | [] -> ()
+  | _ :: _ as qtvs ->
+      let annotated_qtv ppf (name, jkind) =
+        Format_doc.fprintf ppf "@['%s : %a@]" name !Oprint.out_jkind jkind
+      in
+      Format_doc.fprintf ppf " @[(* @[%a@] *)@]"
+        (Format_doc.pp_print_list annotated_qtv
+           ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf ", "))
+        qtvs
+
+let type_scheme_for_merlin ~print_non_value_jkind_on_type_variables ppf ty =
+  prepare_for_printing [ty];
+  prepared_type_scheme ppf ty;
+  if print_non_value_jkind_on_type_variables
+  then (
+    let qtvs = extract_qtvs [ty] in
+    print_annotated_qtvs_as_comment ppf qtvs)
 
 
 (* When printing extension constructor, it is important to ensure that
@@ -2319,6 +2467,8 @@ let rec tree_of_class_type mode params =
       then
         tree_of_class_type mode params cty
       else
+        let nso, p' = best_class_type_path p' in
+        let tyl = apply_subst_opt nso tyl in
         let namespace = Namespace.best_class_namespace p' in
         Octy_constr (tree_of_path namespace p', tree_of_typlist Type_scheme tyl)
   | Cty_signature sign ->
@@ -2527,7 +2677,10 @@ let hide ids env =
 
 let with_hidden_items ids f =
   let with_hidden_in_printing_env ids f =
-    wrap_env (hide ids) (Ident_names.with_hidden ids) f
+    wrap_env
+      (fun env -> Env.update_short_paths (hide ids env))
+      (Ident_names.with_hidden ids)
+      f
   in
   if not !Clflags.real_paths then
     with_hidden_in_printing_env ids f
@@ -2609,6 +2762,8 @@ let rec tree_of_modtype ?abbrev = function
       Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
+  | Mty_for_hole ->
+      Omty_hole
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
       | Mty_strengthen (mty,p,a) ->
@@ -2752,16 +2907,16 @@ let same_path t t' =
   let open Types in
   eq_type t t' ||
   match get_desc t, get_desc t' with
-    Tconstr(p,tl,_), Tconstr(p',tl',_) ->
-      let (p1, s1) = best_type_path p and (p2, s2)  = best_type_path p' in
-      begin match s1, s2 with
-        Nth n1, Nth n2 when n1 = n2 -> true
-      | (Id | Map _), (Id | Map _) when Path.same p1 p2 ->
-          let tl = apply_subst s1 tl and tl' = apply_subst s2 tl' in
+  | Tconstr(p,tl,_), Tconstr(p',tl',_) -> begin
+      match best_type_path p, best_type_path p' with
+      | Nth n, Nth n' when n = n' -> true
+      | Path(nso, p), Path(nso', p') when Path.same p p' ->
+          let tl = apply_subst_opt nso tl in
+          let tl' = apply_subst_opt nso' tl' in
           List.length tl = List.length tl' &&
           List.for_all2 eq_type tl tl'
       | _ -> false
-      end
+    end
   | _ ->
       false
 
@@ -2846,35 +3001,39 @@ let tree_of_path p = tree_of_path None p
 let tree_of_type_declaration ident td rs =
   with_hidden_items [{hide=true; ident}]
     (fun () -> tree_of_type_declaration ident td rs)
+let type_declaration_for_merlin ~print_non_value_inferred_jkind ident ppf td =
+  with_hidden_items [{hide=true; ident}]
+    (fun () ->
+       type_declaration_for_merlin ~print_non_value_inferred_jkind ident ppf td)
 let tree_of_modtype_declaration ?(abbrev = false) id md =
   abbreviate ~abbrev tree_of_modtype_declaration id md
 
-let best_type_path p =
-  if !printing_env == Env.empty
-  then (p, Id)
-  else if !Clflags.real_paths
-  then (p, Id)
-  else
-    let (p', s) = normalize_type_path !printing_env p in
-    let get_path () =
-      try
-        get_best_path (Path.Map.find p' !printing_map) !printing_env
-      with Not_found -> rewrite_double_underscore_paths !printing_env p'
-    in
-    while !printing_cont <> [] &&
-      fst (path_size (get_path ()) !printing_env) > !printing_depth
-    do
-      printing_cont := List.map snd (Env.run_iter_cont !printing_cont);
-      incr printing_depth;
-    done;
-    let p'' = get_path () in
-    (* Format.eprintf "%a = %a -> %a@." path p path p' path p''; *)
-    (p'', s)
+let shorten_type_path env p =
+  wrap_printing_env env (fun () -> best_type_path_simple p)
+
+let shorten_module_type_path env p =
+  wrap_printing_env env (fun () -> best_module_type_path p)
+
+let shorten_module_path env p =
+  wrap_printing_env env (fun () -> best_module_path p)
+
+let shorten_class_type_path env p =
+  wrap_printing_env env (fun () -> best_class_type_path_simple p)
 
 let tree_of_class_type kind cty = tree_of_class_type kind [] cty
 let prepare_class_type cty = prepare_class_type [] cty
 
 let tree_of_type_path p =
-  let (p', s) = best_type_path p in
+  let (p', s) = best_type_path_original p in
   let p'' = if (s = Id) then p' else p in
-  tree_of_path p''
+  tree_of_best_type_path p p''
+
+module Compat = struct
+  let type_declaration_for_merlin ~print_non_value_inferred_jkind id =
+    Format_doc.compat
+      (type_declaration_for_merlin ~print_non_value_inferred_jkind id)
+
+  let type_scheme_for_merlin ~print_non_value_jkind_on_type_variables =
+    Format_doc.compat
+      (type_scheme_for_merlin ~print_non_value_jkind_on_type_variables)
+end

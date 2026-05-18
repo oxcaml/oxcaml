@@ -176,11 +176,11 @@ and modes mode =
   let snapshot = Btype.snapshot () in
   let mode = Mode.Alloc.zap_to_legacy mode in
   Btype.backtrack snapshot;
-  Printtyp.tree_of_modes mode
+  Out_type.tree_of_modes mode
   |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
 
 and const_modalities ~mut modality =
-  Printtyp.tree_of_modalities mut modality
+  Out_type.tree_of_modalities mut modality
   |> List.map ~f:(fun modality ->
       Location.mknoloc (Parsetree.Modality modality))
 

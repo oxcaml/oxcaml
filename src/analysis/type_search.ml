@@ -30,7 +30,7 @@
 
 open Std
 
-let sherlodoc_type_of env typ =
+let sherlodoc_type_of _env typ =
   let open Merlin_sherlodoc in
   let rec aux typ =
     match Types.get_desc typ with
@@ -41,8 +41,8 @@ let sherlodoc_type_of env typ =
       Type_parsed.tuple @@ List.map ~f:aux_tuple_element elts
     | Types.Tarrow (_, a, b, _) -> Type_parsed.Arrow (aux a, aux b)
     | Types.Tconstr (p, args, _) ->
-      let p = Printtyp.rewrite_double_underscore_paths env p in
-      let name = Format_doc.asprintf "%a" Printtyp.path p in
+      let p = p in
+      let name = Format.asprintf "%a" Printtyp.path p in
       Type_parsed.Tycon (name, List.map ~f:aux args)
     | Types.Tpoly (typ, []) -> aux typ
     | _ -> Type_parsed.Unhandled
@@ -99,8 +99,8 @@ let compute_value query env _ path desc _ acc =
   let typ = sherlodoc_type_of env d in
   let name =
     Printtyp.wrap_printing_env env @@ fun () ->
-    let path = Printtyp.rewrite_double_underscore_paths env path in
-    Format_doc.asprintf "%a" Printtyp.path path
+    let path = Out_type.rewrite_double_underscore_paths env path in
+    Format.asprintf "%a" Printtyp.path path
   in
   let cost = Query.distance_for query ~path:name typ in
   if cost >= 1000 then acc
