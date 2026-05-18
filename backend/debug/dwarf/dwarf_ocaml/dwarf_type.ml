@@ -249,40 +249,41 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
       |> attribute_list_with_optional_name name)
     ()
 
-(* Layout of OCaml array elements
-   ==============================
+(** {1 Layout of OCaml array elements}
 
-   The OCaml runtime lays out array elements differently depending on the
-   element kind. The stride between consecutive elements is:
+    The OCaml runtime lays out array elements differently depending on the
+    element kind. The stride between consecutive elements is:
 
-   | Element                          | Stride        | Notes                  |
-   |----------------------------------|---------------|------------------------|
-   | [value] kind                     | [size_addr]   | regular OCaml value    |
-   | [int8#]                          | 1 byte        | densely packed, 8/word |
-   | [int16#]                         | 2 bytes       | densely packed, 4/word |
-   | [int32#], [float32#]             | 4 bytes       | densely packed, 2/word |
-   | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word       |
-   | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}   |
-   |                                  | extended      | takes 16 bytes per     |
-   |                                  | fields        | element                |
+    {v
+    | Element                          | Stride        | Notes                 |
+    |----------------------------------|---------------|-----------------------|
+    | [value] kind                     | [size_addr]   | regular OCaml value   |
+    | [int8#]                          | 1 byte        | densely packed 8/word |
+    | [int16#]                         | 2 bytes       | densely packed 4/word |
+    | [int32#], [float32#]             | 4 bytes       | densely packed 2/word |
+    | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word      |
+    | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}  |
+    |                                  | extended      | takes 16 bytes per    |
+    |                                  | fields        | element               |
+    v}
 
-   So primitive sub-word arrays are densely packed (multiple values per
-   word), but the moment a sub-word value lives inside an unboxed product
-   field its slot grows to one full word.
+    So primitive sub-word arrays are densely packed (multiple values per word),
+    but the moment a sub-word value lives inside an unboxed product field its
+    slot grows to one full word.
 
-   The in-array layout is independent of how the same type is laid out
-   elsewhere (e.g. as a field of a mixed block, or in a register), so the
-   stride is not derivable from the element die alone - it must be
-   computed by the caller. [create_array_die] and [create_packed_struct]
-   below produce DWARF that follows the table above.
+    The in-array layout is independent of how the same type is laid out
+    elsewhere (e.g. as a field of a mixed block, or in a register), so the
+    stride is not derivable from the element die alone - it must be computed by
+    the caller. [create_array_die] and [create_packed_struct] below produce
+    DWARF that follows the table above.
 
-   Caveat for densely packed primitive sub-word arrays: the OCaml block tag
-   encodes how many of the final word's slots are valid, but OxCaml LLDB
-   ignores the [DW_AT_count = 0] we emit below and infers the element count
-   from [block_size / element_stride], which overshoots by up to
-   [elements_per_word - 1]. Once the language plugin supports DWARF
-   expressions we can replace the [0] with a tag-aware count expression and
-   the displayed length will match the logical length. *)
+    Caveat for densely packed primitive sub-word arrays: the OCaml block tag
+    encodes how many of the final word's slots are valid, but OxCaml LLDB
+    ignores the [DW_AT_count = 0] we emit below and infers the element count
+    from [block_size / element_stride], which overshoots by up to
+    [elements_per_word - 1]. Once the language plugin supports DWARF expressions
+    we can replace the [0] with a tag-aware count expression and the displayed
+    length will match the logical length. *)
 let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
     ?name () =
   let array_die =
@@ -1162,10 +1163,9 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
 
 let create_packed_struct ~parent_proto_die dies_and_layouts =
   (* Describes one element of an unboxed product array (see the array-layout
-     commentary above [create_array_die]). Field offsets and the total
-     struct size use [size_in_memory] (the word-extended slot), while each
-     member's [byte_size] is [RL.size] (the bytes the value actually
-     occupies). *)
+     commentary above [create_array_die]). Field offsets and the total struct
+     size use [size_in_memory] (the word-extended slot), while each member's
+     [byte_size] is [RL.size] (the bytes the value actually occupies). *)
   let packed_byte_size =
     List.fold_left
       (fun acc (_, layout) -> acc + RL.size_in_memory layout)
