@@ -14,7 +14,7 @@ end
 module type S0 = sig val f : ('elt : bits64). 'elt -> 'elt array end
 |}]
 
-(* CR implicit-variables: implicit kinds don't work in structures. *)
+(* Implicit kinds in structures. *)
 
 (* This doesn't raise an unused attribute warning because expect tests
    are run at toplevel.
@@ -28,6 +28,151 @@ end
 
 [%%expect{|
 module M : sig val f : ('elt : value_maybe_null). 'elt -> 'elt array end
+|}]
+
+(* File-level structure attributes affect later declarations only. *)
+
+let file_before (x : 'file_before) = x
+
+[@@@implicit_kind: ('file_after : bits64) * ('file_ext : word)]
+
+let file_after (x : 'file_after) = [| x |]
+external file_ignore : 'file_ext -> unit = "%ignore"
+
+[%%expect{|
+val file_before : 'file_before -> 'file_before = <fun>
+val file_after :
+  ('file_after : value_maybe_null). 'file_after -> 'file_after array = <fun>
+external file_ignore : 'file_ext -> unit = "%ignore"
+|}]
+
+(* Module structure attributes affect later declarations only. *)
+
+module Structure_order = struct
+  let before (x : 'before) = x
+  type 'box before_box
+  external before_ignore : 'ext -> unit = "%ignore"
+
+  [@@@implicit_kind: ('after : bits64) * ('box : word) * ('ext : word)]
+
+  let after (x : 'after) = [| x |]
+  type 'box after_box
+  external after_ignore : 'ext -> unit = "%ignore"
+end
+
+[%%expect{|
+module Structure_order :
+  sig
+    val before : 'before -> 'before
+    type 'box before_box
+    external before_ignore : 'ext -> unit = "%ignore"
+    val after : ('after : value_maybe_null). 'after -> 'after array
+    type 'box after_box
+    external after_ignore : 'ext -> unit = "%ignore"
+  end
+|}]
+
+(* Layout-polymorphic external declarations use structure implicit kinds. *)
+
+module Structure_external = struct
+  [@@@implicit_kind: ('ext_any : any)]
+
+  external[@layout_poly] ignore_any : 'ext_any -> unit = "%ignore"
+end
+
+[%%expect{|
+Line 4, characters 38-54:
+4 |   external[@layout_poly] ignore_any : 'ext_any -> unit = "%ignore"
+                                          ^^^^^^^^^^^^^^^^
+Error: "[@layout_poly]" on this external declaration has no
+       effect. Consider removing it or adding a type
+       variable for it to operate on.
+|}]
+
+(* Nested structures inherit and can shadow implicit kinds. *)
+
+module Nested_structures = struct
+  [@@@implicit_kind: ('nested : bits64)]
+
+  module Inherits = struct
+    let inherited (x : 'nested) = [| x |]
+  end
+
+  module Shadows = struct
+    [@@@implicit_kind: ('nested : immediate)]
+
+    let shadowed (x : 'nested) = x
+  end
+
+  let outer_after (x : 'nested) = [| x |]
+end
+
+[%%expect{|
+module Nested_structures :
+  sig
+    module Inherits :
+      sig
+        val inherited :
+          ('nested : value_maybe_null). 'nested -> 'nested array
+      end
+    module Shadows : sig val shadowed : 'nested -> 'nested end
+    val outer_after : ('nested : value_maybe_null). 'nested -> 'nested array
+  end
+|}]
+
+(* [module type of struct] inherits the incoming implicit-kind environment. *)
+
+module Mto_struct = struct
+  [@@@implicit_kind: ('mto : word)]
+
+  module type T = module type of struct
+    let id (x : 'mto) = x
+  end
+end
+
+[%%expect{|
+module Mto_struct :
+  sig module type T = sig val id : 'mto -> 'mto @@ stateless end end
+|}]
+
+(* Conflicting explicit annotations in structures fail like signatures. *)
+
+module Structure_conflict = struct
+  [@@@implicit_kind: ('conflict : word)]
+
+  let bad (x : ('conflict : value_or_null)) = x
+end
+
+[%%expect{|
+module Structure_conflict : sig val bad : 'conflict -> 'conflict end
+|}]
+
+(* Lexical defaults do not cross module boundaries as ambient defaults. *)
+
+module Boundary = struct
+  module Source = struct
+    [@@@implicit_kind: ('boundary : word)]
+
+    let baked (x : 'boundary) = x
+  end
+
+  module Consumer = struct
+    include Source
+
+    let fresh (x : 'boundary) = x
+  end
+end
+
+[%%expect{|
+module Boundary :
+  sig
+    module Source : sig val baked : 'boundary -> 'boundary end
+    module Consumer :
+      sig
+        val baked : 'boundary -> 'boundary
+        val fresh : 'boundary -> 'boundary
+      end
+  end
 |}]
 
 (* Implicit kind without jkind annotation fails. *)
@@ -515,7 +660,6 @@ end
 module type S27 = sig val f : (('w : word). 'w -> 'w) -> unit end
 |}]
 
-(* CR implicit-variables: inherit the annotation here? *)
 (* [module type of struct]. *)
 
 module type S28 = sig
@@ -721,7 +865,7 @@ Error: The type variable 'a has conflicting kind annotations.
        but was already implicitly annotated with any
 |}]
 
-(* Clearing the env inside of a struct. *)
+(* Keeping the env inside of a struct. *)
 
 module type S37 = sig
   [@@@implicit_kind: ('t : word)]
