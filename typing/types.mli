@@ -939,7 +939,7 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
-  | Record_dummy of { represent_as_float_array : bool }
+  | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   (* Note [Record_dummy]:
      We typecheck type declarations before updating their kinds, yet some record
      representations are kind-dependent. In particular, we don't choose between
@@ -947,9 +947,9 @@ and record_representation =
      type declaration jkinds are updated in [update_decls_jkind].
 
      Until then, we use [Record_dummy], which also tracks whether the
-     declaration has the attribute [@@represent_as_float_array], as we can't
-     check whether the attribute is valid until we know the kinds of the fields
-     (which must all be [float64]).
+     declaration has the attributes [@@represent_as_float_array] or
+     [@@flatten_floats], as we can't check whether either attribute is valid
+     until we know the kinds of the fields.
 
      After [update_decls_jkind], no record should have this representation. *)
 

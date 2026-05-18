@@ -10,23 +10,24 @@
  }
 *)
 
-(* Mixed float-float# blocks require [@@flatten_floats]. *)
+(* Mixed float-float# records typecheck without [@@flatten_floats], producing
+   a non-flat mixed block (and thus get an unboxed version). *)
 type t =
   { a : float;
     b : float#;
   }
 
 [%%expect{|
-Lines 1-4, characters 0-3:
-1 | type t =
-2 |   { a : float;
-3 |     b : float#;
-4 |   }
-Error: This record type mixes boxed and unboxed float fields,
-       which causes the flat float record optimization.
-       You must annotate it with "[@@flatten_floats]".
+type t = { a : float; b : float#; }
 |}];;
 
+(* The non-flat representation gives [t] an unboxed version [t#]. *)
+let _f (x : t#) = x.#b
+[%%expect{|
+val _f : t# -> float# = <fun>
+|}];;
+
+(* Opt in to flat storage with [@@flatten_floats]. *)
 type t =
   { a : float;
     b : float#;
@@ -43,6 +44,44 @@ type t =
 
 [%%expect{|
 type t = { a : float#; b : float; }
+|}];;
+
+(* [@@flatten_floats] is rejected on records that don't mix [float] and
+   [float#]. *)
+type bad = { f : float } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-43:
+1 | type bad = { f : float } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+type bad = { f : float# } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-44:
+1 | type bad = { f : float# } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+type bad = { a : float; b : float#; c : int } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-64:
+1 | type bad = { a : float; b : float#; c : int } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+type bad = A | B [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-35:
+1 | type bad = A | B [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
 |}];;
 
 (* When a non-float/float# field appears, [float]
