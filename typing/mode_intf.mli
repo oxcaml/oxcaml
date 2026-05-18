@@ -284,6 +284,10 @@ module type S = sig
     end
   end
 
+  module For_testing : sig
+    val check_all_allowed_compositions : unit -> unit
+  end
+
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates

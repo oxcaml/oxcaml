@@ -3744,6 +3744,468 @@ module Lattices_mono = struct
   end
 end
 
+module For_testing = struct
+  open Lattices_mono
+
+  type packed_obj = Obj : 'a obj -> packed_obj
+
+  let all_objs =
+    [ Obj Locality;
+      Obj Regionality;
+      Obj Uniqueness_op;
+      Obj Linearity;
+      Obj Portability;
+      Obj Forkable;
+      Obj Yielding;
+      Obj Statefulness;
+      Obj Contention_op;
+      Obj Visibility_op;
+      Obj Staticity_op;
+      Obj Monadic_op;
+      Obj Comonadic_with_locality;
+      Obj Comonadic_with_regionality ]
+
+  let ( let* ) xs f = List.concat_map f xs
+
+  let ( let+ ) xs f = List.map f xs
+
+  let values_for_check_locality = [Locality.Global; Locality.Local]
+
+  let values_for_check_regionality =
+    [Regionality.Global; Regionality.Regional; Regionality.Local]
+
+  let values_for_check_uniqueness_op = [Uniqueness.Unique; Uniqueness.Aliased]
+
+  let values_for_check_linearity = [Linearity.Many; Linearity.Once]
+
+  let values_for_check_portability =
+    [ Portability.Portable;
+      Portability.Shareable;
+      Portability.Corruptible;
+      Portability.Nonportable ]
+
+  let values_for_check_forkable = [Forkable.Forkable; Forkable.Unforkable]
+
+  let values_for_check_yielding = [Yielding.Unyielding; Yielding.Yielding]
+
+  let values_for_check_statefulness =
+    [ Statefulness.Stateless;
+      Statefulness.Writing;
+      Statefulness.Reading;
+      Statefulness.Stateful ]
+
+  let values_for_check_contention_op =
+    [ Contention.Uncontended;
+      Contention.Corrupted;
+      Contention.Shared;
+      Contention.Contended ]
+
+  let values_for_check_visibility_op =
+    [ Visibility.Read_write;
+      Visibility.Read;
+      Visibility.Write;
+      Visibility.Immutable ]
+
+  let values_for_check_staticity_op = [Staticity.Static; Staticity.Dynamic]
+
+  let values_for_check_monadic_op =
+    let* uniqueness = values_for_check_uniqueness_op in
+    let* contention = values_for_check_contention_op in
+    let* visibility = values_for_check_visibility_op in
+    let+ staticity = values_for_check_staticity_op in
+    { uniqueness; contention; visibility; staticity }
+
+  let values_for_check_comonadic_with_locality =
+    let* areality = values_for_check_locality in
+    let* linearity = values_for_check_linearity in
+    let* portability = values_for_check_portability in
+    let* forkable = values_for_check_forkable in
+    let* yielding = values_for_check_yielding in
+    let+ statefulness = values_for_check_statefulness in
+    { areality; linearity; portability; forkable; yielding; statefulness }
+
+  let values_for_check_comonadic_with_regionality =
+    let* areality = values_for_check_regionality in
+    let* linearity = values_for_check_linearity in
+    let* portability = values_for_check_portability in
+    let* forkable = values_for_check_forkable in
+    let* yielding = values_for_check_yielding in
+    let+ statefulness = values_for_check_statefulness in
+    { areality; linearity; portability; forkable; yielding; statefulness }
+
+  let all_values_for_check : type a. a obj -> a list = function
+    | Locality -> values_for_check_locality
+    | Regionality -> values_for_check_regionality
+    | Uniqueness_op -> values_for_check_uniqueness_op
+    | Linearity -> values_for_check_linearity
+    | Portability -> values_for_check_portability
+    | Forkable -> values_for_check_forkable
+    | Yielding -> values_for_check_yielding
+    | Statefulness -> values_for_check_statefulness
+    | Contention_op -> values_for_check_contention_op
+    | Visibility_op -> values_for_check_visibility_op
+    | Staticity_op -> values_for_check_staticity_op
+    | Monadic_op -> values_for_check_monadic_op
+    | Comonadic_with_locality -> values_for_check_comonadic_with_locality
+    | Comonadic_with_regionality -> values_for_check_comonadic_with_regionality
+
+  type 'a packed_axis = Axis : ('a, 'b) Axis.t -> 'a packed_axis
+
+  let axes : type a. a obj -> a packed_axis list = function
+    | Comonadic_with_locality ->
+      [ Axis Areality;
+        Axis Forkable;
+        Axis Yielding;
+        Axis Linearity;
+        Axis Statefulness;
+        Axis Portability ]
+    | Comonadic_with_regionality ->
+      [ Axis Areality;
+        Axis Forkable;
+        Axis Yielding;
+        Axis Linearity;
+        Axis Statefulness;
+        Axis Portability ]
+    | Monadic_op ->
+      [Axis Uniqueness; Axis Visibility; Axis Contention; Axis Staticity]
+    | Locality | Regionality | Uniqueness_op | Linearity | Portability
+    | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
+    | Staticity_op ->
+      []
+
+  type ('b, 'd) packed_core_to =
+    | Core_to : 'a obj * ('a, 'b, 'd) Core_morph.t -> ('b, 'd) packed_core_to
+
+  let core_to : type a b d. (a, b, d) Core_morph.t -> (b, d) packed_core_to =
+   fun m -> Core_to (Core_morph.src m, m)
+
+  let left_cores_to : type b. b obj -> (b, left_only) packed_core_to list =
+    function
+    | Locality -> [core_to (Locality_restricted Regional_to_local)]
+    | Regionality ->
+      [ core_to (Locality_restricted Local_to_regional);
+        core_to (Locality_restricted Locality_as_regionality);
+        core_to (Locality_restricted Local_to_regional_regionality);
+        core_to (Locality_restricted Regional_to_local_regionality) ]
+    | Uniqueness_op -> [core_to Linearity_to_uniqueness_op]
+    | Linearity -> [core_to Uniqueness_op_to_linearity]
+    | Portability -> [core_to Contention_op_to_portability]
+    | Forkable -> []
+    | Yielding -> []
+    | Statefulness -> [core_to Visibility_op_to_statefulness]
+    | Contention_op -> [core_to Portability_to_contention_op]
+    | Visibility_op -> [core_to Statefulness_to_visibility_op]
+    | Staticity_op -> []
+    | Monadic_op ->
+      [ core_to (Comonadic_to_monadic_min Locality);
+        core_to (Comonadic_to_monadic_min Regionality) ]
+    | Comonadic_with_locality ->
+      [ core_to (Locality_full Regional_to_local);
+        core_to Monadic_to_comonadic_min ]
+    | Comonadic_with_regionality ->
+      [ core_to (Locality_full Local_to_regional);
+        core_to (Locality_full Locality_as_regionality);
+        core_to (Locality_full Local_to_regional_regionality);
+        core_to (Locality_full Regional_to_local_regionality);
+        core_to Monadic_to_comonadic_min ]
+
+  let right_cores_to : type b. b obj -> (b, right_only) packed_core_to list =
+    function
+    | Locality ->
+      [ core_to (Locality_restricted Regional_to_local);
+        core_to (Locality_restricted Regional_to_global) ]
+    | Regionality ->
+      [ core_to (Locality_restricted Locality_as_regionality);
+        core_to (Locality_restricted Regional_to_local_regionality);
+        core_to (Locality_restricted Regional_to_global_regionality) ]
+    | Uniqueness_op -> [core_to Linearity_to_uniqueness_op]
+    | Linearity -> [core_to Uniqueness_op_to_linearity]
+    | Portability -> [core_to Contention_op_to_portability]
+    | Forkable -> []
+    | Yielding -> []
+    | Statefulness -> [core_to Visibility_op_to_statefulness]
+    | Contention_op -> [core_to Portability_to_contention_op]
+    | Visibility_op -> [core_to Statefulness_to_visibility_op]
+    | Staticity_op -> []
+    | Monadic_op ->
+      [ core_to (Comonadic_to_monadic_max Locality);
+        core_to (Comonadic_to_monadic_max Regionality) ]
+    | Comonadic_with_locality ->
+      [ core_to (Locality_full Regional_to_local);
+        core_to (Locality_full Regional_to_global);
+        core_to Monadic_to_comonadic_max ]
+    | Comonadic_with_regionality ->
+      [ core_to (Locality_full Locality_as_regionality);
+        core_to (Locality_full Regional_to_local_regionality);
+        core_to (Locality_full Regional_to_global_regionality);
+        core_to Monadic_to_comonadic_max ]
+
+  type ('b, 'd) packed_simple_to =
+    | Simple_to :
+        'a obj * ('a, 'b, 'd) Simple_morph.t
+        -> ('b, 'd) packed_simple_to
+
+  let simple_to : type a b d.
+      b obj -> (a, b, d) Simple_morph.t -> (b, d) packed_simple_to =
+   fun dst m -> Simple_to (Simple_morph.src dst m, m)
+
+  let simple_left_to : type b. b obj -> (b, left_only) packed_simple_to list =
+   fun dst ->
+    let constants =
+      List.map
+        (fun c -> simple_to dst (Simple_morph.Meet_const c))
+        (all_values_for_check dst)
+    in
+    let cores = left_cores_to dst in
+    let core_morphs =
+      List.map
+        (fun (Core_to (_, m)) -> simple_to dst (Simple_morph.Core m))
+        cores
+    in
+    let meet_const_cores =
+      let* c = all_values_for_check dst in
+      let+ (Core_to (_, m)) = cores in
+      simple_to dst (Simple_morph.Meet_const_core (c, m))
+    in
+    (simple_to dst Id :: core_morphs) @ constants @ meet_const_cores
+
+  let simple_right_to : type b. b obj -> (b, right_only) packed_simple_to list =
+   fun dst ->
+    let constants =
+      List.map
+        (fun c -> simple_to dst (Simple_morph.Imply_const c))
+        (all_values_for_check dst)
+    in
+    let cores = right_cores_to dst in
+    let core_morphs =
+      List.map
+        (fun (Core_to (_, m)) -> simple_to dst (Simple_morph.Core m))
+        cores
+    in
+    let core_imply_consts =
+      let* (Core_to (src, m)) = cores in
+      let+ c = all_values_for_check src in
+      simple_to dst (Simple_morph.Core_imply_const (m, c))
+    in
+    (simple_to dst Id :: core_morphs) @ constants @ core_imply_consts
+
+  let filter_simple_src : type a b d.
+      a obj -> (b, d) packed_simple_to list -> (a, b, d) Simple_morph.t list =
+   fun src simple_morphs ->
+    let filter : (b, d) packed_simple_to -> (a, b, d) Simple_morph.t option =
+     fun (Simple_to (src', m)) ->
+      match equal_obj src src' with
+      | Misc.Is_eq -> Some m
+      | Misc.Is_not_eq -> None
+    in
+    List.filter_map filter simple_morphs
+
+  let simple_left_from_to src dst = filter_simple_src src (simple_left_to dst)
+
+  let simple_right_from_to src dst = filter_simple_src src (simple_right_to dst)
+
+  type 'b packed_morph_to =
+    | Morph_to : 'a obj * ('a, 'b, neither) morph -> 'b packed_morph_to
+
+  let left_morph_to : type a b.
+      a obj -> (a, b, left_only) morph -> b packed_morph_to =
+   fun src morph -> Morph_to (src, disallow_left morph)
+
+  let right_morph_to : type a b.
+      a obj -> (a, b, right_only) morph -> b packed_morph_to =
+   fun src morph -> Morph_to (src, disallow_right morph)
+
+  let generate_left_morphs_to : type b. b obj -> b packed_morph_to list =
+   fun dst ->
+    let simple_morphs =
+      List.map
+        (fun (Simple_to (src, m)) -> left_morph_to src (Simple m))
+        (simple_left_to dst)
+    in
+    let projections =
+      let* (Obj src) = all_objs in
+      let* (Axis ax) = axes src in
+      let projected = proj_obj ax src in
+      let+ m = simple_left_from_to projected dst in
+      left_morph_to src (Simple_proj (m, ax, src))
+    in
+    let min_with =
+      let* (Axis ax) = axes dst in
+      let projected = proj_obj ax dst in
+      let+ (Simple_to (src, m)) = simple_left_to projected in
+      left_morph_to src (Min_with_simple (ax, m))
+    in
+    let const_min =
+      List.map (fun (Obj src) -> left_morph_to src (Const_min src)) all_objs
+    in
+    simple_morphs @ projections @ min_with @ const_min
+
+  let generate_right_morphs_to : type b. b obj -> b packed_morph_to list =
+   fun dst ->
+    let simple_morphs =
+      List.map
+        (fun (Simple_to (src, m)) -> right_morph_to src (Simple m))
+        (simple_right_to dst)
+    in
+    let projections =
+      let* (Obj src) = all_objs in
+      let* (Axis ax) = axes src in
+      let projected = proj_obj ax src in
+      let+ m = simple_right_from_to projected dst in
+      right_morph_to src (Simple_proj (m, ax, src))
+    in
+    let max_with =
+      let* (Axis ax) = axes dst in
+      let projected = proj_obj ax dst in
+      let+ (Simple_to (src, m)) = simple_right_to projected in
+      right_morph_to src (Max_with_simple (ax, m))
+    in
+    let const_max =
+      List.map (fun (Obj src) -> right_morph_to src (Const_max src)) all_objs
+    in
+    simple_morphs @ projections @ max_with @ const_max
+
+  let generate_morphs_to dst =
+    generate_left_morphs_to dst @ generate_right_morphs_to dst
+
+  let morphs_to_locality = generate_morphs_to Locality
+
+  let morphs_to_regionality = generate_morphs_to Regionality
+
+  let morphs_to_uniqueness_op = generate_morphs_to Uniqueness_op
+
+  let morphs_to_linearity = generate_morphs_to Linearity
+
+  let morphs_to_portability = generate_morphs_to Portability
+
+  let morphs_to_forkable = generate_morphs_to Forkable
+
+  let morphs_to_yielding = generate_morphs_to Yielding
+
+  let morphs_to_statefulness = generate_morphs_to Statefulness
+
+  let morphs_to_contention_op = generate_morphs_to Contention_op
+
+  let morphs_to_visibility_op = generate_morphs_to Visibility_op
+
+  let morphs_to_staticity_op = generate_morphs_to Staticity_op
+
+  let morphs_to_monadic_op = generate_morphs_to Monadic_op
+
+  let morphs_to_comonadic_with_locality =
+    generate_morphs_to Comonadic_with_locality
+
+  let morphs_to_comonadic_with_regionality =
+    generate_morphs_to Comonadic_with_regionality
+
+  let morphs_to : type b. b obj -> b packed_morph_to list = function
+    | Locality -> morphs_to_locality
+    | Regionality -> morphs_to_regionality
+    | Uniqueness_op -> morphs_to_uniqueness_op
+    | Linearity -> morphs_to_linearity
+    | Portability -> morphs_to_portability
+    | Forkable -> morphs_to_forkable
+    | Yielding -> morphs_to_yielding
+    | Statefulness -> morphs_to_statefulness
+    | Contention_op -> morphs_to_contention_op
+    | Visibility_op -> morphs_to_visibility_op
+    | Staticity_op -> morphs_to_staticity_op
+    | Monadic_op -> morphs_to_monadic_op
+    | Comonadic_with_locality -> morphs_to_comonadic_with_locality
+    | Comonadic_with_regionality -> morphs_to_comonadic_with_regionality
+
+  let check_compose : type a b c.
+      a obj ->
+      b obj ->
+      c obj ->
+      (b, c, neither) morph ->
+      (a, b, neither) morph ->
+      unit =
+   fun src mid dst f g ->
+    let result = compose dst f g in
+    List.iter
+      (fun input ->
+        let expected = apply dst f (apply mid g input) in
+        let actual = apply dst result input in
+        if not (equal dst expected actual)
+        then
+          let msg =
+            Fmt.asprintf
+              "@[<v>Lattices_mono compose check failed:@,\
+               source: %a@,\
+               middle: %a@,\
+               target: %a@,\
+               f: %a@,\
+               g: %a@,\
+               result: %a@,\
+               input: %a@,\
+               expected: %a@,\
+               actual: %a@]"
+              print_obj src print_obj mid print_obj dst (print_morph dst) f
+              (print_morph mid) g (print_morph dst) result (print src) input
+              (print dst) expected (print dst) actual
+          in
+          failwith msg)
+      (all_values_for_check src)
+
+  let domain_count_for_jobs job_count =
+    Int.min (Domain.recommended_domain_count ()) job_count
+
+  let run_jobs_in_parallel jobs =
+    let job_count = Array.length jobs in
+    let domain_count = domain_count_for_jobs job_count in
+    if domain_count <= 1
+    then Array.iter (fun job -> job ()) jobs
+    else
+      let worker worker_index =
+        let rec loop job_index =
+          if job_index < job_count
+          then (
+            jobs.(job_index) ();
+            loop (job_index + domain_count))
+        in
+        match loop worker_index with
+        | () -> None
+        | exception exn -> Some (exn, Printexc.get_raw_backtrace ())
+      in
+      let domains =
+        Array.init (domain_count - 1) (fun worker_index ->
+            (Domain.spawn
+            [@ocaml.alert "-do_not_spawn_domains"]
+            [@ocaml.alert "-unsafe_multidomain"]) (fun () ->
+                worker (worker_index + 1)))
+      in
+      let first_error =
+        Array.fold_left
+          (fun first_error domain ->
+            match first_error, Domain.join domain with
+            | Some _, _ -> first_error
+            | None, error -> error)
+          (worker 0) domains
+      in
+      match first_error with
+      | None -> ()
+      | Some (exn, backtrace) -> Printexc.raise_with_backtrace exn backtrace
+
+  let check_jobs () =
+    let jobs =
+      let* (Obj dst) = all_objs in
+      let+ (Morph_to (mid, f)) = morphs_to dst in
+      let morphs_to_mid = morphs_to mid in
+      fun () ->
+        List.iter
+          (fun (Morph_to (src, g)) -> check_compose src mid dst f g)
+          morphs_to_mid
+    in
+    Array.of_list jobs
+
+  let check_all_allowed_compositions () =
+    let jobs = check_jobs () in
+    Printf.printf "allowed checks running on %d domain(s)\n%!"
+      (domain_count_for_jobs (Array.length jobs));
+    run_jobs_in_parallel jobs
+end
+
 module C = Lattices_mono
 module S = Solver_mono (Hint_for_solver) (C)
 
