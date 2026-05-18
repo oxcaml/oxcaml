@@ -931,10 +931,14 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         let_bound_vars
     in
     let handler_params =
-      List.map
-        (fun (let_bound_var, let_bound_var_duid) ->
-          Variable.rename let_bound_var, let_bound_var_duid)
-        let_bound_vars
+      List.map2
+        (fun { kind; _ } (let_bound_var, let_bound_var_duid) ->
+          let user_visible =
+            if Variable.user_visible let_bound_var then Some () else None
+          in
+          let name = Variable.name let_bound_var in
+          Variable.create ?user_visible name kind, let_bound_var_duid)
+        unarized_results let_bound_vars
     in
     let body acc =
       let acc, body = keep_body acc in
