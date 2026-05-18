@@ -47,7 +47,7 @@ let $camlSymbol_projections3__immstring10 = "FOO" in
             -> k * k1
             : imm tagged =
       let foo_2 =
-        %project_value_slot.[`g`].[`foo_1`] ($camlSymbol_projections3__g_3)
+        %project_value_slot.[g].[foo_1] ($camlSymbol_projections3__g_3)
       in
       (let untagged = %untag_imm (foo_2) in
        switch untagged

@@ -27,7 +27,7 @@ let $camlUnroll5__first_const = Block 0 () in
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let foo = %project_value_slot.[`test1`].[`foo`] (my_closure) in
+   let foo = %project_value_slot.[test1].[foo] (my_closure) in
    apply direct(foo_0) foo (x) -> k1 * k2
  in
  let code size(5)
@@ -35,7 +35,7 @@ let $camlUnroll5__first_const = Block 0 () in
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let foo = %project_value_slot.[`test2`].[`foo_1`] (my_closure) in
+   let foo = %project_value_slot.[test2].[foo_1] (my_closure) in
    apply direct(foo_0) unroll(1) foo (x) -> k1 * k2
  in
  let code size(5)
@@ -43,7 +43,7 @@ let $camlUnroll5__first_const = Block 0 () in
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let foo = %project_value_slot.[`test3`].[`foo_2`] (my_closure) in
+   let foo = %project_value_slot.[test3].[foo_2] (my_closure) in
    apply direct(foo_0) unroll(3) foo (x) -> k1 * k2
  in
  let foo = closure foo_0 @foo in

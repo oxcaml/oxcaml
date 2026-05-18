@@ -17,7 +17,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4)
         -> k * k1
         : imm tagged =
   let UndecidedLit =
-    %project_value_slot.[`true_at_level0`].[`UndecidedLit`] (my_closure)
+    %project_value_slot.[true_at_level0].[UndecidedLit] (my_closure)
   in
   let try_region = %begin_try_region () in
   let try_ghost_region = %begin_try_ghost_region () in
@@ -67,7 +67,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   let UndecidedLit =
-    %project_value_slot.[`eval_level`].[`UndecidedLit_1`] (my_closure)
+    %project_value_slot.[eval_level].[UndecidedLit_1] (my_closure)
   in
   let Pfield = %block_load.[`1`] (a) in
   let lvl = %block_load.[`3`] (Pfield) in
@@ -123,7 +123,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
-        %block.imm_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+        %block.immut_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
       in
       let eval_level = closure eval_level_3_1 @eval_level
       with {
@@ -152,7 +152,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
         -> k * k1
         : imm tagged =
   let UndecidedLit =
-    %project_value_slot.[`true_at_level0`].[`UndecidedLit`] (my_closure)
+    %project_value_slot.[true_at_level0].[UndecidedLit] (my_closure)
   in
   let try_region = %begin_try_region () in
   let try_ghost_region = %begin_try_ghost_region () in
@@ -202,7 +202,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   let UndecidedLit =
-    %project_value_slot.[`eval_level`].[`UndecidedLit_1`] (my_closure)
+    %project_value_slot.[eval_level].[UndecidedLit_1] (my_closure)
   in
   let Pfield = %block_load.[`1`] (a) in
   let lvl = %block_load.[`3`] (Pfield) in
@@ -239,7 +239,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
-        %block.imm_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+        %block.immut_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
       in
       let eval_level = closure eval_level_3_2 @eval_level
       with {

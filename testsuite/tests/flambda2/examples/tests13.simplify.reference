@@ -27,9 +27,9 @@ let code loopify(never) size(10) newer_version_of(`fn[tests13.ml:27,2--118]_1`)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
   let map_foo =
-    %project_value_slot.[`fn[tests13.ml:27,2--118]`].[`map_foo`] (my_closure)
+    %project_value_slot.[`fn[tests13.ml:27,2--118]`].[map_foo] (my_closure)
   in
-  let i = %project_value_slot.[`fn[tests13.ml:27,2--118]`].[`i`] (my_closure)
+  let i = %project_value_slot.[`fn[tests13.ml:27,2--118]`].[i] (my_closure)
   in
   let j = %int_barith.add (i, 3) in
   let Popaque = %opaque (j) in

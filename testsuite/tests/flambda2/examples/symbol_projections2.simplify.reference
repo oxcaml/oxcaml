@@ -38,7 +38,7 @@ and code loopify(never) size(4) newer_version_of(`fn[symbol_projections2.ml:21,8
         -> k * k1
         : imm tagged =
   let v_2 =
-    %project_value_slot.[`fn[symbol_projections2.ml:21,8--17]`].[`v_1`]
+    %project_value_slot.[`fn[symbol_projections2.ml:21,8--17]`].[v_1]
       ($`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_5`)
   in
   let int_add = %int_barith.add (x, v_2) in

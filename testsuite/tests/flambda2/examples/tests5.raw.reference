@@ -5,7 +5,7 @@ let $camlTests5__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let g = %project_function_slot.[`f`].[`g`] (my_closure) in
+   let g = %project_function_slot.[f].[g] (my_closure) in
    (let prim = %int_comp.lt (x, 4) in
     let int_lessthan = %tag_imm (prim) in
     (let untagged = %untag_imm (int_lessthan) in
@@ -26,7 +26,7 @@ let $camlTests5__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let f = %project_function_slot.[`g`].[`f`] (my_closure) in
+   let f = %project_function_slot.[g].[f] (my_closure) in
    (let prim = %int_comp.gt (y, 3) in
     let int_greaterthan = %tag_imm (prim) in
     (let untagged = %untag_imm (int_greaterthan) in

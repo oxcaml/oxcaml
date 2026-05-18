@@ -34,7 +34,7 @@ let code inline(always) loopify(never) size(60) newer_version_of(convert_fast_1)
           | 1 -> k3
           where k4 =
             let int_sub = %int_barith.sub (line, 1) in
-            ((let prim_2 = %array_length (index) in
+            ((let prim_2 = %array_length.`imm` (index) in
               let prim_3 = %int_comp.unsigned.lt (int_sub, prim_2) in
               switch prim_3
                 | 0 -> k4
@@ -86,7 +86,7 @@ let code loopify(never) size(75) newer_version_of(f_2)
                | 1 -> k3
                where k4 =
                  let int_sub = %int_barith.sub (line, 1) in
-                 ((let prim_2 = %array_length (index) in
+                 ((let prim_2 = %array_length.`imm` (index) in
                    let prim_3 = %int_comp.unsigned.lt (int_sub, prim_2) in
                    switch prim_3
                      | 0 -> k4
