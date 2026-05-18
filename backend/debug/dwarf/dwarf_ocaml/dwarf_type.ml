@@ -31,8 +31,7 @@ type base_layout = Sort.base
 
 (* The OCaml block header lives at [obj - WORD_SIZE] and packs [tag] in bits
    0-7, [color] in 8-9, [wosize] in 10-55, and [reserved] in 56-63. *)
-let wosize_mask =
-  Numbers.Uint64.of_nonnegative_int64_exn 0x3FFF_FFFF_FFFFL
+let wosize_mask = Numbers.Uint64.of_nonnegative_int64_exn 0x3FFF_FFFF_FFFFL
 
 (* Operators that compute [wosize] from the header at [obj - WORD_SIZE] and
    leave it on the stack. Assumes an empty initial stack. *)
@@ -46,8 +45,8 @@ let read_wosize_ops =
     Dwarf_operator.DW_op_constu wosize_mask;
     Dwarf_operator.DW_op_and ]
 
-(* Compute [wosize * WORD_SIZE] (the payload byte size) by reading the header
-   at [obj - WORD_SIZE]. Empty initial stack; result is an implicit scalar. *)
+(* Compute [wosize * WORD_SIZE] (the payload byte size) by reading the header at
+   [obj - WORD_SIZE]. Empty initial stack; result is an implicit scalar. *)
 let block_payload_byte_size_expr : Single_location_description.t =
   Single_location_description.of_simple_location_description
     (read_wosize_ops
@@ -55,14 +54,14 @@ let block_payload_byte_size_expr : Single_location_description.t =
         Dwarf_operator.DW_op_shl;
         Dwarf_operator.DW_op_stack_value ])
 
-(* Address of the OCaml block header at [obj - WORD_SIZE], with [obj] already
-   on the stack (data-member-location convention). Memory-location result. *)
+(* Address of the OCaml block header at [obj - WORD_SIZE], with [obj] already on
+   the stack (data-member-location convention). Memory-location result. *)
 let header_location_expr : Single_location_description.t =
   Single_location_description.of_simple_location_description
     [Dwarf_operator.DW_op_lit8; Dwarf_operator.DW_op_minus]
 
-(* Read the OCaml block [tag] (the low 8 bits of the header at
-   [obj - WORD_SIZE]). Empty initial stack; leaves [tag] on top. *)
+(* Read the OCaml block [tag] (the low 8 bits of the header at [obj -
+   WORD_SIZE]). Empty initial stack; leaves [tag] on top. *)
 let read_tag_ops =
   [ Dwarf_operator.DW_op_push_object_address;
     Dwarf_operator.DW_op_lit8;
@@ -71,9 +70,9 @@ let read_tag_ops =
     Dwarf_operator.DW_op_constu (Numbers.Uint64.of_nonnegative_int_exn 0xFF);
     Dwarf_operator.DW_op_and ]
 
-(* DWARF expression for the user-visible element count of an OCaml array
-   whose elements have stride [element_stride] bytes. Mirrors the runtime
-   length formulas in [backend/cmm_helpers.ml] (see
+(* DWARF expression for the user-visible element count of an OCaml array whose
+   elements have stride [element_stride] bytes. Mirrors the runtime length
+   formulas in [backend/cmm_helpers.ml] (see
    [unboxed_or_untagged_packed_array_length] and friends):
 
    - stride 1, 2, 4: densely packed sub-word array. The block tag encodes [count
@@ -82,8 +81,8 @@ let read_tag_ops =
 
    - stride 8: one element per word, count is [wosize].
 
-   - stride 8 * N (N >= 2): unboxed product or wide vector; count is
-   [wosize / N]. *)
+   - stride 8 * N (N >= 2): unboxed product or wide vector; count is [wosize /
+   N]. *)
 let array_count_expr ~element_stride : Single_location_description.t =
   let const n =
     Dwarf_operator.DW_op_constu (Numbers.Uint64.of_nonnegative_int_exn n)
@@ -355,11 +354,10 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
     the caller. [create_array_die] and [create_packed_struct] below produce
     DWARF that follows the table above.
 
-   For densely packed sub-word arrays the block tag encodes how many of
-   the final word's slots are valid; the [DW_AT_count] expression emitted
-   below reads the tag to back this out, matching
-   [unboxed_or_untagged_packed_array_length] in
-   [backend/cmm_helpers.ml]. *)
+    For densely packed sub-word arrays the block tag encodes how many of the
+    final word's slots are valid; the [DW_AT_count] expression emitted below
+    reads the tag to back this out, matching
+    [unboxed_or_untagged_packed_array_length] in [backend/cmm_helpers.ml]. *)
 let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
     ?name () =
   let array_die =
@@ -726,7 +724,8 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
         Proto_die.create ~parent:(Some variant_part_pointer)
           ~attribute_values:
             [ DAH.create_type ~proto_die:enum_die;
-              DAH.create_data_member_location_description header_location_expr ]
+              DAH.create_data_member_location_description header_location_expr
+            ]
           ~tag:Dwarf_tag.Member ()
       in
       Proto_die.add_or_replace_attribute_value variant_part_pointer
