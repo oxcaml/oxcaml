@@ -817,6 +817,8 @@ let rec expression : Typedtree.expression -> term_judg =
              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
              | Void | Product _ ->
                Dereference)
+          | Record_dummy _ ->
+            Misc.fatal_error "value_rec_check: unexpected dummy representation"
         in
         let field (label, field_def) =
           let env =
