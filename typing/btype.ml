@@ -2504,11 +2504,7 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Any_creation Array_type_argument)
 
-    let for_or_null_argument ident =
-      let why : Jkind_intf.History.value_creation_reason =
-        Type_argument
-          { parent_path = Path.Pident ident; position = 1; arity = 1 }
-      in
+    let for_or_null_payload_with_history why =
       let mod_bounds =
         Mod_bounds.create Mode.Crossing.max
           ~externality:Mod_bounds.Externality.max
@@ -2525,13 +2521,22 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Value_creation why)
 
-    let for_variant_with_null_result path param =
-      let why : Jkind_intf.History.value_or_null_creation_reason =
+    let for_or_null_argument ident =
+      let why : Jkind_intf.History.value_creation_reason =
         Type_argument
-          { parent_path = path; position = 1; arity = 1 }
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      for_or_null_payload_with_history why
+
+    let for_or_null_payload path =
+      for_or_null_payload_with_history (Or_null_payload path)
+
+    let for_variant_with_null_result path ~modality payload_ty =
+      let why : Jkind_intf.History.value_or_null_creation_reason =
+        Or_null_payload path
       in
       Builtin.value_or_null ~why
-      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
+      |> add_with_bounds ~modality ~type_expr:payload_ty
       |> mark_best
   end
 
