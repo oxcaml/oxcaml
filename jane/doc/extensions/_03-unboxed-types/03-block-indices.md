@@ -135,7 +135,9 @@ let drop_last_to_y_axis (s : line Stack.t) =
 
 1. For block indices to arrays, the array type parameter must be `mod
    non_float`.
-2. Indices cannot be taken to `[@@unboxed]` records, `[@@represent_as_float_array]` records, records that store `float`s flatly, or `private` records.
+2. Indices cannot be taken to `[@@unboxed]` records,
+   `[@@represent_as_float_array]` records, records that store `float`s flatly,
+   or `private` records.
 3. Indices to some records containing both values and non-values, and occupying
    over 2^12 bytes, cannot be created. See [Representation of block
    indices](#representation-of-block-indices) for details.
