@@ -152,6 +152,8 @@ val or_int : expression -> expression -> Debuginfo.t -> expression
 
 val xor_int : expression -> expression -> Debuginfo.t -> expression
 
+val add_int_addr : expression -> expression -> Debuginfo.t -> expression
+
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
     [ptr_out_of_heap] is [false]. *)
 val add_int_ptr :
