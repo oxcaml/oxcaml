@@ -334,7 +334,7 @@ let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
       ()
   in
   Proto_die.create_ignore ~parent:(Some array_die) ~tag:Dwarf_tag.Subrange_type
-    ~attribute_values:[DAH.create_count_description block_wosize_expr]
+    ~attribute_values:[DAH.create_count block_wosize_expr]
     ();
   (* OxCaml LLDB currently uses custom printing for arrays instead of respecting
      the name attached to the [Array_type] node. Thus, we introduce a typedef
