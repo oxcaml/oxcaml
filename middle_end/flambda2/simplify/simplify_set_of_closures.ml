@@ -510,7 +510,11 @@ let introduce_code dacc code_id code_const =
 let simplify_function context ~outer_dacc function_slot code_id
     ~closure_bound_names_inside_function =
   let code_or_metadata =
-    DE.find_code_exn (DA.denv (C.dacc_prior_to_sets context)) code_id
+    try DE.find_code_exn (DA.denv (C.dacc_prior_to_sets context)) code_id
+    with Not_found ->
+      (* CR bclement: not sure if we should do something else here? *)
+      Misc.fatal_errorf "Trying to simplify function %a but it has no code"
+        Code_id.print code_id
   in
   let code_id, outer_dacc =
     match Code_or_metadata.view code_or_metadata with
@@ -748,7 +752,10 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   in
   let find_code_metadata code_id =
     let env = DA.denv dacc in
-    DE.find_code_exn env code_id |> Code_or_metadata.code_metadata
+    (try DE.find_code_exn env code_id
+     with Not_found ->
+       Misc.fatal_errorf "Could not find code for %a" Code_id.print code_id)
+    |> Code_or_metadata.code_metadata
   in
   let set_of_closures_lifted_constant =
     LC.create_set_of_closures denv ~closure_symbols_with_types
@@ -831,7 +838,10 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
               | Deleted _ -> func
               | Code_id { code_id; _ } ->
                 let code_metadata =
-                  DE.find_code_exn (DA.denv dacc) code_id
+                  (try DE.find_code_exn (DA.denv dacc) code_id
+                   with Not_found ->
+                     Misc.fatal_errorf "Could not find code for %a"
+                       Code_id.print code_id)
                   |> Code_or_metadata.code_metadata
                 in
                 Function_declarations.Deleted
@@ -853,7 +863,10 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
     let find_code_characteristics code_id =
       let env = Downwards_acc.denv dacc in
       let code_metadata =
-        DE.find_code_exn env code_id |> Code_or_metadata.code_metadata
+        (try DE.find_code_exn env code_id
+         with Not_found ->
+           Misc.fatal_errorf "Could not find code for %a" Code_id.print code_id)
+        |> Code_or_metadata.code_metadata
       in
       Cost_metrics.
         { cost_metrics = Code_metadata.cost_metrics code_metadata;
@@ -1021,7 +1034,10 @@ let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
   in
   let find_code_metadata code_id =
     let env = DA.denv dacc in
-    Downwards_env.find_code_exn env code_id |> Code_or_metadata.code_metadata
+    (try Downwards_env.find_code_exn env code_id
+     with Not_found ->
+       Misc.fatal_errorf "Could not find code for %a" Code_id.print code_id)
+    |> Code_or_metadata.code_metadata
   in
   let set_of_closures_pattern =
     Bound_static.Pattern.set_of_closures closure_symbols

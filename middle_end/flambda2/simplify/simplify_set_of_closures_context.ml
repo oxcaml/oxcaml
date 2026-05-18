@@ -114,41 +114,46 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                    Function_declarations.code_id_in_function_declaration) ->
               match old_code_id with
               | Deleted _ -> Or_unknown.Unknown
-              | Code_id { code_id = old_code_id; only_full_applications = _ } ->
-                let code_or_metadata = DE.find_code_exn denv old_code_id in
-                let new_code_id =
-                  (* The types of the functions involved should reference the
-                     _new_ code IDs (where such exist), so that direct recursive
-                     calls can be compiled straight to the new code. *)
-                  if
-                    Code_or_metadata.code_present code_or_metadata
-                    && not
-                         (Code_metadata.stub
-                            (Code_or_metadata.code_metadata code_or_metadata))
-                  then Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
-                  else old_code_id
-                in
-                let rec_info =
-                  (* From inside their own bodies, every function in the set
-                     currently being defined has an unknown recursion depth *)
-                  T.unknown K.rec_info
-                in
-                let code_metadata =
-                  code_or_metadata |> Code_or_metadata.code_metadata
-                in
-                let absolute_history, _relative_history =
-                  DE.inlining_history_tracker denv
-                  |> Inlining_history.Tracker.fundecl
-                       ~dbg:(Code_metadata.dbg code_metadata)
-                       ~function_relative_history:
-                         (Code_metadata.relative_history code_metadata)
-                       ~name:(Function_slot.name function_slot)
-                in
-                Inlining_report.record_decision_at_function_definition
-                  ~absolute_history ~code_metadata ~pass:Before_simplify
-                  ~are_rebuilding_terms:(DE.are_rebuilding_terms denv)
-                  (Code_metadata.inlining_decision code_metadata);
-                function_decl_type old_code_id ~new_code_id ~rec_info)
+              | Code_id { code_id = old_code_id; only_full_applications = _ }
+                -> (
+                match DE.find_code_exn denv old_code_id with
+                | exception Not_found -> Or_unknown.Unknown
+                | code_or_metadata ->
+                  let new_code_id =
+                    (* The types of the functions involved should reference the
+                       _new_ code IDs (where such exist), so that direct
+                       recursive calls can be compiled straight to the new
+                       code. *)
+                    if
+                      Code_or_metadata.code_present code_or_metadata
+                      && not
+                           (Code_metadata.stub
+                              (Code_or_metadata.code_metadata code_or_metadata))
+                    then
+                      Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
+                    else old_code_id
+                  in
+                  let rec_info =
+                    (* From inside their own bodies, every function in the set
+                       currently being defined has an unknown recursion depth *)
+                    T.unknown K.rec_info
+                  in
+                  let code_metadata =
+                    code_or_metadata |> Code_or_metadata.code_metadata
+                  in
+                  let absolute_history, _relative_history =
+                    DE.inlining_history_tracker denv
+                    |> Inlining_history.Tracker.fundecl
+                         ~dbg:(Code_metadata.dbg code_metadata)
+                         ~function_relative_history:
+                           (Code_metadata.relative_history code_metadata)
+                         ~name:(Function_slot.name function_slot)
+                  in
+                  Inlining_report.record_decision_at_function_definition
+                    ~absolute_history ~code_metadata ~pass:Before_simplify
+                    ~are_rebuilding_terms:(DE.are_rebuilding_terms denv)
+                    (Code_metadata.inlining_decision code_metadata);
+                  function_decl_type old_code_id ~new_code_id ~rec_info))
             (Function_declarations.funs function_decls)
         in
         Function_slot.Map.mapi
@@ -239,18 +244,20 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
 let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
   Code_id.Map.fold
     (fun old_code_id new_code_id denv ->
-      let code = DE.find_code_exn denv old_code_id in
-      if
-        Code_or_metadata.code_present code
-        && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
-      then
-        let code =
-          Code_or_metadata.get_code code
-          |> Code.with_newer_version_of (Some old_code_id)
-          |> Code.with_code_id new_code_id
-        in
-        DE.define_code denv ~code_id:new_code_id ~code
-      else denv)
+      match DE.find_code_exn denv old_code_id with
+      | exception Not_found -> denv
+      | code ->
+        if
+          Code_or_metadata.code_present code
+          && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
+        then
+          let code =
+            Code_or_metadata.get_code code
+            |> Code.with_newer_version_of (Some old_code_id)
+            |> Code.with_code_id new_code_id
+          in
+          DE.define_code denv ~code_id:new_code_id ~code
+        else denv)
     old_to_new_code_ids_all_sets denv
 
 let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
