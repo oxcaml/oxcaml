@@ -96,7 +96,7 @@ type address =
   | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
-  Subst.Lazy.signature
+  Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t
@@ -105,7 +105,7 @@ type 'a sig_reader =
   -> 'a
 
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
-  -> Subst.Lazy.signature
+  -> Subst.Lazy.persistent_signature
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 
@@ -154,7 +154,7 @@ val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 val make_cmi : 'a t
   -> Compilation_unit.Name.t
   -> Cmi_format.kind
-  -> Subst.Lazy.signature
+  -> Subst.Lazy.persistent_signature
   -> alerts
   -> Cmi_format.cmi_infos_lazy
 
