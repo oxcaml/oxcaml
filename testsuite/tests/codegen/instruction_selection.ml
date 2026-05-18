@@ -149,25 +149,18 @@ let bad_max a b =
 [%%expect_asm X86_64{|
 bad_max:
   movq  %rax, %rdi
-  movl  $1, %esi
-  cmpq  %rdi, %rsi
-  jge   .L1
-.L0:
   movl  $1, %eax
-  jmp   .L2
+  cmpq  %rdi, %rax
+  jl    .L1
+.L0:
+  cmpq  %rbx, %rax
+  jge   .L2
 .L1:
-  xorl  %eax, %eax
-  cmpq  %rbx, %rsi
-  setl  %al
-  testq %rax, %rax
-  je    .L3
-.L2:
-  addq  $2, %rsi
-  cmpq  %rdi, %rsi
-  jge   .L1
+  addq  $2, %rax
+  cmpq  %rdi, %rax
+  jl    .L1
   jmp   .L0
-.L3:
-  movq  %rsi, %rax
+.L2:
   ret
 |}]
 
