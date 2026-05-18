@@ -175,16 +175,22 @@ let block_access_kind =
 type block_kind =
   | FNaked_floats
   | FValues of Tag.Scannable.t
+  | FMixed of Tag.Scannable.t * K.Mixed_block_shape.t
 
 let block_kind : block_kind param_cons =
   let open D in
   let|= bk =
     let| floats = flag "floats", fun _ () -> FNaked_floats in
+    let| mixed =
+      param3_case (flag "mixed") scannable_tag mixed_block_shape
+        ~decode:(fun _ () tag shape -> FMixed (tag, shape))
+    in
     let| values = positional scannable_tag, fun _ tag -> FValues tag in
     return_either (fun env bk ->
         match bk with
         | FNaked_floats -> floats env ()
-        | FValues tag -> values env tag)
+        | FValues tag -> values env tag
+        | FMixed (tag, shape) -> mixed env ((), tag, shape))
   in
   bk
 
@@ -1024,6 +1030,7 @@ let make_block =
             P.Block_kind.Values
               (t, List.init n (fun _ -> Flambda_kind.With_subkind.any_value))
           | FNaked_floats -> P.Block_kind.Naked_floats
+          | FMixed (tag, shape) -> P.Block_kind.Mixed (tag, shape)
         in
         P.Make_block (kind, m, a)))
 
@@ -1136,11 +1143,10 @@ module OfFlambda = struct
       make_block env (mutability, FValues tag, alloc)
     | Make_block (Naked_floats, mutability, alloc) ->
       make_block env (mutability, FNaked_floats, alloc)
+    | Make_block (Mixed (tag, shape), mutability, alloc) ->
+      make_block env (mutability, FMixed (tag, shape), alloc)
     | Make_array (kind, mutability, alloc) ->
       make_array env (kind, mutability, alloc)
-    | Make_block (Mixed (_, _), _, _) ->
-      Misc.fatal_errorf "TODO: Variadic primitive: %a" P.Without_args.print
-        (P.Without_args.Variadic op)
 
   let prim env (p : P.t) : t * Simple.t list =
     match p with
