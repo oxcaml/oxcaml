@@ -13,11 +13,11 @@
 /*                                                                        */
 /**************************************************************************/
 
+#define CAML_INTERNALS
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/signals.h>
-#define CAML_INTERNALS
 #include <caml/osdeps.h>
 #include "caml/unixsupport.h"
 

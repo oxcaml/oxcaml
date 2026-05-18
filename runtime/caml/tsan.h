@@ -14,6 +14,7 @@
 
 #ifndef CAML_TSAN_H
 #define CAML_TSAN_H
+#include "guard.h"
 
 /* Macro used to deactivate thread sanitizer on some functions. */
 #define CAMLno_tsan

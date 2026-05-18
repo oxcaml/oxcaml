@@ -15,6 +15,7 @@
 
 #ifndef CAML_PRINTEXC_H
 #define CAML_PRINTEXC_H
+#include "guard.h"
 
 
 #include "misc.h"

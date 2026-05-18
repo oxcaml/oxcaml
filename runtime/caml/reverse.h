@@ -17,6 +17,7 @@
 
 #ifndef CAML_REVERSE_H
 #define CAML_REVERSE_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

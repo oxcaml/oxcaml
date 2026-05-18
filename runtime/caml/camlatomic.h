@@ -15,6 +15,7 @@
 /**************************************************************************/
 #ifndef CAML_ATOMIC_H
 #define CAML_ATOMIC_H
+#include "guard.h"
 
 #include "config.h"
 #include "misc.h"

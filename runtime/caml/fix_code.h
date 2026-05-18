@@ -17,6 +17,7 @@
 
 #ifndef CAML_FIX_CODE_H
 #define CAML_FIX_CODE_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

@@ -15,6 +15,7 @@
 
 #ifndef CAML_FAIL_H
 #define CAML_FAIL_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 #include <setjmp.h>

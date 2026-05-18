@@ -17,6 +17,7 @@
 
 #ifndef CAML_MISC_H
 #define CAML_MISC_H
+#include "guard.h"
 
 #include "config.h"
 

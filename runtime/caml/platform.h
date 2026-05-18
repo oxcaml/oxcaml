@@ -16,6 +16,7 @@
 
 #ifndef CAML_PLAT_THREADS_H
 #define CAML_PLAT_THREADS_H
+#include "guard.h"
 /* Platform-specific concurrency and memory primitives */
 
 #ifdef CAML_INTERNALS

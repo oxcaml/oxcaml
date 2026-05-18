@@ -17,6 +17,7 @@
 
 #ifndef CAML_PRIMS_H
 #define CAML_PRIMS_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

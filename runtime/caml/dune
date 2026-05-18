@@ -35,7 +35,15 @@
   ../../Makefile.config_if_required
   ../../Makefile.best_binaries)
  (action
-  (run make -s -f Makefile.upstream -C ../.. COMPUTE_DEPS=false runtime/caml/opnames.h)))
+  (run
+   make
+   -s
+   -f
+   Makefile.upstream
+   -C
+   ../..
+   COMPUTE_DEPS=false
+   runtime/caml/opnames.h)))
 
 (rule
  (targets version.h)
@@ -74,6 +82,7 @@
   (gc_ctrl.h as caml/gc_ctrl.h)
   (gc_stats.h as caml/gc_stats.h)
   (gc.h as caml/gc.h)
+  (guard.h as caml/guard.h)
   (globroots.h as caml/globroots.h)
   (hash.h as caml/hash.h)
   (hooks.h as caml/hooks.h)

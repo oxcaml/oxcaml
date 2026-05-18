@@ -17,6 +17,7 @@
 
 #ifndef CAML_SYNC_H
 #define CAML_SYNC_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

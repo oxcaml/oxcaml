@@ -15,8 +15,11 @@
 
 #ifndef CAML_MAJOR_GC_H
 #define CAML_MAJOR_GC_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
+
+#include "misc.h"
 
 typedef enum {
   Phase_sweep_main,

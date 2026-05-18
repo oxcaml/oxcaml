@@ -17,6 +17,7 @@
 
 #ifndef CAML_STACK_H
 #define CAML_STACK_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 
