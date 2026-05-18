@@ -274,12 +274,8 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   source : error_source;
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-=======
-  footnote: Format_doc.t option
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+  footnote: Format_doc.t option;
 }
 
 (* Exposed for Merlin *)
@@ -411,39 +407,28 @@ val deprecated_script_alert: string -> unit
 type error = report
 (** An [error] is a [report] which [report_kind] must be [Report_error]. *)
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val error: ?loc:t -> ?sub:msg list -> ?source:error_source -> string -> error
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-val error: ?loc:t -> ?sub:msg list -> string -> error
-=======
 type delayed_msg = unit -> Format_doc.t option
 
-val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg -> string -> error
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+val error:
+  ?loc:t -> ?sub:msg list -> ?source:error_source ->
+  ?footnote:delayed_msg -> string -> error
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val errorf: ?loc:t -> ?sub:msg list -> ?source:error_source ->
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-val errorf: ?loc:t -> ?sub:msg list ->
-=======
-val errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+val errorf:
+  ?loc:t -> ?sub:msg list -> ?source:error_source ->
+  ?footnote:delayed_msg ->
   ('a, Format_doc.formatter, unit, error) format4 -> 'a
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val error_of_printer: ?loc:t -> ?sub:msg list -> ?source:error_source ->
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-val error_of_printer: ?loc:t -> ?sub:msg list ->
-=======
 val aligned_error_hint:
-  ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ?loc:t -> ?sub:msg list -> ?source:error_source ->
+  ?footnote:delayed_msg ->
   ('a, Format_doc.formatter, unit, Format_doc.t option ->  error) format4 -> 'a
 (** [aligned_error_hint ?loc ?sub ?footnote fmt ... aligned_hint] produces an
     error report where the potential [aligned_hint] message has been aligned
     with the main error message before being added to the list of submessages.*)
 
-val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+val error_of_printer:
+  ?loc:t -> ?sub:msg list -> ?source:error_source ->
+  ?footnote:delayed_msg ->
   (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
 val error_of_printer_file: ?source:error_source -> (Format_doc.formatter -> 'a -> unit) -> 'a -> error
@@ -469,13 +454,9 @@ exception Already_displayed_error
 (** Raising [Already_displayed_error] signals an error which has already been
    printed. The exception will be caught, but nothing will be printed *)
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val raise_errorf: ?loc:t -> ?sub:msg list -> ?source:error_source ->
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-val raise_errorf: ?loc:t -> ?sub:msg list ->
-=======
-val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+val raise_errorf:
+  ?loc:t -> ?sub:msg list -> ?source:error_source ->
+  ?footnote:delayed_msg ->
   ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
 
 val report_exception: formatter -> exn -> unit

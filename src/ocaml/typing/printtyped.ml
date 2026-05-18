@@ -42,14 +42,7 @@ let rec fmt_longident_aux f x =
   | Longident.Lident (s) -> fprintf f "%s" s;
   | Longident.Ldot (y, s) -> fprintf f "%a.%s" fmt_longident_aux y.txt s.txt;
   | Longident.Lapply (y, z) ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      fprintf f "%a(%a)" fmt_longident_aux y fmt_longident_aux z
-
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      fprintf f "%a(%a)" fmt_longident_aux y fmt_longident_aux z
-=======
       fprintf f "%a(%a)" fmt_longident_aux y.txt fmt_longident_aux z.txt
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let fmt_longident f x = fprintf f "\"%a\"" fmt_longident_aux x.txt
 

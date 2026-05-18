@@ -32,31 +32,6 @@ let mark_used t = Attribute_table.remove unused_attrs t
 *)
 let attr_order a1 a2 = Location.compare a1.loc a2.loc
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let compiler_stops_before_attributes_consumed () =
-  let stops_before_lambda =
-    (* Clflags.stop_after is not a flag that Merlin consumes, so default to the None
-       behavior *)
-    false
-    (*
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
-    *)
-  in
-  stops_before_lambda || !Clflags.print_types
-
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-let compiler_stops_before_attributes_consumed () =
-  let stops_before_lambda =
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
-  in
-  stops_before_lambda || !Clflags.print_types
-
-=======
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 let unchecked_zero_alloc_attributes = Attribute_table.create 1
 let mark_zero_alloc_attribute_checked txt loc =
   Attribute_table.remove unchecked_zero_alloc_attributes { txt; loc }
@@ -81,9 +56,9 @@ let warn_unchecked_zero_alloc_attribute () =
 
 let compiler_stops_before_attributes_consumed () =
   let stops_before_lambda =
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+    (* Clflags.stop_after is not a flag that Merlin consumes, so default to the
+       None behavior. *)
+    false
   in
   stops_before_lambda || !Clflags.print_types
 
@@ -1233,7 +1208,6 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 
 let has_atomic attrs = has_attribute "atomic" attrs
 
@@ -1242,8 +1216,3 @@ let has_atomic attrs = has_attribute "atomic" attrs
 let merlin_punned_let = "merlin.punned-let"
 
 let merlin_punned_record_pattern = "merlin.punned-record-pattern"
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-
-let has_atomic attrs = has_attribute "atomic" attrs
-=======
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9

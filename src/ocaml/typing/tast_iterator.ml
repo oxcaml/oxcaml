@@ -656,14 +656,8 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   end;
   sub.env sub mod_env;
   match mod_desc with
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   | Tmod_typed_hole  -> ()
-  | Tmod_ident (_, lid) -> iter_loc sub lid
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-  | Tmod_ident (_, lid) -> iter_loc sub lid
-=======
   | Tmod_ident (_, lid) -> iter_loc_lid sub lid
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | Tmod_structure st -> sub.structure sub st
   | Tmod_functor (arg, mexpr) ->
       functor_parameter sub arg;

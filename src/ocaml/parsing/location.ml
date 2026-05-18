@@ -339,25 +339,8 @@ module Doc = struct
                       if capitalize_first then String.capitalize_ascii s else s)
       else s in
     let comma () =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       if !first then () else Fmt.fprintf ppf ", " in
 
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    comma ();
-    let startline = if line_valid startline then startline else 1 in
-    let endline = if line_valid endline then endline else startline in
-
-    begin if startline = endline then
-        Fmt.fprintf ppf "%s %a"
-          (capitalize "line") linenum startline
-=======
-    comma ();
-    let startline = if line_valid startline then startline else 1 in
-    let endline = if line_valid endline then endline else startline in
-    begin if startline = endline then
-        Fmt.fprintf ppf "%s %a"
-          (capitalize "line") linenum startline
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
     Fmt.fprintf ppf "@{<loc>";
 
     if file_valid file then
@@ -783,12 +766,8 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   source : error_source;
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-=======
   footnote: Fmt.t option;
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 }
 
 let loc_of_report { main; _ } = main.loc
@@ -882,36 +861,12 @@ let batch_mode_printer : report_printer =
     *)
     ()
   in
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-  let pp_txt ppf txt = Format.fprintf ppf "@[%a@]" Fmt.Doc.format txt in
-  let pp self ppf report =
-    (* setup_tags (); *)
-    separate_new_message ppf;
-    (* Make sure we keep [num_loc_lines] updated.
-        The tabulation box is here to give submessage the option
-        to be aligned with the main message box
-    *)
-    print_updating_num_loc_lines ppf (fun ppf () ->
-      Format.fprintf ppf "@[<v>%a%a%a: %a%a%a%a@]@."
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-  let pp_txt ppf txt = Format.fprintf ppf "@[%a@]" Fmt.Doc.format txt in
-  let pp self ppf report =
-    setup_tags ();
-    separate_new_message ppf;
-    (* Make sure we keep [num_loc_lines] updated.
-       The tabulation box is here to give submessage the option
-       to be aligned with the main message box
-    *)
-    print_updating_num_loc_lines ppf (fun ppf () ->
-      Format.fprintf ppf "@[<v>%a%a%a: %a%a%a%a@]@."
-=======
   let pp_txt ppf txt = Format.fprintf ppf "%a" Fmt.Doc.format txt in
   let pp_footnote ppf f =
     Option.iter (Format.fprintf ppf "@,%a" pp_txt) f
   in
   let error_format self ppf report =
     Format.fprintf ppf "@[<v>%a%a%a: %a@[%a@]%a%a%a@]@."
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       Format.pp_open_tbox ()
       (self.pp_main_loc self report) report.main.loc
       (self.pp_report_kind self report) report.kind
@@ -930,7 +885,7 @@ let batch_mode_printer : report_printer =
       pp_footnote report.footnote
   in
   let pp self ppf report =
-    setup_tags ();
+    (* setup_tags (); *)
     separate_new_message ppf;
     let printer ppf () = match report.kind with
       | Report_warning _
@@ -986,7 +941,7 @@ let batch_mode_printer : report_printer =
 (*
 let terminfo_toplevel_printer (lb: lexbuf): report_printer =
   let pp self ppf err =
-    setup_tags ();
+    (* setup_tags (); *)
     (* Highlight all toplevel locations of the report, instead of displaying
        the main location. Do it now instead of in [pp_main_loc], to avoid
        messing with Format boxes. *)
@@ -1030,54 +985,29 @@ type delayed_msg = unit -> Fmt.t option
 let report_error ppf err =
   print_report ppf err
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let mkerror loc sub txt source =
-  { kind = Report_error; main = { loc; txt }; sub; source }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-let mkerror loc sub txt =
-  { kind = Report_error; main = { loc; txt }; sub }
+let mkerror loc sub source footnote txt =
+  { kind = Report_error; main = { loc; txt }; sub; source; footnote=footnote () }
 
-let errorf ?(loc = none) ?(sub = []) =
-  Fmt.kdoc_printf (mkerror loc sub)
-
-let error ?(loc = none) ?(sub = []) msg_str =
-  mkerror loc sub (Fmt.Doc.string msg_str Fmt.Doc.empty)
-=======
-let mkerror loc sub footnote txt =
-  { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
-
-let errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
-  Fmt.kdoc_printf (mkerror loc sub footnote)
+let errorf ?(loc = none) ?(sub = []) ?(source=Typer)
+    ?(footnote=Fun.const None) =
+  Fmt.kdoc_printf (mkerror loc sub source footnote)
 let aligned_error_hint
-    ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) fmt =
+    ?(loc = none) ?(sub = []) ?(source=Typer) ?(footnote=Fun.const None) fmt =
   Fmt.kdoc_printf (fun main hint ->
       match hint with
-      | None -> mkerror loc sub footnote main
+      | None -> mkerror loc sub source footnote main
       | Some hint ->
           let main, hint = Misc.align_error_hint ~main ~hint in
-          mkerror loc (mknoloc hint :: sub) footnote main
+          mkerror loc (mknoloc hint :: sub) source footnote main
   ) fmt
 
-let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
-  mkerror loc sub footnote Fmt.Doc.(string msg_str empty)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+let error ?(loc = none) ?(sub = []) ?(source=Typer)
+    ?(footnote=Fun.const None) msg_str =
+  mkerror loc sub source footnote Fmt.Doc.(string msg_str empty)
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let errorf ?(loc = none) ?(sub = []) ?(source=Typer) =
-  Fmt.kdoc_printf (fun msg -> mkerror loc sub msg source)
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-let error_of_printer ?(loc = none) ?(sub = []) pp x =
-  mkerror loc sub (Fmt.doc_printf "%a" pp x)
-=======
-let error_of_printer ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) pp x =
-  mkerror loc sub footnote (Fmt.doc_printf "%a" pp x)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-
-let error ?(loc = none) ?(sub = []) ?(source=Typer) msg_str =
-  mkerror loc sub (Fmt.Doc.string msg_str Fmt.Doc.empty) source
-
-let error_of_printer ?(loc = none) ?(sub = []) ?(source=Typer) pp x =
-  mkerror loc sub (Fmt.doc_printf "%a" pp x) source
+let error_of_printer ?(loc = none) ?(sub = []) ?(source=Typer)
+    ?(footnote=Fun.const None) pp x =
+  mkerror loc sub source footnote (Fmt.doc_printf "%a" pp x)
 
 let error_of_printer_file ?source print x =
   error_of_printer ?source ~loc:(in_file !input_name) print x
@@ -1095,13 +1025,7 @@ let default_warning_alert_reporter ?(source = Typer) report mk (loc: t) w : repo
       let sub = List.map (fun (loc, sub_message) ->
         { loc; txt = sub_message }
       ) sub_locs in
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      Some { kind; main; sub; source }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      Some { kind; main; sub }
-=======
-      Some { kind; main; sub; footnote=None }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+      Some { kind; main; sub; source; footnote=None }
 
 
 let default_warning_reporter =
@@ -1242,16 +1166,10 @@ let () =
       | _ -> None
     )
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let raise_errorf ?(loc = none) ?(sub = []) ?(source = Typer)=
-  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub txt source)))
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-let raise_errorf ?(loc = none) ?(sub = []) =
-  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub txt)))
-=======
-let raise_errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
-  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub footnote txt)))
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+let raise_errorf ?(loc = none) ?(sub = []) ?(source = Typer)
+    ?(footnote=Fun.const None) =
+  Fmt.kdoc_printf
+    (fun txt -> raise (Error (mkerror loc sub source footnote txt)))
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";

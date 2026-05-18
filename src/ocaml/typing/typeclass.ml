@@ -2036,16 +2036,8 @@ let type_classes define_class approx kind env cls =
          ))
       cls
   in
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   let res, newenv =
-    Ctype.with_local_level_for_class begin fun () ->
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-  let res, env =
-    Ctype.with_local_level_for_class begin fun () ->
-=======
-  let res, env =
     Ctype.with_local_level_generalize_for_class begin fun () ->
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       let (res, env) =
         List.fold_left (initial_env define_class approx) ([], env) cls
       in
@@ -2350,16 +2342,8 @@ let report_error_doc env ppf =
               @[%a@]@]"
        pp_doc msg print_reason reason
   | Non_generalizable_class {id;  clty; nongen_vars } ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       let manual_ref = [ 6; 1; 2] in
-      Printtyp.prepare_for_printing nongen_vars;
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2] in
-      Printtyp.prepare_for_printing nongen_vars;
-=======
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2] in
       Out_type.prepare_for_printing nongen_vars;
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       fprintf ppf
         "@[The type of this class,@ %a,@ \
          contains the non-generalizable type variable(s): %a.@ %a@]"

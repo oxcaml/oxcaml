@@ -889,14 +889,8 @@ let module_expr sub x =
   in
   let mod_desc =
     match x.mod_desc with
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-    | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc sub lid)
     | Tmod_typed_hole -> Tmod_typed_hole
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc sub lid)
-=======
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
     | Tmod_functor (arg, mexpr) ->
         Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)

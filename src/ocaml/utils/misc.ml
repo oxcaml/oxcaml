@@ -1121,22 +1121,6 @@ let find_in_path_rel path name =
 
 let normalized_unit_filename = Utf8_lexeme.uncapitalize
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-let find_in_path_normalized path name =
-  let uname = normalized_unit_filename name in
-  let rec try_dir = function
-    [] -> raise Not_found
-  | dir::rem ->
-=======
-let find_in_path_normalized path name =
-  match normalized_unit_filename name with
-  | Error _ -> raise Not_found
-  | Ok uname ->
-  let rec try_dir = function
-    [] -> raise Not_found
-  | dir::rem ->
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 let find_in_path_normalized ?(fallback="") path name =
   let has_fallback = fallback <> "" in
   let value_or_raise_not_found = function
@@ -1145,8 +1129,16 @@ let find_in_path_normalized ?(fallback="") path name =
   in
   canonicalize_filename
   begin
-    let uname = normalized_unit_filename name in
-    let ufallback = normalized_unit_filename fallback in
+    let uname =
+      match normalized_unit_filename name with
+      | Ok uname -> uname
+      | Error _ -> raise Not_found
+    in
+    let ufallback =
+      match normalized_unit_filename fallback with
+      | Ok ufallback -> ufallback
+      | Error _ -> fallback
+    in
     List.find_map (fun dirname ->
         if exact_file_exists ~dirname ~basename:uname
         then Some (Filename.concat dirname uname)

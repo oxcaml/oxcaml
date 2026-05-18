@@ -430,20 +430,10 @@ val add_value_lazy:
 val add_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> value_description -> t -> t
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val add_type: check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-val add_type_long_path: check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    Ident.t -> Types.value_description -> t -> t
 val add_type:
     check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-=======
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    Ident.t -> Types.value_description -> t -> t
-val add_type:
-  check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+val add_type_long_path:
+    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t

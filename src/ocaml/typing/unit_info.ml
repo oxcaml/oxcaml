@@ -205,13 +205,10 @@ let find_normalized_cmi f =
     original_source_file = Some f.original_source_file;
     raw_source_file = Some f.raw_source_file;
   }
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 
 (* Merlin-only *)
 
 let modify_kind t ~f = { t with kind = f t.kind }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-=======
 
 let report_error = function
   | Invalid_encoding name ->
@@ -223,4 +220,3 @@ let () =
       | Error err -> Some (report_error err)
       | _ -> None
     )
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9

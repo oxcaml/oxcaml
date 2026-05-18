@@ -560,16 +560,8 @@ let retrieve_functor_params env mty =
         (* the function is only used for functor parameter diff, so the return
            mode is intentionally ignored. *)
         retrieve_functor_params (p :: before) env res
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ | Mty_for_hole as res ->
-        List.rev before, res
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ as res ->
-        List.rev before, res
-=======
-    | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ as res ->
         { Error.params = List.rev before; res }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   in
   retrieve_functor_params [] env mty
 
@@ -1237,16 +1229,8 @@ let include_functor_signatures ~core ~direction ~loc env subst sig1 sig2
   | [], [], [] ->
      Ok d.runtime_coercions
   | missings, incompatibles, _leftovers ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-    let missings = List.map Subst.Lazy.force_signature_item missings in
-     Error Error.{ env; missings; incompatibles }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-     let missings = List.map Subst.Lazy.force_signature_item missings in
-     Error Error.{ env; missings; incompatibles }
-=======
      let missings = List.map Subst.Lazy.force_signature_item missings in
      Error Error.{ env; subst; missings; incompatibles }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let can_alias env path =
   let rec no_apply = function

@@ -1635,16 +1635,8 @@ let transl_simple_type_delayed env mode styp =
       let force = TyVarEnv.globalize_used_variables policy env in
       (typ, force)
     end
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      (* Generalize everything except the variables that were just globalized. *)
-      ~post:(fun (typ,_) -> generalize_ctyp typ)
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    (* Generalize everything except the variables that were just globalized. *)
-    ~post:(fun (typ,_) -> generalize_ctyp typ)
-=======
     (* Generalize everything except the variables that were just globalized. *)
     ~before_generalize:(fun (typ,_) -> generalize_ctyp typ)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   in
   (typ, instance typ.ctyp_type, force)
 
@@ -1654,13 +1646,7 @@ let transl_type_scheme_mono env styp =
       TyVarEnv.reset ();
       transl_simple_type ~new_var_jkind:Sort env ~closed:false Alloc.Const.legacy styp
     end
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      ~post:generalize_ctyp
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    ~post:generalize_ctyp
-=======
     ~before_generalize:generalize_ctyp
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   in
   (* This next line is very important: it stops [val] and [external]
      declarations from having undefaulted jkind variables. Without
@@ -1687,13 +1673,7 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       in
       (typed_vars, univars, typ)
     end
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      ~post:(fun (_,_,typ) -> generalize_ctyp typ)
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    ~post:(fun (_,_,typ) -> generalize_ctyp typ)
-=======
     ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
   remove_mode_and_jkind_variables typ.ctyp_type;

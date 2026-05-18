@@ -1274,28 +1274,12 @@ let message = function
       msg "expected %s"
         (if b then "tailcall" else "non-tailcall")
   | Fragile_literal_pattern ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      let ref_manual = [ 13; 5; 3 ] in
-      Format.asprintf
-        "Code should not depend on the actual values of\n\
-         this constructor's arguments. They are only for information\n\
-         and may change in future versions. %a"
-        (Format_doc.compat Misc.print_see_manual) ref_manual
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      let[@manual.ref "ss:warn52"] ref_manual = [ 13; 5; 3 ] in
-      Format.asprintf
-        "Code should not depend on the actual values of\n\
-         this constructor's arguments. They are only for information\n\
-         and may change in future versions. %a"
-        (Format_doc.compat Misc.print_see_manual) ref_manual
-=======
       let[@manual.ref "ss:warn52"] ref_manual = [ 13; 5; 3 ] in
       msg
         "Code should not depend@ on@ the@ actual@ values of@ \
          this@ constructor's arguments.@ @[They are only for@ information@ \
          and@ may@ change@ in@ future versions.@ %a@]"
         Misc.print_see_manual ref_manual
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | Unreachable_case ->
       msg "this match case is unreachable.@ \
            Consider replacing it with a refutation case %a"

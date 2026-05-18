@@ -1972,38 +1972,6 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Constructor_mixed shape
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~long_path:false ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~long_path:false ~check:true ~shape id decl env)
-    decls shapes env
-
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
-
-=======
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
@@ -3202,12 +3170,12 @@ let add_types_to_env ~shapes decls env =
   | None ->
     List.fold_right
       (fun (id, decl) env ->
-        add_type ~check:true id decl env)
+        add_type ~long_path:false ~check:true id decl env)
       decls env
   | Some shapes ->
     List.fold_right2
     (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
+      add_type ~long_path:false ~check:true ~shape id decl env)
     decls shapes env
 
 (* Translate a set of type declarations, mutually recursive or not *)
@@ -3297,35 +3265,7 @@ let transl_type_decl env rec_flag sdecl_list =
       check_duplicates sdecl_list;
       (* Build the final env. *)
       let new_env = add_types_to_env ~shapes:None decls env in
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      (* Update stubs *)
-      let delayed_jkind_checks =
-        match rec_flag with
-        | Asttypes.Nonrecursive -> []
-        | Asttypes.Recursive ->
-            List.map2
-              (fun (id, _) sdecl ->
-                 update_type temp_env new_env id sdecl.ptype_loc,
-                 sdecl.ptype_loc)
-              ids_list sdecl_list
-      in
-      ((tdecls, decls, new_env, delayed_jkind_checks), List.map snd decls)
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      (* Update stubs *)
-      let delayed_jkind_checks =
-        match rec_flag with
-        | Asttypes.Nonrecursive -> []
-        | Asttypes.Recursive ->
-          List.map2
-            (fun (id, _) sdecl ->
-               update_type temp_env new_env id sdecl.ptype_loc,
-               sdecl.ptype_loc)
-            ids_list sdecl_list
-      in
-      ((tdecls, decls, new_env, delayed_jkind_checks), List.map snd decls)
-=======
       (tdecls, decls, temp_env, new_env)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
     end
   in
   (* Check for ill-formed abbrevs *)

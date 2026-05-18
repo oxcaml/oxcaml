@@ -3162,40 +3162,17 @@ let rec type_module ?alias ~strengthen ~funct_body anchor env smod =
   in
   md, shape
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-and type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
-  anchor env smod =
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
-  anchor env smod =
-  Builtin_attributes.warning_scope smod.pmod_attributes
-    (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-      smod)
-
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
-  (* If the module is an identifier, there might be locks between the
-  declaration site and the use site.
-  - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
-=======
 and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
     ~funct_body anchor env smod =
-  Builtin_attributes.warning_scope smod.pmod_attributes
-    (fun () -> type_module_aux ~alias ~hold_locks ~strengthen ~funct_body
-        anchor env smod)
-
-and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
-    smod =
-  (* If the module is an identifier, there might be locks between the
-  declaration site and the use site.
-  - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   (* Merlin: when we start typing a module we don't want to include potential
     saved_items from its parent. We backup them before starting and restore them
     when finished. *)
   Msupport.with_saved_types @@ fun () ->
   try
     Builtin_attributes.warning_scope smod.pmod_attributes
-      (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod)
+      (fun () ->
+         type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
+           smod)
   with exn ->
     Msupport.raise_error exn;
     { mod_desc = Tmod_typed_hole;
@@ -3206,7 +3183,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       mod_loc = smod.pmod_loc },
       Shape.dummy_mod
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
+and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
+    smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -3223,13 +3201,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   | Pmod_structure sstr ->
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-        type_structure funct_body anchor env [] sstr in
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-        type_structure funct_body anchor env sstr in
-=======
-        type_structure ~funct_body anchor env sstr in
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+        type_structure ~funct_body anchor env [] sstr in
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
@@ -3743,18 +3715,6 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-and type_structure ?(toplevel = None) funct_body anchor env sstr =
-  (* CR implicit-types: implement implicit variable jkinds in structures. *)
-  let env = Env.clear_implicit_jkinds env in
-  let names = Signature_names.create () in
-=======
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
-  (* CR implicit-types: implement implicit variable jkinds in structures. *)
-  let env = Env.clear_implicit_jkinds env in
-  let names = Signature_names.create () in
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 (* In the real compiler, the `toplevel` argument is a `signature option` because it serves
    two purposes: To tweak typing if we're in the toplevel, and to pass in the signature
    for what's been typed so far in that case (needed by include functor).  But in merlin
@@ -3762,8 +3722,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
    we're not in the toplevel (because it can incrementally type and cache parts of the
    module).  We don't want the typing tweaks that occur for the toplevel, so we need an
    extra argument (sig_acc), but leave `toplevel` alone to minimize the diff *)
-and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor env
-  sig_acc sstr =
+and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
+    anchor env sig_acc sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
@@ -4270,16 +4230,10 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   let (str, sg, mode, _to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) false None env sig_acc s in
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-  let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) false None env s in
-=======
-  let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env
+      sig_acc s
+  in
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4290,28 +4244,17 @@ let type_module_alias env smod =
   type_module_maybe_hold_locks ~alias:true ~hold_locks:true ~strengthen:true
     ~funct_body:false None env smod
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let type_module = type_module true false None
-let type_module_maybe_hold_locks = type_module_maybe_hold_locks true false None
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-let type_module = type_module true false None
-let type_module_maybe_hold_locks = type_module_maybe_hold_locks true false None
-let type_structure = type_structure false None
-=======
 let type_module =
   type_module ~strengthen:true ~funct_body:false None
 let type_module_maybe_hold_locks =
   type_module_maybe_hold_locks ~strengthen:true ~funct_body:false None
-let type_structure =
-  type_structure ~funct_body:false None
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 
 let merlin_type_structure env sig_acc str =
   let (str, sg, _mode, _sg_names, _shape, env) =
-    type_structure ~keep_warnings:true false None env sig_acc str
+    type_structure ~keep_warnings:true ~funct_body:false None env sig_acc str
   in
   str, sg, env
-let type_structure env = type_structure false None env []
+let type_structure env = type_structure ~funct_body:false None env []
 let merlin_transl_signature env sig_acc sg = transl_signature ~keep_warnings:true env sig_acc sg
 let transl_signature env sg = transl_signature env [] sg
 
@@ -5057,19 +5000,9 @@ let report_error ~loc _env = function
          Names must be unique in a given structure or signature.@]"
         (Sig_component_kind.to_string kind) Style.inline_code name
   | Non_generalizable { vars; expression } ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       let manual_ref = [ 6; 1; 2 ] in
-      prepare_for_printing vars;
-      add_type_to_preparation expression;
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      prepare_for_printing vars;
-      add_type_to_preparation expression;
-=======
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
       Out_type.prepare_for_printing vars;
       Out_type.add_type_to_preparation expression;
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       Location.errorf ~loc
         "@[The type of this expression,@ %a,@ \
          contains the non-generalizable type variable(s): %a.@ %a@]"
@@ -5078,42 +5011,10 @@ let report_error ~loc _env = function
            (Style.as_inline_code Out_type.prepared_type_scheme)) vars
         Misc.print_see_manual manual_ref
   | Non_generalizable_module { vars; mty; item } ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
       let manual_ref = [ 6; 1; 2 ] in
-      prepare_for_printing vars;
-      add_type_to_preparation item.val_type;
-      let sub =
-        [ Location.msg ~loc:item.val_loc
-            "The type of this value,@ %a,@ \
-             contains the non-generalizable type variable(s) %a."
-            (Style.as_inline_code prepared_type_scheme)
-            item.val_type
-            (pp_print_list ~pp_sep:(fun f () -> fprintf f ",@ ")
-               @@ Style.as_inline_code prepared_type_scheme) vars
-        ]
-      in
-      Location.errorf ~loc ~sub
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      prepare_for_printing vars;
-      add_type_to_preparation item.val_type;
-      let sub =
-        [ Location.msg ~loc:item.val_loc
-            "The type of this value,@ %a,@ \
-             contains the non-generalizable type variable(s) %a."
-            (Style.as_inline_code prepared_type_scheme)
-            item.val_type
-            (pp_print_list ~pp_sep:(fun f () -> fprintf f ",@ ")
-               @@ Style.as_inline_code prepared_type_scheme) vars
-        ]
-      in
-      Location.errorf ~loc ~sub
-=======
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
       Out_type.prepare_for_printing vars;
       Out_type.add_type_to_preparation item.val_type;
       Location.errorf ~loc
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         "@[The type of this module,@ %a,@ \
          contains non-generalizable type variable(s).@ %a@]"
         modtype mty

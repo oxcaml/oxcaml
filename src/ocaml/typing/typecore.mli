@@ -174,14 +174,8 @@ val type_option_some:
 val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val generalize_structure_exp: Typedtree.expression -> unit
 type delayed_check
 val delayed_checks: delayed_check list ref
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-val generalize_structure_exp: Typedtree.expression -> unit
-=======
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 

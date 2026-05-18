@@ -2773,16 +2773,8 @@ and store_type ~check ~long_path ~predef id info shape env =
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      (fun s -> Warnings.Unused_type_declaration s)
-      type_declarations;
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      (fun s -> Warnings.Unused_type_declaration s)
-      !type_declarations;
-=======
       (fun s -> Warnings.Unused_type_declaration (s, Warnings.Declaration))
       !type_declarations;
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   let store_decl path info env =
     match info.type_kind with
     | Type_variant (_,repr,umc) ->
@@ -5551,8 +5543,6 @@ let report_error_doc = function
         (Location.Doc.loc ~capitalize_first:false) loc
 
 let () =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
   Location.register_error_of_exn
     (function
       | Error err ->
@@ -5574,24 +5564,6 @@ let () =
           Some
             (error_of_printer
                report_error_doc err)
-      | _ ->
-          None
-    )
-
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_unit_name ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-
-let report_lookup_error loc t =
-  Format_doc.compat (report_lookup_error_doc loc t)
-let report_error = Format_doc.compat report_error_doc
-=======
-  Location.register_error_of_exn
-    (function
-      | Error err ->
-          Some (report_error_doc err)
       | _ ->
           None
     )
@@ -5601,31 +5573,10 @@ let () =
     Option.map Unit_info.modname (get_current_unit ())
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-  Location.register_error_of_exn
-    (function
-      | Error err ->
-          let loc =
-            match err with
-            | Missing_module (loc, _, _)
-            | Illegal_value_name (loc, _)
-            | Implicit_jkind_already_defined { loc; _ }
-            | Toplevel_splice loc
-            | Unsupported_inside_quotation (loc, _)
-            | Lookup_error(loc, _, _) -> loc
-            | Incomplete_instantiation _ -> Location.none
-          in
-          let error_of_printer =
-            if loc = Location.none
-            then Location.error_of_printer_file
-            else Location.error_of_printer ~loc ?sub:None
-          in
-          Some
-            (error_of_printer
-               report_error_doc err)
-      | _ ->
-          None
-    )
+
+let report_lookup_error loc t =
+  Format_doc.compat (report_lookup_error_doc loc t)
+let report_error = Format_doc.compat report_error_doc
 
 (* helper for merlin *)
 

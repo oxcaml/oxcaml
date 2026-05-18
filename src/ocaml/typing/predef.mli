@@ -17,11 +17,8 @@
 
 open Types
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val ident_bytes: Ident.t
 
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-=======
 type abstract_type_constr = [
   | `Int
   | `Char
@@ -86,7 +83,6 @@ type type_constr = [
 
 val find_type_constr : Path.t -> type_constr option
 
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 val type_int: type_expr
 val type_char: type_expr
 val type_string: type_expr

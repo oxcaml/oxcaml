@@ -121,15 +121,6 @@ let mkoperator =
 let mkpatvar ~loc ?attrs name =
   mkpat ~loc ?attrs (Ppat_var (mkrhs name loc))
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-(* See commentary about ghost locations at the declaration of Location.t *)
-let ghexp ~loc ?attrs d = Exp.mk ~loc:(ghost_loc loc) ?attrs d
-let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-(* See commentary about ghost locations at the declaration of Location.t *)
-let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
-let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
-=======
 (*
   See ./location.mli for when to use a ghost location or not.
 
@@ -138,7 +129,6 @@ let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
 *)
 let ghexp ~loc ?attrs d = Exp.mk ~loc:(ghost_loc loc) ?attrs d
 let ghpat ~loc ?attrs d = Pat.mk ~loc:(ghost_loc loc) ?attrs d
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
 let ghloc ~loc d = { txt = d; loc = ghost_loc loc }
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
@@ -420,13 +410,7 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
   | Pcoerce(t1, t2)  ->
      match modes with
      | [] ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      let mk = if ghost then ghexp else mkexp in
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      let mk = if ghost then ghexp else mkexp ?attrs:None in
-=======
       let mk = if ghost then ghexp ?attrs:None else mkexp ?attrs:None in
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ :: _ ->
       not_expecting loc "mode annotations";
@@ -1076,23 +1060,6 @@ let merloc startpos ?endpos x =
   let default_loc = ref Location.none
 
   let default_expr () =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-%token DOTDOT                 ".."
-%token DOTHASH                ".#"
-%token DOWNTO                 "downto"
-%token ELSE                   "else"
-%token END                    "end"
-%token EOF                    ""
-=======
-%token DOTDOT                 ".."
-%token DOTHASH                ".#"
-%token DOWNTO                 "downto"
-%token EFFECT                 "effect"
-%token ELSE                   "else"
-%token END                    "end"
-%token EOF                    ""
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
     Exp.mk ~loc:!default_loc Pexp_hole
 
   let default_pattern () = Pat.any ~loc:!default_loc ()
@@ -1151,6 +1118,7 @@ let merloc startpos ?endpos x =
 %token DOTDOT [@symbol ".."]
 %token DOTHASH [@symbol ".#"]
 %token DOWNTO [@symbol "downto"]
+%token EFFECT [@symbol "effect"]
 %token ELSE [@symbol "else"]
 %token END [@symbol "end"]
 %token EOF
@@ -3050,13 +3018,7 @@ fun_:
         mkexp ~loc:$sloc (Pexp_letop{ let_; ands; body}) }
   | fun_expr COLONCOLON expr
       { mkexp_cons ~loc:$sloc $loc($2)
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
           (ghexp ~loc:$sloc (Pexp_tuple[None, $1; None, (merloc $endpos($2) $3)])) }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-          (ghexp ~loc:$sloc (Pexp_tuple[None, $1;None, $3])) }
-=======
-          (ghexp ~loc:$sloc (Pexp_tuple[None,$1;None,$3])) }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | mkrhs(label) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
@@ -3182,15 +3144,7 @@ spliceable_expr:
      rule and is handled by the next case *)
   | indexop_expr(qualified_dotop, expr_semi_list, { None })
       { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
-(*
-  | indexop_error (DOT, seq_expr) { $1 }
-  | indexop_error (qualified_dotop, expr_semi_list) { $1 }
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-*)
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-=======
   | metaocaml_expr { $1 }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | simple_expr_attrs
     { let desc, attrs = $1 in
       mkexp_attrs ~loc:$sloc desc attrs }
@@ -3221,20 +3175,10 @@ spliceable_expr:
   | NEW ext_attributes mkrhs(class_longident)
       { Pexp_new($3), $2 }
   | LPAREN MODULE ext_attributes module_expr RPAREN
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      { Pexp_pack $4, $3 }
-  | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, []), $3 }
-  (*
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      { Pexp_pack $4, $3 }
-  | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, []), $3 }
-=======
       { Pexp_pack ($4, None), $3 }
   | LPAREN MODULE ext_attributes module_expr COLON package_type_ RPAREN
       { Pexp_pack ($4, Some $6), $3 }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+  (*
   | LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   *)
@@ -3343,10 +3287,7 @@ block_access:
   (*
   | DOT ident _p=LPAREN seq_expr _e=error
     { indexop_unclosed_error $loc(_p) Paren $loc(_e) }
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   *)
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-=======
 
 (* We include this parsing rule from the BER-MetaOCaml patchset
    (see https://okmij.org/ftp/ML/MetaOCaml.html)
@@ -3362,7 +3303,6 @@ block_access:
     { mkexp ~loc:$sloc (pexp_extension ~id:(mknoloc "metaocaml.escape") e) }
   | METAOCAML_BRACKET_OPEN e = seq_expr METAOCAML_BRACKET_CLOSE
     { mkexp ~loc:$sloc (pexp_extension ~id:(mknoloc "metaocaml.bracket") e) }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 
 %inline simple_expr_:
@@ -3948,14 +3888,6 @@ pattern_no_exn:
   | mkpat(
       self AS mkrhs(val_ident)
         { Ppat_alias($1, $3) }
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    | self AS error
-        { expecting $loc($3) "identifier" }
-    | self COLONCOLON error
-        { expecting $loc($3) "pattern" }
-    | self BAR pattern
-=======
     | self AS error
         { expecting $loc($3) "identifier" }
     | labeled_tuple_pattern(self)
@@ -3963,19 +3895,12 @@ pattern_no_exn:
     | self COLONCOLON error
         { expecting $loc($3) "pattern" }
     | self BAR pattern
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-    (*| self AS error
-        { expecting $loc($3) "identifier" } *)
-    (*| self COLONCOLON error
-        { expecting $loc($3) "pattern" } *)
-    | self BAR pattern
         { Ppat_or($1, $3) }
     (*| self BAR error
         { expecting $loc($3) "pattern" } *)
   ) { $1 }
 ;
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 (* Parsing labeled tuple patterns
 
    Here we play essentially the same game we did for expressions - see the
@@ -4001,6 +3926,7 @@ pattern_no_exn:
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
         Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+;
 
 (* If changing this, don't forget to change its copy just above. *)
 %inline labeled_tuple_pat_element_noprec(self):
@@ -4015,6 +3941,7 @@ pattern_no_exn:
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
         Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+;
 
 labeled_tuple_pat_element_list(self):
   | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
@@ -4032,67 +3959,14 @@ reversed_labeled_tuple_pattern(self):
       { Open, $1 }
   | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
       { Open, [ $1 ] }
-
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-(* Parsing labeled tuple patterns
-
-   Here we play essentially the same game we did for expressions - see the
-   comment beginning "Parsing labeled tuple expressions".
-
-   One difference is that we would need to manually inline the definition of
-   individual elements in two places: Once in the base case for lists 2 or more
-   elements, and once in the special case for open patterns with just one
-   element (e.g., [~x, ..]).  Rather than manually inlining
-   [labeled_tuple_pat_element] twice, we simply define it twice: once with the
-   [%prec] annotations needed for its occurrences in tail position, and once
-   without them suitable for use in other locations.
-*)
-%inline labeled_tuple_pat_element(self):
-  | self { None, $1 }
-  | LABEL simple_pattern %prec COMMA
-      { Some $1, $2 }
-  | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
-  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
-
-(* If changing this, don't forget to change its copy just above. *)
-%inline labeled_tuple_pat_element_noprec(self):
-  | self { None, $1 }
-  | LABEL simple_pattern
-      { Some $1, $2 }
-  | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
-  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
-
-labeled_tuple_pat_element_list(self):
-  | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
-      { $3 :: $1 }
-  | labeled_tuple_pat_element_noprec(self) COMMA labeled_tuple_pat_element(self)
-      { [ $3; $1 ] }
-  | self COMMA error
-      { expecting $loc($3) "pattern" }
 ;
 
-reversed_labeled_tuple_pattern(self):
-  | labeled_tuple_pat_element_list(self) %prec below_COMMA
-      { Closed, $1 }
-  | labeled_tuple_pat_element_list(self) COMMA DOTDOT
-      { Open, $1 }
-  | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
-      { Open, [ $1 ] }
+labeled_tuple_pattern(self):
+  | reversed_labeled_tuple_pattern(self)
+      { let closed, pat = $1 in
+        Ppat_tuple(List.rev pat, closed) }
+;
 
-=======
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 pattern_gen:
     simple_pattern
       { $1 }
@@ -4613,31 +4487,17 @@ type_variance:
   | INFIXOP2
       { if $1 = "+!" then Covariant, Injective else
         if $1 = "-!" then Contravariant, Injective else
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-        (expecting $loc($1) "type_variance";
-         NoVariance, NoInjectivity) }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-        expecting $loc($1) "type_variance" }
-=======
         if $1 = "+-" then Bivariant, NoInjectivity else
         if $1 = "-+" then Bivariant, NoInjectivity else
         if $1 = "+-!" then Bivariant, Injective else
         if $1 = "-+!" then Bivariant, Injective else
         expecting $loc($1) "type_variance" }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
   | PREFIXOP
       { if $1 = "!+" then Covariant, Injective else
         if $1 = "!-" then Contravariant, Injective else
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-        (expecting $loc($1) "type_variance";
-         NoVariance, NoInjectivity) }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-        expecting $loc($1) "type_variance" }
-=======
         if $1 = "!+-" then Bivariant, Injective else
         if $1 = "!-+" then Bivariant, Injective else
         expecting $loc($1) "type_variance" }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 
 (* A sequence of constructor declarations is either a single BAR, which
@@ -5620,34 +5480,14 @@ constr_ident:
   | constr_extra_nonprefix_ident                { $1 }
 ;
 constr_longident:
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-    mod_longident       %prec below_DOT         { $1 } /* A.B.x vs (A).B.x */
-  | mod_longident DOT constr_extra_ident        { Ldot($1,$3) }
-  | constr_extra_ident                          { Lident $1 }
-  | constr_extra_nonprefix_ident                { Lident $1 }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-    mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
-  | mod_longident DOT constr_extra_ident { Ldot($1,$3) }
-  | constr_extra_ident                   { Lident $1 }
-  | constr_extra_nonprefix_ident         { Lident $1 }
-=======
     mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
   | mod_longident DOT constr_extra_ident { ldot $1 $loc($1) $3 $loc($3) }
   | constr_extra_ident                   { Lident $1 }
   | constr_extra_nonprefix_ident         { Lident $1 }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 mk_longident(prefix,final):
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-  | final             { Lident $1 }
-  | prefix DOT final  { Ldot($1,$3) }
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-   | final            { Lident $1 }
-   | prefix DOT final { Ldot($1,$3) }
-=======
    | final            { Lident $1 }
    | prefix DOT final { ldot $1 $loc($1) $3 $loc($3) }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
 ;
 val_longident:
     mk_longident(mod_longident, val_ident) { $1 }
@@ -5674,14 +5514,8 @@ mod_longident:
 mod_ext_longident:
     mk_longident(mod_ext_longident, UIDENT) { $1 }
   | mod_ext_longident LPAREN mod_ext_longident RPAREN
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      { lapply ~loc:$sloc $1 $3 }
-  (*
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-      { lapply ~loc:$sloc $1 $3 }
-=======
       { lapply ~loc:$sloc $1 $loc($1) $3 $loc($3) }
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+  (*
   | mod_ext_longident LPAREN error
       { expecting $loc($3) "module path" }
   *)

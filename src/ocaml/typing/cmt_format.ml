@@ -570,16 +570,8 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            cmt_modname = cu;
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-           cmt_comments = [];
-           cmt_args = Sys.argv;
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-           cmt_comments = Lexer.comments ();
-           cmt_args = Sys.argv;
-=======
            cmt_comments = Lexer.comments ();
            cmt_args;
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
            cmt_sourcefile = sourcefile;
            cmt_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
            cmt_loadpath = Load_path.get_paths ();

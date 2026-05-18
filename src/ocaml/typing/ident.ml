@@ -202,26 +202,6 @@ let pp_stamped ppf (name, stamp) =
 let print ~with_scope ppf =
   let open Format_doc in
   function
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-  | Global name -> fprintf ppf "%s!" name
-  | Predef { name; stamp = n } ->
-      fprintf ppf "%s/%i!" name n
-  | Local { name; stamp = n } ->
-      fprintf ppf "%s/%i" name n
-  | Scoped { name; stamp = n; scope } ->
-      fprintf ppf "%s/%i%s" name n
-||||||| oxcaml/oxcaml.git:eb63e0e41869ede83ad3001e4facdff54383861d
-  | Global name -> fprintf ppf "%s!" name
-  | Predef { name; stamp = n } ->
-      fprintf ppf "%s%s!" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-  | Local { name; stamp = n } ->
-      fprintf ppf "%s%s" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-  | Scoped { name; stamp = n; scope } ->
-      fprintf ppf "%s%s%s" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-=======
   | Global name ->
       fprintf ppf "%s!" name
   | Predef { name; stamp } ->
@@ -233,7 +213,6 @@ let print ~with_scope ppf =
   | Scoped { name; stamp; scope } ->
       fprintf ppf "%a%s"
         pp_stamped (name, stamp)
->>>>>>> oxcaml/oxcaml.git:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
         (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
       fprintf ppf "%a!" Global_module.Name.print g
