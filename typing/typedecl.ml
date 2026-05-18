@@ -1271,14 +1271,12 @@ let transl_declaration env sdecl (id, uid) =
    also have unboxed versions, but these aren't stored in
    [type_unboxed_version].
 *)
-let rec shape_has_float_boxed shape =
+let shape_has_float_boxed shape =
   Array.exists
     (fun (kind : mixed_block_element) ->
-      match kind with
-      | Scannable _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
-      | Float_boxed -> true
-      | Product shape -> shape_has_float_boxed shape)
+       (* Note we don't have to recurse into products, as [Float_boxed] can only
+          occur at the top level of a shape *)
+       match kind with Float_boxed -> true | _ -> false)
     shape
 
 let record_has_float_boxed = function
