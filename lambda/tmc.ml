@@ -964,7 +964,6 @@ let rec choice ctx t =
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
     | Pbigstring_set_64 _ | Pbigstring_set_vec _
     | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _
     | Pint_array_load_vec _
     | Puntagged_int8_array_load_vec _
     | Puntagged_int16_array_load_vec _
@@ -974,7 +973,6 @@ let rec choice ctx t =
     | Punboxed_int64_array_load_vec _
     | Punboxed_nativeint_array_load_vec _
     | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
