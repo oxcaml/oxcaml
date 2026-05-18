@@ -1359,6 +1359,7 @@ module Ast = struct
     | Unboxed_field of expression * record_field
     | Let_op of raw_ident_value_t list * expression list * case
     | Let_exception of Name.t * expression
+    | Let_open of raw_ident_module_t * expression
     | Extension_constructor of Name.t
     | List_comprehension of comprehension
     | Array_comprehension of comprehension
@@ -2076,6 +2077,9 @@ module Ast = struct
     | Borrow exp -> pp fmt "@[<2>borrow_@ %a@]" (print_exp_with_parens env) exp
     | Let_exception (name, exp) ->
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
+    | Let_open (id, exp) ->
+      pp fmt "@[<2>let@ open!@ %a@ in@ %a@]"
+        (print_raw_ident_module env) id (print_exp env) exp
     | Extension_constructor name ->
       pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
     | Unboxed_unit -> pp fmt "#()"
@@ -3075,6 +3079,11 @@ module Exp_desc = struct
   let let_op idents defs case =
     let+ idents = all idents and+ defs = all defs and+ case = case in
     Ast.Let_op (idents, defs, case)
+
+  let let_open id exp =
+    let+ id = id
+    and+ exp = exp in
+    Ast.Let_open (id, exp)
 
   let stack exp =
     let+ exp = exp in
