@@ -29,6 +29,10 @@
 #include "caml/alloc.h"
 #include "caml/osdeps.h"
 #include "caml/codefrag.h"
+#include "caml/fail.h"
+#ifdef CAML_RUNTIME_5
+#include "caml/unloadable.h"
+#endif
 
 #include <assert.h>
 #include <stdbool.h>
@@ -146,6 +150,48 @@ static void *alloc_page_aligned_statically(size_t page_size, size_t size) {
   void *result = buffer_current;
   buffer_current += size;
   return result;
+}
+
+/* True if the build uses an allocation backend that supports unloading the
+ * JIT'd buffer when its CU becomes unreachable. The unload path calls [free]
+ * on the buffer (see [jit_unit_on_unload]), which is well-defined only when
+ * the buffer was returned by [aligned_alloc].
+ *
+ * Disabled on three Linux configurations:
+ *   - [musl]: [jit_memalign] uses a static [.bss] arena (musl's malloc mixes
+ *     [sbrk] and [mmap], breaking relocations), so [free] would corrupt
+ *     unrelated process state.
+ *   - AddressSanitizer: [jit_memalign] uses [sbrk] (because ASan's
+ *     intercepted [aligned_alloc] returns high addresses out of relocation
+ *     range), and ASan reports the resulting [free] as a SEGV.
+ *   - TCMalloc: same [sbrk] path, and TCMalloc's [free] does not know about
+ *     pointers returned from [sbrk].
+ *
+ * On macOS, ASan-instrumented [aligned_alloc] is paired with an ASan-aware
+ * [free], so unloading remains supported.
+ *
+ * When unloading is disabled, [Eval.eval] still works: the unit is compiled
+ * as non-unloadable (black-headered data, no Code_block scaffolding), and
+ * the buffer is leaked for the life of the process. */
+CAMLprim value jit_supports_unloading(value unit) {
+  CAMLparam1(unit);
+  int supports;
+  if (MUSL) {
+    supports = 0;
+  } else if (ASAN_IS_ENABLED
+#ifdef __linux__
+             || TCMalloc_MallocExtension_MallocIsTCMalloc()
+#endif
+  ) {
+#if defined(__APPLE__)
+    supports = 1;
+#else
+    supports = 0;
+#endif
+  } else {
+    supports = 1;
+  }
+  CAMLreturn(Val_bool(supports));
 }
 
 CAMLprim value jit_memalign(value section_size) {
@@ -324,3 +370,232 @@ CAMLprim value jit_obj_to_addr(value obj) {
   CAMLparam1(obj);
   CAMLreturn(caml_copy_nativeint((intnat) obj));
 }
+
+#ifdef CAML_RUNTIME_5
+/* Loader-private state stashed in [u->loader_data] for [jit_unit_on_unload]
+ * to use. The base/size describe the page-aligned buffer the JIT loader
+ * reserved for the unit's text and data sections (see [jit_memalign]). */
+struct jit_unit_loader_data {
+  void *buffer_base;
+  size_t buffer_size;
+};
+
+static void jit_unit_on_unload(struct caml_unloadable_unit *u) {
+  /* Called from STW once the GC has determined the unit is unreachable.
+   * Frees the per-unit metadata arrays, restores the JIT buffer to RW so
+   * [free] is well-defined, and releases the buffer back to the allocator.
+   *
+   * This path only runs when unloading is supported (see
+   * [jit_supports_unloading]); under that gate [jit_memalign] always uses
+   * [aligned_alloc], so [free] here is well-defined. */
+  struct jit_unit_loader_data *ld =
+      (struct jit_unit_loader_data *)u->loader_data;
+
+  caml_stat_free(u->code_blocks);
+  caml_stat_free(u->data_blocks);
+  caml_stat_free(u->text_ranges);
+  caml_stat_free(u->text_range_fragnums);
+
+  if (ld != NULL) {
+    if (ld->buffer_base != NULL && ld->buffer_size > 0) {
+      /* Restore RW protection on the entire buffer before [free]: parts
+       * have been mapped RX (text) or RO (.rodata) and the allocator may
+       * touch arbitrary regions of the buffer when reclaiming. The
+       * stored [buffer_size] is rounded up to the page size at
+       * registration time so [mprotect] does not affect memory past
+       * the buffer. */
+      (void)mprotect(ld->buffer_base, ld->buffer_size, PROT_READ | PROT_WRITE);
+      free(ld->buffer_base);
+    }
+    caml_stat_free(ld);
+  }
+
+  caml_stat_free(u);
+}
+
+/* Comparator for qsort on uintnat. */
+static int cmp_uintnat(const void *a, const void *b) {
+  uintnat x = *(const uintnat *)a;
+  uintnat y = *(const uintnat *)b;
+  if (x < y) return -1;
+  if (x > y) return 1;
+  return 0;
+}
+
+/* Build and register an [caml_unloadable_unit] for a JIT-emitted compilation
+ * unit. Inputs are scalars from the OCaml side:
+ *   - [code_blocks_table_addr]: address of the unit's [unloadable_code_blocks]
+ *     sentinel array, layout
+ *         [count; entry_1; code_block_1; ...; entry_count; code_block_count]
+ *     The runtime uses [code_block_i] to populate the [code_blocks] field
+ *     (mark-time darken targets) and [entry_i] to derive per-function text
+ *     ranges [entry_i .. entry_{i+1}). Per-function fragments are needed so
+ *     that F.2 (stack-RA scan) can recover the entry from a return address
+ *     via [caml_find_code_fragment_by_pc]->code_start.
+ *   - [data_blocks_table_addr]: address of the [unloadable_data_blocks]
+ *     sentinel, layout [count; addr_1; ...; addr_count]. May be 0n if the
+ *     unit has no static data blocks.
+ *   - [code_end_addr]: address of the unit's [code_end] symbol; the upper
+ *     bound of the last function's text range.
+ *   - [frametable_addr]: address of the unit's frame table (or 0 if none).
+ *   - [buffer_base_addr]: base of the JIT-allocated buffer covering both
+ *     text and data; passed through to the on_unload callback for [free].
+ *   - [buffer_size]: size of that buffer in bytes.
+ *
+ * The struct and its arrays are allocated via [caml_stat_alloc_noexc]; the
+ * runtime keeps them alive until the unit is unloaded, at which point the
+ * installed [on_unload] callback releases everything. */
+CAMLprim value jit_register_unloadable_unit_native(
+    value code_blocks_table_addr, value data_blocks_table_addr,
+    value code_end_addr, value frametable_addr, value gc_roots_addr,
+    value buffer_base_addr, value buffer_size) {
+  CAMLparam5(code_blocks_table_addr, data_blocks_table_addr, code_end_addr,
+             frametable_addr, gc_roots_addr);
+  CAMLxparam2(buffer_base_addr, buffer_size);
+
+  intnat *code_blocks_table =
+      (intnat *)Nativeint_val(code_blocks_table_addr);
+  /* Every unloadable CU emits the sentinel even when empty. A NULL here
+   * would indicate a bug in the loader's sentinel lookup. */
+  if (code_blocks_table == NULL)
+    caml_failwith("jit_register_unloadable_unit: NULL code_blocks_table");
+  uintnat n_code = (uintnat)code_blocks_table[0];
+  uintnat n_funcs = n_code;
+
+  intnat *data_blocks_table =
+      (intnat *)Nativeint_val(data_blocks_table_addr);
+  uintnat n_data = (data_blocks_table == NULL) ? 0
+                                               : (uintnat)data_blocks_table[0];
+
+  /* Allocate every owned buffer up-front and check each. On any failure,
+   * free everything allocated so far and raise. This avoids the
+   * longjmp-leaks-prior-allocations pattern of a cascade of
+   * [caml_stat_alloc_noexc] + [caml_raise_out_of_memory]. */
+  struct caml_unloadable_unit *u =
+      caml_stat_alloc_noexc(sizeof(struct caml_unloadable_unit));
+  struct jit_unit_loader_data *ld =
+      caml_stat_alloc_noexc(sizeof(struct jit_unit_loader_data));
+  value *code_blocks_buf =
+      (n_code > 0) ? caml_stat_alloc_noexc(n_code * sizeof(value)) : NULL;
+  value *data_blocks_buf =
+      (n_data > 0) ? caml_stat_alloc_noexc(n_data * sizeof(value)) : NULL;
+  char **text_ranges_buf =
+      (n_funcs > 0) ? caml_stat_alloc_noexc(2 * n_funcs * sizeof(char *))
+                    : NULL;
+  int *text_range_fragnums_buf =
+      (n_funcs > 0) ? caml_stat_alloc_noexc(n_funcs * sizeof(int)) : NULL;
+  uintnat *entries_sorted =
+      (n_funcs > 0) ? caml_stat_alloc_noexc(n_funcs * sizeof(uintnat)) : NULL;
+
+  if (u == NULL || ld == NULL
+      || (n_code > 0 && code_blocks_buf == NULL)
+      || (n_data > 0 && data_blocks_buf == NULL)
+      || (n_funcs > 0 && text_ranges_buf == NULL)
+      || (n_funcs > 0 && text_range_fragnums_buf == NULL)
+      || (n_funcs > 0 && entries_sorted == NULL)) {
+    caml_stat_free(u);
+    caml_stat_free(ld);
+    caml_stat_free(code_blocks_buf);
+    caml_stat_free(data_blocks_buf);
+    caml_stat_free(text_ranges_buf);
+    caml_stat_free(text_range_fragnums_buf);
+    caml_stat_free(entries_sorted);
+    caml_raise_out_of_memory();
+  }
+
+  u->next = NULL;
+  u->num_code_blocks = n_code;
+  u->num_data_blocks = n_data;
+  u->num_text_ranges = n_funcs;
+  u->frametable = (intnat *)Nativeint_val(frametable_addr);
+  u->gc_roots = (void *)Nativeint_val(gc_roots_addr);
+  u->on_unload = &jit_unit_on_unload;
+  u->code_blocks = code_blocks_buf;
+  u->data_blocks = data_blocks_buf;
+  u->text_ranges = text_ranges_buf;
+  u->text_range_fragnums = text_range_fragnums_buf;
+  u->loader_data = ld;
+
+  ld->buffer_base = (void *)Nativeint_val(buffer_base_addr);
+  {
+    /* Round [buffer_size] up to the page size: the buffer came from
+     * [aligned_alloc(page_size, ...)] in [jit_memalign], so the kernel-
+     * visible mapping covers at least the page-aligned length. Storing
+     * the page-aligned size makes [mprotect] in [jit_unit_on_unload]
+     * self-consistent and avoids relying on implementation-defined
+     * "round length up" behaviour. */
+    size_t raw = (size_t)Long_val(buffer_size);
+    size_t pg = (size_t)getpagesize();
+    ld->buffer_size = (raw + pg - 1) & ~(pg - 1);
+  }
+
+  /* Walk the [unloadable_code_blocks] sentinel: pairs of (entry, code_block)
+   * starting at index 1. The [code_blocks] array is the mark-time
+   * darken-target list; [entries_sorted] becomes the basis for per-function
+   * text ranges below. */
+  for (uintnat i = 0; i < n_code; i++) {
+    u->code_blocks[i] = (value)code_blocks_table[1 + 2 * i + 1];
+    entries_sorted[i] = (uintnat)code_blocks_table[1 + 2 * i];
+  }
+
+  for (uintnat i = 0; i < n_data; i++) {
+    /* The array entries are stored as raw addresses (Csymbol_address, which
+     * the assembler emits as machine words). */
+    u->data_blocks[i] = (value)data_blocks_table[1 + i];
+  }
+
+  /* Sort entries by address and deduplicate. On Mach-O the assembler/
+   * linker can expose multiple symbol aliases (global + local L_-prefix)
+   * for the same function entry, yielding repeated entries in the
+   * sentinel; we collapse those here so per-function text ranges are
+   * strictly increasing and no two code fragments share a [code_start]. */
+  qsort(entries_sorted, n_funcs, sizeof(uintnat), cmp_uintnat);
+  uintnat n_unique = 0;
+  for (uintnat i = 0; i < n_funcs; i++) {
+    if (i == 0 || entries_sorted[i] != entries_sorted[i - 1]) {
+      entries_sorted[n_unique++] = entries_sorted[i];
+    }
+  }
+  u->num_text_ranges = n_unique;
+
+  /* Per-function text ranges: [entry_i .. entry_{i+1}); last extends to
+   * [code_end]. Each range starts at the function entry, NOT at the
+   * back-pointer word at [entry - 1]. PC-based fragment lookups for
+   * [entry - 1] therefore miss — this is intentional: the designed
+   * paths (return-address scan, code-pointer-slot scan) both start
+   * from in-function PCs. Do not expand the range to cover the
+   * back-pointer. */
+  char *code_end = (char *)Nativeint_val(code_end_addr);
+  for (uintnat i = 0; i < n_unique; i++) {
+    char *start = (char *)entries_sorted[i];
+    char *end = (i + 1 < n_unique) ? (char *)entries_sorted[i + 1] : code_end;
+    u->text_ranges[2 * i] = start;
+    u->text_ranges[2 * i + 1] = end;
+  }
+  caml_stat_free(entries_sorted);
+
+  caml_register_unloadable_unit(u);
+  CAMLreturn(Val_unit);
+}
+
+CAMLprim value jit_register_unloadable_unit_bytecode(value *argv, int argn) {
+  (void)argn;
+  return jit_register_unloadable_unit_native(argv[0], argv[1], argv[2],
+                                             argv[3], argv[4], argv[5],
+                                             argv[6]);
+}
+#else
+CAMLprim value jit_register_unloadable_unit_native(
+    value a, value b, value c, value d, value e, value f, value g) {
+  /* Unloadable units require runtime 5 (concurrent marker). */
+  (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g;
+  return Val_unit;
+}
+
+CAMLprim value jit_register_unloadable_unit_bytecode(value *argv, int argn) {
+  (void)argn;
+  return jit_register_unloadable_unit_native(argv[0], argv[1], argv[2],
+                                             argv[3], argv[4], argv[5],
+                                             argv[6]);
+}
+#endif

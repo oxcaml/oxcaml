@@ -45,6 +45,14 @@ type frame_descr =
   { fd_lbl : Label.t; (* Return address *)
     fd_frame_size : int; (* Size of stack frame *)
     fd_live_offset : int list; (* Offsets/regs of live addresses *)
+    fd_code_ptr_live_offset : int list;
+        (* Offsets/regs of live Code_pointer-typed slots, encoded in the same
+           scheme as [fd_live_offset]. Sets bit 3
+           (FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS = 0x8) of the frame_data word
+           when non-empty. *)
+    fd_unloadable : bool;
+        (* Return address is in code from an unloadable CU; sets bit 2
+           (FRAME_DESCRIPTOR_UNLOADABLE = 0x4) of the frame_data word. *)
     fd_debuginfo : frame_debuginfo; (* Location, if any *)
     fd_long : bool (* Use 32 instead of 16 bit format. *)
   }
@@ -75,14 +83,20 @@ let is_long_stack_index n =
   (* allows negative reg offsets in runtime4 *)
   if is_reg n && not Config.runtime5 then false else is_long n
 
-let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
-  assert (frame_size land 3 = 0);
+let record_frame_descr ~label ~frame_size ~live_offset ~code_ptr_live_offset
+    ~unloadable debuginfo =
+  (* The runtime packs flag bits into the low 4 bits of [frame_data] (see
+     [FRAME_DESCRIPTOR_FLAGS = 0xF] in [frame_descriptors.h]), so the emitted
+     [frame_size] must be 16-byte aligned. *)
+  assert (frame_size land 0xF = 0);
   let fd_long =
     is_long (frame_size + get_flags debuginfo)
     (* The checks below are redundant (if they fail, then frame size check above
        should have failed), but they make the safety of [emit_frame] clear. *)
     || is_long (List.length live_offset)
     || List.exists is_long_stack_index live_offset
+    || is_long (List.length code_ptr_live_offset)
+    || List.exists is_long_stack_index code_ptr_live_offset
   in
   if fd_long && not !Oxcaml_flags.allow_long_frames
   then raise (Error (Stack_frame_too_large frame_size));
@@ -90,6 +104,8 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
     := { fd_lbl = label;
          fd_frame_size = frame_size;
          fd_live_offset = List.sort_uniq ( - ) live_offset;
+         fd_code_ptr_live_offset = List.sort_uniq ( - ) code_ptr_live_offset;
+         fd_unloadable = unloadable;
          fd_debuginfo = debuginfo;
          fd_long
        }
@@ -183,6 +199,11 @@ let emit_frames a =
   in
   let emit_frame fd =
     let flags = get_flags fd.fd_debuginfo in
+    let flags = if fd.fd_unloadable then flags lor 4 else flags in
+    let has_code_ptr_slots =
+      match fd.fd_code_ptr_live_offset with [] -> false | _ -> true
+    in
+    let flags = if has_code_ptr_slots then flags lor 8 else flags in
     a.efa_label_rel fd.fd_lbl 0l;
     (* For short format, the size is guaranteed to be less than the constant
        below. *)
@@ -203,8 +224,15 @@ let emit_frames a =
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
+    (* Bits 0 (DEBUG) and 1 (ALLOC) determine whether the runtime expects a
+       debuginfo / alloc-lengths section here. Bits 2 (UNLOADABLE) and 3
+       (HAS_CODE_PTR_SLOTS) do not affect this layout, so we mask them off
+       before deciding to skip. Without this mask, an unloadable frame whose
+       Cmm-level debuginfo is [Debuginfo.none] would still register an empty
+       entry in the debuginfo table, tripping [assert false] in the
+       [emit_debuginfo] inner loop below. *)
     (match fd.fd_debuginfo with
-    | _ when flags = 0 -> ()
+    | _ when flags land 3 = 0 -> ()
     | Dbg_other dbg ->
       a.efa_align 4;
       a.efa_label_rel (label_debuginfos false dbg) Int32.zero
@@ -223,7 +251,14 @@ let emit_frames a =
             && Config.max_young_wosize <= 256);
           emit_u8 (alloc_words - 2))
         dbg;
-      if flags = 3
+      (* Mask off bits 2 (UNLOADABLE) and 3 (HAS_CODE_PTR_SLOTS) before deciding
+         whether to emit per-alloc debuginfo labels: those bits do not affect
+         this layout, but with [flags = flags lor 4] (or 8) the unmasked check
+         would falsely skip emission for any unloadable function with
+         [Dbg_alloc] under [-g], leaving the runtime parser ([next_frame_descr])
+         to read [4 * num_allocs] bytes that aren't there and silently misalign
+         the rest of the frame table. *)
+      if flags land 3 = 3
       then (
         a.efa_align 4;
         List.iter
@@ -232,6 +267,12 @@ let emit_frames a =
             then emit_i32 0
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
           dbg));
+    if has_code_ptr_slots
+    then (
+      (* Align to 2 (short) or 4 (long) bytes for the count and array. *)
+      a.efa_align (if fd.fd_long then 4 else 2);
+      emit_unsigned_16_or_32 (List.length fd.fd_code_ptr_live_offset);
+      List.iter emit_live_offset fd.fd_code_ptr_live_offset);
     a.efa_align Arch.size_addr
   in
   let emit_filename name lbl =

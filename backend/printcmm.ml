@@ -42,6 +42,7 @@ let machtype_component ppf (ty : machtype_component) =
   | Vec512 -> fprintf ppf "vec512"
   | Float32 -> fprintf ppf "float32"
   | Valx2 -> fprintf ppf "valx2"
+  | Code_pointer -> fprintf ppf "code_ptr"
 
 let machtype ppf mty =
   match Array.length mty with
@@ -151,6 +152,7 @@ let chunk = function
   | Fivetwelve_aligned -> "aligned vec512"
   | Word_int -> "int"
   | Word_val -> "val"
+  | Word_code_pointer -> "code_pointer"
   | Single { reg = Float64 } -> "float32_as_float64"
   | Single { reg = Float32 } -> "float32"
   | Double -> "float64"
@@ -477,6 +479,7 @@ let codegen_option = function
     Printf.sprintf "regalloc_param[%s]"
       (String.concat ";" (List.map (Printf.sprintf "%S") params))
   | Cold -> "cold"
+  | Unloadable -> "unloadable"
   | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }
     ->
     Printf.sprintf "assume_zero_alloc_%s%s%s"

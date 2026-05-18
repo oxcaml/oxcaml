@@ -691,7 +691,13 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
               ~regalloc_param_attribute:Default_regalloc_params
               ~zero_alloc_attribute:Zero_alloc_attribute.Default_zero_alloc
-              ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
+              ~cold:false
+              ~is_unloadable:
+                (assert (
+                   Compilation_unit.is_current
+                     (Code_id.get_compilation_unit code_id));
+                 !Clflags.unit_is_unloadable)
+              ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
               ~dbg ~is_tupled:false

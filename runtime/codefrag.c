@@ -69,6 +69,10 @@ int caml_register_code_fragment(char *start, char *end,
   cf->fragnum = atomic_fetch_add_explicit
                   (&code_fragments_counter, 1, memory_order_relaxed);
   caml_plat_mutex_init(&cf->mutex);
+  /* No unloadable unit owns this fragment by default; the unloadable
+     registration path ([caml_register_unloadable_unit]) sets this field
+     for fragments belonging to unloadable CUs. */
+  cf->owner_unloadable_unit = NULL;
   caml_lf_skiplist_insert(&code_fragments_by_pc, (uintnat)start, (uintnat)cf);
   caml_lf_skiplist_insert(&code_fragments_by_num, (uintnat)cf->fragnum,
                           (uintnat)cf);
