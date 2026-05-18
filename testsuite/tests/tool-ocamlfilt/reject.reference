@@ -1,0 +1,5 @@
+rejected: _Caml
+rejected: main
+rejected: _ZN4testE
+rejected: caml_foo
+rejected: caml_foo
