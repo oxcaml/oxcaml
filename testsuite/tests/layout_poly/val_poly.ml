@@ -8,7 +8,7 @@ module type S = sig
   val foo : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+module type S = sig val poly_ foo : 'a 'b. 'a -> 'b end
 |}]
 
 (* The following is error, because the module type goes through inclusion check
@@ -22,19 +22,21 @@ end
 [%%expect{|
 Line 1:
 Error: Module type declarations do not match:
-         module type S = sig val foo : layout_ l. 'a -> 'b end
+         module type S =
+           sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
        does not match
-         module type S = sig val foo : layout_ l. 'a -> 'b end
+         module type S =
+           sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
        At position "module type S = <here>"
        Module types do not match:
-         sig val foo : layout_ l. 'a -> 'b end
+         sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
        is not equal to
-         sig val foo : layout_ l. 'a -> 'b end
+         sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
        At position "module type S = <here>"
        Values do not match:
-         val foo : layout_ l. 'a -> 'b
+         val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b
        is not included in
-         val foo : layout_ l. 'a -> 'b
+         val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b
        The layout parameter at position 1 in the first
        is instantiated with an unconstrained layout variable,
        which is not supported yet.
@@ -113,11 +115,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : layout_ l l0. ('a : l). 'a -> 'a end
        is not included in
-         sig val f : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ f : 'a. 'a -> 'a end
        Values do not match:
          val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
-         val f : layout_ l. ('a : l). 'a -> 'a
+         val poly_ f : 'a. 'a -> 'a
        the first has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
@@ -134,11 +136,11 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ f : 'a. 'a -> 'a end
        is not included in
          sig val f : layout_ l l0. ('a : l). 'a -> 'a end
        Values do not match:
-         val f : layout_ l. ('a : l). 'a -> 'a
+         val poly_ f : 'a. 'a -> 'a
        is not included in
          val f : layout_ l l0. ('a : l). 'a -> 'a
        the second has 1 more layout parameter that is not used,
@@ -200,8 +202,8 @@ end) : sig
 end = M
 [%%expect{|
 module F1 :
-  functor (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end) ->
-    sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+  functor (M : sig val poly_ f : 'a 'b. 'a -> 'b end) ->
+    sig val poly_ f : 'a 'b. 'a -> 'b end
 |}]
 
 (* layout-poly is not included in non-poly functions, even tho the former can be instantiate to the latter. *)
@@ -216,11 +218,11 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ f : 'a. 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
        Values do not match:
-         val f : layout_ l. ('a : l). 'a -> 'a
+         val poly_ f : 'a. 'a -> 'a
        is not included in
          val f : 'a -> 'a
        the first has 1 more layout parameter that is not used,
@@ -265,11 +267,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : layout_ l. ('a : l) ('b : l). 'a -> 'b end
        is not included in
-         sig val f : layout_ l. 'a -> 'b end
+         sig val f : layout_ l. ('a : value) ('b : value). 'a -> 'b end
        Values do not match:
          val f : layout_ l. ('a : l) ('b : l). 'a -> 'b
        is not included in
-         val f : layout_ l. 'a -> 'b
+         val f : layout_ l. ('a : value) ('b : value). 'a -> 'b
        The layout parameter at position 1 in the first
        is instantiated with layout "value",
        which is not supported yet.
@@ -283,8 +285,8 @@ end) : sig
 end = M
 [%%expect{|
 module FO3 :
-  functor (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end) ->
-    sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+  functor (M : sig val poly_ f : 'a 'b. 'a -> 'b end) ->
+    sig val poly_ f : 'a 'b. 'a -> 'b end
 |}]
 
 (* Ordering: sorts swapped between sides - should fail *)
@@ -299,13 +301,13 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+         sig val poly_ f : 'a 'b. 'a -> 'b end
        is not included in
-         sig val f : layout_ l l0. ('a : l0) ('b : l). 'a -> 'b end
+         sig val poly_ f : 'b 'a. 'a -> 'b end
        Values do not match:
-         val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b
+         val poly_ f : 'a 'b. 'a -> 'b
        is not included in
-         val f : layout_ l l0. ('a : l0) ('b : l). 'a -> 'b
+         val poly_ f : 'b 'a. 'a -> 'b
        The layout parameter at position 1 in the first
        corresponds to the parameter at position 2 in the second,
        which is not supported yet.
@@ -467,3 +469,164 @@ module F :
         layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
     end
 |}]
+
+(* "val poly_" syntax tests *)
+
+(* Layout variables generated corresponding to free type variables *)
+module type S = sig
+  val poly_ foo1 : 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+module type S = sig val poly_ foo1 : 'a 'b. 'a -> 'b -> #('a * 'b) end
+|}]
+
+(* Fresh layout variables assigned as kinds for type variables specifically
+   introduced in the type scheme *)
+module type S = sig
+  val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+module type S = sig val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b) end
+|}]
+
+(* The ordering of the explicitly-quantified type variables matters most in
+   determining the order of layouts. *)
+module type S = sig
+  val poly_ ordering : 'a 'b. 'b -> 'a
+end
+[%%expect {|
+module type S = sig val poly_ ordering : 'a 'b. 'b -> 'a end
+|}]
+
+
+(* Type scheme with a subset of polymorphic type variables that are explicitly
+   forall-bound *)
+module type S = sig
+  val poly_ foo3 : 'a. 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+module type S = sig val poly_ foo3 : 'a 'b. 'a -> 'b -> #('a * 'b) end
+|}]
+
+module type S = sig
+  val poly_ foo4 : 'a. 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+module type S = sig val poly_ foo4 : 'a 'b. 'a -> 'b -> #('a * 'b) end
+|}]
+
+(* Interaction between "val poly_" and "layout_". Currently errors.
+   CR-soon aivaskovic: allow combining them after deciding what order layout
+   variables should have inside "layout_". *)
+module type S = sig
+  val poly_ bar : layout_ x. ('b : x). 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+Line 2, characters 18-61:
+2 |   val poly_ bar : layout_ x. ('b : x). 'a -> 'b -> #('a * 'b)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "layout_" keyword is not supported inside layout-polymorphic
+       value descriptions introduced using "val poly_".
+|}]
+
+(* Interaction with type variables that are constrained. *)
+module type S = sig
+  val poly_ baz1 : 'a ('b : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz1 :
+      'a 'c ('b : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz2 : ('a : immediate) 'b. 'a -> #('b * 'c) -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz2 :
+      'b 'c ('a : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz3 : ('a : immediate) 'b. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz3 :
+      'b 'c ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz4 : ('a : immediate) 'b 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz4 :
+      'b 'c ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz5 : ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz5 :
+      'b 'c ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
+  end
+|}]
+
+(* "value" is special and usually a default.
+   It is not a default inside "val poly_". *)
+module type S = sig
+  val poly_ baz6 : ('a : value) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+end
+[%%expect {|
+module type S =
+  sig val poly_ baz6 : 'b ('a : value). 'a -> #('a * 'b) -> #('a * 'b) end
+|}]
+
+(* "value_or_null" should be printed *)
+module type S = sig
+  val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz7 : 'b ('a : value_or_null). 'a -> #('a * 'b) -> #('a * 'b)
+  end
+|}]
+
+(* "'c is a value and not layout-polymorphic" *)
+module type S = sig
+  val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val poly_ baz8 :
+      'a 'b ('c : value). 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+  end
+|}]
+
+(* CR-soon layouts aivaskovic: uncomment this test once layout variables can
+   appear in products *)
+(* module type S = sig
+ *   val lpoly_prod : layout_ l. ('a : value & l) 'b. 'a -> 'b -> #('a * 'b)
+ * end
+ * [%%expect {|
+ * module type S =
+ *   sig
+ *     val lpoly_prod :
+ *       layout_ l. ('a : value & l) 'b. 'a -> 'b -> #('a * 'b)
+ *   end
+ * |}] *)

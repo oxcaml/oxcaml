@@ -29,11 +29,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ id : 'a. 'a -> 'a end
        is not included in
          sig val id : int end
        Values do not match:
-         val id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ id : 'a. 'a -> 'a
        is not included in
          val id : int
        The type "'a -> 'a" is not compatible with the type "int"
@@ -66,11 +66,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ id : 'a. 'a -> 'a end
        is not included in
          sig val id : int end
        Values do not match:
-         val id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ id : 'a. 'a -> 'a
        is not included in
          val id : int
        The type "'a -> 'a" is not compatible with the type "int"
@@ -94,14 +94,13 @@ Lines 4-7, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
-           val apply :
-             layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b
+           val poly_ const : 'a 'b. 'a -> 'b -> 'a
+           val poly_ apply : 'a 'b. ('a -> 'b) -> 'a -> 'b
          end
        is not included in
          sig val const : int val apply : int end
        Values do not match:
-         val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+         val poly_ const : 'a 'b. 'a -> 'b -> 'a
        is not included in
          val const : int
        The type "'a -> 'b -> 'a" is not compatible with the type "int"
@@ -122,13 +121,13 @@ Lines 4-6, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
-           val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'b
+           val poly_ f : 'a 'b. 'a -> 'b -> 'a
+           val poly_ g : 'a 'b. 'a -> 'b -> 'b
          end
        is not included in
          sig val f : int val g : int end
        Values do not match:
-         val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+         val poly_ f : 'a 'b. 'a -> 'b -> 'a
        is not included in
          val f : int
        The type "'a -> 'b -> 'a" is not compatible with the type "int"
@@ -149,11 +148,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val regular_id : 'a -> 'a end
        is not included in
-         sig val regular_id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ regular_id : 'a. 'a -> 'a end
        Values do not match:
          val regular_id : 'a -> 'a
        is not included in
-         val regular_id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ regular_id : 'a. 'a -> 'a
        the second has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
@@ -215,11 +214,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ id : 'a. 'a -> 'a end
        is not included in
          sig val id : 'a -> 'a end
        Values do not match:
-         val id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ id : 'a. 'a -> 'a
        is not included in
          val id : 'a -> 'a
        the first has 1 more layout parameter that is not used,
@@ -386,12 +385,13 @@ Lines 3-5, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b))
+           val poly_ f :
+             'a ('b : value_or_null). 'a -> 'b -> #('a * ('b * 'b))
          end
        is not included in
          sig val f : int end
        Values do not match:
-         val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b))
+         val poly_ f : 'a ('b : value_or_null). 'a -> 'b -> #('a * ('b * 'b))
        is not included in
          val f : int
        The type "'a -> 'b -> #('a * ('b * 'b))" is not compatible with the type
@@ -411,11 +411,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ f : 'a. 'a -> 'a end
        is not included in
          sig val f : int end
        Values do not match:
-         val f : layout_ l. ('a : l). 'a -> 'a
+         val poly_ f : 'a. 'a -> 'a
        is not included in
          val f : int
        The type "'a -> 'a" is not compatible with the type "int"
@@ -459,11 +459,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ l. ('a : l). unit -> 'a end
+         sig val poly_ f : 'a. unit -> 'a end
        is not included in
          sig val f : int end
        Values do not match:
-         val f : layout_ l. ('a : l). unit -> 'a
+         val poly_ f : 'a. unit -> 'a
        is not included in
          val f : int
        The type "unit -> 'a" is not compatible with the type "int"
@@ -524,11 +524,11 @@ Lines 3-9, characters 6-3:
 9 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end
+         sig val poly_ foo : 'a 'b. 'a -> 'b -> unit end
        is not included in
          sig val foo : int end
        Values do not match:
-         val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit
+         val poly_ foo : 'a 'b. 'a -> 'b -> unit
        is not included in
          val foo : int
        The type "'a -> 'b -> unit" is not compatible with the type "int"
