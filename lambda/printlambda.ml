@@ -96,6 +96,7 @@ let array_kind = function
     "scannableproduct " ^ scannable_product_element_kinds kinds
   | Pgcignorableproductarray kinds ->
     "ignorableproduct " ^ ignorable_product_element_kinds kinds
+  | Punspecializedarray -> "unspecialized"
 
 let array_mut = function
   | Mutable -> "array"
@@ -122,6 +123,7 @@ let array_ref_kind ppf k =
     fprintf ppf "scannableproduct %s" (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_ref kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
+  | Punspecializedarray_ref mode -> fprintf ppf "unspecialized%a" pp_mode mode
 
 let array_index_kind ppf k =
   match k with
@@ -151,6 +153,7 @@ let array_set_kind ppf k =
       (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_set kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
+  | Punspecializedarray_set mode -> fprintf ppf "unspecialized%a" pp_mode mode
 
 let locality_mode_if_local = function
   | Alloc_heap -> ""

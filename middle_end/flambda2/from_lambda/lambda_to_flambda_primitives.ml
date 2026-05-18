@@ -204,6 +204,9 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
         Unboxed_product (List.map convert_kind kinds)
     in
     Array_kind (Unboxed_product (List.map convert_kind kinds))
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_kind: Punspecializedarray"
 
 let convert_array_kind_for_length dbg kind : P.Array_kind_for_length.t =
   match convert_array_kind dbg kind with
@@ -239,17 +242,11 @@ type converted_array_ref_kind =
   | Array_ref_kind of Array_ref_kind.t
   | Float_array_opt_dynamic_ref of L.locality_mode
 
-let convert_array_ref_kind _dbg (kind : L.array_ref_kind) :
+let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     converted_array_ref_kind =
   match kind with
   | Pgenarray_ref mode ->
-    (* CR mshinwell: We can't check this because of the translations of
-       primitives for Obj.size, Obj.field and Obj.set_field, which can be used
-       both on arrays and blocks. We should probably propagate the "%obj_..."
-       primitives which these functions use all the way to the middle end. Then
-       this check could be reinstated for all normal cases.
-
-       check_float_array_optimisation_enabled (); *)
+    check_float_array_optimisation_enabled dbg "Pgenarray_ref";
     Float_array_opt_dynamic_ref mode
   | Paddrarray_ref -> Array_ref_kind (No_float_array_opt Values)
   | Pgcignorableaddrarray_ref ->
@@ -310,6 +307,10 @@ let convert_array_ref_kind _dbg (kind : L.array_ref_kind) :
     in
     Array_ref_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Punspecializedarray_ref _ ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_ref_kind: \
+       Punspecializedarray_ref"
 
 let rec convert_unboxed_product_array_ref_kind
     (kind : Array_ref_kind.no_float_array_opt) : P.Array_kind.t =
@@ -409,13 +410,11 @@ type converted_array_set_kind =
   | Array_set_kind of Array_set_kind.t
   | Float_array_opt_dynamic_set of Alloc_mode.For_assignments.t
 
-let convert_array_set_kind _dbg (kind : L.array_set_kind) :
+let convert_array_set_kind dbg (kind : L.array_set_kind) :
     converted_array_set_kind =
   match kind with
   | Pgenarray_set mode ->
-    (* CR mshinwell: see CR in [convert_array_ref_kind] above
-
-       check_float_array_optimisation_enabled (); *)
+    check_float_array_optimisation_enabled dbg "Pgenarray_set";
     Float_array_opt_dynamic_set (Alloc_mode.For_assignments.from_lambda mode)
   | Paddrarray_set mode ->
     Array_set_kind
@@ -480,6 +479,10 @@ let convert_array_set_kind _dbg (kind : L.array_set_kind) :
     in
     Array_set_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Punspecializedarray_set _ ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_set_kind: \
+       Punspecializedarray_set"
 
 let rec convert_unboxed_product_array_set_kind
     (kind : Array_set_kind.no_float_array_opt) : P.Array_kind.t =
@@ -589,6 +592,10 @@ let convert_array_kind_to_duplicate_array_kind dbg (kind : L.array_kind) :
     Misc.fatal_error
       "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
        unimplemented"
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
+       Punspecializedarray"
 
 let convert_field_read_semantics (sem : L.field_read_semantics) : Mutability.t =
   match sem with Reads_agree -> Immutable | Reads_vary -> Mutable
@@ -2057,6 +2064,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           args
         | Pfloatarray -> List.map unbox_float args
+        | Punspecializedarray ->
+          Misc.fatal_error
+            "Lambda_to_flambda_primitives: Pmakearray Punspecializedarray"
       in
       [Variadic (Make_array (array_kind, mutability, mode), args)]
     | Float_array_opt_dynamic -> (
@@ -3262,14 +3272,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Punspecializedarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Punspecializedarray_ref _ ),
             _,
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
@@ -3289,13 +3301,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Punspecializedarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Punspecializedarray_set _ ),
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _

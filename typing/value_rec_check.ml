@@ -636,6 +636,8 @@ let array_mode exp =
   | Lambda.Punboxedvectorarray _
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
+  | Lambda.Punspecializedarray ->
+    Misc.fatal_error "Value_rec_check.array_mode: Punspecializedarray"
 
 (* Expression judgment:
      G |- e : m

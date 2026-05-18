@@ -1091,6 +1091,9 @@ module With_subkind = struct
       | Parrayval (Punboxedvectorarray Unboxed_vec512) -> Unboxed_vec512_array
       | Parrayval (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
         Unboxed_product_array
+      | Parrayval Punspecializedarray ->
+        Misc.fatal_error
+          "Flambda_kind.from_lambda_value_kind: Punspecializedarray"
     in
     let nullable : Nullable.t =
       match vk.nullable with
