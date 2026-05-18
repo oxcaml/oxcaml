@@ -832,6 +832,9 @@ end = struct
   let no_phys_eq_shortcut _iv _t0 _t1 = None
 
   let phys_eq_shortcut_union _iv t0 t1 =
+    (* Here and below, we use [!=] instead of [==] so that the [is_int] of the
+       result is the same as the result of the test. This allows the code to be
+       simplified without depending on match forwarding optimisations. *)
     if t0 != t1 then None else Some (of_tree t0)
 
   let phys_eq_shortcut_union_total _iv t0 t1 =
@@ -924,8 +927,8 @@ end = struct
         | Some t' -> of_tree t'
         | None -> rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11
       in
-      let[@local] branch_left_only0 prefix_and_bit ~t10 ~t11 =
-        let t0' = (both_sides [@inlined hint]) t0 t10 in
+      let[@local] branch_0x prefix_and_bit ~t00 ~t10 ~t11 =
+        let t0' = (both_sides [@inlined hint]) t00 t10 in
         let t1' = (only_right [@inlined hint]) t11 in
         match t0', t1' with
         | Empty, Empty -> empty iv
@@ -934,9 +937,9 @@ end = struct
         | Non_empty t0', Non_empty t1' ->
           rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11
       in
-      let[@local] branch_left_only1 prefix_and_bit ~t10 ~t11 =
+      let[@local] branch_1x prefix_and_bit ~t01 ~t10 ~t11 =
         let t0' = (only_right [@inlined hint]) t10 in
-        let t1' = (both_sides [@inlined hint]) t0 t11 in
+        let t1' = (both_sides [@inlined hint]) t01 t11 in
         match t0', t1' with
         | Empty, Empty -> empty iv
         | Empty, Non_empty t1' -> of_tree t1'
@@ -944,8 +947,8 @@ end = struct
         | Non_empty t0', Non_empty t1' ->
           rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11
       in
-      let[@local] branch_right_only0 prefix_and_bit ~t00 ~t01 =
-        let t0' = (both_sides [@inlined hint]) t00 t1 in
+      let[@local] branch_x0 prefix_and_bit ~t00 ~t01 ~t10 =
+        let t0' = (both_sides [@inlined hint]) t00 t10 in
         let t1' = (only_left [@inlined hint]) t01 in
         match t0', t1' with
         | Empty, Empty -> empty iv
@@ -954,9 +957,9 @@ end = struct
         | Non_empty t0', Non_empty t1' ->
           rebuild_branch_share_left prefix_and_bit t0' t1' ~t00 ~t01
       in
-      let[@local] branch_right_only1 prefix_and_bit ~t00 ~t01 =
+      let[@local] branch_x1 prefix_and_bit ~t00 ~t01 ~t11 =
         let t0' = (only_left [@inlined hint]) t00 in
-        let t1' = (both_sides [@inlined hint]) t01 t1 in
+        let t1' = (both_sides [@inlined hint]) t01 t11 in
         match t0', t1' with
         | Empty, Empty -> empty iv
         | Empty, Non_empty t1' -> of_tree t1'
@@ -998,8 +1001,8 @@ end = struct
         then
           let t10, t11 = branch0 b1, branch1 b1 in
           if zero_bit i bit
-          then branch_left_only0 prefix_and_bit ~t10 ~t11
-          else branch_left_only1 prefix_and_bit ~t10 ~t11
+          then branch_0x prefix_and_bit ~t00:t0 ~t10 ~t11
+          else branch_1x prefix_and_bit ~t01:t0 ~t10 ~t11
         else join i prefix
       | Branch b0, Leaf l1 ->
         let i = leaf_key l1 in
@@ -1009,8 +1012,8 @@ end = struct
         then
           let t00, t01 = branch0 b0, branch1 b0 in
           if zero_bit i bit
-          then branch_right_only0 prefix_and_bit ~t00 ~t01
-          else branch_right_only1 prefix_and_bit ~t00 ~t01
+          then branch_x0 prefix_and_bit ~t00 ~t01 ~t10:t1
+          else branch_x1 prefix_and_bit ~t00 ~t01 ~t11:t1
         else join prefix i
       (* Branch/Branch case *)
       | Branch b0, Branch b1 ->
@@ -1033,13 +1036,13 @@ end = struct
           if includes_prefix prefix0 bit0 prefix1 bit1
           then
             if zero_bit prefix1 bit0
-            then branch_right_only0 prefix_and_bit0 ~t00 ~t01
-            else branch_right_only1 prefix_and_bit0 ~t00 ~t01
+            then branch_x0 prefix_and_bit0 ~t00 ~t01 ~t10:t1
+            else branch_x1 prefix_and_bit0 ~t00 ~t01 ~t11:t1
           else if includes_prefix prefix1 bit1 prefix0 bit0
           then
             if zero_bit prefix0 bit1
-            then branch_left_only0 prefix_and_bit1 ~t10 ~t11
-            else branch_left_only1 prefix_and_bit1 ~t10 ~t11
+            then branch_0x prefix_and_bit1 ~t00:t0 ~t10 ~t11
+            else branch_1x prefix_and_bit1 ~t01:t0 ~t10 ~t11
           else join prefix0 prefix1)
 
   let pattern_match_pair_merge_total ~only_left ~only_right =
