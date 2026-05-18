@@ -26,7 +26,7 @@ module Pre_serializable : sig
     used_value_slots:Value_slot.Set.t ->
     t * (Simple.t -> Simple.t)
 
-  val find_or_missing : t -> Name.t -> Type_grammar.t option
+  val find : t -> Name.t -> Type_grammar.t
 end
 
 module Serializable : sig
@@ -84,7 +84,6 @@ val print : Format.formatter -> t -> unit
 val create :
   machine_width:Target_system.Machine_width.t ->
   resolver:(Compilation_unit.t -> Serializable.t option) ->
-  get_imported_names:(unit -> Name.Set.t) ->
   t
 
 val machine_width : t -> Target_system.Machine_width.t
@@ -96,8 +95,6 @@ val make_bottom : t -> t
 val closure_env : t -> t
 
 val resolver : t -> Compilation_unit.t -> Serializable.t option
-
-val get_imported_names : t -> unit -> Name.Set.t
 
 val code_age_relation_resolver :
   t -> Compilation_unit.t -> Code_age_relation.t option
@@ -140,13 +137,9 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
     [variable_is_from_missing_cmx_file]. *)
 val find : t -> Name.t -> Flambda_kind.t option -> Type_grammar.t
 
-val find_or_missing : t -> Name.t -> Type_grammar.t option
-
 val find_params : t -> Bound_parameters.t -> Type_grammar.t list
 
 val variable_is_from_missing_cmx_file : t -> Name.t -> bool
-
-val variable_definitely_not_in_scope : t -> Variable.t -> bool
 
 val mem : ?min_name_mode:Name_mode.t -> t -> Name.t -> bool
 
