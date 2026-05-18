@@ -293,6 +293,10 @@ let reg_stack_arg_begin = H.reg_x (phys_reg Int X20)
 
 let reg_stack_arg_end = H.reg_x (phys_reg Int X21)
 
+(* Callee-saved register used to store the OCaml stack pointer around a noalloc
+   external call. *)
+let reg_x_extcall_saved_sp = H.reg_x (phys_reg Int X19)
+
 (** Turn a Linear label into an assembly label. The section is checked against
     the section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
@@ -1451,18 +1455,21 @@ let emit_instr env i =
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
       record_frame env i.live (Dbg_other i.dbg))
     else (
-      (* Store OCaml stack pointer in the frame pointer register. No need to
-         store previous x29 because OCaml doesn't maintain frame pointers. *)
+      (* Store OCaml stack pointer in x19, a callee-save register that the C
+         call will preserve. We used to use x29 (frame pointer) here, but
+         caml_start_program leaves it pointing to its C stack for the unwinder,
+         so it can't be clobbered here. *)
       if Config.runtime5
       then (
-        A.ins_mov_from_sp ~dst:O.fp;
+        A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp;
         D.cfi_remember_state ();
-        D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
+        D.cfi_def_cfa_register
+          ~reg:(Int.to_string (H.gp_x_dwarf_encoding reg_x_extcall_saved_sp));
         A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
         A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
-      if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
+      if Config.runtime5 then A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp;
       D.cfi_restore_state ())
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
