@@ -1392,7 +1392,10 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
 
 and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
     ~invariant_params ~params cont dacc handler k =
-  let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env:CUE.empty in
+  let dacc =
+    DA.with_continuation_uses_env dacc
+      ~cont_uses_env:(CUE.reset (DA.continuation_uses_env dacc))
+  in
   let dacc =
     DA.map_flow_acc
       ~f:
@@ -1907,6 +1910,24 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     then dacc
     else DA.map_denv dacc ~f:DE.set_has_seen_a_non_liftable_continuation
   in
+  let cont_uses_env =
+    match handlers with
+    | Non_recursive { cont; params; _ } ->
+      CUE.record_continuation
+        (DA.continuation_uses_env dacc)
+        cont
+        (Bound_parameters.arity params)
+    | Recursive { invariant_params; continuation_handlers; _ } ->
+      let invariant_arity = Bound_parameters.arity invariant_params in
+      Continuation.Lmap.fold
+        (fun cont (handler : One_recursive_handler.t) cont_uses_env ->
+          CUE.record_continuation cont_uses_env cont
+            (Flambda_arity.concat invariant_arity
+               (Bound_parameters.arity handler.params)))
+        continuation_handlers
+        (DA.continuation_uses_env dacc)
+  in
+  let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env in
   let body = data.body in
   let data : after_downwards_traversal_of_body_data =
     { denv_for_join; prior_lifted_constants; handlers }

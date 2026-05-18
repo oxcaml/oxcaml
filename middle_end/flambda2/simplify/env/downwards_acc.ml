@@ -131,6 +131,12 @@ let[@inline always] with_denv t denv = { t with denv }
 let with_continuation_uses_env t ~cont_uses_env =
   { t with continuation_uses_env = cont_uses_env }
 
+let record_continuation t cont arity =
+  let cont_uses_env =
+    CUE.record_continuation t.continuation_uses_env cont arity
+  in
+  with_continuation_uses_env t ~cont_uses_env
+
 let record_continuation_use t cont use_kind ~env_at_use ~arg_types =
   let cont_uses_env, id =
     CUE.record_continuation_use t.continuation_uses_env cont use_kind
