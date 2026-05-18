@@ -401,10 +401,6 @@ let create_count_const i =
   let spec = AS.create Count Data8 in
   AV.create spec (V.int64 i)
 
-let create_count_description loc_desc =
-  let spec = AS.create Count Exprloc in
-  AV.create spec (V.single_location_description loc_desc)
-
 let create_ocaml_compiler_version version =
   let spec = AS.create (Ocaml_specific Compiler_version) Strp in
   AV.create spec (V.indirect_string ~comment:"OCaml compiler version" version)
