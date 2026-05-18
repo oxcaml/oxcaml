@@ -285,7 +285,7 @@ module type S = sig
   end
 
   module For_testing : sig
-    val check_all_allowed_compositions : unit -> unit
+    val check_all_allowed_compositions : full:bool -> unit -> unit
   end
 
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
