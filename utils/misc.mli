@@ -301,6 +301,10 @@ module Stdlib : sig
 
     val concat_arrays : 'a array array -> 'a array
     (** Concatenate an array of arrays into a single array. *)
+
+    val filteri : (int -> 'a -> bool) -> 'a array -> 'a array
+    (** Filter an array with the current index into a new array, possibly
+        reducing the array length. *)
   end
 
 (** {2 Extensions to the String module} *)

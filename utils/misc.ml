@@ -441,6 +441,10 @@ module Stdlib = struct
           dst_pos := !dst_pos + len
         done;
         dst
+
+      let filteri (f : int -> 'a -> bool) (array : 'a array) =
+        (* CR ttebbi: This could be more efficient. *)
+        array |> Array.to_list |> List.filteri f |> Array.of_list
   end
 
   module String = struct

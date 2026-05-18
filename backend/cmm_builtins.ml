@@ -1242,7 +1242,7 @@ let transl_builtin name args dbg typ_res =
     bigstring_cas Sixtyfour (four_args name args) dbg
   | "caml_bigstring_compare_and_swap_int32_unboxed" ->
     bigstring_cas Thirtytwo (four_args name args) dbg
-  | "caml_pause_hint" -> Some (Cop (Cpause, args, dbg))
+  | "caml_pause_hint" -> Some (return_unit dbg (Cop (Cpause, [], dbg)))
   | _ -> transl_vec_builtin name args dbg typ_res
 
 let builtin_even_if_not_annotated = function
