@@ -416,12 +416,10 @@ type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
 
-module Printtyp = Printtyp.Doc
-
 let report_modality_sub_error first second ppf e =
   let Modality.Error (ax, {left; right}) = e in
   let print_modality id ppf m =
-    Printtyp.modality
+    Printtyp.Doc.modality
       ~id:(fun ppf () -> Format_doc.pp_print_string ppf id) ax ppf m
   in
   Format_doc.fprintf ppf "%s is %a and %s is %a."
@@ -577,8 +575,8 @@ let pp_record_diff first second prefix decl env ppf (x : record_change) =
          %a@ is not the same as:\
          @;<1 2>%a@ %a@]"
         prefix x
-        (Style.as_inline_code Printtyp.label) lbl1
-        (Style.as_inline_code Printtyp.label) lbl2
+        (Style.as_inline_code Printtyp.Doc.label) lbl1
+        (Style.as_inline_code Printtyp.Doc.label) lbl2
         (report_label_mismatch first second env) reason
   | Change Name n ->
       Fmt.fprintf ppf "%aFields have different names, %a and %a."
@@ -667,14 +665,14 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
       Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
         prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
   | Change Type {got; expected; reason} ->
-    Printtyp.wrap_printing_env ~error:true env (fun () ->
+    Printtyp.Doc.wrap_printing_env ~error:true env (fun () ->
       Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
          %a@ is not the same as:\
          @;<1 2>%a@ %a@]"
         prefix x
-        (Style.as_inline_code Printtyp.constructor) got
-        (Style.as_inline_code Printtyp.constructor) expected
+        (Style.as_inline_code Printtyp.Doc.constructor) got
+        (Style.as_inline_code Printtyp.Doc.constructor) expected
         (report_constructor_mismatch first second decl env) reason)
   | Change Name n ->
       Fmt.fprintf ppf
@@ -700,7 +698,7 @@ let report_extension_constructor_mismatch first second decl env ppf err =
       pr "Private extension constructor(s) would be revealed."
   | Constructor_mismatch (id, ext1, ext2, err) ->
       let constructor =
-        Style.as_inline_code (Printtyp.extension_only_constructor id)
+        Style.as_inline_code (Printtyp.Doc.extension_only_constructor id)
       in
       pr "@[<hv>Constructors do not match:@;<1 2>%a@ is not the same as:\
           @;<1 2>%a@ %a@]"
@@ -790,7 +788,7 @@ let report_type_mismatch first second decl env ppf err =
   | Parameter_jkind (ty, v) ->
       pr "The problem is in the kinds of a parameter:@,";
       Jkind.Violation.report_with_offender
-        ~offender:(fun pp -> Printtyp.type_expr pp ty)
+        ~offender:(fun pp -> Printtyp.Doc.type_expr pp ty)
         env ppf v
   | Private_variant (_ty1, _ty2, mismatch) ->
       report_private_variant_mismatch first second decl env ppf mismatch
@@ -1649,7 +1647,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
          "Unification failure in type inclusion rigidity check:@;\
           %s unified with %a."
          (match name with None -> "_" | Some n -> "'" ^ n)
-         Printtyp.type_expr ty
+         Printtyp.Doc.type_expr ty
   | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
      let context = Ctype.mk_jkind_context_always_principal env in
      Some (Parameter_jkind

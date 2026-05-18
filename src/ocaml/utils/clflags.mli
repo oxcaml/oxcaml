@@ -18,6 +18,7 @@ val include_dirs         : visible_include list ref
 val hidden_include_dirs  : string list ref
 val include_paths_files : string list ref
 val hidden_include_paths_files : string list ref
+val print_variance       : bool ref
 val fast                 : bool ref
 val classic              : bool ref
 val all_ppx              : string list ref
@@ -54,6 +55,7 @@ val keep_docs            : bool ref
 val transparent_modules  : bool ref
 val for_package          : string option ref
 val debug                : bool ref
+val unsafe               : bool ref
 val opaque               : bool ref
 val unboxed_types        : bool ref
 val profile_columns : profile_column list ref
@@ -69,4 +71,4 @@ val unique_ids : bool ref
 val dump_dir : string option ref
 val verbose_types : bool ref
 val canonical_ids : bool ref
-val print_variance : bool ref
+val error_style : Misc.Error_style.setting option ref

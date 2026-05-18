@@ -676,7 +676,7 @@ and function_curry =
 and 'k case =
     {
      c_lhs: 'k general_pattern;
-     c_cont: Ident.t option;
+     c_cont: (Ident.t * Types.value_description) option;
      c_guard: expression option;
      c_rhs: expression;
     }
@@ -1540,3 +1540,10 @@ val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
+
+(** Whether an expression looks nice as the subject of a sentence in an error
+    message. *)
+val exp_is_nominal : expression -> bool
+
+val unpack_functor_me : module_expr -> functor_parameter * module_expr
+val unpack_functor_mty : module_type -> functor_parameter * module_type

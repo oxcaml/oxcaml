@@ -446,8 +446,10 @@ let rec of_expression_desc loc = function
            | _, Omitted _ -> id_fold
            | _, Arg (e, _) -> of_expression e)
          ls
-  | Texp_match (e, _, cs, _, _) -> of_expression e ** list_fold of_case cs
-  | Texp_try (e, cs, _) -> of_expression e ** list_fold of_case cs
+  | Texp_match (e, _, cs, effs, _) ->
+    of_expression e ** list_fold of_case cs ** list_fold of_case effs
+  | Texp_try (e, cs, effs) ->
+    of_expression e ** list_fold of_case cs ** list_fold of_case effs
   | Texp_tuple (es, _) -> list_fold (fun (_lbl, e) -> of_expression e) es
   | Texp_unboxed_tuple es ->
     list_fold (fun (_lbl, e, _sort) -> of_expression e) es
@@ -743,7 +745,35 @@ let of_node node =
     | Pattern { pat_desc; pat_extra = _ } -> of_pattern_desc pat_desc
     | Expression { exp_desc; exp_extra = _; exp_loc } ->
       of_expression_desc exp_loc exp_desc
-    | Case { c_lhs; c_guard; c_rhs } ->
+    | Case { c_lhs; c_cont = Some (id, vd); c_guard; c_rhs } ->
+      let name = Ident.name id in
+      let sort =
+        match vd.Types.val_kind with
+        | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
+        | Types.Val_prim _ | Types.Val_ivar _ | Types.Val_self _
+        | Types.Val_anc _ ->
+          Jkind.Sort.(of_const Const.for_continuation)
+      in
+      let cont_pat =
+        { pat_desc =
+            Tpat_var
+              { id;
+                name = { txt = name; loc = vd.val_loc };
+                uid = vd.val_uid;
+                sort;
+                mode = Mode.Value.disallow_right Mode.Value.legacy
+              };
+          pat_loc = vd.val_loc;
+          pat_extra = [];
+          pat_type = vd.val_type;
+          pat_env = c_rhs.exp_env;
+          pat_attributes = [];
+          pat_unique_barrier = Unique_barrier.not_computed ()
+        }
+      in
+      of_pattern c_lhs ** of_expression c_rhs ** of_pattern cont_pat
+      ** option_fold of_expression c_guard
+    | Case { c_lhs; c_cont = None; c_guard; c_rhs } ->
       of_pattern c_lhs ** of_expression c_rhs
       ** option_fold of_expression c_guard
     | Class_expr { cl_desc } -> of_class_expr_desc cl_desc

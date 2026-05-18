@@ -39,7 +39,7 @@ open Outcometree
 
 (** {1 Wrapping functions}*)
 
-val wrap_printing_env: error:bool -> Env.t -> (unit -> 'a) -> 'a
+val wrap_printing_env: ?error:bool -> Env.t -> (unit -> 'a) -> 'a
 (** Call the function using the environment for type path shortening
     This affects all the printing and tree cration functions functions below
     Also, if [~error:true], then disable the loading of cmis *)
@@ -63,7 +63,12 @@ val same_path: type_expr -> type_expr -> bool
 (** Simple heuristic to rewrite Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
+val best_type_path_simple: Path.t -> Path.t
+val best_class_type_path_simple: Path.t -> Path.t
 val shorten_type_path: Env.t -> Path.t -> Path.t
+val shorten_module_type_path: Env.t -> Path.t -> Path.t
+val shorten_module_path: Env.t -> Path.t -> Path.t
+val shorten_class_type_path: Env.t -> Path.t -> Path.t
 
 (** {1 Printing type expressions} *)
 

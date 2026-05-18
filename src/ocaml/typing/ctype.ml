@@ -2538,6 +2538,7 @@ let try_expand_head ?(fuel = 5000)
   let rec loop try_once env ty ~fuel =
     if fuel <= 0 then raise Cannot_expand;
     let ty' = try_once env ty in
+    if ty == ty' then ty' else
     try loop try_once env ty' ~fuel:(fuel - 1)
     with Cannot_expand ->
       try try_reduce env ty'
@@ -7161,7 +7162,7 @@ let match_class_declarations env patt_params patt_type subj_params subj_type =
         let ls = List.length subj_params in
         if lp  <> ls then
           raise (Failure [CM_Parameter_arity_mismatch (lp, ls)]);
-        Stdlib.List.iteri2 (fun n p s ->
+        Std.List.iteri2 ~f:(fun n p s ->
           try eqtype true type_pairs subst env p s with Equality_trace trace ->
             raise (Failure
                      [CM_Type_parameter_mismatch

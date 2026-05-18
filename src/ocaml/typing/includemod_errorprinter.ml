@@ -15,7 +15,6 @@
 
 module Style = Misc.Style
 module Fmt = Format_doc
-module Printtyp = Printtyp.Doc
 type inclusion_env = Includemod.Functor_inclusion_diff.inclusion_env =
   { i_env:Env.t; i_subst:Subst.t }
 
@@ -38,10 +37,10 @@ module Context = struct
 
   let rec context ppf = function
       Module id :: rem ->
-        Fmt.fprintf ppf "@[<2>module %a%a@]" Printtyp.ident id args rem
+        Fmt.fprintf ppf "@[<2>module %a%a@]" Printtyp.Doc.ident id args rem
     | Modtype id :: rem ->
         Fmt.fprintf ppf "@[<2>module type %a =@ %a@]"
-          Printtyp.ident id context_mty rem
+          Printtyp.Doc.ident id context_mty rem
     | Body x :: rem ->
         Fmt.fprintf ppf "(%s) ->@ %a" (argname x) context_mty rem
     | Arg x :: rem ->
@@ -74,7 +73,7 @@ module Context = struct
       Fmt.fprintf ppf ",@ in module %t"
         (fun ppf -> Fmt.deprecated_printer (fun fmt ->
           Format.fprintf fmt "%a"
-            (Fmt.compat (Style.as_inline_code Printtyp.path))
+            (Fmt.compat (Style.as_inline_code Printtyp.Doc.path))
             (path_of_context cxt)
         ) ppf)
     else
@@ -87,7 +86,7 @@ module Context = struct
       Fmt.fprintf ppf "In module %t:@ "
         (fun ppf -> Fmt.deprecated_printer (fun fmt ->
           Format.fprintf fmt "%a"
-            (Fmt.compat (Style.as_inline_code Printtyp.path))
+            (Fmt.compat (Style.as_inline_code Printtyp.Doc.path))
             (path_of_context cxt)
         ) ppf)
     else
@@ -232,7 +231,7 @@ module Runtime_coercion = struct
         Fmt.fprintf ppf
           "@[The two first-class module types differ by a coercion of@ \
            a module alias %a@ to a module%a.@]"
-          (Style.as_inline_code Printtyp.path) path
+          (Style.as_inline_code Printtyp.Doc.path) path
           ctx_printer ctx
     | Transposition (k,l) ->
         Fmt.fprintf ppf
@@ -553,7 +552,7 @@ module With_shorthand = struct
         let mty = modtype { ua with item = mty } in
         Fmt.dprintf
           "%a@ :@ %t"
-          Printtyp.path p
+          Printtyp.Doc.path p
           (pp_orig dmodtype mty)
         |> dthen_mode_l ~is_modal mode
     | Anonymous ->
@@ -571,7 +570,7 @@ module With_shorthand = struct
     | Unit -> Fmt.dprintf "()"
     | Empty_struct ->
         Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
-    | Named p -> fun ppf -> Printtyp.path ppf p
+    | Named p -> fun ppf -> Printtyp.Doc.path ppf p
     | Anonymous ->
         let short_mty = modtype { ua with item=mty } in
         pp dmodtype short_mty
@@ -787,7 +786,7 @@ module Functor_suberror = struct
       Fmt.pp_open_tbox ()
       Diffing.prefix (pos, Diffing.classify diff)
       Fmt.pp_set_tab ()
-      (Printtyp.wrap_printing_env env.i_env ~error:true
+      (Printtyp.Doc.wrap_printing_env env.i_env ~error:true
          (fun () -> sub ~expansion_token env diff)
       )
      Fmt.pp_close_tbox ()
@@ -795,7 +794,7 @@ module Functor_suberror = struct
   let onlycase sub ~expansion_token env (_, diff) =
     Location.msg "%a@[<hv 2>%t@]"
       Fmt.pp_print_tab ()
-      (Printtyp.wrap_printing_env env.i_env ~error:true
+      (Printtyp.Doc.wrap_printing_env env.i_env ~error:true
          (fun () -> sub ~expansion_token env diff)
       )
 
@@ -942,11 +941,11 @@ let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in
   Fmt.fprintf ppf "The %s %a is required but not provided%a"
     (Includemod.kind_of_field_desc kind)
-    (Style.as_inline_code Printtyp.ident) id
+    (Style.as_inline_code Printtyp.Doc.ident) id
     (show_loc "Expected declaration") loc
 
 let module_types ~env {Err.got=mty1; expected=mty2; modes; symptom}=
-  Printtyp.wrap_printing_env ~error:true env @@ fun () ->
+  Printtyp.Doc.wrap_printing_env ~error:true env @@ fun () ->
   let is_modal = Is_modal.module_type_symptom symptom in
   let mode1, mode2 = maybe_print_modes ~is_modal modes in
   Fmt.dprintf
@@ -958,7 +957,7 @@ let module_types ~env {Err.got=mty1; expected=mty2; modes; symptom}=
     mode2
 
 let eq_module_types ~env ({Err.got=mty1; expected=mty2} : _ mdiff) =
-  Printtyp.wrap_printing_env ~error:true env @@ fun () ->
+  Printtyp.Doc.wrap_printing_env ~error:true env @@ fun () ->
   Fmt.dprintf
     "@[<hv 2>Module types do not match:@ \
      %a@;<1 -2>is not equal to@ %a@]"
@@ -993,7 +992,7 @@ let core_module_type_symptom (x:Err.core_module_type_symptom)  =
   | Incompatible_aliases -> None
   | Unbound_module_path path ->
       Some(Fmt.dprintf "Unbound module %a"
-             (Style.as_inline_code Printtyp.path) path
+             (Style.as_inline_code Printtyp.Doc.path) path
           )
 
 (* Construct a linearized error message from the error tree *)
@@ -1078,7 +1077,7 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
   | Invalid_module_alias path ->
       let printer =
         Fmt.dprintf "Module %a cannot be aliased"
-          (Style.as_inline_code Printtyp.path) path
+          (Style.as_inline_code Printtyp.Doc.path) path
       in
       dwith_context ctx printer :: before
   | Mode e ->
@@ -1124,7 +1123,7 @@ and functor_symptom ~expansion_token ~env ~before ~ctx = function
   | Params d -> functor_params ~expansion_token ~env ~before ~ctx d
 
 and signature ~expansion_token ~env:_ ~before ~ctx sgs =
-  Printtyp.wrap_printing_env ~error:true sgs.env (fun () ->
+  Printtyp.Doc.wrap_printing_env ~error:true sgs.env (fun () ->
       match sgs.missings, sgs.incompatibles with
       | _ :: _ as missings, _ ->
           if expansion_token then
@@ -1255,7 +1254,7 @@ let all env = function
 (* General error reporting *)
 
 let err_msgs ppf (env, err) =
-  Printtyp.wrap_printing_env ~error:true env
+  Printtyp.Doc.wrap_printing_env ~error:true env
     (fun () -> (coalesce @@ all {i_env=env; i_subst=Subst.identity} err) ppf)
 
 let report_error_doc err =
@@ -1291,7 +1290,7 @@ let report_apply_error_doc ~loc env (app_name, mty_f, args) =
         | Includemod.Named_leftmost_functor lid ->
             Location.errorf ~loc
               "@[The module %a is not a functor, it cannot be applied.@]"
-               (Style.as_inline_code Printtyp.longident)  lid
+               (Style.as_inline_code Printtyp.Doc.longident)  lid
         | Includemod.Anonymous_functor
         | Includemod.Full_application_path _
           (* The "non-functor application in term" case is directly handled in
@@ -1308,11 +1307,11 @@ let report_apply_error_doc ~loc env (app_name, mty_f, args) =
               Fmt.fprintf ppf "This functor application is ill-typed."
           | Includemod.Full_application_path lid ->
               Fmt.fprintf ppf "The functor application %a is ill-typed."
-                (Style.as_inline_code Printtyp.longident) lid
+                (Style.as_inline_code Printtyp.Doc.longident) lid
           |  Includemod.Named_leftmost_functor lid ->
               Fmt.fprintf ppf
                 "This application of the functor %a is ill-typed."
-                 (Style.as_inline_code Printtyp.longident) lid
+                 (Style.as_inline_code Printtyp.Doc.longident) lid
         in
         let actual = Functor_suberror.App.got ~is_modal:None d in
         let expected = Functor_suberror.expected ~is_modal:None d in
@@ -1337,7 +1336,7 @@ let register () =
     (function
       | Includemod.Error err -> Some (report_error_doc err)
       | Includemod.Apply_error {loc; env; app_name; mty_f; args} ->
-          Some (Printtyp.wrap_printing_env env ~error:true (fun () ->
+          Some (Printtyp.Doc.wrap_printing_env env ~error:true (fun () ->
               report_apply_error_doc ~loc env (app_name, mty_f, args))
             )
       | _ -> None

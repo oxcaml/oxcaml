@@ -2101,7 +2101,8 @@ let solve_constructor_annotation
           new_local_type ~loc:name.loc Definition jkind
             ~manifest_and_scope:(tv, Ident.lowest_scope) in
         let (id, new_env) =
-          Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
+          (* These redundant types should not be added to the shortpath graph. *)
+          Env.enter_type ~long_path:true ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
         {name with txt = id}, (decl, tv), jkind_annot_opt)
       name_list
@@ -5291,10 +5292,12 @@ let rec maybe_computation exp =
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
-    (fun {vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc} ->
+    (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc}
+          as vb) ->
        match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
        | None ->
-         raise(error(vb_expr.exp_loc, env, Illegal_letrec_expr))
+         raise_error(error(vb_expr.exp_loc, env, Illegal_letrec_expr));
+         vb
        | Some vb_rec_kind ->
          { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
     valbinds
@@ -10960,7 +10963,6 @@ and type_cases
     ~type_body:begin
       fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
         ~ty_infer ~contains_gadt:_ ->
-        let cont = Option.map (fun (id,_) -> id) cont in
         let guard =
           match pc_guard with
           | None -> None
@@ -11361,7 +11363,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
            Tpat_var _ | Tpat_fun_layout _ -> ()
-         | _ -> raise(error(pat.pat_loc, env, Illegal_letrec_pat)))
+         | _ -> raise_error(error(pat.pat_loc, env, Illegal_letrec_pat)))
       l;
   List.iter (fun vb ->
       if pattern_needs_partial_application_check vb.vb_pat then

@@ -430,7 +430,7 @@ and comprehension_iterator =
 and 'k case =
     {
      c_lhs: 'k general_pattern;
-     c_cont: Ident.t option;
+     c_cont: (Ident.t * Types.value_description) option;
      c_guard: expression option;
      c_rhs: expression;
     }
@@ -1650,3 +1650,27 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
+
+(* Expressions are considered nominal if they can be used as the subject of a
+   sentence or action. In practice, we consider that an expression is nominal
+   if it is similar to an identifier or does not contain spaces when printed. *)
+let rec exp_is_nominal exp =
+  match exp.exp_desc with
+  | _ when exp.exp_attributes <> [] -> false
+  | Texp_ident _ | Texp_instvar _ | Texp_constant _
+  | Texp_variant (_, None)
+  | Texp_construct (_, _, [], _) ->
+      true
+  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
+      exp_is_nominal parent
+  | _ -> false
+
+let unpack_functor_me me =
+  match me.mod_desc with
+  | Tmod_functor (fp, me) -> fp, me
+  | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
+
+let unpack_functor_mty mty =
+  match mty.mty_desc with
+  | Tmty_functor (fp, mty, _) -> fp, mty
+  | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"

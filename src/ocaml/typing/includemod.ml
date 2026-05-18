@@ -445,7 +445,7 @@ let rec print_coercion ppf c =
         Rawprinttyp.type_expr pc_type
   | Tcoerce_alias (_, p, c) ->
       pr "@[<2>alias %a@ (%a)@]"
-        Printtyp.path p
+        (Format_doc.compat Printtyp.Doc.path) p
         print_coercion c
   | Tcoerce_invalid ->
       pr "invalid_coercion"
