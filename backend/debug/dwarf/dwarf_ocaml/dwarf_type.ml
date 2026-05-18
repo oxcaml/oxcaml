@@ -61,11 +61,51 @@ let header_location_expr : Single_location_description.t =
   Single_location_description.of_simple_location_description
     [Dwarf_operator.DW_op_lit8; Dwarf_operator.DW_op_minus]
 
-(* Read [wosize] (the element count of an OCaml block) from the header at
-   [obj - WORD_SIZE]. Empty initial stack; result is an implicit scalar. *)
-let block_wosize_expr : Single_location_description.t =
+(* Read the OCaml block [tag] (the low 8 bits of the header at
+   [obj - WORD_SIZE]). Empty initial stack; leaves [tag] on top. *)
+let read_tag_ops =
+  [ Dwarf_operator.DW_op_push_object_address;
+    Dwarf_operator.DW_op_lit8;
+    Dwarf_operator.DW_op_minus;
+    Dwarf_operator.DW_op_deref;
+    Dwarf_operator.DW_op_constu (Numbers.Uint64.of_nonnegative_int_exn 0xFF);
+    Dwarf_operator.DW_op_and ]
+
+(* DWARF expression for the user-visible element count of an OCaml array
+   whose elements have stride [element_stride] bytes. Mirrors the runtime
+   length formulas in [backend/cmm_helpers.ml] (see
+   [unboxed_or_untagged_packed_array_length] and friends):
+
+   - stride 1, 2, 4: densely packed sub-word array. The block tag encodes [count
+   mod elements_per_word]; count is [wosize * epw - (tag land (epw - 1))], where
+   [epw = WORD_SIZE / element_stride].
+
+   - stride 8: one element per word, count is [wosize].
+
+   - stride 8 * N (N >= 2): unboxed product or wide vector; count is
+   [wosize / N]. *)
+let array_count_expr ~element_stride : Single_location_description.t =
+  let const n =
+    Dwarf_operator.DW_op_constu (Numbers.Uint64.of_nonnegative_int_exn n)
+  in
+  let ops =
+    match element_stride with
+    | 1 | 2 | 4 ->
+      let elements_per_word = 8 / element_stride in
+      let mask = elements_per_word - 1 in
+      read_wosize_ops
+      @ [const elements_per_word; Dwarf_operator.DW_op_mul]
+      @ read_tag_ops
+      @ [const mask; Dwarf_operator.DW_op_and; Dwarf_operator.DW_op_minus]
+    | 8 -> read_wosize_ops
+    | n when n > 0 && n mod 8 = 0 ->
+      read_wosize_ops @ [const (n / 8); Dwarf_operator.DW_op_div]
+    | _ ->
+      Misc.fatal_errorf "create_array_die: unsupported element_stride %d"
+        element_stride
+  in
   Single_location_description.of_simple_location_description
-    (read_wosize_ops @ [Dwarf_operator.DW_op_stack_value])
+    (ops @ [Dwarf_operator.DW_op_stack_value])
 
 module Debugging_the_compiler = struct
   let enabled () = !Dwarf_flags.ddwarf_types
@@ -315,13 +355,11 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
     the caller. [create_array_die] and [create_packed_struct] below produce
     DWARF that follows the table above.
 
-    Caveat for densely packed primitive sub-word arrays: the OCaml block tag
-    encodes how many of the final word's slots are valid, but OxCaml LLDB
-    ignores the [DW_AT_count = 0] we emit below and infers the element count
-    from [block_size / element_stride], which overshoots by up to
-    [elements_per_word - 1]. Once the language plugin supports DWARF expressions
-    we can replace the [0] with a tag-aware count expression and the displayed
-    length will match the logical length. *)
+   For densely packed sub-word arrays the block tag encodes how many of
+   the final word's slots are valid; the [DW_AT_count] expression emitted
+   below reads the tag to back this out, matching
+   [unboxed_or_untagged_packed_array_length] in
+   [backend/cmm_helpers.ml]. *)
 let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
     ?name () =
   let array_die =
@@ -334,7 +372,7 @@ let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
       ()
   in
   Proto_die.create_ignore ~parent:(Some array_die) ~tag:Dwarf_tag.Subrange_type
-    ~attribute_values:[DAH.create_count block_wosize_expr]
+    ~attribute_values:[DAH.create_count (array_count_expr ~element_stride)]
     ();
   (* OxCaml LLDB currently uses custom printing for arrays instead of respecting
      the name attached to the [Array_type] node. Thus, we introduce a typedef
