@@ -741,3 +741,377 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
           then env_extension
           else TEEV.add_or_replace_equation env_extension lhs ty)
         TEEV.empty equations
+
+let[@inline] is_useful_or_unknown_or_bottom is_useful_head kind env
+    (input : _ Or_unknown_or_bottom.t) =
+  match input with
+  | Unknown | Bottom -> false
+  | Ok head -> is_useful_head kind env head
+
+let is_useful_set (type a) (module S : Container_types_intf.Set with type t = a)
+    _env (s : a) =
+  match S.get_singleton s with Some _ -> true | None -> false
+
+let rec is_useful full_kind env t =
+  let expanded = expand_head env t in
+  is_useful_or_unknown_or_bottom is_useful_expanded_head_descr full_kind env
+    (ET.descr expanded)
+
+and is_useful_expanded_head_descr full_kind env (descr : ET.descr) =
+  match descr, K.With_subkind.kind full_kind with
+  | Value head, Value ->
+    is_useful_head_of_kind_value env
+      (K.With_subkind.nullable full_kind)
+      (K.With_subkind.non_null_value_subkind full_kind)
+      head
+  | Naked_immediate head, Naked_number Naked_immediate ->
+    is_useful_head_of_kind_naked_immediate Or_unknown.Unknown env head
+  | Naked_float32 head, Naked_number Naked_float32 ->
+    is_useful_head_of_kind_naked_float32 env head
+  | Naked_float head, Naked_number Naked_float ->
+    is_useful_head_of_kind_naked_float env head
+  | Naked_int8 head, Naked_number Naked_int8 ->
+    is_useful_head_of_kind_naked_int8 env head
+  | Naked_int16 head, Naked_number Naked_int16 ->
+    is_useful_head_of_kind_naked_int16 env head
+  | Naked_int32 head, Naked_number Naked_int32 ->
+    is_useful_head_of_kind_naked_int32 env head
+  | Naked_int64 head, Naked_number Naked_int64 ->
+    is_useful_head_of_kind_naked_int64 env head
+  | Naked_nativeint head, Naked_number Naked_nativeint ->
+    is_useful_head_of_kind_naked_nativeint env head
+  | Naked_vec128 head, Naked_number Naked_vec128 ->
+    is_useful_head_of_kind_naked_vec128 env head
+  | Naked_vec256 head, Naked_number Naked_vec256 ->
+    is_useful_head_of_kind_naked_vec256 env head
+  | Naked_vec512 head, Naked_number Naked_vec512 ->
+    is_useful_head_of_kind_naked_vec512 env head
+  | Rec_info head, Rec_info -> is_useful_head_of_kind_rec_info env head
+  | Region head, Region -> is_useful_head_of_kind_region env head
+  | ( ( Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
+      | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
+      | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+      | Rec_info _ | Region _ ),
+      ( Value
+      | Naked_number
+          ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
+          | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 )
+      | Rec_info | Region ) ) ->
+    false
+
+and is_useful_head_of_kind_value env (nullable : K.With_subkind.Nullable.t)
+    non_null_value_subkind ({ non_null; is_null } : TG.head_of_kind_value) =
+  match is_null, nullable with
+  | Not_null, Nullable ->
+    (* If the kind thinks we are nullable but the type knows we are not null,
+       that's maybe useful. *)
+    true
+  | (Not_null | Maybe_null _), (Nullable | Non_nullable) ->
+    is_useful_or_unknown_or_bottom is_useful_head_of_kind_value_non_null env
+      non_null_value_subkind non_null
+
+and is_useful_head_of_kind_value_non_null env
+    (non_null_value_subkind : K.With_subkind.Non_null_value_subkind.t)
+    (non_null : TG.head_of_kind_value_non_null) =
+  match non_null_value_subkind, non_null with
+  | ( Anything,
+      ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
+      | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
+      | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) ) ->
+    true
+  | Boxed_float32, Boxed_float32 (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_float32 env ty
+  | Boxed_float, Boxed_float (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_float env ty
+  | Boxed_int32, Boxed_int32 (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_int32 env ty
+  | Boxed_int64, Boxed_int64 (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_int64 env ty
+  | Boxed_nativeint, Boxed_nativeint (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_nativeint env ty
+  | Boxed_vec128, Boxed_vec128 (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_vec128 env ty
+  | Boxed_vec256, Boxed_vec256 (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_vec256 env ty
+  | Boxed_vec512, Boxed_vec512 (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_vec512 env ty
+  | Tagged_immediate, Variant { immediates; _ } -> (
+    match immediates with
+    | Unknown -> false
+    | Known ty -> is_useful K.With_subkind.naked_immediate env ty)
+  | Variant { consts; non_consts }, Variant { immediates; blocks; _ } ->
+    is_useful_variant ~consts ~non_consts env ~immediates ~blocks
+  | Variant _, Mutable_block _ -> false
+  | Float_block { num_fields }, Variant { blocks; _ } ->
+    is_useful_float_block ~num_fields env ~blocks
+  | Float_block { num_fields = _ }, Mutable_block _ -> false
+  | Float_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_float) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Immediate_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.tagged_immediate) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Value_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.any_value) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Generic_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array Or_unknown.Unknown env ~element_kind ~length ~contents
+      ~alloc_mode
+  | Unboxed_float32_array, Array { element_kind; length; contents; alloc_mode }
+    ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_float32) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Untagged_int_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_immediate) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Untagged_int8_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_int8) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Untagged_int16_array, Array { element_kind; length; contents; alloc_mode }
+    ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_int16) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_int32_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_int32) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_int64_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_int64) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | ( Unboxed_nativeint_array,
+      Array { element_kind; length; contents; alloc_mode } ) ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_nativeint) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_vec128_array, Array { element_kind; length; contents; alloc_mode }
+    ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_vec128) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_vec256_array, Array { element_kind; length; contents; alloc_mode }
+    ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_vec256) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_vec512_array, Array { element_kind; length; contents; alloc_mode }
+    ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_vec512) env
+      ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_product_array, Array { element_kind; length; contents; alloc_mode }
+    ->
+    is_useful_array Or_unknown.Unknown env ~element_kind ~length ~contents
+      ~alloc_mode
+  | ( ( Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64
+      | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
+      | Tagged_immediate | Variant _ | Float_block _ | Float_array
+      | Immediate_array | Value_array | Generic_array | Unboxed_float32_array
+      | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
+      | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
+      | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
+      | Unboxed_product_array ),
+      _ ) ->
+    false
+
+and is_useful_variant ~consts ~non_consts env ~immediates ~blocks =
+  match is_useful_tagged_immediate ~consts env ~immediates with
+  | true -> true
+  | false -> is_useful_block ~non_consts env ~blocks
+
+and is_useful_tagged_immediate ~consts env ~immediates =
+  if Target_ocaml_int.Set.is_empty consts
+  then false
+  else
+    match (immediates : _ Or_unknown.t) with
+    | Unknown -> false
+    | Known ty -> (
+      let expanded = expand_head env ty in
+      match ET.descr expanded with
+      | Unknown -> false
+      | Bottom -> true
+      | Ok (Naked_immediate head) ->
+        is_useful_head_of_kind_naked_immediate (Or_unknown.Known consts) env
+          head
+      | Ok
+          ( Value _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
+          | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+          | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _
+          | Region _ ) ->
+        false)
+
+and is_useful_block ~non_consts env ~blocks =
+  if Tag.Scannable.Map.is_empty non_consts
+  then false
+  else
+    match (blocks : TG.row_like_for_blocks Or_unknown.t) with
+    | Unknown -> false
+    | Known row_like_for_blocks ->
+      if TG.Row_like_for_blocks.is_bottom row_like_for_blocks
+      then true
+      else if
+        Tag.Scannable.Map.exists
+          (fun tag (_block_shape, field_kinds) ->
+            let tag = Tag.Scannable.to_tag tag in
+            let[@local] process_case
+                (row_like_block_case : TG.row_like_block_case) =
+              (* Note: if there is a mismatch in the number of fields, it is OK
+                 to return [true]; we should be able to prove [Bottom] during
+                 inlining. *)
+              let types = row_like_block_case.maps_to in
+              try
+                List.iteri
+                  (fun ix field_kind ->
+                    if ix < Array.length types
+                    then
+                      match is_useful field_kind env types.(ix) with
+                      | true -> raise Exit
+                      | false -> ()
+                    else raise Exit)
+                  field_kinds;
+                false
+              with Exit -> true
+            in
+            match Tag.Map.find tag row_like_for_blocks.known_tags with
+            | Unknown -> false
+            | Known row_like_block_case -> process_case row_like_block_case
+            | exception Not_found -> (
+              match row_like_for_blocks.other_tags with
+              | Bottom -> true
+              | Ok row_like_block_case -> process_case row_like_block_case))
+          non_consts
+      then true
+      else false
+
+and is_useful_float_block ~num_fields:_ env ~blocks =
+  match (blocks : TG.row_like_for_blocks Or_unknown.t) with
+  | Unknown -> false
+  | Known row_like_for_blocks -> (
+    let[@local] process_case (row_like_block_case : TG.row_like_block_case) =
+      if
+        Array.exists
+          (fun ty ->
+            match is_useful K.With_subkind.naked_float env ty with
+            | true -> true
+            | false -> false)
+          row_like_block_case.maps_to
+      then true
+      else false
+    in
+    match Tag.Map.find Tag.double_array_tag row_like_for_blocks.known_tags with
+    | Unknown -> false
+    | Known row_like_block_case -> process_case row_like_block_case
+    | exception Not_found -> (
+      match row_like_for_blocks.other_tags with
+      | Bottom -> true
+      | Ok row_like_block_case -> process_case row_like_block_case))
+
+and is_useful_array (known_element_kind : _ Or_unknown.t) env ~element_kind
+    ~length ~contents:_ ~alloc_mode:_ =
+  (* If we know the length, that's maybe useful (we could eliminate some bounds
+     check). *)
+  match is_useful K.With_subkind.tagged_immediate env length with
+  | true -> true
+  | false -> (
+    (* If the [known_element_kind] from the kind can be used as the
+       [element_kind] from the types, the [element_kind] is not more precise.
+
+       But if it can't (not compatible), then the [element_kind] from the types
+       is more precise than the one from the kind -- that's maybe useful.
+
+       If the element kind from the kind is not known, but the kind from the
+       type is known (including if it is bottom, in which case this must be an
+       empty array), it is maybe useful. *)
+    match known_element_kind, (element_kind : _ Or_unknown_or_bottom.t) with
+    | Unknown, (Ok _ | Bottom) -> true
+    | Known known_element_kind, Ok element_kind
+      when not
+             (K.With_subkind.compatible known_element_kind
+                ~when_used_at:element_kind) ->
+      true
+    | (Unknown | Known _), (Unknown | Bottom | Ok _) -> false)
+
+and is_useful_head_of_kind_naked_immediate
+    (consts : Target_ocaml_int.Set.t Or_unknown.t) env
+    (head : TG.head_of_kind_naked_immediate) =
+  let module I = Target_ocaml_int in
+  match consts, head with
+  | Unknown, Naked_immediates set -> is_useful_set (module I.Set) env set
+  | Known consts, Naked_immediates set ->
+    (* The type is useful as long as we can eliminate at least one of the
+       constructors. *)
+    if I.Set.subset consts set then false else true
+  | (Known _ | Unknown), (Is_null _ | Is_int _ | Get_tag _) -> false
+
+and is_useful_head_of_kind_naked_float32 env head =
+  is_useful_set
+    (module Numeric_types.Float32_by_bit_pattern.Set)
+    env
+    (head
+      : TG.head_of_kind_naked_float32
+      :> Numeric_types.Float32_by_bit_pattern.Set.t)
+
+and is_useful_head_of_kind_naked_float env head =
+  is_useful_set
+    (module Numeric_types.Float_by_bit_pattern.Set)
+    env
+    (head
+      : TG.head_of_kind_naked_float
+      :> Numeric_types.Float_by_bit_pattern.Set.t)
+
+and is_useful_head_of_kind_naked_int8 env head =
+  is_useful_set
+    (module Numeric_types.Int8.Set)
+    env
+    (head : TG.head_of_kind_naked_int8 :> Numeric_types.Int8.Set.t)
+
+and is_useful_head_of_kind_naked_int16 env head =
+  is_useful_set
+    (module Numeric_types.Int16.Set)
+    env
+    (head : TG.head_of_kind_naked_int16 :> Numeric_types.Int16.Set.t)
+
+and is_useful_head_of_kind_naked_int32 env head =
+  is_useful_set
+    (module Numeric_types.Int32.Set)
+    env
+    (head : TG.head_of_kind_naked_int32 :> Numeric_types.Int32.Set.t)
+
+and is_useful_head_of_kind_naked_int64 env head =
+  is_useful_set
+    (module Numeric_types.Int64.Set)
+    env
+    (head : TG.head_of_kind_naked_int64 :> Numeric_types.Int64.Set.t)
+
+and is_useful_head_of_kind_naked_nativeint env head =
+  is_useful_set
+    (module Targetint_32_64.Set)
+    env
+    (head : TG.head_of_kind_naked_nativeint :> Targetint_32_64.Set.t)
+
+and is_useful_head_of_kind_naked_vec128 env head =
+  is_useful_set
+    (module Vector_types.Vec128.Bit_pattern.Set)
+    env
+    (head
+      : TG.head_of_kind_naked_vec128
+      :> Vector_types.Vec128.Bit_pattern.Set.t)
+
+and is_useful_head_of_kind_naked_vec256 env head =
+  is_useful_set
+    (module Vector_types.Vec256.Bit_pattern.Set)
+    env
+    (head
+      : TG.head_of_kind_naked_vec256
+      :> Vector_types.Vec256.Bit_pattern.Set.t)
+
+and is_useful_head_of_kind_naked_vec512 env head =
+  is_useful_set
+    (module Vector_types.Vec512.Bit_pattern.Set)
+    env
+    (head
+      : TG.head_of_kind_naked_vec512
+      :> Vector_types.Vec512.Bit_pattern.Set.t)
+
+and is_useful_head_of_kind_rec_info _env _head = false
+
+and is_useful_head_of_kind_region _env () = false
+
+let type_is_useful full_kind env name =
+  let ty = TE.find env name (Some (K.With_subkind.kind full_kind)) in
+  is_useful full_kind env ty

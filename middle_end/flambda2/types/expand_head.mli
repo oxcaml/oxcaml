@@ -153,3 +153,6 @@ val make_suitable_for_environment :
   (Name.t * Type_grammar.t) list ->
   (* these [Name.t] values are called the "bind-to" names *)
   Typing_env_extension.With_extra_variables.t
+
+val type_is_useful :
+  Flambda_kind.With_subkind.t -> Typing_env.t -> Name.t -> bool
