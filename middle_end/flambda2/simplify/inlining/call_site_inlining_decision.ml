@@ -157,21 +157,23 @@ let argument_types_useful dacc apply =
           ~const:(fun _ -> true))
       (Apply.args apply)
 
-let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
+let inlining_does_decrease_code_size ~code_metadata cost_metrics =
   let[@ocamlformat "break-infix=fit-or-vertical"] original_code_size =
-    code_or_metadata
-    |> Code_or_metadata.code_metadata
-    |> Code_metadata.cost_metrics
-    |> Cost_metrics.size
+    code_metadata |> Code_metadata.cost_metrics |> Cost_metrics.size
   in
   let inlined_code_size = Cost_metrics.size cost_metrics in
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
-let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
+let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
+  let code_present () =
+    let code_or_metadata =
+      DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
+    in
+    Code_or_metadata.code_present code_or_metadata
+  in
   let denv = DA.denv dacc in
   let disable_inlining = DE.disable_inlining denv in
-  let code_metadata = Code_or_metadata.code_metadata code_or_metadata in
   let decision = Code_metadata.inlining_decision code_metadata in
   let is_a_functor = Code_metadata.is_a_functor code_metadata in
   let in_a_stub, doing_speculative_inlining =
@@ -184,10 +186,13 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
   then In_a_stub
   else if Function_decl_inlining_decision_type.must_be_inlined decision
   then
-    Definition_says_inline
-      { was_inline_always =
-          Function_decl_inlining_decision_type.has_attribute_inline decision
-      }
+    if code_present ()
+    then
+      Definition_says_inline
+        { was_inline_always =
+            Function_decl_inlining_decision_type.has_attribute_inline decision
+        }
+    else Missing_code
   else if Function_decl_inlining_decision_type.cannot_be_inlined decision
   then Definition_says_not_to_inline
   else if doing_speculative_inlining
@@ -203,7 +208,7 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
           let counters =
             Profile.Counters.incr "speculatively_inline" counters
           in
-          if inlining_does_decrease_code_size ~code_or_metadata cost_metrics
+          if inlining_does_decrease_code_size ~code_metadata cost_metrics
           then counters
           else Profile.Counters.incr "same_code_size" counters
         | Speculatively_not_inline _ ->
@@ -224,6 +229,8 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
       (fun () : Call_site_inlining_decision_type.t ->
         if not (argument_types_useful dacc apply)
         then Argument_types_not_useful
+        else if not (code_present ())
+        then Missing_code
         else
           let cost_metrics =
             speculative_inlining ~apply dacc ~simplify_expr ~return_arity
@@ -274,15 +281,19 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     fail_if_must_inline ();
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
-    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    match
+      DE.find_code_metadata_exn (DA.denv dacc) (FT.code_id function_type)
+    with
     | exception Not_found ->
       fail_if_must_inline ();
       Missing_code
-    | code_or_metadata when not (Code_or_metadata.code_present code_or_metadata)
-      ->
-      fail_if_must_inline ();
-      Missing_code
-    | code_or_metadata -> (
+    | code_metadata -> (
+      let code_present () =
+        let code_or_metadata =
+          DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
+        in
+        Code_or_metadata.code_present code_or_metadata
+      in
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
          1. We see an [@unrolled n] annotation (with n > 0) on an apply
@@ -304,7 +315,12 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
       | Some 0 ->
         fail_if_must_inline ();
         Unrolling_depth_exceeded
-      | Some _ -> Continue_unrolling
+      | Some _ ->
+        if code_present ()
+        then Continue_unrolling
+        else (
+          fail_if_must_inline ();
+          Missing_code)
       | None -> (
         (* lmaurer: This seems semantically dodgy: If we really think of a free
            depth variable as [Unknown], then we shouldn't be considering
@@ -320,10 +336,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
            ramifications of treating unknown-ness as an observable property this
            way. Are we relying on monotonicity somewhere? *)
         let apply_inlining_state = Apply.inlining_state apply in
-        let recursive =
-          Code_metadata.recursive
-            (Code_or_metadata.code_metadata code_or_metadata)
-        in
+        let recursive = Code_metadata.recursive code_metadata in
         if Inlining_state.is_depth_exceeded apply_inlining_state
         then (
           fail_if_must_inline ();
@@ -367,9 +380,17 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
                   "Internal assumption broken: DE.says must_inline\n\
                   \                  (presumably because of the replay \
                    history), but the replay history is still recoding."
-              | Replayed decision -> Replay_history_says_must_inline decision
+              | Replayed decision ->
+                if code_present ()
+                then Replay_history_says_must_inline decision
+                else
+                  Misc.fatal_errorf
+                    "Replay history says we should inline %a, but its code is \
+                     not present"
+                    Code_id.print
+                    (Code_metadata.code_id code_metadata)
             else
-              might_inline dacc ~apply ~code_or_metadata ~function_type
+              might_inline dacc ~apply ~code_metadata ~function_type
                 ~simplify_expr ~return_arity
           | `Unroll unroll_to ->
             if Simplify_rec_info_expr.can_unroll dacc rec_info
@@ -377,11 +398,20 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               (* This sets off step 1 in the comment above; see
                  [Inlining_transforms] for how [unroll_to] is ultimately
                  handled. *)
-              Begin_unrolling unroll_to
+              if code_present ()
+              then Begin_unrolling unroll_to
+              else (
+                fail_if_must_inline ();
+                Missing_code)
             else (
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
-          | `Always -> Attribute_always)))
+          | `Always ->
+            if code_present ()
+            then Attribute_always
+            else (
+              fail_if_must_inline ();
+              Missing_code))))
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
