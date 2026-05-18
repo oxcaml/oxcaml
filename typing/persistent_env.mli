@@ -106,6 +106,15 @@ type 'a sig_reader =
 
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.signature
+
+(** [read_artifact] is a variant of [read] that takes only an artifact: it
+    reads the cmi and registers it as a hidden import under the module name
+    stored inside the cmi (rather than one inferred from the filename or
+    supplied by the caller). Returns the resulting global name and
+    signature. *)
+val read_artifact :
+     'a t -> Unit_info.Artifact.t
+  -> Global_module.Name.t * Subst.Lazy.signature
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 

@@ -95,7 +95,7 @@ let initial_env () =
   Typemod.initial_env
     ~loc:(Location.in_file "command line")
     ~initially_opened_module
-    ~open_implicit_modules:(List.rev !Clflags.open_modules)
+    ~open_implicit_args:(List.rev !Clflags.open_args)
 
 let set_from_env flag Clflags.{ parse; usage; env_var } =
   try

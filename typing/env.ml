@@ -4238,7 +4238,39 @@ let remove_last_open root env0 =
 (* Open a signature from a file *)
 
 let open_pers_signature name env =
-  open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  let path, _, env =
+    open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  in
+  path, env
+
+let open_pers_signature_cmi filename env =
+  let artifact =
+    Unit_info.Artifact.from_filename
+      ~for_pack_prefix:Compilation_unit.Prefix.empty filename
+  in
+  (* Register as hidden so that direct user-code references to the module
+     are still reported as unbound; only transitive lookups can reach it. *)
+  let global_name, _sign =
+    Persistent_env.read_artifact !persistent_env artifact
+  in
+  let mda =
+    find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
+  in
+  let path = Pident (Ident.create_global global_name) in
+  use_module ~use:true ~loc:Location.none path mda;
+  let comps =
+    match get_components mda.mda_components with
+    | Structure_comps c -> c
+    | Functor_comps _ -> raise Not_found
+  in
+  let stage_locks, locks =
+    partition_locks (IdTbl.get_all_locks env.modules)
+  in
+  check_cross_quotation ~errors:false ~loc_use:Location.none
+    ~loc_def:Location.none env path Longident.(Lident (Path.name path))
+    stage_locks;
+  let env = add_components None path env comps locks in
+  path, env
 
 let open_signature
     ~used_slot
