@@ -69,7 +69,7 @@ type const =
 
 type field_of_block =
   | Symbol of symbol
-  | Tagged_immediate of immediate
+  | Const of const
   | Dynamically_computed of variable
 
 type is_recursive =
@@ -105,7 +105,20 @@ type static_data =
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.bits or_variable
   | Immutable_float_block of float or_variable list
   | Immutable_float_array of float or_variable list
+  | Immutable_float32_array of float or_variable list
   | Immutable_value_array of field_of_block list
+  | Immutable_int_array of targetint or_variable list
+  | Immutable_int8_array of Numeric_types.Int8.t or_variable list
+  | Immutable_int16_array of Numeric_types.Int16.t or_variable list
+  | Immutable_int32_array of int32 or_variable list
+  | Immutable_int64_array of int64 or_variable list
+  | Immutable_nativeint_array of targetint or_variable list
+  | Immutable_vec128_array of
+      Vector_types.Vec128.Bit_pattern.bits or_variable list
+  | Immutable_vec256_array of
+      Vector_types.Vec256.Bit_pattern.bits or_variable list
+  | Immutable_vec512_array of
+      Vector_types.Vec512.Bit_pattern.bits or_variable list
   | Empty_array of empty_array_kind
   | Mutable_string of { initial_value : string }
   | Immutable_string of string

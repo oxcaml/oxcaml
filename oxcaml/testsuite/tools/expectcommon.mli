@@ -37,7 +37,8 @@ module type Toplevel = sig
 
   (* Either [Toploop.execute_phrase] or [Opttoploop.execute_phrase] *)
   val execute_phrase :
-    bool -> Format.formatter -> Parsetree.toplevel_phrase -> bool
+    bool -> Format.formatter -> Parsetree.toplevel_phrase ->
+    bool * Compilation_unit.t option
 end
 
 (** Hook to capture assembly output for [%%expect_asm]. This function should be
