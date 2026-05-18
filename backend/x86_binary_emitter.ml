@@ -932,9 +932,15 @@ let emit_simple_encoding enc b dst src =
   | { rax_imm32 = opcodes }, Reg32 RAX, ((Imm _ | Sym _) as n) ->
       buf_opcodes b opcodes;
       buf_int32_imm b n
+  | ( { rm64_imm8 = opcodes; reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
+      Imm n )
+    when is_imm8L n ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 opcodes rm reg;
+      buf_int8L b n
   | ( { rm16_imm16 = opcodes; reg },
-      ((Reg16 _ | Mem { typ = WORD })
-      as rm),
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
       (Imm _ as n) ) ->
       buf_int8 b 0x66;
       emit_mod_rm_reg b 0 opcodes rm reg;
