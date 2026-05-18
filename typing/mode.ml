@@ -3750,147 +3750,192 @@ module For_testing = struct
   type packed_obj = Obj : 'a obj -> packed_obj
 
   let all_objs =
-    [ Obj Locality;
-      Obj Regionality;
-      Obj Uniqueness_op;
-      Obj Linearity;
-      Obj Portability;
-      Obj Forkable;
-      Obj Yielding;
-      Obj Statefulness;
-      Obj Contention_op;
-      Obj Visibility_op;
-      Obj Staticity_op;
-      Obj Monadic_op;
-      Obj Comonadic_with_locality;
-      Obj Comonadic_with_regionality ]
+    lazy
+      [ Obj Locality;
+        Obj Regionality;
+        Obj Uniqueness_op;
+        Obj Linearity;
+        Obj Portability;
+        Obj Forkable;
+        Obj Yielding;
+        Obj Statefulness;
+        Obj Contention_op;
+        Obj Visibility_op;
+        Obj Staticity_op;
+        Obj Monadic_op;
+        Obj Comonadic_with_locality;
+        Obj Comonadic_with_regionality ]
 
   let ( let* ) xs f = List.concat_map f xs
 
   let ( let+ ) xs f = List.map f xs
 
-  let values_for_check_locality = [Locality.Global; Locality.Local]
+  let values_for_check_locality = lazy [Locality.Global; Locality.Local]
 
   let values_for_check_regionality =
-    [Regionality.Global; Regionality.Regional; Regionality.Local]
+    lazy [Regionality.Global; Regionality.Regional; Regionality.Local]
 
-  let values_for_check_uniqueness_op = [Uniqueness.Unique; Uniqueness.Aliased]
+  let values_for_check_uniqueness_op =
+    lazy [Uniqueness.Unique; Uniqueness.Aliased]
 
-  let values_for_check_linearity = [Linearity.Many; Linearity.Once]
+  let values_for_check_linearity = lazy [Linearity.Many; Linearity.Once]
 
   let values_for_check_portability =
-    [ Portability.Portable;
-      Portability.Shareable;
-      Portability.Corruptible;
-      Portability.Nonportable ]
+    lazy
+      [ Portability.Portable;
+        Portability.Shareable;
+        Portability.Corruptible;
+        Portability.Nonportable ]
 
-  let values_for_check_forkable = [Forkable.Forkable; Forkable.Unforkable]
+  let values_for_check_forkable = lazy [Forkable.Forkable; Forkable.Unforkable]
 
-  let values_for_check_yielding = [Yielding.Unyielding; Yielding.Yielding]
+  let values_for_check_yielding = lazy [Yielding.Unyielding; Yielding.Yielding]
 
   let values_for_check_statefulness =
-    [ Statefulness.Stateless;
-      Statefulness.Writing;
-      Statefulness.Reading;
-      Statefulness.Stateful ]
+    lazy
+      [ Statefulness.Stateless;
+        Statefulness.Writing;
+        Statefulness.Reading;
+        Statefulness.Stateful ]
 
   let values_for_check_contention_op =
-    [ Contention.Uncontended;
-      Contention.Corrupted;
-      Contention.Shared;
-      Contention.Contended ]
+    lazy
+      [ Contention.Uncontended;
+        Contention.Corrupted;
+        Contention.Shared;
+        Contention.Contended ]
 
   let values_for_check_visibility_op =
-    [ Visibility.Read_write;
-      Visibility.Read;
-      Visibility.Write;
-      Visibility.Immutable ]
+    lazy
+      [ Visibility.Read_write;
+        Visibility.Read;
+        Visibility.Write;
+        Visibility.Immutable ]
 
-  let values_for_check_staticity_op = [Staticity.Static; Staticity.Dynamic]
+  let values_for_check_staticity_op = lazy [Staticity.Static; Staticity.Dynamic]
 
   let values_for_check_monadic_op =
-    let with_base base =
-      List.concat
-        [ List.map
-            (fun uniqueness -> { base with uniqueness })
-            values_for_check_uniqueness_op;
-          List.map
-            (fun contention -> { base with contention })
-            values_for_check_contention_op;
-          List.map
-            (fun visibility -> { base with visibility })
-            values_for_check_visibility_op;
-          List.map
-            (fun staticity -> { base with staticity })
-            values_for_check_staticity_op ]
-    in
-    with_base Monadic_op.min @ with_base Monadic_op.max
+    lazy
+      (let values_for_check_uniqueness_op =
+         Lazy.force values_for_check_uniqueness_op
+       in
+       let values_for_check_contention_op =
+         Lazy.force values_for_check_contention_op
+       in
+       let values_for_check_visibility_op =
+         Lazy.force values_for_check_visibility_op
+       in
+       let values_for_check_staticity_op =
+         Lazy.force values_for_check_staticity_op
+       in
+       let with_base base =
+         List.concat
+           [ List.map
+               (fun uniqueness -> { base with uniqueness })
+               values_for_check_uniqueness_op;
+             List.map
+               (fun contention -> { base with contention })
+               values_for_check_contention_op;
+             List.map
+               (fun visibility -> { base with visibility })
+               values_for_check_visibility_op;
+             List.map
+               (fun staticity -> { base with staticity })
+               values_for_check_staticity_op ]
+       in
+       with_base Monadic_op.min @ with_base Monadic_op.max)
 
   let values_for_check_comonadic_with_locality =
-    let with_base base =
-      List.concat
-        [ List.map
-            (fun areality -> { base with areality })
-            values_for_check_locality;
-          List.map
-            (fun linearity -> { base with linearity })
-            values_for_check_linearity;
-          List.map
-            (fun portability -> { base with portability })
-            values_for_check_portability;
-          List.map
-            (fun forkable -> { base with forkable })
-            values_for_check_forkable;
-          List.map
-            (fun yielding -> { base with yielding })
-            values_for_check_yielding;
-          List.map
-            (fun statefulness -> { base with statefulness })
-            values_for_check_statefulness ]
-    in
-    with_base Comonadic_with_locality.min
-    @ with_base Comonadic_with_locality.max
+    lazy
+      (let values_for_check_locality = Lazy.force values_for_check_locality in
+       let values_for_check_linearity = Lazy.force values_for_check_linearity in
+       let values_for_check_portability =
+         Lazy.force values_for_check_portability
+       in
+       let values_for_check_forkable = Lazy.force values_for_check_forkable in
+       let values_for_check_yielding = Lazy.force values_for_check_yielding in
+       let values_for_check_statefulness =
+         Lazy.force values_for_check_statefulness
+       in
+       let with_base base =
+         List.concat
+           [ List.map
+               (fun areality -> { base with areality })
+               values_for_check_locality;
+             List.map
+               (fun linearity -> { base with linearity })
+               values_for_check_linearity;
+             List.map
+               (fun portability -> { base with portability })
+               values_for_check_portability;
+             List.map
+               (fun forkable -> { base with forkable })
+               values_for_check_forkable;
+             List.map
+               (fun yielding -> { base with yielding })
+               values_for_check_yielding;
+             List.map
+               (fun statefulness -> { base with statefulness })
+               values_for_check_statefulness ]
+       in
+       with_base Comonadic_with_locality.min
+       @ with_base Comonadic_with_locality.max)
 
   let values_for_check_comonadic_with_regionality =
-    let with_base base =
-      List.concat
-        [ List.map
-            (fun areality -> { base with areality })
-            values_for_check_regionality;
-          List.map
-            (fun linearity -> { base with linearity })
-            values_for_check_linearity;
-          List.map
-            (fun portability -> { base with portability })
-            values_for_check_portability;
-          List.map
-            (fun forkable -> { base with forkable })
-            values_for_check_forkable;
-          List.map
-            (fun yielding -> { base with yielding })
-            values_for_check_yielding;
-          List.map
-            (fun statefulness -> { base with statefulness })
-            values_for_check_statefulness ]
-    in
-    with_base Comonadic_with_regionality.min
-    @ with_base Comonadic_with_regionality.max
+    lazy
+      (let values_for_check_regionality =
+         Lazy.force values_for_check_regionality
+       in
+       let values_for_check_linearity = Lazy.force values_for_check_linearity in
+       let values_for_check_portability =
+         Lazy.force values_for_check_portability
+       in
+       let values_for_check_forkable = Lazy.force values_for_check_forkable in
+       let values_for_check_yielding = Lazy.force values_for_check_yielding in
+       let values_for_check_statefulness =
+         Lazy.force values_for_check_statefulness
+       in
+       let with_base base =
+         List.concat
+           [ List.map
+               (fun areality -> { base with areality })
+               values_for_check_regionality;
+             List.map
+               (fun linearity -> { base with linearity })
+               values_for_check_linearity;
+             List.map
+               (fun portability -> { base with portability })
+               values_for_check_portability;
+             List.map
+               (fun forkable -> { base with forkable })
+               values_for_check_forkable;
+             List.map
+               (fun yielding -> { base with yielding })
+               values_for_check_yielding;
+             List.map
+               (fun statefulness -> { base with statefulness })
+               values_for_check_statefulness ]
+       in
+       with_base Comonadic_with_regionality.min
+       @ with_base Comonadic_with_regionality.max)
 
   let all_values_for_check : type a. a obj -> a list = function
-    | Locality -> values_for_check_locality
-    | Regionality -> values_for_check_regionality
-    | Uniqueness_op -> values_for_check_uniqueness_op
-    | Linearity -> values_for_check_linearity
-    | Portability -> values_for_check_portability
-    | Forkable -> values_for_check_forkable
-    | Yielding -> values_for_check_yielding
-    | Statefulness -> values_for_check_statefulness
-    | Contention_op -> values_for_check_contention_op
-    | Visibility_op -> values_for_check_visibility_op
-    | Staticity_op -> values_for_check_staticity_op
-    | Monadic_op -> values_for_check_monadic_op
-    | Comonadic_with_locality -> values_for_check_comonadic_with_locality
-    | Comonadic_with_regionality -> values_for_check_comonadic_with_regionality
+    | Locality -> Lazy.force values_for_check_locality
+    | Regionality -> Lazy.force values_for_check_regionality
+    | Uniqueness_op -> Lazy.force values_for_check_uniqueness_op
+    | Linearity -> Lazy.force values_for_check_linearity
+    | Portability -> Lazy.force values_for_check_portability
+    | Forkable -> Lazy.force values_for_check_forkable
+    | Yielding -> Lazy.force values_for_check_yielding
+    | Statefulness -> Lazy.force values_for_check_statefulness
+    | Contention_op -> Lazy.force values_for_check_contention_op
+    | Visibility_op -> Lazy.force values_for_check_visibility_op
+    | Staticity_op -> Lazy.force values_for_check_staticity_op
+    | Monadic_op -> Lazy.force values_for_check_monadic_op
+    | Comonadic_with_locality ->
+      Lazy.force values_for_check_comonadic_with_locality
+    | Comonadic_with_regionality ->
+      Lazy.force values_for_check_comonadic_with_regionality
 
   type 'a packed_axis = Axis : ('a, 'b) Axis.t -> 'a packed_axis
 
@@ -4066,7 +4111,7 @@ module For_testing = struct
         (simple_left_to dst)
     in
     let projections =
-      let* (Obj src) = all_objs in
+      let* (Obj src) = Lazy.force all_objs in
       let* (Axis ax) = axes src in
       let projected = proj_obj ax src in
       let+ m = simple_left_from_to projected dst in
@@ -4079,7 +4124,9 @@ module For_testing = struct
       left_morph_to src (Min_with_simple (ax, m))
     in
     let const_min =
-      List.map (fun (Obj src) -> left_morph_to src (Const_min src)) all_objs
+      List.map
+        (fun (Obj src) -> left_morph_to src (Const_min src))
+        (Lazy.force all_objs)
     in
     simple_morphs @ projections @ min_with @ const_min
 
@@ -4091,7 +4138,7 @@ module For_testing = struct
         (simple_right_to dst)
     in
     let projections =
-      let* (Obj src) = all_objs in
+      let* (Obj src) = Lazy.force all_objs in
       let* (Axis ax) = axes src in
       let projected = proj_obj ax src in
       let+ m = simple_right_from_to projected dst in
@@ -4104,58 +4151,61 @@ module For_testing = struct
       right_morph_to src (Max_with_simple (ax, m))
     in
     let const_max =
-      List.map (fun (Obj src) -> right_morph_to src (Const_max src)) all_objs
+      List.map
+        (fun (Obj src) -> right_morph_to src (Const_max src))
+        (Lazy.force all_objs)
     in
     simple_morphs @ projections @ max_with @ const_max
 
   let generate_morphs_to dst =
     generate_left_morphs_to dst @ generate_right_morphs_to dst
 
-  let morphs_to_locality = generate_morphs_to Locality
+  let morphs_to_locality = lazy (generate_morphs_to Locality)
 
-  let morphs_to_regionality = generate_morphs_to Regionality
+  let morphs_to_regionality = lazy (generate_morphs_to Regionality)
 
-  let morphs_to_uniqueness_op = generate_morphs_to Uniqueness_op
+  let morphs_to_uniqueness_op = lazy (generate_morphs_to Uniqueness_op)
 
-  let morphs_to_linearity = generate_morphs_to Linearity
+  let morphs_to_linearity = lazy (generate_morphs_to Linearity)
 
-  let morphs_to_portability = generate_morphs_to Portability
+  let morphs_to_portability = lazy (generate_morphs_to Portability)
 
-  let morphs_to_forkable = generate_morphs_to Forkable
+  let morphs_to_forkable = lazy (generate_morphs_to Forkable)
 
-  let morphs_to_yielding = generate_morphs_to Yielding
+  let morphs_to_yielding = lazy (generate_morphs_to Yielding)
 
-  let morphs_to_statefulness = generate_morphs_to Statefulness
+  let morphs_to_statefulness = lazy (generate_morphs_to Statefulness)
 
-  let morphs_to_contention_op = generate_morphs_to Contention_op
+  let morphs_to_contention_op = lazy (generate_morphs_to Contention_op)
 
-  let morphs_to_visibility_op = generate_morphs_to Visibility_op
+  let morphs_to_visibility_op = lazy (generate_morphs_to Visibility_op)
 
-  let morphs_to_staticity_op = generate_morphs_to Staticity_op
+  let morphs_to_staticity_op = lazy (generate_morphs_to Staticity_op)
 
-  let morphs_to_monadic_op = generate_morphs_to Monadic_op
+  let morphs_to_monadic_op = lazy (generate_morphs_to Monadic_op)
 
   let morphs_to_comonadic_with_locality =
-    generate_morphs_to Comonadic_with_locality
+    lazy (generate_morphs_to Comonadic_with_locality)
 
   let morphs_to_comonadic_with_regionality =
-    generate_morphs_to Comonadic_with_regionality
+    lazy (generate_morphs_to Comonadic_with_regionality)
 
   let morphs_to : type b. b obj -> b packed_morph_to list = function
-    | Locality -> morphs_to_locality
-    | Regionality -> morphs_to_regionality
-    | Uniqueness_op -> morphs_to_uniqueness_op
-    | Linearity -> morphs_to_linearity
-    | Portability -> morphs_to_portability
-    | Forkable -> morphs_to_forkable
-    | Yielding -> morphs_to_yielding
-    | Statefulness -> morphs_to_statefulness
-    | Contention_op -> morphs_to_contention_op
-    | Visibility_op -> morphs_to_visibility_op
-    | Staticity_op -> morphs_to_staticity_op
-    | Monadic_op -> morphs_to_monadic_op
-    | Comonadic_with_locality -> morphs_to_comonadic_with_locality
-    | Comonadic_with_regionality -> morphs_to_comonadic_with_regionality
+    | Locality -> Lazy.force morphs_to_locality
+    | Regionality -> Lazy.force morphs_to_regionality
+    | Uniqueness_op -> Lazy.force morphs_to_uniqueness_op
+    | Linearity -> Lazy.force morphs_to_linearity
+    | Portability -> Lazy.force morphs_to_portability
+    | Forkable -> Lazy.force morphs_to_forkable
+    | Yielding -> Lazy.force morphs_to_yielding
+    | Statefulness -> Lazy.force morphs_to_statefulness
+    | Contention_op -> Lazy.force morphs_to_contention_op
+    | Visibility_op -> Lazy.force morphs_to_visibility_op
+    | Staticity_op -> Lazy.force morphs_to_staticity_op
+    | Monadic_op -> Lazy.force morphs_to_monadic_op
+    | Comonadic_with_locality -> Lazy.force morphs_to_comonadic_with_locality
+    | Comonadic_with_regionality ->
+      Lazy.force morphs_to_comonadic_with_regionality
 
   let check_compose : type a b c.
       a obj ->
@@ -4194,7 +4244,7 @@ module For_testing = struct
   let run_jobs jobs = List.iter (fun job -> job ()) jobs
 
   let check_jobs () =
-    let* (Obj dst) = all_objs in
+    let* (Obj dst) = Lazy.force all_objs in
     let+ (Morph_to (mid, f)) = morphs_to dst in
     let morphs_to_mid = morphs_to mid in
     fun () ->
