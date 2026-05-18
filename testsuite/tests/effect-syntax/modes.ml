@@ -7,6 +7,8 @@ open Effect.Deep
 
 let use_unique : 'a @ unique -> unit = fun _ -> ()
 
+let use_portable : 'a @ portable -> unit = fun _ -> ()
+
 let use_portable_function : (unit -> unit) @ portable -> unit = fun _ -> ()
 
 type record = { a : int }
@@ -18,6 +20,7 @@ type _ eff += Need_unit : unit eff
 type _ eff += Payload : int ref -> unit eff
 [%%expect {|
 val use_unique : 'a @ unique -> unit = <fun>
+val use_portable : 'a @ portable -> unit = <fun>
 val use_portable_function : (unit -> unit) @ portable -> unit = <fun>
 type record = { a : int; }
 type _ eff += Need_ref : int ref eff
@@ -37,6 +40,16 @@ Line 3, characters 20-21:
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
+(* A result returned by [perform] is aliased, not unique. *)
+let () =
+  use_unique (perform Need_ref)
+[%%expect {|
+Line 2, characters 13-31:
+2 |   use_unique (perform Need_ref)
+                 ^^^^^^^^^^^^^^^^^^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
 (* A continuation result cannot be a local reference escaping globally. *)
 let _ =
   match perform Need_ref with
@@ -47,6 +60,44 @@ Line 4, characters 37-53:
 4 |   | effect Need_ref, k -> continue k (stack_ (ref 0))
                                          ^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
+|}]
+
+(* The continuation passed to [continue] must be legacy. *)
+let () =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k ->
+      let (k @ local) = k in
+      continue k ()
+[%%expect {|
+Line 6, characters 15-16:
+6 |       continue k ()
+                   ^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* A result returned by [continue] is aliased, not unique. *)
+let () =
+  match perform Need_ref with
+  | r -> ignore !r
+  | effect Need_ref, k -> use_unique (continue k (ref 0))
+[%%expect {|
+Line 4, characters 37-57:
+4 |   | effect Need_ref, k -> use_unique (continue k (ref 0))
+                                         ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* An effect continuation is legacy, not portable. *)
+let () =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k -> use_portable k
+[%%expect {|
+Line 4, characters 40-41:
+4 |   | effect Need_unit, k -> use_portable k
+                                            ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* An effect payload passed to [perform] must be legacy. *)
