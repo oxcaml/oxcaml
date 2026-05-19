@@ -2104,10 +2104,15 @@ module Ast = struct
     | Src_pos -> pp fmt "[%%src_pos]"
 
   and print_exp env fmt exp =
-    if exp.attributes <> [] then pp fmt "(@[";
-    print_exp_desc env fmt exp;
-    List.iter (print_attribute fmt) exp.attributes;
-    if exp.attributes <> [] then pp fmt "@])"
+    match exp.attributes with
+    | [] ->
+      print_exp_desc env fmt exp
+    | (_ :: _) as attr ->
+      pp fmt "(@[(@[";
+      print_exp_desc env fmt exp;
+      pp fmt "@])";
+      List.iter (print_attribute fmt) attr;
+      pp fmt "@])"
 end
 
 module Label = struct

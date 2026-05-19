@@ -1120,7 +1120,7 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 <[ fun f x -> (f [@inlined]) x [@nontail] ]>
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
-<[fun f x -> ((f [@inlined]) x [@nontail])]>
+<[fun f x -> ((((f) [@inlined]) x) [@nontail])]>
 |}];;
 
 <[ fun x -> [ x ; x + 1 ] ]>
@@ -1722,12 +1722,12 @@ Error: Identifier "foo" is used at line 1, characters 56-59,
 
 <[ let open [@inline] M in foo ]>
 [%%expect {|
-- : <[int]> expr = <[(let open! M in M.foo [@inline])]>
+- : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
 |}];;
 
 <[ ((let open M in foo) [@inline]) ]>
 [%%expect {|
-- : <[int]> expr = <[(let open! M in M.foo [@inline])]>
+- : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
 |}];;
 
 (** Opening modules in patterns **)
