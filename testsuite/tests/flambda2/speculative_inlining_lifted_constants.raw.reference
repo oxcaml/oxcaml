@@ -14,8 +14,8 @@ let $camlSpeculative_inlining_lifted_constants__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 of imm tagged * imm tagged ] =
    let next_depth = rec_info (succ my_depth) in
-   let one = %project_value_slot.[`v1`].[`one`] (my_closure) in
-   let f = %project_value_slot.[`v1`].[`f`] (my_closure) in
+   let one = %project_value_slot.[v1].[one] (my_closure) in
+   let f = %project_value_slot.[v1].[f] (my_closure) in
    apply direct(f_0)
      (f : _ -> [ 0 of imm tagged * imm tagged ]) (one) -> k1 * k2
  in

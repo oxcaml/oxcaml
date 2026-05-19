@@ -25,7 +25,7 @@ apply direct(f_0_1)
             -> k * k1
             : [ 0 of imm tagged * imm tagged ] =
       let one_1 =
-        %project_value_slot.[`v1`].[`one`]
+        %project_value_slot.[v1].[one]
           ($camlSpeculative_inlining_lifted_constants__v1_3)
       in
       apply direct(f_0_1)
