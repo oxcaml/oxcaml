@@ -12,6 +12,7 @@ module M = struct
   let foo = 42
   type 'a record = { record_field : 'a }
   type 'a variant = Variant_tag of 'a
+  type 'a my_option = None | Some of 'a
 end
 [%%expect {|
 module M :
@@ -20,6 +21,7 @@ module M :
     val foo : int
     type 'a record = { record_field : 'a; }
     type 'a variant = Variant_tag of 'a
+    type 'a my_option = None | Some of 'a
   end
 |}];;
 
@@ -979,7 +981,7 @@ Error: Object definition using "object..end"
 Line 1, characters 3-42:
 1 | <[ let open struct let foo = 42 end in foo ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Opening non-trivial modules
+Error: Opening modules otherwise than by name
        is not supported inside quoted expressions,
        as seen at line 1, characters 3-42.
 |}]
@@ -1638,7 +1640,7 @@ exception E
 - : 'a expr = <[Stdlib.raise Exc.E]>
 |}];;
 
-(* Opening modules *)
+(** Opening modules in expressions **)
 
 <[ let open List in map length [[1]; [2; 3]] ]>
 [%%expect {|
@@ -1668,11 +1670,27 @@ exception E
 ]>
 |}];;
 
+<[ M.(Variant_tag "open"), M.Variant_tag "path" ]>
+[%%expect {|
+- : <[string M.variant * string M.variant]> expr =
+<[((let open! M in M.Variant_tag "open"), (M.Variant_tag "path"))]>
+|}];;
+
+(* Opening packed module *)
+
+<[ fun (module M : T) -> let open M in foo + 1 ]>
+[%%expect {|
+- : <[(module T) -> int]> expr =
+<[fun (module M : T) -> let open! M in M.foo + 1]>
+|}];;
+
 (* Cross-stage open *)
+
 <[ let open List in $(hd [ <[ 0 ]>; <[ 1 ]> ]) ]>
 [%%expect {|
 - : <[int]> expr = <[let open! Stdlib.List in 0]>
 |}];;
+
 let open List in <[ length [1; 2; 3] ]>
 [%%expect {|
 - : <[int]> expr = <[Stdlib.List.length ([1; 2; 3])]>
@@ -1690,12 +1708,6 @@ Error: Identifier "foo1" is used at line 2, characters 18-22,
        it is introduced at line 1, characters 23-27, outside any quotations.
 |}];;
 
-(* Opening packed module *)
-<[ fun (module M : T) -> let open M in foo + 1 ]>
-[%%expect {|
-- : <[(module T) -> int]> expr =
-<[fun (module M : T) -> let open! M in M.foo + 1]>
-|}];;
 <[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
 [%%expect {|
 Line 1, characters 56-59:
@@ -1704,4 +1716,30 @@ Line 1, characters 56-59:
 Error: Identifier "foo" is used at line 1, characters 56-59,
        outside any quotations; it is introduced at line 2, characters 2-15,
        inside a quotation (<[ ... ]>).
+|}];;
+
+(* Attributes on let-open *)
+
+<[ let open [@inline] M in foo ]>
+[%%expect {|
+- : <[int]> expr = <[(let open! M in M.foo [@inline])]>
+|}];;
+
+<[ ((let open M in foo) [@inline]) ]>
+[%%expect {|
+- : <[int]> expr = <[(let open! M in M.foo [@inline])]>
+|}];;
+
+(** Opening modules in patterns **)
+
+<[ function M.(Variant_tag 0) -> 1 | M.Variant_tag _ -> 0 ]>
+[%%expect {|
+- : <[int M.variant -> int]> expr =
+<[function | M.Variant_tag (0) -> 1 | M.Variant_tag (_) -> 0]>
+|}];;
+
+<[ function M.(Some x) -> x | M.(None) -> 0 ]>
+[%%expect {|
+- : <[int M.my_option -> int]> expr =
+<[function | M.Some (x) -> x | M.None -> 0]>
 |}];;
