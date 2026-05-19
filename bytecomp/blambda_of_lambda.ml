@@ -1103,8 +1103,9 @@ and comp_unary_scalar_intrinsic op x =
       ccall "caml_%s_%s"
         (Scalar.Operation.Unary.Float_op.to_string op)
         (Scalar.Floating.Width.to_string size))
-  | Static_cast { src; dst } ->
-    (* CR jrayman: why is this not erroring? [signedness] is not bound *)
+  | Static_cast { src; dst; signedness } ->
+    let _ = signedness in
+    (* CR jrayman *)
     static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst)
 
 and make_unsigned_comparison size signed_comparison x y =
