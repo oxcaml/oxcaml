@@ -158,7 +158,6 @@ module T = struct
         sub.typ sub t
     | Ptyp_quote t -> sub.typ sub t
     | Ptyp_splice t -> sub.typ sub t
-    | Ptyp_box t -> sub.typ sub t
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t

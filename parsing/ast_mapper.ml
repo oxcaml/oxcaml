@@ -198,8 +198,6 @@ module T = struct
         quote ~loc ~attrs (sub.typ sub t)
     | Ptyp_splice t ->
         splice ~loc ~attrs (sub.typ sub t)
-    | Ptyp_box t ->
-        box ~loc ~attrs (sub.typ sub t)
     | Ptyp_of_kind jkind ->
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_repr (lvars, t) ->

@@ -125,6 +125,7 @@ val path_floatarray: Path.t
 val path_lexing_position: Path.t
 val path_code: Path.t
 val path_eval: Path.t
+val path_box: Path.t
 
 val path_unboxed_unit : Path.t
 val path_unboxed_bool : Path.t

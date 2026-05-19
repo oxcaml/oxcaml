@@ -985,7 +985,6 @@ let maybe_pmod_constraint mode expr =
 %token BARRBRACKET            "|]"
 %token BEGIN                  "begin"
 %token BORROW                 "borrow_"
-%token BOX_                   "box_"
 %token <char> CHAR            "'a'" (* just an example *)
 %token <char> HASH_CHAR       "#'a'" (* just an example *)
 %token CLASS                  "class"
@@ -4948,8 +4947,6 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
-  | ty = atomic_type BOX_
-      { mktyp ~loc:$sloc (Ptyp_box ty) }
 
 
 (* This is the syntax of the actual type parameters in an application of
