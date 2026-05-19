@@ -855,6 +855,15 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 ]>
 |}];;
 
+<[fun (module M : Hashtbl.S) -> (module M : Hashtbl.S)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> (module Hashtbl.S)]> expr =
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    -> (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+]>
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
 Line 1, characters 19-20:
