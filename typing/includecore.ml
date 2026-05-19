@@ -1012,51 +1012,46 @@ module Record_diffing = struct
         | Record_variable, Record_variable -> None
         | Record_variable, _ -> Some (Fixed_representation Second)
         | _, Record_variable -> Some (Fixed_representation First)
-        | rep1, rep2 ->
-          begin match rep1, rep2 with
-          | Record_unboxed, Record_unboxed -> None
-          | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
-          | _, Record_unboxed -> Some (Unboxed_representation (Second, []))
 
-          | Record_inlined _, Record_inlined _ -> None
-          | Record_inlined _, _ ->
-             Some (Record_mismatch (Inlined_representation First))
-          | _, Record_inlined _ ->
-             Some (Record_mismatch (Inlined_representation Second))
+        | Record_unboxed, Record_unboxed -> None
+        | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
+        | _, Record_unboxed -> Some (Unboxed_representation (Second, []))
 
-          | Record_float, Record_float -> None
-          | Record_float, _ ->
-             Some (Record_mismatch (Float_representation First))
-          | _, Record_float ->
-             Some (Record_mismatch (Float_representation Second))
+        | Record_inlined _, Record_inlined _ -> None
+        | Record_inlined _, _ ->
+           Some (Record_mismatch (Inlined_representation First))
+        | _, Record_inlined _ ->
+           Some (Record_mismatch (Inlined_representation Second))
 
-          | Record_ufloat, Record_ufloat -> None
-          | Record_ufloat, _ ->
-             Some (Record_mismatch (Ufloat_representation First))
-          | _, Record_ufloat ->
-             Some (Record_mismatch (Ufloat_representation Second))
+        | Record_float, Record_float -> None
+        | Record_float, _ ->
+           Some (Record_mismatch (Float_representation First))
+        | _, Record_float ->
+           Some (Record_mismatch (Float_representation Second))
 
-          | Record_mixed m1, Record_mixed m2 ->
-              begin match
-                find_mismatch_in_mixed_record_representations m1 m2
-              with
-              | None -> None
-              | Some mismatch -> Some (Record_mismatch mismatch)
-              end
-          | Record_mixed _, _ ->
-             Some (Record_mismatch (Mixed_representation First))
-          | _, Record_mixed _ ->
-             Some (Record_mismatch (Mixed_representation Second))
+        | Record_ufloat, Record_ufloat -> None
+        | Record_ufloat, _ ->
+           Some (Record_mismatch (Ufloat_representation First))
+        | _, Record_ufloat ->
+           Some (Record_mismatch (Ufloat_representation Second))
 
-          | Record_boxed, Record_boxed -> None
+        | Record_mixed m1, Record_mixed m2 ->
+            begin match
+              find_mismatch_in_mixed_record_representations m1 m2
+            with
+            | None -> None
+            | Some mismatch -> Some (Record_mismatch mismatch)
+            end
+        | Record_mixed _, _ ->
+           Some (Record_mismatch (Mixed_representation First))
+        | _, Record_mixed _ ->
+           Some (Record_mismatch (Mixed_representation Second))
 
-          | Record_dummy _, _ | _, Record_dummy _ ->
-            Misc.fatal_error
-              "compare_with_representation: dummy record representation"
-          | Record_variable, _ | _, Record_variable ->
-            (* Outer match guards against this. *)
-            assert false
-          end
+        | Record_boxed, Record_boxed -> None
+
+        | Record_dummy _, _ | _, Record_dummy _ ->
+          Misc.fatal_error
+            "compare_with_representation: dummy record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
