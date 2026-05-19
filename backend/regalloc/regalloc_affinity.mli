@@ -23,5 +23,8 @@ type affinities
     order. *)
 val get : t -> Reg.t -> affinities
 
+(* CR-someday mslater for xclerc: consider a stateless `iter` or `iter_until`
+   function, that wouldn't need to store an index.*)
+
 (** Returns the next affinity if there is one, `None` otherwise *)
 val next : affinities -> affinity option
