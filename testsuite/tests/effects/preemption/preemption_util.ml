@@ -4,7 +4,7 @@ open Effect.Deep
 external preempt_self : unit -> unit = "caml_domain_preempt_self"
 [@@noalloc]
 
-let with_preemption_setup ?(interval = 0.1) ?(repeating = false) f =
+let with_preemption_setup ?(interval = 0.05) ?(repeating = false) f =
   let it_interval = if repeating then interval else 0. in
   Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ()))
   |> ignore;
