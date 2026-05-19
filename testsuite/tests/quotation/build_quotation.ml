@@ -981,7 +981,7 @@ Error: Object definition using "object..end"
 Line 1, characters 3-42:
 1 | <[ let open struct let foo = 42 end in foo ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Opening modules otherwise than by name
+Error: Opening a non-identifier module expression
        is not supported inside quoted expressions,
        as seen at line 1, characters 3-42.
 |}]

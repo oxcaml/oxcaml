@@ -5011,7 +5011,7 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Module type definition using %a"
         (Style.inline_code) "sig..end"
   | Open_qt ->
-      fprintf ppf "Opening modules otherwise than by name"
+      fprintf ppf "Opening a non-identifier module expression"
   | Object_field_with_attribute_qt ->
       fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
