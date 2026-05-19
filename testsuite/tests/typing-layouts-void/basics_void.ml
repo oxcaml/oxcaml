@@ -185,52 +185,31 @@ Error: Records must contain at least one runtime value.
 
 type bad = A of { a : unit_u }
 [%%expect{|
-Line 1, characters 11-30:
-1 | type bad = A of { a : unit_u }
-               ^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : unit_u; }
 |}]
 type bad = A of { a : #(unit_u * unit_u) }
 [%%expect{|
-Line 1, characters 11-42:
-1 | type bad = A of { a : #(unit_u * unit_u) }
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : #(unit_u * unit_u); }
 |}]
 type bad = A of { a : u1 }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u1 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : u1; }
 |}]
 type bad = A of { a : u2 }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u2 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : u2; }
 |}]
 type bad = A of { a : u3 }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u3 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : u3; }
 |}]
 type bad = A of { a : u4 }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u4 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : u4; }
 |}]
 type bad = A of { a : u5 }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u5 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type bad = A of { a : u5; }
 |}]
 
 (* [void] in arrays is not yet allowed *)

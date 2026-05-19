@@ -539,8 +539,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let ll =
         List.map (fun (e, sort) -> transl_exp ~scopes sort e) args_with_sorts
       in
-      if cstr.cstr_inlined <> None then begin match ll with
-        | [x] -> x
+      if cstr.cstr_inlined <> None then begin match ll, cstr.cstr_tag with
+        | [x], Ordinary { runtime_tag; _ } when cstr.cstr_constant ->
+          (* All-void inline record: the constructor is an immediate, so emit
+             the tag.  The inline record's field-initializer expressions still
+             need to run for their side effects. *)
+          Lsequence (x, tagged_immediate runtime_tag)
+        | [x], _ -> x
         | _ -> assert false
       end else begin match cstr.cstr_tag, cstr.cstr_repr with
       | Null, Variant_with_null -> Lconst Const_null

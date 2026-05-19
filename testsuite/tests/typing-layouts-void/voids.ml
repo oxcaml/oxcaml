@@ -726,4 +726,99 @@ let test19 () =
 
 let _ = test19 ()
 
+(*************************************************************)
+(* Test 20: variants with [any] argument instantiated to void *)
+
+(* A constructor whose argument has layout [any] but is instantiated at the use
+   site to a void type should be allocated as an immediate, matching the
+   behavior of a constructor whose argument is statically known to be void. *)
+
+type fixed_single = Sa of unit#
+type fixed_product = Sb of unit# * #(unit# * unit#)
+type ('a : any) any_single = Aa of 'a
+type ('a : any) any_multi = Aa of 'a | Ab
+type ('a : any) any_inline_mix =
+  | Ia of 'a
+  | Ib of { x : 'a; y : int }
+  | Ic
+
+let test20 () =
+  start_test "variants with any argument instantiated to void";
+
+  assert (Obj.is_int (Obj.repr (Sa #() : fixed_single)));
+  assert (Obj.is_int (Obj.repr (Sb (#(), #(#(), #())) : fixed_product)));
+  assert (Obj.is_int (Obj.repr (Aa #() : unit# any_single)));
+  assert (Obj.is_int (Obj.repr (Aa #(#(), #())
+                                  : #(unit# * unit#) any_single)));
+  assert (Obj.is_int (Obj.repr (Aa #() : unit# any_multi)));
+  assert (Obj.is_int (Obj.repr (Ab : unit# any_multi)));
+
+  (* Pattern matching must remain consistent. *)
+  (match (Aa #() : unit# any_single) with Aa _ -> ());
+  (match (Aa #(#(), #()) : #(unit# * unit#) any_single) with Aa _ -> ());
+  (match (Aa #() : unit# any_multi) with
+   | Aa _ -> ()
+   | Ab -> assert false);
+  (match (Ab : unit# any_multi) with
+   | Aa _ -> assert false
+   | Ab -> ());
+
+  (* Non-void instantiations are still allocated as blocks. *)
+  assert (not (Obj.is_int (Obj.repr (Aa 5 : int any_single))));
+  (match (Aa 5 : int any_single) with Aa x -> assert (x = 5));
+
+  (* Mix of tuple-with-any and inline-record-with-any: when [Ia] becomes a
+     constant at this use site, [Ib]'s and [Ic]'s tags must be reassigned
+     consistently with [Ia]'s.  Inline records remain blocks (they always have
+     a scannable sort at the [cstr_layout] level). *)
+  assert (Obj.is_int (Obj.repr (Ia #() : unit# any_inline_mix)));
+  assert
+    (not (Obj.is_int
+            (Obj.repr (Ib { x = #(); y = 7 } : unit# any_inline_mix))));
+  assert (Obj.is_int (Obj.repr (Ic : unit# any_inline_mix)));
+  let test_mix v expected =
+    match (v : unit# any_inline_mix) with
+    | Ia _ -> assert (expected = `Ia)
+    | Ib { y; _ } ->
+      assert (expected = `Ib); assert (y = 7)
+    | Ic -> assert (expected = `Ic)
+  in
+  test_mix (Ia #()) `Ia;
+  test_mix (Ib { x = #(); y = 7 }) `Ib;
+  test_mix Ic `Ic
+
+let _ = test20 ()
+
+(***************************************************************)
+(* Test 21: all-void inline-record constructors are immediates *)
+
+(* An inline-record constructor whose fields are all void is allocated as an
+   immediate, and field accesses produce void values. *)
+
+type all_void_inline =
+  | Iaa of { x : unit#; y : unit# }
+  | Ibb
+
+let test21 () =
+  start_test "all-void inline records are immediates";
+
+  let counter = ref 0 in
+
+  assert (Obj.is_int (Obj.repr (Iaa { x = #(); y = #() })));
+  assert (Obj.is_int (Obj.repr Ibb));
+
+  (* Side effects in field initializers still run. *)
+  let _ = Iaa { x = (incr counter; #()); y = (incr counter; #()) } in
+  assert (!counter = 2);
+
+  (* Pattern matching can bind the void fields. *)
+  (match Iaa { x = #(); y = #() } with
+   | Iaa { x = _; y = _ } -> ()
+   | Ibb -> assert false);
+  (match Ibb with
+   | Iaa _ -> assert false
+   | Ibb -> ())
+
+let _ = test21 ()
+
 let () = print_endline "All tests passed."

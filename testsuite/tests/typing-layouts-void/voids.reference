@@ -20,4 +20,6 @@ Test 18: Obj.tag of records containing void
   Obj.tag of record with multiple voids: 0
   Obj.tag of variant containing record with void: 0
 Test 19: unboxed variants containing void
+Test 20: variants with any argument instantiated to void
+Test 21: all-void inline records are immediates
 All tests passed.

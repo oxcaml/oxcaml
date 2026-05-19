@@ -1936,6 +1936,32 @@ let get_pat_args_constr p rem =
     args @ rem
   | _ -> assert false
 
+(* Whether a [Types.mixed_block_element] is [Void] all the way down. *)
+let rec is_void_mixed_block_element (elt : Types.mixed_block_element) =
+  match elt with
+  | Void -> true
+  | Product elts -> Array.for_all is_void_mixed_block_element elts
+  | Scannable _ | Float_boxed | Float64 | Float32
+  | Bits8 | Bits16 | Bits32 | Bits64 | Word
+  | Untagged_immediate | Vec128 | Vec256 | Vec512 -> false
+
+(* For a [Lambda.mixed_block_element] that is [Void] all the way down (an empty
+   product), produce a lambda creating it and its corresponding layout. *)
+let rec lambda_of_void_element ~loc el =
+  match (el : _ Lambda.mixed_block_element) with
+  | Product shape ->
+    let ll, layouts =
+      Array.map (lambda_of_void_element ~loc) shape
+      |> Array.to_list |> List.split
+    in
+    Lprim (Pmake_unboxed_product layouts, ll, loc),
+    Lambda.Punboxed_product layouts
+  | Value _ | Float_boxed _ | Float64 | Float32
+  | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+  | Splice_variable _ ->
+    fatal_error "Matching.lambda_of_void_element: non-void element"
+
 let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
   let cstr, cstr_shape, arg_sorts =
     match head.pat_desc with
@@ -1958,27 +1984,13 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
        This is necessary for bytecode, where [Pmixedfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
        boxed in bytecode). *)
-    let rec lambda_void_of_el el =
-      match el with
-      | Product shape ->
-        let ll, layouts =
-          Array.map lambda_void_of_el shape |> Array.to_list |> List.split
-        in
-        Lprim (Pmake_unboxed_product layouts, ll, loc),
-        Punboxed_product layouts
-      | Value _ | Float_boxed _ | Float64 | Float32
-      | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-      | Splice_variable _ ->
-        fatal_error "Matching.get_exr_args_constr: non-void layout"
-    in
     match cstr_shape with
     | Constructor_uniform_value ->
       fatal_error
         "Matching.get_exr_args_constr: constant Constructor_uniform_value"
     | Constructor_mixed shape ->
       let shape = transl_mixed_product_shape shape in
-      let e, layout = lambda_void_of_el shape.(pos) in
+      let e, layout = lambda_of_void_element ~loc shape.(pos) in
       (e, binding_kind, sort, layout)
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
@@ -2428,6 +2440,16 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
+        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+          when Array.for_all is_void_mixed_block_element shape ->
+            (* All-void inline-record constructor: it is allocated as an
+               immediate, so there is no block to project from.  Produce a
+               void value for the field rather than reading one. *)
+            let shape = Lambda.transl_mixed_product_shape shape in
+            let access, layout =
+              lambda_of_void_element ~loc shape.(lbl.lbl_pos)
+            in
+            access, lbl_sort, layout
         | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
         | Record_mixed shape ->
             let shape =

@@ -2868,6 +2868,165 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
         | Error err -> Error err
       end
 
+(* When a variant constructor's [cstr_layouts] contains [Cstr_layout_variable]
+   because its arguments include a layout-[any] parameter, the cached
+   [constructor_description] has [cstr_constant], [cstr_tag.runtime_tag],
+   [cstr_shape], [cstr_consts], and [cstr_nonconsts] computed pessimistically
+   (treating variable-layout args as non-void).  At each use site we know the
+   actual instantiation, so we can recompute these fields from the use-site
+   types of all the constructors of the variant.  This is the analog of
+   [update_labels] for variants. *)
+let refresh_cstr_for_use_site env ~loc constr ~containing_type
+    ~(current_shape : Types.constructor_representation)
+    ~(current_sorts : Jkind.Sort.t list)
+  : constructor_description =
+  let exception No_refresh in
+  let no_refresh () = raise No_refresh in
+  let try_const_sort_array sorts =
+    List.map Jkind.Sort.default_to_scannable_and_get_some sorts
+    |> Misc.Stdlib.List.some_if_all_elements_are_some
+    |> Option.map Array.of_list
+  in
+  try
+    let cached_cstr_layouts =
+      match constr.cstr_repr with
+      | Variant_boxed cstr_layouts
+        when Array.exists
+               (function Cstr_layout_variable -> true | _ -> false)
+               cstr_layouts ->
+        cstr_layouts
+      | _ -> no_refresh ()
+    in
+    let src_index =
+      match constr.cstr_tag with
+      | Ordinary { src_index; _ } -> src_index
+      | Extension _ | Null ->
+        Misc.fatal_error
+          "refresh_cstr_for_use_site: non-Ordinary tag for Variant_boxed"
+    in
+    let path, ty_args =
+      match get_desc (Ctype.expand_head env containing_type) with
+      | Tconstr (p, args, _) -> p, args
+      | _ -> no_refresh ()
+    in
+    let type_params, cstrs_arr =
+      let decl =
+        try Env.find_type path env with Not_found -> no_refresh ()
+      in
+      match decl.type_kind with
+      | Type_variant (cstrs, _, _) -> decl.type_params, Array.of_list cstrs
+      | _ -> no_refresh ()
+    in
+    let current_layout =
+      match try_const_sort_array current_sorts with
+      | Some sorts -> Cstr_layout_known { shape = current_shape; sorts }
+      | None -> Cstr_layout_variable
+    in
+    let jkinds_and_sorts types =
+      let jkinds = List.map (Ctype.type_jkind env) types in
+      let sort_consts =
+        List.map
+          (fun jk ->
+             match Jkind.sort_option_of_jkind env jk with
+             | None -> None
+             | Some s -> Jkind.Sort.default_to_scannable_and_get_some s)
+          jkinds
+      in
+      let sorts =
+        Misc.Stdlib.List.some_if_all_elements_are_some sort_consts
+        |> Option.map Array.of_list
+      in
+      jkinds, sorts
+    in
+    (* Re-estimate the layout of another constructor of the variant at this
+       use site by substituting the type parameters with the use-site arguments
+       and re-running the per-constructor representation analysis. *)
+    let estimate_at_use_site (cstr_decl : Types.constructor_declaration) =
+      let substitute ty =
+        try Ctype.apply env type_params ty ty_args
+        with Ctype.Cannot_apply -> ty
+      in
+      let cd_args, jkinds, sorts_opt =
+        match cstr_decl.cd_args with
+        | Cstr_tuple args ->
+          let args =
+            List.map
+              (fun ({ Types.ca_type; _ } as a) ->
+                 { a with ca_type = substitute ca_type })
+              args
+          in
+          let jkinds, sorts =
+            jkinds_and_sorts (List.map (fun a -> a.Types.ca_type) args)
+          in
+          Types.Cstr_tuple args, jkinds, sorts
+        | Cstr_record lbls ->
+          let lbls =
+            List.map
+              (fun ({ Types.ld_type; _ } as l) ->
+                 { l with ld_type = substitute ld_type })
+              lbls
+          in
+          let jkinds, sorts =
+            jkinds_and_sorts (List.map (fun l -> l.Types.ld_type) lbls)
+          in
+          Types.Cstr_record lbls, jkinds, sorts
+      in
+      match
+        Typedecl.update_constructor_representation env cd_args jkinds
+          ~loc ~is_extension_constructor:false,
+        sorts_opt
+      with
+      | Ok shape, Some sorts -> Cstr_layout_known { shape; sorts }
+      | _, _ -> Cstr_layout_variable
+    in
+    let snap = Btype.snapshot () in
+    let new_cstr_layouts =
+      Array.mapi
+        (fun i old ->
+           if i = src_index then current_layout
+           else match old with
+             | Cstr_layout_known _ -> old
+             | Cstr_layout_variable -> estimate_at_use_site cstrs_arr.(i))
+        cached_cstr_layouts
+    in
+    Btype.backtrack snap;
+    if Array.exists
+         (function Cstr_layout_variable -> true | _ -> false)
+         new_cstr_layouts
+    then no_refresh ();
+    let new_cstr_constants =
+      Array.map
+        (function
+          | Cstr_layout_known { sorts; _ } ->
+            Array.for_all Jkind_types.Sort.Const.all_void sorts
+          | Cstr_layout_variable -> false)
+        new_cstr_layouts
+    in
+    let num_consts = ref 0 in
+    let num_nonconsts = ref 0 in
+    let runtime_tags =
+      Array.map
+        (fun is_const ->
+           let counter = if is_const then num_consts else num_nonconsts in
+           let t = !counter in incr counter; t)
+        new_cstr_constants
+    in
+    let new_cstr_shape =
+      match new_cstr_layouts.(src_index) with
+      | Cstr_layout_known { shape; _ } -> Some shape
+      | Cstr_layout_variable -> None
+    in
+    { constr with
+      cstr_constant = new_cstr_constants.(src_index);
+      cstr_tag =
+        Ordinary { src_index; runtime_tag = runtime_tags.(src_index) };
+      cstr_shape = new_cstr_shape;
+      cstr_consts = !num_consts;
+      cstr_nonconsts = !num_nonconsts;
+      cstr_repr = Variant_boxed new_cstr_layouts;
+    }
+  with No_refresh -> constr
+
 (* Typing of patterns *)
 
 (* "untyped" cases are prior to checking the pattern. *)
@@ -3526,6 +3685,11 @@ and type_pat_aux
         | Error (Unrepresentable_arg (loc, ty, err)) ->
             raise (Error (loc, !!penv,
                           Constructor_arg_projection_not_rep(ty, err)))
+      in
+      let constr =
+        refresh_cstr_for_use_site !!penv ~loc constr
+          ~containing_type:expected_ty
+          ~current_shape:repr ~current_sorts:sorts
       in
       let ctor_args = List.combine sorts ctor_args in
       rvp { pat_desc =
@@ -10178,6 +10342,10 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     | Ok (shape, sorts) -> shape, sorts
     | Error (Unrepresentable_arg (loc, ty, err)) ->
         raise (Error (loc, env, Constructor_arg_value_not_rep(ty, err)))
+  in
+  let constr =
+    refresh_cstr_for_use_site env ~loc constr ~containing_type:ty_res
+      ~current_shape:shape ~current_sorts:sorts
   in
   let args = List.combine sorts args in
   (* NOTE: shouldn't we call "re" on this final expression? -- AF *)

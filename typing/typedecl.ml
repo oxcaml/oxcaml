@@ -1773,10 +1773,12 @@ let all_void_sort_option sort =
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
-(* [update_label_sorts] additionally returns the jkinds of the labels *)
-let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
-  (* CR layouts v5: it wouldn't be too hard to support records that are all
-     void.  just needs a bit of refactoring in translcore *)
+(* [update_label_sorts] additionally returns the jkinds of the labels.
+   [allow_all_void] should be [true] for inline records (so that all-void
+   inline-record constructors can be represented as immediates) and for
+   unboxed products, and [false] for ordinary boxed records (which currently
+   require at least one runtime value). *)
+let update_label_sorts env loc types ~allow_all_void =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
@@ -1788,19 +1790,14 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
     ) types
   in
   let sorts, jkinds = List.split sorts_and_jkinds in
-  let allow_all_void =
-    match form with
-    | Legacy -> false
-    | Unboxed_product -> true
-  in
   let is_all_void () = List.for_all all_void_sort_option sorts in
   if not allow_all_void && is_all_void () then
     raise (Error (loc, Jkind_empty_record))
   else sorts, jkinds
 
-let update_label_sorts_in_place env loc lbls ~form =
+let update_label_sorts_in_place env loc lbls ~allow_all_void =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
+  let sorts, jkinds = update_label_sorts env loc types ~allow_all_void in
   let lbls =
     List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
   in
@@ -1808,9 +1805,8 @@ let update_label_sorts_in_place env loc lbls ~form =
 
 (* In addition to updated constructor arguments, returns whether
    all arguments are void, useful for detecting enumerations that
-   can be [immediate]. Also returns the jkinds and
-   [match cd_args with | Cstr_tuple _ -> the sort of each argument
-                       | Cstr_record -> the single sort value] *)
+   can be [immediate]. Also returns the jkinds and the sort of each
+   argument ([Cstr_tuple]) or field ([Cstr_record]). *)
 let update_constructor_arguments_sorts env loc cd_args =
   match cd_args with
   | Types.Cstr_tuple args ->
@@ -1833,9 +1829,20 @@ let update_constructor_arguments_sorts env loc cd_args =
       |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
     let lbls, jkinds =
-      update_label_sorts_in_place env loc lbls ~form:Legacy
+      update_label_sorts_in_place env loc lbls ~allow_all_void:true
     in
-    Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.scannable |]
+    (* [cstr_layout] sorts are the inline record's per-field sorts (same
+       convention as [Cstr_tuple]).  For an all-void inline-record constructor
+       this makes [cstr_constant] in [Datarepr] derive to [true] and the
+       constructor is represented as an immediate. *)
+    let arg_sorts =
+      Misc.Stdlib.List.map_option (fun lbl -> lbl.Types.ld_sort) lbls
+      |> Option.map Array.of_list
+    in
+    let all_void =
+      List.for_all (fun lbl -> all_void_sort_option lbl.Types.ld_sort) lbls
+    in
+    Types.Cstr_record lbls, all_void, jkinds, arg_sorts
 
 let assert_mixed_product_support =
   let required_reserved_header_bits = 8 in
@@ -2246,6 +2253,11 @@ let compute_repr_summary env lbls jkinds =
     reprs lbls;
   reprs, repr_summary
 
+let allow_all_void_for_form
+    : type rep. rep record_form -> bool = function
+  | Legacy -> false
+  | Unboxed_product -> true
+
 (* Given a record with a temporary representation from [transl_declaration]
    computes updated labels, updated rep, and updated jkind *)
 let compute_record_kind (type rep) env loc (form : rep record_form)
@@ -2272,7 +2284,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
-    let sorts, jkinds = update_label_sorts env loc types ~form in
+    let sorts, jkinds =
+      update_label_sorts env loc types
+        ~allow_all_void:(allow_all_void_for_form form)
+    in
     let reprs, repr_summary = compute_repr_summary env lbls jkinds in
     let jkind =
       match form with
@@ -2347,7 +2362,10 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       lbls ~warn :
     _ * (rep, _) Result.t =
   let types = List.map snd lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
+  let sorts, jkinds =
+    update_label_sorts env loc types
+      ~allow_all_void:(allow_all_void_for_form form)
+  in
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
     (* CR layouts: improve the readability of this match *)
