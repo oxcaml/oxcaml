@@ -492,7 +492,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
              alloc mode is [Local]: direct partial application:@ %a"
             Apply.print apply));
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
-      let wrapper_taking_remaining_args, dacc, code_id, code =
+      let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
+          =
         let return_continuation = Continuation.create () in
         let remaining_params =
           List.map
@@ -724,8 +725,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           | Local { region; ghost_region = _ } ->
             Alloc_mode.For_allocations.local ~region
         in
-        ( Set_of_closures.create ~value_slots new_closure_alloc_mode
-            function_decls,
+        ( Set_of_closures.create ~value_slots function_decls,
+          new_closure_alloc_mode,
           dacc,
           code_id,
           code )
@@ -741,7 +742,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let bound = Bound_pattern.set_of_closures bound_vars in
         let body =
           Let.create bound
-            (Named.create_set_of_closures wrapper_taking_remaining_args)
+            (Named.create_set_of_closures ~alloc_mode:wrapper_alloc_mode
+               wrapper_taking_remaining_args)
             ~body:(Expr.create_apply_cont apply_cont)
             ~free_names_of_body:Unknown
           |> Expr.create_let

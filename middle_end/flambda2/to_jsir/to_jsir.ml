@@ -125,7 +125,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let fvar = Bound_var.var v in
       To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
           create_let_prim ~env ~res fvar p)
-    | Set_of_closures bound_vars, Set_of_closures soc ->
+    | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode) ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
       (* Definitions within this group can reference each others' symbols
