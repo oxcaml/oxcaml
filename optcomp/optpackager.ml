@@ -184,10 +184,11 @@ end) : S = struct
     in
     let ui = Compilenv.current_unit_infos () in
     let ui_export_info =
-      List.fold_left
+      Misc.fatal_error "Not implemented"
+      (* List.fold_left
         (fun acc info ->
           Flambda2_cmx.Flambda_cmx_format.merge info.ui_export_info acc)
-        ui.ui_export_info units
+        ui.ui_export_info units *)
     in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter
@@ -227,7 +228,8 @@ end) : S = struct
         ui_export_info;
         ui_zero_alloc_info;
         ui_external_symbols =
-          union (List.map (fun info -> info.ui_external_symbols) units)
+          union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_file_sections = Misc.fatal_error "Not implemented"
       }
     in
     Compilenv.write_unit_info pkg_infos cmxfile

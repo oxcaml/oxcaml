@@ -183,7 +183,7 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
   fixpoint init_names Name_occurrences.empty
 
 let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-    ~used_value_slots ~canonicalise ~exported_offsets all_code =
+    ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code =
   let reachable_names =
     compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
   in
@@ -224,12 +224,12 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   in
   let cmx =
     Flambda_cmx_format.create ~final_typing_env ~all_code ~exported_offsets
-      ~used_value_slots
+      ~used_value_slots ~sections
   in
   reachable_names, Some cmx
 
 let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
-    ~exported_offsets all_code =
+    ~exported_offsets ~sections all_code =
   match final_typing_env with
   | None ->
     Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
@@ -246,10 +246,10 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
       Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots ~canonicalise ~exported_offsets all_code
+      ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
-    ~exported_offsets ~used_value_slots all_code =
+    ~exported_offsets ~used_value_slots ~sections all_code =
   if Flambda_features.opaque ()
   then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   else
@@ -274,4 +274,6 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
       ~used_value_slots
       ~canonicalise:(fun id -> id)
-      ~exported_offsets all_code
+      ~exported_offsets
+      ~sections
+      all_code

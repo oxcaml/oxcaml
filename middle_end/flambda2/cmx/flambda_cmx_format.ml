@@ -44,7 +44,8 @@ let to_raw (t, sections) = t, sections
 
 let from_raw ~sections t = t, sections
 
-let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots =
+let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
+    ~sections =
   let typing_env_exported_ids =
     Flambda2_types.Typing_env.Serializable.ids_for_export final_typing_env
   in
@@ -87,22 +88,18 @@ let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots =
   let table_data =
     { symbols; variables; simples; consts; code_ids; continuations }
   in
-  let num_code = ref 0 in
-  Exported_code.iter_code ~f:(fun _ -> incr num_code) all_code;
-  let sections = File_sections.Builder.create !num_code in
   let all_code =
     Exported_code.to_raw
       ~add_section:(File_sections.Builder.add sections)
       all_code
   in
-  ( [ { original_compilation_unit = Compilation_unit.get_current_exn ();
-        final_typing_env;
-        all_code;
-        exported_offsets;
-        used_value_slots;
-        table_data
-      } ],
-    File_sections.Builder.build sections )
+  [ { original_compilation_unit = Compilation_unit.get_current_exn ();
+      final_typing_env;
+      all_code;
+      exported_offsets;
+      used_value_slots;
+      table_data
+    } ]
 
 module Make_importer (S : sig
   type t

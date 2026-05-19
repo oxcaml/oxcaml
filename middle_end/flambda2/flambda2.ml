@@ -88,15 +88,15 @@ let print_fexpr name target ppf unit =
 module NO = Flambda2_nominal.Name_occurrences
 
 type run_result =
-  { cmx : Flambda_cmx_format.t option;
+  { cmx : Flambda_cmx_format.raw option;
     unit : Flambda_unit.t;
     all_code : Exported_code.t;
     exported_offsets : Exported_offsets.t;
     reachable_names : NO.t
   }
 
-let build_run_result unit ~free_names ~final_typing_env ~all_code slot_offsets :
-    run_result =
+let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
+  slot_offsets : run_result =
   let module_symbol = Flambda_unit.module_symbol unit in
   let function_slots_in_normal_projections =
     NO.function_slots_in_normal_projections free_names
@@ -121,7 +121,7 @@ let build_run_result unit ~free_names ~final_typing_env ~all_code slot_offsets :
   in
   let reachable_names, cmx =
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-      ~used_value_slots ~exported_offsets all_code
+      ~used_value_slots ~exported_offsets ~sections all_code
   in
   let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
   { cmx; unit; all_code; exported_offsets; reachable_names }
@@ -226,8 +226,8 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
-        build_run_result flambda ~free_names ~final_typing_env ~all_code
-          slot_offsets
+        build_run_result flambda ~free_names ~final_typing_env
+          ~sections:(Compilenv.current_sections ()) ~all_code slot_offsets
       in
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
@@ -300,7 +300,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
-          module_initializer)
+          ~sections:(Compilenv.current_sections ()) module_initializer)
   in
   flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
     ~close_prog_metadata ~code_slot_offsets raw_flambda

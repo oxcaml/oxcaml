@@ -65,7 +65,10 @@ let current_unit =
     ui_zero_alloc_info = Zero_alloc_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
+    ui_file_sections = File_sections.empty
   }
+
+let current_sections = ref (File_sections.Builder.create 0)
 
 let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
@@ -87,7 +90,8 @@ let reset unit_info =
   Zero_alloc_info.reset current_unit.ui_zero_alloc_info;
   Hashtbl.clear exported_constants;
   current_unit.ui_export_info <- None;
-  current_unit.ui_external_symbols <- []
+  current_unit.ui_external_symbols <- [];
+  current_sections := File_sections.Builder.create 0
 
 let record_external_symbols () =
   current_unit.ui_external_symbols <- (List.filter_map (fun prim ->
@@ -97,6 +101,9 @@ let record_external_symbols () =
 
 let current_unit_infos () =
   current_unit
+
+let current_sections () =
+  !current_sections
 
 let read_unit_info filename =
   let ic = open_in_bin filename in
@@ -112,10 +119,6 @@ let read_unit_info filename =
     let crc = Digest.input ic in
     (* This consumes the channel *)
     let sections = File_sections.create uir.uir_section_toc filename ic ~first_section_offset in
-    let export_info =
-      Option.map (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-        uir.uir_export_info
-    in
     let ui = {
       ui_unit = uir.uir_unit;
       ui_defines = uir.uir_defines;
@@ -125,11 +128,12 @@ let read_unit_info filename =
       ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
       ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
       ui_generic_fns = uir.uir_generic_fns;
-      ui_export_info = export_info;
+      ui_export_info = uir.uir_export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+      ui_file_sections = sections;
     }
     in
     (ui, crc)
@@ -162,17 +166,25 @@ let get_unit_export_info comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
+  let of_infos infos =
+    Option.map
+      (fun export_info ->
+        Flambda2_cmx.Flambda_cmx_format.from_raw
+          ~sections:infos.ui_file_sections
+          export_info)
+      infos.ui_export_info
+  in
   (* CR lmaurer: Surely this should just compare [comp_unit] to
      [current_unit.ui_unit], but doing so seems to break Closure. We should fix
      that. *)
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
   then
-    current_unit.ui_export_info
+    of_infos current_unit
   else begin
     let name = CU.to_global_name_without_prefix comp_unit in
     try
       let ui = Infos_table.find global_infos_table name in
-      Option.bind ui (fun ui -> ui.ui_export_info)
+      Option.bind ui of_infos
     with Not_found ->
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
@@ -204,7 +216,7 @@ let get_unit_export_info comp_unit =
       let import = Import_info.create_normal comp_unit ~crc in
       current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
       Infos_table.add global_infos_table name infos;
-      Option.bind infos (fun ui -> ui.ui_export_info)
+      Option.bind infos of_infos
   end
 
 let which_cmx_file comp_unit =
@@ -269,14 +281,9 @@ let ensure_sharing_between_cmi_and_cmx_imports cmi_imports cmx_imports =
 *)
 
 let write_unit_info info filename =
-  let raw_export_info, sections =
-    match info.ui_export_info with
-    | None -> None, File_sections.empty
-    | Some info ->
-      let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-      Some info, sections
+  let serialized_sections, toc, total_length =
+    File_sections.serialize info.ui_file_sections
   in
-  let serialized_sections, toc, total_length = File_sections.serialize sections in
   let raw_info = {
     uir_unit = info.ui_unit;
     uir_defines = info.ui_defines;
@@ -286,7 +293,7 @@ let write_unit_info info filename =
     uir_quoted_globals = Array.of_list info.ui_quoted_globals;
     uir_format = info.ui_format;
     uir_generic_fns = info.ui_generic_fns;
-    uir_export_info = raw_export_info;
+    uir_export_info = info.ui_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
     uir_force_link = info.ui_force_link;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
@@ -311,6 +318,8 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
      they just get computed once. (Arguably we should remove [set_export_info]
      by the same reasoning.) *)
   current_unit.ui_arg_descr <- arg_descr;
+  current_unit.ui_file_sections <-
+    File_sections.Builder.build (current_sections ());
   write_unit_info
     { current_unit with ui_format = main_module_block_format } filename
 

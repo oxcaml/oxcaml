@@ -29,6 +29,8 @@ val get : t -> idx -> Obj.t
 
 val serialize : t -> string array * int array * int
 
+val from_array : Obj.t array -> t
+
 module Builder : sig
   type file_sections := t
   type t

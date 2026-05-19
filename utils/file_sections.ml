@@ -61,6 +61,7 @@ let empty = In_memory [||]
 let length = function
   | From_file { sections; _ } -> Array.length sections
   | In_memory sections -> Array.length sections
+
 let read_section sections channel index =
   match sections.(index) with
   | Loaded section_contents -> section_contents
@@ -98,6 +99,8 @@ let to_array t =
   let dest = Array.make (length t) (Obj.repr 0) in
   unsafe_blit_to_array t dest 0;
   dest
+
+let from_array t = In_memory (Array.copy t)
 
 let compute_toc serialized_sections =
   let toc = Array.make (Array.length serialized_sections) 0 in

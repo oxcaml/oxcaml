@@ -30,6 +30,8 @@ val reset_info_tables: unit -> unit
 val current_unit_infos: unit -> unit unit_infos_gen
         (* Return the infos for the unit being compiled *)
 
+val current_sections: unit -> Oxcaml_utils.File_sections.Builder.t
+
 val get_global_export_info : Compilation_unit.t
   -> Flambda2_cmx.Flambda_cmx_format.t option
         (* Means of getting the export info found in the
@@ -38,7 +40,7 @@ val get_global_export_info : Compilation_unit.t
 val get_unit_export_info
   : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
-val set_export_info : Flambda2_cmx.Flambda_cmx_format.t -> unit
+val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 
 val need_curry_fun:

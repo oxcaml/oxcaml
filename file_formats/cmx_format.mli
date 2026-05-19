@@ -69,11 +69,12 @@ type 'format unit_infos_gen =
     mutable ui_format: 'format;
                                           (* Structure of the main module block *)
     mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
-    mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.t option;
+    mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     mutable ui_zero_alloc_info: Zero_alloc_info.t;
     mutable ui_force_link: bool;          (* Always linked *)
     mutable ui_requires_metaprogramming: bool;
                                           (* Requires metaprogramming libs *)
+    mutable ui_file_sections: Oxcaml_utils.File_sections.t;
     mutable ui_external_symbols: string list; (* Set of external symbols *)
   }
 

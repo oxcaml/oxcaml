@@ -29,7 +29,8 @@ val create :
   all_code:Exported_code.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
-  t
+  sections:Oxcaml_utils.File_sections.Builder.t ->
+  raw
 
 val import_typing_env_and_code :
   t -> Flambda2_types.Typing_env.Serializable.t * Exported_code.t
