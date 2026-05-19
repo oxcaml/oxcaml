@@ -41,16 +41,18 @@ Error: The type of this packed module contains variables:
    See ticket 7081. *)
 let _ = <[ fun (module M : S with type t = $t) -> M.x ]>
 [%%expect {|
->> Fatal error: Translquote [at line 1, characters 23-24]: Splices cannot appear in type annotations
-             inserted in quotations for higher-rank or package types.
+>> Fatal error: Translquote [at line 1, characters 23-24]:
+Splices cannot appear in type annotations inserted in quotations
+for higher-rank or package types.
 Uncaught exception: Misc.Fatal_error
 
 |}]
 
 let _ = <[ <[ fun (module M : S with type t = $t) -> M.x ]> ]>
 [%%expect {|
->> Fatal error: Translquote [at line 1, characters 26-27]: Splices cannot appear in type annotations
-             inserted in quotations for higher-rank or package types.
+>> Fatal error: Translquote [at line 1, characters 26-27]:
+Splices cannot appear in type annotations inserted in quotations
+for higher-rank or package types.
 Uncaught exception: Misc.Fatal_error
 
 |}]
