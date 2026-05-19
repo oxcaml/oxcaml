@@ -20,6 +20,9 @@ include Expr_std.S with type t := t
 
 include Contains_ids.S with type t := t
 
+val print_with_extra_fields :
+  (Format.formatter -> unit) -> Format.formatter -> t -> unit
+
 val is_empty : t -> bool
 
 (** Create a set of closures given the code for its functions and the closure

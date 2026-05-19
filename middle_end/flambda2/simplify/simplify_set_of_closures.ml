@@ -861,8 +861,8 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
       in
       { set_of_closures; dacc }
   in
-  let named = Named.create_set_of_closures ~alloc_mode set_of_closures in
   let defining_expr =
+    let named = Named.create_set_of_closures ~alloc_mode set_of_closures in
     let find_code_characteristics code_id =
       let env = Downwards_acc.denv dacc in
       let code_metadata =
@@ -891,7 +891,10 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
     (Expr_builder.Keep_binding
        { let_bound = bound_vars;
          simplified_defining_expr = defining_expr;
-         original_defining_expr = Some named (* CR ncourant: this is strange *)
+         original_defining_expr =
+           Some (Named.create_set_of_closures ~alloc_mode set_of_closures)
+           (* CR ncourant: this is surprising; I suspect accidental shadowing
+              took place here. *)
        })
 
 type lifting_decision_result =

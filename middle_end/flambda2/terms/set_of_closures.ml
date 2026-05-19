@@ -19,18 +19,22 @@ type t =
     value_slots : Simple.t Value_slot.Map.t
   }
 
-let [@ocamlformat "disable"] print ppf
+let [@ocamlformat "disable"] print_with_extra_fields extra_fields ppf
       { function_decls;
         value_slots
       } =
   Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
+      %t\
       @[<hov 1>(function_decls@ %a)@]@ \
       @[<hov 1>(value_slots@ %a)@]\
       )@]"
     Flambda_colours.prim_constructive
     Flambda_colours.pop
+    extra_fields
     (Function_declarations.print) function_decls
     (Value_slot.Map.print Simple.print) value_slots
+
+let print ppf t = print_with_extra_fields (fun _ppf -> ()) ppf t
 
 include Container_types.Make (struct
   type nonrec t = t
