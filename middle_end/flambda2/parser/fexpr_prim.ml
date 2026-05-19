@@ -295,23 +295,46 @@ let boxable_number =
         "vec512", Naked_vec512 ]
 
 let array_kind =
-  D.(
-    default ~def:P.Array_kind.Values
-    @@ constructor_flag
-         ~no_match_handler:(fun (k : P.Array_kind.t) ->
-           match k with
-           | Immediates | Values | Naked_floats | Gc_ignorable_values ->
-             assert false
-           | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-           | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-           | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
-             Misc.fatal_error
-               "fexpr support for arrays of unboxed elements not yet \
-                implemented")
-         P.Array_kind.
-           [ "imm", Immediates;
-             "float", Naked_floats;
-             "gc_ign", Gc_ignorable_values ])
+  let open D in
+  let open P.Array_kind in
+  let ak =
+    recursive_pattern (fun ak ->
+        let|= ak =
+          let| imm = flag_case "imm" Immediates in
+          let| values = flag_case "values" Values in
+          let| float = flag_case "float" Naked_floats in
+          let| float32 = flag_case "float32" Naked_float32s in
+          let| int = flag_case "int" Naked_ints in
+          let| int8 = flag_case "int8" Naked_int8s in
+          let| int16 = flag_case "int16" Naked_int16s in
+          let| int32 = flag_case "int32" Naked_int32s in
+          let| int64 = flag_case "int64" Naked_int64s in
+          let| nativeint = flag_case "nativeint" Naked_nativeints in
+          let| vec128 = flag_case "vec128" Naked_vec128s in
+          let| vec256 = flag_case "vec256" Naked_vec256s in
+          let| vec512 = flag_case "vec512" Naked_vec512s in
+          let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
+          let| product = list ak, fun _ aks -> Unboxed_product aks in
+          return_either (fun env -> function
+              | Immediates -> imm env ()
+              | Values -> values env ()
+              | Naked_floats -> float env ()
+              | Naked_float32s -> float32 env ()
+              | Naked_ints -> int env ()
+              | Naked_int8s -> int8 env ()
+              | Naked_int16s -> int16 env ()
+              | Naked_int32s -> int32 env ()
+              | Naked_int64s -> int64 env ()
+              | Naked_nativeints -> nativeint env ()
+              | Naked_vec128s -> vec128 env ()
+              | Naked_vec256s -> vec256 env ()
+              | Naked_vec512s -> vec512 env ()
+              | Gc_ignorable_values -> gc_ign env ()
+              | Unboxed_product aks -> product env aks)
+        in
+        ak)
+  in
+  default ~def:Values ak
 
 let array_kind_for_length =
   let open D in
@@ -331,20 +354,74 @@ let lazy_tag =
     @@ constructor_flag ["forward", Lambda.Forward_tag])
 
 let duplicate_array_kind =
-  D.(
-    default ~def:P.Duplicate_array_kind.Values
-    @@ constructor_flag
-         ~no_match_handler:(fun k ->
-           match (k : P.Duplicate_array_kind.t) with
-           | Values | Immediates -> assert false
-           | Naked_floats _ | Naked_float32s _ | Naked_ints _ | Naked_int8s _
-           | Naked_int16s _ | Naked_int32s _ | Naked_int64s _
-           | Naked_nativeints _ | Naked_vec128s _ | Naked_vec256s _
-           | Naked_vec512s _ ->
-             Misc.fatal_error
-               "fexpr support for duplication of array of unboxed element not \
-                yet implemented")
-         P.Duplicate_array_kind.["imm", Immediates])
+  let open D in
+  let open P.Duplicate_array_kind in
+  let ak =
+    let|= ak =
+      let| imm = flag_case "imm" Immediates in
+      let| values = flag_case "values" Values in
+      let| float =
+        labeled "float" (option target_ocaml_int),
+        fun _ length -> Naked_floats { length }
+      in
+      let| float32 =
+        labeled "float32" (option target_ocaml_int),
+        fun _ length -> Naked_float32s { length }
+      in
+      let| int =
+        labeled "int" (option target_ocaml_int),
+        fun _ length -> Naked_ints { length }
+      in
+      let| int8 =
+        labeled "int8" (option target_ocaml_int),
+        fun _ length -> Naked_int8s { length }
+      in
+      let| int16 =
+        labeled "int16" (option target_ocaml_int),
+        fun _ length -> Naked_int16s { length }
+      in
+      let| int32 =
+        labeled "int32" (option target_ocaml_int),
+        fun _ length -> Naked_int32s { length }
+      in
+      let| int64 =
+        labeled "int64" (option target_ocaml_int),
+        fun _ length -> Naked_int64s { length }
+      in
+      let| nativeint =
+        labeled "nativeint" (option target_ocaml_int),
+        fun _ length -> Naked_nativeints { length }
+      in
+      let| vec128 =
+        labeled "vec128" (option target_ocaml_int),
+        fun _ length -> Naked_vec128s { length }
+      in
+      let| vec256 =
+        labeled "vec256" (option target_ocaml_int),
+        fun _ length -> Naked_vec256s { length }
+      in
+      let| vec512 =
+        labeled "vec512" (option target_ocaml_int),
+        fun _ length -> Naked_vec512s { length }
+      in
+      return_either (fun env -> function
+          | Immediates -> imm env ()
+          | Values -> values env ()
+          | Naked_floats { length } -> float env length
+          | Naked_float32s { length } -> float32 env length
+          | Naked_ints { length } -> int env length
+          | Naked_int8s { length } -> int8 env length
+          | Naked_int16s { length } -> int16 env length
+          | Naked_int32s { length } -> int32 env length
+          | Naked_int64s { length } -> int64 env length
+          | Naked_nativeints { length } -> nativeint env length
+          | Naked_vec128s { length } -> vec128 env length
+          | Naked_vec256s { length } -> vec256 env length
+          | Naked_vec512s { length } -> vec512 env length)
+    in
+    ak
+  in
+  default ~def:Values ak
 
 let bigarray_kind =
   D.(

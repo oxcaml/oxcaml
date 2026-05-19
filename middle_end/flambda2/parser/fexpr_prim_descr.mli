@@ -231,6 +231,8 @@ module Describe : sig
 
   val ( let|= ) : 'p build_either -> ('p param_cons -> 'a) -> 'a
 
+  val flag_case : string -> 'p -> unit param_cons * (decode_env -> unit -> 'p)
+
   val param2_case :
     decode:(decode_env -> 'c1 -> 'c2 -> 'p) ->
     'c1 param_cons ->
@@ -262,6 +264,9 @@ module Describe : sig
     'c5 param_cons ->
     ('c1 * 'c2 * 'c3 * 'c4 * 'c5) param_cons
     * (decode_env -> 'c1 * 'c2 * 'c3 * 'c4 * 'c5 -> 'p)
+
+  (** Allow recursive [param_cons]. Needed to define recursive pattern matching. *)
+  val recursive_pattern : ('p param_cons -> 'p param_cons) -> 'p param_cons
 
   (** {2 Parameter payload descriptors}
 

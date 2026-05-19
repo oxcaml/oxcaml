@@ -44,6 +44,7 @@ type 'p conv = encode_env -> 'p -> t
 type _ param_cons =
   | CVoid : unit param_cons
   | CAtom : 'p param_cons -> 'p param_cons
+  | CLazy : 'p param_cons Lazy.t -> 'p param_cons
   | CLabeled : ('p, 'a) labeled_lens * 'a param_cons -> 'p param_cons
   | COptional : 'p param_cons -> 'p option param_cons
   | CDefault : 'p param_cons * 'p * ('p -> 'p -> bool) -> 'p param_cons
@@ -194,6 +195,7 @@ let extract_param (env : decode_env) (params : param list)
     | CList pcons -> list pcons []
     | CVoid -> void
     | CAtom pc -> atom pc []
+    | CLazy l -> aux (Lazy.force l)
     | CParam2 (pc1, pc2) -> param2 pc1 pc2
     | CParam3 (pc1, pc2, pc3) -> param3 pc1 pc2 pc3
     | CParam4 (pc1, pc2, pc3, pc4) -> param4 pc1 pc2 pc3 pc4
@@ -205,6 +207,7 @@ let rec build_param : type p. encode_env -> p -> p param_cons -> param list =
  fun env p cons ->
   match cons with
   | CVoid -> []
+  | CLazy l -> build_param env p (Lazy.force l)
   | CLabeled (lens, pcons) ->
     let label, args = lens.encode env p in
     let args = build_param env args pcons in
@@ -321,7 +324,7 @@ module Describe = struct
     match pcons with
     | CDefault (_pcons, _, _) ->
       Misc.fatal_error "Positional parameter does not support defaulting values"
-    | CVoid | CAtom _ | CLabeled _ | COptional _ | CEither _ | CList _ | CMap _
+    | CVoid | CAtom _ | CLazy _ | CLabeled _ | COptional _ | CEither _ | CList _ | CMap _
     | CParam2 _ | CParam3 _ | CParam4 _ | CParam5 _ ->
       CAtom pcons
 
@@ -398,6 +401,9 @@ module Describe = struct
 
   let param5 pc1 pc2 pc3 pc4 pc5 = CParam5 (pc1, pc2, pc3, pc4, pc5)
 
+  let flag_case flg constr =
+    (flag flg, fun _ () -> constr)
+
   let param2_case ~decode p1 p2 =
     param2 p1 p2, fun env (c1, c2) -> decode env c1 c2
 
@@ -410,6 +416,9 @@ module Describe = struct
   let param5_case ~decode p1 p2 p3 p4 p5 =
     ( param5 p1 p2 p3 p4 p5,
       fun env (c1, c2, c3, c4, c5) -> decode env c1 c2 c3 c4 c5 )
+
+  let recursive_pattern fcons =
+    let rec pat = lazy (fcons (CLazy pat)) in Lazy.force pat
 
   let nullary : type p. string -> params:p param_cons -> p cons0 -> p conv =
    fun id ~params cons ->
