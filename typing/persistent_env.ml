@@ -73,13 +73,25 @@ module Persistent_signature = struct
 
   let load = ref (fun ~allow_hidden ~unit_name ->
     let unit_name = CU.Name.to_string unit_name in
+    Misc.dloading_log
+      "type checker: looking up .cmi for module %s" unit_name;
     match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
     | filename, visibility when allow_hidden ->
+      Misc.dloading_log
+        "type checker: found .cmi for module %s at %s" unit_name filename;
       Some { filename; cmi = read_cmi_lazy filename; visibility}
     | filename, (Visible _ as visibility) ->
+      Misc.dloading_log
+        "type checker: found .cmi for module %s at %s" unit_name filename;
       Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
+    | _, Hidden ->
+      Misc.dloading_log
+        "type checker: .cmi for module %s is hidden" unit_name;
+      None
+    | exception Not_found ->
+      Misc.dloading_log
+        "type checker: no .cmi found for module %s" unit_name;
+      None)
 end
 
 type can_load_cmis =
@@ -402,6 +414,9 @@ let acknowledge_import penv ~check modname pers_sig =
 
 let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
+  Misc.dloading_log
+    "type checker: reading .cmi for module %a from %s"
+    (Format_doc.compat CU.Name.print) modname filename;
   add_import penv modname;
   let cmi = read_cmi_lazy filename in
   let pers_sig =

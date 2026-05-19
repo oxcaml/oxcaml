@@ -128,6 +128,7 @@ type 'a or_default = Set of 'a | Default
 let dump_inlining_paths = ref false
 let davail = ref false
 let dranges = ref false
+let dloading = Misc.dloading
 
 let opt_level = ref Default
 

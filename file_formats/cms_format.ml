@@ -53,14 +53,19 @@ let output_cms oc cms =
   output_value oc (cms : cms_infos)
 
 let read filename =
+  Misc.dloading_log "open %s (cms)" filename;
   let ic = open_in_bin filename in
   Misc.try_finally
-    ~always:(fun () -> close_in ic)
+    ~always:(fun () ->
+      Misc.dloading_log "close %s (cms)" filename;
+      close_in ic)
     (fun () ->
+       Misc.dloading_log "read magic number from %s (cms)" filename;
        let magic_number = read_magic_number ic in
-        if magic_number = Config.cms_magic_number then
+        if magic_number = Config.cms_magic_number then begin
+          Misc.dloading_log "read contents of %s (cms)" filename;
           input_cms ic
-        else
+        end else
           raise (Error (Not_a_shape filename))
     )
 

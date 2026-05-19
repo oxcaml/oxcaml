@@ -424,6 +424,18 @@ end
 
 (** {1 Operations on files and file paths} *)
 
+val dloading: bool ref
+       (** When set, the compiler emits strace-like trace messages on
+           [stderr] showing each attempt to look up, open, read or close a
+           build artifact (e.g. [.cmi], [.cmx], [.cms] files), together with
+           higher-level informational messages such as "opening to find code
+           ID ..." emitted by Flambda 2. Controlled by [-dloading]. *)
+
+val dloading_log: ('a, Format.formatter, unit) format -> 'a
+       (** [dloading_log fmt ...] prints a [dloading] trace line to
+           [stderr] (prefixed with ["[dloading] "]) when {!dloading} is
+           set, otherwise does nothing. *)
+
 val find_in_path: string list -> string -> string
        (** Search a file in a list of directories. *)
 

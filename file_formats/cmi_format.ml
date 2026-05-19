@@ -186,13 +186,19 @@ let input_cmi_lazy ic =
     }
 
 let read_cmi_lazy filename =
+  Misc.dloading_log "open %s (cmi)" filename;
   let ic = open_in_bin filename in
+  let close_in_log ic =
+    Misc.dloading_log "close %s (cmi)" filename;
+    close_in ic
+  in
   try
+    Misc.dloading_log "read magic number from %s (cmi)" filename;
     let buffer =
       really_input_string ic (String.length Config.cmi_magic_number)
     in
     if buffer <> Config.cmi_magic_number then begin
-      close_in ic;
+      close_in_log ic;
       let pre_len = String.length Config.cmi_magic_number - 3 in
       if String.sub buffer 0 pre_len
           = String.sub Config.cmi_magic_number 0 pre_len then
@@ -204,14 +210,15 @@ let read_cmi_lazy filename =
         raise(Error(Not_an_interface filename))
       end
     end;
+    Misc.dloading_log "read contents of %s (cmi)" filename;
     let cmi = input_cmi_lazy ic in
-    close_in ic;
+    close_in_log ic;
     cmi
   with End_of_file | Failure _ ->
-      close_in ic;
+      close_in_log ic;
       raise(Error(Corrupted_interface(filename)))
     | Error e ->
-      close_in ic;
+      close_in_log ic;
       raise (Error e)
 
 let output_cmi filename oc cmi =

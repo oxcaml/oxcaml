@@ -101,18 +101,26 @@ let current_unit_infos () =
   current_unit
 
 let read_unit_info filename =
+  Misc.dloading_log "open %s (cmx)" filename;
   let ic = open_in_bin filename in
   try
+    Misc.dloading_log "read magic number from %s (cmx)" filename;
     let buffer = really_input_string ic (String.length cmx_magic_number) in
     if buffer <> cmx_magic_number then begin
+      Misc.dloading_log "close %s (cmx, bad magic)" filename;
       close_in ic;
       raise(Error(Not_a_unit_info filename))
     end;
+    Misc.dloading_log "read unit_infos header from %s (cmx)" filename;
     let uir = (input_value ic : unit_infos_raw) in
     let first_section_offset = pos_in ic in
     seek_in ic (first_section_offset + uir.uir_sections_length);
+    Misc.dloading_log "read crc from %s (cmx)" filename;
     let crc = Digest.input ic in
     (* This consumes the channel *)
+    Misc.dloading_log
+      "hand %s (cmx) to File_sections (channel will be closed lazily)"
+      filename;
     let sections = File_sections.create uir.uir_section_toc filename ic ~first_section_offset in
     let export_info =
       Option.map (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
@@ -137,15 +145,22 @@ let read_unit_info filename =
     in
     (ui, crc)
   with End_of_file | Failure _ ->
+    Misc.dloading_log "close %s (cmx, corrupted)" filename;
     close_in ic;
     raise(Error(Corrupted_unit_info(filename)))
 
 let read_library_info filename =
+  Misc.dloading_log "open %s (cmxa)" filename;
   let ic = open_in_bin filename in
+  Misc.dloading_log "read magic number from %s (cmxa)" filename;
   let buffer = really_input_string ic (String.length cmxa_magic_number) in
-  if buffer <> cmxa_magic_number then
-    raise(Error(Not_a_unit_info filename));
+  if buffer <> cmxa_magic_number then begin
+    Misc.dloading_log "close %s (cmxa, bad magic)" filename;
+    raise(Error(Not_a_unit_info filename))
+  end;
+  Misc.dloading_log "read library_infos from %s (cmxa)" filename;
   let infos = (input_value ic : library_infos) in
+  Misc.dloading_log "close %s (cmxa)" filename;
   close_in ic;
   infos
 
@@ -186,15 +201,27 @@ let get_unit_export_info comp_unit =
             | true -> "cmjx"
           in
           try
+            Misc.dloading_log
+              "compilenv: looking up .%s for compilation unit %a"
+              missing_extension
+              (Format_doc.compat CU.print) comp_unit;
             let filename =
               Load_path.find_normalized
                 (CU.base_filename comp_unit ^ "." ^ missing_extension) in
+            Misc.dloading_log
+              "compilenv: found .%s for compilation unit %a at %s"
+              missing_extension
+              (Format_doc.compat CU.print) comp_unit filename;
             let (ui, crc) = read_unit_info filename in
             if not (CU.equal ui.ui_unit comp_unit) then
               raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
             cache_zero_alloc_info ui.ui_zero_alloc_info;
             (Some ui, Some crc)
           with Not_found ->
+            Misc.dloading_log
+              "compilenv: no .%s found for compilation unit %a"
+              missing_extension
+              (Format_doc.compat CU.print) comp_unit;
             let warn =
               Warnings.No_cmx_file
                 { missing_extension

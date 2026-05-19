@@ -437,26 +437,33 @@ let output_cmt oc cmt =
 
 let read filename =
 (*  Printf.fprintf stderr "Cmt_format.read %s\n%!" filename; *)
+  Misc.dloading_log "open %s (cmt/cmi)" filename;
   let ic = open_in_bin filename in
   Misc.try_finally
-    ~always:(fun () -> close_in ic)
+    ~always:(fun () ->
+      Misc.dloading_log "close %s (cmt/cmi)" filename;
+      close_in ic)
     (fun () ->
+       Misc.dloading_log "read magic number from %s (cmt/cmi)" filename;
        let magic_number = read_magic_number ic in
        let cmi, cmt =
-         if magic_number = Config.cmt_magic_number then
+         if magic_number = Config.cmt_magic_number then begin
+           Misc.dloading_log "read cmt body from %s" filename;
            None, Some (input_cmt ic)
-         else if magic_number = Config.cmi_magic_number then
+         end else if magic_number = Config.cmi_magic_number then begin
+           Misc.dloading_log "read cmi body from %s" filename;
            let cmi = Cmi_format.input_cmi_lazy ic in
            let cmt = try
                let magic_number = read_magic_number ic in
-               if magic_number = Config.cmt_magic_number then
+               if magic_number = Config.cmt_magic_number then begin
+                 Misc.dloading_log "read trailing cmt body from %s" filename;
                  let cmt = input_cmt ic in
                  Some cmt
-               else None
+               end else None
              with _ -> None
            in
            Some cmi, cmt
-         else
+         end else
            raise(Cmi_format.Error(Cmi_format.Not_an_interface filename))
        in
        cmi, cmt

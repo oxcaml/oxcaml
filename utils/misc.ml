@@ -669,17 +669,36 @@ let repeated_label l =
   in
   go Set.empty l
 
+(* Tracing of artifact loading (-dloading). *)
+
+let dloading = ref false
+
+let dloading_log fmt =
+  if !dloading
+  then
+    Format.kfprintf
+      (fun ppf -> Format.pp_print_newline ppf ())
+      Format.err_formatter
+      ("[dloading] " ^^ fmt)
+  else Format.ifprintf Format.err_formatter fmt
+
+let dloading_stat path =
+  let exists = Sys.file_exists path in
+  if !dloading
+  then dloading_log "stat %s -> %s" path (if exists then "yes" else "no");
+  exists
+
 (* File functions *)
 
 let find_in_path path name =
   if not (Filename.is_implicit name) then
-    if Sys.file_exists name then name else raise Not_found
+    if dloading_stat name then name else raise Not_found
   else begin
     let rec try_dir = function
       [] -> raise Not_found
     | dir::rem ->
         let fullname = Filename.concat dir name in
-        if Sys.file_exists fullname then fullname else try_dir rem
+        if dloading_stat fullname then fullname else try_dir rem
     in try_dir path
   end
 
@@ -696,7 +715,7 @@ let find_in_path_rel path name =
     [] -> raise Not_found
   | dir::rem ->
       let fullname = simplify (Filename.concat dir name) in
-      if Sys.file_exists fullname then fullname else try_dir rem
+      if dloading_stat fullname then fullname else try_dir rem
   in try_dir path
 
 let normalized_unit_filename = String.uncapitalize_ascii
@@ -708,8 +727,8 @@ let find_in_path_normalized path name =
   | dir::rem ->
       let fullname = Filename.concat dir name
       and ufullname = Filename.concat dir uname in
-      if Sys.file_exists ufullname then ufullname
-      else if Sys.file_exists fullname then fullname
+      if dloading_stat ufullname then ufullname
+      else if dloading_stat fullname then fullname
       else try_dir rem
   in try_dir path
 

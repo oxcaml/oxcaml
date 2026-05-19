@@ -57,13 +57,16 @@ let save filename cfg_unit_info =
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
 
 let restore filename =
+  Misc.dloading_log "open %s (cfg)" filename;
   let ic = open_in_bin filename in
   Misc.try_finally
     (fun () ->
+       Misc.dloading_log "read magic number from %s (cfg)" filename;
        let magic = Config.cfg_magic_number in
        let buffer = really_input_string ic (String.length magic) in
        if String.equal buffer magic then begin
          try
+           Misc.dloading_log "read contents of %s (cfg)" filename;
            let cfg_unit_info = (input_value ic : cfg_unit_info) in
            let last_label = (input_value ic : Cmm.label) in
            Cmm.reset ();
@@ -78,7 +81,9 @@ let restore filename =
        else
          raise (Error (Wrong_format filename))
     )
-    ~always:(fun () -> close_in ic)
+    ~always:(fun () ->
+      Misc.dloading_log "close %s (cfg)" filename;
+      close_in ic)
 
 (* Error report *)
 

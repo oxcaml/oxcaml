@@ -393,6 +393,12 @@ let mk_davail f =
 
 let mk_dranges f = ("-dranges", Arg.Unit f, " Dump results of Compute_ranges")
 
+let mk_dloading f =
+  ( "-dloading",
+    Arg.Unit f,
+    " Trace lookup, open, read and close of build artifacts (e.g. .cmi, .cmx) \
+     and Flambda 2 cross-unit loads" )
+
 let mk_ddebug_invariants f =
   ( "-ddebug-invariants",
     Arg.Unit f,
@@ -1239,6 +1245,7 @@ module type Oxcaml_options = sig
   val dump_inlining_paths : unit -> unit
   val davail : unit -> unit
   val dranges : unit -> unit
+  val dloading : unit -> unit
   val ddebug_invariants : unit -> unit
   val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
@@ -1416,6 +1423,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dump_inlining_paths F.dump_inlining_paths;
       mk_davail F.davail;
       mk_dranges F.dranges;
+      mk_dloading F.dloading;
       mk_ddebug_invariants F.ddebug_invariants;
       mk_ddebug_available_regs F.ddebug_available_regs;
       mk_ddwarf_types F.ddwarf_types;
@@ -1810,6 +1818,7 @@ module Oxcaml_options_impl = struct
   let dump_inlining_paths = set' Oxcaml_flags.dump_inlining_paths
   let davail = set' Oxcaml_flags.davail
   let dranges = set' Oxcaml_flags.dranges
+  let dloading = set' Oxcaml_flags.dloading
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
   let ddebug_available_regs = set' Dwarf_flags.ddebug_available_regs
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
@@ -2352,6 +2361,7 @@ module Extra_params = struct
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges
+    | "dloading" -> set' Oxcaml_flags.dloading
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
