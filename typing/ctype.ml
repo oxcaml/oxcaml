@@ -2237,6 +2237,14 @@ let apply ?(use_current_level = false) env params body args =
   with
     Cannot_subst -> raise Cannot_apply
 
+let instance_declaration_components_for_application env args decl =
+  let args = instance_list args in
+  let decl = instance_declaration decl in
+  let apply ty = apply env decl.type_params ty args in
+  ( ~kind:(map_kind apply decl.type_kind),
+    ~jkind:(Jkind.map_type_expr apply decl.type_jkind),
+    ~manifest:(Option.map apply decl.type_manifest) )
+
                               (****************************)
                               (*  Abbreviation expansion  *)
                               (****************************)
