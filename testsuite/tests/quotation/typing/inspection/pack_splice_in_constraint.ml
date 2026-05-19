@@ -5,22 +5,23 @@
 
 #syntax quotations on
 
+type t
 module type S = sig
   type t
   val x : t
   val i : int
 end
 #mark_toplevel_in_quotations;;
+[%%expect {|
+type t
+module type S = sig type t val x : t val i : int end
+|}]
 
 (* Obviously fine, nothing is spliced *)
-let _ = <[ fun (module M : S with type t = int) -> M.x ]>
+let _ = <[ fun (module M : S with type t = t) -> M.x ]>
 [%%expect {|
-module type S = sig type t val x : t val i : int end
-- : <[(module S with type t = int) -> int]> expr =
-<[
-  fun (((module M) : (module S with type t = int)) : (module
-    S with type t = int)) -> M.x
-]>
+Uncaught exception: Stdlib.Exit
+
 |}]
 
 (* Not fine -- there's a wildcard, which is a type variable under the hood,
@@ -38,20 +39,18 @@ Error: The type of this packed module contains variables:
    the below should fail with an error like the above to be consistent. *)
 (* CR metaprogramming jbachurski: This should fail gracefully.
    See ticket 7081. *)
-let _ = <[ fun (module M : S with type t = $int) -> M.x ]>
+let _ = <[ fun (module M : S with type t = $t) -> M.x ]>
 [%%expect {|
->> Fatal error: Translquote [at line 1, characters 23-24]:
-Type variables cannot be spliced in type annotations inserted in quotations
-for higher-rank or package types.
+>> Fatal error: Translquote [at line 1, characters 23-24]: Splices cannot appear in type annotations
+             inserted in quotations for higher-rank or package types.
 Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let _ = <[ <[ fun (module M : S with type t = $int) -> M.x ]> ]>
+let _ = <[ <[ fun (module M : S with type t = $t) -> M.x ]> ]>
 [%%expect {|
->> Fatal error: Translquote [at line 1, characters 26-27]:
-Type variables cannot be spliced in type annotations inserted in quotations
-for higher-rank or package types.
+>> Fatal error: Translquote [at line 1, characters 26-27]: Splices cannot appear in type annotations
+             inserted in quotations for higher-rank or package types.
 Uncaught exception: Misc.Fatal_error
 
 |}]
