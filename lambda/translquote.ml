@@ -3889,7 +3889,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
           },
           exp ) ->
       let exp = quote_expression ~scopes ~transl stage exp in
-      Exp_desc.let_open loc (module_for_path loc path) exp
+      Exp_desc.let_open loc (module_for_path loc env path) exp
     | Texp_open _ ->
       fatal_errorf "Translquote [at %a]: non-trivial Texp_open not implemented"
         Location.print_loc (to_location loc)
