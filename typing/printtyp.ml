@@ -1735,7 +1735,16 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
     | Tbox ty ->
-      Otyp_box (tree_of_typexp mode alloc_mode ty)
+      (* Render as if a regular Tconstr application of Predef.path_box,
+         so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
+      let p', s = best_type_path Predef.path_box in
+      let tyl' = apply_subst s [ty] in
+      if is_nth s && not (tyl' = [])
+      then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
+      else begin
+        Internal_names.add p';
+        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+      end
   in
   if List.memq px !delayed then delayed := List.filter ((!=) px) !delayed;
   alias_nongen_row mode px ty;
