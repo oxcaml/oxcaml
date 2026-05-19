@@ -845,6 +845,8 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+(* CR metaprogramming jbachurski: Eliminating the duplicate type constraint
+   to make the printer output nicer is tracked by internal ticket 7290. *)
 [%%expect {|
 - : <[(module Hashtbl.S) -> int -> unit]> expr =
 <[
