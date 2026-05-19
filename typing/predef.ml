@@ -60,6 +60,7 @@ and ident_atomic_loc = ident_create "atomic_loc"
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
 and ident_eval = ident_create "eval"
+and ident_box = ident_create "box"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -114,6 +115,7 @@ and path_idx_mut = Pident ident_idx_mut
 and path_atomic_loc = Pident ident_atomic_loc
 and path_code = Pident ident_code
 and path_eval = Pident ident_eval
+and path_box = Pident ident_box
 
 and path_or_null = Pident ident_or_null
 
@@ -199,6 +201,7 @@ and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil)
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 and type_eval t = newgenty (Tquote_eval (newgenty (Tsplice t)))
+and type_box t = newgenty (Tbox t)
 
 and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
 and type_unboxed_bool = newgenty (Tconstr(path_unboxed_bool, [], ref Mnil))
@@ -636,6 +639,17 @@ let build_initial_env add_type add_extension add_jkind empty_env =
           parameter. But I'm also fine not doing that for now (and wait until
           users complains). Internal ticket 5103. *)
        ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
+  |> add_type1 ident_box
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:type_box
+       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_box;
+           position = 1;
+           arity = 1;
+         }))
   |> add_type1 ident_list
        ~variance:Variance.covariant
        ~separability:Separability.Ind

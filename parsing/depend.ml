@@ -125,7 +125,6 @@ let rec add_type bv ty =
       add_type bv t
   | Ptyp_quote t -> add_type bv t
   | Ptyp_splice t -> add_type bv t
-  | Ptyp_box t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_repr(_, t) -> add_type bv t
   | Ptyp_newlayout(_, t) -> add_type bv t
