@@ -763,3 +763,14 @@ Error: This pattern matches values of type "string st"
        but a pattern was expected which matches values of type "$0 box st"
        The type constructor "$0" would escape its scope
 |}]
+
+(* Test 32: shadowing the predef [box] disambiguates with [box/2] *)
+
+let id_box (x : 'a box) : 'a box = x
+type 'a box = Mine of 'a
+let still_id = id_box
+[%%expect{|
+val id_box : ('a : any). 'a box -> 'a box = <fun>
+type 'a box = Mine of 'a
+val still_id : ('a : any). 'a box/2 -> 'a box/2 = <fun>
+|}]
