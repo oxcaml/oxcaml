@@ -49,7 +49,7 @@ type _ param_cons =
   | COptional : 'p param_cons -> 'p option param_cons
   | CDefault : 'p param_cons * 'p * ('p -> 'p -> bool) -> 'p param_cons
   | CEither :
-      (encode_env -> 'p -> param list) * 'p case_cons list
+      ('p -> encode_env -> param list) * 'p case_cons list
       -> 'p param_cons
   | CMap : 'a param_cons * ('b, 'a) map_lens -> 'b param_cons
   | CList : 'a param_cons -> 'a list param_cons
@@ -217,7 +217,7 @@ let rec build_param : type p. encode_env -> p -> p param_cons -> param list =
     match p with None -> [] | Some p -> build_param env p pcons)
   | CDefault (pcons, default, eq) ->
     if eq p default then [] else build_param env p pcons
-  | CEither (encode, _) -> encode env p
+  | CEither (encode, _) -> encode p env
   | CList pcons -> List.concat_map (fun pe -> build_param env pe pcons) p
   | CMap (pcons, f) -> build_param env (f.encode env p) pcons
   | CParam2 (pc1, pc2) ->
@@ -324,8 +324,8 @@ module Describe = struct
     match pcons with
     | CDefault (_pcons, _, _) ->
       Misc.fatal_error "Positional parameter does not support defaulting values"
-    | CVoid | CAtom _ | CLazy _ | CLabeled _ | COptional _ | CEither _ | CList _ | CMap _
-    | CParam2 _ | CParam3 _ | CParam4 _ | CParam5 _ ->
+    | CVoid | CAtom _ | CLazy _ | CLabeled _ | COptional _ | CEither _ | CList _
+    | CMap _ | CParam2 _ | CParam3 _ | CParam4 _ | CParam5 _ ->
       CAtom pcons
 
   let labeled label (pcons : 'a param_cons) : 'a param_cons =
@@ -351,15 +351,15 @@ module Describe = struct
        interleaving of other values *)
     CAtom (CList pcons)
 
-  type 'p encode_case = encode_env -> 'p -> param list
+  type 'p encode_case = 'p -> encode_env -> param list
 
   type 'p build_either = 'p case_cons list -> 'p case_cons list * 'p encode_case
 
   let bind_case (cases : 'p case_cons list) (cons : 'case param_cons)
-      (box : decode_env -> 'case -> 'p) :
-      'p case_cons list * (encode_env -> 'case -> param list) =
+      (box : decode_env -> 'case -> 'p) : 'p case_cons list * 'case encode_case
+      =
     let case = Case (cons, box) in
-    let encode env p = build_param env p cons in
+    let encode p env = build_param env p cons in
     case :: cases, encode
 
   let build_match (cases : 'p case_cons list) (destruct_param : 'p encode_case)
@@ -401,8 +401,7 @@ module Describe = struct
 
   let param5 pc1 pc2 pc3 pc4 pc5 = CParam5 (pc1, pc2, pc3, pc4, pc5)
 
-  let flag_case flg constr =
-    (flag flg, fun _ () -> constr)
+  let flag_case flg constr = flag flg, fun _ () -> constr
 
   let param2_case ~decode p1 p2 =
     param2 p1 p2, fun env (c1, c2) -> decode env c1 c2
@@ -417,8 +416,13 @@ module Describe = struct
     ( param5 p1 p2 p3 p4 p5,
       fun env (c1, c2, c3, c4, c5) -> decode env c1 c2 c3 c4 c5 )
 
-  let recursive_pattern fcons =
-    let rec pat = lazy (fcons (CLazy pat)) in Lazy.force pat
+  let patterns pat =
+    let|= pat = pat in
+    pat
+
+  let recursive_patterns fcons =
+    let rec pat = lazy (patterns @@ fcons (CLazy pat)) in
+    Lazy.force pat
 
   let nullary : type p. string -> params:p param_cons -> p cons0 -> p conv =
    fun id ~params cons ->

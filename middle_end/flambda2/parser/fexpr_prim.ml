@@ -141,36 +141,32 @@ let block_access_kind =
     let open P.Mixed_block_access_field_kind in
     let| value_k = block_access_field_kind, fun _ bak -> Value_prefix bak in
     let| suffix_k = flat_suffix_element, fun _ fse -> Flat_suffix fse in
-    return_either (fun env mfk ->
-        match mfk with
-        | Value_prefix bak -> value_k env bak
-        | Flat_suffix fse -> suffix_k env fse)
+    return_either (function
+      | Value_prefix bak -> value_k bak
+      | Flat_suffix fse -> suffix_k fse)
   in
-  let|= bak =
-    let| naked_float =
-      ( param2 (flag "float") size,
-        fun _ ((), size) -> P.Block_access_kind.Naked_floats { size } )
-    in
-    let| mixed =
-      param5_case
-        ~decode:(fun _ () tag size field_kind shape ->
-          P.Block_access_kind.Mixed { tag; size; field_kind; shape })
-        (flag "mixed") tag size mixed_field_kind mixed_block_shape
-    in
-    let| value_k =
-      param3_case block_access_field_kind tag size
-        ~decode:(fun _ field_kind tag size ->
-          P.Block_access_kind.Values { field_kind; tag; size })
-    in
-    P.Block_access_kind.(
-      return_either (fun env bak ->
-          match bak with
-          | Values { field_kind; tag; size } ->
-            value_k env (field_kind, tag, size)
-          | Naked_floats { size } -> naked_float env ((), size)
-          | Mixed m -> mixed env ((), m.tag, m.size, m.field_kind, m.shape)))
+  patterns
+  @@
+  let| naked_float =
+    ( param2 (flag "float") size,
+      fun _ ((), size) -> P.Block_access_kind.Naked_floats { size } )
   in
-  bak
+  let| mixed =
+    param5_case
+      ~decode:(fun _ () tag size field_kind shape ->
+        P.Block_access_kind.Mixed { tag; size; field_kind; shape })
+      (flag "mixed") tag size mixed_field_kind mixed_block_shape
+  in
+  let| value_k =
+    param3_case block_access_field_kind tag size
+      ~decode:(fun _ field_kind tag size ->
+        P.Block_access_kind.Values { field_kind; tag; size })
+  in
+  P.Block_access_kind.(
+    return_either (function
+      | Values { field_kind; tag; size } -> value_k (field_kind, tag, size)
+      | Naked_floats { size } -> naked_float ((), size)
+      | Mixed m -> mixed ((), m.tag, m.size, m.field_kind, m.shape)))
 
 type block_kind =
   | FNaked_floats
@@ -179,20 +175,18 @@ type block_kind =
 
 let block_kind : block_kind param_cons =
   let open D in
-  let|= bk =
-    let| floats = flag "floats", fun _ () -> FNaked_floats in
-    let| mixed =
-      param3_case (flag "mixed") scannable_tag mixed_block_shape
-        ~decode:(fun _ () tag shape -> FMixed (tag, shape))
-    in
-    let| values = positional scannable_tag, fun _ tag -> FValues tag in
-    return_either (fun env bk ->
-        match bk with
-        | FNaked_floats -> floats env ()
-        | FValues tag -> values env tag
-        | FMixed (tag, shape) -> mixed env ((), tag, shape))
+  patterns
+  @@
+  let| floats = flag "floats", fun _ () -> FNaked_floats in
+  let| mixed =
+    param3_case (flag "mixed") scannable_tag mixed_block_shape
+      ~decode:(fun _ () tag shape -> FMixed (tag, shape))
   in
-  bk
+  let| values = positional scannable_tag, fun _ tag -> FValues tag in
+  return_either (function
+    | FNaked_floats -> floats ()
+    | FValues tag -> values tag
+    | FMixed (tag, shape) -> mixed ((), tag, shape))
 
 let string_accessor_width =
   D.value
@@ -245,42 +239,41 @@ let init_or_assign =
 
 let alloc_mode_for_allocation =
   let open D in
-  let|= am =
-    let| local =
-      ( labeled "local" string,
-        fun env r ->
-          let region =
-            if String.equal (unwrap_loc r) "toplevel"
-            then env.toplevel_region
-            else Fexpr_to_flambda_commons.find_var env r
-          in
-          Alloc_mode.For_allocations.local ~region )
-    in
-    let| heap = param0, fun _ () -> Alloc_mode.For_allocations.heap in
-    return_either (fun env -> function
+  patterns
+  @@
+  let| local =
+    ( labeled "local" string,
+      fun env r ->
+        let region =
+          if String.equal (unwrap_loc r) "toplevel"
+          then env.toplevel_region
+          else Fexpr_to_flambda_commons.find_var env r
+        in
+        Alloc_mode.For_allocations.local ~region )
+  in
+  let| heap = param0, fun _ () -> Alloc_mode.For_allocations.heap in
+  return_either (fun alloc env ->
+      match alloc with
       | Alloc_mode.For_allocations.Local { region } ->
         let r =
           match Flambda_to_fexpr_commons.Env.find_region_exn env region with
           | Fexpr.Toplevel -> wrap_loc "toplevel"
           | Named s -> s
         in
-        local env r
-      | Alloc_mode.For_allocations.Heap -> heap env ())
-  in
-  am
+        local r env
+      | Alloc_mode.For_allocations.Heap -> heap () env)
 
 let alloc_mode_for_assignments =
   let open D in
-  let|= am =
-    let| local =
-      flag "local", fun _env () -> Alloc_mode.For_assignments.local ()
-    in
-    let| heap = param0, fun _ () -> Alloc_mode.For_assignments.heap in
-    return_either (fun env -> function
-      | Alloc_mode.For_assignments.Local -> local env ()
-      | Alloc_mode.For_assignments.Heap -> heap env ())
+  patterns
+  @@
+  let| local =
+    flag "local", fun _env () -> Alloc_mode.For_assignments.local ()
   in
-  am
+  let| heap = param0, fun _ () -> Alloc_mode.For_assignments.heap in
+  return_either (function
+    | Alloc_mode.For_assignments.Local -> local ()
+    | Alloc_mode.For_assignments.Heap -> heap ())
 
 let boxable_number =
   D.constructor_flag
@@ -298,55 +291,51 @@ let array_kind =
   let open D in
   let open P.Array_kind in
   let ak =
-    recursive_pattern (fun ak ->
-        let|= ak =
-          let| imm = flag_case "imm" Immediates in
-          let| values = flag_case "values" Values in
-          let| float = flag_case "float" Naked_floats in
-          let| float32 = flag_case "float32" Naked_float32s in
-          let| int = flag_case "int" Naked_ints in
-          let| int8 = flag_case "int8" Naked_int8s in
-          let| int16 = flag_case "int16" Naked_int16s in
-          let| int32 = flag_case "int32" Naked_int32s in
-          let| int64 = flag_case "int64" Naked_int64s in
-          let| nativeint = flag_case "nativeint" Naked_nativeints in
-          let| vec128 = flag_case "vec128" Naked_vec128s in
-          let| vec256 = flag_case "vec256" Naked_vec256s in
-          let| vec512 = flag_case "vec512" Naked_vec512s in
-          let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
-          let| product = list ak, fun _ aks -> Unboxed_product aks in
-          return_either (fun env -> function
-              | Immediates -> imm env ()
-              | Values -> values env ()
-              | Naked_floats -> float env ()
-              | Naked_float32s -> float32 env ()
-              | Naked_ints -> int env ()
-              | Naked_int8s -> int8 env ()
-              | Naked_int16s -> int16 env ()
-              | Naked_int32s -> int32 env ()
-              | Naked_int64s -> int64 env ()
-              | Naked_nativeints -> nativeint env ()
-              | Naked_vec128s -> vec128 env ()
-              | Naked_vec256s -> vec256 env ()
-              | Naked_vec512s -> vec512 env ()
-              | Gc_ignorable_values -> gc_ign env ()
-              | Unboxed_product aks -> product env aks)
-        in
-        ak)
+    recursive_patterns (fun ak ->
+        let| imm = flag_case "imm" Immediates in
+        let| values = flag_case "values" Values in
+        let| float = flag_case "float" Naked_floats in
+        let| float32 = flag_case "float32" Naked_float32s in
+        let| int = flag_case "int" Naked_ints in
+        let| int8 = flag_case "int8" Naked_int8s in
+        let| int16 = flag_case "int16" Naked_int16s in
+        let| int32 = flag_case "int32" Naked_int32s in
+        let| int64 = flag_case "int64" Naked_int64s in
+        let| nativeint = flag_case "nativeint" Naked_nativeints in
+        let| vec128 = flag_case "vec128" Naked_vec128s in
+        let| vec256 = flag_case "vec256" Naked_vec256s in
+        let| vec512 = flag_case "vec512" Naked_vec512s in
+        let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
+        let| product = list ak, fun _ aks -> Unboxed_product aks in
+        return_either (function
+          | Immediates -> imm ()
+          | Values -> values ()
+          | Naked_floats -> float ()
+          | Naked_float32s -> float32 ()
+          | Naked_ints -> int ()
+          | Naked_int8s -> int8 ()
+          | Naked_int16s -> int16 ()
+          | Naked_int32s -> int32 ()
+          | Naked_int64s -> int64 ()
+          | Naked_nativeints -> nativeint ()
+          | Naked_vec128s -> vec128 ()
+          | Naked_vec256s -> vec256 ()
+          | Naked_vec512s -> vec512 ()
+          | Gc_ignorable_values -> gc_ign ()
+          | Unboxed_product aks -> product aks))
   in
   default ~def:Values ak
 
 let array_kind_for_length =
   let open D in
   let open P.Array_kind_for_length in
-  let|= ak =
-    let| generic = flag "generic", fun _ () -> Float_array_opt_dynamic in
-    let| arrayk = array_kind, fun _ k -> Array_kind k in
-    return_either (fun env -> function
-      | Float_array_opt_dynamic -> generic env ()
-      | Array_kind k -> arrayk env k)
-  in
-  ak
+  patterns
+  @@
+  let| generic = flag "generic", fun _ () -> Float_array_opt_dynamic in
+  let| arrayk = array_kind, fun _ k -> Array_kind k in
+  return_either (function
+    | Float_array_opt_dynamic -> generic ()
+    | Array_kind k -> arrayk k)
 
 let lazy_tag =
   D.(
@@ -356,72 +345,68 @@ let lazy_tag =
 let duplicate_array_kind =
   let open D in
   let open P.Duplicate_array_kind in
-  let ak =
-    let|= ak =
-      let| imm = flag_case "imm" Immediates in
-      let| values = flag_case "values" Values in
-      let| float =
-        labeled "float" (option target_ocaml_int),
-        fun _ length -> Naked_floats { length }
-      in
-      let| float32 =
-        labeled "float32" (option target_ocaml_int),
-        fun _ length -> Naked_float32s { length }
-      in
-      let| int =
-        labeled "int" (option target_ocaml_int),
-        fun _ length -> Naked_ints { length }
-      in
-      let| int8 =
-        labeled "int8" (option target_ocaml_int),
-        fun _ length -> Naked_int8s { length }
-      in
-      let| int16 =
-        labeled "int16" (option target_ocaml_int),
-        fun _ length -> Naked_int16s { length }
-      in
-      let| int32 =
-        labeled "int32" (option target_ocaml_int),
-        fun _ length -> Naked_int32s { length }
-      in
-      let| int64 =
-        labeled "int64" (option target_ocaml_int),
-        fun _ length -> Naked_int64s { length }
-      in
-      let| nativeint =
-        labeled "nativeint" (option target_ocaml_int),
-        fun _ length -> Naked_nativeints { length }
-      in
-      let| vec128 =
-        labeled "vec128" (option target_ocaml_int),
-        fun _ length -> Naked_vec128s { length }
-      in
-      let| vec256 =
-        labeled "vec256" (option target_ocaml_int),
-        fun _ length -> Naked_vec256s { length }
-      in
-      let| vec512 =
-        labeled "vec512" (option target_ocaml_int),
-        fun _ length -> Naked_vec512s { length }
-      in
-      return_either (fun env -> function
-          | Immediates -> imm env ()
-          | Values -> values env ()
-          | Naked_floats { length } -> float env length
-          | Naked_float32s { length } -> float32 env length
-          | Naked_ints { length } -> int env length
-          | Naked_int8s { length } -> int8 env length
-          | Naked_int16s { length } -> int16 env length
-          | Naked_int32s { length } -> int32 env length
-          | Naked_int64s { length } -> int64 env length
-          | Naked_nativeints { length } -> nativeint env length
-          | Naked_vec128s { length } -> vec128 env length
-          | Naked_vec256s { length } -> vec256 env length
-          | Naked_vec512s { length } -> vec512 env length)
-    in
-    ak
+  default ~def:Values @@ patterns
+  @@
+  let| imm = flag_case "imm" Immediates in
+  let| values = flag_case "values" Values in
+  let| float =
+    ( labeled "float" (option target_ocaml_int),
+      fun _ length -> Naked_floats { length } )
   in
-  default ~def:Values ak
+  let| float32 =
+    ( labeled "float32" (option target_ocaml_int),
+      fun _ length -> Naked_float32s { length } )
+  in
+  let| int =
+    ( labeled "int" (option target_ocaml_int),
+      fun _ length -> Naked_ints { length } )
+  in
+  let| int8 =
+    ( labeled "int8" (option target_ocaml_int),
+      fun _ length -> Naked_int8s { length } )
+  in
+  let| int16 =
+    ( labeled "int16" (option target_ocaml_int),
+      fun _ length -> Naked_int16s { length } )
+  in
+  let| int32 =
+    ( labeled "int32" (option target_ocaml_int),
+      fun _ length -> Naked_int32s { length } )
+  in
+  let| int64 =
+    ( labeled "int64" (option target_ocaml_int),
+      fun _ length -> Naked_int64s { length } )
+  in
+  let| nativeint =
+    ( labeled "nativeint" (option target_ocaml_int),
+      fun _ length -> Naked_nativeints { length } )
+  in
+  let| vec128 =
+    ( labeled "vec128" (option target_ocaml_int),
+      fun _ length -> Naked_vec128s { length } )
+  in
+  let| vec256 =
+    ( labeled "vec256" (option target_ocaml_int),
+      fun _ length -> Naked_vec256s { length } )
+  in
+  let| vec512 =
+    ( labeled "vec512" (option target_ocaml_int),
+      fun _ length -> Naked_vec512s { length } )
+  in
+  return_either (function
+    | Immediates -> imm ()
+    | Values -> values ()
+    | Naked_floats { length } -> float length
+    | Naked_float32s { length } -> float32 length
+    | Naked_ints { length } -> int length
+    | Naked_int8s { length } -> int8 length
+    | Naked_int16s { length } -> int16 length
+    | Naked_int32s { length } -> int32 length
+    | Naked_int64s { length } -> int64 length
+    | Naked_nativeints { length } -> nativeint length
+    | Naked_vec128s { length } -> vec128 length
+    | Naked_vec256s { length } -> vec256 length
+    | Naked_vec512s { length } -> vec512 length)
 
 let bigarray_kind =
   D.(
@@ -906,14 +891,14 @@ let int_comp =
     in
     let| eq = flag "eq", fun _ () -> Yielding_bool Eq in
     let| neq = flag "ne", fun _ () -> Yielding_bool Neq in
-    return_either (fun env -> function
-      | Yielding_bool (Lt s) -> lt env (s, ())
-      | Yielding_bool (Le s) -> le env (s, ())
-      | Yielding_bool (Gt s) -> gt env (s, ())
-      | Yielding_bool (Ge s) -> ge env (s, ())
-      | Yielding_bool Eq -> eq env ()
-      | Yielding_bool Neq -> neq env ()
-      | Yielding_int_like_compare_functions s -> qmark env (s, ()))
+    return_either (function
+      | Yielding_bool (Lt s) -> lt (s, ())
+      | Yielding_bool (Le s) -> le (s, ())
+      | Yielding_bool (Gt s) -> gt (s, ())
+      | Yielding_bool (Ge s) -> ge (s, ())
+      | Yielding_bool Eq -> eq ()
+      | Yielding_bool Neq -> neq ()
+      | Yielding_int_like_compare_functions s -> qmark (s, ()))
   in
   binary "%int_comp" ~params:(param2 standard_int comp) (fun _ (i, c) ->
       P.Int_comp (i, c))
