@@ -4,6 +4,16 @@
   native;
 *)
 
+(* This test relies on the initialisations happening in order and
+   writing results to the module items at the right address.
+   This does not seem to happen in [-Oclassic] (where this test is disabled)
+   and might be inconsistent in general until we address the underlying issue.
+   Before initialisation, values should be set to a tagged 0 (0x1). *)
+
+(* CR metaprogramming jbachurski: Eval running on a quote that refers to
+   the currently initalised unit should be made well-behaved.
+   Internal ticket 7260. *)
+
 #syntax quotations on
 
 let cell = ref 0

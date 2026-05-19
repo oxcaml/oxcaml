@@ -6,8 +6,9 @@
 
 #syntax quotations on
 
-(* This file showcases a bug where we can access values from the current unit
-   in a top-level [eval] before the rest of the unit is initialized. *)
+(* This test showcases a bug where we can access values from the current unit
+   in a top-level [eval] before the rest of the unit is initialised.
+   We show those uninitialised values are set to a tagged 0 (0x1). *)
 
 let x' = Eval.eval <[ Eval_before_init_bad.x ]>
 
