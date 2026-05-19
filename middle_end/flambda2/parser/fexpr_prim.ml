@@ -133,6 +133,26 @@ let mixed_block_shape =
         value_prefix_size shape, Array.to_list (flat_suffix shape)))
     (param2 int (list flat_suffix_element))
 
+let block_shape =
+  let open D in
+  patterns
+  @@
+  let| mixed =
+    ( mixed_block_shape,
+      fun _ m ->
+        K.(Block_shape.Scannable (Scannable_block_shape.Mixed_record m)) )
+  in
+  let| float_record = flag_case "float_record" K.Block_shape.Float_record in
+  let| values =
+    flag_case "values"
+      K.(Block_shape.Scannable Scannable_block_shape.Value_only)
+  in
+  return_either (function
+    | K.Block_shape.Float_record -> float_record ()
+    | K.Block_shape.Scannable K.Scannable_block_shape.Value_only -> values ()
+    | K.Block_shape.Scannable (K.Scannable_block_shape.Mixed_record m) ->
+      mixed m)
+
 let block_access_kind =
   let open D in
   let tag = or_unknown @@ labeled "tag" scannable_tag in
@@ -470,131 +490,152 @@ let kind =
            "rec_info", K.rec_info ])
 
 let kind_with_subkind =
-  D.value
-    { decode =
-        (fun _ m : Flambda_kind.With_subkind.t ->
-          match unwrap_loc m with
-          | "region" -> Flambda_kind.With_subkind.region
-          | "rec_info" -> Flambda_kind.With_subkind.rec_info
-          | "imm" -> Flambda_kind.With_subkind.naked_immediate
-          | "float32" -> Flambda_kind.With_subkind.naked_float32
-          | "float" -> Flambda_kind.With_subkind.naked_float
-          | "int8" -> Flambda_kind.With_subkind.naked_int8
-          | "int16" -> Flambda_kind.With_subkind.naked_int16
-          | "int32" -> Flambda_kind.With_subkind.naked_int32
-          | "int64" -> Flambda_kind.With_subkind.naked_int64
-          | "nativeint" -> Flambda_kind.With_subkind.naked_nativeint
-          | "vec128" -> Flambda_kind.With_subkind.naked_vec128
-          | "vec256" -> Flambda_kind.With_subkind.naked_vec256
-          | "vec512" -> Flambda_kind.With_subkind.naked_vec512
-          | value ->
-            let nullable, non_null_value_subkind =
-              if String.ends_with ~suffix:"_or_null" value
-              then
-                ( K.With_subkind.Nullable.Nullable,
-                  String.sub value 0
-                    (String.length value - String.length "_or_null") )
-              else K.With_subkind.Nullable.Non_nullable, value
-            in
-            let non_null_value_subkind : K.With_subkind.Non_null_value_subkind.t
-                =
-              match non_null_value_subkind with
-              | "value" -> Anything
-              | "boxed_float32" -> Boxed_float32
-              | "boxed_float" -> Boxed_float
-              | "boxed_int32" -> Boxed_int32
-              | "boxed_int64" -> Boxed_int64
-              | "boxed_nativeint" -> Boxed_nativeint
-              | "boxed_vec128" -> Boxed_vec128
-              | "boxed_vec256" -> Boxed_vec256
-              | "boxed_vec512" -> Boxed_vec512
-              | "tagged_imm" -> Tagged_immediate
-              | "variant" ->
-                Format.eprintf "Unsupported value subkind: variant@.";
-                Anything
-              | "float_block" ->
-                Format.eprintf "Unsupported value subkind: float_block@.";
-                Anything
-              | "floatarray" -> Float_array
-              | "imm_array" -> Immediate_array
-              | "array" -> Value_array
-              | "genarray" -> Generic_array
-              | "float32_array" -> Unboxed_float32_array
-              | "int_array" -> Untagged_int_array
-              | "int8_array" -> Untagged_int8_array
-              | "int16_array" -> Untagged_int16_array
-              | "int32_array" -> Unboxed_int32_array
-              | "int64_array" -> Unboxed_int64_array
-              | "nativeint_array" -> Unboxed_nativeint_array
-              | "vec128_array" -> Unboxed_vec128_array
-              | "vec256_array" -> Unboxed_vec256_array
-              | "vec512_array" -> Unboxed_vec512_array
-              | "array#" -> Unboxed_product_array
-              | _ ->
-                Misc.fatal_errorf "Unsupported value subkind: %s"
-                  non_null_value_subkind
-            in
-            K.With_subkind.create K.value non_null_value_subkind nullable);
-      encode =
-        (fun _ (m : Flambda_kind.With_subkind.t) ->
-          let s =
-            match Flambda_kind.With_subkind.kind m with
-            | Region -> "region"
-            | Rec_info -> "rec_info"
-            | Naked_number naked_number_kind -> (
-              match naked_number_kind with
-              | Naked_immediate -> "imm"
-              | Naked_float32 -> "float32"
-              | Naked_float -> "float"
-              | Naked_int8 -> "int8"
-              | Naked_int16 -> "int16"
-              | Naked_int32 -> "int32"
-              | Naked_int64 -> "int64"
-              | Naked_nativeint -> "nativeint"
-              | Naked_vec128 -> "vec128"
-              | Naked_vec256 -> "vec256"
-              | Naked_vec512 -> "vec512")
-            | Value -> (
-              let s =
-                match Flambda_kind.With_subkind.non_null_value_subkind m with
-                | Anything -> "value"
-                | Boxed_float32 -> "boxed_float32"
-                | Boxed_float -> "boxed_float"
-                | Boxed_int32 -> "boxed_int32"
-                | Boxed_int64 -> "boxed_int64"
-                | Boxed_nativeint -> "boxed_nativeint"
-                | Boxed_vec128 -> "boxed_vec128"
-                | Boxed_vec256 -> "boxed_vec256"
-                | Boxed_vec512 -> "boxed_vec512"
-                | Tagged_immediate -> "tagged_imm"
-                | Variant { consts = _; non_consts = _ } ->
-                  (* CR bclement: need a better support for structural values *)
-                  "variant"
-                | Float_block { num_fields = _ } ->
-                  (* CR bclement: need a better support for structural values *)
-                  "float_block"
-                | Float_array -> "floatarray"
-                | Immediate_array -> "imm_array"
-                | Value_array -> "array"
-                | Generic_array -> "genarray"
-                | Unboxed_float32_array -> "float32_array"
-                | Untagged_int_array -> "int_array"
-                | Untagged_int8_array -> "int8_array"
-                | Untagged_int16_array -> "int16_array"
-                | Unboxed_int32_array -> "int32_array"
-                | Unboxed_int64_array -> "int64_array"
-                | Unboxed_nativeint_array -> "nativeint_array"
-                | Unboxed_vec128_array -> "vec128_array"
-                | Unboxed_vec256_array -> "vec256_array"
-                | Unboxed_vec512_array -> "vec512_array"
-                | Unboxed_product_array -> "array#"
-              in
-              match Flambda_kind.With_subkind.nullable m with
-              | Nullable -> s ^ "_or_null"
-              | Non_nullable -> s)
+  let open D in
+  let nullable =
+    let open K.With_subkind.Nullable in
+    maps (bool_flag "or_null")
+      ~from:(fun _ b -> if b then Nullable else Non_nullable)
+      ~to_:(fun _ -> function Nullable -> true | Non_nullable -> false)
+  in
+  recursive_patterns (fun full_kind ->
+      let|= non_null_value_subkind =
+        let open K.With_subkind.Non_null_value_subkind in
+        let| anything = flag_case "value" Anything in
+        let| tagged_imm = flag_case "tagged_imm" Tagged_immediate in
+        let| boxed_float = flag_case "boxed_float" Boxed_float in
+        let| boxed_float32 = flag_case "boxed_float32" Boxed_float32 in
+        let| boxed_int32 = flag_case "boxed_int32" Boxed_int32 in
+        let| boxed_int64 = flag_case "boxed_int64" Boxed_int64 in
+        let| boxed_nativeint = flag_case "boxed_nativeint" Boxed_nativeint in
+        let| boxed_vec128 = flag_case "boxed_vec128" Boxed_vec128 in
+        let| boxed_vec256 = flag_case "boxed_vec256" Boxed_vec256 in
+        let| boxed_vec512 = flag_case "boxed_vec512" Boxed_vec512 in
+        let| value_array = flag_case "value_array" Value_array in
+        let| imm_array = flag_case "imm_array" Immediate_array in
+        let| float_array = flag_case "float_array" Float_array in
+        let| generic_array = flag_case "generic_array" Generic_array in
+        let| untagged_int_array =
+          flag_case "untagged_int_array" Untagged_int_array
+        in
+        let| untagged_int8_array =
+          flag_case "untagged_int8_array" Untagged_int8_array
+        in
+        let| untagged_int16_array =
+          flag_case "untagged_int16_array" Untagged_int16_array
+        in
+        let| unboxed_int32_array =
+          flag_case "unboxed_int32_array" Unboxed_int32_array
+        in
+        let| unboxed_int64_array =
+          flag_case "unboxed_int64_array" Unboxed_int64_array
+        in
+        let| unboxed_nativeint_array =
+          flag_case "unboxed_nativeint_array" Unboxed_nativeint_array
+        in
+        let| unboxed_float32_array =
+          flag_case "unboxed_float32_array" Unboxed_float32_array
+        in
+        let| unboxed_vec128_array =
+          flag_case "unboxed_vec128_array" Unboxed_vec128_array
+        in
+        let| unboxed_vec256_array =
+          flag_case "unboxed_vec256_array" Unboxed_vec256_array
+        in
+        let| unboxed_vec512_array =
+          flag_case "unboxed_vec512_array" Unboxed_vec512_array
+        in
+        let| unboxed_product_array =
+          flag_case "unboxed_product_array" Unboxed_product_array
+        in
+        let| float_block =
+          ( labeled "float_block" int,
+            fun _ num_fields -> Float_block { num_fields } )
+        in
+        let| variant =
+          let item = param2 block_shape (list full_kind) in
+          let map_bind = positional (param2 scannable_tag item) in
+          let tag_map =
+            maps (list map_bind)
+              ~from:(fun _ l -> Tag.Scannable.Map.of_list l)
+              ~to_:(fun _ m -> Tag.Scannable.Map.bindings m)
           in
-          wrap_loc s)
-    }
+          let target_int_set =
+            maps (list target_ocaml_int)
+              ~from:(fun _ l -> Target_ocaml_int.Set.of_list l)
+              ~to_:(fun _ m -> Target_ocaml_int.Set.elements m)
+          in
+          param2_case target_int_set tag_map ~decode:(fun _ consts non_consts ->
+              Variant { consts; non_consts })
+        in
+        return_either (function
+          | Anything -> anything ()
+          | Boxed_float32 -> boxed_float32 ()
+          | Boxed_float -> boxed_float ()
+          | Boxed_int32 -> boxed_int32 ()
+          | Boxed_int64 -> boxed_int64 ()
+          | Boxed_nativeint -> boxed_nativeint ()
+          | Boxed_vec128 -> boxed_vec128 ()
+          | Boxed_vec256 -> boxed_vec256 ()
+          | Boxed_vec512 -> boxed_vec512 ()
+          | Tagged_immediate -> tagged_imm ()
+          | Float_array -> float_array ()
+          | Immediate_array -> imm_array ()
+          | Value_array -> value_array ()
+          | Generic_array -> generic_array ()
+          | Unboxed_float32_array -> unboxed_float32_array ()
+          | Untagged_int_array -> untagged_int_array ()
+          | Untagged_int8_array -> untagged_int8_array ()
+          | Untagged_int16_array -> untagged_int16_array ()
+          | Unboxed_int32_array -> unboxed_int32_array ()
+          | Unboxed_int64_array -> unboxed_int64_array ()
+          | Unboxed_nativeint_array -> unboxed_nativeint_array ()
+          | Unboxed_vec128_array -> unboxed_vec128_array ()
+          | Unboxed_vec256_array -> unboxed_vec256_array ()
+          | Unboxed_vec512_array -> unboxed_vec512_array ()
+          | Unboxed_product_array -> unboxed_product_array ()
+          | Float_block { num_fields } -> float_block num_fields
+          | Variant { consts; non_consts } -> variant (consts, non_consts))
+      in
+      let| region = flag_case "region" K.With_subkind.region in
+      let| rec_info = flag_case "rec_info" K.With_subkind.rec_info in
+      let| naked_immediate = flag_case "imm" K.With_subkind.naked_immediate in
+      let| naked_float = flag_case "float" K.With_subkind.naked_float in
+      let| naked_float32 = flag_case "float32" K.With_subkind.naked_float32 in
+      let| naked_int8 = flag_case "int8" K.With_subkind.naked_int8 in
+      let| naked_int16 = flag_case "int16" K.With_subkind.naked_int16 in
+      let| naked_int32 = flag_case "int32" K.With_subkind.naked_int32 in
+      let| naked_int64 = flag_case "int64" K.With_subkind.naked_int64 in
+      let| naked_nativeint =
+        flag_case "nativeint" K.With_subkind.naked_nativeint
+      in
+      let| naked_vec128 = flag_case "vec128" K.With_subkind.naked_vec128 in
+      let| naked_vec256 = flag_case "vec256" K.With_subkind.naked_vec256 in
+      let| naked_vec512 = flag_case "vec512" K.With_subkind.naked_vec512 in
+      let| value =
+        param2_case non_null_value_subkind nullable ~decode:(fun _ sk n ->
+            K.With_subkind.create K.value sk n)
+      in
+      return_either (fun full_kind ->
+          match K.With_subkind.kind full_kind with
+          | Region -> region ()
+          | Rec_info -> rec_info ()
+          | Naked_number K.Naked_number_kind.Naked_immediate ->
+            naked_immediate ()
+          | Naked_number K.Naked_number_kind.Naked_float32 -> naked_float32 ()
+          | Naked_number K.Naked_number_kind.Naked_float -> naked_float ()
+          | Naked_number K.Naked_number_kind.Naked_int8 -> naked_int8 ()
+          | Naked_number K.Naked_number_kind.Naked_int16 -> naked_int16 ()
+          | Naked_number K.Naked_number_kind.Naked_int32 -> naked_int32 ()
+          | Naked_number K.Naked_number_kind.Naked_int64 -> naked_int64 ()
+          | Naked_number K.Naked_number_kind.Naked_nativeint ->
+            naked_nativeint ()
+          | Naked_number K.Naked_number_kind.Naked_vec128 -> naked_vec128 ()
+          | Naked_number K.Naked_number_kind.Naked_vec256 -> naked_vec256 ()
+          | Naked_number K.Naked_number_kind.Naked_vec512 -> naked_vec512 ()
+          | Value ->
+            value
+              ( K.With_subkind.non_null_value_subkind full_kind,
+                K.With_subkind.nullable full_kind )))
 
 (* Nullaries *)
 let invalid =
@@ -809,6 +850,26 @@ let bytes_length =
 let boolean_not =
   D.(unary "%boolean_not" ~params:param0 (fun _ () -> P.Boolean_not))
 
+let duplicate_block =
+  let open D in
+  let|= kind =
+    let open P.Duplicate_block_kind in
+    let| floats =
+      labeled "floats" target_ocaml_int, fun _ length -> Naked_floats { length }
+    in
+    let| mixed = flag_case "mixed" Mixed in
+    let| values =
+      param2_case scannable_tag target_ocaml_int ~decode:(fun _ tag length ->
+          Values { tag; length })
+    in
+    return_either (function
+      | Values { tag; length } -> values (tag, length)
+      | Naked_floats { length } -> floats length
+      | Mixed -> mixed ())
+  in
+  unary "%duplicate_block" ~params:kind (fun _ kind ->
+      P.Duplicate_block { kind })
+
 (* Binaries *)
 let atomic_load_field =
   D.(
@@ -823,13 +884,34 @@ let block_set =
       (fun _ (kind, init, field) -> P.Block_set { kind; init; field }))
 
 let array_load =
-  D.(
-    binary "%array_load"
-      ~params:
-        (maps
-           (param2 array_kind opt_mutability)
-           ~from:(fun _ (k, m) ->
-             let lk : P.Array_load_kind.t =
+  let open D in
+  let load_kind =
+    let open P.Array_load_kind in
+    constructor_flag
+      [ "imm", Immediates;
+        "gc_ign", Gc_ignorable_values;
+        "value", Values;
+        "float", Naked_floats;
+        "float32", Naked_float32s;
+        "int", Naked_ints;
+        "int8", Naked_int8s;
+        "int16", Naked_int16s;
+        "int32", Naked_int32s;
+        "int64", Naked_int64s;
+        "nativeint", Naked_nativeints;
+        "vec128", Naked_vec128s;
+        "vec256", Naked_vec256s;
+        "vec512", Naked_vec512s ]
+  in
+  binary "%array_load"
+    ~params:
+      (maps
+         (param3 array_kind (option load_kind) opt_mutability)
+         ~from:(fun _ (k, lk, m) ->
+           let lk : P.Array_load_kind.t =
+             match lk with
+             | Some lk -> lk
+             | None -> (
                match (k : P.Array_kind.t) with
                | Immediates -> Immediates
                | Gc_ignorable_values -> Gc_ignorable_values
@@ -846,11 +928,21 @@ let array_load =
                | Naked_vec256s -> Naked_vec256s
                | Naked_vec512s -> Naked_vec512s
                | Unboxed_product _ ->
-                 Misc.fatal_error "Unboxed product array ops not supported"
-             in
-             k, lk, m)
-           ~to_:(fun _ (k, _, m) -> k, m))
-      (fun _ (k, lk, m) -> P.Array_load (k, lk, m)))
+                 Misc.fatal_error "missing product array load kind")
+           in
+           k, lk, m)
+         ~to_:(fun _ (k, lk, m) ->
+           let lk =
+             match (k : P.Array_kind.t) with
+             | Unboxed_product _ -> Some lk
+             | Immediates | Gc_ignorable_values | Values | Naked_floats
+             | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+             | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+             | Naked_vec256s | Naked_vec512s ->
+               None
+           in
+           k, lk, m))
+    (fun _ (k, lk, m) -> P.Array_load (k, lk, m))
 
 let bigarray_load =
   D.(
@@ -962,15 +1054,55 @@ let poke =
 
 (* Ternaries *)
 let array_set =
-  D.(
-    ternary "%array_set"
-      ~params:
-        (maps
-           (param2 array_kind init_or_assign)
-           ~from:(fun _ (k, ia) ->
-             let sk : P.Array_set_kind.t =
+  let open D in
+  let|= set_kind =
+    let open P.Array_set_kind in
+    let| imm = flag_case "imm" Immediates in
+    let| values =
+      param2_case (flag "value") init_or_assign ~decode:(fun _ () ioa ->
+          Values ioa)
+    in
+    let| float = flag_case "float" Naked_floats in
+    let| float32 = flag_case "float32" Naked_float32s in
+    let| int = flag_case "int" Naked_ints in
+    let| int8 = flag_case "int8" Naked_int8s in
+    let| int16 = flag_case "int16" Naked_int16s in
+    let| int32 = flag_case "int32" Naked_int32s in
+    let| int64 = flag_case "int64" Naked_int64s in
+    let| nativeint = flag_case "nativeint" Naked_nativeints in
+    let| vec128 = flag_case "vec128" Naked_vec128s in
+    let| vec256 = flag_case "vec256" Naked_vec256s in
+    let| vec512 = flag_case "vec512" Naked_vec512s in
+    let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
+    return_either (function
+      | Immediates -> imm ()
+      | Values ioa -> values ((), ioa)
+      | Naked_floats -> float ()
+      | Naked_float32s -> float32 ()
+      | Naked_ints -> int ()
+      | Naked_int8s -> int8 ()
+      | Naked_int16s -> int16 ()
+      | Naked_int32s -> int32 ()
+      | Naked_int64s -> int64 ()
+      | Naked_nativeints -> nativeint ()
+      | Naked_vec128s -> vec128 ()
+      | Naked_vec256s -> vec256 ()
+      | Naked_vec512s -> vec512 ()
+      | Gc_ignorable_values -> gc_ign ())
+  in
+  ternary "%array_set"
+    ~params:
+      (maps
+         (param2 array_kind (option set_kind))
+         ~from:(fun _ (k, sk) ->
+           let sk : P.Array_set_kind.t =
+             match sk with
+             | Some sk -> sk
+             | None -> (
                match (k : P.Array_kind.t) with
-               | Values -> Values ia
+               | Values ->
+                 Values
+                   (P.Init_or_assign.Assignment Alloc_mode.For_assignments.heap)
                | Immediates -> Immediates
                | Gc_ignorable_values -> Gc_ignorable_values
                | Naked_floats -> Naked_floats
@@ -985,24 +1117,21 @@ let array_set =
                | Naked_vec256s -> Naked_vec256s
                | Naked_vec512s -> Naked_vec512s
                | Unboxed_product _ ->
-                 Misc.fatal_error "Unboxed product array ops not supported"
-             in
-             k, sk)
-           ~to_:(fun _ (k, sk) : (P.Array_kind.t * _) ->
-             let no_ai =
-               P.Init_or_assign.Assignment Alloc_mode.For_assignments.heap
-             in
-             let ai =
-               match (sk : P.Array_set_kind.t) with
-               | Values ai -> ai
-               | Immediates | Gc_ignorable_values | Naked_floats
-               | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-               | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-               | Naked_vec256s | Naked_vec512s ->
-                 no_ai
-             in
-             k, ai))
-      (fun _ (k, sk) -> P.Array_set (k, sk)))
+                 Misc.fatal_error "Missing product array set kind")
+           in
+           k, sk)
+         ~to_:(fun _ (k, sk) ->
+           let sk =
+             match (k : P.Array_kind.t) with
+             | Unboxed_product _ -> Some sk
+             | Immediates | Gc_ignorable_values | Values | Naked_floats
+             | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+             | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+             | Naked_vec256s | Naked_vec512s ->
+               None
+           in
+           k, sk))
+    (fun _ (k, sk) -> P.Array_set (k, sk))
 
 let atomic_exchange_field =
   D.(
@@ -1154,9 +1283,7 @@ module OfFlambda = struct
     | Get_header -> get_header env ()
     | Reinterpret_boxed_vector -> reinterpret_boxed_vector env ()
     | Peek standard_int_or_float -> peek env standard_int_or_float
-    | Duplicate_block _ ->
-      Misc.fatal_errorf "TODO: Unary primitive: %a" P.Without_args.print
-        (P.Without_args.Unary op)
+    | Duplicate_block { kind } -> duplicate_block env kind
 
   let binop env (op : P.binary_primitive) =
     match op with
