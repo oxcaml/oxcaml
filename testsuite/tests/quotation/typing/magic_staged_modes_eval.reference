@@ -1,5 +1,5 @@
 generated program:
-(42 [@magic_staged_modes])
+((42) [@magic_staged_modes])
 
 generated program:
 stack_ (Some 42)
@@ -13,9 +13,9 @@ Error: The expression is "local" because it is "stack_"-allocated.
 eval failed.
 
 generated program:
-((Stdlib.ref 0 : _ @ unique) [@magic_staged_modes])
+(((Stdlib.ref 0 : _ @ unique)) [@magic_staged_modes])
 
-File "//eval//", line 1, characters 14-26:
+File "//eval//", line 1, characters 15-27:
 Error: This value is "aliased" but is expected to be "unique".
 eval failed.
 
