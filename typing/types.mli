@@ -843,7 +843,9 @@ type type_declaration =
     type_loc: Location.t;
     type_attributes: Parsetree.attributes;
     type_unboxed_default: bool;
-    (* true if the unboxed-ness of this type was chosen by a compiler flag *)
+    (* true if the user did not specify an explicit representation attribute
+       ([@@unboxed] or [@@represent_as_float_array]), so the representation may
+       have been chosen by a compiler flag. *)
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
     (* stores the unboxed version of that this type introduces: this is [Some]
@@ -939,6 +941,19 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
+  | Record_dummy of { represent_as_float_array : bool }
+  (* Note [Record_dummy]:
+     We typecheck type declarations before updating their kinds, yet some record
+     representations are kind-dependent. In particular, we don't choose between
+     [Record_boxed], [Record_float], [Record_ufloat], and [Record_mixed] until
+     type declaration jkinds are updated in [update_decls_jkind].
+
+     Until then, we use [Record_dummy], which also tracks whether the
+     declaration has the attribute [@@represent_as_float_array], as we can't
+     check whether the attribute is valid until we know the kinds of the fields
+     (which must all be [float64]).
+
+     After [update_decls_jkind], no record should have this representation. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product

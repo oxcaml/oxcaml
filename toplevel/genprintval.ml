@@ -575,6 +575,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                 if !Clflags.native_code
                                 then Outval_record_mixed_block mixed
                                 else Outval_record_boxed
+                          | Record_dummy _ ->
+                              Misc.fatal_error "dummy record representation"
                         in
                         tree_of_record_fields depth
                           env path decl.type_params ty_list
