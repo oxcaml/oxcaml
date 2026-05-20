@@ -86,6 +86,14 @@ val peephole_optimize_from : output_pos -> unit
     (if registered through [register_internal_assembler]). *)
 val generate_code : (X86_ast.asm_program -> unit) option -> unit
 
+(** Iterate over all sections (both regular and delayed), calling [f] with the
+    section name and the instruction stream for each. *)
+val iter_sections :
+  (X86_section.Section_name.t ->
+  X86_ast.asm_line Oxcaml_utils.Doubly_linked_list.t ->
+  unit) ->
+  unit
+
 (** Generate an object file corresponding to the last call to [generate_code].
     An internal assembler is used if available (and the input file is ignored).
     Otherwise, the source asm file with an external assembler. *)
