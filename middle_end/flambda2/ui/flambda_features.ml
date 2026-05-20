@@ -178,6 +178,10 @@ let dump_reaper () = !Oxcaml_flags.Flambda2.Dump.reaper
 
 let freshen_when_printing () = !Oxcaml_flags.Flambda2.Dump.freshen
 
+let erase_in_types_depth_variables =
+  Oxcaml_args.Extra_options.bool __LOC__
+    "flambda2-erase-in-types-depth-variables"
+
 module Inlining = struct
   module I = Oxcaml_flags.Flambda2.Inlining
   module IH = Clflags.Int_arg_helper

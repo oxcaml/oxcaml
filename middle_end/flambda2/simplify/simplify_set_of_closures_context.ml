@@ -247,41 +247,24 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
         else denv)
     old_to_new_code_ids_all_sets denv
 
-let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
-    ~closure_bound_names_all_sets ~value_slot_types_all_sets =
-  let denv = DA.denv dacc_prior_to_sets in
-  let denv_inside_functions =
-    DE.enter_set_of_closures denv ~in_stub:false
-    (* Even if we are not rebuilding terms we should always rebuild them for
-       local functions. The type of a function is dependent on its term and not
-       knowing it prohibits us from inlining it. *)
-    |> DE.set_rebuild_terms
-  in
-  let free_depth_variables =
-    List.concat_map
-      (fun value_slot_types ->
-        Value_slot.Map.mapi
-          (fun _value_slot ty ->
-            let vars = TE.free_names_transitive (DE.typing_env denv) ty in
-            NO.fold_variables vars ~init:Variable.Set.empty
-              ~f:(fun free_depth_variables var ->
-                let ty =
-                  TE.find
-                    (DE.typing_env denv_inside_functions)
-                    (Name.var var) None
-                in
-                match T.kind ty with
-                | Rec_info -> Variable.Set.add var free_depth_variables
-                | Value | Naked_number _ | Region -> free_depth_variables))
-          value_slot_types
-        |> Value_slot.Map.data)
-      value_slot_types_all_sets
-    |> Variable.Set.union_list
-  in
-  (* Pretend that any depth variables appearing free in the closure elements are
-     bound to "never inline anything" in the function. This ensures that
-     in-types depth variables do not end up in terms. *)
-  (* CR-someday lmaurer: It would be better to propagate depth variables into
+let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
+    ~value_slot_types_all_sets =
+  (* The purpose of the code below is to compute the set of depth variables that
+     appear in value slots and might end up free in the body of the function
+     through simplification of the [Project_value_slot] primitive. This would be
+     wrong, because these depth variables are not accessible from the closure
+     (they are now bound with [In_types] name mode, and cannot appear in terms).
+     See discussion below for details.
+
+     If the "erase in-types depth variables" option is set, we don't have to do
+     anything here: instead, any depth variable with [In_types] that is actually
+     accessed during the simplification of the function's body will be replaced
+     with [Rec_info_expr.do_not_inline] in by [simplify_rec_info_expr]. This is
+     important for performance, as the computation of the transitive free names
+     below can be extremely expensive (upwards of 5% of the total compilation
+     time in pathological cases).
+
+     CR-someday lmaurer: It would be better to propagate depth variables into
      closures properly, as this would allow things like unrolling [Seq.map]
      where the recursive call goes through a closure. For the moment, we often
      just stop unrolling cold in that situation. (It's important that we use
@@ -292,22 +275,65 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
      mshinwell: Leo and I have discussed allowing In_types variables in
      closures, which should cover this case, if we allowed such variables to be
      of kinds other than [Value]. *)
+  if Flambda_features.erase_in_types_depth_variables ()
+  then denv_inside_functions, Variable.Set.empty
+  else
+    let free_depth_variables =
+      List.concat_map
+        (fun value_slot_types ->
+          Value_slot.Map.mapi
+            (fun _value_slot ty ->
+              let vars = TE.free_names_transitive typing_env ty in
+              NO.fold_variables vars ~init:Variable.Set.empty
+                ~f:(fun free_depth_variables var ->
+                  let ty =
+                    TE.find
+                      (DE.typing_env denv_inside_functions)
+                      (Name.var var) None
+                  in
+                  match T.kind ty with
+                  | Rec_info -> Variable.Set.add var free_depth_variables
+                  | Value | Naked_number _ | Region -> free_depth_variables))
+            value_slot_types
+          |> Value_slot.Map.data)
+        value_slot_types_all_sets
+      |> Variable.Set.union_list
+    in
+    (* Pretend that any depth variables appearing free in the closure elements
+       are bound to "never inline anything" in the function. This ensures that
+       in-types depth variables do not end up in terms. *)
+    let denv_inside_functions =
+      Variable.Set.fold
+        (fun dv env_inside_functions ->
+          let name = Name.var dv in
+          DE.add_equation_on_name env_inside_functions name
+            (T.this_rec_info Rec_info_expr.do_not_inline))
+        free_depth_variables denv_inside_functions
+    in
+    denv_inside_functions, free_depth_variables
+
+let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
+    ~closure_bound_names_all_sets ~value_slot_types_all_sets =
+  let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
-    Variable.Set.fold
-      (fun dv env_inside_functions ->
-        let name = Name.var dv in
-        DE.add_equation_on_name env_inside_functions name
-          (T.this_rec_info Rec_info_expr.do_not_inline))
-      free_depth_variables denv_inside_functions
+    DE.enter_set_of_closures denv ~in_stub:false
+    (* Even if we are not rebuilding terms we should always rebuild them for
+       local functions. The type of a function is dependent on its term and not
+       knowing it prohibits us from inlining it. *)
+    |> DE.set_rebuild_terms
   in
-  let value_slot_types_inside_functions_all_sets = value_slot_types_all_sets in
+  let denv_inside_functions, previously_free_depth_variables =
+    compute_and_erase_depth_variables ~typing_env:(DE.typing_env denv)
+      ~denv_inside_functions ~value_slot_types_all_sets
+  in
   let old_to_new_code_ids_all_sets =
     compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures
   in
   let ( closure_bound_names_inside_functions_all_sets,
         closure_types_inside_functions_all_sets ) =
     compute_closure_types_inside_functions ~denv ~all_sets_of_closures
-      ~closure_bound_names_all_sets ~value_slot_types_inside_functions_all_sets
+      ~closure_bound_names_all_sets
+      ~value_slot_types_inside_functions_all_sets:value_slot_types_all_sets
       ~old_to_new_code_ids_all_sets
   in
   let dacc_inside_functions =
@@ -323,5 +349,5 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     closure_bound_names_inside_functions_all_sets;
     old_to_new_code_ids_all_sets;
     simplify_function_body;
-    previously_free_depth_variables = free_depth_variables
+    previously_free_depth_variables
   }
