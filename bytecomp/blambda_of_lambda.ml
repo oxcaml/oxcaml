@@ -145,6 +145,57 @@ let static_cast ~src ~dst ~(signedness : Scalar.Signedness.t) x =
       | Boxed Int64 -> "int64"
       | Boxed Float -> "float"
       | Boxed Float32 -> "float32"
+
+    type bit_width =
+      | Static_bits of int
+      | Runtime_bits of Lambda.compile_time_constant
+
+    let bit_width : builtin -> bit_width = function
+      | Int -> Runtime_bits Int_size
+      | Boxed Int32 -> Static_bits 32
+      | Boxed Nativeint -> Runtime_bits Word_size
+      | Boxed Int64 -> Static_bits 64
+      | Boxed (Float | Float32) ->
+        failwith "Blambda_of_lambda.static_cast: expected integer type"
+
+    let bit_width_expr = function
+      | Static_bits bits -> tagged_immediate bits
+      | Runtime_bits const -> Prim (caml_sys_const const, [unit])
+
+    (* Returns a blambda expression giving the number of bits [src] must be
+       extended by to fill [dst], or [None] if the conversion is statically
+       known to be narrowing. *)
+    let extension_bits ~src ~dst =
+      let dst = bit_width dst in
+      let src = bit_width src in
+      match dst, src with
+      | Static_bits dst, Static_bits src ->
+        if dst <= src then None else Some (tagged_immediate (dst - src))
+      | _ ->
+        let dst = bit_width_expr dst in
+        let src = bit_width_expr src in
+        Some
+          (Ifthenelse
+             { cond = Prim (Intcomp Ltint, [dst; src]);
+               ifso = tagged_immediate 0;
+               ifnot = Prim (Subint, [dst; src])
+             })
+
+    let shift_left x ~shift ~(width : builtin) =
+      match width with
+      | Int -> Prim (Lslint, [x; shift])
+      | Boxed (Int32 | Nativeint | Int64) ->
+        Prim (ccallf "caml_%s_shift_left" (name width), [x; shift])
+      | Boxed (Float | Float32) ->
+        failwith "Blambda_of_lambda.static_cast: expected integer type"
+
+    let shift_right_unsigned x ~shift ~(width : builtin) =
+      match width with
+      | Int -> Prim (Lsrint, [x; shift])
+      | Boxed (Int32 | Nativeint | Int64) ->
+        Prim (ccallf "caml_%s_shift_right_unsigned" (name width), [x; shift])
+      | Boxed (Float | Float32) ->
+        failwith "Blambda_of_lambda.static_cast: expected integer type"
   end in
   let rec builtin x ~src ~dst =
     match (src : builtin), (dst : builtin) with
@@ -191,17 +242,26 @@ let static_cast ~src ~dst ~(signedness : Scalar.Signedness.t) x =
       | Int, Int ->
         (* [~signedness] does not effect narrowing conversions *)
         signed_conversion
-      | Int, Boxed (Int64 | Int32 | Nativeint) -> assert false
-      | Boxed Nativeint, Boxed Int64 -> assert false
-      | Boxed Int32, (Int | Boxed (Int64 | Int32 | Nativeint)) -> assert false)
+      | Int, Boxed (Int64 | Int32 | Nativeint)
+      | Boxed Nativeint, Boxed Int64
+      | Boxed Int32, (Int | Boxed (Int64 | Int32 | Nativeint)) -> (
+        match extension_bits ~src ~dst with
+        | None -> signed_conversion
+        | Some shift ->
+          signed_conversion
+          |> shift_left ~shift ~width:dst
+          |> shift_right_unsigned ~shift ~width:dst))
   in
   match value src, value dst with
   | Boxed src, Boxed dst ->
     builtin x ~src:(Boxed src) ~dst:(Boxed dst) ~signedness
-  | Tagged (Int | Int16 | Int8), Boxed dst ->
+  | Tagged src, Boxed dst ->
     (* we don't need to sign-extend in this case because tagged small integers
        are always represented sign-extended in bytecode, and none of these
        are narrowing conversions *)
+    let x =
+      match signedness with Signed -> x | Unsigned -> zero_extend src x
+    in
     builtin x ~src:Int ~dst:(Boxed dst) ~signedness
   | Boxed src, Tagged dst ->
     (* this can be a narrowing conversion, so must be sign extended, in order
