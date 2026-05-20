@@ -865,33 +865,6 @@ let path_of_scalar (scalar : Scalar.any_locality_mode Scalar.t) =
   | Naked width -> Path.unboxed_version (value width)
 ;;
 
-let type_of_scalar : Scalar.any_locality_mode Scalar.t -> type_expr = function
-  | Value (Integral (Taggable Int8)) -> instance Predef.type_int8
-  | Value (Integral (Taggable Int16)) -> instance Predef.type_int16
-  | Value (Integral (Taggable Int)) -> instance Predef.type_int
-  | Value (Integral (Boxable (Int32 Any_locality_mode))) ->
-    instance Predef.type_int32
-  | Value (Integral (Boxable (Int64 Any_locality_mode))) ->
-    instance Predef.type_int64
-  | Value (Integral (Boxable (Nativeint Any_locality_mode))) ->
-    instance Predef.type_nativeint
-  | Value (Floating (Float32 Any_locality_mode)) -> instance Predef.type_float32
-  | Value (Floating (Float64 Any_locality_mode)) -> instance Predef.type_float
-  | Naked (Integral (Taggable Int8)) -> instance Predef.type_unboxed_int8
-  | Naked (Integral (Taggable Int16)) -> instance Predef.type_unboxed_int16
-  | Naked (Integral (Taggable Int)) -> instance Predef.type_unboxed_int
-  | Naked (Integral (Boxable (Int32 Any_locality_mode))) ->
-    instance Predef.type_unboxed_int32
-  | Naked (Integral (Boxable (Int64 Any_locality_mode))) ->
-    instance Predef.type_unboxed_int64
-  | Naked (Integral (Boxable (Nativeint Any_locality_mode))) ->
-    instance Predef.type_unboxed_nativeint
-  | Naked (Floating (Float32 Any_locality_mode)) ->
-    instance Predef.type_unboxed_float32
-  | Naked (Floating (Float64 Any_locality_mode)) ->
-    instance Predef.type_unboxed_float
-;;
-
 type naked_flag =
   | Naked
   | Value
@@ -2933,6 +2906,28 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
   if Types.is_atomic label.lbl_mut && not (wildcard pat) then
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
 
+let disambiguate_integer_literal ~loc env ty_expected i =
+  (* Terrible hack for integer literals *)
+  let ty_exp = expand_head env (protect_expansion env ty_expected) in
+  match get_desc ty_exp with
+  | Tconstr (path, _, _) ->
+    ListLabels.find_map Scalar.Integral.all ~f:(fun scalar ->
+      let expected = path_of_scalar (Scalar.integral scalar) in
+      let matches = Path.same path expected in
+      (match (scalar : _ Scalar.Integral.t) with
+      | Value (Taggable Int) -> None
+      | _ ->
+        if matches then (
+          if !Clflags.principal && get_level ty_exp <> generic_level
+          then
+            Location.prerr_warning loc
+              (not_principal "this coercion to %s" (Path.name expected));
+          match parse_integer scalar i with
+          | Ok integer -> Some integer
+          | Error err -> raise (Error (loc, env, err)))
+        else None))
+  | _ -> None
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -3258,7 +3253,17 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constant cst ->
-      let cst = constant_or_raise !!penv loc cst in
+      let tydi_cst =
+        match cst with
+        | Pconst_integer (i, None) ->
+          disambiguate_integer_literal ~loc !!penv expected_ty i
+        | _ -> None
+      in
+      let cst =
+        match tydi_cst with
+        | Some cst -> cst
+        | None -> constant_or_raise !!penv loc cst
+      in
       rvp @@ solve_expected {
         pat_desc = Tpat_constant cst;
         pat_loc = loc; pat_extra=[];
@@ -5916,7 +5921,7 @@ let may_lower_contravariant_then_generalize env exp =
   generalize exp.exp_type
 
 let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; flat_float = _ } =
+      { ba; base_ty; el_ty; modality = _ } =
   generalize_structure base_ty;
   generalize_structure el_ty;
   match ba with
@@ -6495,51 +6500,18 @@ and type_expect_
         exp_type = instance Predef.type_unboxed_bool;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_constant(Pconst_integer (i, None) as cst) -> (
-      (* Terrible hack for integer literals *)
-      let ty_exp = expand_head env (protect_expansion env ty_expected) in
-      let width =
-        match get_desc ty_exp with
-        | Tconstr (path, _, _) ->
-          ListLabels.find_opt Scalar.Integral.all ~f:(fun scalar ->
-            let expected = path_of_scalar (Scalar.integral scalar) in
-            let matches = Path.same path expected in
-            (match (scalar : _ Scalar.Integral.t) with
-             | Value (Taggable Int) -> matches
-             | _ ->
-               if matches
-               && !Clflags.principal
-               && get_level ty_exp <> generic_level
-               then
-                 Location.prerr_warning loc
-                   (not_principal "this coercion to %s" (Path.name expected));
-               matches))
+  | Pexp_constant cst ->
+      let tydi_cst =
+        match cst with
+        | Pconst_integer (i, None) ->
+          disambiguate_integer_literal ~loc env ty_expected i
         | _ -> None
       in
-      match width with
-      | Some scalar ->
-        let integer =
-          match parse_integer scalar i with
-          | Ok integer -> integer
-          | Error err -> raise (Error (loc, env, err))
-        in
-        rue {
-          exp_desc = Texp_constant integer;
-          exp_loc = loc; exp_extra = [];
-          exp_type = type_of_scalar (Scalar.integral scalar);
-          exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
-      | None ->
-        let cst = constant_or_raise env loc cst in
-        rue {
-          exp_desc = Texp_constant cst;
-          exp_loc = loc; exp_extra = [];
-          exp_type = type_constant cst;
-          exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
-  )
-  | Pexp_constant cst ->
-      let cst = constant_or_raise env loc cst in
+      let cst =
+        match tydi_cst with
+        | Some cst -> cst
+        | None -> constant_or_raise env loc cst
+      in
       rue {
         exp_desc = Texp_constant cst;
         exp_loc = loc; exp_extra = [];

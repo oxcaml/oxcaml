@@ -2,25 +2,59 @@
  expect;
 *)
 
-let _ = Int32.(add 1 2l);;
+let _ = Int32.(add 1m 2);;
+[%%expect{|
+Line 1, characters 19-21:
+1 | let _ = Int32.(add 1m 2);;
+                       ^^
+Error: This expression has type "int" but an expression was expected of type
+         "int32"
+  Hint: Did you mean "1l"?
+|}]
+
+let _ = Int32.(add 1 2);;
 [%%expect{|
 - : int32 = 3l
 |}]
 
-let _ = Int32.(add 1l 2);;
+let _ : int32 * int32 = 42l, 43m;;
 [%%expect{|
-- : int32 = 3l
+Line 1, characters 29-32:
+1 | let _ : int32 * int32 = 42l, 43m;;
+                                 ^^^
+Error: This expression has type "int" but an expression was expected of type
+         "int32"
+  Hint: Did you mean "43l"?
 |}]
-
 
 let _ : int32 * int32 = 42l, 43;;
 [%%expect{|
 - : int32 * int32 = (42l, 43l)
 |}]
 
+let _ : int32 * nativeint = 42l, 43m;;
+[%%expect{|
+Line 1, characters 33-36:
+1 | let _ : int32 * nativeint = 42l, 43m;;
+                                     ^^^
+Error: This expression has type "int" but an expression was expected of type
+         "nativeint"
+  Hint: Did you mean "43n"?
+|}]
+
 let _ : int32 * nativeint = 42l, 43;;
 [%%expect{|
 - : int32 * nativeint = (42l, 43n)
+|}]
+
+let _ = min 6L 7m;;
+[%%expect{|
+Line 1, characters 15-17:
+1 | let _ = min 6L 7m;;
+                   ^^
+Error: This expression has type "int" but an expression was expected of type
+         "int64"
+  Hint: Did you mean "7L"?
 |}]
 
 let _ = min 6L 7;;
@@ -59,27 +93,53 @@ Error: This expression has type "int" but an expression was expected of type
 
 (* pattern *)
 let _ : int32 -> int32 = function
-  | 0 -> 0l
+  | 0m -> 0l
   | x -> x
 [%%expect{|
-Line 2, characters 4-5:
-2 |   | 0 -> 0l
-        ^
+Line 2, characters 4-6:
+2 |   | 0m -> 0l
+        ^^
 Error: This pattern matches values of type "int"
        but a pattern was expected which matches values of type "int32"
   Hint: Did you mean "0l"?
+|}]
+
+let _ : int32 -> int32 = function
+  | 0 -> 0l
+  | x -> x
+[%%expect{|
+- : int32 -> int32 = <fun>
+|}]
+
+let _ : int64 -> int64 = function
+  | 1L | 2m -> 3L
+  | x -> x;;
+[%%expect{|
+Line 2, characters 9-11:
+2 |   | 1L | 2m -> 3L
+             ^^
+Error: This pattern matches values of type "int"
+       but a pattern was expected which matches values of type "int64"
+  Hint: Did you mean "2L"?
 |}]
 
 let _ : int64 -> int64 = function
   | 1L | 2 -> 3L
   | x -> x;;
 [%%expect{|
+- : int64 -> int64 = <fun>
+|}]
+
+let _ = function
+  | 1L | 2 -> 3L
+  | x -> x;;
+[%%expect{|
 Line 2, characters 9-10:
 2 |   | 1L | 2 -> 3L
              ^
-Error: This pattern matches values of type "int"
-       but a pattern was expected which matches values of type "int64"
-  Hint: Did you mean "2L"?
+Warning 18 [not-principal]: this coercion to int64 is not principal.
+
+- : int64 -> int64 = <fun>
 |}]
 
 (* symmetric *)
@@ -140,16 +200,14 @@ Error: This expression has type "int64" but an expression was expected of type
 
 (* Check that the hint preserves formatting of int, int32, int64 and nativeint
    literals in decimal, hexadecimal, octal and binary notation *)
-let _ : int64 = min 0L 1_000;;
+let _ : int64 = min 0L 1_000m;;
 [%%expect{|
-- : int64 = 0L
-|}, Principal{|
-Line 1, characters 23-28:
-1 | let _ : int64 = min 0L 1_000;;
-                           ^^^^^
-Warning 18 [not-principal]: this coercion to int64 is not principal.
-
-- : int64 = 0L
+Line 1, characters 23-29:
+1 | let _ : int64 = min 0L 1_000m;;
+                           ^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "int64"
+  Hint: Did you mean "1_000L"?
 |}]
 let _ : nativeint * nativeint = 0n, 0xAA_BBL;;
 [%%expect{|
@@ -161,23 +219,23 @@ Error: This expression has type "int64" but an expression was expected of type
   Hint: Did you mean "0xAA_BBn"?
 |}]
 let _ : int32 -> int32 = function
-  | 1l | 0o2_345 -> 3l
+  | 1l | 0o2_345m -> 3l
   | x -> x;;
 [%%expect{|
-Line 2, characters 9-16:
-2 |   | 1l | 0o2_345 -> 3l
-             ^^^^^^^
+Line 2, characters 9-17:
+2 |   | 1l | 0o2_345m -> 3l
+             ^^^^^^^^
 Error: This pattern matches values of type "int"
        but a pattern was expected which matches values of type "int32"
   Hint: Did you mean "0o2_345l"?
 |}]
 let _ : int32 -> int32 = fun x -> match x with
-  | 1l | 0b1000_1101 -> 3l
+  | 1l | 0b1000_1101m -> 3l
   | x -> x;;
 [%%expect{|
-Line 2, characters 9-20:
-2 |   | 1l | 0b1000_1101 -> 3l
-             ^^^^^^^^^^^
+Line 2, characters 9-21:
+2 |   | 1l | 0b1000_1101m -> 3l
+             ^^^^^^^^^^^^
 Error: This pattern matches values of type "int"
        but a pattern was expected which matches values of type "int32"
   Hint: Did you mean "0b1000_1101l"?
