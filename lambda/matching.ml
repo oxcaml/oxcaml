@@ -2730,7 +2730,7 @@ let get_expr_args_array ~scopes kind head { arg; mut; _ } rem =
       (* TODO: The resulting float should be allocated to at the mode of the
          array pattern, once that's available *)
       let ref_kind = Lambda.(array_ref_kind alloc_heap kind) in
-      let result_layout = array_ref_kind_result_layout ref_kind in
+      let result_layout = element_layout_of_array_kind kind in
       let am_mut = if Types.is_mutable am then Mutable else Immutable in
       { arg = Lprim
           (Parrayrefu (ref_kind, Ptagged_int_index, am_mut),
