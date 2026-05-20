@@ -38,15 +38,21 @@ val create : Typing_env.t -> t
     performing a meet or adding equations to a typing environment.
 
     It returns the modified typing environment with all new equations added. *)
-val use_meet_env : Typing_env.t -> f:(t -> t) -> Typing_env.t
+val use_meet_env :
+  meet_expanded_head:meet_expanded_head ->
+  Typing_env.t ->
+  f:(t -> t) ->
+  Typing_env.t
 
 (** [use_meet_env_strict] is similar to [use_meet_env], except that it detects
     inconsistencies and returns [Bottom] if the input typing env is inconsistent
     (in which case [f] is not applied), or if it becomes inconsistent while
     applying [f]. *)
-val use_meet_env_strict : Typing_env.t -> f:(t -> t) -> Typing_env.t Or_bottom.t
-
-val typing_env : t -> Typing_env.t
+val use_meet_env_strict :
+  meet_expanded_head:meet_expanded_head ->
+  Typing_env.t ->
+  f:(t -> t) ->
+  Typing_env.t Or_bottom.t
 
 val add_equation :
   t -> Name.t -> Type_grammar.t -> meet_expanded_head:meet_expanded_head -> t
@@ -96,10 +102,6 @@ val add_env_extension_from_level :
 (* The functions below only manipulate the underlying typing env and are
    provided for convenience. *)
 
-val current_scope : t -> Scope.t
-
-val increment_scope : t -> t
-
 val code_age_relation : t -> Code_age_relation.t
 
 val code_age_relation_resolver :
@@ -111,9 +113,30 @@ val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
 
 val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
-val cut : t -> cut_after:Scope.t -> Typing_env_level.t
+(** Complete the meet and return the resulting typing env.
 
-val cut_as_extension : t -> cut_after:Scope.t -> Typing_env_extension.t
+    The meet environment is allowed to delay the processing of some equations
+    (typically to avoid loops), and calling [final_typing_env] will process
+    these equations.
+
+    {b Note}: If the meet environment is a nested environment (i.e. created with
+    [enter_scope]), only equations added within the nested environment are
+    considered. *)
+val final_typing_env :
+  meet_expanded_head:meet_expanded_head -> t -> Typing_env.t
+
+val final_typing_env_strict :
+  meet_expanded_head:meet_expanded_head -> t -> Typing_env.t Or_bottom.t
+
+(** Enter a new scope adequate for computing the meet within sub-environments
+    such as those introduced by env extensions.
+
+    Returns a [Scope.t] that can be used to [cut] the [final_typing_env] inside
+    the scope, and the current version of the typing env outside the scope (that
+    is more precise than the typing environment initially passed to [create] or
+    [use_meet_env], but might be less precise than the result of calling
+    [final_typing_env]). *)
+val enter_scope : t -> Scope.t * Typing_env.t * t
 
 val add_variable_definition :
   t -> Variable.t -> Flambda_kind.t -> Name_mode.t -> t
