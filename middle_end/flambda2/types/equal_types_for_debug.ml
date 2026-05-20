@@ -67,18 +67,22 @@ let extension_env env left_env right_env = { env with left_env; right_env }
 
 let add_env_extension env ext1 ext2 =
   extension_env env
-    (ME.use_meet_env env.left_env ~f:(fun left_env ->
+    (ME.use_meet_env ~meet_expanded_head:env.meet_expanded_head env.left_env
+       ~f:(fun left_env ->
          ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head
            left_env ext1))
-    (ME.use_meet_env env.right_env ~f:(fun right_env ->
+    (ME.use_meet_env ~meet_expanded_head:env.meet_expanded_head env.right_env
+       ~f:(fun right_env ->
          ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head
            right_env ext2))
 
 let add_env_extension_strict env ext1 ext2 =
-  ( ME.use_meet_env_strict env.left_env ~f:(fun left_env ->
+  ( ME.use_meet_env_strict ~meet_expanded_head:env.meet_expanded_head
+      env.left_env ~f:(fun left_env ->
         ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head left_env
           ext1),
-    ME.use_meet_env_strict env.right_env ~f:(fun right_env ->
+    ME.use_meet_env_strict ~meet_expanded_head:env.meet_expanded_head
+      env.right_env ~f:(fun right_env ->
         ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head
           right_env ext2) )
 
