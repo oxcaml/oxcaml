@@ -271,7 +271,7 @@ let mk_dno_asm_comments f =
 let mk_frametables_in_rodata f =
   ( "-frametables-in-rodata",
     Arg.Unit f,
-    " Emit GC frametables into the .rodata section" )
+    " Emit GC frametables into the .rodata section (default)" )
 
 let mk_no_frametables_in_rodata f =
   ( "-no-frametables-in-rodata",

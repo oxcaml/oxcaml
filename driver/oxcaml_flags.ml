@@ -59,7 +59,7 @@ let module_entry_functions_section = ref false
 
 let dasm_comments = ref false (* -dasm-comments *)
 
-let frametables_in_rodata = ref false (* -frametables-in-rodata *)
+let frametables_in_rodata = ref true (* -frametables-in-rodata *)
 
 let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)

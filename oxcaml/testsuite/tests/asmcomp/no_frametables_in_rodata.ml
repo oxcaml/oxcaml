@@ -1,10 +1,10 @@
 (* TEST
- ocamlopt_flags = "-S -g -frametables-in-rodata";
+ ocamlopt_flags = "-S -g -no-frametables-in-rodata";
  native;
 *)
 
 (* Exercises runtime features that depend on the GC frametable, with
-   [-frametables-in-rodata] active.  The frametable is consulted by the
+   [-no-frametables-in-rodata] active.  The frametable is consulted by the
    runtime to:
      - locate live stack roots during GC;
      - resolve return addresses to source locations for backtraces;
