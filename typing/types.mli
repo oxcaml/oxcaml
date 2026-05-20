@@ -843,7 +843,9 @@ type type_declaration =
     type_loc: Location.t;
     type_attributes: Parsetree.attributes;
     type_unboxed_default: bool;
-    (* true if the unboxed-ness of this type was chosen by a compiler flag *)
+    (* true if the user did not specify an explicit representation attribute
+       ([@@unboxed] or [@@represent_as_float_array]), so the representation may
+       have been chosen by a compiler flag. *)
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
     (* stores the unboxed version of that this type introduces: this is [Some]

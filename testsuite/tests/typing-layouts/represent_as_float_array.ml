@@ -125,8 +125,9 @@ Error: Signature mismatch:
        the first declaration uses float# representation.
 |}]
 
-(* The below test requires that [type_unboxed_default] was computed correctly
-   https://github.com/oxcaml/oxcaml/pull/6035#discussion_r3253683496 *)
+(* Regression test: [type_unboxed_default] must be [false] when
+   [@@represent_as_float_array] is used, so that this declaration does not
+   trigger the [unboxable-type-in-prim-decl] warning. *)
 type r = { f : float# } [@@represent_as_float_array]
 external id : r -> r = "%identity"
 [%%expect{|

@@ -2351,8 +2351,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 and transl_atomic_loc ~scopes arg arg_sort lbl =
   let arg = transl_exp ~scopes arg_sort arg in
   begin match lbl.lbl_repres with
+  | Record_dummy _ ->
+    Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
-  | Record_float | Record_ufloat | Record_dummy _
+  | Record_float | Record_ufloat
     ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"

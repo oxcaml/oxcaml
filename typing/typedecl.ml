@@ -931,6 +931,8 @@ let transl_declaration env sdecl (id, uid) =
     Builtin_attributes.has_represent_as_float_array sdecl.ptype_attributes
   in
   let unbox, unboxed_default =
+    (* [unboxed_default] is [true] iff the user did not specify an explicit
+       representation attribute ([@@unboxed] or [@@represent_as_float_array]) *)
     match sdecl.ptype_kind with
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
     | Ptype_variant [{pcd_args = Pcstr_record [{pld_mutable=Immutable; _}]; _}]
