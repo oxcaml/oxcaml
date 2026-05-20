@@ -26,6 +26,8 @@
 #include <unistd.h>
 #endif
 
+typedef int st_retcode;
+
 typedef pthread_t st_thread_id;
 
 /* Thread creation. Created in detached mode if [res] is NULL. */
@@ -218,40 +220,8 @@ static int st_event_wait(st_event e)
   rc = pthread_mutex_unlock(&e->lock);
   return rc;
 }
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
 
 struct caml_thread_tick_args {
   int domain_id;
   atomic_uintnat* stop;
 };
-
-#define ST_INTERRUPT_FLAG   ((uintnat)1)
-
-/* The tick thread: interrupt the domain periodically to force preemption  */
-static void * caml_thread_tick(void * arg)
-{
-  struct caml_thread_tick_args* tick_thread_args =
-    (struct caml_thread_tick_args*) arg;
-  int domain_id = tick_thread_args->domain_id;
-  atomic_uintnat* stop = tick_thread_args->stop;
-  caml_stat_free(tick_thread_args);
-
-  caml_init_domain_self(domain_id);
-  caml_domain_state *domain = Caml_state;
-
-  while(! atomic_load_acquire(stop)) {
-    st_msleep(Thread_timeout);
-
-    atomic_fetch_or(&domain->requested_external_interrupt, ST_INTERRUPT_FLAG);
-    caml_interrupt_self();
-  }
-  return NULL;
-}
-=======
-
-struct caml_thread_tick_args {
-  int domain_id;
-  atomic_uintnat* stop;
-};
->>>>>>> 5.2.0minus-37

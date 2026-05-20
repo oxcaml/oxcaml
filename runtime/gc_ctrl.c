@@ -45,64 +45,26 @@
 atomic_uintnat caml_max_stack_wsize;
 uintnat caml_fiber_wsz;
 
-<<<<<<< HEAD
 /* GC Tweaks */
 /* TODO: turn these into atomics to avoid data races */
-extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */ // tweak
-extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */    // tweak
-extern uintnat caml_compaction_algorithm; /* see shared_heap.c */    // tweak
-extern uintnat caml_compact_unmap;        /* see shared_heap.c */    // tweak
-extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */     // tweak
-extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */     // tweak
-extern uintnat caml_gc_pacing_policy;       /* see major_gc.c */     // tweak
-extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */     // tweak
-extern uintnat caml_nohugepage_stacks;    /* see fiber.c */          // tweak
-extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */ // tweak
+extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */
+extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */
+extern uintnat caml_compaction_algorithm; /* see shared_heap.c */
+extern uintnat caml_compact_unmap;        /* see shared_heap.c */
+extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */
+extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
+extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
+extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
+extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
 
 /* runtime config parameters set with caml_gc_set */
-extern atomic_uintnat caml_max_percent_free;     /*        see major_gc.c */
 extern atomic_uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
 extern atomic_uintnat caml_percent_free; /* see major_gc.c */
+extern atomic_uintnat caml_max_percent_free;     /*        see major_gc.c */
 extern atomic_uintnat caml_custom_major_ratio; /* see custom.c */
 extern atomic_uintnat caml_custom_minor_ratio; /* see custom.c */
 extern atomic_uintnat caml_custom_minor_max_bsz; /* see custom.c */
 extern uintnat caml_minor_heap_max_wsz; /* see domain.c */
-||||||| 5.2.0minus-31
-extern uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
-extern uintnat caml_percent_free;         /*        see major_gc.c */
-extern uintnat caml_max_percent_free;     /*        see major_gc.c */
-extern uintnat caml_custom_major_ratio;   /* see custom.c */
-extern uintnat caml_custom_minor_ratio;   /* see custom.c */
-extern uintnat caml_custom_minor_max_bsz; /* see custom.c */
-extern uintnat caml_minor_heap_max_wsz;   /* see domain.c */
-extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */
-extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */
-extern uintnat caml_compaction_algorithm; /* see shared_heap.c */
-extern uintnat caml_compact_unmap;        /* see shared_heap.c */
-extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */
-extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
-extern uintnat caml_gc_pacing_policy;       /* see major_gc.c */
-extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
-extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
-extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
-=======
-extern uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
-extern uintnat caml_percent_free;         /*        see major_gc.c */
-extern uintnat caml_max_percent_free;     /*        see major_gc.c */
-extern uintnat caml_custom_major_ratio;   /* see custom.c */
-extern uintnat caml_custom_minor_ratio;   /* see custom.c */
-extern uintnat caml_custom_minor_max_bsz; /* see custom.c */
-extern uintnat caml_minor_heap_max_wsz;   /* see domain.c */
-extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */
-extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */
-extern uintnat caml_compaction_algorithm; /* see shared_heap.c */
-extern uintnat caml_compact_unmap;        /* see shared_heap.c */
-extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */
-extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
-extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
-extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
-extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
->>>>>>> 5.2.0minus-37
 
 CAMLprim value caml_gc_quick_stat(value v)
 {

@@ -58,22 +58,6 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #  endif
 #endif
 
-<<<<<<< HEAD
-||||||| 5.2.0minus-31
-#include "caml/misc.h"
-
-#if defined(_WIN32) && !defined(NATIVE_CODE)
-/* Ensure that pthread.h marks symbols __declspec(dllimport) so that they can be
-   picked up from the runtime (which will have linked winpthreads statically).
-   mingw-w64 11.0.0 introduced WINPTHREADS_USE_DLLIMPORT to do this explicitly;
-   prior versions co-opted this on the internal DLL_EXPORT, but this is ignored
-   in 11.0 and later unless IN_WINPTHREAD is also defined, so we can safely
-   define both to support both versions. */
-#define WINPTHREADS_USE_DLLIMPORT
-#define DLL_EXPORT
-#endif
-
-=======
 #include "caml/misc.h"
 
 #if defined(_WIN32) && !defined(NATIVE_CODE)
@@ -88,7 +72,6 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #endif
 
 #include <math.h>
->>>>>>> 5.2.0minus-37
 #include <stdbool.h>
 
 #include "caml/alloc.h"
@@ -117,21 +100,8 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #define CAMLextern_libthreads
 #include "threads.h"
 
-<<<<<<< HEAD
-/* Max computation time before rescheduling, in milliseconds */
-#define Thread_timeout_msec 50
-
-/* Interrupt bit to set for a tick thread interrupt. */
-#define ST_INTERRUPT_FLAG   ((uintnat)1)
-
-typedef int st_retcode;
-||||||| 5.2.0minus-31
-/* Max computation time before rescheduling, in milliseconds */
-#define Thread_timeout 50
-=======
 /* Max computation time before rescheduling, in microseconds */
 #define Thread_timeout_usec 50000
->>>>>>> 5.2.0minus-37
 
 /* OS-specific code */
 #ifdef _WIN32
@@ -676,17 +646,6 @@ static void caml_thread_domain_initialize_hook(void)
 {
   caml_thread_t new_thread;
 
-<<<<<<< HEAD
-  atomic_store_release(&Tick_thread_stop, 0);
-||||||| 5.2.0minus-31
-  atomic_store_release(&Tick_thread_stop, 0);
-  /* OS-specific initialization */
-  st_initialize();
-=======
-  /* OS-specific initialization */
-  st_initialize();
->>>>>>> 5.2.0minus-37
-
   new_thread =
     (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
 
@@ -869,141 +828,6 @@ static void * caml_thread_start(void * v)
   return 0;
 }
 
-<<<<<<< HEAD
-struct caml_thread_tick_args {
-  int domain_id;
-  atomic_uintnat* stop;
-};
-
-/* The tick thread: interrupt the domain periodically to force preemption  */
-static void * caml_thread_tick(void * arg)
-{
-  struct caml_thread_tick_args* tick_thread_args =
-    (struct caml_thread_tick_args*) arg;
-  int domain_id = tick_thread_args->domain_id;
-  atomic_uintnat* stop = tick_thread_args->stop;
-  st_timeout t = st_timeout_of_msec(Thread_timeout_msec);
-  caml_stat_free(tick_thread_args);
-
-  caml_init_domain_self(domain_id);
-  caml_domain_state *domain = Caml_state;
-
-  while(! atomic_load_acquire(stop)) {
-    st_msleep(&t);
-
-    atomic_fetch_or(&domain->requested_external_interrupt, ST_INTERRUPT_FLAG);
-    caml_interrupt_self();
-  }
-  return NULL;
-}
-static st_retcode create_tick_thread(void)
-{
-  if (Tick_thread_running || Tick_thread_disabled) return 0;
-
-#ifdef POSIX_SIGNALS
-  sigset_t mask, old_mask;
-
-  /* Block all signals, so that we do not try to execute a C signal
-     handler in the new tick thread. */
-  sigfillset(&mask);
-  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
-#endif
-
-  struct caml_thread_tick_args* tick_thread_args =
-    caml_stat_alloc_noexc(sizeof(struct caml_thread_tick_args));
-  if (tick_thread_args == NULL)
-    caml_fatal_error("create_tick_thread: failed to allocate thread args");
-
-  tick_thread_args->domain_id = Caml_state->id;
-  tick_thread_args->stop = &Tick_thread_stop;
-
-  st_retcode err = st_thread_create(&Tick_thread_id, caml_thread_tick,
-                                    (void *)tick_thread_args);
-
-#ifdef POSIX_SIGNALS
-  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-#endif
-
-  if (err != 0) {
-    caml_stat_free(tick_thread_args);
-    return err;
-  }
-
-  Tick_thread_running = 1;
-  return 0;
-  if (err != 0) return err;
-
-  Tick_thread_running = 1;
-  return 0;
-}
-
-CAMLprim value caml_enable_tick_thread(value v_enable)
-{
-  int enable = Long_val(v_enable) ? 1 : 0;
-  Tick_thread_disabled = !enable;
-
-  if (enable) {
-    st_retcode err = create_tick_thread();
-    caml_check_error(err, "caml_enable_tick_thread");
-  } else {
-    stop_tick_thread();
-  }
-
-  return Val_unit;
-}
-
-||||||| 5.2.0minus-31
-static st_retcode start_tick_thread(void)
-{
-  if (Tick_thread_running || Tick_thread_disabled) return 0;
-
-#ifdef POSIX_SIGNALS
-  sigset_t mask, old_mask;
-
-  /* Block all signals, so that we do not try to execute a C signal
-     handler in the new tick thread. */
-  sigfillset(&mask);
-  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
-#endif
-
-  struct caml_thread_tick_args* tick_thread_args =
-    caml_stat_alloc_noexc(sizeof(struct caml_thread_tick_args));
-  if (tick_thread_args == NULL)
-    caml_fatal_error("start_tick_thread: failed to allocate thread args");
-
-  tick_thread_args->domain_id = Caml_state->id;
-  tick_thread_args->stop = &Tick_thread_stop;
-
-  st_retcode err = st_thread_create(&Tick_thread_id, caml_thread_tick,
-                                    (void *)tick_thread_args);
-
-#ifdef POSIX_SIGNALS
-  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-#endif
-
-  if (err != 0) return err;
-
-  Tick_thread_running = 1;
-  return 0;
-}
-
-CAMLprim value caml_enable_tick_thread(value v_enable)
-{
-  int enable = Long_val(v_enable) ? 1 : 0;
-  Tick_thread_disabled = !enable;
-
-  if (enable) {
-    st_retcode err = start_tick_thread();
-    sync_check_error(err, "caml_enable_tick_thread");
-  } else {
-    stop_tick_thread();
-  }
-
-  return Val_unit;
-}
-
-=======
->>>>>>> 5.2.0minus-37
 CAMLprim value caml_thread_new(value clos)
 {
   CAMLparam1(clos);
@@ -1013,22 +837,6 @@ CAMLprim value caml_thread_new(value clos)
     caml_fatal_error("ocamldebug does not support multithreaded programs");
 #endif
 
-<<<<<<< HEAD
-  /* Create the tick thread if not already done.
-     Because of PR#4666, we start the tick thread late, only when we create
-     the first additional thread in the current process */
-  st_retcode err = create_tick_thread();
-  caml_check_error(err, "Thread.create");
-
-||||||| 5.2.0minus-31
-  /* Create the tick thread if not already done.
-     Because of PR#4666, we start the tick thread late, only when we create
-     the first additional thread in the current process */
-  st_retcode err = start_tick_thread();
-  sync_check_error(err, "Thread.create");
-
-=======
->>>>>>> 5.2.0minus-37
   /* Create a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   if (th == NULL) caml_raise_out_of_memory();
@@ -1072,18 +880,6 @@ CAMLexport int caml_c_thread_register(void)
   caml_init_domain_self(Dom_c_threads);
   caml_acquire_domain_lock();
 
-<<<<<<< HEAD
-  /* Create tick thread if not already done */
-  st_retcode err = create_tick_thread();
-  if (err != 0) goto out_err;
-
-||||||| 5.2.0minus-31
-  /* Create tick thread if not already done */
-  st_retcode err = start_tick_thread();
-  if (err != 0) goto out_err;
-
-=======
->>>>>>> 5.2.0minus-37
   /* Set a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   /* If it fails, we release the lock and return an error. */
