@@ -1,7 +1,30 @@
 (* TEST
+<<<<<<< HEAD
  multicore;
  { bytecode; }
  { native; }
+||||||| 9790921724
+ flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+ {
+   runtime4;
+   skip;
+ }{
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
+ }
+=======
+ {
+   runtime4;
+   skip;
+ }{
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
+ }
+>>>>>>> 5.2.0minus-37
 *)
 
 let num_domains = 2

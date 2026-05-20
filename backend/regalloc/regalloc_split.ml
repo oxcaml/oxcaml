@@ -152,7 +152,7 @@ let make_spill : type a. a make_operation =
     | Some stack_reg -> stack_reg
     | None ->
       let slots = State.stack_slots state in
-      let slot : int = Regalloc_stack_slots.get_or_fatal slots old_reg in
+      let slot : int = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack : Reg.t =
         Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg
       in
@@ -230,6 +230,11 @@ let rec insert_spills_or_reloads_in_block :
         ~occur_check ~insert ~copy_default ~add_default ~move_cell ~block_subst
         ~stack_subst block cell live_at_interesting_point)
 
+let occur_check : Instruction.t -> Reg.t -> bool =
+ fun instr reg ->
+  occurs_array instr.arg reg || occurs_array instr.res reg
+  || occurs_array (Proc.destroyed_at_basic instr.desc) reg
+
 (* Inserts the spills in a block, as early as possible (i.e. immediately after
    the register is last set), to reduce live ranges. *)
 let insert_spills_in_block :
@@ -244,12 +249,7 @@ let insert_spills_in_block :
  fun state ~instr_id ~block_subst ~stack_subst block cell
      live_at_destruction_point ->
   insert_spills_or_reloads_in_block state ~instr_id
-    ~make_spill_or_reload:make_spill
-    ~occur_check:(fun instr reg ->
-      (* We have reached the insertion point not only if the register is
-         explicitly set, but also if it is destroyed by the instruction. *)
-      occurs_array instr.res reg
-      || occurs_array (Proc.destroyed_at_basic instr.desc) reg)
+    ~make_spill_or_reload:make_spill ~occur_check
     ~insert:(fun cell instr reg ->
       (* See comment before Insert_skipping_name_for_debugger *)
       Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
@@ -309,7 +309,7 @@ let make_reload : type a. a make_operation =
     ~id:(InstructionId.get_and_incr instr_id)
     ~copy ~from:stack_reg ~to_:new_reg
 
-(* Inserts the relaods in a block, as late as possible (i.e. immediately before
+(* Inserts the reloads in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. *)
 let insert_reloads_in_block :
     State.t ->
@@ -323,8 +323,7 @@ let insert_reloads_in_block :
  fun state ~instr_id ~block_subst ~stack_subst block cell
      live_at_definition_point ->
   insert_spills_or_reloads_in_block state ~instr_id
-    ~make_spill_or_reload:make_reload
-    ~occur_check:(fun instr reg -> occurs_array instr.arg reg)
+    ~make_spill_or_reload:make_reload ~occur_check
     ~insert:(fun cell instr _reg ->
       (* We don't need special handling here, because we wouldn't expect a new
          Name_for_debugger operation anyway (that should have occurred when the
@@ -431,8 +430,6 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 instrs ~after:predecessor_block ~before:(Some block)
-                ~next_instruction_id:(fun () ->
-                  InstructionId.get_and_incr instr_id)
             in
             block_inserted := true;
             if debug && Lazy.force invariants

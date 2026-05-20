@@ -112,6 +112,7 @@ let rec var_from_pat pat_desc acc =
   | O (Tpat_or (p1, p2, _)) ->
     var_from_pat p1.pat_desc (var_from_pat p2.pat_desc acc)
   | O (Tpat_lazy pat) -> var_from_pat pat.pat_desc acc
+  | O (Tpat_fun_layout { id; _ }) -> id :: acc
   | O
       ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
       | Tpat_variant _ ) ->
@@ -183,6 +184,11 @@ let rec rem_in_pat str pat should_remove =
     { pat with pat_desc = Tpat_or (p1, p2, a1) }
   | O (Tpat_lazy pat) ->
     { pat with pat_desc = Tpat_lazy (rem_in_pat str pat should_remove) }
+  | O (Tpat_fun_layout { id; _ }) ->
+    let is_used = is_used_var str id in
+    if (not is_used) && should_remove ()
+    then { pat with pat_desc = Tpat_any }
+    else pat
   | O
       ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
       | Tpat_variant _ ) ->

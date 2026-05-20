@@ -1,3 +1,32 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                       Basile Clément, OCamlPro                             *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 OCamlPro                                                *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
 module ET = Expand_head.Expanded_type
 module TE = Typing_env
 module TG = Type_grammar
@@ -591,7 +620,7 @@ module Expr = struct
       ~at_least_these_closure_types:closure_types_in_set
       ~at_least_these_value_slots:value_slots_in_set alloc_mode =
     Closure
-      { exact = true;
+      { exact = false;
         function_slot;
         function_slots_in_set;
         closure_types_in_set;
@@ -839,34 +868,44 @@ struct
       let canonical =
         TE.get_canonical_simple_exn ~min_name_mode:Name_mode.in_types env alias
       in
-      let canonical_with_metadata, acc =
-        Simple.pattern_match canonical
-          ~const:(fun _ -> canonical, acc)
-          ~name:(fun name ~coercion ->
-            let coercion, acc =
-              let acc_ref = ref acc in
-              let coercion =
-                Coercion.map_depth_variables coercion ~f:(fun variable ->
-                    if
-                      not
-                        (Compilation_unit.equal
-                           (Variable.compilation_unit variable)
-                           (Compilation_unit.get_current_exn ()))
-                    then variable
-                    else
-                      let canonical_var, acc =
-                        get_canonical_with !acc_ref (Name.var variable)
-                          K.rec_info (X.in_coercion abs)
-                      in
-                      acc_ref := acc;
-                      match Name.must_be_var_opt canonical_var with
-                      | Some var -> var
-                      | None ->
-                        Misc.fatal_error
-                          "Canonical name of depth variable is a symbol")
-              in
-              coercion, !acc_ref
+      Simple.pattern_match canonical
+        ~const:(fun const ->
+          (* CR bclement: unlike for names, we don't have a cache for constants.
+             This means that if we ever try to rewrite a constant to something
+             that also contain the same constant with the same abstraction, we
+             will loop.
+
+             This is highly unlikely to occur, however -- constants are
+             typically only going to be rewritten with either constants, or an
+             unknown type. *)
+          let ty = MTC.type_for_const const in
+          rewrite env acc abs ty)
+        ~name:(fun name ~coercion ->
+          let coercion, acc =
+            let acc_ref = ref acc in
+            let coercion =
+              Coercion.map_depth_variables coercion ~f:(fun variable ->
+                  if
+                    not
+                      (Compilation_unit.equal
+                         (Variable.compilation_unit variable)
+                         (Compilation_unit.get_current_exn ()))
+                  then variable
+                  else
+                    let canonical_var, acc =
+                      get_canonical_with !acc_ref (Name.var variable) K.rec_info
+                        (X.in_coercion abs)
+                    in
+                    acc_ref := acc;
+                    match Name.must_be_var_opt canonical_var with
+                    | Some var -> var
+                    | None ->
+                      Misc.fatal_error
+                        "Canonical name of depth variable is a symbol")
             in
+            coercion, !acc_ref
+          in
+          let canonical_with_metadata, acc =
             (* Do not rewrite the types of names coming from other compilation
                units, since we can't re-define them and it's hard to think of a
                situation where it would be useful anyways.
@@ -886,9 +925,9 @@ struct
                 get_canonical_with acc name (TG.kind ty) abs
               in
               let simple = Simple.name canonical_name in
-              Simple.with_coercion simple coercion, acc)
-      in
-      TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc
+              Simple.with_coercion simple coercion, acc
+          in
+          TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc)
     | None -> (
       try rewrite env acc abs ty
       with Misc.Fatal_error as e ->
@@ -1281,7 +1320,7 @@ struct
                 TE.add_definition base_env bound_name (TG.kind ty')
               in
               let new_types = Name.Map.add (Name.var var') ty' new_types in
-              Var.Map.add var (var', ty') sbs, base_env, new_types, acc))
+              Var.Map.add var var' sbs, base_env, new_types, acc))
         live_vars
         (Var.Map.empty, base_env, Name.Map.empty, empty)
     in
@@ -1317,20 +1356,20 @@ struct
     in
     let subst var =
       match Var.Map.find_opt var sbs with
-      | Some (v, ty) ->
-        Name.var v, ET.to_type (Expand_head.expand_head final_env ty)
+      | Some v ->
+        Name.var v, TE.find final_env (Name.var v) (Some (Variable.kind v))
       | None -> Misc.fatal_error "Not defined [subst]"
     in
     let to_keep =
       Var.Map.fold
-        (fun _ (var, _) acc -> Variable.Set.add var acc)
+        (fun _ var acc -> Variable.Set.add var acc)
         sbs Variable.Set.empty
     in
     let teev =
       Expand_head.make_suitable_for_environment final_env
         (All_variables_except to_keep) (List.map subst bind_to)
     in
-    Var.Map.map fst sbs, teev
+    sbs, teev
 
   let rewrite env symbol_abstraction =
     (* CR vlaviron for bclement: This should share more code with

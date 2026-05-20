@@ -57,7 +57,7 @@ type t =
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Regs.Phys_reg.t
   | Stack of stack_location
 
 and stack_location =
@@ -76,7 +76,7 @@ let format_stack_location fmt loc =
 let format_location fmt loc =
   match loc with
   | Unknown -> Format.fprintf fmt "unknown"
-  | Reg i -> Format.fprintf fmt "reg %d" i
+  | Reg i -> Format.fprintf fmt "reg %a" Regs.Phys_reg.print i
   | Stack s -> Format.fprintf fmt "stack (%a)" format_stack_location s
 
 type reg = t
@@ -315,7 +315,7 @@ let compare_stack_location left right =
 let equal_location left right =
   match left, right with
   | Unknown, Unknown -> true
-  | Reg left, Reg right -> Int.equal left right
+  | Reg left, Reg right -> Regs.Phys_reg.equal left right
   | Stack left, Stack right -> equal_stack_location left right
   | Unknown, (Reg _ | Stack _)
   | Reg _, (Unknown | Stack _)
@@ -327,7 +327,7 @@ let compare_location left right =
   | Unknown, Unknown -> 0
   | Unknown, (Reg _ | Stack _) -> -1
   | (Reg _ | Stack _), Unknown -> 1
-  | Reg left, Reg right -> Int.compare left right
+  | Reg left, Reg right -> Regs.Phys_reg.compare left right
   | Reg _, Stack _ -> -1
   | Stack _, Reg _ -> 1
   | Stack left, Stack right -> compare_stack_location left right
@@ -338,9 +338,9 @@ let same_loc left right =
   match left.loc with
   | Unknown -> true
   | Reg _ ->
-    Reg_class.equal
-      (Reg_class.of_machtype left.typ)
-      (Reg_class.of_machtype right.typ)
+    Regs.Reg_class.equal
+      (Regs.Reg_class.of_machtype left.typ)
+      (Regs.Reg_class.of_machtype right.typ)
   | Stack _ ->
     Stack_class.equal
       (Stack_class.of_machtype left.typ)
@@ -363,8 +363,8 @@ let compare_loc left right =
     | Unknown -> 0
     | Reg _ ->
       Stdlib.compare
-        (Reg_class.of_machtype left.typ)
-        (Reg_class.of_machtype right.typ)
+        (Regs.Reg_class.of_machtype left.typ)
+        (Regs.Reg_class.of_machtype right.typ)
     | Stack _ ->
       Stdlib.compare
         (Stack_class.of_machtype left.typ)
@@ -386,7 +386,7 @@ let hash_stack_loc = function
 
 let hash_loc = function
   | Unknown -> -1
-  | Reg r -> r
+  | Reg r -> Regs.Phys_reg.hash r
   | Stack stack_loc -> hash_stack_loc stack_loc
 
 let is_of_type_addr t =

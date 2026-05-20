@@ -30,9 +30,6 @@ let fatal_errorf_doc fmt =
     fatal_errorf "%t" (fun ppf -> Format_doc.Doc.format ppf doc)
   ) fmt
 
-let splices_should_not_exist_after_eval () =
-  fatal_error "slambda splices should not exist in lambda after slambda eval"
-
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =
@@ -330,6 +327,13 @@ module Stdlib = struct
       | None -> Format.pp_print_string ppf "None"
       | Some contents ->
         Format.fprintf ppf "@[(Some@ %a)@]" print_contents contents
+
+    let map_sharing f t =
+      match t with
+      | None -> t
+      | Some x ->
+        let y = f x in
+        if y == x then t else Some y
   end
 
   module Array = struct
@@ -1763,7 +1767,11 @@ let get_build_path_prefix_map =
     !map_cache
 
 let debug_prefix_map_flags () =
-  if not Config.as_has_debug_prefix_map then
+  (* CR sspies: If [BUILD_PATH_PREFIX_MAP] is set but
+     [Config.as_debug_prefix_map_flag] is empty (i.e. the assembler does not
+     support debug prefix map flags), we should emit a warning, as the user's
+     intent to remap paths will be silently ignored. *)
+  if String.equal Config.as_debug_prefix_map_flag "" then
     []
   else begin
     match get_build_path_prefix_map () with
@@ -1774,7 +1782,8 @@ let debug_prefix_map_flags () =
            match map_elem with
            | None -> acc
            | Some { Build_path_prefix_map.target; source; } ->
-             (Printf.sprintf "--debug-prefix-map %s=%s"
+             (Printf.sprintf "%s %s=%s"
+                Config.as_debug_prefix_map_flag
                 (Filename.quote source)
                 (Filename.quote target)) :: acc)
         map
@@ -2143,6 +2152,17 @@ end
 (* Fancy types *)
 
 type (_, _) eq = Refl : ('a, 'a) eq
+
+type ('a, 'b) comparison =
+  | Less_than : ('a, 'b) comparison
+  | Equal : ('a, 'a) comparison
+  | Greater_than : ('a, 'b) comparison
+
+let comparison_result : type a b. (a, b) comparison -> int = function
+  | Less_than -> -1
+  | Equal -> 0
+  | Greater_than -> 1
+
 (*********************************************)
 (* Fancy modules *)
 

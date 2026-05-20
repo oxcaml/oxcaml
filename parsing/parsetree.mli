@@ -213,6 +213,11 @@ and core_type_desc =
            - As the {!core_type} of a
            {{!function_param_desc.Pparam_val}[Pparam_val]}.
          *)
+  | Ptyp_newlayout of string loc list * core_type
+      (** [layout_ a b c. T]
+
+           Introduces locally abstract layouts into scope.
+         *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
   | Ptyp_quote of core_type (** [<[T]>] *)
@@ -554,8 +559,8 @@ and expression_desc =
           - [CLAUSES] is a series of [comprehension_clause].
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
-  | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
-  | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
+  | Pexp_quote of expression (** [<[E]>] *)
+  | Pexp_splice of expression (** [$E] *)
   | Pexp_hole (** _ *)
   | Pexp_borrow of expression
     (** borrow_ exp *)
@@ -668,15 +673,6 @@ and function_constraint =
 and block_access =
   | Baccess_field of Longident.t loc
       (** [.foo] *)
-  | Baccess_array of mutable_flag * index_kind * expression
-      (** Mutable array accesses:
-            [.(E)], [.L(E)], [.l(E)], [.S(E)], [.s(E)], [.n(E)]
-          Immutable array accesses:
-            [.:(E)], [.:L(E)], [.:l(E)], [.:S(E)], [.:s(E)], [.:n(E)]
-
-          Indexed by [int], [int64#], [int32#], [int16#], [int8#], or
-          [nativeint#], respectively.
-      *)
   | Baccess_block of mutable_flag * expression
       (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
           (usually followed by unboxed accesses, to deepen the index).
@@ -1256,12 +1252,16 @@ and with_constraint =
       (** [with module X.Y = Z] *)
   | Pwith_modtype of Longident.t loc * module_type
       (** [with module type X.Y = Z] *)
+  | Pwith_jkind of Longident.t loc * jkind_declaration
+      (** [with kind_ X.k = ...] *)
   | Pwith_modtypesubst of Longident.t loc * module_type
       (** [with module type X.Y := sig end] *)
   | Pwith_typesubst of Longident.t loc * type_declaration
       (** [with type X.t := ..., same format as [Pwith_type]] *)
   | Pwith_modsubst of Longident.t loc * Longident.t loc
       (** [with module X.Y := Z] *)
+  | Pwith_jkindsubst of Longident.t loc * jkind_declaration
+      (** [with kind_ X.k := ...] *)
 
 (** {2 Value expressions for the module language} *)
 
@@ -1376,7 +1376,15 @@ and module_binding =
 
 and jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of Longident.t loc
+  (* CR layouts-scannable: Scannable axes annotations only currently parse on
+     abbreviations, not on products/etc. It could be desirable for these
+     annotations to parse in more places with a warning (ex: for generated
+     code). This change should only be made if necessary (and after the
+     ignored-kind-modifier warning is enabled), since it adds confusion. *)
+  | Pjk_abbreviation of Longident.t loc * string loc list
+  (** [Pjk_abbreviation(A, [SA1; ...; SAn])] represents the layout
+      [A SA1 ... SAn] where [A] is some abbreviation (like [value])
+      and each [SAi] is a scannable axis annotation (like [non_pointer]) *)
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)

@@ -25,7 +25,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type subcommand = Run
+type dune_subcommand = Build
+
+type subcommand =
+  | Run
+  | Dune
 
 let spec_list = ref []
 
@@ -33,12 +37,19 @@ let anon_fun = ref ignore
 
 let subcommand = ref None
 
+let dune_subcommand = ref None
+
 let usage_msg =
   Format.asprintf
     "usage: %s <file1> [<file2>] ... -c \"<command>\" [-m <minimizers>] [-x \
      <minimizers>] [-e <error>] [[-t <typing command>] | [--cmt <cmt file>]] \
      [-i | [-o <output>]]"
     (Filename.basename Sys.executable_name)
+
+(* common args *)
+
+let common_spec_list =
+  ["-e", Arg.Set_string Utils.error_str, "Set error to preserve"]
 
 (* `chamelon run` *)
 
@@ -68,7 +79,6 @@ let run_spec_list =
   [ "-c", Arg.Set_string command, "Set command";
     "-m", Arg.Set_string arg_minimizers, "Set minimizers";
     "-x", Arg.Set_string exclude_minimizers, "Exclude minimizers";
-    "-e", Arg.Set_string Utils.error_str, "Set error to preserve";
     ( "-t",
       Arg.Set_string typing_command,
       "Set command to use to generate cmt file" );
@@ -82,6 +92,48 @@ let run_spec_list =
       Arg.Set inplace,
       "Minimize file in place (incompatible with -o); in that case, command \
        should include the input file" ) ]
+  @ common_spec_list
+
+(* `chamelon dune` *)
+
+let root = ref ""
+
+let workspace = ref ""
+
+let only_packages = ref None
+
+let targets = ref []
+
+let set_only_packages pkgs = only_packages := Some pkgs
+
+let assume_failing = ref false
+
+let extra_args_for_failing_target = ref []
+
+let add_extra_arg_for_failing_target s =
+  extra_args_for_failing_target := s :: !extra_args_for_failing_target
+
+let dune_spec_list =
+  [ "--root", Arg.Set_string root, "Passed through to dune.";
+    "--workspace", Arg.Set_string workspace, "Set workspace file";
+    "--only-packages", Arg.String set_only_packages, "Passed through to dune.";
+    ( "--assume-failing",
+      Arg.Set assume_failing,
+      "Assume that provided targets are failing (skip failing target \
+       inference)." );
+    ( "--extra-arg-for-failing-target",
+      Arg.String add_extra_arg_for_failing_target,
+      "Extra argument to add to the compilation command of the failing target."
+    ) ]
+  @ common_spec_list
+
+let dune_build_anon_fun target = targets := target :: !targets
+
+let dune_anon_fun = function
+  | "build" ->
+    dune_subcommand := Some Build;
+    anon_fun := dune_build_anon_fun
+  | s -> raise (Arg.Bad (Format.asprintf "unknown dune subcommand: %s" s))
 
 (* `chamelon` *)
 
@@ -90,6 +142,10 @@ let chamelon_anon_fun s =
   | "run" ->
     subcommand := Some Run;
     anon_fun := run_anon_fun
+  | "dune" ->
+    subcommand := Some Dune;
+    spec_list := dune_spec_list;
+    anon_fun := dune_anon_fun
   | _ ->
     Format.eprintf "@[%a@ %s;@ %a@]@." Format.pp_print_text
       "warning: unknown subcommand" (Filename.quote s) Format.pp_print_text

@@ -138,27 +138,50 @@ AC_DEFUN([OCAML_CC_RESTORE_VARIABLES], [
 ])
 
 AC_DEFUN([OCAML_AS_HAS_DEBUG_PREFIX_MAP], [
-  AC_MSG_CHECKING([whether the assembler supports --debug-prefix-map])
+  as_debug_prefix_map_flag=""
 
   OCAML_CC_SAVE_VARIABLES
 
   # Modify C-compiler variables to use the assembler
   CC="$AS"
-  CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
   CPPFLAGS=""
   ac_ext="S"
   ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 
+  # Try --debug-prefix-map first (used by GNU as)
+  AC_MSG_CHECKING([whether the assembler supports --debug-prefix-map])
+  CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
   AC_COMPILE_IFELSE(
     [AC_LANG_SOURCE([
 camlPervasives__loop_1128:
         .file   1       "pervasives.ml"
         .loc    1       193
     ])],
-    [as_has_debug_prefix_map=true
+    [as_debug_prefix_map_flag="--debug-prefix-map"
     AC_MSG_RESULT([yes])],
+<<<<<<< HEAD
     [as_has_debug_prefix_map=false
     AC_MSG_RESULT([no])])
+||||||| 9790921724
+    [ashas_debug_prefix_map=false
+    AC_MSG_RESULT([no])])
+=======
+    [AC_MSG_RESULT([no])])
+
+  # Try --fdebug-prefix-map (used by llvm-mc)
+  AS_IF([test -z "$as_debug_prefix_map_flag"],
+    [AC_MSG_CHECKING([whether the assembler supports --fdebug-prefix-map])
+    CFLAGS="--fdebug-prefix-map old=new -o conftest.$ac_objext"
+    AC_COMPILE_IFELSE(
+      [AC_LANG_SOURCE([
+camlPervasives__loop_1128:
+        .file   1       "pervasives.ml"
+        .loc    1       193
+      ])],
+      [as_debug_prefix_map_flag="--fdebug-prefix-map"
+      AC_MSG_RESULT([yes])],
+      [AC_MSG_RESULT([no])])])
+>>>>>>> 5.2.0minus-37
 
   OCAML_CC_RESTORE_VARIABLES
 ])

@@ -56,8 +56,8 @@ In the event that one needs to rebase a patch over formatting changes, here is a
 Assuming a specific formatting commit:
 ```shell
 # main formatting commit for flambda2/ in the repository
-format_commit=first-ocamlformat.0.28.1
-previous_commit=last-ocamlformat.0.24.1 # or $format_commit~1
+format_commit=first-ocamlformat.0.29.0
+previous_commit=last-ocamlformat.0.28.1 # or $format_commit~1
 ```
 
 Rebase as usual until its parent:
@@ -106,7 +106,6 @@ install parallel`.
 
 There is also a `make ci` target which does a full build and test run.
 
-Some of our tests are expect tests run using a custom tool called `flexpect`.
 Corrected outputs can be promoted using `make promote`.
 
 See `HACKING.ox.adoc` for documentation on additional test-related

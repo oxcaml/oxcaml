@@ -1,0 +1,47 @@
+let code `!_0` deleted in
+let code foo_1 deleted in
+let $camlFrom_odoc_texi__immstring23 = "b" in
+let $camlFrom_odoc_texi__immstring21 = "a" in
+let code loopify(never) size(2) newer_version_of(`!_0`)
+      `!_0_1` (param : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.mut.[`0`] (param) in
+  cont k (Pfield)
+in
+let $`camlFrom_odoc_texi__!_2` = closure `!_0_1` @`!` in
+let esc_8bits = %block.mut.[`0`] (0) in
+let code inline(never) loopify(never) size(1) newer_version_of(foo_1)
+      foo_1_1 (x : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Popaque = %opaque (x) in
+  cont k (Popaque)
+in
+let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo in
+(let Pfield = %block_load.mut.[`0`] (esc_8bits) in
+ (let untagged = %untag_imm (Pfield) in
+  switch untagged
+    | 0 -> k (0)
+    | 1 -> k1)
+   where k1 =
+     (apply direct(foo_1_1)
+        ($camlFrom_odoc_texi__foo_3 : _ -> val)
+          ($camlFrom_odoc_texi__immstring21)
+          -> k1 * error
+        where k1 (apply_result : val) =
+          let Pmakeblock =
+            %block.[`0`] (apply_result, $camlFrom_odoc_texi__immstring23)
+          in
+          let Pmakeblock_1 = %block.[`0`] (Pmakeblock, 0) in
+          cont k (Pmakeblock_1)))
+  where k (y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+    let $camlFrom_odoc_texi =
+      Block 0 ($`camlFrom_odoc_texi__!_2`,
+               esc_8bits,
+               $camlFrom_odoc_texi__foo_3,
+               y)
+    in
+    cont done ($camlFrom_odoc_texi)

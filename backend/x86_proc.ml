@@ -18,51 +18,7 @@
 open! Int_replace_polymorphic_compare
 open X86_ast
 module DLL = Oxcaml_utils.Doubly_linked_list
-
-module Section_name = struct
-  module S = struct
-    type t =
-      { name : string list;
-        name_str : string;
-        flags : string option;
-        args : string list
-      }
-
-    let equal t1 t2 = List.equal String.equal t1.name t2.name
-
-    let hash t = Hashtbl.hash t.name
-
-    let compare t1 t2 = List.compare String.compare t1.name t2.name
-
-    let make name flags args =
-      { name; name_str = String.concat "," name; flags; args }
-
-    let of_string name =
-      { name = [name]; name_str = name; flags = None; args = [] }
-
-    let to_string t = t.name_str
-
-    let flags t = t.flags
-
-    let alignment t =
-      let rec align = function
-        | [] -> 0L
-        | [hd] -> Option.value ~default:0L (Int64.of_string_opt hd)
-        | _hd :: tl -> align tl
-      in
-      align t.args
-
-    let is_text_like t = String.starts_with ~prefix:".text" t.name_str
-
-    let is_data_like t = String.starts_with ~prefix:".data" t.name_str
-
-    let is_note_like t = String.starts_with ~prefix:".note" t.name_str
-  end
-
-  include S
-  module Map = Map.Make (S)
-  module Tbl = Hashtbl.Make (S)
-end
+module Section_name = X86_section.Section_name
 
 type system =
   (* 32 bits and 64 bits *)
@@ -444,6 +400,16 @@ let output_from pos =
   match pos with
   | None -> DLL.to_list asm_code
   | Some start_excl -> DLL.suffix start_excl
+
+let peephole_optimize_from pos =
+  if !Oxcaml_flags.x86_peephole_optimize
+  then
+    let start =
+      match pos with
+      | None -> DLL.hd_cell asm_code
+      | Some start_excl -> DLL.next start_excl
+    in
+    X86_peephole_optimize.optimize_from_cell start
 
 let generate_code asm =
   (match asm with

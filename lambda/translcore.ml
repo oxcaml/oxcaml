@@ -39,7 +39,6 @@ type error =
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
-  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
@@ -300,8 +299,8 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
 
 let rec iter_exn_names f pat =
   match pat.pat_desc with
-  | Tpat_var (id, _, _, _, _) -> f id
-  | Tpat_alias (p, id, _, _, _, _, _) ->
+  | Tpat_var { id; _ } -> f id
+  | Tpat_alias { pattern = p; id; _ } ->
       f id;
       iter_exn_names f p
   | _ -> ()
@@ -339,7 +338,7 @@ let zero_alloc_of_application
   | Some assume, _ ->
     (* The user wrote a zero_alloc attribute on the application - keep it. *)
     Builtin_attributes.assume_zero_alloc ~inferred:false assume
-  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _, _) ->
+  | None, Texp_ident { desc = { val_zero_alloc; _ }; _ } ->
     (* We assume the call is zero_alloc if the function is known to be
        zero_alloc. If the function is zero_alloc opt, then we need to be sure
        that the opt checks were run to license this assumption. We judge
@@ -387,9 +386,18 @@ and transl_exp1 ~scopes ~in_new_scope sort e =
 
 and transl_exp0 ~in_new_scope ~scopes sort e =
   match e.exp_desc with
-  | Texp_ident(path, _, desc, kind, _, _) ->
+  | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
+  | Texp_apply_layout (_, args) ->
+      let sorts = List.map Jkind.Sort.var_default_to_scannable_and_get args in
+      Misc.fatal_errorf
+        "Translcore: translation of layout-polymorphic instantiation is not \
+         yet supported@ (layout args: [%a])"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
+           (Format_doc.compat Jkind.Sort.Const.format))
+        sorts
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       let return_layout = layout_exp sort body in
@@ -404,8 +412,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
-  | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p},
-                                       Id_prim (pmode, psort), _, _);
+  | Texp_apply({ exp_desc = Texp_ident { path;
+                                        desc = {val_kind = Val_prim p};
+                                        kind = Id_prim (pmode, psort); _ };
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
@@ -947,12 +956,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Transl_array_comprehension.comprehension
         ~transl_exp ~scopes ~loc ~array_kind comp
   | Texp_ifthenelse(cond, ifso, Some ifnot) ->
-      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
                   event_before ~scopes ifso (transl_exp ~scopes sort ifso),
                   event_before ~scopes ifnot (transl_exp ~scopes sort ifnot),
                   layout_exp sort e)
   | Texp_ifthenelse(cond, ifso, None) ->
-      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
                   event_before ~scopes ifso (transl_exp ~scopes sort ifso),
                   lambda_unit,
                   Lambda.layout_unit)
@@ -962,7 +971,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 event_before ~scopes expr2 (transl_exp ~scopes sort expr2))
   | Texp_while {wh_body; wh_body_sort; wh_cond} ->
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
-      let cond = transl_exp ~scopes Jkind.Sort.Const.for_predef_value wh_cond in
+      let cond =
+        transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable wh_cond
+      in
       let body = transl_exp ~scopes wh_body_sort wh_body in
       Lwhile {
         wh_cond = maybe_region_layout layout_int cond;
@@ -977,8 +988,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         for_id;
         for_debug_uid;
         for_loc = of_location ~scopes e.exp_loc;
-        for_from = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_from;
-        for_to = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_to;
+        for_from = transl_exp ~scopes
+                     Jkind.Sort.Const.for_predef_scannable for_from;
+        for_to = transl_exp ~scopes
+                   Jkind.Sort.Const.for_predef_scannable for_to;
         for_dir;
         for_body = event_before ~scopes for_body
                      (maybe_region_layout layout_unit body);
@@ -1096,7 +1109,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       then lambda_unit
       else begin
         Lifthenelse
-          (transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+          (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
            lambda_unit,
            assert_failed loc ~scopes e,
            Lambda.layout_unit)
@@ -1364,12 +1377,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         "@[Cannot unquote expression outside of a quotation context:@ \
          %a@]"
         Pprintast.expression (Untypeast.untype_expression exp)
-  | Texp_eval (_, _sort) ->
-    let loc = of_location ~scopes e.exp_loc in
-    Lprim (Pfield (0, Pointer, Reads_agree), [
-      Lprim
-        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
-    ], loc)
 
 and pure_module m =
   match m.mod_desc with
@@ -1401,7 +1408,8 @@ and transl_guard ~scopes guard rhs_sort rhs =
   | None -> expr
   | Some cond ->
       event_before ~scopes cond
-        (Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+        (Lifthenelse(transl_exp ~scopes
+                       Jkind.Sort.Const.for_predef_scannable cond,
                      expr, staticfail, layout))
 
 and transl_cont cont c_cont body =
@@ -2061,8 +2069,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var (id,_,uid,_,_) -> id, uid
-            | _ -> assert false)
+              Tpat_var { id; uid; _ } -> id, uid
+            | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case
             {vb_expr=expr; vb_sort; vb_attributes; vb_rec_kind = rkind;
@@ -2080,7 +2088,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
-  let arg_sort = Jkind_types.Sort.default_to_value_and_get vb_sort in
+  let arg_sort = Jkind_types.Sort.default_to_scannable_and_get vb_sort in
   let lam =
     transl_bound_exp ~scopes ~in_structure:false pat arg_sort expr vb_loc attr
   in
@@ -2432,41 +2440,6 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     end
-  | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
-    let index_sort, index_kind = match index_kind with
-      | Index_int ->
-        Jkind.Sort.Const.value, Ptagged_int_index
-      | Index_unboxed_int64 ->
-        Jkind.Sort.Const.bits64,
-        Punboxed_or_untagged_integer_index Unboxed_int64
-      | Index_unboxed_int32 ->
-        Jkind.Sort.Const.bits32,
-        Punboxed_or_untagged_integer_index Unboxed_int32
-      | Index_unboxed_int16 ->
-        Jkind.Sort.Const.bits16,
-        Punboxed_or_untagged_integer_index Untagged_int16
-      | Index_unboxed_int8 ->
-        Jkind.Sort.Const.bits8,
-        Punboxed_or_untagged_integer_index Untagged_int8
-      | Index_unboxed_nativeint ->
-        Jkind.Sort.Const.word,
-        Punboxed_or_untagged_integer_index Unboxed_nativeint
-    in
-    let index = transl_exp ~scopes index_sort index in
-    let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-    let array_kind =
-      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
-        base_ty
-    in
-    let elt_layout = layout env loc elt_sort elt_ty in
-    let mbe = mixed_block_element_of_layout elt_layout in
-    (* CR layouts v8: remove this restriction once we stable sort (within) array
-       elements to place values before non-values, which will likely be done to
-       support striped arrays *)
-    if will_be_reordered mbe then
-      raise (Error (loc, Element_would_be_reordered_in_record));
-    Lprim (Pmake_idx_array (array_kind, index_kind, mbe, uas_path), [index],
-           (of_location ~scopes loc))
   end
 
 and transl_atomic_loc ~scopes arg arg_sort lbl =
@@ -2903,10 +2876,6 @@ let report_error_doc ppf = function
          and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
         (64 - Mixed_product_bytes.block_index_offset_bits)
-  | Element_would_be_reordered_in_record ->
-      fprintf ppf
-        "Block indices into arrays whose element layout contains a@ \
-         non-value before a value are not yet supported."
 let () =
   Location.register_error_of_exn
     (function

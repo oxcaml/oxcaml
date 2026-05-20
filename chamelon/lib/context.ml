@@ -130,13 +130,39 @@ let print ppf t =
   let str_item str_desc =
     { Typedtree.str_desc; str_loc = Location.none; str_env = Env.empty }
   in
-  let str_items =
+  let empty, non_empty =
     Utils.Smap.fold
-      (fun _ module_info str_items ->
-        let module_binding = Utils.to_module_binding module_info in
-        str_item (Tstr_module module_binding) :: str_items)
-      t.modules []
+      (fun _ module_info (empty, non_empty) ->
+        let no_implementation =
+          match module_info.Utils.implementation with
+          | None | Some { annots = { str_items = []; _ }; _ } -> true
+          | Some _ -> false
+        in
+        let no_interface =
+          match module_info.Utils.interface with
+          | None | Some { annots = { sig_items = []; _ }; _ } -> true
+          | Some _ -> false
+        in
+        if no_implementation && no_interface
+        then module_info :: empty, non_empty
+        else empty, module_info :: non_empty)
+      t.modules ([], [])
   in
+  let non_empty_str_items =
+    List.map
+      (fun module_info ->
+        let module_binding = Utils.to_module_binding module_info in
+        str_item (Tstr_module module_binding))
+      non_empty
+  in
+  let empty_str_items =
+    List.map
+      (fun module_info ->
+        let module_binding = Utils.to_module_binding module_info in
+        str_item (Tstr_module module_binding))
+      empty
+  in
+  let str_items = empty_str_items @ non_empty_str_items in
   let str = { Typedtree.str_items; str_type = []; str_final_env = Env.empty } in
   Pprintast.structure ppf (Untypeast.untype_structure str)
 

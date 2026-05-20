@@ -270,6 +270,8 @@ module Mixed_block_shape = struct
              file, and would provide an overly-permissive type in the face of
              the various restrictions as to what suffix elements are
              permitted. *)
+          (* Note: if we decide to use a kind with subkind, the shapes will
+             have to be rewritten in the reaper, see reaper/rebuild.ml. *)
     }
 
   let value_prefix_size t = t.value_prefix_size
@@ -1111,7 +1113,7 @@ module With_subkind = struct
         "Flambda_kind.from_lambda_values_and_unboxed_numbers_only: cannot \
          convert %a"
         Printlambda.layout layout
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
 
   include Container_types.Make (struct
     type nonrec t = t

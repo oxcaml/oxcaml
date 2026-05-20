@@ -191,6 +191,7 @@ module Runtime_4 = struct
   let self () = 0
   let is_main_domain () = true
   let recommended_domain_count () = 1
+  let max_domain_count = 1
   let self_index () = 0
 end
 
@@ -219,6 +220,8 @@ module Runtime_5 = struct
       = "caml_ml_domain_id" [@@noalloc]
     external get_recommended_domain_count: unit -> int @@ portable
       = "caml_recommended_domain_count" [@@noalloc]
+    external get_max_domain_count : unit -> int @@ portable
+      = "caml_max_domain_count" [@@noalloc]
   end
 
   type id = Raw.t
@@ -452,6 +455,7 @@ module Runtime_5 = struct
     | Error ex -> raise ex
 
   let recommended_domain_count = Raw.get_recommended_domain_count
+  let max_domain_count = Raw.get_max_domain_count ()
 end
 
 module type S = sig
@@ -478,6 +482,7 @@ module type S = sig
   val self : unit -> id @@ portable
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
+  val max_domain_count : int
   val self_index : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable
   val at_exit : (unit -> unit) @ portable -> unit @@ portable
@@ -592,6 +597,180 @@ module TLS0 = struct
     let set_initial_keys (l : key_value list) =
       List.iter (fun (KV (k, v)) -> set k (v ())) l
   end
+end
+
+module Tick = struct
+  module type S = sig @@ portable
+    type t : mutable_data mod external_ global
+
+    val acquire : interval_usec:int -> t @ unique
+    val release : t @ unique -> unit
+  end
+
+  module Runtime4 = struct
+    type t = |
+
+    let fail () =
+      failwith "[Domain.Tick] not supported in runtime4"
+
+    let acquire ~interval_usec:_ = fail ()
+    let release = function | (_ : t) -> .
+  end
+
+  module Runtime5 = struct
+    module Registry : sig @@ portable
+      type t : sync_data
+      type inner : mutable_data
+
+      val create : unit -> t
+
+      val protect
+        : t
+        -> (inner -> 'r @ contended portable) @ local once portable
+        -> 'r @ contended portable
+
+      (** These two functions return the new min interval *)
+      val add : inner -> int -> int
+      val remove : inner -> int -> int or_null
+    end = struct
+      (* NOTE this is extremely un-optimized; we assume that ticks are acquired
+         and released relatively infrequently so the performance of registry
+         modification doesn't matter. *)
+
+      module Inner = struct
+        (* It would be better for this to be a decent min-heap, but there is not
+           one around that is convenient to use (and see above note about this
+           not being tight-loop). *)
+        include Map.MakePortable (Int)
+
+        external magic_empty_stateless
+          : ('a t[@local_opt])
+          -> ('a t[@local_opt]) @ stateless
+          @@ stateless
+          = "%identity"
+
+        external magic_empty_read_write
+          : ('a t[@local_opt]) @ immutable
+          -> ('a t[@local_opt])
+          @@ stateless
+          = "%identity"
+
+        let empty = magic_empty_stateless empty
+        let[@inline] empty () = magic_empty_read_write empty
+      end
+
+      type t : sync_data =
+        { mutable inner : int Inner.t
+        (* A bag, mapping the interval to the number of requesters of ticks with
+           that interval *)
+        ; mutex : Mutex.t
+        }
+      [@@unsafe_allow_any_mode_crossing "All accesses protected by mutex"]
+
+      type inner = t
+
+      let create () =
+        { inner = Inner.empty ()
+        ; mutex = Mutex.create ()
+        }
+
+      let protect t f =
+        (Mutex.protect
+          t.mutex
+          (fun () -> { Modes.Portended.portended = f t })).portended
+
+      (* Must be called from within [protect] *)
+      let add t tick =
+        let inner' =
+          Inner.update tick
+            (function
+              | None -> Some 1
+              | Some i -> Some (i + 1))
+            t.inner
+        in
+        t.inner <- inner';
+        Inner.min_binding inner' |> fst
+
+      (* Must be called from within [protect] *)
+      let remove t tick =
+        let inner' =
+          Inner.update tick
+            (function
+              | None | Some 0 | Some 1 -> None
+              | Some i -> Some (i - 1))
+            t.inner
+        in
+        t.inner <- inner';
+        if Inner.is_empty inner' then Null
+        else This (Inner.min_binding inner' |> fst)
+    end
+
+    (* NOTE: st_stubs.c relies on this being an int (and in particular not
+       scanned) *)
+    type t = int
+
+    (* One registry per recommended_domain_count.
+
+       If more than recommended_domain_count domains are spawned (which in
+       practice we never do in OxCaml), multiple domains share a registry. This
+       is fine since we have to have synchronization for systhreads anyway
+    *)
+    let registry =
+      (* CR ocaml-5.4: This should be an iarray *)
+      Array.init (recommended_domain_count ()) (fun _ -> Registry.create ())
+
+    let local_registry () =
+      (* Safety: modulo ensures this is in bounds *)
+      Array.unsafe_get
+        (* Safety: Array is never mutated after creation *)
+        (Obj.magic_uncontended registry)
+        (self_index () mod recommended_domain_count ())
+
+    external set_tick_interval_usec
+      : (int[@untagged]) -> (unit[@untagged])
+      @@ portable
+      = "caml_domain_set_tick_interval_usec_bytecode"
+          "caml_domain_set_tick_interval_usec"
+
+    let acquire ~interval_usec =
+      if interval_usec <= 0
+      then invalid_arg "Tick.acquire: interval must be strictly positive";
+      Registry.protect (local_registry ()) (fun registry ->
+        let interval = Registry.add registry interval_usec in
+        set_tick_interval_usec interval);
+      interval_usec
+
+    let release interval_usec =
+      Registry.protect (local_registry ()) (fun registry ->
+        (* Note that the calls to [set_tick_interval_usec] can't raise here, as
+           we're neither setting the requested interval to a value we haven't
+           successfully set it to before, nor are we starting the tick
+           thread. *)
+        match Registry.remove registry interval_usec with
+        | Null -> set_tick_interval_usec 0
+        | This interval -> set_tick_interval_usec interval)
+  end
+
+  let impl =
+    if runtime5 ()
+    then (module Runtime5 : S)
+    else (module Runtime4 : S)
+
+  include (val impl : S)
+
+  let () = Callback.Safe.register "Domain.Tick.acquire" acquire
+  let () = Callback.Safe.register "Domain.Tick.release" release
+
+  external effective_interval_usec_prim
+    : (unit[@untagged]) -> (int[@untagged]) @@ portable
+    = "caml_effective_tick_interval_usec_bytecode"
+        "caml_effective_tick_interval_usec"
+  [@@noalloc]
+
+  let effective_interval_usec () =
+    match effective_interval_usec_prim () with
+    | 0 -> Null
+    | n -> This n
 end
 
 module Safe = struct

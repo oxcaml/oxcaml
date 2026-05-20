@@ -24,10 +24,22 @@ type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
 Line 1, characters 0-50:
 1 | type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
   and would not be accepted by upstream OCaml.
 
 type t18 = A : 'a list abs -> t18 [@@unboxed]
+||||||| 9790921724
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+and would not be accepted by upstream OCaml.
+
+type t18 = A : 'a list abs -> t18 [@@unboxed]
+=======
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
+>>>>>>> 5.2.0minus-37
 |}];;
 
 (* regression test for PR#7511 (wrong determination of unboxability for GADTs)
@@ -78,10 +90,22 @@ type t = T : (unit -> _) M.r -> t [@@unboxed];;
 Line 1, characters 0-45:
 1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
   and would not be accepted by upstream OCaml.
 
 type t = T : (unit -> 'a) M.r -> t [@@unboxed]
+||||||| 9790921724
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+and would not be accepted by upstream OCaml.
+
+type t = T : (unit -> 'a) M.r -> t [@@unboxed]
+=======
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
+>>>>>>> 5.2.0minus-37
 |}];;
 
 (* accept *)
@@ -128,10 +152,22 @@ type t = T : (unit -> _) N.r -> t [@@unboxed];;
 Line 1, characters 0-45:
 1 | type t = T : (unit -> _) N.r -> t [@@unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
   and would not be accepted by upstream OCaml.
 
 type t = T : (unit -> 'a) N.r -> t [@@unboxed]
+||||||| 9790921724
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+and would not be accepted by upstream OCaml.
+
+type t = T : (unit -> 'a) N.r -> t [@@unboxed]
+=======
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
+>>>>>>> 5.2.0minus-37
 |}];;
 
 (* accept *)
@@ -197,10 +233,22 @@ type t = T : (unit -> _) M.r -> t [@@unboxed];;
 Line 1, characters 0-45:
 1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
   and would not be accepted by upstream OCaml.
 
 type t = T : (unit -> 'a) M.r -> t [@@unboxed]
+||||||| 9790921724
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+and would not be accepted by upstream OCaml.
+
+type t = T : (unit -> 'a) M.r -> t [@@unboxed]
+=======
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
+>>>>>>> 5.2.0minus-37
 |}];;
 
 type 'a s = S : (unit -> 'a) M.r -> 'a option s [@@unboxed];;

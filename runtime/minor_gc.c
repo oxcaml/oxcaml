@@ -142,8 +142,8 @@ void caml_set_minor_heap_size (asize_t wsize)
 
   if (domain_state->young_ptr != domain_state->young_end) {
     CAML_EV_COUNTER (EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE, 1);
-    // Don't call caml_minor_collection, since that can run the
-    // caml_domain_external_interrupt_hook, which can allocate.
+    // Don't call caml_minor_collection, since that can run tick hooks, which
+    // can allocate.
     caml_empty_minor_heaps_once();
   }
   CAMLassert (domain_state->young_ptr == domain_state->young_end);
@@ -874,7 +874,7 @@ static void custom_finalize_minor (caml_domain_state * domain)
        elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
-      if (!Is_promoted_hd(get_header_val(*v))) { /* value not copied to major heap */
+      if (!Is_promoted_hd(Hd_val(*v))) { /* value not copied to major heap */
         void (*final_fun)(value) = Custom_ops_val(*v)->finalize;
         if (final_fun != NULL) final_fun(*v);
       }

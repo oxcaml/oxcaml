@@ -1,0 +1,73 @@
+(data global "camlInvalid__gc_roots": int 0)
+(data
+ int 3840
+ global "camlInvalid":
+ addr G:"camlInvalid__check_3"
+ addr G:"camlInvalid__bar_4"
+ addr G:"camlInvalid__foo_5")
+(data
+ int 3063
+ global "camlInvalid__foo_5":
+ addr G:"camlInvalid__foo_2_5_code"
+ int 108086391056891909)
+(data
+ int 21500
+ "camlInvalid__invalid177":
+ string "(Defining_expr_of_let (bound_pattern prim/110N)
+ (defining_expr
+  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)
+   invalid.ml:20,2--23)))"
+ skip 7
+ byte 7)
+(data
+ int 4087
+ global "camlInvalid__bar_4":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlInvalid__bar_1_4_code")
+(data
+ int 4087
+ global "camlInvalid__check_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlInvalid__check_0_3_code")
+(data
+ int 2816
+ "camlInvalid__Pmakeblock71":
+ addr G:"caml_exn_Failure"
+ addr L:"camlInvalid__immstring17")
+(data int 768 "camlInvalid__empty_array41":)
+(data int 2044 "camlInvalid__immstring17": string "lengths" skip 0 byte 0)
+(function{invalid.ml:15,25-96} camlInvalid__check_0_3_code
+     (t1/360: val t2/361: val) : int
+ (if
+   (!= (or (>>u (<< (load_mut int (+a t1/360 -8)) 8) 17) 1)
+     (or (>>u (<< (load_mut int (+a t2/361 -8)) 8) 17) 1))
+   (raise_notrace{invalid.ml:16,45-63;stdlib.ml:39,17-33}
+     L:"camlInvalid__Pmakeblock71")
+   1) )
+
+(function{invalid.ml:18,17-68} camlInvalid__bar_1_4_code
+     (t1/365: val t2/366: val) : int
+ (let
+   param/367
+     (app{invalid.ml:19,2-13} G:"camlInvalid__check_0_3_code" t1/365 t2/366
+       int)
+   (+ (<< (==f (load_mut float64 t2/366) 0.) 1) 1)) )
+
+(function{invalid.ml:22,8-30} camlInvalid__foo_2_5_code
+     (param/371: int) : int
+ (let
+   (Pmakearray/372 (alloc{invalid.ml:22,17-25} 1278 1.)
+    param/373
+      (app{invalid.ml:22,13-30;invalid.ml:19,2-13}
+        G:"camlInvalid__check_0_3_code" Pmakearray/372
+        L:"camlInvalid__empty_array41" int))
+   (invalid
+     "(Defining_expr_of_let (bound_pattern prim/110N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)\n   invalid.ml:20,2--23)))"
+     L:"camlInvalid__invalid177")) )
+
+(function no_cse reduce_code_size linscan camlInvalid__entry () : val
+ (catch (exit 2 G:"camlInvalid") with(2 *ret*/358: val) 1) )
+
+(data)

@@ -180,6 +180,11 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
+let fatal_var_lpoly lpoly =
+  let n = List.length (Types.Lpoly.get_exn lpoly) in
+  Misc.fatal_errorf
+    "Matching: layout-poly patterns not yet supported (%d sort var(s))" n
+
 module General = struct
   include Patterns.General
 
@@ -222,9 +227,11 @@ end = struct
     | Tpat_any
     | Tpat_var _ ->
         p
-    | Tpat_alias (q, id, s, uid, sort, mode, ty) ->
+    | Tpat_alias { pattern = q; id; name = s; uid; sort; mode;
+                   type_expr = ty } ->
         { p with pat_desc =
-            Tpat_alias (simpl_under_orpat q, id, s, uid, sort, mode, ty) }
+            Tpat_alias { pattern = simpl_under_orpat q; id; name = s;
+                         uid; sort; mode; type_expr = ty } }
     | Tpat_or (p1, p2, o) ->
         let p1, p2 = (simpl_under_orpat p1, simpl_under_orpat p2) in
         if le_pat p1 p2 then
@@ -252,6 +259,7 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | `Alias (p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view p, patl),
@@ -368,6 +376,7 @@ end = struct
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -625,6 +634,7 @@ end = struct
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -673,7 +683,7 @@ let rec flatten_pat_line size p k =
   | Tpat_tuple args -> (List.map snd args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
-  | Tpat_alias (p, _, _, _, _, _, _) ->
+  | Tpat_alias { pattern = p; _ } ->
       (* Note: we are only called from flatten_matrix,
          which is itself only ever used in places
          where variables do not matter (default environments,
@@ -767,6 +777,7 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -1485,7 +1496,7 @@ let rec omega_like p =
   | Tpat_any
   | Tpat_var _ ->
       true
-  | Tpat_alias (p, _, _, _, _, _, _) -> omega_like p
+  | Tpat_alias { pattern = p; _ } -> omega_like p
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
 
@@ -4104,8 +4115,8 @@ let rec comp_match_handlers layout comp_fun partial ctx first_match next_matches
 let rec name_pattern default = function
   | ((pat, _), _) :: rem -> (
       match pat.pat_desc with
-      | Tpat_var (id, _, uid, _, _) -> id, uid
-      | Tpat_alias (_, id, _, uid, _, _, _) -> id, uid
+      | Tpat_var { id; uid; _ } -> id, uid
+      | Tpat_alias { id; uid; _ } -> id, uid
       | _ -> name_pattern default rem
     )
   | _ -> Ident.create_local default, Lambda.debug_uid_none
@@ -4465,6 +4476,194 @@ and compile_no_test ~scopes value_kind divide up_ctx repr partial ctx to_match =
 
 (* The entry points *)
 
+<<<<<<< HEAD
+||||||| 9790921724
+(*
+   If there is a guard in a matching or a lazy pattern,
+   then set exhaustiveness info to Partial.
+   (because of side effects, assume the worst).
+
+   Notice that exhaustiveness information is trusted by the compiler,
+   that is, a match flagged as Total should not fail at runtime.
+   More specifically, for instance if match y with x::_ -> x is flagged
+   total (as it happens during JoCaml compilation) then y cannot be []
+   at runtime. As a consequence, the static Total exhaustiveness information
+   have to be downgraded to Partial, in the dubious cases where guards
+   or lazy pattern execute arbitrary code that may perform side effects
+   and change the subject values.
+LM:
+   Lazy pattern was PR#5992, initial patch by lpw25.
+   I have  generalized the patch, so as to also find mutable fields.
+*)
+
+let is_lazy_pat p =
+  match p.pat_desc with
+  | Tpat_lazy _ -> true
+  | Tpat_alias _
+  | Tpat_variant _
+  | Tpat_record _
+  | Tpat_record_unboxed_product _
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _
+  | Tpat_tuple _
+  | Tpat_unboxed_tuple _
+  | Tpat_construct _
+  | Tpat_array _
+  | Tpat_or _
+  | Tpat_constant _
+  | Tpat_var _
+  | Tpat_any ->
+      false
+
+let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
+
+let is_record_with_mutable_field p =
+  let fields_have_mutable_type lps =
+    List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
+  in
+  match p.pat_desc with
+  | Tpat_record (lps, _) -> fields_have_mutable_type lps
+  | Tpat_record_unboxed_product (lps, _) -> fields_have_mutable_type lps
+  | Tpat_alias _
+  | Tpat_variant _
+  | Tpat_lazy _
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _
+  | Tpat_tuple _
+  | Tpat_unboxed_tuple _
+  | Tpat_construct _
+  | Tpat_array _
+  | Tpat_or _
+  | Tpat_constant _
+  | Tpat_var _
+  | Tpat_any ->
+      false
+
+let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p
+
+(* Downgrade Total when
+   1. Matching accesses some mutable fields;
+   2. And there are  guards or lazy patterns.
+*)
+
+let check_partial has_mutable has_lazy pat_act_list = function
+  | Partial -> Partial
+  | Total ->
+      if
+        pat_act_list = []
+        || (* allow empty case list *)
+           List.exists
+             (fun (pats, lam) ->
+               has_mutable pats && (is_guarded lam || has_lazy pats))
+             pat_act_list
+      then
+        Partial
+      else
+        Total
+
+let check_partial_list pats_act_list =
+  check_partial (List.exists has_mutable) (List.exists has_lazy) pats_act_list
+
+let check_partial pat_act_list =
+  check_partial has_mutable has_lazy pat_act_list
+
+(* have toplevel handler when appropriate *)
+
+=======
+(*
+   If there is a guard in a matching or a lazy pattern,
+   then set exhaustiveness info to Partial.
+   (because of side effects, assume the worst).
+
+   Notice that exhaustiveness information is trusted by the compiler,
+   that is, a match flagged as Total should not fail at runtime.
+   More specifically, for instance if match y with x::_ -> x is flagged
+   total (as it happens during JoCaml compilation) then y cannot be []
+   at runtime. As a consequence, the static Total exhaustiveness information
+   have to be downgraded to Partial, in the dubious cases where guards
+   or lazy pattern execute arbitrary code that may perform side effects
+   and change the subject values.
+LM:
+   Lazy pattern was PR#5992, initial patch by lpw25.
+   I have  generalized the patch, so as to also find mutable fields.
+*)
+
+let is_lazy_pat p =
+  match p.pat_desc with
+  | Tpat_lazy _ -> true
+  | Tpat_alias _
+  | Tpat_variant _
+  | Tpat_record _
+  | Tpat_record_unboxed_product _
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _
+  | Tpat_tuple _
+  | Tpat_unboxed_tuple _
+  | Tpat_construct _
+  | Tpat_array _
+  | Tpat_or _
+  | Tpat_constant _
+  | Tpat_var _
+  | Tpat_fun_layout _
+  | Tpat_any ->
+      false
+
+let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
+
+let is_record_with_mutable_field p =
+  let fields_have_mutable_type lps =
+    List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
+  in
+  match p.pat_desc with
+  | Tpat_record (lps, _) -> fields_have_mutable_type lps
+  | Tpat_record_unboxed_product (lps, _) -> fields_have_mutable_type lps
+  | Tpat_alias _
+  | Tpat_variant _
+  | Tpat_lazy _
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _
+  | Tpat_tuple _
+  | Tpat_unboxed_tuple _
+  | Tpat_construct _
+  | Tpat_array _
+  | Tpat_or _
+  | Tpat_constant _
+  | Tpat_var _
+  | Tpat_fun_layout _
+  | Tpat_any ->
+      false
+
+let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p
+
+(* Downgrade Total when
+   1. Matching accesses some mutable fields;
+   2. And there are  guards or lazy patterns.
+*)
+
+let check_partial has_mutable has_lazy pat_act_list = function
+  | Partial -> Partial
+  | Total ->
+      if
+        pat_act_list = []
+        || (* allow empty case list *)
+           List.exists
+             (fun (pats, lam) ->
+               has_mutable pats && (is_guarded lam || has_lazy pats))
+             pat_act_list
+      then
+        Partial
+      else
+        Total
+
+let check_partial_list pats_act_list =
+  check_partial (List.exists has_mutable) (List.exists has_lazy) pats_act_list
+
+let check_partial pat_act_list =
+  check_partial has_mutable has_lazy pat_act_list
+
+(* have toplevel handler when appropriate *)
+
+>>>>>>> 5.2.0minus-37
 type failer_kind =
   | Raise_match_failure
   | Reraise_noloc of lambda
@@ -4578,7 +4777,7 @@ let for_trywith ~scopes ~return_layout loc param pat_act_list =
      It is important to *not* include location information in
      the reraise (hence the [_noloc]) to avoid seeing this
      silent reraise in exception backtraces. *)
-  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
+  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_scannable
     ~arg_layout:layout_block ~return_layout loc ~failer:(Reraise_noloc param)
     None param pat_act_list Partial
 
@@ -4677,12 +4876,12 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lsplice _) as l ->
-      (* CR layout poly: I believe this could inhibit some optimisations in the
-         splice case. We should consider moving this after slambda eval.*)
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
+  | Lsplice _ as lam ->
+      fatal_error_invalid_constructor lam
 
 (* The 'opt' reference indicates if the optimization is worthy.
 
@@ -4747,8 +4946,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_var (id, _, duid, _, _)
-  | Tpat_alias ({ pat_desc = Tpat_any }, id, _, duid, _, _, _) ->
+  | Tpat_var { id; uid = duid; _ }
+  | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ } ->
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be

@@ -1,0 +1,69 @@
+let $camlExn_extra_args__immstring9 = "bar" in
+let code input_line_0 deleted in
+let code ld_conf_contents_1 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(input_line_0)
+      input_line_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont k ($camlExn_extra_args__immstring9)
+in
+let $camlExn_extra_args__input_line_2 = closure input_line_0_1 @input_line in
+let code loopify(never) size(49) newer_version_of(ld_conf_contents_1)
+      ld_conf_contents_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let try_region = %begin_try_region () in
+  let try_ghost_region = %begin_try_ghost_region () in
+  (let try_region_1 = %begin_try_region () in
+   let try_ghost_region_1 = %begin_try_ghost_region () in
+   cont k6 push(k5)
+     where k6 =
+       (cont k6 (0)
+          where rec k6
+                      (path_285_unboxed0 :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+            let path_285_unboxed0_1 = path_285_unboxed0 in
+            (apply direct(input_line_0_1)
+               ($camlExn_extra_args__input_line_2 : _ -> val)
+                 (0)
+                 -> k7 * k5 (path_285_unboxed0 val)
+               where k7 (return_val0 : val) =
+                 let Pmakeblock =
+                   %block.[`0`] (return_val0, path_285_unboxed0)
+                 in
+                 cont k6 (Pmakeblock)))
+     where k5 exn (`exn` : val, path_285_unboxed0) =
+       let path_285_unboxed0_1 = path_285_unboxed0 in
+       let `unit` = %end_try_region (try_region_1) in
+       let unit_1 = %end_try_ghost_region (try_ghost_region_1) in
+       let prim = %phys_eq (`exn`, $`*predef*`.caml_exn_End_of_file) in
+       switch prim
+         | 0 -> k3 (path_285_unboxed0, `exn`)
+         | 1 -> k4 (path_285_unboxed0))
+    where k4 (path_285_unboxed0) =
+      let path_285_unboxed0_1 = path_285_unboxed0 in
+      cont k2 (path_285_unboxed0)
+    where k3 (path_285_unboxed0, `exn`) =
+      let exn_1 = `exn` in
+      let path_285_unboxed0_1 = path_285_unboxed0 in
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      let Pfield = %block_load.[`0`] (exn_1) in
+      let prim = %phys_eq (Pfield, $`*predef*`.caml_exn_Sys_error) in
+      switch prim
+        | 0 -> k1 pop(reraise k1) (exn_1)
+        | 1 -> k2 (path_285_unboxed0)
+    where k2 (path_285_unboxed0) =
+      let path_285_unboxed0_1 = path_285_unboxed0 in
+      cont k (path_285_unboxed0_1)
+in
+let $camlExn_extra_args__ld_conf_contents_3 =
+  closure ld_conf_contents_1_1 @ld_conf_contents
+in
+let $camlExn_extra_args =
+  Block 0 ($camlExn_extra_args__input_line_2,
+           $camlExn_extra_args__ld_conf_contents_3)
+in
+cont done ($camlExn_extra_args)

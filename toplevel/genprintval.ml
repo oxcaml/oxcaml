@@ -330,13 +330,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as of string (* can't print *)
 
     let print_sort : Jkind.Sort.Const.t -> _ = function
-      | Base Value -> Print_as_value
+      | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
+      | Genvar _ -> Print_as "<genvar>"
 
     let outval_of_value max_steps max_depth check_depth env obj ty =
 
@@ -433,6 +434,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_abstract _; type_manifest = Some body;
                    type_params} ->
                     tree_of_val depth obj
+<<<<<<< HEAD
                       (instantiate_type env type_params ty_list body)
                 | {type_kind = Type_variant (constr_list,rep,_); type_params} ->
                     tree_of_variant depth path type_params ty_list obj
@@ -440,6 +442,266 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_record(lbl_list, rep,_); type_params} ->
                     tree_of_record depth path type_params ty_list obj
                       lbl_list rep
+||||||| 9790921724
+                      (instantiate_type env decl.type_params ty_list body)
+                | {type_kind = Type_variant (constr_list, rep, _)} ->
+                  (* Here we work backwards from the actual runtime value to
+                     find the appropriate `constructor_declaration` in
+                     `constr_list`.  `Datarepr.find_constr_by_tag` does most
+                     of the work, but needs two pieces of information in
+                     addition to the tag:
+                     1) Whether the value is a block or immediate (because tags
+                        are only unique within a category).
+                     2) The `constructor_description`s, because the declarations
+                        don't record the jkind information needed to determine
+                        which constructors are immediate due to void arguments.
+                  *)
+                    let cstrs =
+                      Env.lookup_all_constructors_from_type ~use:false
+                        ~loc:Location.none Positive path env
+                    in
+                    let constant, tag =
+                      (* CR dkalinichenko: the null case being represented
+                         by [-1] is hacky, but there's no simple fix. *)
+                      if is_null obj then
+                        true, -1
+                      else if O.is_block obj then
+                        false, O.tag obj
+                      else
+                        true, O.obj obj
+                    in
+                    let {cd_id;cd_args;cd_res} =
+                      try
+                        (* CR dkalinichenko: this is broken for unboxed variants:
+                           unless the tag of the inner value just happens to be 0,
+                           [Datarepr.find_constr_by_tag] will fail. *)
+                        let {cstr_uid} =
+                          Datarepr.find_constr_by_tag ~constant tag cstrs
+                        in
+                        List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
+                          constr_list
+                      with
+                      | Datarepr.Constr_not_found | Not_found ->
+                        (* If a [Variant_with_null] is not a [Null],
+                            it's guaranteed to be [This value]. *)
+                        match rep with
+                        | Variant_with_null -> List.nth constr_list 1
+                        | _ -> raise Datarepr.Constr_not_found
+                    in
+                    let type_params =
+                      match cd_res with
+                        Some t ->
+                          begin match get_desc t with
+                            Tconstr (_,params,_) ->
+                              params
+                          | _ -> assert false end
+                      | None -> decl.type_params
+                    in
+                    let unbx =
+                      match rep with
+                      | Variant_unboxed -> true
+                      | Variant_with_null when tag = -1 -> false
+                      | Variant_with_null -> true
+                      | Variant_boxed _ | Variant_extensible -> false
+                    in
+                    begin
+                      match cd_args with
+                      | Cstr_tuple l ->
+                          let ty_args =
+                            instantiate_types env type_params ty_list l in
+                          let ty_args =
+                            List.map2
+                              (fun { ca_sort } ty_arg ->
+                                 (ty_arg, print_sort ca_sort)
+                              ) l ty_args
+                          in
+                          tree_of_constr_with_args (tree_of_constr env path)
+                            (Ident.name cd_id) false 0 depth obj
+                            ty_args unbx
+                      | Cstr_record lbls ->
+                          let rep =
+                            if unbx then
+                              Outval_record_unboxed
+                            else
+                              Outval_record_boxed
+                          in
+                          let r =
+                            tree_of_record_fields depth
+                              env path type_params ty_list
+                              lbls 0 obj rep
+                          in
+                          Oval_constr(tree_of_constr env path
+                                        (Out_name.create (Ident.name cd_id)),
+                                      [ r ])
+                    end
+                | {type_kind = Type_record(lbl_list, rep, _)} ->
+                    begin match check_depth depth obj ty with
+                      Some x -> x
+                    | None ->
+                        let pos =
+                          match rep with
+                          | Record_inlined (_, _, Variant_extensible) -> 1
+                          | _ -> 0
+                        in
+                        let rep =
+                          match rep with
+                          | Record_inlined (_, Constructor_mixed _,
+                                            Variant_unboxed) ->
+                              Misc.fatal_error
+                                "a 'mixed' unboxed record is impossible"
+                          | Record_inlined (_, Constructor_uniform_value,
+                                            Variant_unboxed)
+                          | Record_unboxed
+                              -> Outval_record_unboxed
+                          | Record_boxed _ | Record_float | Record_ufloat
+                          | Record_inlined (_, Constructor_uniform_value, _)
+                              -> Outval_record_boxed
+                          | Record_inlined (_, Constructor_mixed mixed, _)
+                          | Record_mixed mixed
+                              ->
+                                (* Mixed records are only represented as
+                                   mixed blocks in native code.
+                                *)
+                                if !Clflags.native_code
+                                then Outval_record_mixed_block mixed
+                                else Outval_record_boxed
+                        in
+                        tree_of_record_fields depth
+                          env path decl.type_params ty_list
+                          lbl_list pos obj rep
+                    end
+=======
+                      (instantiate_type env decl.type_params ty_list body)
+                | {type_kind = Type_variant (constr_list, rep, _)} ->
+                  (* Here we work backwards from the actual runtime value to
+                     find the appropriate `constructor_declaration` in
+                     `constr_list`.  `Datarepr.find_constr_by_tag` does most
+                     of the work, but needs two pieces of information in
+                     addition to the tag:
+                     1) Whether the value is a block or immediate (because tags
+                        are only unique within a category).
+                     2) The `constructor_description`s, because the declarations
+                        don't record the jkind information needed to determine
+                        which constructors are immediate due to void arguments.
+                  *)
+                    let cstrs =
+                      Env.lookup_all_constructors_from_type ~use:false
+                        ~loc:Location.none Positive path env
+                    in
+                    let constant, tag =
+                      (* CR dkalinichenko: the null case being represented
+                         by [-1] is hacky, but there's no simple fix. *)
+                      if is_null obj then
+                        true, -1
+                      else if O.is_block obj then
+                        false, O.tag obj
+                      else
+                        true, O.obj obj
+                    in
+                    let {cd_id;cd_args;cd_res} =
+                      try
+                        (* CR dkalinichenko: this is broken for unboxed variants:
+                           unless the tag of the inner value just happens to be 0,
+                           [Datarepr.find_constr_by_tag] will fail. *)
+                        let {cstr_uid} =
+                          Datarepr.find_constr_by_tag ~constant tag cstrs
+                        in
+                        List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
+                          constr_list
+                      with
+                      | Datarepr.Constr_not_found | Not_found ->
+                        match rep with
+                        | Variant_with_null ->
+                          (match
+                             Datarepr.find_variant_with_null_payload constr_list
+                           with
+                           | Some { payload_cstr; _ } -> payload_cstr
+                           | None -> raise Datarepr.Constr_not_found)
+                        | _ -> raise Datarepr.Constr_not_found
+                    in
+                    let type_params =
+                      match cd_res with
+                        Some t ->
+                          begin match get_desc t with
+                            Tconstr (_,params,_) ->
+                              params
+                          | _ -> assert false end
+                      | None -> decl.type_params
+                    in
+                    let unbx =
+                      match rep with
+                      | Variant_unboxed -> true
+                      | Variant_with_null when tag = -1 -> false
+                      | Variant_with_null -> true
+                      | Variant_boxed _ | Variant_extensible -> false
+                    in
+                    begin
+                      match cd_args with
+                      | Cstr_tuple l ->
+                          let ty_args =
+                            instantiate_types env type_params ty_list l in
+                          let ty_args =
+                            List.map2
+                              (fun { ca_sort } ty_arg ->
+                                 (ty_arg, print_sort ca_sort)
+                              ) l ty_args
+                          in
+                          tree_of_constr_with_args (tree_of_constr env path)
+                            (Ident.name cd_id) false 0 depth obj
+                            ty_args unbx
+                      | Cstr_record lbls ->
+                          let rep =
+                            if unbx then
+                              Outval_record_unboxed
+                            else
+                              Outval_record_boxed
+                          in
+                          let r =
+                            tree_of_record_fields depth
+                              env path type_params ty_list
+                              lbls 0 obj rep
+                          in
+                          Oval_constr(tree_of_constr env path
+                                        (Out_name.create (Ident.name cd_id)),
+                                      [ r ])
+                    end
+                | {type_kind = Type_record(lbl_list, rep, _)} ->
+                    begin match check_depth depth obj ty with
+                      Some x -> x
+                    | None ->
+                        let pos =
+                          match rep with
+                          | Record_inlined (_, _, Variant_extensible) -> 1
+                          | _ -> 0
+                        in
+                        let rep =
+                          match rep with
+                          | Record_inlined (_, Constructor_mixed _,
+                                            Variant_unboxed) ->
+                              Misc.fatal_error
+                                "a 'mixed' unboxed record is impossible"
+                          | Record_inlined (_, Constructor_uniform_value,
+                                            Variant_unboxed)
+                          | Record_unboxed
+                              -> Outval_record_unboxed
+                          | Record_boxed _ | Record_float | Record_ufloat
+                          | Record_inlined (_, Constructor_uniform_value, _)
+                              -> Outval_record_boxed
+                          | Record_inlined (_, Constructor_mixed mixed, _)
+                          | Record_mixed mixed
+                              ->
+                                (* Mixed records are only represented as
+                                   mixed blocks in native code.
+                                *)
+                                if !Clflags.native_code
+                                then Outval_record_mixed_block mixed
+                                else Outval_record_boxed
+                        in
+                        tree_of_record_fields depth
+                          env path decl.type_params ty_list
+                          lbl_list pos obj rep
+                    end
+>>>>>>> 5.2.0minus-37
                 | {type_kind = Type_record_unboxed_product
                                  (lbl_list, Record_unboxed_product, _);
                   type_params} ->
@@ -457,8 +719,25 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               tree_of_polyvariant depth obj row
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
-          | Tquote _ | Tsplice _ | Tof_kind _ ->
+          | Tquote _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                  fatal_error "Ill-staged value of quote type"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tsplice _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                fatal_error "Ill-staged value of splice type"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tquote_eval _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                Oval_stuff "<eval>"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
@@ -723,7 +1002,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   | Outval_record_mixed_block shape ->
                       let fld =
                         match shape.(pos) with
-                        | Value -> `Continue (O.field obj pos)
+                        | Scannable -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate

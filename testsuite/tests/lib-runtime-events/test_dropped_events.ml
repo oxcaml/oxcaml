@@ -3,8 +3,19 @@
    runtime4;
    skip;
  }{
+   reason = "flaky test: sporadically failing on both arm64 and amd64 (#5669)";
+   skip;
    include runtime_events;
+<<<<<<< HEAD
    multicore;
+||||||| 9790921724
+   runtime5;
+   multidomain;
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+=======
+   runtime5;
+   multidomain;
+>>>>>>> 5.2.0minus-37
    include unix;
    ocamlrunparam += ",e=6";
    hasunix;

@@ -96,11 +96,11 @@ module Await_atomic_bitset = struct
     ;;
 end
 
-type 'a spawn_result =
+type ('a : value_or_null) spawn_result =
   | Spawned
   | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
-type 'a request_inner : value mod contended portable  =
+type ('a : value_or_null) request_inner : value mod contended portable  =
   { action : 'a @ contended once portable unique -> unit @@ portable
   ; argument : 'a @@ contended portable
   ; mutable result : 'a spawn_result @@ contended portable
@@ -112,7 +112,7 @@ type 'a request_inner : value mod contended portable  =
    (* The mutable fields are synchronized via [mutex] and [condition]. *)]
 
 type request : value mod contended portable =
-    Request : 'a request_inner -> request
+    Request : ('a : value_or_null). 'a request_inner -> request
 [@@unboxed]
 
 type t : value mod contended portable =
@@ -209,7 +209,9 @@ let () =
 ;;
 
 external magic_unique__contended_portable
-  : 'a @ contended portable -> 'a @ contended portable unique @@ portable
+  :  ('a : value_or_null).
+     'a @ contended portable
+  -> 'a @ contended portable unique @@ portable
   = "%identity"
 
 (** Run some function on a new thread. *)
@@ -257,12 +259,7 @@ let rec manager_loop t =
          | exception exn ->
            (* This might fail if the user tries to create too many threads *)
            let bt = Printexc.get_raw_backtrace () in
-           (* The only exception raised by [Thread.Portable.create] is
-              [Sys_error of string] which is immutable data and we only use the
-              [exn] and [bt] to reraise to the caller of [spawn_on] in that
-              function. In other words, the [exn] and [bt] are in fact portable
-              and uncontended meaning that they do not contain shared mutable
-              state being potentially accessed by multiple threads. *)
+           Atomic.decr t.threads;
            req.result <-
              Failed (
                req.argument, Obj.magic_portable exn, Obj.magic_portable bt));
@@ -296,7 +293,8 @@ let spawn_on ~domain:i f a =
        pass a function through a data structure such that it is statically known
        to be used only once without having to use a mutable box to do so. *)
     external magic_many__contended_portable
-      :  'a @ contended once portable
+      :  ('a : value_or_null).
+         'a @ contended once portable
       -> 'a @ contended many portable
       @@ portable
       = "%identity"

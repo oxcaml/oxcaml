@@ -395,20 +395,29 @@ caml_result caml_do_pending_actions_res(void)
   if (caml_result_is_exception(res)) goto exception;
 
   /* Call memprof callbacks */
+<<<<<<< HEAD
   res = caml_memprof_run_callbacks_res();
   caml_check_async(res, "memprof callback");
   if (caml_result_is_exception(res)) goto exception;
+||||||| 9790921724
+  exn = caml_memprof_run_callbacks_exn();
+  check_async_exn(exn, "memprof callback");
+  if (Is_exception_result(exn)) goto exception;
+=======
+  exn = caml_memprof_do_pending_exn();
+  check_async_exn(exn, "memprof callback");
+  if (Is_exception_result(exn)) goto exception;
+>>>>>>> 5.2.0minus-37
 
   /* Call finalisers */
   res = caml_final_do_calls_res();
   caml_check_async(res, "finaliser");
   if (caml_result_is_exception(res)) goto exception;
 
-  /* Process external interrupts (e.g. preemptive systhread switching).
-     By doing this last, we do not need to set the action pending flag
-     in case a context switch happens: all actions have been processed
-     at this point. */
-  caml_process_external_interrupt();
+  /* Process ticks (fiber preemptions and preemptive systhread switching). By
+     doing this last, we do not need to set the action pending flag in case a
+     context switch happens: all actions have been processed at this point. */
+  caml_process_tick();
 
   return Result_unit;
 

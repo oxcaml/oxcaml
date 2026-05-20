@@ -178,6 +178,8 @@ module Identifier : sig
 
     val expr : t
 
+    val eval : t
+
     val unboxed_float : t
 
     val unboxed_nativeint : t
@@ -330,6 +332,14 @@ module Module_type : sig
   val of_string : string -> t
 end
 
+module Modes : sig
+  type t
+
+  val legacy : t
+
+  val of_string_list : string list -> t
+end
+
 module rec Object_type : sig
   module Object_closed_flag : sig
     type t
@@ -381,7 +391,7 @@ and Type : sig
 
   val var : Var.Type_var.t option -> t
 
-  val arrow : Label.t -> t -> t -> t
+  val arrow : Label.t -> t -> Modes.t -> t -> Modes.t -> t
 
   val tuple : (Label.Nonoptional.t * t) list -> t
 
@@ -445,7 +455,7 @@ module Pat : sig
 
   val exception_ : t -> t
 
-  val constraint_ : t -> Type.t -> t
+  val constraint_ : t -> Type.t -> Modes.t -> t
 end
 
 module Exp_attribute : sig
@@ -470,6 +480,12 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
+end
+
+module Vb_attribute : sig
+  type t
+
+  val mk : string -> string option -> t
 end
 
 module rec Case : sig
@@ -504,7 +520,7 @@ end
 and Type_constraint : sig
   type t
 
-  val constraint_ : Type.t -> t
+  val constraint_ : Type.t -> Modes.t -> t
 
   val coercion : Type.t option -> Type.t -> t
 end
@@ -560,7 +576,7 @@ and Exp_desc : sig
 
   val let_rec_simple :
     Loc.t ->
-    (Name.t * Type.t option) list ->
+    (Name.t * Type.t option * Vb_attribute.t list) list ->
     (Var.Value.t list -> Exp.t list * Exp.t) lam ->
     t
 
@@ -569,6 +585,7 @@ and Exp_desc : sig
     Name.t list ->
     Name.t list ->
     Exp.t list ->
+    Vb_attribute.t list list ->
     (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t) lam ->
     t
 
@@ -660,7 +677,6 @@ and Exp_desc : sig
 
   val splice : Code.t -> t
 
-  val eval : Type.t -> t
 end
 
 and Exp : sig

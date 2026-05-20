@@ -2,34 +2,105 @@
   (empty_cases_returning_string/280 =
      (function {nlocal = 0} param/282?
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Match_failure/51!!) [0: "test.ml" 28 50])))
    empty_cases_returning_float64/283 =
      (function {nlocal = 0} param/285? : unboxed_float
+||||||| 9790921724
+         (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 28 50])))
+   empty_cases_returning_float64/279 =
+     (function {nlocal = 0} param/281? : unboxed_float
+=======
+         (makeblock 0 (getpredef Match_failure/50!!) [0: "test.ml" 28 50])))
+   empty_cases_returning_float64/279 =
+     (function {nlocal = 0} param/281? : unboxed_float
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Match_failure/51!!) [0: "test.ml" 29 50])))
    empty_cases_accepting_string/286 =
      (function {nlocal = 0} param/288?
+||||||| 9790921724
+         (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 29 50])))
+   empty_cases_accepting_string/282 =
+     (function {nlocal = 0} param/284?
+=======
+         (makeblock 0 (getpredef Match_failure/50!!) [0: "test.ml" 29 50])))
+   empty_cases_accepting_string/282 =
+     (function {nlocal = 0} param/284?
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Match_failure/51!!) [0: "test.ml" 30 50])))
    empty_cases_accepting_float64/289 =
      (function {nlocal = 0} param/291[float]
+||||||| 9790921724
+         (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 30 50])))
+   empty_cases_accepting_float64/285 =
+     (function {nlocal = 0} param/287[float]
+=======
+         (makeblock 0 (getpredef Match_failure/50!!) [0: "test.ml" 30 50])))
+   empty_cases_accepting_float64/285 =
+     (function {nlocal = 0} param/287[float]
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Match_failure/51!!) [0: "test.ml" 31 50])))
    non_empty_cases_returning_string/292 =
      (function {nlocal = 0} param/294
+||||||| 9790921724
+         (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 31 50])))
+   non_empty_cases_returning_string/288 =
+     (function {nlocal = 0} param/290
+=======
+         (makeblock 0 (getpredef Match_failure/50!!) [0: "test.ml" 31 50])))
+   non_empty_cases_returning_string/288 =
+     (function {nlocal = 0} param/290
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Assert_failure/62!!) [0: "test.ml" 32 68])))
    non_empty_cases_returning_float64/295 =
      (function {nlocal = 0} param/297 : unboxed_float
+||||||| 9790921724
+         (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 32 68])))
+   non_empty_cases_returning_float64/291 =
+     (function {nlocal = 0} param/293 : unboxed_float
+=======
+         (makeblock 0 (getpredef Assert_failure/61!!) [0: "test.ml" 32 68])))
+   non_empty_cases_returning_float64/291 =
+     (function {nlocal = 0} param/293 : unboxed_float
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Assert_failure/62!!) [0: "test.ml" 33 68])))
    non_empty_cases_accepting_string/298 =
      (function {nlocal = 0} param/300
+||||||| 9790921724
+         (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 33 68])))
+   non_empty_cases_accepting_string/294 =
+     (function {nlocal = 0} param/296
+=======
+         (makeblock 0 (getpredef Assert_failure/61!!) [0: "test.ml" 33 68])))
+   non_empty_cases_accepting_string/294 =
+     (function {nlocal = 0} param/296
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Assert_failure/62!!) [0: "test.ml" 34 68])))
    non_empty_cases_accepting_float64/301 =
      (function {nlocal = 0} param/303[float]
+||||||| 9790921724
+         (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 34 68])))
+   non_empty_cases_accepting_float64/297 =
+     (function {nlocal = 0} param/299[float]
+=======
+         (makeblock 0 (getpredef Assert_failure/61!!) [0: "test.ml" 34 68])))
+   non_empty_cases_accepting_float64/297 =
+     (function {nlocal = 0} param/299[float]
+>>>>>>> 5.2.0minus-37
        (raise
+<<<<<<< HEAD
          (makeblock 0 (getpredef Assert_failure/62!!) [0: "test.ml" 35 68]))))
   (makeblock 0 empty_cases_returning_string/280
     empty_cases_returning_float64/283 empty_cases_accepting_string/286
@@ -37,3 +108,20 @@
     non_empty_cases_returning_float64/295
     non_empty_cases_accepting_string/298
     non_empty_cases_accepting_float64/301))
+||||||| 9790921724
+         (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 35 68]))))
+  (makeblock 0 empty_cases_returning_string/276
+    empty_cases_returning_float64/279 empty_cases_accepting_string/282
+    empty_cases_accepting_float64/285 non_empty_cases_returning_string/288
+    non_empty_cases_returning_float64/291
+    non_empty_cases_accepting_string/294
+    non_empty_cases_accepting_float64/297))
+=======
+         (makeblock 0 (getpredef Assert_failure/61!!) [0: "test.ml" 35 68]))))
+  (makeblock 0 empty_cases_returning_string/276
+    empty_cases_returning_float64/279 empty_cases_accepting_string/282
+    empty_cases_accepting_float64/285 non_empty_cases_returning_string/288
+    non_empty_cases_returning_float64/291
+    non_empty_cases_accepting_string/294
+    non_empty_cases_accepting_float64/297))
+>>>>>>> 5.2.0minus-37

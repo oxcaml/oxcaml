@@ -1203,7 +1203,7 @@
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
           -zero-alloc-checker-details-extra
-          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+          -flambda2-expert-cont-lifting-budget 0 -flambda2-expert-cont-specialization-budget 0 -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
 

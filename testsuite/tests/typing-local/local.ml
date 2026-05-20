@@ -1208,6 +1208,16 @@ Error: This function takes a parameter which is "local",
        but was expected to take a parameter which is "global".
 |}]
 
+let rec f1 () = f2 ()
+and f2 () : string @ local = exclave_ "hi"
+[%%expect{|
+Line 2, characters 7-42:
+2 | and f2 () : string @ local = exclave_ "hi"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This function has a return value which is "local",
+       but was expected to have a return value which is "global".
+|}]
+
 (* Return mode must be greater than the type *)
 
 let foo : unit -> local_ string = fun () -> "hello"
@@ -1454,8 +1464,14 @@ let foo y =
   mut
 [%%expect{|
 val foo : 'a -> 'a = <fun>
+<<<<<<< HEAD
 |}, Principal{|
 val foo : 'a -> 'a = <fun>
+||||||| 9790921724
+|}, Principal{|
+val foo : '_weak1 -> '_weak1 = <fun>
+=======
+>>>>>>> 5.2.0minus-37
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
@@ -1466,8 +1482,14 @@ let foo y =
   gbl
 [%%expect{|
 val foo : 'a -> 'a = <fun>
+<<<<<<< HEAD
 |}, Principal{|
 val foo : 'a -> 'a = <fun>
+||||||| 9790921724
+|}, Principal{|
+val foo : '_weak2 -> '_weak2 = <fun>
+=======
+>>>>>>> 5.2.0minus-37
 |}]
 
 let foo (local_ imm) =
@@ -1554,11 +1576,16 @@ val foo : 'a gbl @ local -> 'a = <fun>
 let foo y =
   let #{ gbl } = local_ #{ gbl = y } in
   gbl
-(* CR layouts v2.8: Fix principal case, or convince ourselves that it's expected. Internal ticket 5111 *)
 [%%expect{|
 val foo : 'a -> 'a = <fun>
+<<<<<<< HEAD
 |}, Principal{|
 val foo : 'a -> 'a = <fun>
+||||||| 9790921724
+|}, Principal{|
+val foo : '_weak3 -> '_weak3 = <fun>
+=======
+>>>>>>> 5.2.0minus-37
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in

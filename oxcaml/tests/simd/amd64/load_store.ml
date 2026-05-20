@@ -316,6 +316,14 @@ module AVX2 = struct
   external vec256_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec256_gather32_index64"
   [@@noalloc] [@@builtin]
 
+  (* All args must be distinct registers. *)
+
+  let f x = vec128_gather32_index32 ~scale:#1L ~onto:x #0n ~idx:x ~mask:x
+  let _ = f (Int32s.to_int32x4 0l 0l 0l 0l)
+
+  let f x = vec256_gather32_index32 ~scale:#1L ~onto:x #0n ~idx:x ~mask:x
+  let _ = f (Int32s.to_int32x8 0l 0l 0l 0l 0l 0l 0l 0l)
+
   let () =
     let mem = aligned_alloc ~align:#32n ~size:#32n in
     let _ = Avx.store_aligned32 mem (Int32s.to_int32x8 1l 2l 3l 4l 5l 6l 7l 8l) in
@@ -384,6 +392,14 @@ module AVX2 = struct
   [@@noalloc] [@@builtin]
   external vec256_gather64_index64 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> (int64x4[@unboxed]) = "" "caml_avx2_vec256_gather64_index64"
   [@@noalloc] [@@builtin]
+
+  (* All args must be distinct registers. *)
+
+  let f x = vec128_gather64_index64 ~scale:#1L ~onto:x #0n ~idx:x ~mask:x
+  let _ = f (int64x2_of_int64s 0L 0L)
+
+  let f x = vec256_gather64_index64 ~scale:#1L ~onto:x #0n ~idx:x ~mask:x
+  let _ = f (int64x4_of_int64s 0L 0L 0L 0L)
 
   let () =
     let mem = aligned_alloc ~align:#32n ~size:#32n in

@@ -1,0 +1,10 @@
+let code thd3_0 deleted in
+let code loopify(never) size(1) newer_version_of(thd3_0) tupled 
+      thd3_0_1 (param, param_1, param_2)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k (param_2)
+in
+let $camlTuple_stub__thd3_1 = closure thd3_0_1 @thd3 in
+let $camlTuple_stub = Block 0 ($camlTuple_stub__thd3_1) in
+cont done ($camlTuple_stub)

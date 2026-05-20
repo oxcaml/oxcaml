@@ -33,7 +33,7 @@ let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 
 let dummy_value_mode = Value.disallow_right Value.legacy
 
-let dummy_value_sort = Jkind.Sort.value
+let dummy_scannable_sort = Jkind.Sort.scannable
 
 let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
 
@@ -45,10 +45,10 @@ let mkTarrow (label, t1, t2, comm) =
 
 type texp_ident_identifier = ident_kind * unique_use
 
-let mkTexp_ident ?id:(ident_kind, uu = Id_value, aliased_many_use)
-    (path, longident, vd) =
-  Texp_ident
-    (path, longident, vd, ident_kind, uu, Mode.Value.(disallow_right legacy))
+let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
+    (path, lid, desc) =
+  let mode = Mode.Value.(disallow_right legacy) in
+  Texp_ident { path; lid; desc; kind; unique_use; mode }
 
 type nonrec apply_arg = apply_arg
 
@@ -132,7 +132,7 @@ type texp_function_identifier =
 
 let texp_function_cases_identifier_defaults =
   { last_arg_mode = Alloc.disallow_right Alloc.legacy;
-    last_arg_sort = Jkind.Sort.value;
+    last_arg_sort = Jkind.Sort.scannable;
     last_arg_exp_extra = [];
     last_arg_attributes = [];
     env = Env.empty;
@@ -140,7 +140,7 @@ let texp_function_cases_identifier_defaults =
   }
 
 let texp_function_param_identifier_defaults =
-  { param_sort = Jkind.Sort.value;
+  { param_sort = Jkind.Sort.scannable;
     param_mode = Alloc.disallow_right Alloc.legacy;
     param_curry = More_args { partial_mode = Alloc.disallow_right Alloc.legacy };
     param_newtypes = []
@@ -148,7 +148,7 @@ let texp_function_param_identifier_defaults =
 
 let texp_function_defaults =
   { alloc_mode = dummy_alloc_mode;
-    ret_sort = Jkind.Sort.value;
+    ret_sort = Jkind.Sort.scannable;
     ret_mode = Alloc.disallow_right Alloc.legacy;
     zero_alloc = Zero_alloc.default
   }
@@ -208,13 +208,21 @@ let mkTexp_function ?(id = texp_function_defaults)
 
 type texp_sequence_identifier = Jkind.sort
 
-let mkTexp_sequence ?id:(sort = Jkind.Sort.value) (e1, e2) =
+let mkTexp_sequence ?id:(sort = Jkind.Sort.scannable) (e1, e2) =
   Texp_sequence (e1, sort, e2)
 
 type texp_match_identifier = Jkind.sort
 
+<<<<<<< HEAD
 let mkTexp_match ?id:(sort = Jkind.Sort.value) (e, cases, partial) =
   Texp_match (e, sort, cases, [], partial)
+||||||| 9790921724
+let mkTexp_match ?id:(sort = Jkind.Sort.value) (e, cases, partial) =
+  Texp_match (e, sort, cases, partial)
+=======
+let mkTexp_match ?id:(sort = Jkind.Sort.scannable) (e, cases, partial) =
+  Texp_match (e, sort, cases, partial)
+>>>>>>> 5.2.0minus-37
 
 let mkTexp_assert e loc = Texp_assert (e, loc)
 
@@ -245,8 +253,8 @@ let untype_label = function
 
 let view_texp (e : expression_desc) =
   match e with
-  | Texp_ident (path, longident, vd, ident_kind, uu, _mode) ->
-    Texp_ident (path, longident, vd, (ident_kind, uu))
+  | Texp_ident { path; lid; desc; kind; unique_use; _ } ->
+    Texp_ident (path, lid, desc, (kind, unique_use))
   | Texp_apply (exp, args, pos, mode, za) ->
     let args = List.map (fun (label, x) -> untype_label label, x) args in
     Texp_apply (exp, args, (pos, mode, za))
@@ -319,21 +327,30 @@ let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
 
 type tpat_var_identifier = Jkind.Sort.t * Value.l
 
-let mkTpat_var ?id:(sort, mode = dummy_value_sort, dummy_value_mode)
+let mkTpat_var ?id:(sort, mode = dummy_scannable_sort, dummy_value_mode)
     (ident, name) =
-  Tpat_var (ident, name, Uid.internal_not_actually_unique, sort, mode)
+  Tpat_var
+    { id = ident; name; uid = Uid.internal_not_actually_unique; sort; mode }
 
 type tpat_alias_identifier = Jkind.Sort.t * Value.l * Types.type_expr
 
 let mkTpat_alias ~id:(sort, mode, ty) (p, ident, name) =
-  Tpat_alias (p, ident, name, Uid.internal_not_actually_unique, sort, mode, ty)
+  Tpat_alias
+    { pattern = p;
+      id = ident;
+      name;
+      uid = Uid.internal_not_actually_unique;
+      sort;
+      mode;
+      type_expr = ty
+    }
 
 type tpat_array_identifier = mutability * Jkind.sort
 
 let mkTpat_array
     ?id:(mut, arg_sort =
         ( Mutable { mode = Value.Comonadic.legacy; atomic = Nonatomic },
-          Jkind.Sort.value )) l =
+          Jkind.Sort.scannable )) l =
   Tpat_array (mut, arg_sort, l)
 
 type tpat_tuple_identifier = string option list
@@ -366,9 +383,10 @@ type 'a matched_pattern_desc =
 
 let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
   match p with
-  | Tpat_var (ident, name, _uid, sort, mode) ->
+  | Tpat_var { id = ident; name; sort; mode; _ } ->
     Tpat_var (ident, name, (sort, mode))
-  | Tpat_alias (p, ident, name, _uid, sort, mode, ty) ->
+  | Tpat_alias { pattern = p; id = ident; name; sort; mode; type_expr = ty; _ }
+    ->
     Tpat_alias (p, ident, name, (sort, mode, ty))
   | Tpat_array (mut, arg_sort, l) -> Tpat_array (l, (mut, arg_sort))
   | Tpat_tuple pats ->
@@ -378,7 +396,7 @@ let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
 
 type tstr_eval_identifier = Jkind.sort
 
-let mkTstr_eval ?id:(sort = Jkind.Sort.value) (e, attrs) =
+let mkTstr_eval ?id:(sort = Jkind.Sort.scannable) (e, attrs) =
   Tstr_eval (e, sort, attrs)
 
 type matched_structure_item_desc =
@@ -392,7 +410,7 @@ let view_tstr (si : structure_item_desc) =
 
 type arg_identifier = Jkind.sort
 
-let mkArg ?id:(sort = Jkind.Sort.value) e = Arg (e, sort)
+let mkArg ?id:(sort = Jkind.Sort.scannable) e = Arg (e, sort)
 
 let map_arg_or_omitted f arg =
   match arg with Arg (e, sort) -> Arg (f e, sort) | Omitted o -> Omitted o
@@ -427,8 +445,8 @@ type value_binding_identifier = Jkind.Sort.t
 
 let value_binding_identifier_from_texp_match_identifier jkind = jkind
 
-let mk_value_binding ?(id = Jkind.Sort.value) ~vb_pat ~vb_expr ~vb_attributes ()
-    =
+let mk_value_binding ?(id = Jkind.Sort.scannable) ~vb_pat ~vb_expr
+    ~vb_attributes () =
   { vb_pat;
     vb_expr;
     vb_attributes;
@@ -444,7 +462,8 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_modalities = Mode.Modality.(Const.id |> of_const);
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
-    val_zero_alloc = Zero_alloc.default
+    val_zero_alloc = Zero_alloc.default;
+    val_lpoly = Lpoly.determined []
   }
 
 let mkTtyp_any = Ttyp_var (None, None)

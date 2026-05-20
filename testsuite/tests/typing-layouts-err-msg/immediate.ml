@@ -26,12 +26,23 @@ type v = unit
 Line 3, characters 21-22:
 3 | let f (x: v): 'a t = x
                          ^
+<<<<<<< HEAD
 Error: The value "x" has type "v" = "unit" but an expression was expected of type
          "'a t" = "('a : void)"
        The layout of unit is value
+||||||| 9790921724
+Error: This expression has type "v" = "unit"
+       but an expression was expected of type "'a t" = "('a : void)"
+       The layout of unit is value
+=======
+Error: This expression has type "v" = "unit"
+       but an expression was expected of type "'a t" = "('a : void)"
+       The layout of unit is value non_pointer
+>>>>>>> 5.2.0minus-37
          because it is the primitive type unit.
        But the layout of unit must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Primitive *)
@@ -44,10 +55,11 @@ Line 2, characters 23-24:
                            ^
 Error: The value "x" has type "int" but an expression was expected of type
          "'a t" = "('a : void)"
-       The layout of int is value
+       The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Immediate_polymorphic_variant *)
@@ -60,9 +72,10 @@ Line 2, characters 29-30:
                                  ^
 Error: The value "x" has type "[ `A | `B ]"
        but an expression was expected of type "'a t" = "('a : void)"
-       The layout of [ `A | `B ] is value
+       The layout of [ `A | `B ] is value non_pointer
          because it's an enumeration variant type (all constructors are constant).
        But the layout of [ `A | `B ] must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The layout of immediate is value non_pointer.
 |}]
 

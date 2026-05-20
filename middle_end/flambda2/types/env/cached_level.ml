@@ -140,10 +140,10 @@ let merge t1 t2 =
   in
   let aliases = Aliases.empty in
   let symbol_projections =
-    Variable.Map.union
+    Variable.Map.union_total_shared
       (fun var proj1 proj2 ->
         if Symbol_projection.equal proj1 proj2
-        then Some proj1
+        then proj1
         else
           Misc.fatal_errorf
             "Cannot merge symbol projections for %a:@ %a@ and@ %a"

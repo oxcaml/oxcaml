@@ -222,6 +222,8 @@ module T = struct
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_repr (lvars, t) ->
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
+    | Ptyp_newlayout (lvars, t) ->
+        newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub
@@ -391,13 +393,29 @@ module MT = struct
     | Pwith_module (lid, lid2) ->
         Pwith_module (map_loc_lid sub lid, map_loc_lid sub lid2)
     | Pwith_modtype (lid, mty) ->
+<<<<<<< HEAD
         Pwith_modtype (map_loc_lid sub lid, sub.module_type sub mty)
+||||||| 9790921724
+        Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
+=======
+        Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
+    | Pwith_jkind (lid, d) ->
+        Pwith_jkind (map_loc sub lid, sub.jkind_declaration sub d)
+>>>>>>> 5.2.0minus-37
     | Pwith_typesubst (lid, d) ->
         Pwith_typesubst (map_loc_lid sub lid, sub.type_declaration sub d)
     | Pwith_modsubst (s, lid) ->
         Pwith_modsubst (map_loc_lid sub s, map_loc_lid sub lid)
     | Pwith_modtypesubst (lid, mty) ->
+<<<<<<< HEAD
         Pwith_modtypesubst (map_loc_lid sub lid, sub.module_type sub mty)
+||||||| 9790921724
+        Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
+=======
+        Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
+    | Pwith_jkindsubst (lid, d) ->
+        Pwith_jkindsubst (map_loc sub lid, sub.jkind_declaration sub d)
+>>>>>>> 5.2.0minus-37
 
   let map_signature_item sub {psig_desc = desc; psig_loc = loc} =
     let open Sig in
@@ -522,8 +540,15 @@ module E = struct
     }
 
   let map_block_access sub = function
+<<<<<<< HEAD
     | Baccess_field lid -> Baccess_field (map_loc_lid sub lid)
     | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
+||||||| 9790921724
+    | Baccess_field lid -> Baccess_field (map_loc sub lid)
+    | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
+=======
+    | Baccess_field lid -> Baccess_field (map_loc sub lid)
+>>>>>>> 5.2.0minus-37
     | Baccess_block (mut, e) -> Baccess_block (mut, sub.expr sub e)
 
   let map_unboxed_access sub = function
@@ -1004,7 +1029,8 @@ let default_mapper =
       let pjka_desc =
         match pjka_desc with
         | Pjk_default -> Pjk_default
-        | Pjk_abbreviation lid -> Pjk_abbreviation (map_loc this lid)
+        | Pjk_abbreviation (lid, sa) ->
+          Pjk_abbreviation (map_loc this lid, List.map (map_loc this) sa)
         | Pjk_mod (t, mode_list) ->
           Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
         | Pjk_with (t, ty, modalities) ->
@@ -1134,15 +1160,25 @@ module PpxContext = struct
 
   let make ~tool_name () =
     let Load_path.{ visible; hidden } = Load_path.get_paths () in
+    let visible_load_dir_pairs dirs =
+      List.map
+        (fun (e : Clflags.visible_include) -> (e.path, e.cmx_guaranteed))
+        dirs
+    in
     let fields =
       [
         lid "tool_name",    make_string tool_name;
-        lid "include_dirs", make_list make_string (!Clflags.include_dirs);
+        lid "include_dirs",
+          make_list
+            (make_pair make_string make_bool)
+            (visible_load_dir_pairs !Clflags.include_dirs);
         lid "hidden_include_dirs",
           make_list make_string (!Clflags.hidden_include_dirs);
         lid "load_path",
-          make_pair (make_list make_string) (make_list make_string)
-            (visible, hidden);
+          make_pair
+            (make_list (make_pair make_string make_bool))
+            (make_list make_string)
+            (visible_load_dir_pairs visible, hidden);
         lid "open_modules", make_list make_string !Clflags.open_modules;
         lid "for_package",  make_option make_string !Clflags.for_package;
         lid "debug",        make_bool !Clflags.debug;
@@ -1214,7 +1250,10 @@ module PpxContext = struct
       | "tool_name" ->
           tool_name_ref := get_string payload
       | "include_dirs" ->
-          Clflags.include_dirs := get_list get_string payload
+          Clflags.include_dirs :=
+            List.map
+              (fun (path, cmx_guaranteed) -> { Clflags.path; cmx_guaranteed })
+              (get_list (get_pair get_string get_bool) payload)
       | "hidden_include_dirs" ->
           Clflags.hidden_include_dirs := get_list get_string payload
       | "load_path" ->
@@ -1228,7 +1267,16 @@ module PpxContext = struct
               Load_path.auto_include_otherlibs alert find_in_dir fn
           in
           let visible, hidden =
-            get_pair (get_list get_string) (get_list get_string) payload
+            get_pair
+              (get_list (get_pair get_string get_bool))
+              (get_list get_string)
+              payload
+          in
+          let visible =
+            List.map
+              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
+                 { path; cmx_guaranteed })
+              visible
           in
           Load_path.init ~auto_include ~visible ~hidden
       | "open_modules" ->

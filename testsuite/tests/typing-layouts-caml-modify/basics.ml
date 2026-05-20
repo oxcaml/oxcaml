@@ -334,7 +334,7 @@ let () =
 
 (* First layout poly versions *)
 external unsafe_set : ('a : value) ('b : any).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 [@@layout_poly]
 
 let () =
@@ -367,7 +367,7 @@ let () =
 
 (* Second, specialized versions *)
 external unsafe_set_imm : ('a : value) ('b : immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -379,7 +379,7 @@ let () =
     (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
 
 external unsafe_set_i64 : ('a : value) ('b : bits64).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -391,7 +391,7 @@ let () =
     (fun () -> unsafe_set_i64 t idx #1L; ignore (Sys.opaque_identity t))
 
 external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -407,7 +407,7 @@ external unsafe_set_or_null
   : ('a : value) ('b : any).
   'a or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
   @@ portable
-  = "%unsafe_set_idx"
+  = "%set_idx"
 [@@layout_poly]
 
 let () =
@@ -564,4 +564,31 @@ let () =
   let idx = (.y) in
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+(* Parameterized unboxed records: type args must be substituted for params *)
+let () =
+  let open struct
+    type ('a : value_or_null) pair = #{ x : 'a; y : 'a }
+    type t = { mutable is : int pair }
+  end in
+  let[@inline never] f t is =
+    t.is <- is
+  in
+  let t = { is = #{ x = 1; y = 2 } } in
+  test ~expect_caml_modifies:0
+    (fun () -> f t #{ x = 3; y = 4 };
+               ignore (Sys.opaque_identity t))
+
+(* Two type params, one immediate and one pointer *)
+let () =
+  let open struct
+    type ('a : value_or_null, 'b : value_or_null) t2 =
+      #{ x : 'a; y : 'b }
+    type t = { mutable p : (int, string) t2 }
+  end in
+  let[@inline never] f t p = t.p <- p in
+  let t = { p = #{ x = 1; y = "a" } } in
+  test ~expect_caml_modifies:1
+    (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))

@@ -58,7 +58,8 @@ let all_minimizers =
       Simplifysequences.minimizer;
       Simplifytypes.minimizer;
       Reducepat.minimizer;
-      Stub.minimizer ]
+      Stub.minimizer;
+      Cleanup.minimizer ]
 
 let default_iteration =
   [ "stub";
@@ -88,21 +89,6 @@ let default_iteration =
     "remove-cons-fields" ]
 
 (* CHECKING ERROR PRESENCE AFTER PRINTING *)
-let must_raise_error command =
-  if !test < 0 && not (raise_error command)
-  then (
-    Format.eprintf "@[<v 2>*** Printing error ***";
-    Format.eprintf "@ @[%a@ %S;@ %a@]@ " Format.pp_print_text
-      "This command raises the error" !Utils.error_str Format.pp_print_text
-      "however, printing the contents from the cmt file does not raise that \
-       same error.";
-    Format.eprintf "@ @[%a@]@ @;<1 2>%s@ " Format.pp_print_text
-      "The following command does *NOT* raise the error:" command;
-    Format.eprintf "@ @[%a@]" Format.pp_print_text
-      "Hint: This is likely due to a missing feature in either untypeast.ml or \
-       pprintast.ml.";
-    Format.eprintf "@]@.";
-    exit 1)
 
 type mode =
   | Legacy_multi_files of
@@ -149,6 +135,13 @@ let main () =
         (Iterator.test ~pos:!test ~len:1)
         [Context.minimizer (List.hd minimizers_to_run)])
     else Iterator.fix (List.map Context.minimizer minimizers_to_run)
+  in
+  let named name =
+    Chamelon_lib.Context.minimizer
+      (Chamelon_lib.Utils.Smap.find name all_minimizers)
+  in
+  let schedule =
+    Iterator.(list [schedule; fix [named "cleanup"; named "delete-lines"]])
   in
   (* LIST MINIMIZERS *)
   if !list_minimizers
@@ -207,7 +200,7 @@ let main () =
       let command = !command ^ " " ^ sourcefile in
       Modules { modname; command; output_dir = ""; context }
     | true, [(input_file, cmt_info)] ->
-      if !output_file != ""
+      if !output_file <> ""
       then (
         Format.eprintf "Options -i and -o are not compatible@.";
         exit 2);
@@ -285,7 +278,7 @@ let main () =
     let c = ref (make_command command input_files) in
     let nmap = ref str_map in
     Context.write_to ~path:output_dir !nmap;
-    must_raise_error !c;
+    if !test < 0 then Utils.must_raise_error !c;
     let has_changed = ref true in
     while !has_changed do
       (* REMOVING FILES *)

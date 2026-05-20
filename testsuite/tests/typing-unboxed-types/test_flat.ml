@@ -17,10 +17,17 @@ Error: This type cannot be unboxed because
        You should annotate it with "[@@ocaml.boxed]".
 |}];;
 
-(* accept since [list] is always non-float *)
+(* reject: [abs] could be implemented as a GADT that extracts the list
+   element type, e.g. [type _ abs = A : 'b -> 'b list abs [@@unboxed]] *)
 type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
 [%%expect{|
-type t18 = A : 'a list abs -> t18 [@@unboxed]
+Line 1, characters 0-50:
+1 | type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
 |}];;
 
 (* regression test for PR#7511 (wrong determination of unboxability for GADTs)
@@ -65,10 +72,17 @@ module M :
   sig type 'a r constraint 'a = unit -> 'b val inj : 'b -> (unit -> 'b) r end
 |}];;
 
-(* accept since functions are non-float *)
+(* reject: [M.r] has constraint ['a = unit -> 'b] and extracts ['b], so
+   [(unit -> float) M.r = float] while [(unit -> int) M.r = int] *)
 type t = T : (unit -> _) M.r -> t [@@unboxed];;
 [%%expect{|
-type t = T : (unit -> 'a) M.r -> t [@@unboxed]
+Line 1, characters 0-45:
+1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
 |}];;
 
 (* accept *)
@@ -109,10 +123,17 @@ end;;
 module N : sig type 'a r val inj : 'b -> (unit -> 'b) r end
 |}];;
 
-(* accept since functions are non-float *)
+(* reject: [N.r]'s GADT implementation extracts the return type from the
+   function, so [(unit -> float) N.r = float] while [(unit -> int) N.r = int] *)
 type t = T : (unit -> _) N.r -> t [@@unboxed];;
 [%%expect{|
-type t = T : (unit -> 'a) N.r -> t [@@unboxed]
+Line 1, characters 0-45:
+1 | type t = T : (unit -> _) N.r -> t [@@unboxed];;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
 |}];;
 
 (* accept *)
@@ -172,10 +193,16 @@ module M :
   sig type 'a r constraint 'a = unit -> 'b val inj : 'b -> (unit -> 'b) r end
 |}];;
 
-(* accept since functions are non-float *)
+(* reject: same as above, [M.r] extracts the return type *)
 type t = T : (unit -> _) M.r -> t [@@unboxed];;
 [%%expect{|
-type t = T : (unit -> 'a) M.r -> t [@@unboxed]
+Line 1, characters 0-45:
+1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of an unnamed existential variable.
+       You should annotate it with "[@@ocaml.boxed]".
 |}];;
 
 type 'a s = S : (unit -> 'a) M.r -> 'a option s [@@unboxed];;

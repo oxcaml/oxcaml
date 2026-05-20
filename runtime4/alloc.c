@@ -372,5 +372,8 @@ CAMLexport value caml_alloc_some(value v)
 
 CAMLprim value caml_atomic_make_contended(value v)
 {
-  caml_fatal_error("Atomic.make_contended is not supported by runtime4");
+  CAMLparam1(v);
+  value cell = caml_alloc_small(1, 0);
+  Field(cell, 0) = v;
+  CAMLreturn(cell);
 }

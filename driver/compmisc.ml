@@ -30,7 +30,9 @@ let auto_include find_in_dir fn =
 
 let init_path ?(auto_include=auto_include) ?(dir="") () =
   let visible =
-    if !Clflags.use_threads then "+threads" :: !Clflags.include_dirs
+    if !Clflags.use_threads then
+      { Clflags.path = "+threads"; cmx_guaranteed = true }
+      :: !Clflags.include_dirs
     else
       !Clflags.include_dirs
   in
@@ -38,17 +40,33 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
     List.concat
       [!Compenv.last_include_dirs;
        visible;
+<<<<<<< HEAD
        (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
           reference to the Standard Library when -nostdlib was specified. *)
        (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
+||||||| 9790921724
+       Config.flexdll_dirs;
+=======
+       List.map
+         (fun path : Clflags.visible_include ->
+            { path; cmx_guaranteed = false })
+         Config.flexdll_dirs;
+>>>>>>> 5.2.0minus-37
        !Compenv.first_include_dirs]
   in
   let visible =
-    List.map (Misc.expand_directory Config.standard_library) visible
+    List.map (fun (e : Clflags.visible_include) : Clflags.visible_include ->
+      { path = Misc.expand_directory Config.standard_library e.path;
+        cmx_guaranteed = e.cmx_guaranteed })
+      visible
   in
   let visible =
-    (if !Clflags.no_cwd then [] else [dir])
-    @ List.rev_append visible (Clflags.std_include_dir ())
+    (if !Clflags.no_cwd then []
+     else [{ Clflags.path = dir; cmx_guaranteed = false }])
+    @ List.rev_append visible
+        (List.map
+           (fun path -> { Clflags.path; cmx_guaranteed = true })
+           (Clflags.std_include_dir ()))
   in
   let hidden =
     List.rev_map (Misc.expand_directory Config.standard_library)

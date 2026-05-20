@@ -26,6 +26,7 @@ let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
+<<<<<<< HEAD
 let as_has_debug_prefix_map = @as_has_debug_prefix_map@
 let bytecode_cflags = {@QS@|@bytecode_cflags@|@QS@}
 let bytecode_cppflags = {@QS@|@bytecode_cppflags@|@QS@}
@@ -33,6 +34,25 @@ let native_cflags = {@QS@|@native_cflags@|@QS@}
 let native_cppflags = {@QS@|@native_cppflags@|@QS@}
 
 let bytecomp_c_libraries = {@QS@|@zstd_libs@ @cclibs@|@QS@}
+||||||| 9790921724
+let as_has_debug_prefix_map = @as_has_debug_prefix_map@
+let ocamlc_cflags = {@QS@|@ocamlc_cflags@|@QS@}
+let ocamlc_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
+(* #7678: ocamlopt uses these only to compile .c files, and the behaviour for
+          the two drivers should be identical. *)
+let ocamlopt_cflags = {@QS@|@ocamlc_cflags@|@QS@}
+let ocamlopt_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
+let bytecomp_c_libraries = {@QS@|@cclibs@|@QS@}
+=======
+let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}
+let ocamlc_cflags = {@QS@|@ocamlc_cflags@|@QS@}
+let ocamlc_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
+(* #7678: ocamlopt uses these only to compile .c files, and the behaviour for
+          the two drivers should be identical. *)
+let ocamlopt_cflags = {@QS@|@ocamlc_cflags@|@QS@}
+let ocamlopt_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
+let bytecomp_c_libraries = {@QS@|@cclibs@|@QS@}
+>>>>>>> 5.2.0minus-37
 (* bytecomp_c_compiler and native_c_compiler have been supported for a
    long time and are retained for backwards compatibility.
    For programs that don't need compatibility with older OCaml releases
@@ -87,6 +107,7 @@ let asm_size_type_directives = @asm_size_type_directives@
 let with_frame_pointers = @frame_pointers@
 let with_address_sanitizer = @address_sanitizer@
 let with_cpp_mangling = @cpp_mangling@
+let name_mangling_scheme_string = {@QS@|@name_mangling_scheme@|@QS@}
 let custom_ops_struct_size = @custom_ops_struct_size@
 
 let ext_exe = {@QS@|@EXEEXT@|@QS@}

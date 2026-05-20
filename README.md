@@ -46,7 +46,7 @@ The OxCaml tree has to be configured before building.  The configure script is n
 in; you have to run `autoconf`.  For example:
 ```
 $ autoconf
-$ ./configure --prefix=/path/to/install/dir --enable-runtime5
+$ ./configure --prefix=/path/to/install/dir
 ```
 
 ## Building and installing

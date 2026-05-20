@@ -32,7 +32,7 @@ type ('a : any mod separable) t5' = 'a iarray
 type ('a : float32) t6' = 'a iarray
 
 [%%expect{|
-type t_any_mod_separable : any mod separable
+type t_any_mod_separable : any separable
 type t1 = float# iarray
 type t2 = int32# iarray
 type t3 = int64# iarray
@@ -43,7 +43,7 @@ type ('a : float64) t1' = 'a iarray
 type ('a : bits32) t2' = 'a iarray
 type ('a : bits64) t3' = 'a iarray
 type ('a : word) t4' = 'a iarray
-type ('a : any mod separable) t5' = 'a iarray
+type ('a : any separable) t5' = 'a iarray
 type ('a : float32) t6' = 'a iarray
 |}];;
 
@@ -127,9 +127,9 @@ external get :
 let d (x : 'a iarray) = get x 0
 
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int -> float
+external get : ('a : any separable). 'a iarray -> int -> float
   = "%floatarray_safe_get"
-val d : ('a : value_or_null mod separable). 'a iarray -> float = <fun>
+val d : ('a : value maybe_null). 'a iarray -> float = <fun>
 |}];;
 
 external get : int32# iarray -> int -> float = "%floatarray_safe_get"
@@ -192,7 +192,7 @@ let f4 (x : nativeint# iarray) = get x 0
 let f5 (x : float32# iarray) = get x 0
 
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int -> 'a
+external get : ('a : any separable). 'a iarray -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f1 : float# iarray -> float# = <fun>
 val f2 : int32# iarray -> int32# = <fun>
@@ -223,8 +223,16 @@ end
 Line 13, characters 39-42:
 13 |                     #42L (get_third [: #0L; #1L; #42L :]))
                                             ^^^
+<<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
          "('a : bits32 mod separable)"
+||||||| 9790921724
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : bits32 mod separable)"
+=======
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : bits32)"
+>>>>>>> 5.2.0minus-37
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a sublayout of bits32
@@ -247,7 +255,7 @@ end
 Line 10, characters 24-35:
 10 |   let f2 idx : int32# = get arr idx
                              ^^^^^^^^^^^
-Error: This expression has type "('a : float64 mod separable)"
+Error: This expression has type "('a : float64)"
        but an expression was expected of type "int32#"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
@@ -267,11 +275,19 @@ let _ =
 Line 2, characters 39-44:
 2 |   let[@warning "-10"] rec x = [: x :]; #42.0 in
                                            ^^^^^
+<<<<<<< HEAD
 Error: This constant has type "float#" but an expression was expected of type
          "('a : value_or_null mod separable)"
+||||||| 9790921724
+Error: This expression has type "float#" but an expression was expected of type
+         "('a : value_or_null mod separable)"
+=======
+Error: This expression has type "float#" but an expression was expected of type
+         "('a : value maybe_null)"
+>>>>>>> 5.2.0minus-37
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -283,11 +299,19 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42l in
                                            ^^^^
+<<<<<<< HEAD
 Error: This constant has type "int32#" but an expression was expected of type
          "('a : value_or_null mod separable)"
+||||||| 9790921724
+Error: This expression has type "int32#" but an expression was expected of type
+         "('a : value_or_null mod separable)"
+=======
+Error: This expression has type "int32#" but an expression was expected of type
+         "('a : value maybe_null)"
+>>>>>>> 5.2.0minus-37
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a sublayout of value
+       But the layout of int32# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -299,11 +323,19 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42L in
                                            ^^^^
+<<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
          "('a : value_or_null mod separable)"
+||||||| 9790921724
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : value_or_null mod separable)"
+=======
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : value maybe_null)"
+>>>>>>> 5.2.0minus-37
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -315,12 +347,21 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42n in
                                            ^^^^
+<<<<<<< HEAD
 Error: This constant has type "nativeint#"
        but an expression was expected of type
          "('a : value_or_null mod separable)"
+||||||| 9790921724
+Error: This expression has type "nativeint#"
+       but an expression was expected of type
+         "('a : value_or_null mod separable)"
+=======
+Error: This expression has type "nativeint#"
+       but an expression was expected of type "('a : value maybe_null)"
+>>>>>>> 5.2.0minus-37
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of value
+       But the layout of nativeint# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -332,11 +373,20 @@ let _ =
 Line 2, characters 39-45:
 2 |   let[@warning "-10"] rec x = [: x :]; #42.0s in
                                            ^^^^^^
+<<<<<<< HEAD
 Error: This constant has type "float32#" but an expression was expected of type
          "('a : value_or_null mod separable)"
+||||||| 9790921724
+Error: This expression has type "float32#"
+       but an expression was expected of type
+         "('a : value_or_null mod separable)"
+=======
+Error: This expression has type "float32#"
+       but an expression was expected of type "('a : value maybe_null)"
+>>>>>>> 5.2.0minus-37
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a sublayout of value
+       But the layout of float32# must be a value layout
          because it's the type of an array element.
 |}]
 

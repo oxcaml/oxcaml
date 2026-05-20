@@ -21,6 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          # Pin to nix 2.33.0; later versions of nix cause out of memory issues
+          # on darwin
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
       - id: set-matrix
         name: Generate Nix Matrix
         run: |
@@ -43,6 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          # Pin to nix 2.33.0; later versions of nix cause out of memory issues
+          # on darwin
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
       - run: nix build -L '.#${{ matrix.attr }}'
 
 concurrency:

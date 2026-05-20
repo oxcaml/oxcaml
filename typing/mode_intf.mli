@@ -55,6 +55,7 @@ module type Const_product = sig
   (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
   val max_with : 'a axis -> 'a -> t
 
+  (** For interfacing with the user only; potentially slow. *)
   module Per_axis :
     Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
 end
@@ -206,7 +207,7 @@ module type Axis = sig
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
   *)
-  val compare : 'a t -> 'b t -> int
+  val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison
 
   type packed = P : 'a t -> packed
 
@@ -247,7 +248,38 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
+module type Total = sig
+  (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
+
+      If it's also finite, then the ordering can be represented as a monotone
+      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
+
+  type t
+
+  val ord : t -> int
+
+  val min : t
+
+  val max : t
+end
+
 module type S = sig
+  module Lattices : sig
+    module Total : functor (L : Total) -> sig
+      val min : L.t
+
+      val max : L.t
+
+      val le : L.t -> L.t -> bool
+
+      val equal : L.t -> L.t -> bool
+
+      val join : L.t -> L.t -> L.t
+
+      val meet : L.t -> L.t -> L.t
+    end
+  end
+
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
@@ -378,6 +410,7 @@ module type S = sig
       type t =
         | Portable
         | Shareable
+        | Corruptible
         | Nonportable
 
       include Const with type t := t
@@ -406,6 +439,7 @@ module type S = sig
     module Const : sig
       type t =
         | Uncontended
+        | Corrupted
         | Shared
         | Contended
 
@@ -451,7 +485,8 @@ module type S = sig
     module Const : sig
       type t =
         | Stateless
-        | Observing
+        | Writing
+        | Reading
         | Stateful
 
       include Const with type t := t
@@ -461,7 +496,9 @@ module type S = sig
 
     val stateless : lr
 
-    val observing : lr
+    val writing : lr
+
+    val reading : lr
 
     val stateful : lr
   end
@@ -471,6 +508,7 @@ module type S = sig
       type t =
         | Read_write
         | Read
+        | Write
         | Immutable
 
       include Const with type t := t
@@ -481,6 +519,8 @@ module type S = sig
     val immutable : lr
 
     val read : lr
+
+    val write : lr
 
     val read_write : lr
   end
@@ -529,7 +569,7 @@ module type S = sig
 
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
-    val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
+    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
 
   module type Mode := sig
@@ -545,6 +585,7 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
+      (** For interfacing with the user only; potentially slow. *)
       module Per_axis : sig
         val zap_to_floor : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
 
@@ -564,6 +605,7 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
 
+      (** For interfacing with the user only; potentially slow. *)
       module Per_axis : sig
         val zap_to_floor : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
 
@@ -577,8 +619,8 @@ module type S = sig
       (** Represents a mode axis in this product whose constant is ['a], and
           whose allowance is ['d1] given the product's allowance ['d0]. *)
       type 'a t =
-        | Monadic : 'a Monadic.Axis.t -> 'a t
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
+        | Monadic : 'a Monadic.Axis.t -> 'a t
 
       include Axis with type 'a t := 'a t
     end
@@ -719,9 +761,10 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val meet_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
-    val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val join_const_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
@@ -799,8 +842,8 @@ module type S = sig
     module Comonadic : sig
       module Atom : sig
         type 'a t =
-          | Meet_with of 'a
-              (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be
+          | Meet_const of 'a
+              (** [Meet_const c] takes [x] and returns [meet c x]. [c] can be
                   [max] in which case it's the identity modality. *)
         [@@unboxed]
       end
@@ -809,8 +852,8 @@ module type S = sig
     module Monadic : sig
       module Atom : sig
         type 'a t =
-          | Join_with of 'a
-              (** [Join_with c] takes [x] and returns [join c x]. [c] can be
+          | Join_const of 'a
+              (** [Join_const c] takes [x] and returns [join c x]. [c] can be
                   [min] in which case it's the identity modality. *)
         [@@unboxed]
       end
@@ -830,6 +873,7 @@ module type S = sig
 
     type atom = Atom : 'a Axis.t * 'a -> atom
 
+    (** For interfacing with the user only; potentially slow. *)
     module Per_axis : sig
       (** Test if the given modality is the identity modality. *)
       val is_id : 'a Axis.t -> 'a -> bool
@@ -1012,7 +1056,7 @@ module type S = sig
                   ]}
                   The type ['x r] can cross the portability axis. This is
                   represented as
-                  [Modality (Meet_with Portable) : Portability.Const.t t]. *)
+                  [Modality (Meet_const Portable) : Portability.Const.t t]. *)
         [@@unboxed]
       end
 
@@ -1081,6 +1125,7 @@ module type S = sig
       val to_modality : packed -> Modality.Axis.packed
     end
 
+    (** For interfacing with the user only; potentially slow. *)
     module Per_axis :
       Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 

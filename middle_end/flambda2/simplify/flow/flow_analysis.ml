@@ -60,7 +60,12 @@ let analyze ?(speculative = false) ?print_name ~machine_width
           (Continuation_callsite_map.print Continuation.print)
           specialization_map T.Acc.print t;
       (* Accumulator normalization *)
-      let ({ T.Acc.stack; map; extra = _; dummy_toplevel_cont } as t) =
+      let ({ T.Acc.stack;
+             map;
+             extra = _;
+             lifted_constants = _;
+             dummy_toplevel_cont
+           } as t) =
         Flow_acc.normalize_acc ~specialization_map t
       in
       assert (match stack with [] -> true | _ :: _ -> false);

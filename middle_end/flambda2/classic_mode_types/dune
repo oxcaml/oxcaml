@@ -14,6 +14,8 @@
    -open
    Flambda2_numbers
    -open
+   Flambda2_bound_identifiers
+   -open
    Flambda2_term_basics))
  (ocamlopt_flags
   (:standard
@@ -27,4 +29,5 @@
   flambda2_kinds
   flambda2_nominal
   flambda2_numbers
+  flambda2_bound_identifiers
   flambda2_term_basics))

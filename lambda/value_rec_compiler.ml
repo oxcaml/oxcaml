@@ -245,8 +245,7 @@ let compute_static_size lam =
       *)
       assert false
     | Lsplice _ ->
-      (* CR layout poly: Fix this (and split_static_function below). *)
-      Misc.fatal_error "letrec: layout poly not supported"
+      fatal_error_invalid_constructor lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -315,6 +314,9 @@ let compute_static_size lam =
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+        (* CR layout poly: This is no longer known before slambda eval, we
+           should merge Regular_block and Mixed_record (and fix the error
+           produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
          | None -> Block (Regular_block (List.length args))
          | Some arr -> Block (Mixed_record arr))
@@ -777,7 +779,7 @@ let rec split_static_function lfun block_var local_idents lam :
       Printlambda.lfunction lfun
       Printlambda.lambda lam
   | Lsplice _ ->
-    Misc.fatal_error "letrec: layout poly not supported"
+    fatal_error_invalid_constructor lam
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =
@@ -1066,7 +1068,55 @@ let compile_letrec input_bindings body =
   in
   let body_with_pre_allocations =
     List.fold_left (fun body (id, duid, size, _lam) ->
+<<<<<<< HEAD
         let alloc = compile_alloc size in
+||||||| 9790921724
+        let alloc_prim, const_args =
+          match size with
+          | Regular_block size -> alloc_prim, [size]
+          | Float_record size -> alloc_float_record_prim, [size]
+          | Mixed_record shape ->
+              let shape =
+                Mixed_block_shape.of_mixed_block_elements
+                  ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+                  shape
+              in
+              let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
+              let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
+              let size = value_prefix_len + flat_suffix_len in
+              alloc_mixed_record_prim, [size; value_prefix_len]
+        in
+        let alloc =
+          Lprim (Pccall alloc_prim,
+                 List.map Lambda.tagged_immediate const_args,
+                 no_loc)
+        in
+=======
+        let alloc_prim, const_args =
+          match size with
+          | Regular_block size -> alloc_prim, [size]
+          | Float_record size -> alloc_float_record_prim, [size]
+          | Mixed_record shape ->
+            if !Clflags.native_code then
+              let shape =
+                Mixed_block_shape.of_mixed_block_elements
+                  ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+                  shape
+              in
+              let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
+              let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
+              let size = value_prefix_len + flat_suffix_len in
+              alloc_mixed_record_prim, [size; value_prefix_len]
+            else
+              let size = Array.length shape in
+              alloc_mixed_record_prim, [size; size]
+        in
+        let alloc =
+          Lprim (Pccall alloc_prim,
+                 List.map Lambda.tagged_immediate const_args,
+                 no_loc)
+        in
+>>>>>>> 5.2.0minus-37
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))
       body_with_dynamic_values all_bindings_rev.static
   in

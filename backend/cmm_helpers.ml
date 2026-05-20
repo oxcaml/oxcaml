@@ -981,22 +981,35 @@ let rec low_bits ~bits ~dbg x =
       let low_bits = Nativeint.pred (Nativeint.shift_left 1n bits) in
       Nativeint.equal low_bits (Nativeint.logand mask low_bits)
     in
-    (* Ignore sign and zero extensions which do not affect the low bits *)
     map_tail
       (function
         | Cop
             ( (Casr | Clsr),
               [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
-          when 0 <= right && right <= left && left <= unused_bits ->
-          (* these sign-extensions can be replaced with a left shift since we
-             don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          when 0 <= left && 0 <= right && max left right <= unused_bits ->
+          (* Replacing a first left then right shift pattern with a single shift
+             leaves the highest `max left right` bits in a different state. It
+             doesn't matter if we use a logical or arithmetic right shift in the
+             end because the topmost bits are wrong anyway. *)
+          if left >= right
+          then low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          else low_bits ~bits ~dbg (asr_const x (right - left) dbg)
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
             low_bits ~bits x ~dbg
-          | _ -> x))
+          | _ -> (
+            match x with
+            | Cop (((Cand | Cor | Cxor) as op), [x1; x2], dbg) -> (
+              let x1 = low_bits ~bits ~dbg x1 in
+              let x2 = low_bits ~bits ~dbg x2 in
+              match op with
+              | Cand -> and_int x1 x2 dbg
+              | Cor -> or_int x1 x2 dbg
+              | Cxor -> xor_int x1 x2 dbg
+              | _ -> Misc.fatal_error "impossible")
+            | _ -> x)))
       x
 
 let tag_int i dbg =
@@ -2192,7 +2205,7 @@ module Extended_machtype = struct
     | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
     | Pbottom ->
       Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_float Unboxed_float64 -> typ_float
     | Punboxed_float Unboxed_float32 -> typ_float32
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
@@ -4261,6 +4274,16 @@ let make_symbol ?compilation_unit name =
     | None -> Compilation_unit.get_current_exn ()
     | Some compilation_unit -> compilation_unit
   in
+  (* CR sspies: [make_symbol] always uses flat name mangling. Structured
+     mangling can currently only be enabled for functions with a code id. It
+     could, in principle, also be used for other symbols such as module entry
+     points, frame tables, etc. If desired, structured mangling for these can be
+     enabled here BUT this requires additional changes, since other parts of the
+     compiler currently hardcode the symbol names and some symbols should use C
+     linkage names to be referenced from the runtime (e.g., frame tables and GC
+     roots). [make_symbol] is called, for example, for [code_begin], [code_end],
+     [data_begin], [data_end], [entry], [frametable], [gc_roots], and
+     [jump_tables]. *)
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
 

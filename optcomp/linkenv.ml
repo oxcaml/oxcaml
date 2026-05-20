@@ -42,6 +42,7 @@ type error =
   | Linking_error of int
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
+  | Requires_metaprogramming_without_flag of filepath
 
 exception Error of error
 
@@ -279,7 +280,18 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>The file %a@ can only be compiled with a backend with support \
        for metaprogramming@]"
+<<<<<<< HEAD
       Location.Doc.quoted_filename filename
+||||||| 9790921724
+      Location.Doc.filename filename
+=======
+      Location.Doc.filename filename
+  | Requires_metaprogramming_without_flag filename ->
+    fprintf ppf
+      "@[<hov>The library %a@ requires metaprogramming support@ but \
+       -uses-metaprogramming was not passed@]"
+      Location.Doc.filename filename
+>>>>>>> 5.2.0minus-37
 
 let () =
   Location.register_error_of_exn (function

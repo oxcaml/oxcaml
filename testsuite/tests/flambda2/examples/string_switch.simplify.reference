@@ -1,0 +1,64 @@
+let $camlString_switch__immstring9 = "Cow" in
+let $camlString_switch__immstring14 = "Goat" in
+let $camlString_switch__immstring19 = "Horse" in
+let $camlString_switch__immstring24 = "Sheep" in
+let $camlString_switch__immstring30 = "string_switch.ml" in
+let $camlString_switch__const_block32 =
+  Block 0 ($camlString_switch__immstring30, 21, 9)
+in
+let $camlString_switch__Pmakeblock35 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlString_switch__const_block32)
+in
+let code of_string_0 deleted in
+let code loopify(never) size(60) newer_version_of(of_string_0)
+      of_string_0_1 (str : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply ccall noalloc
+    ($`*extern*`.caml_string_notequal : val * val -> val)
+      (str, $camlString_switch__immstring9)
+      -> k2 * k1
+    where k2 (Pccall) =
+      ((let untagged = %untag_imm (Pccall) in
+        switch untagged
+          | 0 -> k (1)
+          | 1 -> k2)
+         where k2 =
+           (apply ccall noalloc
+              ($`*extern*`.caml_string_notequal : val * val -> val)
+                (str, $camlString_switch__immstring14)
+                -> k2 * k1
+              where k2 (Pccall_1) =
+                ((let untagged = %untag_imm (Pccall_1) in
+                  switch untagged
+                    | 0 -> k (2)
+                    | 1 -> k2)
+                   where k2 =
+                     (apply ccall noalloc
+                        ($`*extern*`.caml_string_notequal : val * val -> val)
+                          (str, $camlString_switch__immstring19)
+                          -> k2 * k1
+                        where k2 (Pccall_2) =
+                          ((let untagged = %untag_imm (Pccall_2) in
+                            switch untagged
+                              | 0 -> k (3)
+                              | 1 -> k2)
+                             where k2 =
+                               (apply ccall noalloc
+                                  ($`*extern*`.caml_string_notequal
+                                   : val * val -> val)
+                                    (str, $camlString_switch__immstring24)
+                                    -> k2 * k1
+                                  where k2 (Pccall_3) =
+                                    let untagged = %untag_imm (Pccall_3) in
+                                    switch untagged
+                                      | 0 -> k (0)
+                                      | 1 -> k1
+                                               pop(regular k1)
+                                               ($camlString_switch__Pmakeblock35)))))))
+in
+let $camlString_switch__of_string_1 = closure of_string_0_1 @of_string in
+let $camlString_switch = Block 0 ($camlString_switch__of_string_1) in
+cont done ($camlString_switch)

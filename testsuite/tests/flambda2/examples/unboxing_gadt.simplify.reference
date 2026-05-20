@@ -1,0 +1,46 @@
+let code f_0 deleted in
+let code baz_1 deleted in
+let code loopify(never) size(13) newer_version_of(f_0)
+      f_0_1 (param : [ 0 | 0 of [ 0 of float boxed |1 of imm tagged ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let Pfield = %block_load.[`0`] (param) in
+      cont k (Pfield)
+in
+let $camlUnboxing_gadt__f_2 = closure f_0_1 @f in
+let code loopify(never) size(23) newer_version_of(baz_1)
+      baz_1_1
+        (p : imm tagged,
+         x : [ 0 | 0 of [ 0 of float boxed |1 of imm tagged ] ],
+         z : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of float boxed |1 of imm tagged ] =
+  (let untagged = %untag_imm (p) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      apply direct(f_0_1)
+        ($camlUnboxing_gadt__f_2 : _ -> [ 0 of float boxed |1 of imm tagged ]
+         )
+          (x)
+          -> k2 * k1
+    where k3 =
+      let Pmakeblock = %block.[`1`] (z) in
+      cont k2 (Pmakeblock)
+    where k2 (a : [ 0 of float boxed |1 of imm tagged ]) =
+      let Popaque = %opaque (a) in
+      cont k (Popaque)
+in
+let $camlUnboxing_gadt__baz_3 = closure baz_1_1 @baz in
+let $camlUnboxing_gadt =
+  Block 0 ($camlUnboxing_gadt__f_2, $camlUnboxing_gadt__baz_3)
+in
+cont done ($camlUnboxing_gadt)

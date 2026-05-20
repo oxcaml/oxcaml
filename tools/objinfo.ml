@@ -191,7 +191,13 @@ let print_cmt_infos cmt =
     printf "Compilation flags:";
     Array.iter print_spaced_string cmt.cmt_args;
     printf "\nLoad path:\n  Visible:";
-    List.iter print_spaced_string cmt.cmt_loadpath.visible;
+    List.iter
+      (fun (dir : Clflags.visible_include) ->
+        if dir.cmx_guaranteed then
+          printf " %s(cmx guaranteed)" dir.path
+        else
+          print_spaced_string dir.path)
+      cmt.cmt_loadpath.visible;
     printf "\n  Hidden:";
     List.iter print_spaced_string cmt.cmt_loadpath.hidden;
     printf "\n";

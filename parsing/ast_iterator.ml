@@ -173,6 +173,7 @@ module T = struct
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t
+    | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub
@@ -326,13 +327,29 @@ module MT = struct
     | Pwith_module (lid, lid2) ->
         iter_loc_lid sub lid; iter_loc_lid sub lid2
     | Pwith_modtype (lid, mty) ->
+<<<<<<< HEAD
         iter_loc_lid sub lid; sub.module_type sub mty
+||||||| 9790921724
+        iter_loc sub lid; sub.module_type sub mty
+=======
+        iter_loc sub lid; sub.module_type sub mty
+    | Pwith_jkind (lid, d) ->
+        iter_loc sub lid; sub.jkind_declaration sub d
+>>>>>>> 5.2.0minus-37
     | Pwith_typesubst (lid, d) ->
         iter_loc_lid sub lid; sub.type_declaration sub d
     | Pwith_modsubst (s, lid) ->
         iter_loc_lid sub s; iter_loc_lid sub lid
     | Pwith_modtypesubst (lid, mty) ->
+<<<<<<< HEAD
         iter_loc_lid sub lid; sub.module_type sub mty
+||||||| 9790921724
+        iter_loc sub lid; sub.module_type sub mty
+=======
+        iter_loc sub lid; sub.module_type sub mty
+    | Pwith_jkindsubst (lid, d) ->
+        iter_loc sub lid; sub.jkind_declaration sub d
+>>>>>>> 5.2.0minus-37
 
   let iter_signature_item sub {psig_desc = desc; psig_loc = loc} =
     sub.location sub loc;
@@ -475,8 +492,15 @@ module E = struct
         sub.attributes sub attrs
 
   let iter_block_access sub = function
+<<<<<<< HEAD
     | Baccess_field lid -> iter_loc_lid sub lid
     | Baccess_array (_, _, index) -> sub.expr sub index
+||||||| 9790921724
+    | Baccess_field lid -> iter_loc sub lid
+    | Baccess_array (_, _, index) -> sub.expr sub index
+=======
+    | Baccess_field lid -> iter_loc sub lid
+>>>>>>> 5.2.0minus-37
     | Baccess_block (_, idx) -> sub.expr sub idx
 
   let iter_unboxed_access sub = function
@@ -883,7 +907,9 @@ let default_iterator =
          this.location this pjka_loc;
          match pjka_desc with
          | Pjk_default -> ()
-         | Pjk_abbreviation lid -> iter_loc this lid
+         | Pjk_abbreviation (lid, sa_annot) ->
+           iter_loc this lid;
+           List.iter (iter_loc this) sa_annot
          | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list

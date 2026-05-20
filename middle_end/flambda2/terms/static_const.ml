@@ -674,6 +674,21 @@ let ids_for_export t =
   | Immutable_value_array fields -> ids_for_export_fields fields
   | Empty_array _ -> Ids_for_export.empty
 
+let block_field_kind t i =
+  match t with
+  | Block (_, _, shape, _) ->
+    Flambda_kind.Scannable_block_shape.element_kind shape i
+  | Immutable_value_array _ -> Flambda_kind.value
+  | Set_of_closures _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _
+  | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _
+  | Boxed_vec512 _ | Immutable_float_block _ | Immutable_float_array _
+  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
+  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
+  | Immutable_nativeint_array _ | Immutable_vec128_array _
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
+  | Mutable_string _ | Immutable_string _ ->
+    Misc.fatal_errorf "Unexpected static const %a in [block_field_kind]" print t
+
 let is_block t =
   match t with
   | Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _ | Boxed_int64 _

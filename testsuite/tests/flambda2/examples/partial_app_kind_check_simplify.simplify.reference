@@ -1,0 +1,34 @@
+let code f_1 deleted in
+let code loopify(never) size(7)
+      partial_f_2 (param1)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let f = %project_value_slot.[`partial_f`].[`f`] (my_closure) in
+  apply (f : val * val -> imm tagged) (0, param1) -> k * k1
+in
+let code test_0 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(f_1)
+      f_1_1 (param, param_1)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlPartial_app_kind_check_simplify__f_4 = closure f_1_1 @f in
+let $camlPartial_app_kind_check_simplify__partial_f_5 =
+  closure partial_f_2 @partial_f
+  with { f = $camlPartial_app_kind_check_simplify__f_4 }
+in
+let code loopify(never) size(1) newer_version_of(test_0)
+      test_0_1 (u : imm tagged, a, b)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : int64 =
+  cont k ($camlPartial_app_kind_check_simplify__partial_f_5)
+in
+let $camlPartial_app_kind_check_simplify__test_3 = closure test_0_1 @test in
+let $camlPartial_app_kind_check_simplify =
+  Block 0 ($camlPartial_app_kind_check_simplify__test_3)
+in
+cont done ($camlPartial_app_kind_check_simplify)

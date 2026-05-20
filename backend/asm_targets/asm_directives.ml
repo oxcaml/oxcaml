@@ -727,6 +727,13 @@ let emit (d : Directive.t) =
 let emit_non_masm (d : Directive.t) =
   match TS.assembler () with MASM -> () | MacOS | GAS_like -> emit d
 
+let with_measuring ~f =
+  let saved = !emit_ref in
+  emit_ref := Some (fun _ -> ());
+  let result = f () in
+  emit_ref := saved;
+  result
+
 let align ~fill ~bytes = emit (Align { bytes; fill })
 
 let should_generate_cfi () =

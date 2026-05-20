@@ -105,6 +105,29 @@ let mk_no_cfg_peephole_optimize f =
     Arg.Unit f,
     " Do not apply peephole optimizations to CFG" )
 
+let mk_x86_peephole_optimize f =
+  ("-x86-peephole-optimize", Arg.Unit f, " Apply peephole optimizations to x86")
+
+let mk_no_x86_peephole_optimize f =
+  ( "-no-x86-peephole-optimize",
+    Arg.Unit f,
+    " Do not apply peephole optimizations to x86" )
+
+let mk_no_x86_peephole_remove_mov_to_dead_register f =
+  ( "-no-x86-peephole-remove-mov-to-dead-register",
+    Arg.Unit f,
+    " Disable x86 peephole: remove mov to dead register" )
+
+let mk_no_x86_peephole_remove_redundant_cmp f =
+  ( "-no-x86-peephole-remove-redundant-cmp",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant cmp" )
+
+let mk_no_x86_peephole_combine_add_rsp f =
+  ( "-no-x86-peephole-combine-add-rsp",
+    Arg.Unit f,
+    " Disable x86 peephole: combine adjacent add rsp" )
+
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
 
@@ -168,6 +191,12 @@ let mk_cfg_prologue_shrink_wrap_threshold f =
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be shrink-wrapped" )
 
+let mk_cfg_merge_blocks f =
+  ("-cfg-merge-blocks", Arg.Unit f, " Merge equivalent CFG blocks")
+
+let mk_no_cfg_merge_blocks f =
+  ("-no-cfg-merge-blocks", Arg.Unit f, " Do not merge equivalent CFG blocks")
+
 let mk_cfg_value_propagation f =
   ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
 
@@ -185,6 +214,16 @@ let mk_no_cfg_value_propagation_float f =
   ( "-no-cfg-value-propagation-float",
     Arg.Unit f,
     " Do not propagate float value to simplify CFG" )
+
+let mk_cfg_value_propagation_flow f =
+  ( "-cfg-value-propagation-flow",
+    Arg.Unit f,
+    " Propagate values across block to simplify CFG" )
+
+let mk_no_cfg_value_propagation_flow f =
+  ( "-no-cfg-value-propagation-flow",
+    Arg.Unit f,
+    " Do not propagate values across block to simplify CFG" )
 
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
@@ -638,6 +677,14 @@ let mk_no_reaper_unbox f =
     Printf.sprintf " Disable unboxing in the reaper%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_unbox) )
 
+let mk_reaper_max_unbox_size f =
+  ( "-reaper-max-unbox-size",
+    Arg.Int f,
+    Printf.sprintf
+      " Maximum number of fields unboxed by the reaper for a single block \
+       (default %d) (Flambda2 only)"
+      Flambda2.Default.reaper_max_unbox_size )
+
 let mk_reaper_change_calling_conventions f =
   ( "-reaper-change-calling-conventions",
     Arg.Unit f,
@@ -994,11 +1041,6 @@ let mk_dfexpr_to f =
     Arg.String f,
     "<file> Like -dfexpr but dumps to given file (Flambda 2 only)" )
 
-let mk_dflexpect_to f =
-  ( "-dflexpect-to",
-    Arg.String f,
-    "<file> Combine -drawfexpr and -dfexpr in an .flt file (Flambda 2 only)" )
-
 let mk_dslot_offsets f =
   ("-dslot-offsets", Arg.Unit f, " Dump closure offsets (Flambda 2 only)")
 
@@ -1167,6 +1209,11 @@ module type Oxcaml_options = sig
   val dvectorize : unit -> unit
   val cfg_peephole_optimize : unit -> unit
   val no_cfg_peephole_optimize : unit -> unit
+  val x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
+  val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_combine_add_rsp : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1177,10 +1224,14 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val cfg_merge_blocks : unit -> unit
+  val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
   val no_cfg_value_propagation_float : unit -> unit
+  val cfg_value_propagation_flow : unit -> unit
+  val no_cfg_value_propagation_flow : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1249,6 +1300,7 @@ module type Oxcaml_options = sig
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
   val no_reaper_unbox : unit -> unit
+  val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
@@ -1293,7 +1345,6 @@ module type Oxcaml_options = sig
   val dfexpr : unit -> unit
   val dfexpr_to : string -> unit
   val dfexpr_after : string -> unit
-  val dflexpect_to : string -> unit
   val dfexpr_annot : unit -> unit
   val dfexpr_annot_after : string -> unit
   val dslot_offsets : unit -> unit
@@ -1331,6 +1382,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dvectorize F.dvectorize;
       mk_cfg_peephole_optimize F.cfg_peephole_optimize;
       mk_no_cfg_peephole_optimize F.no_cfg_peephole_optimize;
+      mk_x86_peephole_optimize F.x86_peephole_optimize;
+      mk_no_x86_peephole_optimize F.no_x86_peephole_optimize;
+      mk_no_x86_peephole_remove_mov_to_dead_register
+        F.no_x86_peephole_remove_mov_to_dead_register;
+      mk_no_x86_peephole_remove_redundant_cmp
+        F.no_x86_peephole_remove_redundant_cmp;
+      mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1342,10 +1400,14 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
       mk_no_cfg_prologue_shrink_wrap F.no_cfg_prologue_shrink_wrap;
       mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
+      mk_cfg_merge_blocks F.cfg_merge_blocks;
+      mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
       mk_cfg_value_propagation F.cfg_value_propagation;
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
+      mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
+      mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1422,6 +1484,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_reaper_local_fields F.no_reaper_local_fields;
       mk_reaper_unbox F.reaper_unbox;
       mk_no_reaper_unbox F.no_reaper_unbox;
+      mk_reaper_max_unbox_size F.reaper_max_unbox_size;
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
@@ -1486,7 +1549,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr F.dfexpr;
       mk_dfexpr_to F.dfexpr_to;
       mk_dfexpr_after F.dfexpr_after;
-      mk_dflexpect_to F.dflexpect_to;
       mk_dfexpr_annot F.dfexpr_annot;
       mk_dfexpr_annot_after F.dfexpr_annot_after;
       mk_dslot_offsets F.dslot_offsets;
@@ -1531,6 +1593,18 @@ module Oxcaml_options_impl = struct
   let dvectorize = set' Oxcaml_flags.dump_vectorize
   let cfg_peephole_optimize = set' Oxcaml_flags.cfg_peephole_optimize
   let no_cfg_peephole_optimize = clear' Oxcaml_flags.cfg_peephole_optimize
+  let x86_peephole_optimize = set' Oxcaml_flags.x86_peephole_optimize
+  let no_x86_peephole_optimize = clear' Oxcaml_flags.x86_peephole_optimize
+
+  let no_x86_peephole_remove_mov_to_dead_register =
+    clear' Oxcaml_flags.x86_peephole_remove_mov_to_dead_register
+
+  let no_x86_peephole_remove_redundant_cmp =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_cmp
+
+  let no_x86_peephole_combine_add_rsp =
+    clear' Oxcaml_flags.x86_peephole_combine_add_rsp
+
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
 
@@ -1550,6 +1624,8 @@ module Oxcaml_options_impl = struct
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
   let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
+  let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
+  let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
   let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
 
@@ -1558,6 +1634,11 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_value_propagation_float =
     clear' Oxcaml_flags.cfg_value_propagation_float
+
+  let cfg_value_propagation_flow = set' Oxcaml_flags.cfg_value_propagation_flow
+
+  let no_cfg_value_propagation_flow =
+    clear' Oxcaml_flags.cfg_value_propagation_flow
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -1734,6 +1815,9 @@ module Oxcaml_options_impl = struct
   let reaper_unbox = set Flambda2.reaper_unbox
   let no_reaper_unbox = clear Flambda2.reaper_unbox
 
+  let reaper_max_unbox_size size =
+    Flambda2.reaper_max_unbox_size := Oxcaml_flags.Set size
+
   let reaper_change_calling_conventions =
     set Flambda2.reaper_change_calling_conventions
 
@@ -1877,7 +1961,6 @@ module Oxcaml_options_impl = struct
     Flambda2.Dump.fexpr_after := Flambda2.Dump.This_pass pass
 
   let dfexpr_to file = Flambda2.Dump.fexpr := Flambda2.Dump.File file
-  let dflexpect_to file = Flambda2.Dump.flexpect := Flambda2.Dump.File file
   let dfexpr_annot () = Flambda2.Dump.fexpr_annot := true
 
   let dfexpr_annot_after pass =
@@ -2068,14 +2151,18 @@ module Extra_params = struct
     | "vectorize-max-block-size" ->
         set_int' Oxcaml_flags.vectorize_max_block_size
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
+    | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
+    | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float
+    | "cfg-value-propagation-flow" ->
+        set' Oxcaml_flags.cfg_value_propagation_flow
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges

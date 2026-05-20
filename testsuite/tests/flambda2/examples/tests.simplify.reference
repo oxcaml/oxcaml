@@ -1,0 +1,33 @@
+let code to_inline_0 deleted in
+let code f_1 deleted in
+let code inline(always) loopify(never) size(1) newer_version_of(to_inline_0)
+      to_inline_0_1 (_x, _y)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (42)
+in
+let $camlTests__to_inline_2 = closure to_inline_0_1 @to_inline in
+let code loopify(never) size(22) newer_version_of(f_1)
+      f_1_1
+        (c : imm tagged,
+         m : [ 0 | 0 of val ],
+         n : [ 0 | 0 of val ],
+         x' : imm tagged,
+         y' : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_int (m) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let prim_1 = %is_int (n) in
+      switch prim_1
+        | 0 -> k (42)
+        | 1 -> k (1)
+in
+let $camlTests__f_3 = closure f_1_1 @f in
+let $camlTests = Block 0 ($camlTests__to_inline_2, $camlTests__f_3) in
+cont done ($camlTests)

@@ -142,4 +142,6 @@ val use_runtime : Variables.t
 
 val fexpr_dump_files : Variables.t
 
+val fexpr_reference_suffix : Variables.t
+
 val init : unit -> unit

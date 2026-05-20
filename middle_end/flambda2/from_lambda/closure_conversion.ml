@@ -368,12 +368,13 @@ module Inlining = struct
       assert false
     | Some (Closure_approximation { code; _ }) ->
       let metadata = Code_or_metadata.code_metadata code in
-      let fun_params_length =
-        Code_metadata.params_arity metadata |> Flambda_arity.num_params
-      in
+      (* CR-someday mshinwell/bclement: we should handle tupled functions
+         correctly here rather than bailing out. (Tupled functions have detupled
+         params in the code metadata but the apply has a single tuple
+         argument) *)
       if
         (not (Code_or_metadata.code_present code))
-        || fun_params_length > List.length (Apply_expr.args apply)
+        || Code_metadata.is_tupled metadata
       then (
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
@@ -381,6 +382,21 @@ module Inlining = struct
           ~are_rebuilding_terms Definition_says_not_to_inline;
         Not_inlinable)
       else
+        (* These calculations are all in terms of non-unarized parameters. *)
+        let params_length_from_code_metadata =
+          Code_metadata.params_arity metadata |> Flambda_arity.num_params
+        in
+        let params_length_from_args =
+          Flambda_arity.num_params (Apply_expr.args_arity apply)
+        in
+        if params_length_from_code_metadata <> params_length_from_args
+        then
+          Misc.fatal_errorf
+            "Closure_conversion: inlinable function has %d (complex) params \
+             but application has %d (complex) args, despite earlier \
+             determination this was an exact application:@ %a"
+            params_length_from_code_metadata params_length_from_args
+            Apply_expr.print apply;
         let code = Code_or_metadata.get_code code in
         let inlined_call = Apply_expr.inlined apply in
         let decision, res =
@@ -404,10 +420,9 @@ module Inlining = struct
         res
 
   let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
-      ~args ~my_closure ~my_region ~my_ghost_region ~my_depth ~body
-      ~free_names_of_body ~exn_continuation ~return_continuation
-      ~apply_exn_continuation ~apply_return_continuation ~apply_depth ~apply_dbg
-      =
+      ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
+      ~exn_continuation ~return_continuation ~apply_exn_continuation
+      ~apply_return_continuation ~apply_depth ~apply_dbg =
     let my_depth_duid = Flambda_debug_uid.none in
     let my_closure_duid = Flambda_debug_uid.none in
     let rec_info =
@@ -444,9 +459,9 @@ module Inlining = struct
       Inlining_helpers.make_inlined_body ~callee ~called_code_id
         ~region_inlined_into ~params ~args
         ~my_closure:(my_closure, my_closure_duid)
-        ~my_region ~my_ghost_region ~my_depth ~rec_info ~body:(acc, body)
-        ~exn_continuation ~return_continuation ~apply_exn_continuation
-        ~apply_return_continuation ~bind_params ~bind_depth ~apply_renaming
+        ~my_alloc_mode ~my_depth ~rec_info ~body:(acc, body) ~exn_continuation
+        ~return_continuation ~apply_exn_continuation ~apply_return_continuation
+        ~bind_params ~bind_depth ~apply_renaming
     in
     let inlined_debuginfo =
       Inlined_debuginfo.create ~called_code_id ~apply_dbg
@@ -504,8 +519,7 @@ module Inlining = struct
           ~body
           ~my_closure
           ~is_my_closure_used:_
-          ~my_region
-          ~my_ghost_region
+          ~my_alloc_mode
           ~my_depth
           ~free_names_of_body
         ->
@@ -520,9 +534,8 @@ module Inlining = struct
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
             ~region_inlined_into
             ~params:(Bound_parameters.vars_and_uids params)
-            ~args ~my_closure ~my_region ~my_ghost_region ~my_depth ~body
-            ~free_names_of_body ~exn_continuation ~return_continuation
-            ~apply_depth ~apply_dbg
+            ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
+            ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
         in
         let acc = Acc.with_free_names Name_occurrences.empty acc in
         let acc = Acc.increment_metrics cost_metrics acc in
@@ -553,7 +566,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
   | Base base -> (
     match base with
     | Void -> []
-    | Value ->
+    | Scannable ->
       [{ kind = K.value; arg_transformer = None; return_transformer = None }]
     | Float64 ->
       [ { kind = K.naked_float;
@@ -611,6 +624,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           return_transformer = None
         } ])
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
+  | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
 let unarize_extern_repr ~machine_width alloc_mode
@@ -627,6 +641,8 @@ let unarize_extern_repr ~machine_width alloc_mode
     [{ kind; arg_transformer = None; return_transformer = None }]
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "unarize_extern_repr: unexpected univar"
+  | Same_as_ocaml_repr (Genvar _) ->
+    Misc.fatal_error "unarize_extern_repr: unexpected genvar"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
   | Unboxed_float Boxed_float64 ->
@@ -1165,7 +1181,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     in
     close_c_call acc env ~loc ~let_bound_ids_with_kinds prim ~args
       exn_continuation dbg ~current_region ~current_ghost_region k
-  | Pgetglobal cu, [] ->
+  | Pgetglobal (cu, _), [] ->
     if Compilation_unit.equal cu (Env.current_unit env)
     then
       Misc.fatal_errorf_doc "Pgetglobal %a in the same unit"
@@ -1201,8 +1217,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
           (* There should not be any way to reach this from Ocaml code. *)
           Misc.fatal_error
             "Non-zero tag on empty block allocation in [Closure_conversion]"
-        else begin
-          if Lambda.is_uniform_block_shape shape
+        else
+          begin if Lambda.is_uniform_block_shape shape
           then
             register_const0 acc
               (Static_const.block Tag.Scannable.zero Immutable Value_only [])
@@ -1210,7 +1226,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
           else
             Misc.fatal_error
               "Unexpected empty mixed block in [Closure_conversion]"
-        end
+          end
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
@@ -2415,10 +2431,15 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     | None -> make_body return_continuation
     | Some k -> make_return_wrapper (boxing_primitive k alloc_mode)
   in
+  let my_alloc_mode =
+    Alloc_mode.For_applications.from_lambda
+      (Function_decl.result_mode decl)
+      ~current_region:my_region ~current_ghost_region:my_ghost_region
+  in
   let wrapper_params_and_body =
     Function_params_and_body.create ~return_continuation ~exn_continuation
       params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
-      ~my_region ~my_ghost_region ~my_depth
+      ~my_alloc_mode ~my_depth
   in
   let free_names_of_params_and_body =
     Name_occurrences.remove_continuation ~continuation:return_continuation
@@ -2624,25 +2645,26 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         env)
       unarized_params closure_env
   in
-  let closure_env, my_region =
-    match my_region with
-    | None -> closure_env, None
-    | Some my_region ->
+  let closure_env, my_region, my_ghost_region, my_alloc_mode =
+    match my_region, my_ghost_region with
+    | None, None -> closure_env, None, None, Alloc_mode.For_applications.heap
+    | Some _, None | None, Some _ ->
+      Misc.fatal_errorf
+        "In [close_one_function], only one of [my_region] and \
+         [my_ghost_region] is local"
+    | Some my_region, Some my_ghost_region ->
       let env, region =
         Env.add_var_like closure_env my_region Not_user_visible
           K.With_subkind.region
       in
-      env, Some region
-  in
-  let closure_env, my_ghost_region =
-    match my_ghost_region with
-    | None -> closure_env, None
-    | Some my_ghost_region ->
-      let env, region =
-        Env.add_var_like closure_env my_ghost_region Not_user_visible
+      let env, ghost_region =
+        Env.add_var_like env my_ghost_region Not_user_visible
           K.With_subkind.region
       in
-      env, Some region
+      ( env,
+        Some region,
+        Some ghost_region,
+        Alloc_mode.For_applications.local ~region ~ghost_region )
   in
   let closure_env = Env.with_depth closure_env my_depth in
   let closure_env, absolute_history, relative_history =
@@ -2785,8 +2807,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-      main_code_unarized_params ~body ~my_closure ~my_region ~my_ghost_region
-      ~my_depth ~free_names_of_body:(Known free_names_of_body)
+      main_code_unarized_params ~body ~my_closure ~my_alloc_mode ~my_depth
+      ~free_names_of_body:(Known free_names_of_body)
   in
   let result_mode = Function_decl.result_mode decl in
   (match my_region with

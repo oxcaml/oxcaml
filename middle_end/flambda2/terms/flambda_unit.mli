@@ -45,3 +45,5 @@ val used_value_slots : t -> Value_slot.Set.t Or_unknown.t
 val with_used_value_slots : t -> Value_slot.Set.t -> t
 
 val body : t -> Flambda.Expr.t
+
+val with_body : t -> Flambda.Expr.t -> t

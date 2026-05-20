@@ -186,10 +186,20 @@ let anonymous f =
 
 module Options = Main_args.Make_ocamldoc_options(struct
     include Main_args.Default.Odoc_args
-    let _I s = Odoc_global.include_dirs := s :: !Odoc_global.include_dirs
-    let _H s = Odoc_global.hidden_include_dirs := s :: !Odoc_global.hidden_include_dirs
-    let _impl s = Odoc_global.files := !Odoc_global.files @ [Odoc_global.Impl_file s]
-    let _intf s = Odoc_global.files := !Odoc_global.files @ [Odoc_global.Intf_file s]
+    let _I s =
+      Odoc_global.include_dirs :=
+        { Clflags.path = s; cmx_guaranteed = false }
+        :: !Odoc_global.include_dirs
+    let _Ix s =
+      Odoc_global.include_dirs :=
+        { Clflags.path = s; cmx_guaranteed = true }
+        :: !Odoc_global.include_dirs
+    let _H s =
+      Odoc_global.hidden_include_dirs := s :: !Odoc_global.hidden_include_dirs
+    let _impl s =
+      Odoc_global.files := !Odoc_global.files @ [Odoc_global.Impl_file s]
+    let _intf s =
+      Odoc_global.files := !Odoc_global.files @ [Odoc_global.Intf_file s]
 end)
 
 (** The default option list *)

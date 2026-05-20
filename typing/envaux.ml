@@ -85,9 +85,9 @@ let rec env_from_summary ~allow_missing_modules sum subst =
             ~arg:true (env_from_summary ~allow_missing_modules s subst)
       | Env_functor_arg _ -> assert false
       | Env_constraints(s, map) ->
-          Path.Map.fold
-            (fun path info ->
-              Env.add_local_constraint (Subst.type_path subst path)
+          StagedPath.Map.fold
+            (fun { stage; path } info ->
+              Env.add_local_constraint ~stage (Subst.type_path subst path)
                 (Subst.type_declaration subst info))
             map (env_from_summary ~allow_missing_modules s subst)
       | Env_copy_types s ->

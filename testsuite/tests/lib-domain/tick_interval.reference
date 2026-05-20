@@ -1,0 +1,28 @@
+Single domain:
+Global (effective) interval: none(expected none)
+acquiring tick at 100μs
+Global (effective) interval: 100 μs(expected 100 μs)
+acquiring tick at 50μs
+Global (effective) interval: 50 μs(expected 50 μs)
+acquiring second tick at 100μs
+Global (effective) interval: 50 μs(expected 50 μs)
+Releasing 50μs tick
+Global (effective) interval: 100 μs(expected 100 μs)
+releasing 100μs tick
+Global (effective) interval: 100 μs(expected 100 μs)
+releasing 100μs tick
+Global (effective) interval: none(expected none)
+
+Multi domain:
+Main acquired 200μs
+Global (effective) interval: 200 μs(expected 200 μs)
+Child acquired 100μs
+Global (effective) interval: 100 μs(expected 100 μs)
+Child also acquired 50μs
+Global (effective) interval: 50 μs(expected 50 μs)
+Child released 50μs
+Global (effective) interval: 100 μs(expected 100 μs)
+Child released 100μs
+Global (effective) interval: 200 μs(expected 200 μs)
+Main released 200μs
+Global (effective) interval: none(expected none)

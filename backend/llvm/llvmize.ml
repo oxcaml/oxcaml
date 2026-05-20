@@ -1303,7 +1303,8 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     store_into_reg t i.res.(0) domain_id
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
-  | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
+  | Spill | Reload | Dummy_use ->
+    not_implemented_basic ~msg:"spill / reload / dummy_use" i
   | Probe_is_enabled _ | Name_for_debugger _ -> not_implemented_basic i
 
 let emit_basic t (i : Cfg.basic Cfg.instruction) =

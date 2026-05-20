@@ -253,3 +253,7 @@ val map_specialization_cost :
 val specialization_cost : t -> Specialization_cost.t
 
 val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
+
+val has_seen_a_non_liftable_continuation : t -> bool
+
+val set_has_seen_a_non_liftable_continuation : t -> t

@@ -192,14 +192,14 @@ let () =
   Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
   unsafe_set_ptr #(r, (.u.#s)) "b";
   unsafe_set_ptr #(r, (.u.#f)) #2.;
-  Idx_mut.unsafe_set r (.u.#v) (void ());
+  Idx_mut.set r (.u.#v) (void ());
   let s = unsafe_get_ptr #(r, (.u.#s)) in
   let f = unsafe_get_ptr #(r, (.u.#f)) in
   let v = unsafe_get_ptr #(r, (.u.#v)) in
   Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
   unsafe_set_ptr #(r, (.idx_mut((.u)).#s)) "c";
   unsafe_set_ptr #(r, (.idx_mut((.u)).#f)) #3.;
-  Idx_mut.unsafe_set r (.idx_mut((.u)).#v) (void ());
+  Idx_mut.set r (.idx_mut((.u)).#v) (void ());
   let s = unsafe_get_ptr #(r, (.idx_mut((.u)).#s)) in
   let f = unsafe_get_ptr #(r, (.idx_mut((.u)).#f)) in
   let v = unsafe_get_ptr #(r, (.idx_mut((.u)).#v)) in
@@ -227,11 +227,11 @@ let () =
   let t = { b = #{ i = #1L; a = #{ s = "a"; i = #2L }; s = "b" }; s = "c" } in
   print_t_b t;
   let idx = (.b) in
-  Idx_mut.unsafe_set t idx
+  Idx_mut.set t idx
     #{ i = #10L; a = #{ s = "aa"; i = #20L }; s = "bb"};
   print_t_b t;
   let deeper_idx = (.idx_mut(idx).#a) in
-  Idx_mut.unsafe_set t deeper_idx #{ s = "aaa"; i = #200L };
+  Idx_mut.set t deeper_idx #{ s = "aaa"; i = #200L };
   print_t_b t;
   print_newline ();
   ()
@@ -255,13 +255,13 @@ let () =
   let idx_is = (.idx_mut((.inner)).#is) in
   let #{ i; j } = unsafe_get_ptr #(r, idx_is) in
   Printf.printf "will incr: %d %d\n" i j;
-  Idx_mut.unsafe_set r (.idx_mut((.inner)).#is) #{ i = 2; j = 22 };
+  Idx_mut.set r (.idx_mut((.inner)).#is) #{ i = 2; j = 22 };
   print_outer "" r;
   print_endline "\nDeepen mixed product to flats (continues above)";
   let idx_fs = (.idx_mut((.inner)).#fs) in
   let #{ f; g } = unsafe_get_ptr #(r, idx_fs) in
   Printf.printf "will incr: %f %f\n" (Float_u.to_float f) (Float_u.to_float g);
-  Idx_mut.unsafe_set r (.idx_mut((.inner)).#fs) #{ f = #2.0; g = #22.0 };
+  Idx_mut.set r (.idx_mut((.inner)).#fs) #{ f = #2.0; g = #22.0 };
   print_outer "" r;
   print_endline "\nDeepen values to values (continues above)";
   let idx_j = (.idx_mut(idx_is).#j) in
@@ -284,14 +284,14 @@ let () =
     set a i (Float32_u.of_float (Float_u.of_int i))
   done;
   for i = 0 to 9 do
-    let idx : (_, float32#) idx_mut = (.(i)) in
+    let idx : (_, float32#) idx_mut = Idx_mut.unsafe_create_into_array i in
     let x = unsafe_get_ptr #(a, idx) in
     Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float x))
   done;
   print_endline "\nWriting to a float32# array";
   for i = 0 to 9 do
-    let idx : (_, float32#) idx_mut = (.(i)) in
-    Idx_mut.unsafe_set a idx (Float32_u.of_float (Float_u.of_int (i + 10)))
+    let idx : (_, float32#) idx_mut = Idx_mut.unsafe_create_into_array i in
+    Idx_mut.set a idx (Float32_u.of_float (Float_u.of_int (i + 10)))
   done;
   for i = 0 to 9 do
     Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float (get a i)))
@@ -301,17 +301,17 @@ let () =
 let () =
   print_endline "Reads of all index types from string array";
   let a = Array.init 10 (fun x -> Int.to_string x) in
-  let s = unsafe_get_ptr #(a, (.(3))) in
+  let s = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array 3) in
   print_endline s;
-  let s = unsafe_get_ptr #(a, (.L(#3L))) in
+  let s = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L) in
   print_endline s;
-  let s = unsafe_get_ptr #(a, (.l(#3l))) in
+  let s = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l) in
   print_endline s;
-  let s = unsafe_get_ptr #(a, (.S(#3S))) in
+  let s = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S) in
   print_endline s;
-  let s = unsafe_get_ptr #(a, (.s(#3s))) in
+  let s = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s) in
   print_endline s;
-  let s = unsafe_get_ptr #(a, (.n(#3n))) in
+  let s = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n) in
   print_endline s;
   print_newline ()
 
@@ -323,29 +323,29 @@ let () =
   for i = 0 to 9 do
     set a i #{ i = i; j = i * 11 }
   done;
-  let #{ i; j } = unsafe_get_ptr #(a, (.(3))) in
-  let i2 = unsafe_get_ptr #(a, (.(3).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.(3).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array 3) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array 3).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array 3).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = unsafe_get_ptr #(a, (.L(#3L))) in
-  let i2 = unsafe_get_ptr #(a, (.L(#3L).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.L(#3L).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = unsafe_get_ptr #(a, (.l(#3l))) in
-  let i2 = unsafe_get_ptr #(a, (.l(#3l).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.l(#3l).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = unsafe_get_ptr #(a, (.S(#3S))) in
-  let i2 = unsafe_get_ptr #(a, (.S(#3S).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.S(#3S).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = unsafe_get_ptr #(a, (.s(#3s))) in
-  let i2 = unsafe_get_ptr #(a, (.s(#3s).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.s(#3s).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = unsafe_get_ptr #(a, (.n(#3n))) in
-  let i2 = unsafe_get_ptr #(a, (.n(#3n).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.n(#3n).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
   print_newline ()
 
@@ -358,39 +358,39 @@ let () =
     let f = Float_u.of_int i in
     set a i #{ i = f; j = Float_u.mul f #11. }
   done;
-  let #{ i; j } = unsafe_get_ptr #(a, (.(3))) in
-  let i2 = unsafe_get_ptr #(a, (.(3).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.(3).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array 3) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array 3).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array 3).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.L(#3L))) in
-  let i2 = unsafe_get_ptr #(a, (.L(#3L).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.L(#3L).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.l(#3l))) in
-  let i2 = unsafe_get_ptr #(a, (.l(#3l).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.l(#3l).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.S(#3S))) in
-  let i2 = unsafe_get_ptr #(a, (.S(#3S).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.S(#3S).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.s(#3s))) in
-  let i2 = unsafe_get_ptr #(a, (.s(#3s).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.s(#3s).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.n(#3n))) in
-  let i2 = unsafe_get_ptr #(a, (.n(#3n).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.n(#3n).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
@@ -403,39 +403,39 @@ let () =
     let f = Float_u.of_int i in
     set a i #{ i = f; j = Float_u.mul f #11. }
   done;
-  let #{ i; j } = unsafe_get_ptr #(a, (.(3))) in
-  let i2 = unsafe_get_ptr #(a, (.(3).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.(3).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array 3) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array 3).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array 3).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.L(#3L))) in
-  let i2 = unsafe_get_ptr #(a, (.L(#3L).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.L(#3L).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int64 #3L).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.l(#3l))) in
-  let i2 = unsafe_get_ptr #(a, (.l(#3l).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.l(#3l).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int32 #3l).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.S(#3S))) in
-  let i2 = unsafe_get_ptr #(a, (.S(#3S).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.S(#3S).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int16 #3S).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.s(#3s))) in
-  let i2 = unsafe_get_ptr #(a, (.s(#3s).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.s(#3s).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_int8 #3s).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = unsafe_get_ptr #(a, (.n(#3n))) in
-  let i2 = unsafe_get_ptr #(a, (.n(#3n).#i)) in
-  let j2 = unsafe_get_ptr #(a, (.n(#3n).#j)) in
+  let #{ i; j } = unsafe_get_ptr #(a, Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n) in
+  let i2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.idx_mut(Idx_mut.unsafe_create_into_array_indexed_by_nativeint #3n).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);

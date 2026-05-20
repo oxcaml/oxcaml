@@ -206,7 +206,6 @@ let iter_on_occurrences
   let iter_block_access exp_env = function
     | Baccess_field (lid, label_desc) ->
       add_label ~namespace:Label exp_env lid label_desc
-    | Baccess_array _ -> ()
     | Baccess_block _ -> ()
   in
   let iter_unboxed_access exp_env = function
@@ -223,7 +222,7 @@ let iter_on_occurrences
 
   expr = (fun sub ({ exp_desc; exp_env; _ } as e) ->
       (match exp_desc with
-      | Texp_ident (path, lid, _, _, _, _) ->
+      | Texp_ident { path; lid; _ } ->
           f ~namespace:Value exp_env path lid
       | Texp_construct (lid, constr_desc, _, _) ->
           add_constructor_description exp_env lid constr_desc
@@ -256,6 +255,7 @@ let iter_on_occurrences
             modifs
       | Texp_extension_constructor (lid, path) ->
           f ~namespace:Extension_constructor exp_env path lid
+      | Texp_apply_layout _
       | Texp_constant _ | Texp_let _ | Texp_letmutable _ | Texp_function _
       | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_unboxed_unit
       | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _
@@ -268,8 +268,7 @@ let iter_on_occurrences
       (* CR-someday let_mutable: maybe iterate on mutvar? *)
       | Texp_mutvar _ | Texp_setmutvar _
       | Texp_open _ | Texp_src_pos | Texp_overwrite _
-      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _
-      | Texp_eval _ -> ());
+      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are
@@ -291,7 +290,7 @@ let iter_on_occurrences
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos
-      | Ttyp_repr _ -> ());
+      | Ttyp_repr _ | Ttyp_newlayout _ -> ());
       default_iterator.typ sub ct);
 
   pat =
@@ -304,8 +303,17 @@ let iter_on_occurrences
         iter_field_pats ~namespace:Label pat_env fields
       | Tpat_record_unboxed_product (fields, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
+<<<<<<< HEAD
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _
+||||||| 9790921724
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
+      | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+=======
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
+      | Tpat_fun_layout _
+      | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+>>>>>>> 5.2.0minus-37
       | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _ | Tpat_lazy _
       | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
       List.iter  (fun (pat_extra, _, _) ->

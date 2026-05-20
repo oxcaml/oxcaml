@@ -41,6 +41,8 @@ module Datalog : sig
         that is part of a schema. *)
     type ('t, 'k, 'v) id
 
+    val singleton : ('t, 'k, 'v) id -> 'k -> 'v -> 't
+
     type (_, _, _) hlist =
       | [] : ('v, nil, 'v) hlist
       | ( :: ) :
@@ -108,10 +110,10 @@ module Datalog : sig
       to distinguish some sort of {e marked} nodes.
 
       {[
-        let marked_pred : node rel1 = create_relation ~name:"marked" [node]
+      let marked_pred : node rel1 = create_relation ~name:"marked" [node]
 
-        let edge_rel : (node, node) rel2 =
-          create_relation ~name:"edge" [node; node]
+      let edge_rel : (node, node) rel2 =
+        create_relation ~name:"edge" [node; node]
       ]} *)
   val create_relation :
     ?provenance:bool ->
@@ -161,9 +163,9 @@ module Datalog : sig
       {b Example}
 
       {[
-        let marked = atom marked_pred
+      let marked = atom marked_pred
 
-        let edge = atom edge_rel
+      let edge = atom edge_rel
       ]} *)
   val atom : ('t, 'k) relation -> 'k Term.hlist -> [> `Atom of atom]
 
@@ -193,24 +195,24 @@ module Datalog : sig
       marked node [n1].
 
       {[
-        let n1 = Node.make ()
+      let n1 = Node.make ()
 
-        let n2 = Node.make ()
+      let n2 = Node.make ()
 
-        let n3 = Node.make ()
+      let n3 = Node.make ()
 
-        let n4 = Node.make ()
+      let n4 = Node.make ()
 
-        let n5 = Node.make ()
+      let n5 = Node.make ()
 
-        let db =
-          add_fact marked_pred [n1]
-          @@ add_fact edge_rel [n1; n2]
-          @@ add_fact edge_rel [n3; n2]
-          @@ add_fact edge_rel [n2; n5]
-          @@ add_fact edge_rel [n5; n4]
-          @@ add_fact edge_rel [n4; n2]
-          @@ empty
+      let db =
+        add_fact marked_pred [n1]
+        @@ add_fact edge_rel [n1; n2]
+        @@ add_fact edge_rel [n3; n2]
+        @@ add_fact edge_rel [n2; n5]
+        @@ add_fact edge_rel [n5; n4]
+        @@ add_fact edge_rel [n4; n2]
+        @@ empty
       ]} *)
   val add_fact : ('t, 'k) relation -> 'k Constant.hlist -> database -> database
 
@@ -299,10 +301,10 @@ module Datalog : sig
         ([edge_cursor]), respectively.
 
         {[
-          let marked_cursor = Cursor.create ["X"] (fun [x] -> [marked [x]])
+        let marked_cursor = Cursor.create ["X"] (fun [x] -> [marked [x]])
 
-          let edge_cursor =
-            Cursor.create ["src"; "dst"] (fun [src; dst] -> [edge [src; dst]])
+        let edge_cursor =
+          Cursor.create ["src"; "dst"] (fun [src; dst] -> [edge [src; dst]])
         ]} *)
     val create : 'v String.hlist -> ('v Term.hlist -> hypothesis list) -> 'v t
 
@@ -331,13 +333,13 @@ module Datalog : sig
         its successor map.
 
         {[
-          let successor_cursor =
-            Cursor.create_with_parameters ~parameters:["P"] ["X"]
-              (fun [p] [x] -> [edge [p; x]])
+        let successor_cursor =
+          Cursor.create_with_parameters ~parameters:["P"] ["X"] (fun [p] [x] ->
+              [edge [p; x]])
 
-          let predecessor_cursor =
-            Cursor.create_with_parameters ~parameters:["P"] ["X"]
-              (fun [p] [x] -> [edge [x; p]])
+        let predecessor_cursor =
+          Cursor.create_with_parameters ~parameters:["P"] ["X"] (fun [p] [x] ->
+              [edge [x; p]])
         ]} *)
     val create_with_parameters :
       parameters:'p String.hlist ->
@@ -356,9 +358,9 @@ module Datalog : sig
         target to source).
 
         {[
-          let reverse_edges =
-            Cursor.fold edge_cursor db ~init:[] ~f:(fun [src; dst] acc ->
-                (dst, src) :: acc)
+        let reverse_edges =
+          Cursor.fold edge_cursor db ~init:[] ~f:(fun [src; dst] acc ->
+              (dst, src) :: acc)
         ]} *)
     val fold :
       'v t -> database -> init:'a -> f:('v Constant.hlist -> 'a -> 'a) -> 'a
@@ -373,11 +375,11 @@ module Datalog : sig
         The following code prints all the marked nodes.
 
         {[
-          let () =
-            Format.eprintf "@[<v 2>Marked nodes:@ ";
-            Cursor.iter marked_cursor db ~f:(fun [n] ->
-                Format.eprintf "- %a@ " Node.print n);
-            Format.eprintf "@]@."
+        let () =
+          Format.eprintf "@[<v 2>Marked nodes:@ ";
+          Cursor.iter marked_cursor db ~f:(fun [n] ->
+              Format.eprintf "- %a@ " Node.print n);
+          Format.eprintf "@]@."
         ]} *)
     val iter : 'v t -> database -> f:('v Constant.hlist -> unit) -> unit
 
@@ -392,9 +394,9 @@ module Datalog : sig
         The following code accumulates the successors of node [n2] in a list.
 
         {[
-          let successors =
-            Cursor.fold_with_parameters successor_cursor [n2] db ~init:[]
-              ~f:(fun [n] acc -> n :: acc)
+        let successors =
+          Cursor.fold_with_parameters successor_cursor [n2] db ~init:[]
+            ~f:(fun [n] acc -> n :: acc)
         ]} *)
     val fold_with_parameters :
       ('p, 'v) with_parameters ->
@@ -415,11 +417,11 @@ module Datalog : sig
         The following code prints the predecessors of node [n2].
 
         {[
-          let () =
-            Format.eprintf "@[<v 2>Predecessors of %a:@ " Node.print n2;
-            Cursor.iter_with_parameters predecessor_cursor [n2] db
-              ~f:(fun [n] -> Format.eprintf "- %a@ " Node.print n);
-            Format.eprintf "@]@."
+        let () =
+          Format.eprintf "@[<v 2>Predecessors of %a:@ " Node.print n2;
+          Cursor.iter_with_parameters predecessor_cursor [n2] db ~f:(fun [n] ->
+              Format.eprintf "- %a@ " Node.print n);
+          Format.eprintf "@]@."
         ]} *)
     val iter_with_parameters :
       ('p, 'v) with_parameters ->

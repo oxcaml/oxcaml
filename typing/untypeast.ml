@@ -341,7 +341,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
     | { pat_extra=[Tpat_unpack, _, _attrs];
-        pat_desc = Tpat_var (_,name, _, _, _); _ } ->
+        pat_desc = Tpat_var { name; _ }; _ } ->
         Ppat_unpack { name with txt = Some name.txt }
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
@@ -354,7 +354,13 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
+<<<<<<< HEAD
     | Tpat_var (id, name, _, _, _) ->
+||||||| 9790921724
+    | Tpat_var (id, name,_,_,_) ->
+=======
+    | Tpat_var { id; name; _ } ->
+>>>>>>> 5.2.0minus-37
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -367,11 +373,26 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        The compiler transforms (x:t) into (_ as x : t).
        This avoids transforming a warning 27 into a 26.
      *)
+<<<<<<< HEAD
     | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _, _, _ty)
+||||||| 9790921724
+    | Tpat_alias
+      ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
+=======
+    | Tpat_alias
+      { pattern = {pat_desc = Tpat_any; pat_loc};
+        name; _ }
+>>>>>>> 5.2.0minus-37
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
+<<<<<<< HEAD
     | Tpat_alias (pat, _id, name, _, _, _, _ty) ->
+||||||| 9790921724
+    | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
+=======
+    | Tpat_alias { pattern = pat; name; _ } ->
+>>>>>>> 5.2.0minus-37
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
@@ -424,6 +445,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
     | Tpat_value p -> (sub.pat sub (p :> pattern)).ppat_desc
     | Tpat_or (p1, p2, _) -> Ppat_or (sub.pat sub p1, sub.pat sub p2)
+    | Tpat_fun_layout { id; name; _ } ->
+        Ppat_var { name with txt = Ident.name id }
   in
   Pat.mk ~loc ~attrs desc
 
@@ -479,10 +502,6 @@ let value_binding sub vb =
 let block_access sub : block_access -> Parsetree.block_access = function
   | Baccess_field (lid, _) ->
     Baccess_field (map_loc sub lid)
-  | Baccess_array
-      { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort = _ } ->
-    let index = sub.expr sub index in
-    Baccess_array (mut, index_kind, index)
   | Baccess_block (mut, idx) ->
     Baccess_block (mut, sub.expr sub idx)
 
@@ -533,7 +552,8 @@ let expression sub exp =
   let attrs = sub.attributes sub exp.exp_attributes in
   let desc =
     match exp.exp_desc with
-      Texp_ident (_path, lid, _, _, _, _) -> Pexp_ident (map_loc sub lid)
+      Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
+    | Texp_apply_layout (exp, _) -> (sub.expr sub exp).pexp_desc
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
         Pexp_let (Immutable, rec_flag,
@@ -829,8 +849,6 @@ let expression sub exp =
     | Texp_hole _ -> Pexp_hole
     | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
     | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
-    | Texp_eval (typ, _) ->
-        Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
@@ -981,6 +999,8 @@ let with_constraint sub (_path, lid, cstr) =
   | Twith_modtype mty ->
       let mty = sub.module_type sub mty in
       Pwith_modtype (map_loc sub lid,mty)
+  | Twith_jkind jd ->
+      Pwith_jkind (map_loc sub lid, sub.jkind_declaration sub jd)
   | Twith_typesubst decl ->
      Pwith_typesubst (map_loc sub lid, sub.type_declaration sub decl)
   | Twith_modsubst (_path, lid2) ->
@@ -988,6 +1008,8 @@ let with_constraint sub (_path, lid, cstr) =
   | Twith_modtypesubst mty ->
       let mty = sub.module_type sub mty in
       Pwith_modtypesubst (map_loc sub lid, mty)
+  | Twith_jkindsubst jd ->
+     Pwith_jkindsubst (map_loc sub lid, sub.jkind_declaration sub jd)
 
 let module_expr (sub : mapper) mexpr =
   let loc = sub.location sub mexpr.mod_loc in
@@ -1132,6 +1154,8 @@ let core_type sub ct =
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
+    | Ttyp_newlayout (list, ct) ->
+        Ptyp_newlayout (list, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
@@ -1140,8 +1164,16 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
+<<<<<<< HEAD
     | { pat_desc = Tpat_alias (p, id, _s, _, _, _, _ty) }
       when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
+||||||| 9790921724
+    | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
+      when string_is_prefix "selfpat-" (Ident.name id) ->
+=======
+    | { pat_desc = Tpat_alias { pattern = p; id; _ } }
+      when string_is_prefix "selfpat-" (Ident.name id) ->
+>>>>>>> 5.2.0minus-37
         remove_self p
     | p -> p
   in
@@ -1170,8 +1202,16 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
+<<<<<<< HEAD
   | { pat_desc = Tpat_alias(_pat, id, _, _, _, _, _ty) } ->
       String.starts_with ~prefix:"self-" (Ident.name id)
+||||||| 9790921724
+  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
+      string_is_prefix "self-" (Ident.name id)
+=======
+  | { pat_desc = Tpat_alias { id; _ } } ->
+      string_is_prefix "self-" (Ident.name id)
+>>>>>>> 5.2.0minus-37
   | _ -> false
 
 (* [Typeclass] adds a [self] parameter to initializers and methods that isn't
