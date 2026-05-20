@@ -195,7 +195,12 @@ val max : ('a : value_or_null) . 'a -> 'a -> 'a
     The result is unspecified if one of the arguments contains
     the float value [nan]. *)
 
-external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
+external ( == )
+  : ('a : value_or_null).
+     ('a[@local_opt]) @ immutable
+  -> ('a[@local_opt]) @ immutable
+  -> bool
+  = "%eq"
 (** [e1 == e2] tests for physical equality of [e1] and [e2].
    On mutable types such as references, arrays, byte sequences, records with
    mutable fields and objects with mutable instance variables,
@@ -207,7 +212,11 @@ external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
    Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%noteq"
+external ( != )
+  : ('a : value_or_null).
+    ('a[@local_opt]) @ immutable
+  -> ('a[@local_opt]) @ immutable
+  -> bool = "%noteq"
 (** Negation of {!Stdlib.( == )}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)

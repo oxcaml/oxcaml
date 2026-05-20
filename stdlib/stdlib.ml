@@ -86,8 +86,20 @@ external compare : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -
 let min x y = if x <= y then x else y
 let max x y = if x >= y then x else y
 
-external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%eq"
-external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%noteq"
+external ( == )
+  : ('a : value_or_null).
+     ('a[@local_opt]) @ immutable
+  -> ('a[@local_opt]) @ immutable
+  -> bool
+  @@ portable
+  = "%eq"
+external ( != )
+  : ('a : value_or_null).
+     ('a[@local_opt]) @ immutable
+  -> ('a[@local_opt]) @ immutable
+  -> bool
+  @@ portable
+  = "%noteq"
 
 (* Boolean operations *)
 
