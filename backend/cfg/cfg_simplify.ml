@@ -192,9 +192,8 @@ end = struct
      * return the next non-fallthrough block rather than the next block. *)
     if !C.verbose
     then
-      CL.save_as_dot
-        ~annotate_instr:[Printcfg.instruction]
-        cfg_with_layout "before_elim_ft";
+      CL.save_as_dot ~annotate_instr:[Printcfg.instruction] cfg_with_layout
+        "before_elim_ft";
     let dead_labels =
       disconnect_fallthrough_blocks cfg_with_layout Label.Set.empty
     in
@@ -203,9 +202,8 @@ end = struct
       Printf.printf "%s: eliminated %d block that were dead or fallthrough.\n"
         cfg.fun_name
         (Label.Set.cardinal dead_labels);
-      CL.save_as_dot
-        ~annotate_instr:[Printcfg.instruction]
-        cfg_with_layout "after_elim_ft");
+      CL.save_as_dot ~annotate_instr:[Printcfg.instruction] cfg_with_layout
+        "after_elim_ft");
     dead_labels
 end
 

@@ -151,10 +151,10 @@ let terminator_body ?(print_reg = Printreg.reg) ?(sep = "\n") ppf
     (ti : Cfg.terminator Cfg.instruction) =
   terminator_body_with_args ~print_reg ~args:ti.arg ~sep ppf ti.desc
 
-(* Common wrapping for [basic] and [terminator]: prints
-   [<colour>res := <pop>] if [res] is non-empty, followed by the body printed
-   via [print_body] with argument registers wrapped in [Cfg_colours.argument]
-   on top of [print_reg]. The whole thing is wrapped in [outer_colour]. *)
+(* Common wrapping for [basic] and [terminator]: prints [<colour>res := <pop>]
+   if [res] is non-empty, followed by the body printed via [print_body] with
+   argument registers wrapped in [Cfg_colours.argument] on top of [print_reg].
+   The whole thing is wrapped in [outer_colour]. *)
 let instruction_with_colours ~outer_colour ~print_reg ~res ~print_body ppf =
   outer_colour ppf;
   if Array.length res > 0
@@ -174,8 +174,8 @@ let basic_with_print_reg ~print_reg ppf (instr : Cfg.basic Cfg.instruction) =
 let basic ppf instr = basic_with_print_reg ~print_reg:Printreg.reg ppf instr
 
 (* Internal: full-options terminator printer, used by [terminator],
-   [terminator_with_print_reg], and the block printer (which needs
-   [~sep:", "]). *)
+   [terminator_with_print_reg], and the block printer (which needs [~sep:",
+   "]). *)
 let terminator_full ~print_reg ?(sep = "") ppf
     (ti : Cfg.terminator Cfg.instruction) =
   instruction_with_colours ~outer_colour:Cfg_colours.terminator ~print_reg
@@ -192,8 +192,7 @@ let instruction_with_print_reg ~print_reg ppf = function
   | `Basic i -> basic_with_print_reg ~print_reg ppf i
   | `Terminator i -> terminator_with_print_reg ~print_reg ppf i
 
-let instruction ppf i =
-  instruction_with_print_reg ~print_reg:Printreg.reg ppf i
+let instruction ppf i = instruction_with_print_reg ~print_reg:Printreg.reg ppf i
 
 (* Helpers for the rich block printer below. *)
 

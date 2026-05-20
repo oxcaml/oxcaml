@@ -384,8 +384,7 @@ module Transfer = struct
       Printcfg.terminator term;
     term.available_before <- avail_before;
     if !Dwarf_flags.ddebug_invariants
-    then
-      check_invariants term ~print_instr:Printcfg.terminator ~avail_before;
+    then check_invariants term ~print_instr:Printcfg.terminator ~avail_before;
     let avail_across, avail_after =
       match avail_before with
       | Unreachable -> unreachable, unreachable
