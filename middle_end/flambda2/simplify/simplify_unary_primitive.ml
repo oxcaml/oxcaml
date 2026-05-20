@@ -308,6 +308,8 @@ module Make_simplify_int_conv (N : A.Number_kind) = struct
   let simplify ~(dst : K.Standard_int_or_float.t)
       ~(signedness : Scalar.Signedness.t) dacc ~original_term ~arg ~arg_ty
       ~result_var =
+    (* CR jrayman *)
+    let _ = signedness in
     if K.Standard_int_or_float.equal N.standard_int_or_float_kind dst
     then
       let dacc = DA.add_variable dacc result_var arg_ty in

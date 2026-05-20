@@ -113,7 +113,7 @@ let zero_extend width exp =
   | Int8 -> go ~bits:8
   | Int16 -> go ~bits:16
 
-let static_cast ~src ~dst x =
+let static_cast ~src ~dst ~(signedness : Scalar.Signedness.t) x =
   let open struct
     type boxed =
       | Int32
@@ -177,31 +177,53 @@ let static_cast ~src ~dst x =
     | (Int | Boxed Float32), Boxed Float ->
       Prim (ccallf "caml_%s_of_%s" (name dst) (name src), [x])
   in
+  let builtin x ~(src : builtin) ~(dst : builtin)
+      ~(signedness : Scalar.Signedness.t) =
+    let signed_conversion = builtin x ~src ~dst in
+    match signedness with
+    | Signed -> signed_conversion
+    | Unsigned -> (
+      match src, dst with
+      | Boxed (Float | Float32), _ | _, Boxed (Float | Float32) ->
+        failwith "Blambda_of_lambda.static_cast: ~unsigned:true in a float cast"
+      | Boxed Int64, (Int | Boxed (Int64 | Int32 | Nativeint))
+      | Boxed Nativeint, (Int | Boxed (Nativeint | Int32))
+      | Int, Int ->
+        (* [~signedness] does not effect narrowing conversions *)
+        signed_conversion
+      | Int, Boxed (Int64 | Int32 | Nativeint) -> assert false
+      | Boxed Nativeint, Boxed Int64 -> assert false
+      | Boxed Int32, (Int | Boxed (Int64 | Int32 | Nativeint)) -> assert false)
+  in
   match value src, value dst with
-  | Boxed src, Boxed dst -> builtin x ~src:(Boxed src) ~dst:(Boxed dst)
+  | Boxed src, Boxed dst ->
+    builtin x ~src:(Boxed src) ~dst:(Boxed dst) ~signedness
   | Tagged (Int | Int16 | Int8), Boxed dst ->
     (* we don't need to sign-extend in this case because tagged small integers
        are always represented sign-extended in bytecode, and none of these
        are narrowing conversions *)
-    builtin x ~src:Int ~dst:(Boxed dst)
+    builtin x ~src:Int ~dst:(Boxed dst) ~signedness
   | Boxed src, Tagged dst ->
     (* this can be a narrowing conversion, so must be sign extended, in order
        that the value is taken mod 2^31 or 2^63 as appropriate.  In addition
        this avoids any ambiguity about whether a random boxed int32 is already
        sign extended (on a 64-bit target). *)
-    builtin x ~src:(Boxed src) ~dst:Int |> sign_extend dst
-  | Tagged Int8, Tagged (Int8 | Int16 | Int)
-  | Tagged Int16, Tagged (Int16 | Int)
-  | Tagged Int, Tagged Int ->
+    builtin x ~src:(Boxed src) ~dst:Int ~signedness |> sign_extend dst
+  | Tagged (Int8 as src), Tagged (Int8 | Int16 | Int)
+  | Tagged (Int16 as src), Tagged (Int16 | Int)
+  | Tagged (Int as src), Tagged Int -> (
+    match signedness with
     (* we don't need to sign-extend in this case because tagged small integers
        are always represented sign-extended in bytecode, and none of these are
        narrowing conversions *)
-    x
+    | Signed -> x
+    | Unsigned -> zero_extend src x)
   | Tagged Int, Tagged ((Int16 | Int8) as dst)
   | Tagged Int16, Tagged (Int8 as dst) ->
     (* we need to sign-extend for these narrowing conversions because the input
        values are stored in full-width immediates, and we need to take them
-       modulo 2^8 or 2^16. *)
+       modulo 2^8 or 2^16. Also, [~signedness] is irrelevant for narrowing
+       conversions. *)
     sign_extend dst x
 
 (** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
@@ -1104,9 +1126,7 @@ and comp_unary_scalar_intrinsic op x =
         (Scalar.Operation.Unary.Float_op.to_string op)
         (Scalar.Floating.Width.to_string size))
   | Static_cast { src; dst; signedness } ->
-    let _ = signedness in
-    (* CR jrayman *)
-    static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst)
+    static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst) ~signedness
 
 and make_unsigned_comparison size signed_comparison x y =
   (* For unsigned comparisons, we flip the sign bit of both operands and use

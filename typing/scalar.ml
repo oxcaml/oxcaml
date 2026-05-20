@@ -460,20 +460,31 @@ module Operation = struct
               ListLabels.map Int_op.all ~f:(fun op -> Integral (size, op)));
           ListLabels.concat_map Floating.all ~f:(fun size ->
               ListLabels.map Float_op.all ~f:(fun op -> Floating (size, op)));
-          ListLabels.concat_map all ~f:(fun src ->
-              ListLabels.concat_map all ~f:(fun dst ->
-                  let src_signedness : Signedness.t list =
-                    match (src : (_ Width.t, _ Width.t) Maybe_naked.t) with
-                    | Naked (Integral _) -> Signedness.all
-                    | Value (Integral _)
-                    | Value (Floating _)
-                    | Naked (Floating _) ->
-                      [Signed]
-                  in
-                  ListLabels.concat_map src_signedness ~f:(fun signedness ->
-                      if src = dst
-                      then []
-                      else [Static_cast { src; dst; signedness }]))) ]
+          ListLabels.concat_map all
+            ~f:(fun (src : (_ Width.t, _ Width.t) Maybe_naked.t) ->
+              ListLabels.concat_map all
+                ~f:(fun (dst : (_ Width.t, _ Width.t) Maybe_naked.t) ->
+                  if src = dst
+                  then []
+                  else
+                    let signedness : Signedness.t list =
+                      match src, dst with
+                      | ( ( Naked (Integral src_width)
+                          | Value (Integral src_width) ),
+                          ( Naked (Integral dst_width)
+                          | Value (Integral dst_width) ) ) ->
+                        if
+                          Integral.Width.equal
+                            (fun Any_locality_mode Any_locality_mode -> true)
+                            src_width dst_width
+                        then [Signed]
+                        else Signedness.all
+                      | (Value (Floating _) | Naked (Floating _)), _
+                      | _, (Value (Floating _) | Naked (Floating _)) ->
+                        [Signed]
+                    in
+                    ListLabels.map signedness ~f:(fun signedness ->
+                        Static_cast { src; dst; signedness }))) ]
 
     let map (type a b) (t : a t) ~(f : a -> b) : b t =
       match t with
