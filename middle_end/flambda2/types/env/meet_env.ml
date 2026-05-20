@@ -246,7 +246,8 @@ let add_env_extension_with_extra_variables t
   Typing_env_extension.With_extra_variables.fold
     ~variable:(fun var kind t ->
       map_typing_env t ~f:(fun t ->
-          TE.add_variable_definition t var kind Name_mode.in_types))
+          TE.add_variable_definition t var kind (MTC.unknown kind)
+            Name_mode.in_types))
     ~equation:(fun name ty t ->
       try add_equation ~raise_on_bottom:true t name ty ~meet_type
       with Bottom_equation -> map_typing_env ~f:TE.make_bottom t)
@@ -257,7 +258,8 @@ let add_env_extension_from_level t level ~meet_type =
     map_typing_env t ~f:(fun t ->
         TEL.fold_on_defined_vars
           (fun var kind t ->
-            TE.add_variable_definition t var kind Name_mode.in_types)
+            TE.add_variable_definition t var kind (MTC.unknown kind)
+              Name_mode.in_types)
           level t)
   in
   let t =
@@ -327,7 +329,8 @@ let current_scope env = TE.current_scope (typing_env env)
 let increment_scope env = map_typing_env env ~f:TE.increment_scope
 
 let add_definition env bound_name kind =
-  map_typing_env env ~f:(fun env -> TE.add_definition env bound_name kind)
+  map_typing_env env ~f:(fun env ->
+      TE.add_definition env bound_name kind (MTC.unknown kind))
 
 let add_symbol_projection env var symbol_projection =
   map_typing_env env ~f:(fun env ->
@@ -340,4 +343,4 @@ let cut_as_extension env ~cut_after =
 
 let add_variable_definition env var kind name_mode =
   map_typing_env env ~f:(fun env ->
-      TE.add_variable_definition env var kind name_mode)
+      TE.add_variable_definition env var kind (MTC.unknown kind) name_mode)

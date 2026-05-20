@@ -52,7 +52,7 @@ let join_types ~env_at_fork envs_with_levels =
                                at runtime, so we do not equip them with a
                                [Flambda_debug_uid.t]. See #3967. *)
                             Name_mode.in_types))
-                      kind)
+                      kind (MTC.unknown kind))
                 vars base_env)
             (TEL.variables_by_binding_time level)
             base_env

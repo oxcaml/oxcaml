@@ -518,7 +518,8 @@ let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
                    so we do not equip them with a [Flambda_debug_uid.t]. See
                    #3967. *)
                 Name_mode.in_types))
-          kind)
+          kind
+          (More_type_creators.unknown kind))
       level1 env
   in
   let right_env =
@@ -531,7 +532,8 @@ let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
                    so we do not equip them with a [Flambda_debug_uid.t]. See
                    #3967. *)
                 Name_mode.in_types))
-          kind)
+          kind
+          (More_type_creators.unknown kind))
       level2 env
   in
   names_with_non_equal_types_env_extension ~equal_type

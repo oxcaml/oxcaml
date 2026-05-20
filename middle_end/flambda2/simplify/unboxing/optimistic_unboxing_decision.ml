@@ -180,7 +180,8 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
            { Extra_param_and_args.param = var; param_debug_uid = _; args = _ }
          ->
         let name = Bound_name.create (Name.var var) Name_mode.normal in
-        TE.add_definition acc name (K.Block_shape.element_kind shape index))
+        let kind = K.Block_shape.element_kind shape index in
+        TE.add_definition acc name kind (T.unknown kind))
       tenv field_vars
   in
   let shape =
