@@ -423,8 +423,7 @@ end = struct
          testing. Currently it's not a problem because we abort the build
          whenever register allocation fails but if there was a fallback mode
          then the interesting files would be instantly overwritten. *)
-      Cfg_with_layout.save_as_dot
-        ~annotate_instr:[Printcfg.instruction]
+      Cfg_with_layout.save_as_dot ~annotate_instr:[Printcfg.instruction]
         ~filename:"before.dot" cfg "before_allocation_before_validation";
     let basic_count, terminator_count =
       Cfg_with_layout.fold_instructions cfg
@@ -1290,8 +1289,7 @@ let save_as_dot_with_equations ~desc ~res_instr ~res_block ?filename cfg msg =
             | None -> ()
           in
           match instr with
-          | `Basic instr ->
-            print Printcfg.basic Description.find_basic instr
+          | `Basic instr -> print Printcfg.basic Description.find_basic instr
           | `Terminator ti ->
             print Printcfg.terminator Description.find_terminator ti) ]
     ~annotate_block_end:(fun ppf block ->
@@ -1425,7 +1423,8 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
        register allocation fails but if there was a fallback mode then the
        interesting files would be instantly overwritten. *)
     Cfg_with_layout.save_as_dot
-      ~annotate_instr:[Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc]
+      ~annotate_instr:
+        [Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc]
       ~filename:"after.dot" cfg "after_allocation_before_validation";
   Description.verify desc cfg;
   let module Check_backwards = Check_backwards (struct

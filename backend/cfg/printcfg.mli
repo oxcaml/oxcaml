@@ -18,8 +18,8 @@ val basic_body :
   unit
 
 (** Renders the body of a terminator instruction (no result, no instruction id,
-    no surrounding colour wrapping). Register arguments are interleaved into
-    the terminator syntax, and printed via [print_reg]. *)
+    no surrounding colour wrapping). Register arguments are interleaved into the
+    terminator syntax, and printed via [print_reg]. *)
 val terminator_body :
   ?print_reg:(Format.formatter -> Reg.t -> unit) ->
   ?sep:string ->
@@ -27,16 +27,16 @@ val terminator_body :
   Cfg.terminator Cfg.instruction ->
   unit
 
-(** Full rendering of a basic instruction (result, body) with colour
-    wrapping. *)
+(** Full rendering of a basic instruction (result, body) with colour wrapping.
+*)
 val basic : Format.formatter -> Cfg.basic Cfg.instruction -> unit
 
 (** Full rendering of a terminator instruction (result, body) with colour
     wrapping. *)
 val terminator : Format.formatter -> Cfg.terminator Cfg.instruction -> unit
 
-(** Full rendering of an instruction (basic or terminator) with colour
-    wrapping. *)
+(** Full rendering of an instruction (basic or terminator) with colour wrapping.
+*)
 val instruction :
   Format.formatter ->
   [ `Basic of Cfg.basic Cfg.instruction
@@ -65,8 +65,8 @@ val instruction_with_print_reg :
   | `Terminator of Cfg.terminator Cfg.instruction ] ->
   unit
 
-(** Full rendering of a CFG (blocks, instructions, edges) with colour
-    wrapping. Blocks are visited in [Label.compare] order. *)
+(** Full rendering of a CFG (blocks, instructions, edges) with colour wrapping.
+    Blocks are visited in [Label.compare] order. *)
 val cfg : Format.formatter -> Cfg.t -> unit
 
 (** Like {!cfg}, but visits blocks in the layout's order. *)
