@@ -579,3 +579,25 @@ Line 3, characters 4-31:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
 |}]
+
+module Non_value_atomic_single_float64 = struct
+type t = { mutable f : float# [@atomic] }
+end
+
+[%%expect{|
+Line 2, characters 11-39:
+2 | type t = { mutable f : float# [@atomic] }
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Non_value_atomic_single_bits32 = struct
+  type t = { mutable f : int32# [@atomic] }
+end
+
+[%%expect{|
+Line 2, characters 13-41:
+2 |   type t = { mutable f : int32# [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
