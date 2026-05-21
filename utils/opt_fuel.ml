@@ -1,17 +1,3 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*                    Tobias Tebbi, Jane Street Europe                    *)
-(*                                                                        *)
-(*   Copyright 2025 Jane Street Group LLC                                 *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
-
 let record_path = Sys.getenv_opt "OPT_FUEL_RECORD"
 
 let threshold =
@@ -90,9 +76,9 @@ let compute_step_range file_id =
 let step_range =
   lazy (if reading_record then compute_step_range !file_id else 0, 0)
 
-(* --- Public API --- *)
-
 let format_message = function Some f -> " (" ^ f () ^ ")" | None -> ""
+
+(* --- Public API --- *)
 
 let should_do_opt_step ?message () : bool =
   if recording
