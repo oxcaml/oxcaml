@@ -432,19 +432,32 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | _ ->
         let primitive : Blambda.primitive =
           match ref_kind, index_kind with
-          | _, Punboxed_or_untagged_integer_index _ ->
+          | Pgenarray_ref _, _
+          | ( ( Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+              | Pfloatarray_ref _
+              | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
+              | Punboxedoruntaggedintarray_ref _
+              | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+                ),
+              Punboxed_or_untagged_integer_index _ ) ->
             indexing_primitive index_kind
               (if unsafe then "caml_array_unsafe_get" else "caml_array_get")
-          | Pgenarray_ref _, Ptagged_int_index ->
-            Ccall (if unsafe then "caml_array_unsafe_get" else "caml_array_get")
-          | ( (Pfloatarray_ref _ | Punboxedfloatarray_ref Unboxed_float64),
+          | ( (Punboxedfloatarray_ref Unboxed_float64 | Pfloatarray_ref _),
               Ptagged_int_index ) ->
             Ccall
               (if unsafe
                then "caml_floatarray_unsafe_get"
                else "caml_floatarray_get")
-          | _, Ptagged_int_index ->
+          | ( ( Punboxedfloatarray_ref Unboxed_float32
+              | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref
+              | Pgcignorableaddrarray_ref | Pintarray_ref
+              | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+                ),
+              Ptagged_int_index ) ->
             if unsafe then Getvectitem else Ccall "caml_array_get_addr"
+          | Punboxedvectorarray_ref _, _ ->
+            (* Handled by the outer match. *)
+            assert false
         in
         copy_mixed_block_element
           (element_of_array_kind (Lambda.array_kind_of_array_ref_kind ref_kind))
@@ -464,19 +477,32 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | _ -> (
         let primitive : Blambda.primitive =
           match set_kind, index_kind with
-          | _, Punboxed_or_untagged_integer_index _ ->
+          | Pgenarray_set _, _
+          | ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
+              | Pfloatarray_set
+              | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
+              | Punboxedoruntaggedintarray_set _
+              | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+                ),
+              Punboxed_or_untagged_integer_index _ ) ->
             indexing_primitive index_kind
               (if unsafe then "caml_array_unsafe_set" else "caml_array_set")
-          | Pgenarray_set _, Ptagged_int_index ->
-            Ccall (if unsafe then "caml_array_unsafe_set" else "caml_array_set")
-          | ( (Pfloatarray_set | Punboxedfloatarray_set Unboxed_float64),
+          | ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
               Ptagged_int_index ) ->
             Ccall
               (if unsafe
                then "caml_floatarray_unsafe_set"
                else "caml_floatarray_set")
-          | _, Ptagged_int_index ->
+          | ( ( Punboxedfloatarray_set Unboxed_float32
+              | Punboxedoruntaggedintarray_set _ | Paddrarray_set _
+              | Pgcignorableaddrarray_set | Pintarray_set
+              | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+                ),
+              Ptagged_int_index ) ->
             if unsafe then Setvectitem else Ccall "caml_array_set_addr"
+          | Punboxedvectorarray_set _, _ ->
+            (* Handled by the outer match. *)
+            assert false
         in
         match args with
         | [arr; idx; value] ->
