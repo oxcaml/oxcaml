@@ -42,6 +42,9 @@ type chunk =
 let register_assembly_callback :
   ((string -> unit) -> unit) option ref = ref None
 
+let register_compilation_unit_callback :
+  ((Compilation_unit.t -> unit) -> unit) option ref = ref None
+
 type correction =
   { corrected_expectations : expectation list
   ; trailing_output        : string
@@ -82,6 +85,8 @@ let match_expect_extension (ext : Parsetree.extension) =
     in
     if Option.is_none !register_assembly_callback && kind = Expect_asm
     then invalid_payload ~msg:"expect_asm is only supported by expect.opt" ();
+    if Option.is_none !register_compilation_unit_callback && kind = Expect_fexpr
+    then invalid_payload ~msg:"expect_fexpr is only supported by expect.opt" ();
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
       | Pexp_constant (Pconst_string (str, _, Some tag)) ->
@@ -377,6 +382,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
   let () = Misc.Style.set_tag_handling ppf in
   let exec_phrases phrases =
     let last_asm = ref None in
+    let last_unit = ref None in
     let phrases =
       match min_line_number phrases with
       | None -> phrases
@@ -388,6 +394,9 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Option.iter
         (fun register -> register (fun asm_out -> last_asm := Some asm_out))
         !register_assembly_callback;
+      Option.iter
+        (fun register -> register (fun cu -> last_unit := Some cu))
+        !register_compilation_unit_callback;
       let snap = Btype.snapshot () in
       try
         Sys.with_async_exns
@@ -401,11 +410,11 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
             (Printexc.raw_backtrace_to_string bt)
         end;
         Btype.backtrack snap;
-        false, None
+        false
     in
-    let (_, last_unit : bool * Compilation_unit.t option) =
-      List.fold_left phrases ~init:(true, None) ~f:(fun (acc, unit) phrase ->
-          if acc then exec_one phrase else acc, unit)
+    let (_ : bool) =
+      List.fold_left phrases ~init:true ~f:(fun acc phrase ->
+          if acc then exec_one phrase else acc)
     in
     Format.pp_print_flush ppf ();
     let len = Buffer.length buf in
@@ -414,7 +423,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    (Misc.delete_eol_spaces s, !last_asm, last_unit)
+    (Misc.delete_eol_spaces s, !last_asm, !last_unit)
   in
   let fexpr_outputs unit filters =
     let read_dump_file pass =
@@ -536,8 +545,7 @@ module type Toplevel = sig
   val initialize_toplevel_env : unit -> unit
   val load_file : Format.formatter -> string -> bool
   val execute_phrase :
-    bool -> Format.formatter -> Parsetree.toplevel_phrase ->
-    bool * Compilation_unit.t option
+    bool -> Format.formatter -> Parsetree.toplevel_phrase -> bool
 end
 
 let is_object_file ~object_extensions fname =

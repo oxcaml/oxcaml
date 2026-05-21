@@ -18,8 +18,7 @@ module Toplevel = struct
   let override_sys_argv = Toploop.override_sys_argv
   let initialize_toplevel_env = Toploop.initialize_toplevel_env
   let load_file fmt fname = Topeval.load_file false fmt fname
-  let execute_phrase print fmt phrase =
-    Toploop.execute_phrase print fmt phrase, None
+  let execute_phrase = Toploop.execute_phrase
 end
 
 let read_anonymous_arg =
