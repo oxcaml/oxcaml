@@ -349,7 +349,8 @@ let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
     | Sym s -> Sym (rewrite_str s)
     | Mem ({ sym; _ } as addr) ->
       Mem { addr with sym = Option.map rewrite_str sym }
-    | Mem64_RIP (typ, s, displ) -> Mem64_RIP (typ, rewrite_str s, displ)
+    | Mem64_RIP (typ, _, displ) ->
+      Mem64_RIP (typ, "<hidden PC-relative offset>", displ)
     | (Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _) as a ->
       a
   in
