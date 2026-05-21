@@ -783,6 +783,30 @@ let rec and_const e n dbg =
             match get_const y with
             | Some y -> and_const x (Nativeint.logand y n) dbg
             | None -> default ())
+          | Cop
+              ( Caddi,
+                [ Cop (Clsl, [c; (Cconst_int (k, _) as k_cst)], _);
+                  Cconst_int (offset, _) ],
+                _ )
+            when n >= 0n && is_defined_shift k
+                 && Nativeint.shift_right_logical (Nativeint.of_int offset) k
+                    = 0n ->
+            (* [((c lsl k) + offset) land n = ((c land (n lsr k)) lsl k) +
+               (offset land n)] when [n >= 0] and [0 <= offset < 2^k] (so the
+               [+] is carry-free). Both [n lsr k] and [offset land n] are
+               constants. In concert with the [asr]-of-[lsl]-of-[+] rule in
+               [asr_int], this collapses tag/AND/untag round-trips on unboxed
+               small integers. *)
+            let upper_mask = Nativeint.shift_right_logical n k in
+            let lower_offset =
+              Nativeint.to_int (Nativeint.logand (Nativeint.of_int offset) n)
+            in
+            let shifted =
+              if Nativeint.equal upper_mask 0n
+              then replace c ~with_:(Cconst_int (0, dbg))
+              else Cop (Clsl, [and_const c upper_mask dbg; k_cst], dbg)
+            in
+            add_const shifted lower_offset dbg
           | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
             let[@local] load memory_chunk =
               Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
@@ -796,7 +820,7 @@ let rec and_const e n dbg =
             | _ -> default ())
           | _ -> default ()))
 
-let xor_int c1 c2 dbg =
+and xor_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
@@ -804,7 +828,7 @@ let xor_int c1 c2 dbg =
       | Some c1, None -> xor_const c2 c1 dbg
       | None, None -> Cop (Cxor, [c1; c2], dbg))
 
-let or_int c1 c2 dbg =
+and or_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logor c1 c2)
@@ -812,7 +836,7 @@ let or_int c1 c2 dbg =
       | Some c1, None -> or_const c2 c1 dbg
       | None, None -> Cop (Cor, [c1; c2], dbg))
 
-let and_int c1 c2 dbg =
+and and_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logand c1 c2)
@@ -820,7 +844,7 @@ let and_int c1 c2 dbg =
       | Some c1, None -> and_const c2 c1 dbg
       | None, None -> Cop (Cand, [c1; c2], dbg))
 
-let rec lsr_int c1 c2 dbg =
+and lsr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match c1, c2 with
       | c1, Cconst_int (0, _) -> c1
@@ -892,24 +916,19 @@ and asr_int c1 c2 dbg =
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
           | Cop
-              ( Cand,
-                [ Cop
-                    ( Caddi,
-                      [ Cop (Clsl, [c; Cconst_int (x, _)], _);
-                        Cconst_int (offset, _) ],
-                      _ );
-                  ((Cconst_int _ | Cconst_natint _) as y) ],
+              ( Caddi,
+                [ (Cop (Clsl, [_; Cconst_int (x, _)], _) as lsl_term);
+                  Cconst_int (offset, _) ],
                 _ )
-            when x = n
-                 && Nativeint.shift_right_logical (Nativeint.of_int offset) x
-                    = 0n
-                 && const_exn y >= 0n ->
-            (* [asr (and ((c lsl k) + o) m) k = c land (m asr k)] when [0 <= o <
-               2^k] (so the [+] cannot carry into the high bits) and [m >= 0]
-               (so the sign extension by [asr] agrees with the zero high bits
-               the [land] produces). Removes the redundant tag/untag pair when a
-               mask sits between them. *)
-            and_const c (Nativeint.shift_right (const_exn y) n) dbg
+            when is_defined_shift x
+                 && Nativeint.shift_right_logical (Nativeint.of_int offset)
+                      (Int.min n x)
+                    = 0n ->
+            (* [asr ((c lsl x) + o) n = asr (c lsl x) n] when [0 <= o < 2^min(x,
+               n)]: [o < 2^x] makes the [+] carry-free, and [o < 2^n] means [asr
+               n] discards every bit of [o]. The next clause then handles [asr
+               (c lsl x) n] further. *)
+            asr_int lsl_term c2 dbg
           | _ -> Cop (Casr, [c1; c2], dbg)))
       | Cop (Casr, [x; (Cconst_int (n', _) as y)], z), c2
         when is_defined_shift n' ->
