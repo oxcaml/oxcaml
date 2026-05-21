@@ -1,0 +1,14 @@
+rejected: _Caml
+rejected: main
+rejected: _ZN4testE
+rejected: caml_foo
+rejected: caml_foo
+rejected: _CamlU3FooXXX
+rejected: _CamlU99Foo
+rejected: _CamlUFoo
+rejected: _CamlU3FooFu5G2gg_funcsub
+rejected: camlFoo__$3
+rejected: camlFoo__$
+rejected: camlFoo__$3
+rejected: __camlFoo__bar_0
+rejected: __camlFoo__bar_0
