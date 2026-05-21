@@ -253,18 +253,35 @@ let lets (bindings : (Ident.t * Blambda.blambda) list) (body : Blambda.blambda)
     (fun (id, arg) body -> Blambda.Let { id; arg; body })
     bindings body
 
-(** [for_each_slot ~length ~body] builds a [For] loop running [body] for each
-    index in [0 .. length - 1], passing the loop-index ident to [body]. *)
-let for_each_slot ~(length : Blambda.blambda)
-    ~(body : Ident.t -> Blambda.blambda) : Blambda.blambda =
-  let i = Ident.create_local "i" in
-  For
-    { id = i;
-      from = Const (Const_base (Const_int 0));
-      to_ = Prim (Offsetint (-1), [length]);
-      dir = Upto;
-      body = body i
-    }
+(** [in_place_copy_array_slice ~length ~offset ~array ~elt] evaluates [length],
+    then [offset], then [array], binding each to a local. Then, for each [i] in
+    [0 .. length - 1], it overwrites the slot at index [offset + i] with a fresh
+    deep copy of its current contents. Returns the (bound) array. *)
+let in_place_copy_array_slice ~(length : Blambda.blambda)
+    ~(offset : Blambda.blambda) ~(array : Blambda.blambda)
+    ~(elt : unit Lambda.mixed_block_element) : Blambda.blambda =
+  let len_id = Ident.create_local "len" in
+  let offset_id = Ident.create_local "offset" in
+  let arr_id = Ident.create_local "arr" in
+  let i_id = Ident.create_local "i" in
+  lets
+    [len_id, length; offset_id, offset; arr_id, array]
+    (Sequence
+       ( Blambda.For
+           { id = i_id;
+             from = Const (Const_base (Const_int 0));
+             to_ = Prim (Offsetint (-1), [Var len_id]);
+             dir = Upto;
+             body =
+               (let idx = Prim (Addint, [Var offset_id; Var i_id]) in
+                Prim
+                  ( Setvectitem,
+                    [ Var arr_id;
+                      idx;
+                      copy_mixed_block_element elt
+                        (Prim (Getvectitem, [Var arr_id; idx])) ] ))
+           },
+         Var arr_id ))
 
 let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   let comp_fun ({ params; body; loc = _ } as lfunction : Lambda.lfunction) :
@@ -672,25 +689,20 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           (* In bytecode, [caml_obj_dup] only does a shallow copy, so each slot
              of the duplicate would alias the corresponding slot in the source.
              For product arrays we deep-copy every slot. *)
-          let elt = element_of_array_kind kind in
           let src_arg =
             match args with [s] -> comp_expr s | _ -> wrong_arity ~expected:1
           in
           let src_id = Ident.create_local "dup_src" in
-          let dst_id = Ident.create_local "dup_dst" in
-          lets
-            [src_id, src_arg; dst_id, Prim (Ccall "caml_obj_dup", [Var src_id])]
-            (Sequence
-               ( for_each_slot
-                   ~length:(Prim (Vectlength, [Var src_id]))
-                   ~body:(fun i ->
-                     Prim
-                       ( Setvectitem,
-                         [ Var dst_id;
-                           Var i;
-                           copy_mixed_block_element elt
-                             (Prim (Getvectitem, [Var src_id; Var i])) ] )),
-                 Var dst_id ))
+          Let
+            { id = src_id;
+              arg = src_arg;
+              body =
+                in_place_copy_array_slice
+                  ~length:(Prim (Vectlength, [Var src_id]))
+                  ~offset:(tagged_immediate 0)
+                  ~array:(Prim (Ccall "caml_obj_dup", [Var src_id]))
+                  ~elt:(element_of_array_kind kind)
+            }
         | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
         | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
         | Punboxedvectorarray _ ->
@@ -971,7 +983,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
            same [init] block. For unboxed products (boxed in bytecode), we must
            overwrite each slot with a fresh deep copy so slots don't alias the
            caller's initializer or each other. *)
-        let elt = element_of_array_kind kind in
         let n_arg, init_arg =
           match args with
           | [n; init] -> comp_expr n, comp_expr init
@@ -982,21 +993,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Alloc_heap -> "caml_array_make"
           | Alloc_local -> "caml_array_make_local"
         in
-        let n_id = Ident.create_local "n" in
         let init_id = Ident.create_local "init" in
-        let arr_id = Ident.create_local "arr" in
+        let n_id = Ident.create_local "n" in
         lets
-          [ init_id, init_arg;
-            n_id, n_arg;
-            arr_id, Prim (Ccall cname, [Var n_id; Var init_id]) ]
-          (Sequence
-             ( for_each_slot ~length:(Var n_id) ~body:(fun i ->
-                   Prim
-                     ( Setvectitem,
-                       [ Var arr_id;
-                         Var i;
-                         copy_mixed_block_element elt (Var init_id) ] )),
-               Var arr_id ))
+          [init_id, init_arg; n_id, n_arg]
+          (in_place_copy_array_slice ~length:(Var n_id)
+             ~offset:(tagged_immediate 0)
+             ~array:(Prim (Ccall cname, [Var n_id; Var init_id]))
+             ~elt:(element_of_array_kind kind))
       | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
       | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _ -> (
         match locality with
@@ -1034,19 +1038,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               [Var src_id; Var srcofs_id; Var dst_id; Var dstofs_id; Var len_id]
             )
         in
-        let copy_slot i =
-          let idx = Ident.create_local "idx" in
-          Blambda.Let
-            { id = idx;
-              arg = Prim (Addint, [Var dstofs_id; Var i]);
-              body =
-                Prim
-                  ( Setvectitem,
-                    [ Var dst_id;
-                      Var idx;
-                      copy_mixed_block_element elt
-                        (Prim (Getvectitem, [Var dst_id; Var idx])) ] )
-            }
+        let copy_pass =
+          in_place_copy_array_slice ~length:(Var len_id) ~offset:(Var dstofs_id)
+            ~array:(Var dst_id) ~elt
         in
         lets
           [ len_id, len_arg;
@@ -1054,8 +1048,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             dst_id, dst_arg;
             srcofs_id, srcofs_arg;
             src_id, src_arg ]
-          (Sequence
-             (blit_call, for_each_slot ~length:(Var len_id) ~body:copy_slot))
+          (Sequence (Sequence (blit_call, copy_pass), unit))
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
       | Pgcignorableaddrarray_set | Punboxedoruntaggedintarray_set _
       | Pfloatarray_set | Punboxedfloatarray_set _ ->
