@@ -10,7 +10,7 @@
        list_to_array_0 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure _region _ghost_region my_depth
          -> k1 * k2
-         : any array =
+         : val array =
    let next_depth = rec_info (succ my_depth) in
    (let prim = %is_int (param) in
     let Pisint = %tag_imm (prim) in
