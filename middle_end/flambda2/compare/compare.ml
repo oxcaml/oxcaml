@@ -278,8 +278,7 @@ let subst_set_of_closures env set =
         subst_value_slot env var, subst_simple env simple)
     |> Value_slot.Map.of_list
   in
-  let alloc = Set_of_closures.alloc_mode set in
-  Set_of_closures.create alloc ~value_slots decls
+  Set_of_closures.create ~value_slots decls
 
 let subst_rec_info_expr _env ri =
   (* Only depth variables can occur in [Rec_info_expr], and we only mess with
@@ -320,8 +319,8 @@ and subst_named env (n : Named.t) =
   match n with
   | Simple s -> Named.create_simple (subst_simple env s)
   | Prim (p, dbg) -> Named.create_prim (subst_primitive env p) dbg
-  | Set_of_closures set ->
-    Named.create_set_of_closures (subst_set_of_closures env set)
+  | Set_of_closures (set, alloc_mode) ->
+    Named.create_set_of_closures ~alloc_mode (subst_set_of_closures env set)
   | Static_consts sc -> Named.create_static_consts (subst_static_consts env sc)
   | Rec_info ri -> Named.create_rec_info (subst_rec_info_expr env ri)
 
@@ -887,9 +886,13 @@ let named_exprs env named1 named2 : Named.t Comparison.t =
   | Prim (prim1, dbg1), Prim (prim2, _) ->
     primitives env prim1 prim2
     |> Comparison.map ~f:(fun prim -> Named.create_prim prim dbg1)
-  | Set_of_closures set1, Set_of_closures set2 ->
-    sets_of_closures env set1 set2
-    |> Comparison.map ~f:Named.create_set_of_closures
+  | Set_of_closures (set1, alloc_mode1), Set_of_closures (set2, alloc_mode2) ->
+    if Alloc_mode.For_allocations.compare alloc_mode1 alloc_mode2 = 0
+    then
+      sets_of_closures env set1 set2
+      |> Comparison.map
+           ~f:(Named.create_set_of_closures ~alloc_mode:alloc_mode1)
+    else Different { approximant = named1 }
   | Rec_info rec_info_expr1, Rec_info rec_info_expr2 ->
     rec_info_exprs env rec_info_expr1 rec_info_expr2
     |> Comparison.map ~f:Named.create_rec_info

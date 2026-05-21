@@ -16,25 +16,25 @@
 
 type t =
   { function_decls : Function_declarations.t;
-    value_slots : Simple.t Value_slot.Map.t;
-    alloc_mode : Alloc_mode.For_allocations.t
+    value_slots : Simple.t Value_slot.Map.t
   }
 
-let [@ocamlformat "disable"] print ppf
+let [@ocamlformat "disable"] print_with_extra_fields extra_fields ppf
       { function_decls;
-        value_slots;
-        alloc_mode;
+        value_slots
       } =
   Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
+      %t\
       @[<hov 1>(function_decls@ %a)@]@ \
-      @[<hov 1>(value_slots@ %a)@]@ \
-      @[<hov 1>(alloc_mode@ %a)@]\
+      @[<hov 1>(value_slots@ %a)@]\
       )@]"
     Flambda_colours.prim_constructive
     Flambda_colours.pop
+    extra_fields
     (Function_declarations.print) function_decls
     (Value_slot.Map.print Simple.print) value_slots
-    Alloc_mode.For_allocations.print alloc_mode
+
+let print ppf t = print_with_extra_fields (fun _ppf -> ()) ppf t
 
 include Container_types.Make (struct
   type nonrec t = t
@@ -43,67 +43,50 @@ include Container_types.Make (struct
 
   let hash _ = Misc.fatal_error "Not yet implemented"
 
-  let compare
-      { function_decls = function_decls1;
-        value_slots = value_slots1;
-        alloc_mode = alloc_mode1
-      }
-      { function_decls = function_decls2;
-        value_slots = value_slots2;
-        alloc_mode = alloc_mode2
-      } =
+  let compare { function_decls = function_decls1; value_slots = value_slots1 }
+      { function_decls = function_decls2; value_slots = value_slots2 } =
     let c = Function_declarations.compare function_decls1 function_decls2 in
     if c <> 0
     then c
-    else
-      let c = Value_slot.Map.compare Simple.compare value_slots1 value_slots2 in
-      if c <> 0
-      then c
-      else Alloc_mode.For_allocations.compare alloc_mode1 alloc_mode2
+    else Value_slot.Map.compare Simple.compare value_slots1 value_slots2
 
   let equal t1 t2 = compare t1 t2 = 0
 end)
 
-let is_empty { function_decls; value_slots; alloc_mode = _ } =
+let is_empty { function_decls; value_slots } =
   Function_declarations.is_empty function_decls
   && Value_slot.Map.is_empty value_slots
 
-let create ~value_slots alloc_mode function_decls =
-  { function_decls; value_slots; alloc_mode }
+let create ~value_slots function_decls = { function_decls; value_slots }
 
 let function_decls t = t.function_decls
 
 let value_slots t = t.value_slots
-
-let alloc_mode t = t.alloc_mode
 
 let is_closed t = Value_slot.Map.is_empty t.value_slots
 
 let [@ocamlformat "disable"] print ppf
       { function_decls;
         value_slots;
-        alloc_mode;
       } =
   if Value_slot.Map.is_empty value_slots then
-    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ %a@ \
+    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
         @[<hov 1>%a@]\
         )@]"
       Flambda_colours.prim_constructive
       Flambda_colours.pop
-      Alloc_mode.For_allocations.print alloc_mode
       (Function_declarations.print) function_decls
   else
-    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ %a@ \
+    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
         @[<hov 1>%a@]@ \
         @[<hov 1>(env@ %a)@]\
         )@]"
       Flambda_colours.prim_constructive
       Flambda_colours.pop
-      Alloc_mode.For_allocations.print alloc_mode
       Function_declarations.print function_decls
       (Value_slot.Map.print Simple.print) value_slots
 
-let free_names { function_decls; value_slots; alloc_mode } =
+let free_names { function_decls; value_slots } =
   let free_names_of_value_slots =
     Value_slot.Map.fold
       (fun value_slot simple free_names ->
@@ -112,15 +95,11 @@ let free_names { function_decls; value_slots; alloc_mode } =
              (Simple.free_names simple) value_slot Name_mode.normal))
       value_slots Name_occurrences.empty
   in
-  Name_occurrences.union_list
-    [ Function_declarations.free_names function_decls;
-      free_names_of_value_slots;
-      Alloc_mode.For_allocations.free_names alloc_mode ]
+  Name_occurrences.union
+    (Function_declarations.free_names function_decls)
+    free_names_of_value_slots
 
-let apply_renaming ({ function_decls; value_slots; alloc_mode } as t) renaming =
-  let alloc_mode' =
-    Alloc_mode.For_allocations.apply_renaming alloc_mode renaming
-  in
+let apply_renaming ({ function_decls; value_slots } as t) renaming =
   let function_decls' =
     Function_declarations.apply_renaming function_decls renaming
   in
@@ -138,26 +117,17 @@ let apply_renaming ({ function_decls; value_slots; alloc_mode } as t) renaming =
           None))
       value_slots
   in
-  if
-    alloc_mode == alloc_mode'
-    && function_decls == function_decls'
-    && not !changed
+  if function_decls == function_decls' && not !changed
   then t
-  else
-    { function_decls = function_decls';
-      value_slots = value_slots';
-      alloc_mode = alloc_mode'
-    }
+  else { function_decls = function_decls'; value_slots = value_slots' }
 
-let ids_for_export { function_decls; value_slots; alloc_mode } =
+let ids_for_export { function_decls; value_slots } =
   let function_decls_ids =
     Function_declarations.ids_for_export function_decls
   in
-  Ids_for_export.union
-    (Value_slot.Map.fold
-       (fun _value_slot simple ids -> Ids_for_export.add_simple ids simple)
-       value_slots function_decls_ids)
-    (Alloc_mode.For_allocations.ids_for_export alloc_mode)
+  Value_slot.Map.fold
+    (fun _value_slot simple ids -> Ids_for_export.add_simple ids simple)
+    value_slots function_decls_ids
 
 let filter_function_declarations t ~f =
   let function_decls = Function_declarations.filter t.function_decls ~f in

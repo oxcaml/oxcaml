@@ -48,7 +48,10 @@ type 'a close_program_result =
 
 type close_functions_result =
   | Lifted of (Symbol.t * Env.value_approximation) Function_slot.Lmap.t
-  | Dynamic of Set_of_closures.t * Env.value_approximation Function_slot.Map.t
+  | Dynamic of
+      Set_of_closures.t
+      * Alloc_mode.For_allocations.t
+      * Env.value_approximation Function_slot.Map.t
 
 let manufacture_symbol acc proposed_name =
   let acc, linkage_name =
@@ -3151,13 +3154,12 @@ let close_functions acc external_env ~current_region function_declarations =
           { code_id; function_slot; code; symbol = None })
       approximations
   in
-  let set_of_closures =
-    Set_of_closures.create ~value_slots
-      (Alloc_mode.For_allocations.from_lambda
-         (Function_decls.alloc_mode function_declarations)
-         ~current_region)
-      function_decls
+  let alloc_mode =
+    Alloc_mode.For_allocations.from_lambda
+      (Function_decls.alloc_mode function_declarations)
+      ~current_region
   in
+  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
   let acc =
     Acc.add_set_of_closures_offsets ~is_phantom:false acc set_of_closures
   in
@@ -3182,7 +3184,7 @@ let close_functions acc external_env ~current_region function_declarations =
     let symbols = Function_slot.Lmap.map fst symbols_with_approx in
     let acc = Acc.add_lifted_set_of_closures ~symbols ~set_of_closures acc in
     acc, Lifted symbols_with_approx
-  else acc, Dynamic (set_of_closures, approximations)
+  else acc, Dynamic (set_of_closures, alloc_mode, approximations)
 
 let close_let_rec acc env ~function_declarations
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) ~current_region =
@@ -3256,7 +3258,7 @@ let close_let_rec acc env ~function_declarations
         symbols (acc, env)
     in
     body acc env
-  | Dynamic (set_of_closures, approximations) ->
+  | Dynamic (set_of_closures, alloc_mode, approximations) ->
     let generated_closures =
       Function_slot.Set.diff
         (Function_slot.Map.keys
@@ -3291,7 +3293,7 @@ let close_let_rec acc env ~function_declarations
         fun_vars_map env
     in
     let acc, body = body acc env in
-    let named = Named.create_set_of_closures set_of_closures in
+    let named = Named.create_set_of_closures ~alloc_mode set_of_closures in
     Let_with_acc.create acc
       (Bound_pattern.set_of_closures bound_vars)
       named ~body

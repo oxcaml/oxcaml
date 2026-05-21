@@ -781,9 +781,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     cmm, free_vars, symbol_inits, res
   | Singleton v, Prim (p, dbg) ->
     let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
-  | Set_of_closures bound_vars, Set_of_closures soc ->
+  | Set_of_closures bound_vars, Set_of_closures (soc, alloc_mode) ->
     To_cmm_set_of_closures.let_dynamic_set_of_closures env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars soc ~translate_expr:expr
+      ~num_normal_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr
   | Static bound_static, Static_consts consts -> (
     let env, res, update_opt =
       To_cmm_static.static_consts env res
