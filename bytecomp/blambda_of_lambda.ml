@@ -946,8 +946,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let init_id = Ident.create_local "init" in
         let arr_id = Ident.create_local "arr" in
         lets
-          [ n_id, n_arg;
-            init_id, init_arg;
+          [ init_id, init_arg;
+            n_id, n_arg;
             arr_id, Prim (Ccall cname, [Var n_id; Var init_id]) ]
           (Sequence
              ( for_each_slot ~length:(Var n_id) ~body:(fun i ->
@@ -1006,11 +1006,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             }
         in
         lets
-          [ src_id, src_arg;
-            srcofs_id, srcofs_arg;
-            dst_id, dst_arg;
+          [ len_id, len_arg;
             dstofs_id, dstofs_arg;
-            len_id, len_arg ]
+            dst_id, dst_arg;
+            srcofs_id, srcofs_arg;
+            src_id, src_arg ]
           (Sequence
              (blit_call, for_each_slot ~length:(Var len_id) ~body:copy_slot))
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
