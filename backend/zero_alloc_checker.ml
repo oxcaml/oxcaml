@@ -2083,7 +2083,7 @@ end = struct
       Some { nor; exn; div }
 
   let set_value s (v : Value.t) =
-    let info = (Compilenv.current_unit_infos ()).ui_zero_alloc_info in
+    let info = Compilenv.current_zero_alloc_info () in
     match encode v with
     | None -> ()
     | Some i -> Zero_alloc_info.set_value info s i
@@ -2831,8 +2831,7 @@ let reset_unit_info () =
 
 let record_unit_info ppf_dump =
   Analysis.record_unit unit_info unresolved_deps ppf_dump;
-  Compilenv.cache_zero_alloc_info
-    (Compilenv.current_unit_infos ()).ui_zero_alloc_info
+  Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
 type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
 

@@ -17,7 +17,10 @@
 (** file sections cache *)
 
 type t
-type idx
+
+module Idx : sig
+  type t
+end
 
 val create : int array -> string -> in_channel -> first_section_offset:int -> t
 
@@ -25,7 +28,7 @@ val empty : t
 
 val length : t -> int
 
-val get : t -> idx -> Obj.t
+val get : t -> Idx.t -> Obj.t
 
 val serialize : t -> string array * int array * int
 
@@ -36,6 +39,7 @@ module Builder : sig
   type t
 
   val create : int -> t
-  val add : t -> Obj.t -> idx
+  val add : t -> Obj.t -> Idx.t
   val build : t -> file_sections
+  val clear : t -> unit
 end

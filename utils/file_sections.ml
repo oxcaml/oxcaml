@@ -39,7 +39,9 @@ type t =
       }
   | In_memory of Obj.t array
 
-type idx = int
+module Idx = struct
+  type t = int
+end
 
 let create section_toc file channel ~first_section_offset =
   if Array.length section_toc = 0
@@ -133,4 +135,6 @@ module Builder = struct
     idx
 
   let build t = In_memory (Dynarray.to_array t)
+
+  let clear t = Dynarray.clear t
 end

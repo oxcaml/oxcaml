@@ -35,6 +35,19 @@ type error =
 
 exception Error of error
 
+type unit_infos_builder =
+  { mutable uib_unit : Compilation_unit.t;
+    mutable uib_defines: Compilation_unit.t list;
+    mutable uib_imports_cmx: Import_info.t list;
+    mutable uib_generic_fns: generic_fns;
+    mutable uib_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
+    uib_zero_alloc_info: Zero_alloc_info.t;
+    mutable uib_force_link : bool;
+    mutable uib_requires_metaprogramming : bool;
+    mutable uib_external_symbols : string list;
+    uib_file_sections : File_sections.Builder.t;
+  }
+
 module Infos_table = Global_module.Name.Tbl
 
 let global_infos_table =
@@ -45,65 +58,47 @@ let reset_info_tables () =
 
 module String = Misc.Stdlib.String
 
-let exported_constants = Hashtbl.create 17
-
 let cached_zero_alloc_info = Zero_alloc_info.create ()
 
 let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
 
 let current_unit =
-  { ui_unit = CU.dummy;
-    ui_defines = [];
-    ui_arg_descr = None;
-    ui_imports_cmi = [];
-    ui_imports_cmx = [];
-    ui_quoted_globals = [];
-    ui_format = ();
-    ui_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
-    ui_force_link = false;
-    ui_requires_metaprogramming = false;
-    ui_zero_alloc_info = Zero_alloc_info.create ();
-    ui_export_info = None;
-    ui_external_symbols = [];
-    ui_file_sections = File_sections.empty
+  { uib_unit = CU.dummy;
+    uib_defines = [];
+    uib_imports_cmx = [];
+    uib_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
+    uib_export_info = None;
+    uib_zero_alloc_info = Zero_alloc_info.create ();
+    uib_force_link = false;
+    uib_requires_metaprogramming = false;
+    uib_external_symbols = [];
+    uib_file_sections = File_sections.Builder.create 0;
   }
 
-let current_sections = ref (File_sections.Builder.create 0)
+let current_zero_alloc_info () = current_unit.uib_zero_alloc_info
+
+let current_generic_fns () = current_unit.uib_generic_fns
+
+let current_sections () = current_unit.uib_file_sections
 
 let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
   Zero_alloc_info.reset cached_zero_alloc_info;
   Env.set_unit_name (Some unit_info);
-  current_unit.ui_unit <- compilation_unit;
-  current_unit.ui_defines <- [compilation_unit];
-  current_unit.ui_arg_descr <- None;
-  current_unit.ui_imports_cmi <- [];
-  current_unit.ui_imports_cmx <- [];
-  current_unit.ui_quoted_globals <- [];
-  current_unit.ui_format <- ();
-  current_unit.ui_generic_fns <-
-    { curry_fun = []; apply_fun = []; send_fun = [] };
-  current_unit.ui_force_link <- !Clflags.link_everything;
-  current_unit.ui_requires_metaprogramming <-
+  current_unit.uib_unit <- compilation_unit;
+  current_unit.uib_defines <- [compilation_unit];
+  current_unit.uib_force_link <- !Clflags.link_everything;
+  current_unit.uib_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
-  Zero_alloc_info.reset current_unit.ui_zero_alloc_info;
-  Hashtbl.clear exported_constants;
-  current_unit.ui_export_info <- None;
-  current_unit.ui_external_symbols <- [];
-  current_sections := File_sections.Builder.create 0
+  Zero_alloc_info.reset current_unit.uib_zero_alloc_info;
+  File_sections.Builder.clear current_unit.uib_file_sections
 
 let record_external_symbols () =
-  current_unit.ui_external_symbols <- (List.filter_map (fun prim ->
+  current_unit.uib_external_symbols <- (List.filter_map (fun prim ->
       if not (Primitive.native_name_is_external prim) then None
       else Some (Primitive.native_name prim))
       !Translmod.primitive_declarations)
-
-let current_unit_infos () =
-  current_unit
-
-let current_sections () =
-  !current_sections
 
 let read_unit_info filename =
   let ic = open_in_bin filename in
@@ -165,7 +160,7 @@ let equal_up_to_pack_prefix cu1 cu2 =
 let get_unit_export_info comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
-  assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
+  assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
   let of_infos infos =
     Option.map
       (fun export_info ->
@@ -177,9 +172,10 @@ let get_unit_export_info comp_unit =
   (* CR lmaurer: Surely this should just compare [comp_unit] to
      [current_unit.ui_unit], but doing so seems to break Closure. We should fix
      that. *)
-  if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
+  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
   then
-    of_infos current_unit
+    Misc.fatal_error
+      "get_unit_export_info: unable to get unit_info for current unit"
   else begin
     let name = CU.to_global_name_without_prefix comp_unit in
     try
@@ -214,7 +210,7 @@ let get_unit_export_info comp_unit =
           end
       in
       let import = Import_info.create_normal comp_unit ~crc in
-      current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
+      current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
       Infos_table.add global_infos_table name infos;
       Option.bind infos of_infos
   end
@@ -233,27 +229,27 @@ let cache_unit_info ui =
 (* Exporting cross-module information *)
 
 let set_export_info export_info =
-  current_unit.ui_export_info <- Some export_info
+  current_unit.uib_export_info <- Some export_info
 
 (* Record that a currying function or application function is needed *)
 
 let need_curry_fun kind arity result =
-  let fns = current_unit.ui_generic_fns in
+  let fns = current_unit.uib_generic_fns in
   if not (List.mem (kind, arity, result) fns.curry_fun) then
-    current_unit.ui_generic_fns <-
+    current_unit.uib_generic_fns <-
       { fns with curry_fun = (kind, arity, result) :: fns.curry_fun }
 
 let need_apply_fun arity result mode =
   assert(List.compare_length_with arity 0 > 0);
-  let fns = current_unit.ui_generic_fns in
+  let fns = current_unit.uib_generic_fns in
   if not (List.mem (arity, result, mode) fns.apply_fun) then
-    current_unit.ui_generic_fns <-
+    current_unit.uib_generic_fns <-
       { fns with apply_fun = (arity, result, mode) :: fns.apply_fun }
 
 let need_send_fun arity result mode =
-  let fns = current_unit.ui_generic_fns in
+  let fns = current_unit.uib_generic_fns in
   if not (List.mem (arity, result, mode) fns.send_fun) then
-    current_unit.ui_generic_fns <-
+    current_unit.uib_generic_fns <-
       { fns with send_fun = (arity, result, mode) :: fns.send_fun }
 
 (* Write the description of the current unit *)
@@ -310,18 +306,30 @@ let write_unit_info info filename =
   Digest.output oc crc)
 
 let save_unit_info filename ~main_module_block_format ~arg_descr =
-  current_unit.ui_imports_cmi <- Env.imports();
-  current_unit.ui_quoted_globals <- Env.quoted_globals();
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
      of passing these in as arguments but, unlike most of the state that this
      module keeps track of, they're not values that get accumulated over time,
      they just get computed once. (Arguably we should remove [set_export_info]
      by the same reasoning.) *)
-  current_unit.ui_arg_descr <- arg_descr;
-  current_unit.ui_file_sections <-
-    File_sections.Builder.build (current_sections ());
-  write_unit_info
-    { current_unit with ui_format = main_module_block_format } filename
+  let current_unit =
+    { ui_unit = current_unit.uib_unit;
+      ui_defines = current_unit.uib_defines;
+      ui_arg_descr = arg_descr;
+      ui_imports_cmi = Env.imports();
+      ui_imports_cmx = current_unit.uib_imports_cmx;
+      ui_quoted_globals = Env.quoted_globals();
+      ui_format = main_module_block_format;
+      ui_generic_fns = current_unit.uib_generic_fns;
+      ui_export_info = current_unit.uib_export_info;
+      ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
+      ui_force_link = current_unit.uib_force_link;
+      ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
+      ui_file_sections =
+        File_sections.Builder.build current_unit.uib_file_sections;
+      ui_external_symbols = current_unit.uib_external_symbols;
+    }
+  in
+  write_unit_info current_unit filename
 
 let new_const_symbol () =
   Symbol.for_new_const_in_current_unit ()
@@ -329,9 +337,11 @@ let new_const_symbol () =
   |> Linkage_name.to_string
 
 let require_global global_ident =
-  ignore
+  if equal_up_to_pack_prefix global_ident current_unit.uib_unit
+  then ()
+  else ignore
     (get_global_export_info global_ident
-     : Flambda2_cmx.Flambda_cmx_format.t option)
+      : Flambda2_cmx.Flambda_cmx_format.t option)
 
 (* Error report *)
 

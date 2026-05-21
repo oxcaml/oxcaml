@@ -40,11 +40,9 @@ type raw = t0 list
 
 type t = raw * File_sections.t
 
-let to_raw (t, sections) = t, sections
-
 let from_raw ~sections t = t, sections
 
-let create ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
+let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
   let typing_env_exported_ids =
     Flambda2_types.Typing_env.Serializable.ids_for_export final_typing_env

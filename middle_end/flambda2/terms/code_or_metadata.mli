@@ -42,7 +42,7 @@ val create_metadata_only : Code_metadata.t -> t
 
 val from_raw : sections:Oxcaml_utils.File_sections.t -> raw -> t
 
-val to_raw : add_section:(Obj.t -> Oxcaml_utils.File_sections.idx) -> t -> raw
+val to_raw : add_section:(Obj.t -> Oxcaml_utils.File_sections.Idx.t) -> t -> raw
 
 val remember_only_metadata : t -> t
 

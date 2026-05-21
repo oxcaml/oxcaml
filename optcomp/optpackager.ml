@@ -163,7 +163,7 @@ end) : S = struct
               (objtemp :: objfiles));
         main_module_block_size)
 
-  let build_package_cmx linkenv members cmxfile ~main_module_block_size =
+  let build_package_cmx linkenv cu members cmxfile ~main_module_block_size =
     let unit_names = List.map (fun m -> m.pm_name) members in
     let filter lst =
       List.filter
@@ -182,7 +182,6 @@ end) : S = struct
           match m.pm_kind with PM_intf -> accu | PM_impl info -> info :: accu)
         members []
     in
-    let ui = Compilenv.current_unit_infos () in
     let ui_export_info =
       Misc.fatal_error "Not implemented"
       (* List.fold_left
@@ -195,21 +194,21 @@ end) : S = struct
       (fun info ->
         Zero_alloc_info.merge info.ui_zero_alloc_info ~into:ui_zero_alloc_info)
       units;
-    let modname = Compilation_unit.name ui.ui_unit in
+    let modname = Compilation_unit.name cu in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
       Mb_struct
         { mb_repr = Module_value_only { field_count = main_module_block_size } }
     in
     let pkg_infos =
-      { ui_unit = ui.ui_unit;
+      { ui_unit = cu;
         ui_defines =
           List.flatten (List.map (fun info -> info.ui_defines) units)
-          @ [ui.ui_unit];
+          @ [cu];
         ui_arg_descr = None;
         ui_imports_cmi =
           Import_info.create modname
-            ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
+            ~crc_with_unit:(Some (cu, Env.crc_of_unit modname))
           :: filter (Linkenv.extract_crc_interfaces linkenv);
         ui_imports_cmx = filter (Linkenv.extract_crc_implementations linkenv);
         ui_quoted_globals = [] (* CR jrickard: Metaprogramming support. *);
@@ -242,7 +241,7 @@ end) : S = struct
     let main_module_block_size =
       make_package_object ~ppf_dump members target coercion
     in
-    build_package_cmx linkenv members targetcmx ~main_module_block_size
+    build_package_cmx linkenv pack_path members targetcmx ~main_module_block_size
 
   (* The entry point *)
 

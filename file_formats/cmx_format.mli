@@ -51,34 +51,32 @@ type generic_fns =
     apply_fun: apply_fn list;
     send_fun: apply_fn list }
 
-type 'format unit_infos_gen =
-  { mutable ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)
-    mutable ui_defines: Compilation_unit.t list;
-                                          (* All compilation units in the
-                                             .cmx file (i.e. [ui_unit] and
-                                             any produced via [Asmpackager]) *)
-    mutable ui_arg_descr: Lambda.arg_descr option;
-                                          (* If this is an argument unit, the
-                                             parameter it implements *)
-    mutable ui_imports_cmi: Import_info.t list;
-                                          (* Interfaces imported *)
-    mutable ui_imports_cmx: Import_info.t list;
-                                          (* Infos imported *)
-    mutable ui_quoted_globals: Compilation_unit.Name.t list;
-                                          (* Globals that are used in quotes *)
-    mutable ui_format: 'format;
-                                          (* Structure of the main module block *)
-    mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
-    mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
-    mutable ui_zero_alloc_info: Zero_alloc_info.t;
-    mutable ui_force_link: bool;          (* Always linked *)
-    mutable ui_requires_metaprogramming: bool;
-                                          (* Requires metaprogramming libs *)
-    mutable ui_file_sections: Oxcaml_utils.File_sections.t;
-    mutable ui_external_symbols: string list; (* Set of external symbols *)
+type unit_infos =
+  { ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)
+    ui_defines: Compilation_unit.t list;
+                                  (* All compilation units in the
+                                     .cmx file (i.e. [ui_unit] and
+                                     any produced via [Asmpackager]) *)
+    ui_arg_descr: Lambda.arg_descr option;
+                                  (* If this is an argument unit, the
+                                     parameter it implements *)
+    ui_imports_cmi: Import_info.t list;
+                                  (* Interfaces imported *)
+    ui_imports_cmx: Import_info.t list;
+                                  (* Infos imported *)
+    ui_quoted_globals: Compilation_unit.Name.t list;
+                                  (* Globals that are used in quotes *)
+    ui_format: Lambda.main_module_block_format;
+                                  (* Structure of the main module block *)
+    ui_generic_fns: generic_fns;  (* Generic functions needed *)
+    ui_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
+    ui_zero_alloc_info: Zero_alloc_info.t;
+    ui_force_link: bool;          (* Always linked *)
+    ui_requires_metaprogramming: bool;
+                                  (* Requires metaprogramming libs *)
+    ui_external_symbols: string list; (* Set of external symbols *)
+    ui_file_sections: Oxcaml_utils.File_sections.t;
   }
-
-type unit_infos = Lambda.main_module_block_format unit_infos_gen
 
 type unit_infos_raw =
   { uir_unit: Compilation_unit.t;
@@ -96,8 +94,8 @@ type unit_infos_raw =
     uir_section_toc: int array;    (* Byte offsets of sections in .cmx
                                       relative to byte immediately after
                                       this record *)
-    uir_sections_length: int;      (* Byte length of all sections *)
     uir_external_symbols: string array;
+    uir_sections_length: int;      (* Byte length of all sections *)
   }
 
 (* Each .a library has a matching .cmxa file that provides the following

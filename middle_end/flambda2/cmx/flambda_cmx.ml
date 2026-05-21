@@ -223,7 +223,7 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
             slots_used_in_typing_env)
   in
   let cmx =
-    Flambda_cmx_format.create ~final_typing_env ~all_code ~exported_offsets
+    Flambda_cmx_format.create_raw ~final_typing_env ~all_code ~exported_offsets
       ~used_value_slots ~sections
   in
   reachable_names, Some cmx
