@@ -4147,7 +4147,28 @@ let mutable_array ~element_kind ~length alloc_mode =
   non_null_value
     (Array { element_kind; length; contents = Known Mutable; alloc_mode })
 
+let check_array_contents ~element_kind contents =
+  match (contents : array_contents Or_unknown.t) with
+  | Unknown | Known Mutable -> ()
+  | Known (Immutable { fields }) ->
+    Array.iter
+      (fun field ->
+        match (element_kind : _ Or_unknown_or_bottom.t) with
+        | Unknown | Bottom -> ()
+        | Ok element_kind ->
+          if not (K.equal (K.With_subkind.kind element_kind) (kind field))
+          then
+            Misc.fatal_errorf
+              "Creating array with element kind %a, but field has kind \
+               %a@.Type of fields: %a@."
+              K.With_subkind.print element_kind K.print (kind field)
+              (Format.pp_print_list ~pp_sep:Format.pp_print_space print)
+              (Array.to_list fields))
+      fields
+
 let immutable_array ~element_kind ~fields alloc_mode ~machine_width =
+  check_array_contents ~element_kind
+    (Known (Immutable { fields = Array.of_list fields }));
   non_null_value
     (Array
        { element_kind;
@@ -4294,6 +4315,7 @@ module Head_of_kind_value = struct
   let create_string info = mk_non_null (String info)
 
   let create_array_with_contents ~element_kind ~length contents alloc_mode =
+    check_array_contents ~element_kind contents;
     mk_non_null (Array { element_kind; length; contents; alloc_mode })
 end
 
@@ -4338,6 +4360,7 @@ module Head_of_kind_value_non_null = struct
   let create_string info = String info
 
   let create_array_with_contents ~element_kind ~length contents alloc_mode =
+    check_array_contents ~element_kind contents;
     Array { element_kind; length; contents; alloc_mode }
 end
 
