@@ -1299,7 +1299,8 @@ struct
     let env =
       ME.use_meet_env env ~f:(fun env ->
           ME.add_env_extension_with_extra_variables
-            ~meet_type:(Meet.meet_type ()) env extension)
+            ~meet_expanded_head:(Meet.meet_expanded_head ())
+            env extension)
     in
     let sbs, base_env, new_types, acc =
       Variable.Map.fold
@@ -1350,7 +1351,8 @@ struct
       ME.use_meet_env base_env ~f:(fun env ->
           Name.Map.fold
             (fun name ty env ->
-              ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
+              ME.add_equation env name ty
+                ~meet_expanded_head:(Meet.meet_expanded_head ()))
             new_types env)
     in
     let subst var =
@@ -1419,6 +1421,7 @@ struct
     ME.use_meet_env base_env ~f:(fun env ->
         Name.Map.fold
           (fun name ty env ->
-            ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
+            ME.add_equation env name ty
+              ~meet_expanded_head:(Meet.meet_expanded_head ()))
           new_types env)
 end
