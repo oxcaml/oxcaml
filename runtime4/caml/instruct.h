@@ -65,6 +65,8 @@ enum instructions {
   MAKE_FAUX_MIXEDBLOCK,
   WITH_STACK,
   WITH_STACK_BIND,
+  WITH_STACK_PREEMPTIBLE,
+  WITH_STACK_BIND_PREEMPTIBLE,
 FIRST_UNIMPLEMENTED_OP};
 
 // Think carefully before adding a new bytecode instruction. In general,
