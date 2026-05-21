@@ -1497,6 +1497,9 @@ let assemble_instr b loc = function
   | SBB (src, dst) -> emit_SBB b dst src
   | SET (condition, dst) -> emit_set b condition dst
   | TEST (src, dst) -> emit_test b dst src
+  | UD2 ->
+      buf_int8 b 0x0F;
+      buf_int8 b 0x0B
   | XCHG (src, dst) -> emit_XCHG b dst src
   | XOR (src, dst) -> emit_XOR b dst src
   | SIMD (instr, args) -> emit_simd b instr args

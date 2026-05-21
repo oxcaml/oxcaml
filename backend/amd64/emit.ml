@@ -784,6 +784,7 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
+  I.ud2 (); (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
@@ -3129,6 +3130,7 @@ let end_assembly () =
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
   D.text ();
+  I.ud2 (); (* data in text below *)
   D.align ~fill:Nop ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:Text "frametable";
