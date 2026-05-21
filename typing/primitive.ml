@@ -933,6 +933,47 @@ let prim_has_valid_reprs ~loc prim =
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
+    | "%get_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%set_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_exchange_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_cas_idx"
+    | "%atomic_compare_exchange_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_fetch_add_idx"
+    | "%atomic_add_idx"
+    | "%atomic_sub_idx"
+    | "%atomic_land_idx"
+    | "%atomic_lor_idx"
+    | "%atomic_lxor_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
     | "%unsafe_array_idx" ->
       check [
         is (Same_as_ocaml_repr C.scannable);

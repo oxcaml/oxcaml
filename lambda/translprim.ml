@@ -1204,6 +1204,23 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
         (gen_array_kind,
          Punboxed_or_untagged_integer_index Unboxed_nativeint,
          Value generic_value, []), 1)
+    | "%get_idx_atomic" ->
+      Primitive(Patomic_load_idx { immediate_or_pointer = Pointer }, 2)
+    | "%set_idx_atomic" ->
+      Primitive(Patomic_set_idx { immediate_or_pointer = Pointer }, 3)
+    | "%atomic_exchange_idx" ->
+      Primitive(Patomic_exchange_idx { immediate_or_pointer = Pointer }, 3)
+    | "%atomic_compare_exchange_idx" ->
+      Primitive
+        (Patomic_compare_exchange_idx { immediate_or_pointer = Pointer }, 4)
+    | "%atomic_cas_idx" ->
+      Primitive(Patomic_compare_set_idx { immediate_or_pointer = Pointer }, 4)
+    | "%atomic_fetch_add_idx" -> Primitive(Patomic_fetch_add_idx, 3)
+    | "%atomic_add_idx" -> Primitive(Patomic_add_idx, 3)
+    | "%atomic_sub_idx" -> Primitive(Patomic_sub_idx, 3)
+    | "%atomic_land_idx" -> Primitive(Patomic_land_idx, 3)
+    | "%atomic_lor_idx" -> Primitive(Patomic_lor_idx, 3)
+    | "%atomic_lxor_idx" -> Primitive(Patomic_lxor_idx, 3)
     | "%unsafe_get_ptr_imm" ->
       (* This primitive requires the pointed-to data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
@@ -2546,6 +2563,11 @@ let lambda_primitive_needs_event_after = function
   | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
+  | Patomic_add_idx | Patomic_sub_idx
+  | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+  | Patomic_load_idx _ | Patomic_set_idx _
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Ptls_get

@@ -377,6 +377,20 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  (* Atomic operations on a block index. The index points to a [value]
+     element, which can be inside a mixed block. *)
+  | Patomic_load_idx of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_idx of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_exchange_idx of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_compare_exchange_idx of
+    { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_compare_set_idx of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)

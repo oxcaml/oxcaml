@@ -507,8 +507,12 @@ and block_access i ppf = function
   | Baccess_field lid ->
       line i ppf "Baccess_field %a\n" fmt_longident_loc lid
   | Baccess_block (mut, idx) ->
-      line i ppf "Baccess_block %a\n"
-        fmt_mutable_flag mut;
+      let s = match mut with
+        | Block_idx_imm -> "imm"
+        | Block_idx_mut -> "mut"
+        | Block_idx_atomic -> "atomic"
+      in
+      line i ppf "Baccess_block %s\n" s;
       expression i ppf idx
 
 and unboxed_access i ppf = function

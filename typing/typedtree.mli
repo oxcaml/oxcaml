@@ -758,7 +758,7 @@ and meth =
 
 and block_access =
   | Baccess_field of Longident.t loc * Types.label_description
-  | Baccess_block of mutable_flag * expression
+  | Baccess_block of Parsetree.block_idx_mutability * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description

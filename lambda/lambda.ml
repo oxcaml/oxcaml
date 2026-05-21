@@ -381,6 +381,20 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  (* Atomic operations on a block index. The index points to a [value]
+     element, which can be inside a mixed block. *)
+  | Patomic_load_idx of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_set_idx of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_exchange_idx of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_compare_exchange_idx of
+    {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_compare_set_idx of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -2560,6 +2574,17 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx _
+  | Patomic_set_idx _
+  | Patomic_exchange_idx _
+  | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -2746,7 +2771,11 @@ let primitive_can_raise prim =
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx
+  | Patomic_lxor_idx | Patomic_load_idx _ | Patomic_set_idx _ -> false
   | Pwith_stack | Pwith_stack_bind | Pperform | Presume
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
@@ -3176,6 +3205,21 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
+  | Patomic_load_idx { immediate_or_pointer = Immediate } ->
+    layout_int_or_null
+  | Patomic_load_idx { immediate_or_pointer = Pointer } ->
+    layout_any_value
+  | Patomic_set_idx _ -> layout_unit
+  | Patomic_exchange_idx { immediate_or_pointer = Immediate } ->
+    layout_int_or_null
+  | Patomic_exchange_idx { immediate_or_pointer = Pointer } ->
+    layout_any_value
+  | Patomic_compare_exchange_idx { immediate_or_pointer = Immediate } ->
+    layout_int_or_null
+  | Patomic_compare_exchange_idx { immediate_or_pointer = Pointer } ->
+    layout_any_value
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3183,6 +3227,11 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64

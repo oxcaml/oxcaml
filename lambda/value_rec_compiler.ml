@@ -235,6 +235,11 @@ let compute_static_size lam =
     | Patomic_land_field
     | Patomic_lor_field
     | Patomic_lxor_field
+    | Patomic_add_idx
+    | Patomic_sub_idx
+    | Patomic_land_idx
+    | Patomic_lor_idx
+    | Patomic_lxor_idx
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -360,6 +365,12 @@ let compute_static_size lam =
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
     | Patomic_fetch_add_field
+    | Patomic_load_idx _
+    | Patomic_set_idx _
+    | Patomic_exchange_idx _
+    | Patomic_compare_exchange_idx _
+    | Patomic_compare_set_idx _
+    | Patomic_fetch_add_idx
     | Popaque _
     | Pdls_get
     | Ptls_get

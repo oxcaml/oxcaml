@@ -7073,7 +7073,8 @@ and type_expect_
       match get_desc (expand_head env ty_expected) with
       | Tconstr(p, [arg1; _], _)
         when Path.same p Predef.path_idx_imm
-          || Path.same p Predef.path_idx_mut ->
+          || Path.same p Predef.path_idx_mut
+          || Path.same p Predef.path_idx_atomic ->
         arg1
       | _ ->
         newgenvar (Jkind.Builtin.value_or_null ~why:Idx_base)
@@ -7099,18 +7100,24 @@ and type_expect_
            (try unify env res.base_ty expected_base_ty with Unify _ -> ());
            res)
     in
-    let mut =
+    let idx_kind : [ `Immutable | `Mutable | `Atomic ] =
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ })
-      | Baccess_block (Immutable, _) ->
-        false
+      | Baccess_block (Block_idx_imm, _) ->
+        `Immutable
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
-      | Baccess_block (Mutable, _) ->
-        true
+      | Baccess_block (Block_idx_mut, _) ->
+        `Mutable
       | Baccess_field
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ })
+      | Baccess_block (Block_idx_atomic, _) ->
+        `Atomic
+    in
+    let mut =
+      match idx_kind with
+      | `Immutable -> false
+      | `Mutable | `Atomic -> true
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -7139,10 +7146,10 @@ and type_expect_
         raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
     end;
     let ty =
-      if mut then
-        Predef.type_idx_mut base_ty el_ty
-      else
-        Predef.type_idx_imm base_ty el_ty
+      match idx_kind with
+      | `Mutable -> Predef.type_idx_mut base_ty el_ty
+      | `Immutable -> Predef.type_idx_imm base_ty el_ty
+      | `Atomic -> Predef.type_idx_atomic base_ty el_ty
     in
     with_explanation (fun () ->
       unify_exp_types loc env ty (generic_instance ty_expected));
@@ -8115,19 +8122,37 @@ and type_block_access env expected_base_ty principal
     { ba; base_ty = ty_res; el_ty = ty_arg; modality }
   | Baccess_block (mut, idx) ->
     let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
-    let el_ty =
-      newvar
-        (Jkind.of_new_sort ~why:Idx_element ~level:(Ctype.get_current_level ()))
+    (* Atomic indices' element type must be [value] (atomic ops are
+       word-sized loads/stores). Creating the variable at jkind [value] up
+       front lets the standard unification machinery flag a non-value
+       element in the inner expression, with proper jkind history. *)
+    let el_ty_jkind =
+      match mut with
+      | Block_idx_imm | Block_idx_mut ->
+        Jkind.of_new_sort ~why:Idx_element
+          ~level:(Ctype.get_current_level ())
+      | Block_idx_atomic ->
+        Jkind.Builtin.value ~why:(Type_argument {
+          parent_path = Path.Pident Predef.ident_idx_atomic;
+          position = 2;
+          arity = 2;
+        })
     in
+    let el_ty = newvar el_ty_jkind in
     let idx_type_expected =
       match mut with
-      | Immutable -> Predef.type_idx_imm base_ty el_ty
-      | Mutable -> Predef.type_idx_mut base_ty el_ty
+      | Block_idx_imm -> Predef.type_idx_imm base_ty el_ty
+      | Block_idx_mut -> Predef.type_idx_mut base_ty el_ty
+      | Block_idx_atomic -> Predef.type_idx_atomic base_ty el_ty
     in
     let idx =
       type_expect env mode_legacy idx (mk_expected idx_type_expected) in
     let ba = Baccess_block (mut, idx) in
-    let mut = match mut with Immutable -> false | Mutable -> true in
+    let mut =
+      match mut with
+      | Block_idx_imm -> false
+      | Block_idx_mut | Block_idx_atomic -> true
+    in
     let modality = Typemode.idx_expected_modalities ~mut in
     { ba; base_ty; el_ty; modality }
 

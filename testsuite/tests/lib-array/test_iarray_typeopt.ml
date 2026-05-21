@@ -35,40 +35,9 @@ let _ = [| [: :] |];;
 
 let arr = [: 1; 2; 3 :];;
 [%%expect {|
-(let (arr/400 =[value<intarray>] (makearray_imm[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "arr" arr/400))
-val arr : int iarray = [:1; 2; 3:]
-|}];;
-
-let _ = arr.:(1);;
-[%%expect {|
-(let (arr/400 =? (apply (field_imm 0 (global Toploop!)) "arr"))
-  (iarray.get[int indexed by int] arr/400 1))
-- : int = 2
-|}]
-
-let _ = get arr 1;;
-[%%expect {|
-(let (arr/400 =? (apply (field_imm 0 (global Toploop!)) "arr"))
-  (iarray.get[int indexed by int] arr/400 1))
-- : int = 2
-|}]
-
-let _ = unsafe_get arr 1;;
-[%%expect {|
-(let (arr/400 =? (apply (field_imm 0 (global Toploop!)) "arr"))
-  (iarray.unsafe_get[int indexed by int] arr/400 1))
-- : int = 2
-|}]
-
-type 'a alias = 'a iarray
-let arr : int alias = [: 1; 2; 3 :];;
-[%%expect {|
-0
-type 'a alias = 'a iarray
 (let (arr/402 =[value<intarray>] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/402))
-val arr : int alias = [:1; 2; 3:]
+val arr : int iarray = [:1; 2; 3:]
 |}];;
 
 let _ = arr.:(1);;
@@ -92,18 +61,14 @@ let _ = unsafe_get arr 1;;
 - : int = 2
 |}]
 
-let mut_arr = [| 1; 2; 3 |];;
-let arr = of_array mut_arr;;
+type 'a alias = 'a iarray
+let arr : int alias = [: 1; 2; 3 :];;
 [%%expect {|
-(let (mut_arr/403 =[value<intarray>] (makearray[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/403))
-val mut_arr : int array = [|1; 2; 3|]
-(let
-  (mut_arr/403 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
-   arr/404 =[value<intarray>]
-     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/403))
+0
+type 'a alias = 'a iarray
+(let (arr/404 =[value<intarray>] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/404))
-val arr : int iarray = [:1; 2; 3:]
+val arr : int alias = [:1; 2; 3:]
 |}];;
 
 let _ = arr.:(1);;
@@ -127,14 +92,18 @@ let _ = unsafe_get arr 1;;
 - : int = 2
 |}]
 
-type 'a alias = 'a iarray
-let arr : int alias = [: 1; 2; 3 :];;
+let mut_arr = [| 1; 2; 3 |];;
+let arr = of_array mut_arr;;
 [%%expect {|
-0
-type 'a alias = 'a iarray
-(let (arr/406 =[value<intarray>] (makearray_imm[int] 1 2 3))
+(let (mut_arr/405 =[value<intarray>] (makearray[int] 1 2 3))
+  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/405))
+val mut_arr : int array = [|1; 2; 3|]
+(let
+  (mut_arr/405 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
+   arr/406 =[value<intarray>]
+     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/405))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/406))
-val arr : int alias = [:1; 2; 3:]
+val arr : int iarray = [:1; 2; 3:]
 |}];;
 
 let _ = arr.:(1);;
@@ -158,18 +127,14 @@ let _ = unsafe_get arr 1;;
 - : int = 2
 |}]
 
-let mut_arr = [| 1; 2; 3 |];;
-let arr = of_array mut_arr;;
+type 'a alias = 'a iarray
+let arr : int alias = [: 1; 2; 3 :];;
 [%%expect {|
-(let (mut_arr/407 =[value<intarray>] (makearray[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/407))
-val mut_arr : int array = [|1; 2; 3|]
-(let
-  (mut_arr/407 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
-   arr/408 =[value<intarray>]
-     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/407))
+0
+type 'a alias = 'a iarray
+(let (arr/408 =[value<intarray>] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/408))
-val arr : int iarray = [:1; 2; 3:]
+val arr : int alias = [:1; 2; 3:]
 |}];;
 
 let _ = arr.:(1);;
@@ -193,14 +158,18 @@ let _ = unsafe_get arr 1;;
 - : int = 2
 |}]
 
-type 'a alias = 'a iarray
-let arr : int alias = [: 1; 2; 3 :];;
+let mut_arr = [| 1; 2; 3 |];;
+let arr = of_array mut_arr;;
 [%%expect {|
-0
-type 'a alias = 'a iarray
-(let (arr/410 =[value<intarray>] (makearray_imm[int] 1 2 3))
+(let (mut_arr/409 =[value<intarray>] (makearray[int] 1 2 3))
+  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/409))
+val mut_arr : int array = [|1; 2; 3|]
+(let
+  (mut_arr/409 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
+   arr/410 =[value<intarray>]
+     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/409))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/410))
-val arr : int alias = [:1; 2; 3:]
+val arr : int iarray = [:1; 2; 3:]
 |}];;
 
 let _ = arr.:(1);;
@@ -224,18 +193,14 @@ let _ = unsafe_get arr 1;;
 - : int = 2
 |}]
 
-let mut_arr = [| 1; 2; 3 |];;
-let arr = of_array mut_arr;;
+type 'a alias = 'a iarray
+let arr : int alias = [: 1; 2; 3 :];;
 [%%expect {|
-(let (mut_arr/411 =[value<intarray>] (makearray[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/411))
-val mut_arr : int array = [|1; 2; 3|]
-(let
-  (mut_arr/411 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
-   arr/412 =[value<intarray>]
-     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/411))
+0
+type 'a alias = 'a iarray
+(let (arr/412 =[value<intarray>] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/412))
-val arr : int iarray = [:1; 2; 3:]
+val arr : int alias = [:1; 2; 3:]
 |}];;
 
 let _ = arr.:(1);;
@@ -259,33 +224,68 @@ let _ = unsafe_get arr 1;;
 - : int = 2
 |}]
 
+let mut_arr = [| 1; 2; 3 |];;
+let arr = of_array mut_arr;;
+[%%expect {|
+(let (mut_arr/413 =[value<intarray>] (makearray[int] 1 2 3))
+  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/413))
+val mut_arr : int array = [|1; 2; 3|]
+(let
+  (mut_arr/413 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
+   arr/414 =[value<intarray>]
+     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/413))
+  (apply (field_imm 1 (global Toploop!)) "arr" arr/414))
+val arr : int iarray = [:1; 2; 3:]
+|}];;
+
+let _ = arr.:(1);;
+[%%expect {|
+(let (arr/414 =? (apply (field_imm 0 (global Toploop!)) "arr"))
+  (iarray.get[int indexed by int] arr/414 1))
+- : int = 2
+|}]
+
+let _ = get arr 1;;
+[%%expect {|
+(let (arr/414 =? (apply (field_imm 0 (global Toploop!)) "arr"))
+  (iarray.get[int indexed by int] arr/414 1))
+- : int = 2
+|}]
+
+let _ = unsafe_get arr 1;;
+[%%expect {|
+(let (arr/414 =? (apply (field_imm 0 (global Toploop!)) "arr"))
+  (iarray.unsafe_get[int indexed by int] arr/414 1))
+- : int = 2
+|}]
+
 (* And check that arrays are still mutable loads (array.get) *)
 
 let mut_arr = [| 1; 2; 3 |];;
 [%%expect {|
-(let (mut_arr/413 =[value<intarray>] (makearray[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/413))
+(let (mut_arr/415 =[value<intarray>] (makearray[int] 1 2 3))
+  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/415))
 val mut_arr : int array = [|1; 2; 3|]
 |}]
 
 let _ = mut_arr.(1);;
 [%%expect {|
-(let (mut_arr/413 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
-  (array.get[int indexed by int] mut_arr/413 1))
+(let (mut_arr/415 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
+  (array.get[int indexed by int] mut_arr/415 1))
 - : int = 2
 |}]
 
 let _ = Array.get mut_arr 1;;
 [%%expect {|
-(let (mut_arr/413 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
-  (array.get[int indexed by int] mut_arr/413 1))
+(let (mut_arr/415 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
+  (array.get[int indexed by int] mut_arr/415 1))
 - : int = 2
 |}]
 
 let _ = Array.unsafe_get mut_arr 1;;
 [%%expect {|
-(let (mut_arr/413 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
-  (array.unsafe_get[int indexed by int] mut_arr/413 1))
+(let (mut_arr/415 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
+  (array.unsafe_get[int indexed by int] mut_arr/415 1))
 - : int = 2
 |}]
 
@@ -294,44 +294,9 @@ let mut_arr : int alias = [| 1; 2; 3 |];;
 [%%expect {|
 0
 type 'a alias = 'a array
-(let (mut_arr/465 =[value<intarray>] (makearray[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/465))
-val mut_arr : int alias = [|1; 2; 3|]
-|}];;
-
-let _ = mut_arr.(1);;
-[%%expect {|
-(let (mut_arr/465 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
-  (array.get[int indexed by int] mut_arr/465 1))
-- : int = 2
-|}]
-
-let _ = Array.get mut_arr 1;;
-[%%expect {|
-(let (mut_arr/465 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
-  (array.get[int indexed by int] mut_arr/465 1))
-- : int = 2
-|}]
-
-let _ = Array.unsafe_get mut_arr 1;;
-[%%expect {|
-(let (mut_arr/465 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
-  (array.unsafe_get[int indexed by int] mut_arr/465 1))
-- : int = 2
-|}]
-
-let arr = [: 1; 2; 3 :];;
-let mut_arr = to_array arr;;
-[%%expect {|
-(let (arr/466 =[value<intarray>] (makearray_imm[int] 1 2 3))
-  (apply (field_imm 1 (global Toploop!)) "arr" arr/466))
-val arr : int iarray = [:1; 2; 3:]
-(let
-  (arr/466 =? (apply (field_imm 0 (global Toploop!)) "arr")
-   mut_arr/467 =[value<intarray>]
-     (apply (field_imm 12 (global Stdlib_stable__IarrayLabels!)) arr/466))
+(let (mut_arr/467 =[value<intarray>] (makearray[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/467))
-val mut_arr : int array = [|1; 2; 3|]
+val mut_arr : int alias = [|1; 2; 3|]
 |}];;
 
 let _ = mut_arr.(1);;
@@ -352,5 +317,40 @@ let _ = Array.unsafe_get mut_arr 1;;
 [%%expect {|
 (let (mut_arr/467 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
   (array.unsafe_get[int indexed by int] mut_arr/467 1))
+- : int = 2
+|}]
+
+let arr = [: 1; 2; 3 :];;
+let mut_arr = to_array arr;;
+[%%expect {|
+(let (arr/468 =[value<intarray>] (makearray_imm[int] 1 2 3))
+  (apply (field_imm 1 (global Toploop!)) "arr" arr/468))
+val arr : int iarray = [:1; 2; 3:]
+(let
+  (arr/468 =? (apply (field_imm 0 (global Toploop!)) "arr")
+   mut_arr/469 =[value<intarray>]
+     (apply (field_imm 12 (global Stdlib_stable__IarrayLabels!)) arr/468))
+  (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/469))
+val mut_arr : int array = [|1; 2; 3|]
+|}];;
+
+let _ = mut_arr.(1);;
+[%%expect {|
+(let (mut_arr/469 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
+  (array.get[int indexed by int] mut_arr/469 1))
+- : int = 2
+|}]
+
+let _ = Array.get mut_arr 1;;
+[%%expect {|
+(let (mut_arr/469 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
+  (array.get[int indexed by int] mut_arr/469 1))
+- : int = 2
+|}]
+
+let _ = Array.unsafe_get mut_arr 1;;
+[%%expect {|
+(let (mut_arr/469 =? (apply (field_imm 0 (global Toploop!)) "mut_arr"))
+  (array.unsafe_get[int indexed by int] mut_arr/469 1))
 - : int = 2
 |}]

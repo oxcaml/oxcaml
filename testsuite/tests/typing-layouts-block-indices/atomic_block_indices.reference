@@ -1,0 +1,23 @@
+get y = 2
+after set, get y = 10
+exchange returned 10, get y = 20
+cas (20->30) success=true, get y = 30
+cas (99->40) success=false, get y = 30
+fetch_and_add prev=30, get y = 35
+after add 100, get y = 135
+after sub 5, get y = 130
+after set 0xff, logand 0x0f, get y = 0xf
+after logor 0xf0, get y = 0xff
+after logxor 0xff, get y = 0x0
+get_contended y = 0
+get u = two
+after set, get u = ten
+exchange returned ten, get u = zero
+multi: get c = 7
+multi: after set, get c = 77
+multi: compare_exchange prev=77, now c = 88
+multi: unchanged a=-1 b=filler d=99
+deepened: get = 42
+deepened: after set, get = 100
+deepened: exchange returned 100, now = 200
+deepened: fetch_and_add 1 prev=200, now = 201

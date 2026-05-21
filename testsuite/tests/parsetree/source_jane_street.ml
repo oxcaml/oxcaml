@@ -1292,6 +1292,22 @@ val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
 |}]
 
+(* Block-index deepening syntax: .idx_imm(_), .idx_mut(_), .idx_atomic(_). *)
+type a = { mutable a_mut : int; mutable a_atom : int [@atomic]; a_imm : int }
+let deepen_imm  (i : (_, _ r#) idx_imm) = (.idx_imm(i).#foo)
+let deepen_mut  (i : (_, _ r#) idx_mut) = (.idx_mut(i).#foo)
+let deepen_atom (i : (_, _ r#) idx_atomic) = (.idx_atomic(i).#foo)
+[%%expect{|
+type a = {
+  mutable a_mut : int;
+  mutable a_atom : int [@atomic];
+  a_imm : int;
+}
+val deepen_imm : ('a, 'b r#) idx_imm -> ('a, 'b) idx_imm = <fun>
+val deepen_mut : ('a, 'b r#) idx_mut -> ('a, 'b) idx_mut = <fun>
+val deepen_atom : ('a, 'b r#) idx_atomic -> ('a, 'b) idx_atomic = <fun>
+|}]
+
 module Borrow = struct
   let f () =
     let x = "hello" in

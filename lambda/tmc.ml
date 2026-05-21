@@ -916,6 +916,11 @@ let rec choice ctx t =
     | Patomic_add_field | Patomic_sub_field | Patomic_land_field
     | Patomic_lor_field | Patomic_lxor_field
     | Patomic_load_field _ | Patomic_set_field _
+    | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+    | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
+    | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
+    | Patomic_lor_idx | Patomic_lxor_idx
+    | Patomic_load_idx _ | Patomic_set_idx _
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
     | Pjoin_vec256 | Psplit_vec256

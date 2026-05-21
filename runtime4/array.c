@@ -1037,6 +1037,113 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLreturn (Val_unit);
 }
 
+/* Forward declarations for the atomic field primitives (defined in
+   runtime4/misc.c). */
+CAMLextern value caml_atomic_exchange_field (value, value, value);
+CAMLextern value caml_atomic_compare_exchange_field (value, value, value,
+                                                     value);
+CAMLextern value caml_atomic_cas_field (value, value, value, value);
+CAMLextern value caml_atomic_fetch_add_field (value, value, value);
+CAMLextern value caml_atomic_add_field (value, value, value);
+CAMLextern value caml_atomic_sub_field (value, value, value);
+CAMLextern value caml_atomic_land_field (value, value, value);
+CAMLextern value caml_atomic_lor_field (value, value, value);
+CAMLextern value caml_atomic_lxor_field (value, value, value);
+
+/* Helpers for atomic operations through a block index (bytecode). See
+   [runtime/array.c] for the analogous (runtime5) versions. */
+static value caml_idx_atomic_target(value base, value idx, intnat *last_pos)
+{
+  CAMLassert (Tag_val(idx) == 0);
+  mlsize_t depth = Wosize_val(idx);
+  CAMLassert (depth >= 1);
+  value dst = base;
+  for (mlsize_t i = 0; i < depth - 1; i++) {
+    intnat pos = Long_val(Field(idx, i));
+    dst = Field(dst, pos);
+  }
+  *last_pos = Long_val(Field(idx, depth - 1));
+  return dst;
+}
+
+CAMLprim value caml_atomic_exchange_idx_bytecode(value base, value idx,
+                                                  value v)
+{
+  CAMLparam3 (base, idx, v);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_exchange_field(target, Val_long(pos), v));
+}
+
+CAMLprim value caml_atomic_cas_idx_bytecode(value base, value idx,
+                                             value oldv, value newv)
+{
+  CAMLparam4 (base, idx, oldv, newv);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_cas_field(target, Val_long(pos), oldv, newv));
+}
+
+CAMLprim value caml_atomic_compare_exchange_idx_bytecode(value base, value idx,
+                                                          value oldv,
+                                                          value newv)
+{
+  CAMLparam4 (base, idx, oldv, newv);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (
+    caml_atomic_compare_exchange_field(target, Val_long(pos), oldv, newv));
+}
+
+CAMLprim value caml_atomic_fetch_add_idx_bytecode(value base, value idx,
+                                                   value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_fetch_add_field(target, Val_long(pos), incr));
+}
+
+CAMLprim value caml_atomic_add_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_add_field(target, Val_long(pos), incr));
+}
+
+CAMLprim value caml_atomic_sub_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_sub_field(target, Val_long(pos), incr));
+}
+
+CAMLprim value caml_atomic_land_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_land_field(target, Val_long(pos), incr));
+}
+
+CAMLprim value caml_atomic_lor_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_lor_field(target, Val_long(pos), incr));
+}
+
+CAMLprim value caml_atomic_lxor_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  intnat pos;
+  value target = caml_idx_atomic_target(base, idx, &pos);
+  CAMLreturn (caml_atomic_lxor_field(target, Val_long(pos), incr));
+}
+
 /* Concatenates idx_prefix and idx_suffix */
 CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   mlsize_t prefix_depth = Wosize_val(idx_prefix);

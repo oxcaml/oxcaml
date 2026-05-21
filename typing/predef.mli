@@ -55,6 +55,7 @@ val type_unboxed_int64:type_expr
 val type_or_null: type_expr -> type_expr
 val type_idx_imm : type_expr -> type_expr -> type_expr
 val type_idx_mut : type_expr -> type_expr -> type_expr
+val type_idx_atomic : type_expr -> type_expr -> type_expr
 
 val type_int8x16: type_expr
 val type_int16x8: type_expr
@@ -140,6 +141,7 @@ val path_unboxed_int64: Path.t
 val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t
+val path_idx_atomic: Path.t
 
 val path_int8x16: Path.t
 val path_int16x8: Path.t
@@ -202,6 +204,7 @@ val ident_some : Ident.t
 val ident_or_null : Ident.t
 val ident_idx_imm : Ident.t
 val ident_idx_mut : Ident.t
+val ident_idx_atomic : Ident.t
 
 (* The jkind used for optional function argument types *)
 val option_argument_jkind : jkind_lr
