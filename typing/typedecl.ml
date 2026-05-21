@@ -2054,6 +2054,17 @@ let compute_record_repr
     ~represent_as_float_array
     ~flatten_floats
   =
+  (* Atomic fields must have layout value, independently of whether the
+     record is a mixed block. A single-field record with a non-value atomic
+     field would otherwise slip past the mixed-block patterns below. *)
+  List.iter2
+    (fun ((repr : Element_repr.t option), _) (lbl, _) ->
+       if Types.is_atomic lbl.Types.ld_mutable then
+         match repr with
+         | Some (Value_element _ | Float_element) -> ()
+         | Some (Unboxed_element _ | Void) | None ->
+           raise (Error (lbl.Types.ld_loc, Non_value_atomic_field)))
+    reprs lbls;
   let mixed_record () =
     let shape =
       Element_repr.mixed_product_shape loc reprs Record
@@ -2099,40 +2110,18 @@ let compute_record_repr
       Ok (Record_mixed shape)
     else
       mixed_record ()
-  (* Forbid atomic fields in mixed (or potentially mixed) blocks *)
+  (* Forbid atomic fields in mixed blocks. Non-value atomic fields are
+     already rejected upfront with [Non_value_atomic_field]. *)
   | ~values:true, ~voids:true, ~atomic_fields:true, ..
   | ~floats:true, ~voids:true, ~atomic_fields:true, ..
   | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
   | ~values:true, ~float64s:true, ~atomic_fields:true, ..
   | ~non_float64_unboxed_fields:true, ~atomic_fields:true, ..
   | ~first_any:(Some _), ~atomic_fields:true, .. ->
-    let error =
-      (* Print a different error if an atomic field itself is
-          non-value *)
-      match
-        List.find_map
-          (fun ((repr : Element_repr.t option), lbl) ->
-              match repr with
-              | Some (Value_element _ | Float_element) | None -> None
-              | Some _ ->
-                if Types.is_atomic lbl.Types.ld_mutable
-                then Some lbl
-                else None)
-          (List.map2 (fun (repr, _) (lbl, _) -> repr, lbl)
-              reprs lbls)
-      with
-      | Some lbl ->
-        Error(lbl.Types.ld_loc, Non_value_atomic_field)
-      | None ->
-        (* Find the first atomic field, to get a better location for the
-            error *)
-        let lbl, _ =
-          List.find (fun (lbl, _) -> Types.is_atomic lbl.Types.ld_mutable)
-            lbls
-        in
-        Error(lbl.Types.ld_loc, Atomic_field_in_mixed_block)
+    let lbl, _ =
+      List.find (fun (lbl,_) -> Types.is_atomic lbl.Types.ld_mutable) lbls
     in
-    raise error
+    raise (Error(lbl.Types.ld_loc, Atomic_field_in_mixed_block))
   (* Any record with a field of kind [any] can't be represented. *)
   | ~first_any:(Some id), .. ->
     Result.Error (Unrepresentable_field (Ident.name id))
