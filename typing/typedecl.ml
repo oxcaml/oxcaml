@@ -2315,6 +2315,15 @@ let rec update_decl_jkind env dpath decl =
       assert false
   in
 
+  let warn_if_immediate_tags_change_upstream_repr cstrs rep =
+    if Language_extension.erasable_extensions_only () then
+      Option.iter
+        (fun loc ->
+          Location.prerr_warning loc
+            (Warnings.Incompatible_with_upstream
+               Warnings.Immediate_constructor_tag))
+        (Datarepr.first_immediate_constructor_tag_changing_default cstrs rep)
+  in
 
   let new_decl =
     match decl.type_kind with
@@ -2396,6 +2405,7 @@ let rec update_decl_jkind env dpath decl =
       let cstrs, rep, type_jkind =
         update_variant_kind decl.type_loc cstrs rep
       in
+      warn_if_immediate_tags_change_upstream_repr cstrs rep;
       (* See Note [Quality of jkinds during inference] for more information
          about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in

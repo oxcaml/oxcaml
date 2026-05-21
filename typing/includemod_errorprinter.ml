@@ -909,12 +909,12 @@ let module_type_declarations id {Err.got=d1 ; expected=d2} =
 
 let interface_mismatch ppf (diff: _ Err.diff) =
   Fmt.fprintf ppf
-    "The implementation %a@ does not match the interface %a:@ "
+    "The implementation %a@ does not match the interface %a:"
     Style.inline_code diff.got Style.inline_code diff.expected
 
 let parameter_mismatch ppf (diff: _ Err.diff) =
   Fmt.fprintf ppf
-    "The argument module %s@ does not match the parameter signature %s:@ "
+    "The argument module %s@ does not match the parameter signature %s:"
     diff.got diff.expected
 
 let compilation_unit_mismatch comparison ppf diff =

@@ -2057,10 +2057,20 @@ let tree_of_constructor_args_and_ret_type args ret_type =
 let tree_of_single_constructor cd =
   let name = Ident.name cd.cd_id in
   let args, ret = tree_of_constructor_args_and_ret_type cd.cd_args cd.cd_res in
+  let attrs =
+    match Builtin_attributes.immediate_constructor_tag cd.cd_attributes with
+    | Some (Builtin_attributes.Immediate_constructor_tag { txt; _ }) ->
+      [{ oattr_name = Printf.sprintf "immediate %d" txt }]
+    | Some (Builtin_attributes.Invalid_immediate_constructor_tag _)
+    | Some (Builtin_attributes.Duplicate_immediate_constructor_tag _)
+    | None ->
+      []
+  in
   {
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
+      ocstr_attributes = attrs;
   }
 
 (* When printing GADT constructor, we need to forget the naming decision we took
@@ -2411,6 +2421,7 @@ let extension_only_constructor id ppf ext =
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
+      ocstr_attributes = [];
     }
 
 (* Print a value declaration *)

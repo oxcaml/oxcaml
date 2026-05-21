@@ -411,10 +411,10 @@ let create_simple_variant_die ~reference ~parent_proto_die ?name
       ()
   in
   List.iteri
-    (fun i constructor ->
+    (fun tag constructor ->
       Proto_die.create_ignore ~parent:(Some enum) ~tag:Dwarf_tag.Enumerator
         ~attribute_values:
-          [ DAH.create_const_value ~value:(Int64.of_int ((2 * i) + 1));
+          [ DAH.create_const_value ~value:(Int64.of_int ((2 * tag) + 1));
             DAH.create_name constructor ]
         ())
     simple_constructors
@@ -562,11 +562,11 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
       ~reference:(Proto_die.reference enum_die)
       simple_constructors;
     List.iteri
-      (fun i name ->
+      (fun tag name ->
         Proto_die.create_ignore ~parent:(Some enum_die)
           ~tag:Dwarf_tag.Enumerator
           ~attribute_values:
-            [ DAH.create_const_value ~value:(Int64.of_int i);
+            [ DAH.create_const_value ~value:(Int64.of_int tag);
               DAH.create_name name ]
           ())
       simple_constructors;
