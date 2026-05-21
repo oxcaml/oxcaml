@@ -176,7 +176,7 @@ unboxing_through_select:
   addq  $8, %rdx
   addq  $24, %rdx
   movq  $3071, -8(%rdx)
-  movq  caml_int64_ops@GOTPCREL(%rip), %rcx
+  movq  <hidden PC-relative offset>(%rip), %rcx
   movq  %rcx, (%rdx)
   movq  %rdi, 8(%rdx)
   leaq  -24(%rdx), %rdi
