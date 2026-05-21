@@ -136,13 +136,13 @@ Error: An unboxed product array element must be formed from all
        contained abstract types as [mod external] may resolve this error.
 |}]
 
-(* safe get indexed by int64# *)
-external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> 'a =
+(* safe get indexed by int64_u *)
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64_u -> 'a =
   "%array_safe_get_indexed_by_int64#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any separable). 'a iarray -> int64# -> 'a
+external get : ('a : any separable). 'a iarray -> int64_u -> 'a
   = "%array_safe_get_indexed_by_int64#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -167,13 +167,13 @@ Error: An unboxed product array element must be formed from all
        contained abstract types as [mod external] may resolve this error.
 |}]
 
-(* unsafe get indexed by int64# *)
-external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> 'a =
+(* unsafe get indexed by int64_u *)
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64_u -> 'a =
   "%array_unsafe_get_indexed_by_int64#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any separable). 'a iarray -> int64# -> 'a
+external get : ('a : any separable). 'a iarray -> int64_u -> 'a
   = "%array_unsafe_get_indexed_by_int64#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -198,13 +198,13 @@ Error: An unboxed product array element must be formed from all
        contained abstract types as [mod external] may resolve this error.
 |}]
 
-(* safe get indexed by int32# *)
-external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> 'a =
+(* safe get indexed by int32_u *)
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32_u -> 'a =
   "%array_safe_get_indexed_by_int32#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any separable). 'a iarray -> int32# -> 'a
+external get : ('a : any separable). 'a iarray -> int32_u -> 'a
   = "%array_safe_get_indexed_by_int32#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -229,13 +229,13 @@ Error: An unboxed product array element must be formed from all
        contained abstract types as [mod external] may resolve this error.
 |}]
 
-(* unsafe get indexed by int32# *)
-external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> 'a =
+(* unsafe get indexed by int32_u *)
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32_u -> 'a =
   "%array_unsafe_get_indexed_by_int32#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any separable). 'a iarray -> int32# -> 'a
+external get : ('a : any separable). 'a iarray -> int32_u -> 'a
   = "%array_unsafe_get_indexed_by_int32#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -342,20 +342,20 @@ val f_scannable_empty_literal :
 |}]
 
 let f_ignorable_literal (type a : value mod external_)
-      (x : int) (y : a) (z : #(int64# * float#)) = [: #(x, y, z) :]
+      (x : int) (y : a) (z : #(int64_u * float#)) = [: #(x, y, z) :]
 [%%expect{|
 val f_ignorable_literal :
   ('a : value mod external_).
     int ->
-    'a -> #(int64# * float#) -> #(int * 'a * #(int64# * float#)) iarray =
+    'a -> #(int64_u * float#) -> #(int * 'a * #(int64_u * float#)) iarray =
   <fun>
 |}]
 
 let f_ignorable_empty_literal (type a : value mod external_)
-  : #(int * a * #(int64# * float#)) iarray = [: :]
+  : #(int * a * #(int64_u * float#)) iarray = [: :]
 [%%expect{|
 val f_ignorable_empty_literal :
-  ('a : value mod external_). #(int * 'a * #(int64# * float#)) iarray =
+  ('a : value mod external_). #(int * 'a * #(int64_u * float#)) iarray =
   [::]
 |}]
 
@@ -403,15 +403,15 @@ val f_scannable_literal :
   <fun>
 |}]
 
-let f_ignorable_literal arr : #(#(int64# * float#) * int32# * int) =
+let f_ignorable_literal arr : #(#(int64_u * float#) * int32_u * int) =
   match arr with
   | [: :] -> #(#(#42L, #3.14), #10l, 43)
   | [: #(x, y, #(z, q)) :] -> #(#(q, z), y, x)
   | _ -> assert false
 [%%expect{|
 val f_ignorable_literal :
-  #(int * int32# * #(float# * int64#)) iarray ->
-  #(#(int64# * float#) * int32# * int) = <fun>
+  #(int * int32_u * #(float# * int64_u)) iarray ->
+  #(#(int64_u * float#) * int32_u * int) = <fun>
 |}]
 
 let f_illegal_literal : #(float# * bool option * int) iarray -> int =

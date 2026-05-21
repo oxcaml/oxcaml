@@ -65,15 +65,15 @@ let test_empty_arrays () =
 
   (* Empty arrays should never allocate *)
   let empty_int64 =
-    check_allocation "empty int64#" false (fun () -> ([| |] : int64# array))
+    check_allocation "empty int64_u" false (fun () -> ([| |] : int64_u array))
   in
-  Block_checks.check_empty_array_is_uniform ~array_type:"empty int64#"
+  Block_checks.check_empty_array_is_uniform ~array_type:"empty int64_u"
     (Obj.repr empty_int64);
 
   let empty_int32 =
-    check_allocation "empty int32#" false (fun () -> ([| |] : int32# array))
+    check_allocation "empty int32_u" false (fun () -> ([| |] : int32_u array))
   in
-  Block_checks.check_empty_array_is_uniform ~array_type:"empty int32#"
+  Block_checks.check_empty_array_is_uniform ~array_type:"empty int32_u"
     (Obj.repr empty_int32);
 
   let empty_int16 =
@@ -132,13 +132,13 @@ let test_array name array_type create native_tag =
         ~array_type (Obj.repr arr) 0
   | Bytecode | Other _ -> ())
 
-(* Test int64# arrays *)
+(* Test int64_u arrays *)
 let test_int64_arrays () =
-  Printf.printf "\nTesting int64# arrays:\n";
+  Printf.printf "\nTesting int64_u arrays:\n";
 
   (* Constant arrays should be statically allocated *)
   let arr1 =
-    check_allocation "int64# [42L]" false (fun () -> [: #42L :])
+    check_allocation "int64_u [42L]" false (fun () -> [: #42L :])
   in
   let tag1 = Obj.tag (Obj.repr arr1) in
   let expected_tag =
@@ -150,28 +150,28 @@ let test_int64_arrays () =
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"int64# single" (Obj.repr arr1) 0
+         ~array_type:"int64_u single" (Obj.repr arr1) 0
    | Bytecode | Other _ -> ());
 
   let arr2 =
-    check_allocation "int64# [1L; 2L; 3L]" false (fun () -> [: #1L; #2L; #3L :])
+    check_allocation "int64_u [1L; 2L; 3L]" false (fun () -> [: #1L; #2L; #3L :])
   in
   let tag2 = Obj.tag (Obj.repr arr2) in
   assert (tag2 = expected_tag);
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"int64# triple" (Obj.repr arr2) 0
+         ~array_type:"int64_u triple" (Obj.repr arr2) 0
    | Bytecode | Other _ -> ());
 
-  Printf.printf "int64# array tests passed\n"
+  Printf.printf "int64_u array tests passed\n"
 
-(* Test int32# arrays *)
+(* Test int32_u arrays *)
 let test_int32_arrays () =
-  Printf.printf "\nTesting int32# arrays:\n";
+  Printf.printf "\nTesting int32_u arrays:\n";
 
   let arr1 =
-    check_allocation "int32# [42l]" false (fun () -> [: #42l :])
+    check_allocation "int32_u [42l]" false (fun () -> [: #42l :])
   in
   let tag1 = Obj.tag (Obj.repr arr1) in
   let expected_tag1 =
@@ -183,11 +183,11 @@ let test_int32_arrays () =
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"int32# single" (Obj.repr arr1) 0
+         ~array_type:"int32_u single" (Obj.repr arr1) 0
    | Bytecode | Other _ -> ());
 
   let arr2 =
-    check_allocation "int32# [1l; 2l]" false (fun () -> [: #1l; #2l :])
+    check_allocation "int32_u [1l; 2l]" false (fun () -> [: #1l; #2l :])
   in
   let tag2 = Obj.tag (Obj.repr arr2) in
   let expected_tag2 =
@@ -199,11 +199,11 @@ let test_int32_arrays () =
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"int32# pair" (Obj.repr arr2) 0
+         ~array_type:"int32_u pair" (Obj.repr arr2) 0
    | Bytecode | Other _ -> ());
 
   let arr3 =
-    check_allocation "int32# [1l; 2l; 3l]" false (fun () -> [: #1l; #2l; #3l :])
+    check_allocation "int32_u [1l; 2l; 3l]" false (fun () -> [: #1l; #2l; #3l :])
   in
   let tag3 = Obj.tag (Obj.repr arr3) in
   let expected_tag3 =
@@ -215,10 +215,10 @@ let test_int32_arrays () =
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"int32# triple" (Obj.repr arr3) 0
+         ~array_type:"int32_u triple" (Obj.repr arr3) 0
    | Bytecode | Other _ -> ());
 
-  Printf.printf "int32# array tests passed\n"
+  Printf.printf "int32_u array tests passed\n"
 
 (* Test int16# arrays *)
 let test_int16_arrays () =

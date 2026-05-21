@@ -74,7 +74,7 @@ select_constant:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_int32 b (x : int32#) (y : int32#) =
+let select_int32 b (x : int32_u) (y : int32_u) =
   Builtins.select_int32 b x y
 [%%expect_asm X86_64{|
 select_int32:
@@ -87,7 +87,7 @@ select_int32:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_int64 b (x : int64#) (y : int64#) =
+let select_int64 b (x : int64_u) (y : int64_u) =
   Builtins.select_int64 b x y
 [%%expect_asm X86_64{|
 select_int64:

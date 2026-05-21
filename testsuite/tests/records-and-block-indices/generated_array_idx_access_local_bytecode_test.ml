@@ -61,17 +61,17 @@ type v3 = C3_0 of unit_u (* (| unit_u) *)
 type t4 = #{ a4 : int; b4 : v3 } (* #{ int; (| unit_u) } *)
 type t5 = #{ a5 : int; b5 : t0 } (* #{ int; #{ int } } *)
 type t6 = #{ a6 : int; b6 : t1 } (* #{ int; #{ int; int } } *)
-type t7 = #{ a7 : int32# } (* #{ int32# } *)
-type t8 = #{ a8 : int; b8 : t7 } (* #{ int; #{ int32# } } *)
-type t9 = #{ a9 : int64#; b9 : int64# } (* #{ int64#; int64# } *)
-type t10 = #{ a10 : int32#; b10 : nativeint# } (* #{ int32#; nativeint# } *)
+type t7 = #{ a7 : int32_u } (* #{ int32_u } *)
+type t8 = #{ a8 : int; b8 : t7 } (* #{ int; #{ int32_u } } *)
+type t9 = #{ a9 : int64_u; b9 : int64_u } (* #{ int64_u; int64_u } *)
+type t10 = #{ a10 : int32_u; b10 : nativeint# } (* #{ int32_u; nativeint# } *)
 type t11 = #{ a11 : nativeint# } (* #{ nativeint# } *)
 type t12 = #{ a12 : string; b12 : string } (* #{ string; string } *)
 type t13 = #{ a13 : v3 } (* #{ (| unit_u) } *)
-type t14 = #{ a14 : v3; b14 : int32# } (* #{ (| unit_u); int32# } *)
+type t14 = #{ a14 : v3; b14 : int32_u } (* #{ (| unit_u); int32_u } *)
 type t15 = #{ a15 : t0; b15 : int } (* #{ #{ int }; int } *)
-type t16 = #{ a16 : t0; b16 : int32# } (* #{ #{ int }; int32# } *)
-type t17 = #{ a17 : t7 } (* #{ #{ int32# } } *)
+type t16 = #{ a16 : t0; b16 : int32_u } (* #{ #{ int }; int32_u } *)
+type t17 = #{ a17 : t7 } (* #{ #{ int32_u } } *)
 type t18 = #{ a18 : float# } (* #{ float# } *)
 type t19 = #{ a19 : t18; b19 : float# } (* #{ #{ float# }; float# } *)
 type t20 = #{ a20 : string } (* #{ string } *)
@@ -109,13 +109,13 @@ let test size =
   done;
   Gc.compact ();
 
-  (**************)
-  (*   int32#   *)
-  (**************)
+  (***************)
+  (*   int32_u   *)
+  (***************)
   let eq = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
   let mk_value i = Int32_u.of_int (i + 0) in
   (* Create an array of size [size] *)
-  let a : int32# array = makearray_dynamic_local size #0l in
+  let a : int32_u array = makearray_dynamic_local size #0l in
   (* Fill [a] with distinct values using block indices *)
   for i = 0 to size - 1 do
     Idx_mut.set a (Idx_mut.unsafe_create_into_array i) (mk_value i);
@@ -443,9 +443,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (**********************************)
-  (*   t8 = #{ int; #{ int32# } }   *)
-  (**********************************)
+  (***********************************)
+  (*   t8 = #{ int; #{ int32_u } }   *)
+  (***********************************)
   let eq = (fun #{ a8 = a81; b8 = b81 } #{ a8 = a82; b8 = b82 } -> (fun a b -> Int.equal a b) a81 a82 && (fun #{ a7 = a71 } #{ a7 = a72 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a71 a72) b81 b82) in
   let mk_value i = #{ a8 = (i + 0); b8 = #{ a7 = Int32_u.of_int (i + 1) } } in
   (* Create an array of size [size] *)
@@ -501,9 +501,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (********************************)
-  (*   t9 = #{ int64#; int64# }   *)
-  (********************************)
+  (**********************************)
+  (*   t9 = #{ int64_u; int64_u }   *)
+  (**********************************)
   let eq = (fun #{ a9 = a91; b9 = b91 } #{ a9 = a92; b9 = b92 } -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a91 a92 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) b91 b92) in
   let mk_value i = #{ a9 = Int64_u.of_int (i + 0); b9 = Int64_u.of_int (i + 1) } in
   (* Create an array of size [size] *)
@@ -547,9 +547,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (*************************************)
-  (*   t10 = #{ int32#; nativeint# }   *)
-  (*************************************)
+  (**************************************)
+  (*   t10 = #{ int32_u; nativeint# }   *)
+  (**************************************)
   let eq = (fun #{ a10 = a101; b10 = b101 } #{ a10 = a102; b10 = b102 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a101 a102 && (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) b101 b102) in
   let mk_value i = #{ a10 = Int32_u.of_int (i + 0); b10 = Nativeint_u.of_int (i + 1) } in
   (* Create an array of size [size] *)
@@ -719,9 +719,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (*************************************)
-  (*   t14 = #{ (| unit_u); int32# }   *)
-  (*************************************)
+  (**************************************)
+  (*   t14 = #{ (| unit_u); int32_u }   *)
+  (**************************************)
   let eq = (fun #{ a14 = a141; b14 = b141 } #{ a14 = a142; b14 = b142 } -> (fun a b -> match a, b with C3_0(a0), C3_0(b0) -> (fun _ _ -> true) a0 b0) a141 a142 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b141 b142) in
   let mk_value i = #{ a14 = (C3_0 (unbox_unit ())); b14 = Int32_u.of_int (i + 0) } in
   (* Create an array of size [size] *)
@@ -823,9 +823,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (***********************************)
-  (*   t16 = #{ #{ int }; int32# }   *)
-  (***********************************)
+  (************************************)
+  (*   t16 = #{ #{ int }; int32_u }   *)
+  (************************************)
   let eq = (fun #{ a16 = a161; b16 = b161 } #{ a16 = a162; b16 = b162 } -> (fun #{ a0 = a01 } #{ a0 = a02 } -> (fun a b -> Int.equal a b) a01 a02) a161 a162 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b161 b162) in
   let mk_value i = #{ a16 = #{ a0 = (i + 0) }; b16 = Int32_u.of_int (i + 1) } in
   (* Create an array of size [size] *)
@@ -881,9 +881,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (******************************)
-  (*   t17 = #{ #{ int32# } }   *)
-  (******************************)
+  (*******************************)
+  (*   t17 = #{ #{ int32_u } }   *)
+  (*******************************)
   let eq = (fun #{ a17 = a171 } #{ a17 = a172 } -> (fun #{ a7 = a71 } #{ a7 = a72 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a71 a72) a171 a172) in
   let mk_value i = #{ a17 = #{ a7 = Int32_u.of_int (i + 0) } } in
   (* Create an array of size [size] *)

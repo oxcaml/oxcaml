@@ -14,7 +14,7 @@ open Stdlib_stable
 open Stdlib_upstream_compatible
 
 module Int64_u = struct
-  type t = int64#
+  type t = int64_u
 
   external to_int64 : t -> (int64[@local_opt]) @@ portable =
     "%box_int64"
@@ -29,19 +29,19 @@ type nothing = |
 
 external get_ptr_local
   : ('a : any).
-  #(nothing or_null * int64#) @ local -> 'a @ local
+  #(nothing or_null * int64_u) @ local -> 'a @ local
   = "%unsafe_get_ptr"
 [@@layout_poly]
 
 external set_ptr_local
   : ('a : any).
-  #(nothing or_null * int64#) @ local -> 'a @ local -> unit
+  #(nothing or_null * int64_u) @ local -> 'a @ local -> unit
   = "%unsafe_set_ptr"
 [@@layout_poly]
 
 external addr_of_value
   : ('a : value_or_null).
-  'a @ local -> int64#
+  'a @ local -> int64_u
   = "" "caml_native_pointer_of_value"
 
 (************************************************)
@@ -120,11 +120,11 @@ let () =
   ()
 
 (******************************************************)
-(* Test 4: int32# field (flat type, not GC-scannable) *)
+(* Test 4: int32_u field (flat type, not GC-scannable) *)
 
-type pt_int32 = { x : int; mutable y : int32# }
+type pt_int32 = { x : int; mutable y : int32_u }
 
-let[@inline never] set_int32_field pt (y : int32#) =
+let[@inline never] set_int32_field pt (y : int32_u) =
   let y_addr = Int64_u.add (addr_of_value pt) #8L in
   set_ptr_local #(Null, y_addr) y
 
@@ -134,9 +134,9 @@ let[@inline never] get_int32_field pt =
   get_ptr_local #(Null, y_addr)
 
 let () =
-  print_endline "Test 4: int32# field (flat type)";
+  print_endline "Test 4: int32_u field (flat type)";
   let pt = stack_ { x = 10; y = #20l } in
-  let i : int32# = get_int32_field pt in
+  let i : int32_u = get_int32_field pt in
   Printf.printf "  get: expected 20, got %ld\n" (Int32_u.to_int32 i);
   set_int32_field pt #200l;
   let pt = Sys.opaque_identity pt in
@@ -145,11 +145,11 @@ let () =
   ()
 
 (******************************************************)
-(* Test 5: int64# field (flat type, not GC-scannable) *)
+(* Test 5: int64_u field (flat type, not GC-scannable) *)
 
-type pt_int64 = { x : int; mutable y : int64# }
+type pt_int64 = { x : int; mutable y : int64_u }
 
-let[@inline never] set_int64_field pt (y : int64#) =
+let[@inline never] set_int64_field pt (y : int64_u) =
   let y_addr = Int64_u.add (addr_of_value pt) #8L in
   set_ptr_local #(Null, y_addr) y
 
@@ -159,9 +159,9 @@ let[@inline never] get_int64_field pt =
   get_ptr_local #(Null, y_addr)
 
 let () =
-  print_endline "Test 5: int64# field (flat type)";
+  print_endline "Test 5: int64_u field (flat type)";
   let pt = stack_ { x = 10; y = #20L } in
-  let i : int64# = get_int64_field pt in
+  let i : int64_u = get_int64_field pt in
   Printf.printf "  get: expected 20, got %Ld\n" (Int64_u.to_int64 i);
   set_int64_field pt #200L;
   let pt = Sys.opaque_identity pt in

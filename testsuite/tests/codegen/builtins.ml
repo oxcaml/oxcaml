@@ -369,7 +369,7 @@ ptr_load_int64:
   ret
 |}]
 
-let ptr_store_int64 (p : nativeint#) (v : int64#) =
+let ptr_store_int64 (p : nativeint#) (v : int64_u) =
   Builtins.native_pointer_store_int64 p v
 [%%expect_asm X86_64{|
 ptr_store_int64:
@@ -388,7 +388,7 @@ ptr_load_int32:
   ret
 |}]
 
-let ptr_store_int32 (p : nativeint#) (v : int32#) =
+let ptr_store_int32 (p : nativeint#) (v : int32_u) =
   Builtins.native_pointer_store_int32 p v
 [%%expect_asm X86_64{|
 ptr_store_int32:
@@ -556,7 +556,7 @@ ptr_cas_int:
 
 (* Native pointer atomics - int64 *)
 
-let ptr_fetch_add_int64 (p : nativeint#) (v : int64#) =
+let ptr_fetch_add_int64 (p : nativeint#) (v : int64_u) =
   Int64_u.of_int64
     (Builtins.native_pointer_fetch_add_int64
        (Nativeint_u.to_nativeint p) (Int64_u.to_int64 v))
@@ -568,7 +568,7 @@ ptr_fetch_add_int64:
   ret
 |}]
 
-let ptr_fetch_sub_int64 (p : nativeint#) (v : int64#) =
+let ptr_fetch_sub_int64 (p : nativeint#) (v : int64_u) =
   Int64_u.of_int64
     (Builtins.native_pointer_fetch_sub_int64
        (Nativeint_u.to_nativeint p) (Int64_u.to_int64 v))
@@ -582,7 +582,7 @@ ptr_fetch_sub_int64:
 |}]
 
 let ptr_cas_int64 (p : nativeint#)
-    (old_v : int64#) (new_v : int64#) =
+    (old_v : int64_u) (new_v : int64_u) =
   Builtins.native_pointer_cas_int64
     (Nativeint_u.to_nativeint p)
     (Int64_u.to_int64 old_v) (Int64_u.to_int64 new_v)
@@ -600,7 +600,7 @@ ptr_cas_int64:
 
 (* Native pointer atomics - int32 *)
 
-let ptr_fetch_add_int32 (p : nativeint#) (v : int32#) =
+let ptr_fetch_add_int32 (p : nativeint#) (v : int32_u) =
   Int32_u.of_int32
     (Builtins.native_pointer_fetch_add_int32
        (Nativeint_u.to_nativeint p) (Int32_u.to_int32 v))
@@ -611,7 +611,7 @@ ptr_fetch_add_int32:
   ret
 |}]
 
-let ptr_fetch_sub_int32 (p : nativeint#) (v : int32#) =
+let ptr_fetch_sub_int32 (p : nativeint#) (v : int32_u) =
   Int32_u.of_int32
     (Builtins.native_pointer_fetch_sub_int32
        (Nativeint_u.to_nativeint p) (Int32_u.to_int32 v))
@@ -625,7 +625,7 @@ ptr_fetch_sub_int32:
 |}]
 
 let ptr_cas_int32 (p : nativeint#)
-    (old_v : int32#) (new_v : int32#) =
+    (old_v : int32_u) (new_v : int32_u) =
   Builtins.native_pointer_cas_int32
     (Nativeint_u.to_nativeint p)
     (Int32_u.to_int32 old_v) (Int32_u.to_int32 new_v)
@@ -718,7 +718,7 @@ ext_load_int64:
   ret
 |}]
 
-let ext_store_int64 (p : Builtins.ext_pointer) (v : int64#) =
+let ext_store_int64 (p : Builtins.ext_pointer) (v : int64_u) =
   Builtins.ext_pointer_store_unboxed_int64
     p (Int64_u.to_int64 v)
 [%%expect_asm X86_64{|
@@ -737,7 +737,7 @@ ext_load_int32:
   ret
 |}]
 
-let ext_store_int32 (p : Builtins.ext_pointer) (v : int32#) =
+let ext_store_int32 (p : Builtins.ext_pointer) (v : int32_u) =
   Builtins.ext_pointer_store_unboxed_int32
     p (Int32_u.to_int32 v)
 [%%expect_asm X86_64{|
@@ -851,7 +851,7 @@ ext_cas_int:
 |}]
 
 let ext_fetch_add_int64
-    (p : Builtins.ext_pointer) (v : int64#) =
+    (p : Builtins.ext_pointer) (v : int64_u) =
   Int64_u.of_int64
     (Builtins.ext_pointer_fetch_add_int64
        p (Int64_u.to_int64 v))
@@ -865,7 +865,7 @@ ext_fetch_add_int64:
 |}]
 
 let ext_fetch_add_int32
-    (p : Builtins.ext_pointer) (v : int32#) =
+    (p : Builtins.ext_pointer) (v : int32_u) =
   Int32_u.of_int32
     (Builtins.ext_pointer_fetch_add_int32
        p (Int32_u.to_int32 v))
@@ -908,7 +908,7 @@ bs_fetch_add_int:
 |}]
 
 let bs_fetch_add_int64
-    (bs : Builtins.bigstring) pos (v : int64#) =
+    (bs : Builtins.bigstring) pos (v : int64_u) =
   Int64_u.of_int64
     (Builtins.bigstring_fetch_add_int64
        bs pos (Int64_u.to_int64 v))
@@ -924,7 +924,7 @@ bs_fetch_add_int64:
 |}]
 
 let bs_fetch_add_int32
-    (bs : Builtins.bigstring) pos (v : int32#) =
+    (bs : Builtins.bigstring) pos (v : int32_u) =
   Int32_u.of_int32
     (Builtins.bigstring_fetch_add_int32
        bs pos (Int32_u.to_int32 v))
@@ -960,7 +960,7 @@ bs_cas_int:
 
 let bs_cas_int64
     (bs : Builtins.bigstring) pos
-    (old_v : int64#) (new_v : int64#) =
+    (old_v : int64_u) (new_v : int64_u) =
   Builtins.bigstring_cas_int64
     bs pos (Int64_u.to_int64 old_v)
     (Int64_u.to_int64 new_v)

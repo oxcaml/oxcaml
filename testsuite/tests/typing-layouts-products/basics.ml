@@ -120,21 +120,21 @@ Error: The layout of type "t2_wrong" is
 |}]
 
 type ('a : value & bits64) t3 = 'a
-type t4 = #(int * int64#) t3
+type t4 = #(int * int64_u) t3
 type t5 = t4 t3
 [%%expect{|
 type ('a : value & bits64) t3 = 'a
-type t4 = #(int * int64#) t3
+type t4 = #(int * int64_u) t3
 type t5 = t4 t3
 |}]
 
 type ('a : value & bits64) t3 = 'a
-type t4_inner = #{ i : int; i64 : int64# }
+type t4_inner = #{ i : int; i64 : int64_u }
 type t4 = t4_inner t3
 type t5 = t4 t3
 [%%expect{|
 type ('a : value & bits64) t3 = 'a
-type t4_inner = #{ i : int; i64 : int64#; }
+type t4_inner = #{ i : int; i64 : int64_u; }
 type t4 = t4_inner t3
 type t5 = t4 t3
 |}]
@@ -180,10 +180,10 @@ type ('a : value & bits64) t6 = 'a t7
 and ('a : value & bits64) t7 = { x : 'a t6; }
 |}]
 
-type t9 = #(int * int64#) t7
+type t9 = #(int * int64_u) t7
 type t10 = bool t6
 [%%expect{|
-type t9 = #(int * int64#) t7
+type t9 = #(int * int64_u) t7
 Line 2, characters 11-15:
 2 | type t10 = bool t6
                ^^^^
@@ -202,11 +202,11 @@ type ('a : value & bits64) t6 = 'a t7
 and ('a : value & bits64) t7 = { x : 'a t6; }
 |}]
 
-type t9_record = #{ i : int; i64 : int64# }
+type t9_record = #{ i : int; i64 : int64_u }
 type t9 = t9_record t7
 type t10 = bool t6
 [%%expect{|
-type t9_record = #{ i : int; i64 : int64#; }
+type t9_record = #{ i : int; i64 : int64_u; }
 type t9 = t9_record t7
 Line 3, characters 11-15:
 3 | type t10 = bool t6
@@ -303,12 +303,12 @@ Error: This type "('a : value)" should be an instance of type
 (*********************************************************************)
 (* Test 3: Unboxed products are allowed in function args and returns *)
 
-type t1 = #(int * bool) -> #(int * float# * #(int64# * string option))
+type t1 = #(int * bool) -> #(int * float# * #(int64_u * string option))
 type t2 : value & float64
 type t3 : value & (float64 & immediate) & float64
 type t4 = t2 -> (t3 -> t3) -> t2
 [%%expect{|
-type t1 = #(int * bool) -> #(int * float# * #(int64# * string option))
+type t1 = #(int * bool) -> #(int * float# * #(int64_u * string option))
 type t2 : value & float64
 type t3 : value & (float64 & value non_pointer) & float64
 type t4 = t2 -> (t3 -> t3) -> t2
@@ -355,12 +355,12 @@ val f_take_a_few_unboxed_tuples :
 (* Unboxed records version of the same test *)
 
 type t1_left = #{ i : int; b : bool }
-type t1_right_inner = #{ i64 : int64#; so : string option }
+type t1_right_inner = #{ i64 : int64_u; so : string option }
 type t1_right = #{ i : int; f : float#; inner : t1_right_inner }
 type t1 = t1_left -> t1_right
 [%%expect{|
 type t1_left = #{ i : int; b : bool; }
-type t1_right_inner = #{ i64 : int64#; so : string option; }
+type t1_right_inner = #{ i64 : int64_u; so : string option; }
 type t1_right = #{ i : int; f : float#; inner : t1_right_inner; }
 type t1 = t1_left -> t1_right
 |}]
@@ -842,7 +842,7 @@ module F : functor (X : S_coherence_deep') -> sig type r = X.t2 end
 module type S_coherence_deeper = sig
   type t1 : any
   type t2 = #(int * t1)
-  type t3 = #(t2 * bool * int64#)
+  type t3 = #(t2 * bool * int64_u)
   type t4 = #(float# * t3 * int)
 end
 
@@ -856,14 +856,14 @@ module type S_coherence_deeper =
   sig
     type t1 : any
     type t2 = #(int * t1)
-    type t3 = #(t2 * bool * int64#)
+    type t3 = #(t2 * bool * int64_u)
     type t4 = #(float# * t3 * int)
   end
 module type S_coherence_deeper' =
   sig
     type t1 = float#
     type t2 = #(int * t1)
-    type t3 = #(t2 * bool * int64#)
+    type t3 = #(t2 * bool * int64_u)
     type t4 = #(float# * t3 * int)
   end
 module F : functor (X : S_coherence_deeper') -> sig type r = X.t4 end
@@ -898,7 +898,7 @@ module F :
 module type S_constrain_type_jkind_deeper = sig
   type t1 : any
   type t2 = #(int * t1)
-  type t3 = #(t2 * bool * int64#)
+  type t3 = #(t2 * bool * int64_u)
   type t4 = #(float# * t3 * int)
 end
 
@@ -915,14 +915,14 @@ module type S_constrain_type_jkind_deeper =
   sig
     type t1 : any
     type t2 = #(int * t1)
-    type t3 = #(t2 * bool * int64#)
+    type t3 = #(t2 * bool * int64_u)
     type t4 = #(float# * t3 * int)
   end
 module type S_constrain_type_jkind_deeper' =
   sig
     type t1 = float#
     type t2 = #(int * t1)
-    type t3 = #(t2 * bool * int64#)
+    type t3 = #(t2 * bool * int64_u)
     type t4 = #(float# * t3 * int)
   end
 type ('a : float64 & ((value & float64) & value & bits64) & value)
@@ -2228,8 +2228,8 @@ Error: This expression has type "a" but an expression was expected of type
 (* Test 19: Complex nesting of records and variants *)
 
 type boxed_record = { x : int; y : string; z : float# }
-type unboxed_record = #{ x : int; y : int32#; z : string }
-type unboxed_tuple = #(int64# * int * string)
+type unboxed_record = #{ x : int; y : int32_u; z : string }
+type unboxed_tuple = #(int64_u * int * string)
 
 type nested_record = { a : boxed_record#; b : unboxed_record; c : unboxed_tuple }
 type nested_variant =
@@ -2239,8 +2239,8 @@ type nested_variant =
 
 [%%expect{|
 type boxed_record = { x : int; y : string; z : float#; }
-type unboxed_record = #{ x : int; y : int32#; z : string; }
-type unboxed_tuple = #(int64# * int * string)
+type unboxed_record = #{ x : int; y : int32_u; z : string; }
+type unboxed_tuple = #(int64_u * int * string)
 type nested_record = {
   a : boxed_record#;
   b : unboxed_record;
@@ -2273,7 +2273,7 @@ type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
     b : abstract_product;
     c : string;
     d : 'b;
-    e : int64#;
+    e : int64_u;
     f : abstract_product;
     g : 'a;
     h : int option }
@@ -2298,7 +2298,7 @@ type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
   b : abstract_product;
   c : string;
   d : 'b;
-  e : int64#;
+  e : int64_u;
   f : abstract_product;
   g : 'a;
   h : int option;
@@ -2339,14 +2339,14 @@ type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
 type ('a : (value & value) mod portable, 'b) record : value mod portable =
   { a : 'a;
     b : string;
-    c : #(int64# * #(float# * bool option * 'b));
+    c : #(int64_u * #(float# * bool option * 'b));
     d : char }
   constraint 'b = int * string
 [%%expect{|
 type ('a : value mod portable & value mod portable, 'b) record = {
   a : 'a;
   b : string;
-  c : #(int64# * #(float# * bool option * 'b));
+  c : #(int64_u * #(float# * bool option * 'b));
   d : char;
 } constraint 'b = int * string
 |}]
@@ -2354,7 +2354,7 @@ type ('a : value mod portable & value mod portable, 'b) record = {
 type ('a : (value & value) mod portable, 'b) record : value mod portable =
   { a : 'a;
     b : string;
-    c : #(int64# * #(float# * (bool -> bool) * 'b ));
+    c : #(int64_u * #(float# * (bool -> bool) * 'b ));
     d : char }
   constraint 'b = int * string
 [%%expect{|
@@ -2362,7 +2362,7 @@ Lines 1-6, characters 0-30:
 1 | type ('a : (value & value) mod portable, 'b) record : value mod portable =
 2 |   { a : 'a;
 3 |     b : string;
-4 |     c : #(int64# * #(float# * (bool -> bool) * 'b ));
+4 |     c : #(int64_u * #(float# * (bool -> bool) * 'b ));
 5 |     d : char }
 6 |   constraint 'b = int * string
 Error: The kind of type "record" is value non_float mod immutable with 'a

@@ -75,7 +75,7 @@ match_naked_float32:
   ret
 |}]
 
-let match_naked_int32 (t : t) : int32# =
+let match_naked_int32 (t : t) : int32_u =
   match t with
   | A -> #5l
   | B -> #10l
@@ -88,7 +88,7 @@ match_naked_int32:
   ret
 |}]
 
-let match_naked_int64 (t : t) : int64# =
+let match_naked_int64 (t : t) : int64_u =
   match t with
   | A -> #5L
   | B -> #10L

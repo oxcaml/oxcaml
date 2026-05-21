@@ -2477,8 +2477,8 @@ let type_for_path loc = function
         | "eval" -> Identifier.Type.eval
         | "float#" -> Identifier.Type.unboxed_float
         | "nativeint#" -> Identifier.Type.unboxed_nativeint
-        | "int32#" -> Identifier.Type.unboxed_int32
-        | "int64#" -> Identifier.Type.unboxed_int64
+        | "int32_u" -> Identifier.Type.unboxed_int32
+        | "int64_u" -> Identifier.Type.unboxed_int64
         | "int8x16" -> Identifier.Type.int8x16
         | "int16x8" -> Identifier.Type.int16x8
         | "int32x4" -> Identifier.Type.int32x4

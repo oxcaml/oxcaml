@@ -44,12 +44,12 @@ external unsafe_create_into_array_indexed_by_int16
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_int32
-  : ('a : any mod non_float). int32# -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int32_u -> ('a array, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_int32#"
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_int64
-  : ('a : any mod non_float). int64# -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int64_u -> ('a array, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_int64#"
 [@@layout_poly]
 

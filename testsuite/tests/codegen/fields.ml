@@ -177,7 +177,7 @@ do_ignore:
 
 (* Records with unboxed fields *)
 
-type unboxed_int64 = { a : int; b : int64#; c : int }
+type unboxed_int64 = { a : int; b : int64_u; c : int }
 
 let get_unboxed_int64 (r : unboxed_int64) = r.b
 [%%expect_asm X86_64{|
@@ -209,7 +209,7 @@ get_after_float:
   ret
 |}]
 
-type unboxed_int32 = { i : int32#; j : int }
+type unboxed_int32 = { i : int32_u; j : int }
 
 let get_unboxed_int32 (r : unboxed_int32) = r.i
 [%%expect_asm X86_64{|
@@ -218,7 +218,7 @@ get_unboxed_int32:
   ret
 |}]
 
-type mutable_unboxed = { mutable p : int64#; q : int }
+type mutable_unboxed = { mutable p : int64_u; q : int }
 
 let get_mut_unboxed (r : mutable_unboxed) = r.p
 [%%expect_asm X86_64{|
@@ -227,7 +227,7 @@ get_mut_unboxed:
   ret
 |}]
 
-let set_mut_unboxed (r : mutable_unboxed) (v : int64#) = r.p <- v
+let set_mut_unboxed (r : mutable_unboxed) (v : int64_u) = r.p <- v
 [%%expect_asm X86_64{|
 set_mut_unboxed:
   movq  %rbx, 8(%rax)

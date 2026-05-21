@@ -361,14 +361,14 @@ type t : any mod global aliased many immutable stateless external_ = float32#
 type t = float32#
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = int64#
+type t : any mod global aliased many immutable stateless external_ = int64_u
 [%%expect{|
-type t = int64#
+type t = int64_u
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = int32#
+type t : any mod global aliased many immutable stateless external_ = int32_u
 [%%expect{|
-type t = int32#
+type t = int32_u
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = nativeint#

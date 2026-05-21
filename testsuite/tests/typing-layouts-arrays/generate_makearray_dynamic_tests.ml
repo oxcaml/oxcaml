@@ -235,7 +235,7 @@ end = struct
   }
 
   let int32_u = {
-    ty_code = "int32#";
+    ty_code = "int32_u";
     value_code = (fun i -> "#" ^ Int.to_string i ^ "l");
     mk_value_code = "Int32_u.of_int i";
     eq = "(fun a b -> Int32_u.(equal (add #0l a) (add #0l b)))";
@@ -251,7 +251,7 @@ end = struct
   }
 
   let int64_u = {
-    ty_code = "int64#";
+    ty_code = "int64_u";
     value_code = (fun i -> "#" ^ Int.to_string i ^ "L");
     mk_value_code = "Int64_u.of_int i";
     eq = "(fun a b -> Int64_u.(equal (add #0L a) (add #0L b)))";

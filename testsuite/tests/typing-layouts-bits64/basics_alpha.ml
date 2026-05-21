@@ -7,29 +7,29 @@
 
 (* This file contains typing tests for the layout [bits64].
 
-   Runtime tests for the type [int64#] can be found in the
+   Runtime tests for the type [int64_u] can be found in the
    [unboxed_int64], [alloc], and [test_int64_u] tests in this
-   directory.  The type [int64#] here is used as a convenient example of a
+   directory.  The type [int64_u] here is used as a convenient example of a
    concrete [bits64] type in some tests, but its behavior isn't the primary
    purpose of this test. *)
 
 type t_bits64 : bits64
 type ('a : bits64) t_bits64_id = 'a
-external of_i64 : int64# -> t_bits64 = "%opaque"
+external of_i64 : int64_u -> t_bits64 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
 
 let f1_1 (x : t_bits64) = x;;
 let f1_2 (x : 'a t_bits64_id) = x;;
-let f1_3 (x : int64#) = x;;
+let f1_3 (x : int64_u) = x;;
 [%%expect{|
 type t_bits64 : bits64
 type ('a : bits64) t_bits64_id = 'a
-external of_i64 : int64# -> t_bits64 = "%opaque"
+external of_i64 : int64_u -> t_bits64 = "%opaque"
 val f1_1 : t_bits64 -> t_bits64 = <fun>
 val f1_2 : ('a : bits64). 'a t_bits64_id -> 'a t_bits64_id = <fun>
-val f1_3 : int64# -> int64# = <fun>
+val f1_3 : int64_u -> int64_u = <fun>
 |}];;
 
 (*****************************************)
@@ -42,13 +42,13 @@ let f2_2 (x : 'a t_bits64_id) =
   let y = x in
   y;;
 
-let f2_3 (x : int64#) =
+let f2_3 (x : int64_u) =
   let y = x in
   y;;
 [%%expect{|
 val f2_1 : t_bits64 -> t_bits64 = <fun>
 val f2_2 : ('a : bits64). 'a t_bits64_id -> 'a t_bits64_id = <fun>
-val f2_3 : int64# -> int64# = <fun>
+val f2_3 : int64_u -> int64_u = <fun>
 |}];;
 
 (**********************************)
@@ -62,13 +62,13 @@ val x3_1 : t_bits64 = <abstr>
 let x3_2_1 : 'a t_bits64_id = #42L;;
 let x3_2_2 : 'a t_bits64_id = of_i64 #42L;;
 [%%expect{|
-val x3_2_1 : int64# t_bits64_id = <abstr>
+val x3_2_1 : int64_u t_bits64_id = <abstr>
 val x3_2_2 : t_bits64 t_bits64_id = <abstr>
 |}];;
 
-let x3_3 : int64# = #64L;;
+let x3_3 : int64_u = #64L;;
 [%%expect{|
-val x3_3 : int64# = <abstr>
+val x3_3 : int64_u = <abstr>
 |}];;
 
 module M3_4 = struct
@@ -79,12 +79,12 @@ module M3_4 : sig val x : t_bits64 end
 |}];;
 
 module M3_5 = struct
-  let f (x : int64#) = x
+  let f (x : int64_u) = x
 
   let y = f #64L
 end
 [%%expect{|
-module M3_5 : sig val f : int64# -> int64# val y : int64# end
+module M3_5 : sig val f : int64_u -> int64_u val y : int64_u end
 |}];;
 
 (*************************************)
@@ -116,16 +116,16 @@ Error: This expression has type "'a t_bits64_id" = "('a : bits64)"
          because it's the type of a tuple element.
 |}];;
 
-let f4_3 (x : int64#) = x, false;;
+let f4_3 (x : int64_u) = x, false;;
 [%%expect{|
-Line 1, characters 24-25:
-1 | let f4_3 (x : int64#) = x, false;;
-                            ^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+Line 1, characters 25-26:
+1 | let f4_3 (x : int64_u) = x, false;;
+                             ^
+Error: This expression has type "int64_u"
+       but an expression was expected of type "('a : value_or_null)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -141,15 +141,15 @@ Error: Tuple element types must have layout value.
          because it's the type of a tuple element.
 |}];;
 
-type t4_5 = int * int64#;;
+type t4_5 = int * int64_u;;
 [%%expect{|
-Line 1, characters 18-24:
-1 | type t4_5 = int * int64#;;
-                      ^^^^^^
+Line 1, characters 18-25:
+1 | type t4_5 = int * int64_u;;
+                      ^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "int64#" is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of "int64#" must be a value layout
+       The layout of "int64_u" is bits64
+         because it is the primitive type int64_u.
+       But the layout of "int64_u" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -247,9 +247,9 @@ module type S6_2 = sig val x : 'a t_bits64_id end
 module type S6_2 = sig val x : ('a : bits64). 'a t_bits64_id end
 |}];;
 
-module type S6_3 = sig val x : int64# end
+module type S6_3 = sig val x : int64_u end
 [%%expect{|
-module type S6_3 = sig val x : int64# end
+module type S6_3 = sig val x : int64_u end
 |}];;
 
 
@@ -281,16 +281,16 @@ Error: This expression has type "'a t_bits64_id" = "('a : bits64)"
          because it's the type of the field of a polymorphic variant.
 |}];;
 
-let f7_3 (x : int64#) = `A x;;
+let f7_3 (x : int64_u) = `A x;;
 [%%expect{|
-Line 1, characters 27-28:
-1 | let f7_3 (x : int64#) = `A x;;
-                               ^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+Line 1, characters 28-29:
+1 | let f7_3 (x : int64_u) = `A x;;
+                                ^
+Error: This expression has type "int64_u"
+       but an expression was expected of type "('a : value_or_null)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -323,13 +323,13 @@ Error: Polymorphic variant constructor argument types must have layout value.
 
 let make_t_bits64 () : t_bits64 = assert false
 let make_t_bits64_id () : 'a t_bits64_id = assert false
-let make_int64u () : int64# = assert false
+let make_int64u () : int64_u = assert false
 
 let id_value x = x;;
 [%%expect{|
 val make_t_bits64 : unit -> t_bits64 = <fun>
 val make_t_bits64_id : ('a : bits64). unit -> 'a t_bits64_id = <fun>
-val make_int64u : unit -> int64# = <fun>
+val make_int64u : unit -> int64_u = <fun>
 val id_value : 'a -> 'a = <fun>
 |}];;
 
@@ -364,11 +364,11 @@ let x8_3 = id_value (make_int64u ());;
 Line 1, characters 20-36:
 1 | let x8_3 = id_value (make_int64u ());;
                         ^^^^^^^^^^^^^^^^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+Error: This expression has type "int64_u"
+       but an expression was expected of type "('a : value_or_null)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -387,7 +387,7 @@ val twice :
   <fun>
 val f9_1 : unit -> t_bits64 t_bits64_id = <fun>
 val f9_2 : ('a : bits64). unit -> 'a t_bits64_id = <fun>
-val f9_3 : unit -> int64# t_bits64_id = <fun>
+val f9_3 : unit -> int64_u t_bits64_id = <fun>
 |}];;
 
 (**************************************************)
@@ -401,11 +401,11 @@ val f9_3 : unit -> int64# t_bits64_id = <fun>
      true for [@untagged].
 *)
 
-external f10_1 : int -> bool -> int64# = "foo";;
+external f10_1 : int -> bool -> int64_u = "foo";;
 [%%expect{|
-Line 1, characters 0-46:
-1 | external f10_1 : int -> bool -> int64# = "foo";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-47:
+1 | external f10_1 : int -> bool -> int64_u = "foo";;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
@@ -419,35 +419,35 @@ Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
 
-external f10_6 : (int64#[@unboxed]) -> bool -> string  = "foo" "bar";;
+external f10_6 : (int64_u[@unboxed]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-external f10_6 : int64# -> bool -> string = "foo" "bar"
+external f10_6 : int64_u -> bool -> string = "foo" "bar"
 |}];;
 
-external f10_7 : string -> (int64#[@unboxed])  = "foo" "bar";;
+external f10_7 : string -> (int64_u[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f10_7 : string -> int64# = "foo" "bar"
+external f10_7 : string -> int64_u = "foo" "bar"
 |}];;
 
-external f10_8 : int64 -> int64#  = "foo" "bar" [@@unboxed];;
+external f10_8 : int64 -> int64_u  = "foo" "bar" [@@unboxed];;
 [%%expect{|
-external f10_8 : (int64 [@unboxed]) -> int64# = "foo" "bar"
+external f10_8 : (int64 [@unboxed]) -> int64_u = "foo" "bar"
 |}];;
 
-external f10_9 : (int64#[@untagged]) -> bool -> string  = "foo" "bar";;
+external f10_9 : (int64_u[@untagged]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 18-24:
-1 | external f10_9 : (int64#[@untagged]) -> bool -> string  = "foo" "bar";;
-                      ^^^^^^
+Line 1, characters 18-25:
+1 | external f10_9 : (int64_u[@untagged]) -> bool -> string  = "foo" "bar";;
+                      ^^^^^^^
 Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
 
-external f10_10 : string -> (int64#[@untagged])  = "foo" "bar";;
+external f10_10 : string -> (int64_u[@untagged])  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 29-35:
-1 | external f10_10 : string -> (int64#[@untagged])  = "foo" "bar";;
-                                 ^^^^^^
+Line 1, characters 29-36:
+1 | external f10_10 : string -> (int64_u[@untagged])  = "foo" "bar";;
+                                 ^^^^^^^
 Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
@@ -469,11 +469,11 @@ Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
 
-type t11_1 += B of int64#;;
+type t11_1 += B of int64_u;;
 [%%expect{|
-Line 1, characters 14-25:
-1 | type t11_1 += B of int64#;;
-                  ^^^^^^^^^^^
+Line 1, characters 14-26:
+1 | type t11_1 += B of int64_u;;
+                  ^^^^^^^^^^^^
 Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
@@ -572,26 +572,27 @@ Error: Variables bound in a class must have layout value.
          because it's the type of a class field.
 |}];;
 
-class type c12_6 = object method x : int64# end;;
+class type c12_6 = object method x : int64_u end;;
 [%%expect{|
-Line 1, characters 26-43:
-1 | class type c12_6 = object method x : int64# end;;
-                              ^^^^^^^^^^^^^^^^^
-Error: The method "x" has type "int64#" but is expected to have type "('a : value)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+Line 1, characters 26-44:
+1 | class type c12_6 = object method x : int64_u end;;
+                              ^^^^^^^^^^^^^^^^^^
+Error: The method "x" has type "int64_u" but is expected to have type
+         "('a : value)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the type of an object field.
 |}];;
 
-class type c12_7 = object val x : int64# end
+class type c12_7 = object val x : int64_u end
 [%%expect{|
-Line 1, characters 26-40:
-1 | class type c12_7 = object val x : int64# end
-                              ^^^^^^^^^^^^^^
+Line 1, characters 26-41:
+1 | class type c12_7 = object val x : int64_u end
+                              ^^^^^^^^^^^^^^^
 Error: Variables bound in a class must have layout value.
        The layout of x is bits64
-         because it is the unboxed version of the primitive type int64.
+         because it is the primitive type int64_u.
        But the layout of x must be a value layout
          because it's the type of an instance variable.
 |}];;

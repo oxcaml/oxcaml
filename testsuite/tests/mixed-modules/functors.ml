@@ -131,7 +131,7 @@ let () = print_endline "Test: functor with mixed products"
 
 module type With_products = sig
   val simple_product : #(float# * string)
-  val nested_product : #(int64# * #(string * float# * string))
+  val nested_product : #(int64_u * #(string * float# * string))
 end
 
 module Add_to_products (M : With_products) : With_products = struct

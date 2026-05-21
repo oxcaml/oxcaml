@@ -396,14 +396,14 @@ type b = #(a * a * a * a * a * a * a * a) (* 2^6 bytes *)
 type c = #(b * b * b * b * b * b * b * b) (* 2^9 *)
 type d = #(c * c * c * c * c * c * c * c) (* 2^12 *)
 
-type si = { s : string; i : int64# }
+type si = { s : string; i : int64_u }
 type r = { d : d; si : si# }
 [%%expect{|
 type a = float#
 type b = #(a * a * a * a * a * a * a * a)
 type c = #(b * b * b * b * b * b * b * b)
 type d = #(c * c * c * c * c * c * c * c)
-type si = { s : string; i : int64#; }
+type si = { s : string; i : int64_u; }
 type r = { d : d; si : si#; }
 |}]
 
@@ -442,11 +442,11 @@ Error: This block index cannot be created because it refers to values
 
 (* CR layouts v8: these should be allowed once we reorder array elements *)
 
-type r = #{ a : int64#; b : int }
+type r = #{ a : int64_u; b : int }
 let bad_idx () : (_, r) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
-type r = #{ a : int64#; b : int; }
+type r = #{ a : int64_u; b : int; }
 Line 3, characters 2-36:
 3 |   Idx_mut.unsafe_create_into_array 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -454,11 +454,11 @@ Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
-type r = { ii : #( int * int64#) ; i : int }
+type r = { ii : #( int * int64_u) ; i : int }
 let bad_idx () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
 [%%expect{|
-type r = { ii : #(int * int64#); i : int; }
+type r = { ii : #(int * int64_u); i : int; }
 Line 3, characters 12-46:
 3 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -467,11 +467,11 @@ Error: Block indices into arrays of unboxed products containing a
 |}]
 
 (* Note that this does work, though, as no reordering is needed *)
-type r = #{ a : int; b : int64# }
+type r = #{ a : int; b : int64_u }
 let idx_into_r_array () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#a)
 [%%expect{|
-type r = #{ a : int; b : int64#; }
+type r = #{ a : int; b : int64_u; }
 val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
 |}]
 

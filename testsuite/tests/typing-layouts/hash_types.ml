@@ -87,7 +87,10 @@ type float = int32
 type t : bits32 = float#
 [%%expect{|
 type float = int32
-type t = float#
+Line 2, characters 18-24:
+2 | type t : bits32 = float#
+                      ^^^^^^
+Error: The type "float" has no unboxed version.
 |}]
 
 (* And if the type is shadowed by a type without an unboxed version,
@@ -321,13 +324,13 @@ val id : itu -> it# = <fun>
 
 (* CR layouts v7.2: "float/2#" makes sense with the view of [#] as an operator,
    but we may aesthetically prefer "float#/2". *)
-let bad : itu -> int32# = fun x -> x
+let bad : itu -> int32_u = fun x -> x
 [%%expect{|
-Line 1, characters 35-36:
-1 | let bad : itu -> int32# = fun x -> x
-                                       ^
+Line 1, characters 36-37:
+1 | let bad : itu -> int32_u = fun x -> x
+                                        ^
 Error: This expression has type "itu" = "float/2#"
-       but an expression was expected of type "int32#"
+       but an expression was expected of type "int32_u"
        Line 1, characters 0-20:
          Definition of type "float/1"
        File "_none_", line 1:
@@ -564,7 +567,10 @@ include M
 type t : bits32 = i32#
 [%%expect{|
 type i32 = int32
-type t = i32#
+Line 2, characters 18-22:
+2 | type t : bits32 = i32#
+                      ^^^^
+Error: The type "i32" has no unboxed version.
 |}]
 
 module Bad = struct
@@ -573,13 +579,15 @@ module Bad = struct
   end
   include M
 
-  type bad = int32#
+  type bad = int32_u
 end
 [%%expect{|
-Line 7, characters 13-19:
-7 |   type bad = int32#
-                 ^^^^^^
-Error: The type "int32" has no unboxed version.
+module Bad :
+  sig
+    module M : sig type int32 end
+    type int32 = M.int32
+    type bad = int32_u
+  end
 |}]
 
 (*************************)
@@ -764,20 +772,20 @@ Error: In this "with" constraint, the new definition of "t"
 
 (* Can't substitute an unboxed version for a different unboxed version *)
 module type Bad = sig
-  type t = int32#
+  type t = int32_u
 end with type t := float#
 [%%expect{|
 Lines 1-3, characters 18-25:
 1 | ..................sig
-2 |   type t = int32#
+2 |   type t = int32_u
 3 | end with type t := float#
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
          type t = float#
        is not included in
-         type t = int32#
-       The type "float/1#" = "float/2#" is not equal to the type "int32#"
+         type t = int32_u
+       The type "float/1#" = "float/2#" is not equal to the type "int32_u"
        Line 1, characters 0-20:
          Definition of type "float/1"
        File "_none_", line 1:
@@ -1290,7 +1298,10 @@ type 'a t = int32
 type packed = P : 'a t# -> packed [@@unboxed]
 [%%expect{|
 type 'a t = int32
-type packed = P : 'a t# -> packed [@@unboxed]
+Line 2, characters 21-23:
+2 | type packed = P : 'a t# -> packed [@@unboxed]
+                         ^^
+Error: The type "t" has no unboxed version.
 |}]
 
 type ('a, 'b) t = { a : 'a; b : 'b }

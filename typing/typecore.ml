@@ -845,8 +845,8 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_untagged_int _ -> instance Predef.type_unboxed_int
   | Const_untagged_int8 _ -> instance Predef.type_unboxed_int8
   | Const_untagged_int16 _ -> instance Predef.type_unboxed_int16
-  | Const_unboxed_int32 _ -> instance Predef.type_unboxed_int32
-  | Const_unboxed_int64 _ -> instance Predef.type_unboxed_int64
+  | Const_unboxed_int32 _ -> instance Predef.type_int32_u
+  | Const_unboxed_int64 _ -> instance Predef.type_int64_u
   | Const_unboxed_nativeint _ -> instance Predef.type_unboxed_nativeint
 
 type constant_integer_result =
