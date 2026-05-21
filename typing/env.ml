@@ -1571,6 +1571,9 @@ and find_cstr path name env =
   | Type_open ->
       raise Not_found
 and find_type_unboxed_version path env seen =
+  (* No type has a twice-unboxed version (see [type_unboxed_version] invariant
+     1. in [types.mli]). *)
+  if Path.is_unboxed_version path then raise Not_found else
   if Path.Set.mem path seen then raise Not_found else
   let seen = Path.Set.add path seen in
   let decl = (find_type_data path env seen).tda_declaration in

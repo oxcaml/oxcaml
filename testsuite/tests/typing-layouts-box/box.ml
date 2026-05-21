@@ -764,7 +764,34 @@ Error: This pattern matches values of type "string st"
        The type constructor "$0" would escape its scope
 |}]
 
-(* Test 32: shadowing the predef [box] disambiguates with [box/2] *)
+(* Test 32: [(T box)#] = [T] -- the unboxed version of a [_ box] alias is
+   the inner type. *)
+
+type t = int box
+type u = t#
+let u_is_int (x : u) : int = x
+let int_is_u (x : int) : u = x
+[%%expect{|
+type t = int box
+type u = t#
+val u_is_int : u -> int = <fun>
+val int_is_u : int -> u = <fun>
+|}]
+
+(* The same property holds parametrically. *)
+
+type ('a : any) my_box = 'a box
+type 'a uu = 'a my_box#
+let probe (x : 'a uu) : 'a = x
+let probe_inv (x : 'a) : 'a uu = x
+[%%expect{|
+type ('a : any) my_box = 'a box
+type 'a uu = 'a my_box#
+val probe : 'a uu -> 'a = <fun>
+val probe_inv : 'a -> 'a uu = <fun>
+|}]
+
+(* Test 33: shadowing the predef [box] disambiguates with [box/2] *)
 
 let id_box (x : 'a box) : 'a box = x
 type 'a box = Mine of 'a
