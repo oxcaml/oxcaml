@@ -188,6 +188,7 @@
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
+  variable_availability
   ;; PARSING
   location
   longident
@@ -241,6 +242,7 @@
   envaux
   includecore
   type_shape
+  debug_variable_availability
   tast_iterator
   tast_mapper
   signature_group

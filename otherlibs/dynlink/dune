@@ -137,6 +137,7 @@
   value_rec_types
   btype
   lazy_backtrack
+  variable_availability
   type_shape
   zero_alloc_utils
   diffing
@@ -266,6 +267,8 @@
 (copy_files ../../utils/lazy_backtrack.ml)
 
 (copy_files ../../utils/zero_alloc_utils.ml)
+
+(copy_files ../../utils/variable_availability.ml)
 
 (copy_files ../../utils/diffing.ml)
 
@@ -465,6 +468,8 @@
 (copy_files ../../utils/lazy_backtrack.mli)
 
 (copy_files ../../utils/zero_alloc_utils.mli)
+
+(copy_files ../../utils/variable_availability.mli)
 
 (copy_files ../../utils/diffing.mli)
 
@@ -749,6 +754,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Variable_availability.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
@@ -871,6 +877,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Variable_availability.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx

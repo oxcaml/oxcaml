@@ -1125,6 +1125,28 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
+(* The [Variable_availability] table. The functor in
+   [utils/variable_availability.ml] holds no state itself: each application of
+   [Make] produces a fresh table. We apply it exactly once here. *)
+module Variable_availability =
+  Variable_availability.Make
+    (struct
+      type t = Shape.Uid.t
+
+      let equal = Shape.Uid.equal
+
+      let hash = Hashtbl.hash
+
+      let print = Shape.Uid.print
+
+      let no_uid = Shape.Uid.internal_not_actually_unique
+    end)
+    (struct
+      type t = Location.t
+
+      let print = Location.print_loc
+    end)
+
 let print_table_all_type_decls ppf =
   let entries = Uid.Tbl.to_list all_type_decls in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
