@@ -216,6 +216,59 @@ let test_ignorable_arrayblit () =
   assert ((array_get dst 0).#i = 10);
   assert ((array_get dst 1).#i = 2)
 
+(* Regression tests: the evaluation order of arguments for [makearray_dynamic]
+   and [array_blit] is consistent unboxed products and non-products. *)
+
+let collect_eval_order f =
+  let log = ref [] in
+  let record s () = log := s :: !log in
+  f record;
+  List.rev !log
+
+let test_eval_order_makearray_dynamic () =
+  let order_product =
+    collect_eval_order (fun record ->
+        let _ : u array =
+          makearray_dynamic
+            (record "n" (); 1)
+            (record "init" (); #{ x = 0; y = 0 })
+        in
+        ())
+  in
+  let order_int =
+    collect_eval_order (fun record ->
+        let _ : int array =
+          makearray_dynamic (record "n" (); 1) (record "init" (); 0)
+        in
+        ())
+  in
+  assert (order_product = order_int)
+
+let test_eval_order_arrayblit () =
+  let order_product =
+    collect_eval_order (fun record ->
+        let src = [| #{ x = 1; y = 1 } |] in
+        let dst = [| #{ x = 0; y = 0 } |] in
+        array_blit
+          (record "src" (); src)
+          (record "srcofs" (); 0)
+          (record "dst" (); dst)
+          (record "dstofs" (); 0)
+          (record "len" (); 1))
+  in
+  let order_int =
+    collect_eval_order (fun record ->
+        let src = [| 1 |] in
+        let dst = [| 0 |] in
+        array_blit
+          (record "src" (); src)
+          (record "srcofs" (); 0)
+          (record "dst" (); dst)
+          (record "dstofs" (); 0)
+          (record "len" (); 1))
+  in
+  assert (order_product = order_int)
+
 let () =
   test_makearray ();
   test_makearray_multi ();
@@ -232,4 +285,6 @@ let () =
   test_ignorable_arrayget ();
   test_ignorable_makearray_dynamic ();
   test_ignorable_arrayblit ();
+  test_eval_order_makearray_dynamic ();
+  test_eval_order_arrayblit ();
   print_endline "All tests passed"
