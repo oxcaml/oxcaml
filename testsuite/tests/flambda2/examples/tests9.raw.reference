@@ -108,9 +108,9 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let cmp = %project_value_slot.[rev_merge].[cmp] (my_closure) in
    let rev_append = %project_value_slot.[rev_merge].[rev_append] (my_closure)
    in
+   let cmp = %project_value_slot.[rev_merge].[cmp] (my_closure) in
    (let prim = %is_int (l1) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -205,10 +205,10 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let cmp = %project_value_slot.[rev_merge_rev].[cmp_1] (my_closure) in
    let rev_append =
      %project_value_slot.[rev_merge_rev].[rev_append_1] (my_closure)
    in
+   let cmp = %project_value_slot.[rev_merge_rev].[cmp_1] (my_closure) in
    (let prim = %is_int (l1) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -302,10 +302,10 @@
    let next_depth = rec_info (succ my_depth) in
    let chop = %project_value_slot.[sort].[chop] (my_closure) in
    let cmp = %project_value_slot.[sort].[cmp_2] (my_closure) in
+   let rev_merge = %project_value_slot.[sort].[rev_merge] (my_closure) in
    let rev_merge_rev =
      %project_value_slot.[sort].[rev_merge_rev] (my_closure)
    in
-   let rev_merge = %project_value_slot.[sort].[rev_merge] (my_closure) in
    let rev_sort = %project_function_slot.[sort].[rev_sort] (my_closure) in
    (let prim = %int_comp.ne (n, 2) in
     let int_notequal = %tag_imm (prim) in
@@ -880,11 +880,11 @@
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
    let chop = %project_value_slot.[rev_sort].[chop] (my_closure) in
+   let cmp = %project_value_slot.[rev_sort].[cmp_2] (my_closure) in
    let rev_merge = %project_value_slot.[rev_sort].[rev_merge] (my_closure) in
    let rev_merge_rev =
      %project_value_slot.[rev_sort].[rev_merge_rev] (my_closure)
    in
-   let cmp = %project_value_slot.[rev_sort].[cmp_2] (my_closure) in
    let sort = %project_function_slot.[rev_sort].[sort] (my_closure) in
    (let prim = %int_comp.ne (n, 2) in
     let int_notequal = %tag_imm (prim) in
@@ -1460,11 +1460,11 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
+   let length = %project_value_slot.[sort_uniq].[length] (my_closure) in
    let rev_append =
      %project_value_slot.[sort_uniq].[rev_append_2] (my_closure)
    in
    let chop = %project_value_slot.[sort_uniq].[chop_1] (my_closure) in
-   let length = %project_value_slot.[sort_uniq].[length] (my_closure) in
    let rev_merge = closure rev_merge_5 @rev_merge
    with { rev_append = rev_append; cmp = cmp }
    in

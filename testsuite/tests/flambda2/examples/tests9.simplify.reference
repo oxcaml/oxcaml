@@ -218,8 +218,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
-  let rev_merge = %project_value_slot.[rev_sort].[rev_merge] (my_closure) in
   let cmp = %project_value_slot.[rev_sort].[cmp_2] (my_closure) in
+  let rev_merge = %project_value_slot.[rev_sort].[rev_merge] (my_closure) in
   let sort = %project_function_slot.[rev_sort].[sort] (my_closure) in
   (let prim = %int_comp.ne (n, 2) in
    switch prim

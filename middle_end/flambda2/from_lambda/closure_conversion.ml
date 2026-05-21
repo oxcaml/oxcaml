@@ -2573,24 +2573,24 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
 
      Note that free variables corresponding to predefined exception identifiers
      have been filtered out by [close_functions], above. *)
-  let (value_slots_to_bind : Value_slot.t Variable.Map.t), vars_for_idents =
+  let (value_slots_to_bind : (Variable.t * Value_slot.t) list), vars_for_idents
+      =
     Ident.Map.fold
       (fun id value_slot (value_slots_to_bind, vars_for_idents) ->
         let var =
           Variable.create_with_same_name_as_ident id
             (Value_slot.kind value_slot)
         in
-        ( Variable.Map.add var value_slot value_slots_to_bind,
+        ( (var, value_slot) :: value_slots_to_bind,
           Ident.Map.add id var vars_for_idents ))
-      value_slots_from_idents
-      (Variable.Map.empty, Ident.Map.empty)
+      value_slots_from_idents ([], Ident.Map.empty)
   in
   let coerce_to_deeper =
     Coercion.change_depth
       ~from:(Rec_info_expr.var my_depth)
       ~to_:(Rec_info_expr.var next_depth)
   in
-  if has_lifted_closure && not (Variable.Map.is_empty value_slots_to_bind)
+  if has_lifted_closure && not (List.is_empty value_slots_to_bind)
   then
     Misc.fatal_errorf
       "Variables found in closure when trying to lift %a in \
@@ -2601,7 +2601,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let closure_vars_to_bind, closure_env =
     if has_lifted_closure
     then (* No projection needed *)
-      Variable.Map.empty, closure_env
+      [], closure_env
     else
       List.fold_left
         (fun (to_bind, env) function_decl ->
@@ -2622,9 +2622,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
               let function_slot =
                 Ident.Map.find let_rec_ident function_slots_from_idents
               in
-              ( Variable.Map.add variable function_slot to_bind,
-                variable,
-                function_slot )
+              (variable, function_slot) :: to_bind, variable, function_slot
           in
           let simple = Simple.with_coercion (Simple.var var) coerce_to_deeper in
           let approx = Function_slot.Map.find function_slot approx_map in
@@ -2634,7 +2632,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
           in
           let env = Env.add_var_approximation env var approx in
           to_bind, env)
-        (Variable.Map.empty, closure_env)
+        ([], closure_env)
         (Function_decls.to_list function_declarations)
   in
   let closure_env =
@@ -2724,8 +2722,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
          inserted at the point of use rather than at the top of the function. We
          should also check the behaviour of the backend w.r.t. CSE of
          projections from closures. *)
-      Variable.Map.fold
-        (fun var move_to (acc, body) ->
+      List.fold_left
+        (fun (acc, body) (var, move_to) ->
           let move : Flambda_primitive.unary_primitive =
             Project_function_slot { move_from = function_slot; move_to }
           in
@@ -2736,11 +2734,11 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
             Named.create_prim (Unary (move, my_closure')) Debuginfo.none
           in
           Let_with_acc.create acc (Bound_pattern.singleton var) named ~body)
-        closure_vars_to_bind (acc, body)
+        (acc, body) closure_vars_to_bind
     in
     let acc, body =
-      Variable.Map.fold
-        (fun var value_slot (acc, body) ->
+      List.fold_left
+        (fun (acc, body) (var, value_slot) ->
           let var = VB.create var Flambda_debug_uid.none Name_mode.normal in
           (* CR sspies: In the future, improve the debugging UIDs here if
              possible. *)
@@ -2753,7 +2751,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
               Debuginfo.none
           in
           Let_with_acc.create acc (Bound_pattern.singleton var) named ~body)
-        value_slots_to_bind (acc, body)
+        (acc, body) value_slots_to_bind
     in
     let next_depth_expr = Rec_info_expr.succ (Rec_info_expr.var my_depth) in
     let bound =
