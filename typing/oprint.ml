@@ -638,6 +638,7 @@ and print_out_jkind_const ppf ojkind =
     | Ojkind_const_default -> fprintf ppf "_"
     | Ojkind_const_abbreviation (abbrev, sa) ->
       (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (abbrev :: sa)
+    | Ojkind_const_genvar var -> pp_print_string ppf var
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
@@ -959,8 +960,9 @@ and print_out_sig_item ppf =
            | Orec_next  -> "and")
           ppf td
   | Osig_value { oval_name; oval_type; oval_modalities;
-                 oval_prims; oval_attributes } ->
+                 oval_prims; oval_attributes; oval_poly } ->
       let kwd = if oval_prims = [] then "val" else "external" in
+      let poly = if oval_poly then "poly_ " else "" in
       let pr_prims ppf =
         function
           [] -> ()
@@ -968,7 +970,7 @@ and print_out_sig_item ppf =
             fprintf ppf "@ = \"%s\"" s;
             List.iter (fun s -> fprintf ppf "@ \"%s\"" s) sl
       in
-      fprintf ppf "@[<2>%s %a :@ %a%a%a%a@]" kwd value_ident oval_name
+      fprintf ppf "@[<2>%s %s%a :@ %a%a%a%a@]" kwd poly value_ident oval_name
         !out_type oval_type
         print_out_modalities oval_modalities
         pr_prims oval_prims
