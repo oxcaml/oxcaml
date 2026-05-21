@@ -2223,8 +2223,9 @@ and block_access ctxt f = function
   | Baccess_block (mut, index) ->
     let s =
       match mut with
-      | Mutable -> "idx_mut"
-      | Immutable -> "idx_imm"
+      | Block_idx_imm -> "idx_imm"
+      | Block_idx_mut -> "idx_mut"
+      | Block_idx_atomic -> "idx_atomic"
     in
     pp f ".%s(%a)" s (expression ctxt) index
 

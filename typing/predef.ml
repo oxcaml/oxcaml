@@ -64,6 +64,7 @@ and ident_eval = ident_create "eval"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
+and ident_idx_atomic = ident_create "idx_atomic"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -111,6 +112,7 @@ and path_floatarray = Pident ident_floatarray
 and path_lexing_position = Pident ident_lexing_position
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
+and path_idx_atomic = Pident ident_idx_atomic
 and path_atomic_loc = Pident ident_atomic_loc
 and path_code = Pident ident_code
 and path_eval = Pident ident_eval
@@ -215,6 +217,8 @@ and type_unboxed_int16 = newgenty (Tconstr(path_unboxed_int16, [], ref Mnil))
 and type_or_null t = newgenty (Tconstr(path_or_null, [t], ref Mnil))
 and type_idx_imm t1 t2 = newgenty (Tconstr(path_idx_imm, [t1; t2], ref Mnil))
 and type_idx_mut t1 t2 = newgenty (Tconstr(path_idx_mut, [t1; t2], ref Mnil))
+and type_idx_atomic t1 t2 =
+  newgenty (Tconstr(path_idx_atomic, [t1; t2], ref Mnil))
 
 and type_int8x16 = newgenty (Tconstr(path_int8x16, [], ref Mnil))
 and type_int16x8 = newgenty (Tconstr(path_int16x8, [], ref Mnil))
@@ -693,6 +697,24 @@ let build_initial_env add_type add_extension add_jkind empty_env =
          }))
        ~jkind:(
          Jkind.of_builtin ~why:(Primitive ident_idx_mut)
+           Jkind.Const.Builtin.kind_of_idx)
+       ~type_variance:[Variance.full; Variance.full]
+       ~type_separability:[Separability.Ind; Separability.Ind]
+  |> add_type2 ident_idx_atomic
+       ~param1_jkind:(
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_atomic;
+           position = 1;
+           arity = 2;
+         }))
+       ~param2_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_atomic;
+           position = 2;
+           arity = 2;
+         }))
+       ~jkind:(
+         Jkind.of_builtin ~why:(Primitive ident_idx_atomic)
            Jkind.Const.Builtin.kind_of_idx)
        ~type_variance:[Variance.full; Variance.full]
        ~type_separability:[Separability.Ind; Separability.Ind]

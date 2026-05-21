@@ -513,13 +513,112 @@ val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 (*****************************************)
 (* Block indices to atomic record fields *)
 type atomic = { mutable i : int [@atomic] }
-let bad () = (.i)
+let i () = (.i)
 [%%expect{|
 type atomic = { mutable i : int [@atomic]; }
-Line 2, characters 13-17:
-2 | let bad () = (.i)
-                 ^^^^
-Error: Block indices do not yet support [@atomic] record fields.
+val i : unit -> (atomic, int) idx_atomic = <fun>
+|}]
+
+(* Cannot take an [idx_atomic] to an immutable field. *)
+type r_imm = { imm : int }
+let bad () : (r_imm, int) idx_atomic = (.imm)
+[%%expect{|
+type r_imm = { imm : int; }
+Line 2, characters 39-45:
+2 | let bad () : (r_imm, int) idx_atomic = (.imm)
+                                           ^^^^^^
+Error: This expression has type "(r_imm, int) idx_imm"
+       but an expression was expected of type "(r_imm, int) idx_atomic"
+|}]
+
+(* Cannot take an [idx_atomic] to a non-atomic mutable field. *)
+type r_mut = { mutable mut : int }
+let bad () : (r_mut, int) idx_atomic = (.mut)
+[%%expect{|
+type r_mut = { mutable mut : int; }
+Line 2, characters 39-45:
+2 | let bad () : (r_mut, int) idx_atomic = (.mut)
+                                           ^^^^^^
+Error: This expression has type "(r_mut, int) idx_mut"
+       but an expression was expected of type "(r_mut, int) idx_atomic"
+|}]
+
+(* [.idx_atomic(i)] cannot deepen an [idx_imm] or [idx_mut]. *)
+let bad (i : (r_imm, int) idx_imm) = (.idx_atomic(i))
+[%%expect{|
+Line 1, characters 50-51:
+1 | let bad (i : (r_imm, int) idx_imm) = (.idx_atomic(i))
+                                                      ^
+Error: This expression has type "(r_imm, int) idx_imm"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+let bad (i : (r_mut, int) idx_mut) = (.idx_atomic(i))
+[%%expect{|
+Line 1, characters 50-51:
+1 | let bad (i : (r_mut, int) idx_mut) = (.idx_atomic(i))
+                                                      ^
+Error: This expression has type "(r_mut, int) idx_mut"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+(* A multi-field unboxed record can't be the type of an atomic field —
+   its layout is a product, not value. This is rejected at the record
+   declaration site. *)
+type bad_box = #{ v : int; w : float# }
+type t_bad2 = { mutable boxed : bad_box [@atomic] }
+[%%expect{|
+type bad_box = #{ v : int; w : float#; }
+Line 2, characters 16-49:
+2 | type t_bad2 = { mutable boxed : bad_box [@atomic] }
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+(* But it's fine when the singleton's payload is a value. *)
+type val_box = #{ v : int }
+type t_vbox = { filler : string; mutable boxed : val_box [@atomic] }
+let i () = (.boxed)
+let i2 () = (.idx_atomic(i ()).#v)
+[%%expect{|
+type val_box = #{ v : int; }
+type t_vbox = { filler : string; mutable boxed : val_box [@atomic]; }
+val i : unit -> (t_vbox, val_box) idx_atomic = <fun>
+val i2 : unit -> (t_vbox, int) idx_atomic = <fun>
+|}]
+
+(* Modality restrictions on atomic fields are the same as for ordinary
+   mutable fields: the element must be [global many aliased unyielding]. *)
+type 'a atomic_not_global = { mutable f : 'a @@ local [@atomic] }
+type 'a atomic_not_many = { mutable f : 'a @@ once [@atomic] }
+type 'a atomic_not_unyielding = { mutable f : 'a @@ yielding [@atomic] }
+[%%expect{|
+type 'a atomic_not_global = { mutable f : 'a @@ local [@atomic]; }
+type 'a atomic_not_many = { mutable f : 'a @@ once [@atomic]; }
+type 'a atomic_not_unyielding = { mutable f : 'a @@ yielding [@atomic]; }
+|}]
+let bad () : ('a atomic_not_global, _) idx_atomic = (.f)
+[%%expect{|
+Line 1, characters 52-56:
+1 | let bad () : ('a atomic_not_global, _) idx_atomic = (.f)
+                                                        ^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       mutable elements must be global, but this is not.
+|}]
+let bad () : ('a atomic_not_many, _) idx_atomic = (.f)
+[%%expect{|
+Line 1, characters 50-54:
+1 | let bad () : ('a atomic_not_many, _) idx_atomic = (.f)
+                                                      ^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       mutable elements must be many, but this is not.
+|}]
+let bad () : ('a atomic_not_unyielding, _) idx_atomic = (.f)
+[%%expect{|
+Line 1, characters 56-60:
+1 | let bad () : ('a atomic_not_unyielding, _) idx_atomic = (.f)
+                                                            ^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       mutable elements must be unyielding, but this is not.
 |}]
 
 (**************)

@@ -1698,6 +1698,18 @@ let extract_block_index_offset ~machine_width idx =
   in
   H.Binary (Int_shift (Naked_int64, Lsr), H.Prim shifted_left, shift_amount)
 
+(* Convert an atomic block index [idx] (which never points to a mixed product,
+   so no need to extract th eoffset) into the tagged-int field number suitable
+   for [Atomic_*_field] primitives. *)
+let atomic_idx_to_tagged_field ~machine_width idx : H.expr_primitive =
+  let three = H.simple_untagged_int ~machine_width 3 in
+  let word_index = H.Binary (Int_shift (Naked_int64, Lsr), idx, three) in
+  let word_index_imm =
+    H.Unary
+      (Num_conv { src = Naked_int64; dst = Naked_immediate }, Prim word_index)
+  in
+  Unary (Tag_immediate, Prim word_index_imm)
+
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
 let block_index_access_offsets ~machine_width layout idx =
@@ -3155,6 +3167,79 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Ternary (Atomic_field_int_arith Or, atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
+  | Patomic_load_idx { immediate_or_pointer }, [[atomic]; [idx]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [ Binary
+        ( Atomic_load_field
+            (convert_block_access_field_kind immediate_or_pointer),
+          atomic,
+          Prim field ) ]
+  | Patomic_set_idx { immediate_or_pointer }, [[atomic]; [idx]; [new_value]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [ Ternary
+        ( Atomic_set_field (convert_block_access_field_kind immediate_or_pointer),
+          atomic,
+          Prim field,
+          new_value ) ]
+  | Patomic_exchange_idx { immediate_or_pointer }, [[atomic]; [idx]; [new_value]]
+    ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [ Ternary
+        ( Atomic_exchange_field
+            (convert_block_access_field_kind immediate_or_pointer),
+          atomic,
+          Prim field,
+          new_value ) ]
+  | ( Patomic_compare_exchange_idx { immediate_or_pointer },
+      [[atomic]; [idx]; [comparison_value]; [new_value]] ) ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    let access_kind = convert_block_access_field_kind immediate_or_pointer in
+    [ Quaternary
+        ( Atomic_compare_exchange_field
+            { atomic_kind = access_kind; args_kind = access_kind },
+          atomic,
+          Prim field,
+          comparison_value,
+          new_value ) ]
+  | ( Patomic_compare_set_idx { immediate_or_pointer },
+      [[atomic]; [idx]; [old_value]; [new_value]] ) ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [ Quaternary
+        ( Atomic_compare_and_set_field
+            (convert_block_access_field_kind immediate_or_pointer),
+          atomic,
+          Prim field,
+          old_value,
+          new_value ) ]
+  | Patomic_fetch_add_idx, [[atomic]; [idx]; [i]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [Ternary (Atomic_field_int_arith Fetch_add, atomic, Prim field, i)]
+  | Patomic_add_idx, [[atomic]; [idx]; [i]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [Ternary (Atomic_field_int_arith Add, atomic, Prim field, i)]
+  | Patomic_sub_idx, [[atomic]; [idx]; [i]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [Ternary (Atomic_field_int_arith Sub, atomic, Prim field, i)]
+  | Patomic_land_idx, [[atomic]; [idx]; [i]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [Ternary (Atomic_field_int_arith And, atomic, Prim field, i)]
+  | Patomic_lor_idx, [[atomic]; [idx]; [i]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [Ternary (Atomic_field_int_arith Or, atomic, Prim field, i)]
+  | Patomic_lxor_idx, [[atomic]; [idx]; [i]] ->
+    needs_64_bit_target prim dbg;
+    let field = atomic_idx_to_tagged_field ~machine_width idx in
+    [Ternary (Atomic_field_int_arith Xor, atomic, Prim field, i)]
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
@@ -3277,7 +3362,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
       | Pscalar (Binary _)
-      | Pget_idx _ | Pset_ptr _ ),
+      | Pget_idx _ | Pset_ptr _ | Patomic_load_idx _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -3311,7 +3396,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
       | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
       | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
-      | Patomic_lor_field | Pset_idx _ ),
+      | Patomic_lor_field | Pset_idx _ | Patomic_set_idx _
+      | Patomic_exchange_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
+      | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+        ),
       ( []
       | [_]
       | [_; _]
@@ -3323,7 +3411,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       "Closure_conversion.convert_primitive: Wrong arity for ternary primitive \
        %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | ( (Patomic_compare_exchange_field _ | Patomic_compare_set_field _),
+  | ( ( Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _ ),
       ( []
       | [_]
       | [_; _]

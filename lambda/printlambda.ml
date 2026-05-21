@@ -869,6 +869,32 @@ let primitive ppf = function
   | Patomic_land_field -> fprintf ppf "atomic_land_field"
   | Patomic_lor_field -> fprintf ppf "atomic_lor_field"
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
+  | Patomic_load_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> fprintf ppf "atomic_load_idx_imm"
+        | Pointer -> fprintf ppf "atomic_load_idx_ptr")
+  | Patomic_set_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> fprintf ppf "atomic_set_idx_imm"
+        | Pointer -> fprintf ppf "atomic_set_idx_ptr")
+  | Patomic_exchange_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> fprintf ppf "atomic_exchange_idx_imm"
+        | Pointer -> fprintf ppf "atomic_exchange_idx_ptr")
+  | Patomic_compare_exchange_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> fprintf ppf "atomic_compare_exchange_idx_imm"
+        | Pointer -> fprintf ppf "atomic_compare_exchange_idx_ptr")
+  | Patomic_compare_set_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> fprintf ppf "atomic_compare_set_idx_imm"
+        | Pointer -> fprintf ppf "atomic_compare_set_idx_ptr")
+  | Patomic_fetch_add_idx -> fprintf ppf "atomic_fetch_add_idx"
+  | Patomic_add_idx -> fprintf ppf "atomic_add_idx"
+  | Patomic_sub_idx -> fprintf ppf "atomic_sub_idx"
+  | Patomic_land_idx -> fprintf ppf "atomic_land_idx"
+  | Patomic_lor_idx -> fprintf ppf "atomic_lor_idx"
+  | Patomic_lxor_idx -> fprintf ppf "atomic_lxor_idx"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ptls_get -> fprintf ppf "tls_get"
@@ -1065,6 +1091,32 @@ let name_of_primitive = function
   | Patomic_land_field -> "Patomic_land_field"
   | Patomic_lor_field -> "Patomic_lor_field"
   | Patomic_lxor_field -> "Patomic_lxor_field"
+  | Patomic_load_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> "atomic_load_idx_imm"
+        | Pointer -> "atomic_load_idx_ptr")
+  | Patomic_set_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> "atomic_set_idx_imm"
+        | Pointer -> "atomic_set_idx_ptr")
+  | Patomic_exchange_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> "atomic_exchange_idx_imm"
+        | Pointer -> "atomic_exchange_idx_ptr")
+  | Patomic_compare_exchange_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> "atomic_compare_exchange_idx_imm"
+        | Pointer -> "atomic_compare_exchange_idx_ptr")
+  | Patomic_compare_set_idx {immediate_or_pointer} ->
+      (match immediate_or_pointer with
+        | Immediate -> "atomic_compare_set_idx_imm"
+        | Pointer -> "atomic_compare_set_idx_ptr")
+  | Patomic_fetch_add_idx -> "Patomic_fetch_add_idx"
+  | Patomic_add_idx -> "Patomic_add_idx"
+  | Patomic_sub_idx -> "Patomic_sub_idx"
+  | Patomic_land_idx -> "Patomic_land_idx"
+  | Patomic_lor_idx -> "Patomic_lor_idx"
+  | Patomic_lxor_idx -> "Patomic_lxor_idx"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"

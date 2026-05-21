@@ -310,6 +310,22 @@ module Type_structure = struct
       is_mixed_float_float64_record
     | None -> false
 
+  let atomic_record_compatible t =
+    (* An [\[@atomic\]] field requires the field type's layout to be exactly
+       [value] — no products (even of values), no flats, no [void]. *)
+    let is_exactly_value (l : Layout.t) =
+      match l with
+      | Value _ -> true
+      | Void | Bits32 | Bits64 | Float32 | Float64 | Vec128 | Word | Product _
+        ->
+        false
+    in
+    match t with
+    | Record (ts, Boxed) ->
+      (not (flattens_floats t))
+      && List.for_all ts ~f:(fun t -> is_exactly_value (layout t))
+    | _ -> false
+
   let rec contains_vec128 t =
     match t with
     | Record (ts, _) | Tuple (ts, _) -> List.exists ts ~f:contains_vec128
@@ -810,6 +826,18 @@ module Type = struct
     | String -> sprintf "(fun a b -> String.equal (globalize a) (globalize b))"
     | Int64x2_u -> sprintf "int64x2_u_equal"
 
+  let eq_code_for_atomic_record (t : t) : string =
+    match t with
+    | Record { name = _; fields; boxing = Boxed } ->
+      let body =
+        List.map fields ~f:(fun (s, t) ->
+            sprintf "%s r1.%s r2.%s" (eq_code t) s s
+        )
+        |> String.concat ~sep:" && "
+      in
+      sprintf "(fun r1 r2 -> %s)" body
+    | _ -> invalid_arg "eq_code_for_atomic_record: expected boxed record"
+
   let rec reverse_unboxed_paths (ty : t) acc cur_path =
     match ty with
     | Record { name = _; fields; boxing = Unboxed } ->
@@ -924,7 +952,7 @@ module Type_naming = struct
           ty )
     )
 
-  let decls_code t =
+  let decls_code ?(atomic = false) t =
     let decls =
       Type_structure_map.fold
         (fun (ty_structure : Type_structure.t) ((id : int), (ty : Type.t)) acc
@@ -938,7 +966,15 @@ module Type_naming = struct
                 | Unboxed -> labels
                 | Boxed -> List.map labels ~f:(fun s -> "mutable " ^ s)
               in
-              assemble_record ":" boxing labels (List.map tys ~f:Type.code)
+              let ty_codes =
+                let codes = List.map tys ~f:Type.code in
+                match boxing with
+                | Unboxed -> codes
+                | Boxed when atomic ->
+                  List.map codes ~f:(fun s -> s ^ " [@atomic]")
+                | Boxed -> codes
+              in
+              assemble_record ":" boxing labels ty_codes
             | Variant { name; constructors } ->
               let constructor_defs =
                 List.map constructors ~f:(fun c ->

@@ -2,6 +2,7 @@ module Iarray = Iarray
 module IarrayLabels = IarrayLabels
 module Float32 = Float32
 module Float32_u = Float32_u
+module Idx_atomic = Idx_atomic
 module Idx_imm = Idx_imm
 module Idx_mut = Idx_mut
 module Int = Int

@@ -3097,8 +3097,9 @@ block_access:
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
-      | "idx_imm" -> Baccess_block (Immutable, i)
-      | "idx_mut" -> Baccess_block (Mutable, i)
+      | "idx_imm" -> Baccess_block (Block_idx_imm, i)
+      | "idx_mut" -> Baccess_block (Block_idx_mut, i)
+      | "idx_atomic" -> Baccess_block (Block_idx_atomic, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }

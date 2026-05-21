@@ -20,6 +20,7 @@ type test =
       { local : bool;
         with_void : bool
       }
+  | Record_atomic_idx_access of { local : bool }
 
 let interesting_type_trees test : Type_structure.t Tree.t list =
   (* There are many possible type trees, exponential in the size of the tree and
@@ -383,9 +384,15 @@ let test_array_idx_deepening ty =
 let path_is_valid_block_idx ty _path =
   not (Type_structure.flattens_floats (Type.structure ty))
 
-let test_record_idx_access ty ~local =
+let test_record_idx_access ?(atomic = false) ty ~local =
+  let idx_kind, mod_name =
+    if atomic then "idx_atomic", "Idx_atomic" else "idx_mut", "Idx_mut"
+  in
+  let eq_code_outer ty =
+    if atomic then Type.eq_code_for_atomic_record ty else Type.eq_code ty
+  in
   type_section ty;
-  line "let eq = %s in" (Type.eq_code ty);
+  line "let eq = %s in" (eq_code_outer ty);
   let fields =
     match ty with
     | Record { name = _; fields; boxing = Boxed } -> fields
@@ -428,17 +435,17 @@ let test_record_idx_access ty ~local =
                 in
                 line "let expected = %s in" reference_update;
                 let idx =
-                  sprintf "((.%s%s) : (%s, _) idx_mut)" lbl
+                  sprintf "((.%s%s) : (%s, _) %s)" lbl
                     (Path.to_string unboxed_path)
-                    (Type.code ty)
+                    (Type.code ty) idx_kind
                 in
                 let next_r_sub_element_flat =
                   sprintf "next_r%s" (Path.to_string full_path)
                 in
-                line "Idx_mut.set r %s %s;" idx next_r_sub_element_flat;
+                line "%s.set r %s %s;" mod_name idx next_r_sub_element_flat;
                 seq_assert ~debug_exprs "eq r expected";
                 seq_assert ~debug_exprs
-                  (sprintf "sub_eq (Idx_mut.get r %s) %s" idx
+                  (sprintf "sub_eq (%s.get r %s) %s" mod_name idx
                      next_r_sub_element_flat
                   )
               in
@@ -664,6 +671,10 @@ let main test ~bytecode =
     | Record_idx_access _ | Record_idx_deepening | Record_size _ ->
       List.filter_map interesting_type_trees
         ~f:Type_structure.boxed_record_containing_unboxed_records
+    | Record_atomic_idx_access _ ->
+      List.filter_map interesting_type_trees
+        ~f:Type_structure.boxed_record_containing_unboxed_records
+      |> List.filter ~f:Type_structure.atomic_record_compatible
     | Record_access { with_void = false; _ } ->
       List.filter_map interesting_type_trees
         ~f:Type_structure.boxed_record_containing_unboxed_records
@@ -704,7 +715,12 @@ let main test ~bytecode =
   line {|[@@@warning "-23"]|};
   line "%s" (Metaprogramming.preamble ~bytecode);
   line "%s" preamble;
-  List.iter (Type_naming.decls_code naming) ~f:(fun s -> line "%s" s);
+  let atomic_decls =
+    match test with Record_atomic_idx_access _ -> true | _ -> false
+  in
+  List.iter (Type_naming.decls_code ~atomic:atomic_decls naming) ~f:(fun s ->
+      line "%s" s
+  );
   line "";
   begin match test with
   | Array_idx_access { local } ->
@@ -721,6 +737,10 @@ let main test ~bytecode =
   | Record_idx_access { local } ->
     toplevel_unit_block (fun () ->
         List.iter types ~f:(test_record_idx_access ~local)
+    )
+  | Record_atomic_idx_access { local } ->
+    toplevel_unit_block (fun () ->
+        List.iter types ~f:(test_record_idx_access ~atomic:true ~local)
     )
   | Record_idx_deepening ->
     toplevel_unit_block (fun () -> List.iter types ~f:test_record_idx_deepening)
@@ -752,6 +772,8 @@ let tests =
     "array_idx_access_local", Array_idx_access { local = true };
     "record_idx_access", Record_idx_access { local = false };
     "record_idx_access_local", Record_idx_access { local = true };
+    "record_atomic_idx_access", Record_atomic_idx_access { local = false };
+    "record_atomic_idx_access_local", Record_atomic_idx_access { local = true };
     "array_idx_deepening", Array_idx_deepening;
     "record_idx_deepening", Record_idx_deepening;
     "record_size", Record_size

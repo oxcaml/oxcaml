@@ -105,6 +105,11 @@ module Type_structure : sig
 
   val is_mixed_float_float64_record : t -> bool
 
+  (** True iff a boxed record with [t]'s fields can carry [[@atomic]] record
+      fields, i.e. every field's layout is all-scannable so the record is not a
+      mixed block. *)
+  val atomic_record_compatible : t -> bool
+
   (** [None] if block indices to arrays of [nested_unboxed_record t] are not
       supported *)
   val array_element : t Tree.t -> t option
@@ -188,6 +193,11 @@ module Type : sig
       [let eq : $ty_code @ local -> $ty_code @ local -> bool = $eq_code] *)
   val eq_code : t -> string
 
+  (** Like [eq_code] but works on a boxed record whose fields are [[@atomic]]:
+      it uses field accessors instead of pattern matching (which the compiler
+      forbids for atomic fields). *)
+  val eq_code_for_atomic_record : t -> string
+
   (** Enumerate all paths into a nested unboxed record type. E.g. for an unboxed
       record with the structure: [#{ a : #{ b : int; c : int } }] produces:
       [(0, [<empty path>]), (1, [.#a]); (2, [[.#a.#b]; [.#a.#c]])] *)
@@ -204,6 +214,8 @@ module Type_naming : sig
 
   val add_names : t -> Type_structure.t -> t * Type.t
 
-  (** The list of type declarations for all nominal types produced *)
-  val decls_code : t -> string list
+  (** The list of type declarations for all nominal types produced. If [~atomic]
+      is true, fields of boxed records are emitted as
+      [mutable lbl : ty [@atomic]] instead of [mutable lbl : ty]. *)
+  val decls_code : ?atomic:bool -> t -> string list
 end

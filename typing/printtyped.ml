@@ -1397,8 +1397,12 @@ and block_access i ppf = function
   | Baccess_field (li, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_block (mut, index) ->
-      line i ppf "Baccess_block %a\n"
-        fmt_mutable_flag mut;
+      let s = match mut with
+        | Parsetree.Block_idx_imm -> "imm"
+        | Block_idx_mut -> "mut"
+        | Block_idx_atomic -> "atomic"
+      in
+      line i ppf "Baccess_block %s\n" s;
       expression i ppf index
 
 and unboxed_access i ppf = function
