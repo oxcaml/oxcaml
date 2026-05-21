@@ -1285,6 +1285,9 @@ void caml_continuation_replace(value cont, struct stack_info* stk)
 CAMLprim value caml_continuation_update_handler_noexc
   (value cont, value hval, value hexn, value heff, value htick)
 {
+  /* Note: this can be noalloc because, despite participating in marking (by
+     potentially calling [caml_darken_cont], through
+     [caml_continuation_use_noexc]), it can't actually enter the GC */
   CAMLnoalloc;
   value stack;
   struct stack_info* stk;
@@ -1310,6 +1313,9 @@ CAMLprim value caml_continuation_update_handler_noexc
 CAMLprim value caml_continuation_update_tick_handler_noexc
   (value cont, value htick)
 {
+  /* Note: this can be noalloc because, despite participating in marking (by
+     potentially calling [caml_darken_cont], through
+     [caml_continuation_use_noexc]), it can't actually enter the GC */
   CAMLnoalloc;
   value stack;
   struct stack_info *stk;
