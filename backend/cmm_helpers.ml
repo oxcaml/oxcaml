@@ -891,6 +891,25 @@ and asr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
+          | Cop
+              ( Cand,
+                [ Cop
+                    ( Caddi,
+                      [ Cop (Clsl, [c; Cconst_int (x, _)], _);
+                        Cconst_int (offset, _) ],
+                      _ );
+                  ((Cconst_int _ | Cconst_natint _) as y) ],
+                _ )
+            when x = n
+                 && Nativeint.shift_right_logical (Nativeint.of_int offset) x
+                    = 0n
+                 && const_exn y >= 0n ->
+            (* [asr (and ((c lsl k) + o) m) k = c land (m asr k)] when [0 <= o <
+               2^k] (so the [+] cannot carry into the high bits) and [m >= 0]
+               (so the sign extension by [asr] agrees with the zero high bits
+               the [land] produces). Removes the redundant tag/untag pair when a
+               mask sits between them. *)
+            and_const c (Nativeint.shift_right (const_exn y) n) dbg
           | _ -> Cop (Casr, [c1; c2], dbg)))
       | Cop (Casr, [x; (Cconst_int (n', _) as y)], z), c2
         when is_defined_shift n' ->
