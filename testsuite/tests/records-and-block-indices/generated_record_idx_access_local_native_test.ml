@@ -81,18 +81,18 @@ type t9 = { mutable a9 : int; mutable b9 : t8 } (* { int; #{ float; int } } *)
 type t10 = #{ a10 : int64x2# } (* #{ int64x2# } *)
 type t11 = { mutable a11 : int; mutable b11 : t10 } (* { int; #{ int64x2# } } *)
 type t12 = { mutable a12 : int64; mutable b12 : int } (* { int64; int } *)
-type t13 = { mutable a13 : int64#; mutable b13 : int32# } (* { int64#; int32# } *)
+type t13 = { mutable a13 : int64_u; mutable b13 : int32_u } (* { int64_u; int32_u } *)
 type v14 = C14_0 of unit_u (* (| unit_u) *)
-type t15 = { mutable a15 : int64#; mutable b15 : v14 } (* { int64#; (| unit_u) } *)
-type t16 = { mutable a16 : int32#; mutable b16 : int } (* { int32#; int } *)
-type t17 = { mutable a17 : int32#; mutable b17 : int32#; mutable c17 : int } (* { int32#; int32#; int } *)
-type t18 = { mutable a18 : int32#; mutable b18 : v14 } (* { int32#; (| unit_u) } *)
-type t19 = #{ a19 : int; b19 : int32# } (* #{ int; int32# } *)
-type t20 = { mutable a20 : int32#; mutable b20 : t19 } (* { int32#; #{ int; int32# } } *)
+type t15 = { mutable a15 : int64_u; mutable b15 : v14 } (* { int64_u; (| unit_u) } *)
+type t16 = { mutable a16 : int32_u; mutable b16 : int } (* { int32_u; int } *)
+type t17 = { mutable a17 : int32_u; mutable b17 : int32_u; mutable c17 : int } (* { int32_u; int32_u; int } *)
+type t18 = { mutable a18 : int32_u; mutable b18 : v14 } (* { int32_u; (| unit_u) } *)
+type t19 = #{ a19 : int; b19 : int32_u } (* #{ int; int32_u } *)
+type t20 = { mutable a20 : int32_u; mutable b20 : t19 } (* { int32_u; #{ int; int32_u } } *)
 type t21 = { mutable a21 : nativeint# } (* { nativeint# } *)
 type t22 = { mutable a22 : nativeint#; mutable b22 : nativeint# } (* { nativeint#; nativeint# } *)
-type t23 = { mutable a23 : unit_u; mutable b23 : int64# } (* { unit_u; int64# } *)
-type t24 = { mutable a24 : unit_u; mutable b24 : int32# } (* { unit_u; int32# } *)
+type t23 = { mutable a23 : unit_u; mutable b23 : int64_u } (* { unit_u; int64_u } *)
+type t24 = { mutable a24 : unit_u; mutable b24 : int32_u } (* { unit_u; int32_u } *)
 type t25 = { mutable a25 : unit_u; mutable b25 : string } (* { unit_u; string } *)
 type t26 = { mutable a26 : float; mutable b26 : int } (* { float; int } *)
 type t27 = { mutable a27 : float; mutable b27 : int; mutable c27 : int } (* { float; int; int } *)
@@ -118,20 +118,20 @@ type t46 = { mutable a46 : int64x2#; mutable b46 : t6 } (* { int64x2#; #{ int; i
 type t47 = { mutable a47 : v14; mutable b47 : float } (* { (| unit_u); float } *)
 type t48 = { mutable a48 : t4 } (* { #{ int } } *)
 type t49 = { mutable a49 : t4; mutable b49 : int } (* { #{ int }; int } *)
-type t50 = { mutable a50 : t4; mutable b50 : int32# } (* { #{ int }; int32# } *)
+type t50 = { mutable a50 : t4; mutable b50 : int32_u } (* { #{ int }; int32_u } *)
 type t51 = { mutable a51 : t4; mutable b51 : float } (* { #{ int }; float } *)
 type t52 = { mutable a52 : t6 } (* { #{ int; int } } *)
-type t53 = #{ a53 : int32# } (* #{ int32# } *)
-type t54 = { mutable a54 : t53 } (* { #{ int32# } } *)
-type t55 = #{ a55 : int32#; b55 : int } (* #{ int32#; int } *)
-type t56 = { mutable a56 : t55 } (* { #{ int32#; int } } *)
+type t53 = #{ a53 : int32_u } (* #{ int32_u } *)
+type t54 = { mutable a54 : t53 } (* { #{ int32_u } } *)
+type t55 = #{ a55 : int32_u; b55 : int } (* #{ int32_u; int } *)
+type t56 = { mutable a56 : t55 } (* { #{ int32_u; int } } *)
 type t57 = #{ a57 : float } (* #{ float } *)
 type t58 = { mutable a58 : t57; mutable b58 : float } (* { #{ float }; float } *)
 type t59 = { mutable a59 : t32; mutable b59 : int } (* { #{ float; float }; int } *)
 type t60 = { mutable a60 : t32; mutable b60 : float } (* { #{ float; float }; float } *)
-type t61 = #{ a61 : float32#; b61 : int64# } (* #{ float32#; int64# } *)
-type t62 = #{ a62 : string; b62 : int64# } (* #{ string; int64# } *)
-type t63 = { mutable a63 : t61; mutable b63 : t62 } (* { #{ float32#; int64# }; #{ string; int64# } } *)
+type t61 = #{ a61 : float32#; b61 : int64_u } (* #{ float32#; int64_u } *)
+type t62 = #{ a62 : string; b62 : int64_u } (* #{ string; int64_u } *)
+type t63 = { mutable a63 : t61; mutable b63 : t62 } (* { #{ float32#; int64_u }; #{ string; int64_u } } *)
 type t64 = #{ a64 : string } (* #{ string } *)
 type t65 = { mutable a65 : t64; mutable b65 : unit_u } (* { #{ string }; unit_u } *)
 type t66 = { mutable a66 : t10; mutable b66 : int64x2# } (* { #{ int64x2# }; int64x2# } *)
@@ -488,9 +488,9 @@ let to_run () =
   mark_test_run 50;
   let test = sub_eq (Idx_mut.get r ((.b12) : (t12, _) idx_mut)) next_r.b12 in
   if not test then failwithf "test 50 failed";
-  (********************************)
-  (*   t13 = { int64#; int32# }   *)
-  (********************************)
+  (**********************************)
+  (*   t13 = { int64_u; int32_u }   *)
+  (**********************************)
   let eq = (fun { a13 = a131; b13 = b131 } { a13 = a132; b13 = b132 } -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a131 a132 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b131 b132) in
   let r = { a13 = #0L; b13 = #1l } in
   (* Paths of depth 1 *)
@@ -518,9 +518,9 @@ let to_run () =
   mark_test_run 54;
   let test = sub_eq (Idx_mut.get r ((.b13) : (t13, _) idx_mut)) next_r.b13 in
   if not test then failwithf "test 54 failed";
-  (************************************)
-  (*   t15 = { int64#; (| unit_u) }   *)
-  (************************************)
+  (*************************************)
+  (*   t15 = { int64_u; (| unit_u) }   *)
+  (*************************************)
   let eq = (fun { a15 = a151; b15 = b151 } { a15 = a152; b15 = b152 } -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a151 a152 && (fun a b -> match a, b with C14_0(a0), C14_0(b0) -> (fun _ _ -> true) a0 b0) b151 b152) in
   let r = { a15 = #0L; b15 = (C14_0 (unbox_unit ())) } in
   (* Paths of depth 1 *)
@@ -548,9 +548,9 @@ let to_run () =
   mark_test_run 58;
   let test = sub_eq (Idx_mut.get r ((.b15) : (t15, _) idx_mut)) next_r.b15 in
   if not test then failwithf "test 58 failed";
-  (*****************************)
-  (*   t16 = { int32#; int }   *)
-  (*****************************)
+  (******************************)
+  (*   t16 = { int32_u; int }   *)
+  (******************************)
   let eq = (fun { a16 = a161; b16 = b161 } { a16 = a162; b16 = b162 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a161 a162 && (fun a b -> Int.equal a b) b161 b162) in
   let r = { a16 = #0l; b16 = 1 } in
   (* Paths of depth 1 *)
@@ -578,9 +578,9 @@ let to_run () =
   mark_test_run 62;
   let test = sub_eq (Idx_mut.get r ((.b16) : (t16, _) idx_mut)) next_r.b16 in
   if not test then failwithf "test 62 failed";
-  (*************************************)
-  (*   t17 = { int32#; int32#; int }   *)
-  (*************************************)
+  (***************************************)
+  (*   t17 = { int32_u; int32_u; int }   *)
+  (***************************************)
   let eq = (fun { a17 = a171; b17 = b171; c17 = c171 } { a17 = a172; b17 = b172; c17 = c172 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a171 a172 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b171 b172 && (fun a b -> Int.equal a b) c171 c172) in
   let r = { a17 = #0l; b17 = #1l; c17 = 2 } in
   (* Paths of depth 1 *)
@@ -621,9 +621,9 @@ let to_run () =
   mark_test_run 68;
   let test = sub_eq (Idx_mut.get r ((.c17) : (t17, _) idx_mut)) next_r.c17 in
   if not test then failwithf "test 68 failed";
-  (************************************)
-  (*   t18 = { int32#; (| unit_u) }   *)
-  (************************************)
+  (*************************************)
+  (*   t18 = { int32_u; (| unit_u) }   *)
+  (*************************************)
   let eq = (fun { a18 = a181; b18 = b181 } { a18 = a182; b18 = b182 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a181 a182 && (fun a b -> match a, b with C14_0(a0), C14_0(b0) -> (fun _ _ -> true) a0 b0) b181 b182) in
   let r = { a18 = #0l; b18 = (C14_0 (unbox_unit ())) } in
   (* Paths of depth 1 *)
@@ -651,9 +651,9 @@ let to_run () =
   mark_test_run 72;
   let test = sub_eq (Idx_mut.get r ((.b18) : (t18, _) idx_mut)) next_r.b18 in
   if not test then failwithf "test 72 failed";
-  (******************************************)
-  (*   t20 = { int32#; #{ int; int32# } }   *)
-  (******************************************)
+  (********************************************)
+  (*   t20 = { int32_u; #{ int; int32_u } }   *)
+  (********************************************)
   let eq = (fun { a20 = a201; b20 = b201 } { a20 = a202; b20 = b202 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a201 a202 && (fun #{ a19 = a191; b19 = b191 } #{ a19 = a192; b19 = b192 } -> (fun a b -> Int.equal a b) a191 a192 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b191 b192) b201 b202) in
   let r = { a20 = #0l; b20 = #{ a19 = 1; b19 = #2l } } in
   (* Paths of depth 1 *)
@@ -750,9 +750,9 @@ let to_run () =
   mark_test_run 86;
   let test = sub_eq (Idx_mut.get r ((.b22) : (t22, _) idx_mut)) next_r.b22 in
   if not test then failwithf "test 86 failed";
-  (********************************)
-  (*   t23 = { unit_u; int64# }   *)
-  (********************************)
+  (*********************************)
+  (*   t23 = { unit_u; int64_u }   *)
+  (*********************************)
   let eq = (fun { a23 = a231; b23 = b231 } { a23 = a232; b23 = b232 } -> (fun _ _ -> true) a231 a232 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) b231 b232) in
   let r = { a23 = (unbox_unit ()); b23 = #0L } in
   (* Paths of depth 1 *)
@@ -780,9 +780,9 @@ let to_run () =
   mark_test_run 90;
   let test = sub_eq (Idx_mut.get r ((.b23) : (t23, _) idx_mut)) next_r.b23 in
   if not test then failwithf "test 90 failed";
-  (********************************)
-  (*   t24 = { unit_u; int32# }   *)
-  (********************************)
+  (*********************************)
+  (*   t24 = { unit_u; int32_u }   *)
+  (*********************************)
   let eq = (fun { a24 = a241; b24 = b241 } { a24 = a242; b24 = b242 } -> (fun _ _ -> true) a241 a242 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b241 b242) in
   let r = { a24 = (unbox_unit ()); b24 = #0l } in
   (* Paths of depth 1 *)
@@ -1648,10 +1648,28 @@ let to_run () =
   if not test then failwithf "test 205 failed";
   mark_test_run 206;
   let test = sub_eq (Idx_mut.get r ((.b49) : (t49, _) idx_mut)) next_r.b49 in
+<<<<<<< HEAD
   if not test then failwithf "test 206 failed";
+||||||| parent of 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 190 failed";
+=======
+<<<<<<< HEAD
+  if not test then failwithf "test 190 failed";
+>>>>>>> 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   (**********************************)
   (*   t50 = { #{ int }; int32# }   *)
   (**********************************)
+||||||| parent of 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 216 failed";
+  (**********************************)
+  (*   t50 = { #{ int }; int32# }   *)
+  (**********************************)
+=======
+  if not test then failwithf "test 216 failed";
+  (***********************************)
+  (*   t50 = { #{ int }; int32_u }   *)
+  (***********************************)
+>>>>>>> 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   let eq = (fun { a50 = a501; b50 = b501 } { a50 = a502; b50 = b502 } -> (fun #{ a4 = a41 } #{ a4 = a42 } -> (fun a b -> Int.equal a b) a41 a42) a501 a502 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b501 b502) in
   let r = { a50 = #{ a4 = 0 }; b50 = #1l } in
   (* Paths of depth 1 *)
@@ -1771,10 +1789,28 @@ let to_run () =
   if not test then failwithf "test 223 failed";
   mark_test_run 224;
   let test = sub_eq (Idx_mut.get r ((.a52.#b6) : (t52, _) idx_mut)) next_r.a52.#b6 in
+<<<<<<< HEAD
   if not test then failwithf "test 224 failed";
+||||||| parent of 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 208 failed";
+=======
+<<<<<<< HEAD
+  if not test then failwithf "test 208 failed";
+>>>>>>> 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   (*****************************)
   (*   t54 = { #{ int32# } }   *)
   (*****************************)
+||||||| parent of 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 234 failed";
+  (*****************************)
+  (*   t54 = { #{ int32# } }   *)
+  (*****************************)
+=======
+  if not test then failwithf "test 234 failed";
+  (******************************)
+  (*   t54 = { #{ int32_u } }   *)
+  (******************************)
+>>>>>>> 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   let eq = (fun { a54 = a541 } { a54 = a542 } -> (fun #{ a53 = a531 } #{ a53 = a532 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a531 a532) a541 a542) in
   let r = { a54 = #{ a53 = #0l } } in
   (* Paths of depth 1 *)
@@ -1800,10 +1836,28 @@ let to_run () =
   if not test then failwithf "test 227 failed";
   mark_test_run 228;
   let test = sub_eq (Idx_mut.get r ((.a54.#a53) : (t54, _) idx_mut)) next_r.a54.#a53 in
+<<<<<<< HEAD
   if not test then failwithf "test 228 failed";
+||||||| parent of 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 212 failed";
+=======
+<<<<<<< HEAD
+  if not test then failwithf "test 212 failed";
+>>>>>>> 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   (**********************************)
   (*   t56 = { #{ int32#; int } }   *)
   (**********************************)
+||||||| parent of 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 238 failed";
+  (**********************************)
+  (*   t56 = { #{ int32#; int } }   *)
+  (**********************************)
+=======
+  if not test then failwithf "test 238 failed";
+  (***********************************)
+  (*   t56 = { #{ int32_u; int } }   *)
+  (***********************************)
+>>>>>>> 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   let eq = (fun { a56 = a561 } { a56 = a562 } -> (fun #{ a55 = a551; b55 = b551 } #{ a55 = a552; b55 = b552 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a551 a552 && (fun a b -> Int.equal a b) b551 b552) a561 a562) in
   let r = { a56 = #{ a55 = #0l; b55 = 1 } } in
   (* Paths of depth 1 *)
@@ -1973,10 +2027,28 @@ let to_run () =
   if not test then failwithf "test 249 failed";
   mark_test_run 250;
   let test = sub_eq (Idx_mut.get r ((.b60) : (t60, _) idx_mut)) next_r.b60 in
+<<<<<<< HEAD
   if not test then failwithf "test 250 failed";
+||||||| parent of 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 234 failed";
+=======
+<<<<<<< HEAD
+  if not test then failwithf "test 234 failed";
+>>>>>>> 8f9a20068e (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   (************************************************************)
   (*   t63 = { #{ float32#; int64# }; #{ string; int64# } }   *)
   (************************************************************)
+||||||| parent of 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
+  if not test then failwithf "test 264 failed";
+  (************************************************************)
+  (*   t63 = { #{ float32#; int64# }; #{ string; int64# } }   *)
+  (************************************************************)
+=======
+  if not test then failwithf "test 264 failed";
+  (**************************************************************)
+  (*   t63 = { #{ float32#; int64_u }; #{ string; int64_u } }   *)
+  (**************************************************************)
+>>>>>>> 732ea919f6 (Split int32/int64 boxed/unboxed versions (`int64#`->`int64_u`))
   let eq = (fun { a63 = a631; b63 = b631 } { a63 = a632; b63 = b632 } -> (fun #{ a61 = a611; b61 = b611 } #{ a61 = a612; b61 = b612 } -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a611 a612 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) b611 b612) a631 a632 && (fun #{ a62 = a621; b62 = b621 } #{ a62 = a622; b62 = b622 } -> (fun a b -> String.equal (globalize a) (globalize b)) a621 a622 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) b621 b622) b631 b632) in
   let r = { a63 = #{ a61 = #0.s; b61 = #1L }; b63 = #{ a62 = "2"; b62 = #3L } } in
   (* Paths of depth 1 *)

@@ -7,19 +7,19 @@
    expands to the boxed type during unification *)
 
 type t1 = float# box
-type t2 = int32# box
-type t3 = int64# box
+type t2 = int32_u box
+type t3 = int64_u box
 type t4 = nativeint# box
 type t5 = int# box
-type t6 = #(int64# * string) box
+type t6 = #(int64_u * string) box
 type 'a t7 = 'a ref# box
 [%%expect{|
 type t1 = float
-type t2 = int32
-type t3 = int64
+type t2 = int32_u box
+type t3 = int64_u box
 type t4 = nativeint
 type t5 = int
-type t6 = int64# * string
+type t6 = int64_u * string
 type 'a t7 = 'a ref
 |}]
 
@@ -265,11 +265,15 @@ let check_bits32 : type (a : bits32). a -> a box -> unit =
 val check_bits32 : ('a : bits32). 'a -> 'a box -> unit = <fun>
 |}]
 
-type ui32 = int32#
+type ui32 = int32_u
 let test_bits32 (u : ui32) (b : int32) = check_bits32 u b;;
 [%%expect{|
-type ui32 = int32#
-val test_bits32 : ui32 -> int32 -> unit = <fun>
+type ui32 = int32_u
+Line 2, characters 56-57:
+2 | let test_bits32 (u : ui32) (b : int32) = check_bits32 u b;;
+                                                            ^
+Error: This expression has type "int32" but an expression was expected of type
+         "ui32 box" = "int32_u box"
 |}]
 
 let check_bits64 : type (a : bits64). a -> a box -> unit =
@@ -278,11 +282,15 @@ let check_bits64 : type (a : bits64). a -> a box -> unit =
 val check_bits64 : ('a : bits64). 'a -> 'a box -> unit = <fun>
 |}]
 
-type ui64 = int64#
+type ui64 = int64_u
 let test_bits64 (u : ui64) (b : int64) = check_bits64 u b;;
 [%%expect{|
-type ui64 = int64#
-val test_bits64 : ui64 -> int64 -> unit = <fun>
+type ui64 = int64_u
+Line 2, characters 56-57:
+2 | let test_bits64 (u : ui64) (b : int64) = check_bits64 u b;;
+                                                            ^
+Error: This expression has type "int64" but an expression was expected of type
+         "ui64 box" = "int64_u box"
 |}]
 
 let check_word : type (a : word). a -> a box -> unit =
@@ -354,7 +362,7 @@ Error: This expression has type "float# box" = "float"
        but an expression was expected of type "int"
 |}]
 
-let mismatch2 (x : int32# box) : int64 = x;;
+let mismatch2 (x : int32_u box) : int64 = x;;
 [%%expect{|
 Line 1, characters 41-42:
 1 | let mismatch2 (x : int32# box) : int64 = x;;
@@ -364,11 +372,11 @@ Error: This expression has type "int32# box" = "int32"
 |}]
 
 type uf1 = float#
-type uf2 = int64#
+type uf2 = int64_u
 let mismatch3 (x : uf1 box) : uf2 box = x;;
 [%%expect{|
 type uf1 = float#
-type uf2 = int64#
+type uf2 = int64_u
 Line 3, characters 40-41:
 3 | let mismatch3 (x : uf1 box) : uf2 box = x;;
                                             ^
@@ -400,10 +408,10 @@ val infer3 : ufl box -> float = <fun>
 (* Test 19: Distinct vs same underlying box types *)
 
 type t_float_box = float# box
-type t_int32_box = int32# box;;
+type t_int32_box = int32_u box;;
 [%%expect{|
 type t_float_box = float
-type t_int32_box = int32
+type t_int32_box = int32_u box
 |}]
 
 let distinct1 (x : t_float_box) (y : t_int32_box) = x = y;;
@@ -411,8 +419,9 @@ let distinct1 (x : t_float_box) (y : t_int32_box) = x = y;;
 Line 1, characters 56-57:
 1 | let distinct1 (x : t_float_box) (y : t_int32_box) = x = y;;
                                                             ^
-Error: This expression has type "t_int32_box" = "int32"
+Error: This expression has type "int32_u box"
        but an expression was expected of type "t_float_box" = "float"
+       Type "int32_u" is not compatible with type "float#"
 |}]
 
 type ua = float#
@@ -622,12 +631,20 @@ let _ = f_box 5.;;
 
 let _ = f_box 42l;;
 [%%expect{|
-- : int32 = 42l
+Line 1, characters 14-17:
+1 | let _ = f_box 42l;;
+                  ^^^
+Error: This expression has type "int32" but an expression was expected of type
+         "'a box"
 |}]
 
 let _ = f_box 42L;;
 [%%expect{|
-- : int64 = 42L
+Line 1, characters 14-17:
+1 | let _ = f_box 42L;;
+                  ^^^
+Error: This expression has type "int64" but an expression was expected of type
+         "'a box"
 |}]
 
 (* int also has an unboxed version (int#) *)

@@ -556,7 +556,7 @@ spill_slot_lifetime.get_one:
 
 
 (* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2288 *)
-let f ~(s: int64#) (t : int64#) =
+let f ~(s: int64_u) (t : int64_u) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:

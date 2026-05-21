@@ -35,6 +35,8 @@ val type_int8: type_expr
 val type_int16: type_expr
 val type_int32: type_expr
 val type_int64: type_expr
+val type_int32_u: type_expr
+val type_int64_u: type_expr
 val type_lazy_t: type_expr -> type_expr
 val type_extension_constructor:type_expr
 val type_floatarray:type_expr
@@ -50,8 +52,6 @@ val type_unboxed_char: type_expr
 val type_unboxed_int: type_expr
 val type_unboxed_int8: type_expr
 val type_unboxed_int16: type_expr
-val type_unboxed_int32:type_expr
-val type_unboxed_int64:type_expr
 val type_or_null: type_expr -> type_expr
 val type_idx_imm : type_expr -> type_expr -> type_expr
 val type_idx_mut : type_expr -> type_expr -> type_expr
@@ -119,6 +119,8 @@ val path_int8: Path.t
 val path_int16: Path.t
 val path_int32: Path.t
 val path_int64: Path.t
+val path_int32_u: Path.t
+val path_int64_u: Path.t
 val path_lazy_t: Path.t
 val path_extension_constructor: Path.t
 val path_floatarray: Path.t
@@ -136,8 +138,6 @@ val path_unboxed_char: Path.t
 val path_unboxed_int: Path.t
 val path_unboxed_int8: Path.t
 val path_unboxed_int16: Path.t
-val path_unboxed_int32: Path.t
-val path_unboxed_int64: Path.t
 val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t

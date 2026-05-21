@@ -63,17 +63,17 @@ type t5 = #{ a5 : int; b5 : float } (* #{ int; float } *)
 type t6 = { mutable a6 : int; mutable b6 : t5 } (* { int; #{ int; float } } *)
 type t7 = { mutable a7 : int64; mutable b7 : int64 } (* { int64; int64 } *)
 type t8 = { mutable a8 : int64; mutable b8 : nativeint# } (* { int64; nativeint# } *)
-type t9 = { mutable a9 : int64#; mutable b9 : int64 } (* { int64#; int64 } *)
-type t10 = { mutable a10 : int64#; mutable b10 : int64# } (* { int64#; int64# } *)
-type t11 = { mutable a11 : int64#; mutable b11 : nativeint# } (* { int64#; nativeint# } *)
-type t12 = { mutable a12 : int32#; mutable b12 : int32#; mutable c12 : int32# } (* { int32#; int32#; int32# } *)
+type t9 = { mutable a9 : int64_u; mutable b9 : int64 } (* { int64_u; int64 } *)
+type t10 = { mutable a10 : int64_u; mutable b10 : int64_u } (* { int64_u; int64_u } *)
+type t11 = { mutable a11 : int64_u; mutable b11 : nativeint# } (* { int64_u; nativeint# } *)
+type t12 = { mutable a12 : int32_u; mutable b12 : int32_u; mutable c12 : int32_u } (* { int32_u; int32_u; int32_u } *)
 type t13 = #{ a13 : int; b13 : int } (* #{ int; int } *)
-type t14 = { mutable a14 : int32#; mutable b14 : t13 } (* { int32#; #{ int; int } } *)
+type t14 = { mutable a14 : int32_u; mutable b14 : t13 } (* { int32_u; #{ int; int } } *)
 type v15 = C15_0 of unit_u (* (| unit_u) *)
 type t16 = { mutable a16 : nativeint#; mutable b16 : v15 } (* { nativeint#; (| unit_u) } *)
 type t17 = { mutable a17 : float; mutable b17 : int; mutable c17 : int } (* { float; int; int } *)
 type t18 = { mutable a18 : float; mutable b18 : int64 } (* { float; int64 } *)
-type t19 = { mutable a19 : float; mutable b19 : int64# } (* { float; int64# } *)
+type t19 = { mutable a19 : float; mutable b19 : int64_u } (* { float; int64_u } *)
 type t20 = { mutable a20 : float; mutable b20 : nativeint# } (* { float; nativeint# } *)
 type t21 = { mutable a21 : float; mutable b21 : float } (* { float; float } *)
 type t22 = { mutable a22 : float; mutable b22 : float; mutable c22 : float } (* { float; float; float } *)
@@ -99,19 +99,19 @@ type t41 = { mutable a41 : v15; mutable b41 : v15 } (* { (| unit_u); (| unit_u) 
 type t42 = #{ a42 : int } (* #{ int } *)
 type t43 = { mutable a43 : t42 } (* { #{ int } } *)
 type t44 = { mutable a44 : t42; mutable b44 : int } (* { #{ int }; int } *)
-type t45 = { mutable a45 : t42; mutable b45 : int32# } (* { #{ int }; int32# } *)
+type t45 = { mutable a45 : t42; mutable b45 : int32_u } (* { #{ int }; int32_u } *)
 type t46 = { mutable a46 : t13 } (* { #{ int; int } } *)
 type t47 = { mutable a47 : t13; mutable b47 : int } (* { #{ int; int }; int } *)
-type t48 = { mutable a48 : t13; mutable b48 : int32# } (* { #{ int; int }; int32# } *)
-type t49 = #{ a49 : int; b49 : int32# } (* #{ int; int32# } *)
-type t50 = { mutable a50 : t49; mutable b50 : int } (* { #{ int; int32# }; int } *)
+type t48 = { mutable a48 : t13; mutable b48 : int32_u } (* { #{ int; int }; int32_u } *)
+type t49 = #{ a49 : int; b49 : int32_u } (* #{ int; int32_u } *)
+type t50 = { mutable a50 : t49; mutable b50 : int } (* { #{ int; int32_u }; int } *)
 type t51 = { mutable a51 : t5; mutable b51 : int } (* { #{ int; float }; int } *)
-type t52 = #{ a52 : int64; b52 : int64# } (* #{ int64; int64# } *)
-type t53 = #{ a53 : int64#; b53 : float# } (* #{ int64#; float# } *)
-type t54 = { mutable a54 : t52; mutable b54 : t53 } (* { #{ int64; int64# }; #{ int64#; float# } } *)
-type t55 = #{ a55 : int32# } (* #{ int32# } *)
-type t56 = { mutable a56 : t55 } (* { #{ int32# } } *)
-type t57 = { mutable a57 : t55; mutable b57 : int32# } (* { #{ int32# }; int32# } *)
+type t52 = #{ a52 : int64; b52 : int64_u } (* #{ int64; int64_u } *)
+type t53 = #{ a53 : int64_u; b53 : float# } (* #{ int64_u; float# } *)
+type t54 = { mutable a54 : t52; mutable b54 : t53 } (* { #{ int64; int64_u }; #{ int64_u; float# } } *)
+type t55 = #{ a55 : int32_u } (* #{ int32_u } *)
+type t56 = { mutable a56 : t55 } (* { #{ int32_u } } *)
+type t57 = { mutable a57 : t55; mutable b57 : int32_u } (* { #{ int32_u }; int32_u } *)
 type t58 = { mutable a58 : t26 } (* { #{ float } } *)
 type t59 = #{ a59 : float; b59 : int } (* #{ float; int } *)
 type t60 = { mutable a60 : t59; mutable b60 : int } (* { #{ float; int }; int } *)
@@ -337,9 +337,9 @@ let to_run () =
     if not test then failwithf "test 18 failed %d" i;
   );
 
-  (******************************)
-  (*   t9 = { int64#; int64 }   *)
-  (******************************)
+  (*******************************)
+  (*   t9 = { int64_u; int64 }   *)
+  (*******************************)
   (* Deepening to (.a9) *)
   let idx : (t9, _) idx_mut = (.a9) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -361,9 +361,9 @@ let to_run () =
     if not test then failwithf "test 20 failed %d" i;
   );
 
-  (********************************)
-  (*   t10 = { int64#; int64# }   *)
-  (********************************)
+  (**********************************)
+  (*   t10 = { int64_u; int64_u }   *)
+  (**********************************)
   (* Deepening to (.a10) *)
   let idx : (t10, _) idx_mut = (.a10) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -385,9 +385,9 @@ let to_run () =
     if not test then failwithf "test 22 failed %d" i;
   );
 
-  (************************************)
-  (*   t11 = { int64#; nativeint# }   *)
-  (************************************)
+  (*************************************)
+  (*   t11 = { int64_u; nativeint# }   *)
+  (*************************************)
   (* Deepening to (.a11) *)
   let idx : (t11, _) idx_mut = (.a11) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -409,9 +409,9 @@ let to_run () =
     if not test then failwithf "test 24 failed %d" i;
   );
 
-  (****************************************)
-  (*   t12 = { int32#; int32#; int32# }   *)
-  (****************************************)
+  (*******************************************)
+  (*   t12 = { int32_u; int32_u; int32_u }   *)
+  (*******************************************)
   (* Deepening to (.a12) *)
   let idx : (t12, _) idx_mut = (.a12) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -443,9 +443,9 @@ let to_run () =
     if not test then failwithf "test 27 failed %d" i;
   );
 
-  (***************************************)
-  (*   t14 = { int32#; #{ int; int } }   *)
-  (***************************************)
+  (****************************************)
+  (*   t14 = { int32_u; #{ int; int } }   *)
+  (****************************************)
   (* Deepening to (.a14) *)
   let idx : (t14, _) idx_mut = (.a14) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -581,9 +581,9 @@ let to_run () =
     if not test then failwithf "test 40 failed %d" i;
   );
 
-  (*******************************)
-  (*   t19 = { float; int64# }   *)
-  (*******************************)
+  (********************************)
+  (*   t19 = { float; int64_u }   *)
+  (********************************)
   (* Deepening to (.a19) *)
   let idx : (t19, _) idx_mut = (.a19) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -1227,9 +1227,9 @@ let to_run () =
     if not test then failwithf "test 95 failed %d" i;
   );
 
-  (**********************************)
-  (*   t45 = { #{ int }; int32# }   *)
-  (**********************************)
+  (***********************************)
+  (*   t45 = { #{ int }; int32_u }   *)
+  (***********************************)
   (* Deepening to (.a45) *)
   let idx : (t45, _) idx_mut = (.a45) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -1369,9 +1369,9 @@ let to_run () =
     if not test then failwithf "test 110 failed %d" i;
   );
 
-  (***************************************)
-  (*   t48 = { #{ int; int }; int32# }   *)
-  (***************************************)
+  (****************************************)
+  (*   t48 = { #{ int; int }; int32_u }   *)
+  (****************************************)
   (* Deepening to (.a48) *)
   let idx : (t48, _) idx_mut = (.a48) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -1425,9 +1425,9 @@ let to_run () =
     if not test then failwithf "test 116 failed %d" i;
   );
 
-  (***************************************)
-  (*   t50 = { #{ int; int32# }; int }   *)
-  (***************************************)
+  (****************************************)
+  (*   t50 = { #{ int; int32_u }; int }   *)
+  (****************************************)
   (* Deepening to (.a50) *)
   let idx : (t50, _) idx_mut = (.a50) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -1537,9 +1537,9 @@ let to_run () =
     if not test then failwithf "test 128 failed %d" i;
   );
 
-  (*********************************************************)
-  (*   t54 = { #{ int64; int64# }; #{ int64#; float# } }   *)
-  (*********************************************************)
+  (***********************************************************)
+  (*   t54 = { #{ int64; int64_u }; #{ int64_u; float# } }   *)
+  (***********************************************************)
   (* Deepening to (.a54) *)
   let idx : (t54, _) idx_mut = (.a54) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -1625,9 +1625,9 @@ let to_run () =
     if not test then failwithf "test 138 failed %d" i;
   );
 
-  (*****************************)
-  (*   t56 = { #{ int32# } }   *)
-  (*****************************)
+  (******************************)
+  (*   t56 = { #{ int32_u } }   *)
+  (******************************)
   (* Deepening to (.a56) *)
   let idx : (t56, _) idx_mut = (.a56) in
   iter indices_in_deepening_tests ~f:(fun i ->
@@ -1655,9 +1655,9 @@ let to_run () =
     if not test then failwithf "test 141 failed %d" i;
   );
 
-  (*************************************)
-  (*   t57 = { #{ int32# }; int32# }   *)
-  (*************************************)
+  (***************************************)
+  (*   t57 = { #{ int32_u }; int32_u }   *)
+  (***************************************)
   (* Deepening to (.a57) *)
   let idx : (t57, _) idx_mut = (.a57) in
   iter indices_in_deepening_tests ~f:(fun i ->

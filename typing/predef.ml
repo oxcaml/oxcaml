@@ -50,6 +50,8 @@ and ident_int8 = ident_create "int8"
 and ident_int16 = ident_create "int16"
 and ident_int32 = ident_create "int32"
 and ident_int64 = ident_create "int64"
+and ident_int32_u = ident_create "int32_u"
+and ident_int64_u = ident_create "int64_u"
 and ident_lazy_t = ident_create "lazy_t"
 and ident_string = ident_create "string"
 and ident_extension_constructor = ident_create "extension_constructor"
@@ -105,6 +107,8 @@ and path_int8 = Pident ident_int8
 and path_int16 = Pident ident_int16
 and path_int32 = Pident ident_int32
 and path_int64 = Pident ident_int64
+and path_int32_u = Pident ident_int32_u
+and path_int64_u = Pident ident_int64_u
 and path_lazy_t = Pident ident_lazy_t
 and path_string = Pident ident_string
 and path_extension_constructor = Pident ident_extension_constructor
@@ -150,8 +154,6 @@ and path_unboxed_char = Path.unboxed_version path_char
 and path_unboxed_int = Path.unboxed_version path_int
 and path_unboxed_int8 = Path.unboxed_version path_int8
 and path_unboxed_int16 = Path.unboxed_version path_int16
-and path_unboxed_int32 = Path.unboxed_version path_int32
-and path_unboxed_int64 = Path.unboxed_version path_int64
 
 and path_unboxed_int8x16 = Path.unboxed_version path_int8x16
 and path_unboxed_int16x8 = Path.unboxed_version path_int16x8
@@ -192,6 +194,8 @@ and type_option t = newgenty (Tconstr(path_option, [t], ref Mnil))
 and type_nativeint = newgenty (Tconstr(path_nativeint, [], ref Mnil))
 and type_int32 = newgenty (Tconstr(path_int32, [], ref Mnil))
 and type_int64 = newgenty (Tconstr(path_int64, [], ref Mnil))
+and type_int32_u = newgenty (Tconstr(path_int32_u, [], ref Mnil))
+and type_int64_u = newgenty (Tconstr(path_int64_u, [], ref Mnil))
 and type_lazy_t t = newgenty (Tconstr(path_lazy_t, [t], ref Mnil))
 and type_string = newgenty (Tconstr(path_string, [], ref Mnil))
 and type_extension_constructor =
@@ -209,8 +213,6 @@ and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
 and type_unboxed_nativeint =
       newgenty (Tconstr(path_unboxed_nativeint, [], ref Mnil))
-and type_unboxed_int32 = newgenty (Tconstr(path_unboxed_int32, [], ref Mnil))
-and type_unboxed_int64 = newgenty (Tconstr(path_unboxed_int64, [], ref Mnil))
 and type_unboxed_char = newgenty (Tconstr(path_unboxed_char, [], ref Mnil))
 and type_unboxed_int = newgenty (Tconstr(path_unboxed_int, [], ref Mnil))
 and type_unboxed_int8 = newgenty (Tconstr(path_unboxed_int8, [], ref Mnil))
@@ -636,9 +638,11 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_int
   |> add_type ident_int32 ~jkind:Jkind.Const.Builtin.immutable_data
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
   |> add_type ident_int64 ~jkind:Jkind.Const.Builtin.immutable_data
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int64
+  |> add_type ident_int32_u
+       ~jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
+  |> add_type ident_int64_u
+       ~jkind:Jkind.Const.Builtin.kind_of_unboxed_int64
   |> add_type1 ident_lazy_t
        ~variance:Variance.covariant
        ~separability:Separability.Ind

@@ -624,12 +624,12 @@ Error: Identifier "Int'" is used at line 2, characters 27-31,
 
 <[ fun () -> #25l ]>;;
 [%%expect {|
-- : <[unit -> int32#]> expr = <[fun () -> #25l]>
+- : <[unit -> int32_u]> expr = <[fun () -> #25l]>
 |}];;
 
 <[ fun () -> #25L ]>;;
 [%%expect {|
-- : <[unit -> int64#]> expr = <[fun () -> #25L]>
+- : <[unit -> int64_u]> expr = <[fun () -> #25L]>
 |}];;
 
 <[ fun () -> #6.0 ]>;;
