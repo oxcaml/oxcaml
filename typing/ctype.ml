@@ -3214,6 +3214,11 @@ let constrain_type_jkind ~fixed env ty jkind =
                         estimate_jkind_and_loop ~fuel ~expanded:false env
                           unwrapped_ty.ty jkind
                       | _ ->
+                        (* In this case, there's nothing to gain by
+                           re-estimating: either it's already a product and we
+                           will successfully recurse into it, or it's not a
+                           product and (because it's not [any]) re-estimating
+                           won't change that. *)
                         loop ~fuel ~expanded:false env unwrapped_ty.ty
                           ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds

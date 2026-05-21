@@ -1039,7 +1039,7 @@ module Layout = struct
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
-      | Base (b, _) -> Sort.Const.some_of_base b
+      | Base (b, _) -> Sort.Const.some (Base b)
       | Product ts ->
         Option.map
           (fun x -> Sort.Const.Product x)

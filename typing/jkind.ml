@@ -2535,7 +2535,13 @@ let sort_option_of_jkind env (t : jkind_l) : sort option =
   in
   match extract_layout env t with
   | Ok layout -> sort_of_layout layout
-  | Error _ -> None
+  | Error _ ->
+    (* CR-someday lmaurer: This assumes that the only reason [extract_layout]
+       would return an [Error] is because of an abstract kind, which is not
+       true: there could be worse problems like a path missing from the
+       environment. Unfortunately, being more careful would require changing
+       [Env.find_jkind_expansion] (see comment there). *)
+    None
 
 let sort_of_jkind env (t : jkind_l) : sort =
   match sort_option_of_jkind env t with
