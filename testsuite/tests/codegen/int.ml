@@ -65,7 +65,7 @@ div:
   leaq  1(%rax,%rax), %rax
   ret
 .L0:
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -118,7 +118,7 @@ rem:
   leaq  1(%rdx,%rdx), %rax
   ret
 .L0:
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
