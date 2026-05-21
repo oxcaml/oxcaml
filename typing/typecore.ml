@@ -5921,7 +5921,7 @@ let may_lower_contravariant_then_generalize env exp =
   generalize exp.exp_type
 
 let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; modality = _ } =
+      { ba; base_ty; el_ty; flat_float = _ } =
   generalize_structure base_ty;
   generalize_structure el_ty;
   match ba with

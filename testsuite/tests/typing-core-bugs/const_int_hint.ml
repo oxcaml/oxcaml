@@ -32,6 +32,14 @@ let _ : int32 * int32 = 42l, 43;;
 - : int32 * int32 = (42l, 43l)
 |}]
 
+let _ : int32 = 2147483649;;
+[%%expect{|
+Line 1, characters 16-26:
+1 | let _ : int32 = 2147483649;;
+                    ^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int32"
+|}]
+
 let _ : int32 * nativeint = 42l, 43m;;
 [%%expect{|
 Line 1, characters 33-36:
@@ -128,6 +136,13 @@ let _ : int64 -> int64 = function
   | x -> x;;
 [%%expect{|
 - : int64 -> int64 = <fun>
+|}]
+
+let _ : nativeint -> nativeint = function
+  | 12 -> 0n
+  | x -> x;;
+[%%expect{|
+- : nativeint -> nativeint = <fun>
 |}]
 
 let _ = function
