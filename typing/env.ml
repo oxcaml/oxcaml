@@ -2019,7 +2019,12 @@ let find_type_expansion_opt path env =
 let find_jkind_expansion path env =
   let decl = find_jkind path env in
   match decl.jkind_manifest with
-  | None -> raise Not_found
+  | None ->
+      (* CR-someday lmaurer: Raising [Not_found] here makes it impossible to
+         differentiate an abstract kind (normal) from a path missing from the
+         environment (big error). We should instead be returning [None] or
+         [`Kind_is_abstract] or some such. *)
+      raise Not_found
   | Some body -> body
 
 let find_modtype_expansion_lazy path env =

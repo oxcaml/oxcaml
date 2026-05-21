@@ -111,3 +111,22 @@ let f' () =
   let _ = f () 10 in
   f () (unbox 10.)
 ;;
+
+(* These should type check *)
+module rec Rec_unboxed_tuple_1 : sig
+  type t = #(int * Rec_unboxed_tuple_2.t)
+end = Rec_unboxed_tuple_1
+and Rec_unboxed_tuple_2 : sig
+  type t : value & (value & (value & any)) (* can be arbitrarily deep *)
+end = struct
+  type t = #(int * Rec_unboxed_tuple_1.t)
+end
+
+module rec Rec_unboxed_record_1 : sig
+  type t = #{ i : int; r : Rec_unboxed_record_2.t }
+end = Rec_unboxed_record_1
+and Rec_unboxed_record_2 : sig
+  type t : value & (value & (value & any)) (* can be arbitrarily deep *)
+end = struct
+  type t = #{ i : int; r : Rec_unboxed_record_1.t }
+end
