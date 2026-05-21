@@ -3540,7 +3540,6 @@ and type_pat_aux
         { p with pat_extra = (Tpat_type (path, lid), loc, sp.ppat_attributes)
         :: p.pat_extra }
   | Ppat_open (lid,p) ->
-      Env.check_no_open_quotations sp.ppat_loc !!penv Env.Open_qt;
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
@@ -7665,7 +7664,10 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_open (od, e) ->
-      Env.check_no_open_quotations loc env Open_qt;
+      begin match od with
+      | { popen_expr = { pmod_desc = Pmod_ident _ } } -> ()
+      | _ -> Env.check_no_open_quotations loc env Open_qt
+      end;
       let tv = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
       let (od, newenv) = !type_open_decl env od in
       let exp = type_expect newenv expected_mode e ty_expected_explained in

@@ -2041,6 +2041,9 @@ and Exp_desc : sig
     Case.t ->
     t'
 
+  val let_open :
+    Debuginfo.Scoped_location.t -> Identifier.Module.t -> Exp.t -> t'
+
   val exclave : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val list_comprehension : Debuginfo.Scoped_location.t -> Comprehension.t -> t'
@@ -2197,6 +2200,9 @@ end = struct
       (mk_list ~loc (List.map extract a1))
       (mk_list ~loc (List.map extract a2))
       (extract a3)
+
+  let let_open loc a1 a2 =
+    apply2 "Exp_desc" "let_open" loc (extract a1) (extract a2)
 
   let exclave loc a1 = apply1 "Exp_desc" "exclave" loc (extract a1)
 
@@ -2898,9 +2904,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
       Location.print_loc (to_location loc)
-  | Tpat_open _ ->
-    fatal_errorf "Translquote [at %a]: no support for open patterns."
-      Location.print_loc (to_location loc)
+  | Tpat_open _ -> pat_lam (* handled by path resolution  *)
   | Tpat_inspected_type (Label_disambiguation ambiguity) ->
     pat_lam
     |> maybe_constrain_pat_with_type loc
@@ -3646,7 +3650,7 @@ and update_env_without_extra ~loc extra =
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 
-and quote_expression_desc ~scopes ~transl stage e =
+and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
   let env = e.exp_env in
   let loc' = e.exp_loc in
   let loc = of_location ~scopes loc' in
@@ -3879,8 +3883,15 @@ and quote_expression_desc ~scopes ~transl stage e =
       let obj = quote_expression ~scopes ~transl stage obj in
       let meth = quote_method loc meth in
       Exp_desc.send loc obj meth
+    | Texp_open
+        ( { open_expr = { mod_desc = Tmod_ident (path, _) };
+            open_attributes = []
+          },
+          exp ) ->
+      let exp = quote_expression ~scopes ~transl stage exp in
+      Exp_desc.let_open loc (module_for_path loc env path) exp
     | Texp_open _ ->
-      fatal_errorf "Translquote [at %a]: Texp_open not implemented"
+      fatal_errorf "Translquote [at %a]: non-trivial Texp_open not implemented"
         Location.print_loc (to_location loc)
     | Texp_letmodule (ident, _, _, mod_exp, body) -> (
       let mod_exp = quote_module_exp ~transl stage loc env mod_exp in
@@ -4023,7 +4034,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     (quote_expression_extra ~env ~scopes stage)
     e.exp_extra (Exp_desc.wrap body)
 
-and quote_expression ~scopes ~transl stage e =
+and quote_expression ~scopes ~transl stage e : Exp.t =
   let desc = quote_expression_desc ~scopes ~transl stage e
   and attributes = quote_attributes e
   and loc = of_location ~scopes e.exp_loc in
