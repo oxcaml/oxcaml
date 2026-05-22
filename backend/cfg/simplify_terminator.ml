@@ -212,7 +212,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
   in
   if !Oxcaml_flags.cfg_value_propagation_flow
   then infer_known_values_from_predecessor ();
-  Dll.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+  Dll.iter_cell block.body
+    ~f:(fun (cell : Cfg.basic Cfg.instruction Dll.cell) ->
+      let instr = Dll.value cell in
       let apply_int_op op right_opt =
         let result_opt =
           match find_opt instr.arg.(0) with
@@ -241,7 +243,15 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         remove_destroyed instr
       in
       match instr.desc with
-      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op (Const_int c) ->
+        begin match find_opt instr.res.(0) with
+        | Some (Const_int c') ->
+          if Nativeint.equal c c'
+          then Dll.delete_curr cell
+          else replace instr.res.(0) (Const_int c)
+        | Some (Const_float32 _ | Const_float _) | None ->
+          replace instr.res.(0) (Const_int c)
+        end
       | Op (Const_float32 c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float32 c)
@@ -542,6 +552,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
   | Call _ | Prim _ | Invalid _ ->
+    if is_after_regalloc
+    then begin
+      let _ : known_value Reg.UsingLocEquality.Tbl.t =
+        collect_known_values cfg block
+      in
+      ()
+    end;
     false
 
 let run cfg =
