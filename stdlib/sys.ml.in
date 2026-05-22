@@ -126,10 +126,13 @@ let io_buffer_size = io_buffer_size ()
 
 let interactive = ref false
 
+type external_signal_handler (* abstract *)
+
 type signal_behavior =
     Signal_default
   | Signal_ignore
   | Signal_handle of (int -> unit)
+  | Signal_external of external_signal_handler
 
 module Safe = struct
   external signal
