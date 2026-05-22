@@ -489,6 +489,13 @@ let build : Cfg.t -> t =
     dominator_forest = dominator_forest_opt
   }
 
+let immediate_dominator t label =
+  match Label.Tbl.find_opt t.doms label with
+  | None ->
+    fatal "Cfg_dominators.immediate_dominator: no entry for label %a"
+      Label.format label
+  | Some idom -> if Label.equal idom label then None else Some idom
+
 let is_dominating t left right = is_dominating t.doms left right
 
 let is_strictly_dominating t left right =
