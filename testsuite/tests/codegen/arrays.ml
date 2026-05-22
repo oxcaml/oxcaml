@@ -49,7 +49,7 @@ push:
   addq  $8, %rsp
   ret
 .L0:
-  movq  camlTOP3__block33@GOTPCREL(%rip), %rax
+  movq  camlTOP3__block37@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -434,7 +434,7 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
-  movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
+  movq  camlTOP38__block1284@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -458,7 +458,7 @@ ref_safe_set:
   addq  $8, %rsp
   ret
 .L0:
-  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
+  movq  camlTOP39__block1330@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -498,7 +498,7 @@ poly_safe_get:
   ret
 .L2:
   subq  $8, %rsp
-  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
+  movq  camlTOP40__block1377@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -531,7 +531,7 @@ poly_safe_set:
   ret
 .L1:
   subq  $8, %rsp
-  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
+  movq  camlTOP41__block1436@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -552,7 +552,7 @@ int64_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
-  movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
+  movq  camlTOP42__block1497@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -571,7 +571,7 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
-  movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
+  movq  camlTOP43__block1542@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -590,7 +590,7 @@ float_safe_get_plain:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
-  movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
+  movq  camlTOP44__block1587@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -614,7 +614,7 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L0:
-  movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
+  movq  camlTOP45__block1636@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

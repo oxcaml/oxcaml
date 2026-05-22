@@ -1,14 +1,14 @@
 let code h_1 deleted in
 let code g_2 deleted in
 let code f_0 deleted in
-let $camlSymbol_projections5__immstring10 = "FOO" in
+let $camlSymbol_projections5__immstring11 = "FOO" in
 (let try_region = %begin_try_region () in
  let try_ghost_region = %begin_try_ghost_region () in
  cont k2 push(k1)
    where k2 =
      (apply ccall
         ($`*extern*`.caml_sys_getenv : val -> val)
-          ($camlSymbol_projections5__immstring10)
+          ($camlSymbol_projections5__immstring11)
           -> k3 * k1
         where k3 (param) =
           cont k2
@@ -23,7 +23,7 @@ let $camlSymbol_projections5__immstring10 = "FOO" in
       closure g_2_1 @g
     and code rec loopify(never) size(26) newer_version_of(g_2)
           g_2_1 (y : imm tagged)
-            my_closure _region _ghost_region my_depth
+            my_closure &my_alloc_region my_depth
             -> k * k1
             : [ 0 of val |1 of val ] =
       let prim = %int_comp.lt (y, 0) in
@@ -32,13 +32,13 @@ let $camlSymbol_projections5__immstring10 = "FOO" in
         | 1 -> k3
         where k3 =
           let Pmakeblock =
-            %block.[`0`]
+            %block.[`0`].my_alloc_region
               ($camlSymbol_projections5__g_5 ~ depth my_depth -> succ my_depth)
           in
           cont k (Pmakeblock)
         where k2 =
           let Pmakeblock =
-            %block.[`1`]
+            %block.[`1`].my_alloc_region
               ($camlSymbol_projections5__g_5 ~ depth my_depth -> succ my_depth)
           in
           cont k (Pmakeblock)
@@ -47,7 +47,7 @@ let $camlSymbol_projections5__immstring10 = "FOO" in
       closure h_1_1 @h
     and code rec loopify(never) size(26) newer_version_of(h_1)
           h_1_1 (z : imm tagged)
-            my_closure _region _ghost_region my_depth
+            my_closure &my_alloc_region my_depth
             -> k * k1
             : [ 0 of val |1 of val ] =
       let prim = %int_comp.lt (z, 0) in
@@ -56,20 +56,20 @@ let $camlSymbol_projections5__immstring10 = "FOO" in
         | 1 -> k3
         where k3 =
           let Pmakeblock =
-            %block.[`0`]
+            %block.[`0`].my_alloc_region
               ($camlSymbol_projections5__h_4 ~ depth my_depth -> succ my_depth)
           in
           cont k (Pmakeblock)
         where k2 =
           let Pmakeblock =
-            %block.[`1`]
+            %block.[`1`].my_alloc_region
               ($camlSymbol_projections5__h_4 ~ depth my_depth -> succ my_depth)
           in
           cont k (Pmakeblock)
     in
     let code loopify(never) size(11) newer_version_of(f_0)
           f_0_1 (b : imm tagged)
-            my_closure _region _ghost_region my_depth
+            my_closure &my_alloc_region my_depth
             -> k * k1
             : val =
       let untagged = %untag_imm (b) in

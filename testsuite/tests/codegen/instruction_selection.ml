@@ -329,7 +329,7 @@ let is_int_constant () : bool =
    Obj.repr (Some 3) |> Obj.is_int
 [%%expect_asm X86_64{|
 is_int_constant:
-  movq  camlTOP25__const_block785@GOTPCREL(%rip), %rax
+  movq  camlTOP25__const_block879@GOTPCREL(%rip), %rax
   andl  $1, %eax
   leaq  1(%rax,%rax), %rax
   ret
@@ -376,13 +376,13 @@ let branch_or_tailcall x =
 branch_or_tailcall:
   cmpq  $5, %rax
   jbe   .L0
-  movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
+  movq  camlTOP28__Pmakeblock1026@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
 .L0:
-  movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
+  movq  camlTOP28__switch_block1027@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]

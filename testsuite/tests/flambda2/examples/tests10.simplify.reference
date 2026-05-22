@@ -3,11 +3,11 @@ let $camlTests10__f_1 =
   closure f_0_1 @f
 and code rec loopify(never) size(8) newer_version_of(f_0)
       f_0_1 (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of val * val ] =
   let Pmakeblock =
-    %block.[`0`]
+    %block.[`0`].my_alloc_region
       ($camlTests10__f_1 ~ depth my_depth -> succ my_depth,
        $camlTests10__f_1 ~ depth my_depth -> succ my_depth)
   in

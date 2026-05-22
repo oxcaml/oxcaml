@@ -1,7 +1,7 @@
 let code sum_0 deleted in
 let code loopify(never) size(52) newer_version_of(sum_0)
       sum_0_1 (t : [ 0 of imm tagged * imm tagged * val array ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Pfield = %block_load.[`2`] (t) in

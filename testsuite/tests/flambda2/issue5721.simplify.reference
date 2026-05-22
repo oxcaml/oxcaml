@@ -1,7 +1,7 @@
 let code main_0 deleted in
 let code loopify(never) size(33) newer_version_of(main_0)
       main_0_1 (f : val, x : [ 0 |1 | 0 of val ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let prim = %is_int (x) in
@@ -14,7 +14,7 @@ let code loopify(never) size(33) newer_version_of(main_0)
            | 0 -> k2 (1i)
            | 1 -> k3)
           where k3 =
-            (apply f (0) -> k3 * k1
+            (apply &my_alloc_region f (0) -> k3 * k1
                where k3 (param : imm tagged) =
                  cont k2 (1i))))
     where k2 (join_param : imm) =

@@ -210,7 +210,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
         | Reinterpret_boxed_vector | Unbox_number _ | Box_number _
         | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
-        | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
+        | End_region _ | End_try_region _ | Obj_dup _ | Get_header | Peek _
         | Make_lazy _ ),
         _ )
   | Binary
@@ -783,8 +783,10 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
   Acc.kind acc (Name.var my_closure) K.value;
   (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-  | Heap -> ()
-  | Local { region; ghost_region } ->
+  | Heap { alloc_region } ->
+    Acc.kind acc (Name.var alloc_region) Flambda_kind.region
+  | Local { alloc_region; region; ghost_region } ->
+    Acc.kind acc (Name.var alloc_region) Flambda_kind.region;
     Acc.kind acc (Name.var region) Flambda_kind.region;
     Acc.kind acc (Name.var ghost_region) Flambda_kind.region);
   Acc.kind acc (Name.var my_depth) K.rec_info;
@@ -812,8 +814,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_closure;
     any_source my_depth;
     (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> ()
-    | Local { region; ghost_region } ->
+    | Heap { alloc_region } -> any_source alloc_region
+    | Local { alloc_region; region; ghost_region } ->
+      any_source alloc_region;
       any_source region;
       any_source ghost_region);
     List.iter any_source (code_dep.exn :: code_dep.return);

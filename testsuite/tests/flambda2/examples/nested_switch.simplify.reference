@@ -2,7 +2,7 @@ let code test_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(31) newer_version_of(test_0)
       test_0_1 (foo : imm tagged, x, y)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (foo) in
@@ -19,7 +19,7 @@ in
 let $camlNested_switch__test_2 = closure test_0_1 @test in
 let code loopify(never) size(21) newer_version_of(f_1)
       f_1_1 (foo : imm tagged, x, y)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (foo) in

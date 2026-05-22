@@ -2,7 +2,7 @@ let code to_inline_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(1) newer_version_of(to_inline_0)
       to_inline_0_1 (_x, _y)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   cont k (42)
@@ -15,7 +15,7 @@ let code loopify(never) size(22) newer_version_of(f_1)
          n : [ 0 | 0 of val ],
          x' : imm tagged,
          y' : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let prim = %is_int (m) in

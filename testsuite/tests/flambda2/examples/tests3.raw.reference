@@ -1,10 +1,10 @@
-(let $camlTests3__string14 = "index out of bounds" in
- let $camlTests3__block16 =
-   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string14)
+(let $camlTests3__string16 = "index out of bounds" in
+ let $camlTests3__block18 =
+   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string16)
  in
  let code size(94)
        foo_0 (arr : any array, f : val, i : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -16,7 +16,7 @@
      where k6 =
        cont k4
      where k5 =
-       cont k2 pop(regular k2) ($camlTests3__block16)
+       cont k2 pop(regular k2) ($camlTests3__block18)
      where k4 =
        ((let cond_result = %is_flat_float_array (arr) in
          switch cond_result
@@ -27,10 +27,10 @@
             cont k4 (ifnot_result)
           where k5 =
             let prim = %array_load.`float`.mut (arr, i) in
-            let ifso_result = %box_num.`float` (prim) in
+            let ifso_result = %box_num.`float`.my_alloc_region (prim) in
             cont k4 (ifso_result)
           where k4 (if_then_else_result) =
-            apply f (if_then_else_result) -> k3 * k2)
+            apply &my_alloc_region f (if_then_else_result) -> k3 * k2)
      where k3 (apply_result : val) =
        ((let prim = %array_length.generic (arr) in
          let prim_1 = %int_comp.unsigned.lt (i, prim) in
@@ -40,7 +40,7 @@
           where k5 =
             cont k3
           where k4 =
-            cont k2 pop(regular k2) ($camlTests3__block16)
+            cont k2 pop(regular k2) ($camlTests3__block18)
           where k3 =
             ((let cond_result = %is_flat_float_array (arr) in
               switch cond_result
@@ -58,7 +58,7 @@
  in
  let code size(41)
        f_1 (c : imm tagged, m, n, x' : imm tagged, y' : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -91,7 +91,7 @@
  in
  let foo = closure foo_0 @foo in
  let f = closure f_1 @f in
- let Pmakeblock = %block.[`0`] (foo, f) in
+ let Pmakeblock = %block.[`0`].`toplevel` (foo, f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in

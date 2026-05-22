@@ -1,6 +1,6 @@
 let code bal_0 deleted in
 let code min_binding_1 deleted in
-let $camlMap_remove__immstring46 = "Map.remove_min_elt" in
+let $camlMap_remove__immstring50 = "Map.remove_min_elt" in
 let code remove_min_binding_2 deleted in
 let code merge_3 deleted in
 let code remove_4 deleted in
@@ -15,12 +15,12 @@ let code inline(never) loopify(never) size(9) newer_version_of(bal_0)
            [ 0
            | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
                [ 0 | 0 of val * imm tagged * val ] ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0
           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
               [ 0 | 0 of val * imm tagged * val ] ] =
-  let Pmakeblock = %block.[`0`] (l, v, r) in
+  let Pmakeblock = %block.[`0`].my_alloc_region (l, v, r) in
   cont k (Pmakeblock)
 in
 let $camlMap_remove__bal_5 = closure bal_0_1 @bal in
@@ -30,7 +30,7 @@ let code loopify(done) size(26) newer_version_of(min_binding_1)
            [ 0
            | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
                [ 0 | 0 of val * imm tagged * val ] ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   cont self (param)
@@ -54,9 +54,9 @@ let code loopify(done) size(26) newer_version_of(min_binding_1)
                 cont k (Pfield)))
 in
 let $camlMap_remove__min_binding_6 = closure min_binding_1_1 @min_binding in
-let $camlMap_remove__Pmakeblock161 =
+let $camlMap_remove__Pmakeblock171 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlMap_remove__immstring46)
+           $camlMap_remove__immstring50)
 in
 let $camlMap_remove__remove_min_binding_7 =
   closure remove_min_binding_2_1 @remove_min_binding
@@ -66,7 +66,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
            [ 0
            | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
                [ 0 | 0 of val * imm tagged * val ] ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0
           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
@@ -74,7 +74,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k1 pop(reraise k1) ($camlMap_remove__Pmakeblock161)
+    | 1 -> k1 pop(reraise k1) ($camlMap_remove__Pmakeblock171)
     where k2 =
       let l = %block_load.[`0`] (param) in
       let prim_1 = %is_int (l) in
@@ -87,7 +87,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
          where k2 =
            let Pfield = %block_load.[`2`] (param) in
            let Pfield_1 = %block_load.[`1`] (param) in
-           (apply direct(remove_min_binding_2_1)
+           (apply direct(remove_min_binding_2_1 &my_alloc_region)
               ($camlMap_remove__remove_min_binding_7 ~ depth my_depth -> succ my_depth
                : _ ->
                  [ 0
@@ -102,7 +102,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
                          | 0 of [ 0 | 0 of val * imm tagged * val ] *
                              imm tagged * [ 0 | 0 of val * imm tagged * val ]
                          ]) =
-                apply direct(bal_0_1)
+                apply direct(bal_0_1 &my_alloc_region)
                   ($camlMap_remove__bal_5
                    : _ ->
                      [ 0
@@ -122,7 +122,7 @@ let code loopify(never) size(34) newer_version_of(merge_3)
            [ 0
            | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
                [ 0 | 0 of val * imm tagged * val ] ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0
           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
@@ -137,12 +137,12 @@ let code loopify(never) size(34) newer_version_of(merge_3)
          | 0 -> k2
          | 1 -> k (t1)
          where k2 =
-           (apply direct(min_binding_1_1)
+           (apply direct(min_binding_1_1 &my_alloc_region)
               ($camlMap_remove__min_binding_6 : _ -> imm tagged)
                 (t2)
                 -> k2 * k1
               where k2 (x : imm tagged) =
-                (apply direct(remove_min_binding_2_1)
+                (apply direct(remove_min_binding_2_1 &my_alloc_region)
                    ($camlMap_remove__remove_min_binding_7
                     : _ ->
                       [ 0
@@ -157,7 +157,7 @@ let code loopify(never) size(34) newer_version_of(merge_3)
                               | 0 of [ 0 | 0 of val * imm tagged * val ] *
                                   imm tagged *
                                   [ 0 | 0 of val * imm tagged * val ] ]) =
-                     apply direct(bal_0_1)
+                     apply direct(bal_0_1 &my_alloc_region)
                        ($camlMap_remove__bal_5
                         : _ ->
                           [ 0
@@ -176,7 +176,7 @@ let code loopify(never) size(36) newer_version_of(remove_4)
            [ 0
            | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
                [ 0 | 0 of val * imm tagged * val ] ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0
           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
@@ -196,7 +196,7 @@ let code loopify(never) size(36) newer_version_of(remove_4)
          | 1 -> k2
          where k2 =
            let Pfield_1 = %block_load.[`2`] (param) in
-           apply direct(merge_3_1)
+           apply direct(merge_3_1 &my_alloc_region)
              ($camlMap_remove__merge_8
               : _ ->
                 [ 0

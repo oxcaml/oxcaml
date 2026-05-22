@@ -1,7 +1,7 @@
 let code f_0 deleted in
 let code loopify(never) size(30) newer_version_of(f_0)
       f_0_1 (bit : imm tagged, bit' : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let prim = %int_comp.lt (bit', 0) in

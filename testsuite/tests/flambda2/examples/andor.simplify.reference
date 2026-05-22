@@ -1,7 +1,7 @@
 let code is_valid_0 deleted in
 let code loopify(never) size(41) newer_version_of(is_valid_0)
       is_valid_0_1 (i : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let prim = %int_comp.le (0, i) in
