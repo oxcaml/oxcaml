@@ -13,6 +13,10 @@ type t
     dominators, dominance frontiers, and dominator forest for the passed CFG. *)
 val build : Cfg.t -> t
 
+(** [immediate_dominator doms label] returns the immediate dominator of [label],
+    or [None] for the entry block and for unreachable blocks. *)
+val immediate_dominator : t -> Label.t -> Label.t option
+
 (** [is_dominating doms x y] is [true] iff [x] is dominating [y] according to
     [doms]. That is, all paths from the entry node to [y] go through [x]. All
     edges, regular and exceptional are treated the same way. *)

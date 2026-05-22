@@ -19,39 +19,73 @@ let apply_fold (block : C.basic_block) (result : fold_result) =
   | Replace { desc; arg } ->
     block.terminator <- { block.terminator with desc; arg; res = [||] }
 
-let predecessor_if_unique (block : C.basic_block) ~cfg =
-  if Label.Set.cardinal block.predecessors = 1
-  then Some (Cfg.get_block_exn cfg (Label.Set.choose block.predecessors))
-  else None
-
-(** [find_reaching_def reg blocks] searches for the most recent non-move
-    definition of [reg], walking backwards from the end of the given basic
-    block, right before the termintor. It can walk multiple blocks as long as
-    there is a single predecessor.
+(** [find_reaching_def reg block dominators cfg] searches for the definition of
+    [reg] visible at the end of [block]'s body (right before its terminator)
+    while looking through moves. The search walks up the immediate-dominator
+    chain of [block]; at each step it also visits any blocks between the current
+    block and its immediate dominator (blocks reverse-reachable from the current
+    block and dominated by the immediate dominator) — these are only consulted
+    to invalidate registers, never to source the definition. This lets the
+    search cross control-flow patterns like if-then-else.
 
     [Move] instructions defining the current target are chased through: when we
     encounter [target = src], the search continues for [src]. A register is
     considered clobbered if it has been written to between the candidate
     definition and the use point. The function returns the defining instruction
     only when none of its arguments has been clobbered after it, so that the
-    arguments can be still be used at the use point. *)
-let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
-    C.basic C.instruction option =
+    arguments can still be used at the use point. *)
+let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
+    ~(cfg : Cfg_with_infos.t) : C.basic C.instruction option =
+  let dominators = Cfg_with_infos.dominators cfg in
+  let cfg = Cfg_with_infos.cfg cfg in
   let clobbered = ref Reg.Set.empty in
   let add_to_clobbered arr =
     clobbered := Array.fold_right Reg.Set.add arr !clobbered
   in
-  let rec loop ~pos ~(next_block : C.basic_block option) ~reg :
-      C.basic C.instruction option =
-    match pos, next_block with
-    | None, Some next_block
-      when not (Array.exists (Reg.same reg) next_block.terminator.res) ->
-      add_to_clobbered next_block.terminator.res;
-      loop
-        ~pos:(DLL.last_cell next_block.body)
-        ~next_block:(predecessor_if_unique next_block ~cfg)
-        ~reg
-    | Some cell, _ ->
+  (* For a non-dominator, we cannot find a definition, but we might have to
+     invalidate one. *)
+  let visit_non_dominator (b : C.basic_block) ~reg =
+    (not (Array.exists (Reg.same reg) b.terminator.res))
+    &&
+    (add_to_clobbered b.terminator.res;
+     DLL.fold_left b.body
+       ~f:(fun acc (instr : C.basic C.instruction) ->
+         acc
+         &&
+         (add_to_clobbered instr.res;
+          not (Array.exists (Reg.same reg) instr.res)))
+       ~init:true)
+  in
+  (* Visit blocks reverse-reachable from [from_block], stopping at dominators of
+     the block for which we search a definion. *)
+  let visit_non_dominating_predecessors ~(from_block : C.basic_block) ~reg :
+      bool =
+    let visited = ref Label.Set.empty in
+    let stack = Stack.create () in
+    let push lbl =
+      if
+        (not (Label.Set.mem lbl !visited))
+        && not (Cfg_dominators.is_dominating dominators lbl block.start)
+      then (
+        visited := Label.Set.add lbl !visited;
+        Stack.push lbl stack)
+    in
+    Label.Set.iter push from_block.predecessors;
+    let rec loop () =
+      if not (Stack.is_empty stack)
+      then (
+        let label = Stack.pop stack in
+        let b = Cfg.get_block_exn cfg label in
+        Label.Set.iter push b.predecessors;
+        visit_non_dominator b ~reg && loop ())
+      else true
+    in
+    loop ()
+  in
+  let rec walk ~(block : C.basic_block) ~pos ~reg : C.basic C.instruction option
+      =
+    match pos with
+    | Some cell ->
       let instr : C.basic C.instruction = DLL.value cell in
       add_to_clobbered instr.res;
       if Array.length instr.res >= 1 && Reg.same reg instr.res.(0)
@@ -62,7 +96,7 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
                && Array.length instr.res = 1
                && not (Reg.is_preassigned instr.arg.(0)) ->
           assert (Reg.is_unknown instr.arg.(0));
-          loop ~pos:(DLL.prev cell) ~next_block ~reg:instr.arg.(0)
+          walk ~block ~pos:(DLL.prev cell) ~reg:instr.arg.(0)
         | _ ->
           let inputs_safe =
             Array.for_all (fun a -> not (Reg.Set.mem a !clobbered)) instr.arg
@@ -71,15 +105,23 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
         end
       else if Array.exists (Reg.same reg) instr.res
       then None
-      else loop ~pos:(DLL.prev cell) ~next_block ~reg
-    | _ -> None
+      else walk ~block ~pos:(DLL.prev cell) ~reg
+    | None -> (
+      match Cfg_dominators.immediate_dominator dominators block.start with
+      | None -> None
+      | Some idom_label ->
+        let idom_block = Cfg.get_block_exn cfg idom_label in
+        if
+          (not (visit_non_dominating_predecessors ~from_block:block ~reg))
+          || Array.exists (Reg.same reg) idom_block.terminator.res
+        then None
+        else (
+          add_to_clobbered idom_block.terminator.res;
+          walk ~block:idom_block ~pos:(DLL.last_cell idom_block.body) ~reg))
   in
   if Reg.is_preassigned reg
   then None
-  else
-    loop ~pos:(DLL.last_cell block.body)
-      ~next_block:(predecessor_if_unique block ~cfg)
-      ~reg
+  else walk ~block ~pos:(DLL.last_cell block.body) ~reg
 
 let int_test_of_compare (cmp : Operation.integer_comparison) ~imm ~ifso ~ifnot :
     C.terminator =
@@ -202,8 +244,9 @@ let apply_and_check_change (block : C.basic_block) (result : fold_result) : bool
     (Label.Set.equal old_successors
        (C.successor_labels ~normal:true ~exn:false block))
 
-let process_block ~(is_loop_header : Label.t -> bool) (cfg : C.t)
+let process_block ~(is_loop_header : Label.t -> bool) ~(cfg : Cfg_with_infos.t)
     (block : C.basic_block) : bool =
+  let raw_cfg = Cfg_with_infos.cfg cfg in
   (* 1. Fold the block's own terminator (e.g. [Truth_test] → [Int_test] when the
      test argument is a comparison computed in this block). *)
   let reduced_terminator =
@@ -215,10 +258,10 @@ let process_block ~(is_loop_header : Label.t -> bool) (cfg : C.t)
   let skipped_successor =
     match[@ocaml.warning "-4"] block.terminator.desc with
     | Always successor_label
-      when (not (Label.equal block.start cfg.entry_label))
-           && (cfg.allowed_to_be_irreducible
+      when (not (Label.equal block.start raw_cfg.entry_label))
+           && (raw_cfg.allowed_to_be_irreducible
               || not (is_loop_header successor_label)) -> (
-      let successor_block = C.get_block_exn cfg successor_label in
+      let successor_block = C.get_block_exn raw_cfg successor_label in
       if not (DLL.is_empty successor_block.body)
       then false
       else
@@ -241,7 +284,7 @@ let run cfg_with_infos =
     let is_loop_header label = Label.Map.mem label header_map in
     let registration_needed =
       C.fold_blocks cfg ~init:false ~f:(fun _ block acc ->
-          process_block ~is_loop_header cfg block || acc)
+          process_block ~is_loop_header ~cfg:cfg_with_infos block || acc)
     in
     if registration_needed
     then (
