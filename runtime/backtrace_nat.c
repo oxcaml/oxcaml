@@ -435,12 +435,87 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
     li->loc_defname = name_info->name;
     li->loc_filename =
       (char *)name_info + name_info->filename_offs;
-    li->loc_start_lnum = li->loc_end_lnum = info2 >> 19;
-    li->loc_end_lnum += (info2 >> 16) & 0x7;
-    li->loc_start_chr = (info2 >> 10) & 0x3F;
-    li->loc_end_chr = li->loc_end_offset = (info2 >> 3) & 0x7F;
-    li->loc_end_offset += (((info2 & 0x7) << 6) | (info1 >> 26));
+    li->loc_start_lnum = li->loc_end_lnum = info2 >> 19; /* l */
+    li->loc_end_lnum += (info2 >> 16) & 0x7;             /* m */
+    li->loc_start_chr = (info2 >> 10) & 0x3F;            /* a */
+    li->loc_end_chr = li->loc_end_offset = (info2 >> 3) & 0x7F; /* b */
+    li->loc_end_offset += (((info2 & 0x7) << 6) | (info1 >> 26)); /* o */
   }
+}
+
+/* ---- Debuginfo measurement ---- */
+
+static size_t debuginfo_count = 0; /* Number of debuginfo records seen */
+static void* debuginfo_low = NULL; /* lowest address seen */
+static void* debuginfo_high = NULL; /* highest address seen */
+
+void caml_debuginfo_reset(void)
+{
+  debuginfo_count = 0;
+  debuginfo_low = NULL;
+  debuginfo_high = NULL;
+}
+
+void caml_debuginfo_measurements(size_t *count_p, char **low_p, char **high_p)
+{
+  *count_p = debuginfo_count;
+  *low_p = debuginfo_low;
+  *high_p = debuginfo_high;
+  caml_debuginfo_reset();
+}
+
+static void include_low(char *low)
+{
+  if ((debuginfo_low == NULL) || (low < (char *)debuginfo_low))
+    debuginfo_low = low;
+}
+
+static void include_high(char *high)
+{
+  if ((debuginfo_high == NULL) || (high > (char *)debuginfo_high))
+    debuginfo_high = high;
+}
+
+
+static void include_string(char *s)
+{
+  include_low(s);
+  include_high(s + strlen(s) + 1);
+}
+
+void caml_debuginfo_measure(debuginfo dbg)
+{
+  uint32_t info1, info2;
+
+  /* Control flow to match caml_debuginfo_location */
+  if (dbg == NULL) {
+    return;
+  }
+  include_low((char*)dbg);
+
+  do {
+    info1 = ((uint32_t *)dbg)[0];
+    info2 = ((uint32_t *)dbg)[1];
+    ++debuginfo_count;
+
+    if (info2 & 0x80000000) {
+      struct name_and_loc_info * name_and_loc_info =
+        (struct name_and_loc_info*)((char *) dbg + (info1 & 0x3FFFFFC));
+      include_low((char*)name_and_loc_info);
+      include_string(name_and_loc_info->name);
+      include_string((char *)name_and_loc_info
+                     + name_and_loc_info->filename_offs);
+    } else {
+      struct name_info * name_info =
+        (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
+      include_low((char*)name_info);
+      include_string(name_info->name);
+      include_string((char *)name_info
+                     + name_info->filename_offs);
+    }
+    dbg = (debuginfo)((uint32_t*)dbg + 2);
+  } while (info1 & 1);
+  include_high(dbg);
 }
 
 value caml_add_debug_info(backtrace_slot start, value size, value events)

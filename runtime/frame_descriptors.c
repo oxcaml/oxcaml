@@ -24,6 +24,7 @@
 #include "caml/memory.h"
 #include "caml/fail.h"
 #include "caml/shared_heap.h"
+#include "caml/backtrace_prim.h"
 #include <stddef.h>
 
 struct caml_frame_descrs {
@@ -192,6 +193,573 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
   table->zombies = NULL;
 }
 
+/* ---- Frametable measurement ---- */
+
+/* As preparation for designing a more memory-efficient frametable
+ * format, this code measures various things about the frametables of
+ * an executable. */
+
+/* Settable via GC tweak OCAMLRUNPARAM=Xmeasure_frametables */
+extern uintnat caml_measure_frametables;
+
+#define MAX_LOG 32
+#define SMALL_FRAMES 32
+#define REGS 64
+#define MAX_REG (REGS - 1) /* Largest register index recorded in reg tables */
+#define MAX_REG_IN_SMALL_MAP 12
+#define REG_MAPS (1<<(MAX_REG_IN_SMALL_MAP + 1))
+#define REGMAP_REPORT_THRESHOLD 1000
+
+struct frametable_stats {
+  /* A few per-frametable items */
+  unsigned char *last_retaddr;
+  unsigned char *min_retaddr;
+  unsigned char *max_retaddr;
+  unsigned char *min_descr;
+  unsigned char *max_descr;
+  size_t descrs;
+
+  /* Everything else is accumulated over all frametables */
+  size_t frametables;
+  size_t total_codesize;
+  size_t total_ft_size;
+  size_t total_debuginfo_size;
+  size_t total_descrs;
+  size_t total_debuginfo;
+
+  /* Are frametables in memory before or after the code they describe? */
+  size_t ft_before_code;
+  size_t ft_after_code;
+
+  /* Descriptor kinds */
+  size_t return_to_C;
+  size_t with_debug;
+  size_t with_alloc;
+  size_t long_descrs;
+
+  /* Frame sizes */
+  size_t small_frames[SMALL_FRAMES];
+  size_t log_framesize[MAX_LOG];
+  size_t max_framesize;
+
+  /* Relative return addresses */
+  size_t log_pos_retaddr_rel[MAX_LOG];
+  size_t max_pos_retaddr_rel;
+  size_t log_neg_retaddr_rel[MAX_LOG];
+  size_t max_neg_retaddr_rel;
+
+  /* Delta from one retaddr to the next */
+  size_t log_pos_delta[MAX_LOG];
+  size_t max_pos_delta;
+  size_t log_neg_delta[MAX_LOG];
+  size_t max_neg_delta;
+
+  /* Counts of "live offset" slots (GC regs + slots) */
+  size_t small_lives[SMALL_FRAMES];
+  size_t log_lives[MAX_LOG];
+  size_t max_lives; /* Overall maximum count of lives */
+
+  /* GCable registers */
+  size_t reg_count[REGS]; /* Count GCable registers */
+  size_t max_regs;
+  size_t max_reg[REGS];  /* Count max GCable register index */
+  size_t reg_maps[REG_MAPS]; /* Count reg maps up to REG_MAPS */
+  size_t big_reg_descrs; /* Descrs with a register > MAX_REG_IN_SMALL_MAP */
+  size_t big_reg_entries; /* live_ofs register entries with number > MAX_REG */
+  size_t noalloc_with_regs; /* Non-alloc descrs that have registers (anomaly) */
+
+  /* Count of GCable stack slots */
+  size_t small_slots[SMALL_FRAMES];
+  size_t log_slots[MAX_LOG];
+  size_t max_slots;
+
+  /* maximum GCable stack slot offset */
+  size_t small_max_slot[SMALL_FRAMES];
+  size_t log_max_slot[MAX_LOG];
+  size_t max_slot;
+
+  /* Comballoc allocation counts */
+  size_t log_comballocs[MAX_LOG];
+  size_t small_comballocs[SMALL_FRAMES];
+  size_t max_comballocs;
+
+  /* allocation sizes */
+  size_t alloc_sizes;
+  size_t log_alloc_sizes[MAX_LOG];
+  size_t small_alloc_sizes[SMALL_FRAMES];
+  size_t max_alloc_size;
+};
+
+static void clear_stats(struct frametable_stats *stats)
+{
+  caml_debuginfo_reset();
+  memset(stats, 0, sizeof(*stats));
+}
+
+static void clear_per_frametable_stats(struct frametable_stats *stats)
+{
+  stats->min_retaddr = stats->max_retaddr = stats->last_retaddr =
+    stats->min_descr = stats->max_descr = NULL;
+  stats->descrs = 0;
+  caml_debuginfo_reset();
+}
+
+/* Turn `val` into a string representing that number of bytes */
+
+static void report_bytes(char *buf, size_t space, size_t val)
+{
+  if (val < 1024) {
+    snprintf(buf, space, "%zu", val);
+  } else {
+    char suffix[] = " kMGTE";
+    double scaled = val;
+    char *p = suffix;
+    while(scaled > 1000 && *p) {
+      scaled /= 1024.0;
+      ++p;
+    }
+    snprintf(buf, space, "%.2f %ciB", scaled, *p);
+  }
+}
+
+/* Write text showing an array `vals` of `count` size_t values,
+ * without trailing zero values, into `buf` (size `space` bytes). */
+
+/* This works for regs and logs and smalls */
+#define TABLE_BUF_SIZE (REGS * 16)
+
+static void report_table(char *fmt, size_t *vals, size_t count)
+{
+  char buf[TABLE_BUF_SIZE];
+  size_t space = TABLE_BUF_SIZE;
+
+  size_t max = count - 1;
+  while(max && vals[max] == 0) {
+    --max;
+  }
+  char *p = buf;
+  for (size_t i = 0; i <= max; ++i) {
+    int len = snprintf(p, space, "%zu ", vals[i]);
+    if (len > space) { /* truncated, replace with ... */
+      p[space-4] = p[space-3] = p[space-2] = '.';
+      p[space-1] = '\0';
+      return;
+    }
+    space -= len;
+    p += len;
+  }
+  printf(fmt, buf);
+}
+
+/* At the end of a single frametable, deduce per-frametable sizes and
+ * add them to global stats. */
+
+static void accumulate_frametable_stats(intnat *frametable,
+                                        struct frametable_stats *stats)
+{
+  char *debuginfo_low, *debuginfo_high;
+  size_t debuginfo_count;
+  caml_debuginfo_measurements(&debuginfo_count,
+                              &debuginfo_low,
+                              &debuginfo_high);
+  /* round debuginfo_high up to word boundary */
+  debuginfo_high = Align_to(debuginfo_high, uintnat);
+/*
+  printf("Frametable at %p: return addresses %p-%p(0x%zx), "
+        "descriptors %p-%p(0x%zx, %zu), "
+        "debuginfo %p-%p(0x%zx, %zu)\n",
+        (void*)frametable,
+        (void*)stats->min_retaddr,
+        (void*)stats->max_retaddr,
+        (size_t)(stats->max_retaddr - stats->min_retaddr),
+        (void*)stats->min_descr,
+        (void*)stats->max_descr,
+        (size_t)(stats->max_descr - stats->min_descr),
+        stats->descrs,
+        (void*)debuginfo_low,
+        (void*)debuginfo_high,
+        (size_t)(debuginfo_high - debuginfo_low),
+        debuginfo_count);
+*/
+  stats->total_codesize += (stats->max_retaddr - stats->min_retaddr);
+  stats->total_ft_size += (stats->max_descr - stats->min_descr);
+  stats->total_debuginfo_size += (debuginfo_high - debuginfo_low);
+  stats->total_descrs += stats->descrs;
+  stats->total_debuginfo += debuginfo_count;
+  if (stats->min_retaddr) {
+    if (stats->min_retaddr > stats->min_descr)
+      ++ stats->ft_before_code;
+    else
+      ++ stats->ft_after_code;
+  }
+}
+
+/* Report all accumulated frametable stats to stdout. */
+
+static void report_stats(struct frametable_stats *stats)
+{
+  char table_buf[TABLE_BUF_SIZE];
+
+  size_t total_size =
+    stats->total_codesize
+    + stats->total_ft_size
+    + stats->total_debuginfo_size;
+  printf("Summary of %zu frametables.\n", stats->frametables);
+  report_bytes(table_buf, TABLE_BUF_SIZE, stats->total_codesize);
+  printf("%s code (%5.2f%%)\n", table_buf,
+         (double)stats->total_codesize/total_size * 100.0);
+  report_bytes(table_buf, TABLE_BUF_SIZE, stats->total_ft_size);
+  printf("%s descriptors (%5.2f%%; %zu descrs, %f bytes each)\n",
+         table_buf,
+         (double)stats->total_ft_size/total_size * 100.0,
+         stats->total_descrs,
+         (double)stats->total_ft_size / stats->total_descrs);
+  report_bytes(table_buf, TABLE_BUF_SIZE, stats->total_debuginfo_size);
+  printf("%s Debuginfo (%5.2f%% %zu entries)\n",
+         table_buf,
+         (double)stats->total_debuginfo_size/total_size * 100.0,
+         stats->total_debuginfo);
+  printf("%zu frametables before code, %zu after code.\n",
+         stats->ft_before_code, stats->ft_after_code);
+  printf("long %zu return to C %zu alloc %zu debug %zu\n",
+         stats->long_descrs, stats->return_to_C,
+         stats->with_alloc, stats->with_debug);
+
+  printf("Max pos retaddr offset %zu\n", stats->max_pos_retaddr_rel);
+  report_table("  (logs %s)\n", stats->log_pos_retaddr_rel, MAX_LOG);
+  printf("Max neg retaddr offset %zu\n", stats->max_neg_retaddr_rel);
+  report_table("  (logs %s)\n", stats->log_neg_retaddr_rel, MAX_LOG);
+  printf("Max retaddr pos delta %zu\n", stats->max_pos_delta);
+  report_table("  (logs %s)\n", stats->log_pos_delta, MAX_LOG);
+  printf("Max retaddr neg delta %zu\n", stats->max_neg_delta);
+  report_table("  (logs %s)\n", stats->log_neg_delta, MAX_LOG);
+
+  printf("Frame sizes (max %zu)\n", stats->max_framesize);
+  report_table("  (small %s)\n", stats->small_frames, SMALL_FRAMES);
+  report_table("  (logs %s)\n", stats->log_framesize, MAX_LOG);
+
+  printf("Comballoc entries (max %zu)\n",
+         stats->max_comballocs);
+  report_table("  (small %s)\n", stats->small_comballocs, SMALL_FRAMES);
+  report_table("  (logs %s)\n", stats->log_comballocs, MAX_LOG);
+
+  printf("Allocation sizes (wosize-1) (%zu allocs, max %zu)\n",
+         stats->alloc_sizes, stats->max_alloc_size);
+  report_table("  (small %s)\n", stats->small_alloc_sizes, SMALL_FRAMES);
+  report_table("  (logs %s)\n", stats->log_alloc_sizes, MAX_LOG);
+
+  printf("GC live values (max %zu)\n", stats->max_lives);
+  report_table("  (small %s)\n", stats->small_lives, SMALL_FRAMES);
+  report_table("  (logs %s)\n", stats->log_lives, MAX_LOG);
+
+  printf("GCable stack slots (max %zu)\n", stats->max_slots);
+  report_table("  (small %s)\n", stats->small_slots, SMALL_FRAMES);
+  report_table("  (logs %s)\n", stats->log_slots, MAX_LOG);
+
+  printf("Max GCable stack slot (max %zu)\n", stats->max_slot);
+  report_table("  (small %s)\n", stats->small_max_slot, SMALL_FRAMES);
+  report_table("  (logs %s)\n", stats->log_max_slot, MAX_LOG);
+
+  printf("GCable registers (max %zu)\n", stats->max_regs);
+  report_table("  (counts %s)\n", stats->reg_count, REGS);
+  report_table("  (max %s)\n", stats->max_reg, REGS);
+
+  /* report all register maps which are more than 1/128 of the total
+   * (apart from the empty reg map */
+  size_t others = 0;
+  size_t regmaps = 0;
+  for (size_t i = 1; i < REG_MAPS; ++i) {
+    regmaps += stats->reg_maps[i];
+  }
+
+  printf("Register map frequencies (of %zu allocation descriptors):\n",
+         stats->with_alloc);
+  for (size_t i = 0; i < REG_MAPS; ++i) {
+    if (stats->reg_maps[i] > regmaps/REGMAP_REPORT_THRESHOLD) {
+      for (size_t j = 0; j <= MAX_REG_IN_SMALL_MAP; ++j) {
+        table_buf[MAX_REG_IN_SMALL_MAP - j] = (i & (1 << j)) ? '1' : '0';
+      }
+      table_buf[MAX_REG_IN_SMALL_MAP+1] = '\0';
+      printf("  %s %zu\n", table_buf, stats->reg_maps[i]);
+    } else {
+      others += stats->reg_maps[i];
+    }
+  }
+  printf("  others (<= %zu) %zu\n", regmaps/REGMAP_REPORT_THRESHOLD, others);
+  printf("Descriptors with a register > %d: %zu\n",
+         MAX_REG_IN_SMALL_MAP, stats->big_reg_descrs);
+  printf("live_ofs register entries with number > %d: %zu\n",
+         MAX_REG, stats->big_reg_entries);
+  printf("Non-allocation descriptors with registers: %zu\n",
+         stats->noalloc_with_regs);
+}
+
+/* Actually log+1.
+   mylog(0) = 0
+   mylog(1) = 1
+   mylog(2) = 2
+   mylog(3) = 2
+   mylog(4) = 3
+   ...
+   mylog(255) = 8
+   mylog(256) = 9
+   etc
+  */
+Caml_inline size_t mylog(size_t v)
+{
+  size_t log = 0;
+  while(v) {
+    v /= 2;
+    ++ log;
+  }
+  /* Clamp so the result is always a valid index into a MAX_LOG table */
+  if (log >= MAX_LOG) {
+    log = MAX_LOG - 1;
+  }
+  return log;
+}
+
+/* Common code for recording an item in:
+   - an optional max value;
+   - an optional table of small values (less than SMALL_FRAMES)
+   - an optional table of log values.
+ */
+
+Caml_inline void count_item(size_t item, size_t *max, size_t *smalls,
+                            size_t *logs)
+{
+  if (max && item > *max) {
+    *max = item;
+  }
+  if (smalls && item < SMALL_FRAMES) {
+    ++ smalls[item];
+  }
+  if (logs) {
+    ++ logs[mylog(item)];
+  }
+}
+
+/* Record a single live_ofs entry: either a GCable register or a GCable
+   stack slot.  Register numbers are normally small (we have never
+   observed one larger than MAX_REG_IN_SMALL_MAP), but the format
+   permits large ones (e.g. Valx2 values held in SIMD registers), so we
+   guard the fixed-size tables and count the outliers separately. */
+
+static void add_live_ofs(uint32_t ofs,
+                         size_t *regs, size_t *max_reg, uint64_t *reg_map,
+                         bool *has_big_reg,
+                         size_t *slots, size_t *max_slot,
+                         struct frametable_stats *stats)
+{
+  if (ofs & 1) {
+    size_t reg = ofs >> 1;
+    ++ *regs;
+    if (reg > *max_reg) {
+      *max_reg = reg;
+    }
+    if (reg <= MAX_REG_IN_SMALL_MAP) {
+      *reg_map |= (uint64_t)1 << reg;
+    } else {
+      *has_big_reg = true;
+    }
+    if (reg > MAX_REG) {
+      ++ stats->big_reg_entries;
+    }
+  } else {
+    size_t slot = ofs / sizeof(value);
+    ++ *slots;
+    if (slot > *max_slot) {
+      *max_slot = slot;
+    }
+  }
+}
+
+/* Record stats for a single descriptor */
+
+static void add_descriptor_to_stats(frame_descr *d,
+                                    struct frametable_stats *stats)
+{
+  unsigned char *p;
+  ++ stats->descrs;
+  if (!stats->min_descr || ((unsigned char*)d < stats->min_descr)) {
+    stats->min_descr = (unsigned char*)d;
+  }
+
+  intnat retaddr_rel = d->retaddr_rel;
+  if (retaddr_rel < 0) {
+    count_item(-retaddr_rel, &stats->max_neg_retaddr_rel, NULL,
+               stats->log_neg_retaddr_rel);
+  } else {
+    count_item(retaddr_rel, &stats->max_pos_retaddr_rel, NULL,
+               stats->log_pos_retaddr_rel);
+  }
+
+  unsigned char *retaddr = (unsigned char *)Retaddr_frame(d);
+  if (stats->last_retaddr) {
+    if (retaddr < stats->min_retaddr) {
+      stats->min_retaddr = retaddr;
+    }
+    if (retaddr > stats->max_retaddr) {
+      stats->max_retaddr = retaddr;
+    }
+    intnat delta = (uintnat)retaddr - (uintnat)stats->last_retaddr;
+    if (delta < 0) {
+      count_item(-delta, &stats->max_neg_delta, NULL, stats->log_neg_delta);
+    } else {
+      count_item(delta, &stats->max_pos_delta, NULL, stats->log_pos_delta);
+    }
+  } else {
+    stats->min_retaddr = stats->max_retaddr = retaddr;
+  }
+  stats->last_retaddr = retaddr;
+
+  if (frame_return_to_C(d)) {
+    ++ stats->return_to_C;
+    /* Top of an ML stack chunk. Skip over empty frame descriptor */
+    p = (unsigned char*)&d->live_ofs[0];
+    /* Align to word size */
+    p = Align_to(p, void*);
+  } else {
+    uint32_t sz = frame_size(d); /* in bytes */
+    sz /= sizeof(uintnat);
+    count_item(sz, &stats->max_framesize, stats->small_frames,
+               stats->log_framesize);
+
+    uint64_t reg_map = 0; /* bitmap of live registers */
+    size_t regs = 0; /* number of live registers */
+    size_t max_reg = 0; /* max live register number */
+    size_t slots = 0; /* number of live stack slots */
+    size_t max_slot = 0; /* max live stack slot offset */
+    bool has_big_reg = false; /* saw a register too big for the small map */
+
+    uint32_t num_live;
+    if (frame_is_long(d)) {
+      ++stats->long_descrs;
+      frame_descr_long *dl = frame_as_long(d);
+      num_live = dl->num_live;
+      uint32_t n = num_live;
+      for (uint32_t *ofp = dl->live_ofs; n > 0; n--, ofp++) {
+        add_live_ofs(*ofp, &regs, &max_reg, &reg_map, &has_big_reg,
+                     &slots, &max_slot, stats);
+      }
+    } else {
+      num_live = d->num_live;
+      uint16_t n = num_live;
+      for (uint16_t *ofp = d->live_ofs; n > 0; n--, ofp++) {
+        add_live_ofs(*ofp, &regs, &max_reg, &reg_map, &has_big_reg,
+                     &slots, &max_slot, stats);
+      }
+    }
+
+    /* Record size of GC "offset" table */
+    count_item(num_live, &stats->max_lives, stats->small_lives,
+               stats->log_lives);
+
+    /* Register counts and maps, recorded only for allocation descriptors.
+       Non-allocation descriptors are not expected to keep GC roots in
+       registers, so count any that do as an anomaly rather than folding
+       them into the register statistics. */
+    if (frame_has_allocs(d)) {
+      if (regs < REGS) {
+        ++ stats->reg_count[regs];
+      }
+      if (max_reg < REGS) {
+        ++ stats->max_reg[max_reg];
+      }
+      if (regs > stats->max_regs) {
+        stats->max_regs = regs;
+      }
+      if (reg_map < REG_MAPS) {
+        ++ stats->reg_maps[reg_map];
+      }
+      if (has_big_reg) {
+        ++ stats->big_reg_descrs;
+      }
+    } else if (regs > 0) {
+      ++ stats->noalloc_with_regs;
+    }
+
+    /* Slot counts */
+    count_item(slots, &stats->max_slots, stats->small_slots,
+               stats->log_slots);
+
+    /* Maximum slot offset */
+    count_item(max_slot, &stats->max_slot, stats->small_max_slot,
+               stats->log_max_slot);
+
+    p = (unsigned char*)frame_end_of_live_ofs(d);
+    size_t num_debuginfo = 1;
+    if (frame_has_allocs(d)) {
+      ++ stats->with_alloc;
+      size_t num_allocs = *(uint8_t *)p;
+      stats->alloc_sizes += num_allocs;
+      num_debuginfo = num_allocs;
+      count_item(num_allocs, &stats->max_comballocs, stats->small_comballocs,
+                 stats->log_comballocs);
+      ++ p;
+      for (size_t idx = 0; idx < num_allocs; ++idx) {
+        count_item(p[idx], &stats->max_alloc_size, stats->small_alloc_sizes,
+                   stats->log_alloc_sizes);
+      }
+      p += num_allocs;
+    }
+    /* Count debug info if present */
+    if (frame_has_debug(d)) {
+      ++ stats->with_debug;
+      /* Align to 32 bits */
+      p = Align_to(p, uint32_t);
+      for (size_t i = 0; i <  num_debuginfo; ++i) {
+        uint32_t offset = *(uint32_t*)p;
+        if (offset) { /* there may be invalid debuginfo slots */
+          caml_debuginfo_measure((debuginfo)(p + offset));
+        }
+        p += sizeof(uint32_t);
+      }
+    }
+    /* Align to word size */
+    p = Align_to(p, void*);
+  }
+  if (!stats->max_descr || (p > stats->max_descr)) {
+    stats->max_descr = p;
+  }
+}
+
+/* Record stats for all descriptors from a frametable */
+
+static void add_frametable_to_stats(intnat *frametable,
+                                    struct frametable_stats *stats)
+{
+  ++ stats->frametables;
+  if (!stats->min_descr ||
+      ((unsigned char*)frametable < stats->min_descr)) {
+    stats->min_descr = (unsigned char*)frametable;
+  }
+  if (!stats->max_descr ||
+      ((unsigned char*)frametable > stats->max_descr)) {
+    stats->max_descr = (unsigned char*)(frametable+1);
+  }
+  intnat len = *frametable;
+  frame_descr * d = (frame_descr *)(frametable + 1);
+  for (intnat j = 0; j < len; j++) {
+    add_descriptor_to_stats(d, stats);
+    d = next_frame_descr(d);
+  }
+}
+
+/* Record and report stats for all frametables on a list */
+
+static void report_frametables_stats(caml_frametable_list *new_frametables)
+{
+  struct frametable_stats stats;
+  clear_stats(&stats);
+  iter_list(new_frametables, cur) {
+    add_frametable_to_stats(cur->frametable, &stats);
+    accumulate_frametable_stats(cur->frametable, &stats);
+    clear_per_frametable_stats(&stats);
+  }
+  report_stats(&stats);
+}
+
 static void add_frame_descriptors(
   caml_frame_descrs *table,
   caml_frametable_list *new_frametables)
@@ -226,9 +794,15 @@ static void add_frame_descriptors(
     if (table->descriptors == NULL) caml_raise_out_of_memory();
 
     fill_hashtable(table, new_frametables);
+    if (caml_measure_frametables) {
+      report_frametables_stats(new_frametables);
+    }
   } else {
     table->num_descr += increase;
     fill_hashtable(table, new_frametables);
+    if (caml_measure_frametables) {
+      report_frametables_stats(new_frametables);
+    }
     tail->next = table->frametables;
   }
 
