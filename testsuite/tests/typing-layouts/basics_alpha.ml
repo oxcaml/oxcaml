@@ -1090,7 +1090,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of a constructor argument being projected.
 |}];;
 

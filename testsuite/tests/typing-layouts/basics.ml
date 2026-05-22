@@ -1290,7 +1290,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the type of a constructor argument being projected.
 |}];;
 
