@@ -25,6 +25,10 @@ open Translmode
 
 module String = Misc.Stdlib.String
 
+let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+  Array.init (pos + 1) (fun i ->
+    Value (if i = pos then value_kind else generic_value))
+
 type invalid_stack_primitive =
   | Not_primitive
   | Not_allocating
@@ -659,20 +663,39 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%loc_POS" -> Loc Loc_POS
     | "%loc_MODULE" -> Loc Loc_MODULE
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
-    | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
-    | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
-    | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
-    | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
+    | "%field0" ->
+       Primitive
+         (Pfield
+            ([0], mixed_block_shape_of_generic_values 1,
+             Reads_vary),
+          1)
+    | "%field1" ->
+       Primitive
+         (Pfield ([1], mixed_block_shape_of_generic_values 2, Reads_vary), 1)
+    | "%field0_immut" ->
+       Primitive
+         (Pfield ([0], mixed_block_shape_of_generic_values 1, Reads_agree), 1)
+    | "%field1_immut" ->
+       Primitive
+         (Pfield ([1], mixed_block_shape_of_generic_values 2, Reads_agree), 1)
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
-       Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
+       Primitive
+         (Psetfield
+            ([0], mixed_block_shape_of_generic_values 1, Assignment mode),
+          2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
-       Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
+       Primitive
+         (Psetfield
+            ([1], mixed_block_shape_of_generic_values 2, Assignment mode),
+          2);
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Immutable,
+                              mixed_block_shape_of_generic_values 0, mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Mutable, mixed_block_shape_of_generic_values 0,
+                              mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1676,17 +1699,26 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
           | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
   in
   match prim, param_tys with
-  | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
+  | Primitive (Psetfield([n], shape, init), arity), [_; p2] -> begin
       match fst (maybe_pointer_type env p2) with
       | Pointer -> None
-      | Immediate -> Some (Primitive (Psetfield(n, Immediate, init), arity))
+      | Immediate ->
+        let shape = Array.copy shape in
+        shape.(n) <- Value { generic_value with raw_kind = Pintval };
+        Some (Primitive (Psetfield([n], shape, init), arity))
     end
-  | Primitive (Pfield (n, Pointer, mut), arity), _ ->
+  | Primitive (Psetfield _, _), _ -> None
+  | Primitive (Pfield ([n], shape, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
       let is_int = match is_function_type env ty with
         | None -> Pointer
         | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
-      Some (Primitive (Pfield (n, is_int, mut), arity))
+      let shape = Array.copy shape in
+      shape.(n) <-
+        Value
+          { generic_value with raw_kind = value_kind_of_pointerness is_int };
+      Some (Primitive (Pfield ([n], shape, mut), arity))
+  | Primitive (Pfield _, _), _ -> None
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
       let array_type =
@@ -1793,7 +1825,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Pbigarray_unknown, Pbigarray_unknown_layout -> None
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
-  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
+  | Primitive (Pmakeblock(tag, mut, old_shape, mode), arity), fields
+    when Lambda.is_uniform_block_shape old_shape ->
     begin
       let shape =
         List.map (fun typ ->
@@ -1804,7 +1837,12 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
         Some (Primitive (Pmakeblock(tag, mut,
-                           Lambda.block_shape_of_value_kinds (Some shape),
+                           Lambda.mixed_block_shape_of_value_kinds shape,
+                           mode), arity))
+      else if List.length fields <> Array.length old_shape then
+        Some (Primitive (Pmakeblock(tag, mut,
+                           Lambda.mixed_block_shape_of_generic_values
+                             (List.length fields),
                            mode), arity))
       else None
     end
@@ -2068,12 +2106,15 @@ let lambda_of_loc kind sloc =
       loc_start.Lexing.pos_cnum + cnum in
   match kind with
   | Loc_POS ->
-    Lconst (Const_block (0, [
+    let fields = [
           Const_immstring file;
           Const_base (Const_int lnum);
           Const_base (Const_int cnum);
           Const_base (Const_int enum);
-        ]))
+        ] in
+    Lconst
+      (Const_block
+        (0, mixed_block_shape_of_generic_values (List.length fields), fields))
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
@@ -2174,10 +2215,23 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
       | _ ->
           let varg = Ident.create_local "atomic_arg" in
           let ptr =
-            Lprim (Pfield (0, Pointer, Reads_agree), [Lvar varg], loc)
+            Lprim
+              ( Pfield
+                  ( [0],
+                    mixed_block_shape_with_locality_mode_for_field 0 generic_value,
+                    Reads_agree ),
+                [Lvar varg],
+                loc )
           in
           let ofs =
-            Lprim (Pfield (1, Immediate, Reads_agree), [Lvar varg], loc)
+            Lprim
+              ( Pfield
+                  ( [1],
+                    mixed_block_shape_with_locality_mode_for_field
+                      1 { generic_value with raw_kind = Pintval },
+                    Reads_agree ),
+                [Lvar varg],
+                loc )
           in
           let args = ptr :: ofs :: rest in
           Llet (
@@ -2242,7 +2296,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+      Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 2,
+                       alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
@@ -2291,7 +2346,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, All_value, alloc_heap),
+          Pmakeblock (0, Immutable, mixed_block_shape_of_generic_values 2,
+                      alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],
         loc)
@@ -2519,12 +2575,12 @@ let lambda_primitive_needs_event_after = function
   | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pmake_idx_field _ | Pmake_idx_array _
   | Pidx_deepen _
 
   | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _
-  | Pufloatfield _ | Psetufloatfield _ | Pmixedfield _ | Psetmixedfield _
+  | Pufloatfield _ | Psetufloatfield _
   | Poffsetref _
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu

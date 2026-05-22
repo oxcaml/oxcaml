@@ -360,7 +360,8 @@ and value_kind_variant env subst ~visited ~depth
 and value_kind_record env subst ~visited ~depth
     (labels : Types.label_declaration list) rep =
   match rep with
-  | Record_mixed _ ->
+  | Record_boxed shape
+    when not (Types.mixed_product_shape_is_flat_all_value shape) ->
     raise (Vicuna_unsupported Mixed_records)
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
@@ -384,7 +385,7 @@ and value_kind_record env subst ~visited ~depth
       | Record_inlined (Ordinary { runtime_tag; _ }, _, _) ->
         Block (Some (runtime_tag, fields))
       | Record_float -> FloatArray
-      | Record_boxed -> Block (Some (0, fields))
+      | Record_boxed _ -> Block (Some (0, fields))
       | Record_inlined (Extension _, _, _) -> Block (Some (0, fields))
       | Record_inlined (Null, _, _) ->
         raise (Vicuna_unsupported With_null_variants)
@@ -392,7 +393,6 @@ and value_kind_record env subst ~visited ~depth
         raise
           (Vicuna_unsupported
              (Other "Record_unboxed should have been handled above"))
-      | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
     in
     non_consts

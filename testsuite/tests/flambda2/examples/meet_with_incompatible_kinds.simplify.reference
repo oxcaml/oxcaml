@@ -23,7 +23,7 @@ let code loopify(never) size(10) newer_version_of(f_1)
         -> k * k1
         : [ 0 of float boxed * imm tagged ] =
   let Pfield = %block_load.[`0`] (x) in
-  let n = %block_load.[`0`] (Pfield) in
+  let n = %block_load.`imm`.[`0`] (Pfield) in
   let Pmakeblock =
     %block.[`0`] ($camlMeet_with_incompatible_kinds__float12, n)
   in

@@ -1004,11 +1004,7 @@ module With_subkind = struct
           (* If we have [Obj.double_array_tag] here, this is always an all-float
              block, not an array. *)
           (* CR vlaviron: change the Lambda type *)
-          let num_fields =
-            match shape with
-            | Constructor_uniform fields -> List.length fields
-            | Constructor_mixed _ -> assert false
-          in
+          let num_fields = Array.length shape in
           Float_block { num_fields }
         | [], _ :: _ | _ :: _, [] | _ :: _, _ :: _ ->
           let consts =
@@ -1025,17 +1021,31 @@ module With_subkind = struct
                   let shape_and_fields : Block_shape.t * t list =
                     (* CR mshinwell/vlaviron: In both of these cases it would be
                        nice to propagate immediacy information. *)
-                    match (shape : Lambda.constructor_shape) with
-                    | Constructor_uniform fields ->
+                    if Lambda.is_uniform_block_shape shape
+                    then
+                      let fields =
+                        Lambda.mixed_block_element_leaves (Product shape)
+                        |> List.map (function
+                          | Lambda.Value value_kind -> value_kind
+                          | Lambda.Product _ | Lambda.Float_boxed _
+                          | Lambda.Float64 | Lambda.Float32
+                          | Lambda.Bits8 | Lambda.Bits16 | Lambda.Bits32
+                          | Lambda.Bits64 | Lambda.Vec128 | Lambda.Vec256
+                          | Lambda.Vec512 | Lambda.Word
+                          | Lambda.Untagged_immediate
+                          | Lambda.Splice_variable _ ->
+                            Misc.fatal_error
+                              "unexpected non-value in uniform block shape")
+                      in
                       ( Scannable Value_only,
                         List.map (from_lambda_value_kind ~machine_width) fields
                       )
-                    | Constructor_mixed mixed_block_shape ->
+                    else
                       let mixed_block_shape =
                         Mixed_block_lambda_shape.of_mixed_block_elements
                           ~print_locality:(fun ppf () ->
                             Format.fprintf ppf "()")
-                          mixed_block_shape
+                          shape
                       in
                       let from_mixed_block_element :
                           _

@@ -383,6 +383,17 @@ module Type_shape = struct
 end
 
 module Type_decl_shape = struct
+  let rec mixed_block_element_is_all_value = function
+    | Types.Scannable _ | Types.Void -> true
+    | Types.Product elts -> Array.for_all mixed_block_element_is_all_value elts
+    | Types.Float_boxed | Types.Float64 | Types.Float32 | Types.Bits8
+    | Types.Bits16 | Types.Bits32 | Types.Bits64
+    | Types.Untagged_immediate | Types.Vec128 | Types.Vec256
+    | Types.Vec512 | Types.Word -> false
+
+  let mixed_block_shape_is_all_value shape =
+    Array.for_all mixed_block_element_is_all_value shape
+
   let rec mixed_block_shape_to_layout = function
     (* CR layouts-scannable: We forget about the stored scannable axes when
        converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
@@ -410,7 +421,7 @@ module Type_decl_shape = struct
 
   let of_complex_constructor type_subst name
       (cstr_args : Types.constructor_declaration)
-      ((constructor_repr, _) : Types.constructor_representation * _)
+      ((constructor_shape, _) : Types.mixed_product_shape * _)
       shape_for_constr =
     let args =
       match cstr_args.cd_args with
@@ -439,42 +450,20 @@ module Type_decl_shape = struct
           list
     in
     let constructor_repr =
-      match constructor_repr with
-      | Constructor_mixed shapes ->
-        List.iter2
-          (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
-            let ly2 = mixed_block_shape_to_layout mix_shape in
-            if not (Layout.equal ly ly2)
+      List.iter2
+        (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
+          let ly2 = mixed_block_shape_to_layout mix_shape in
+          if not (Layout.equal ly ly2)
+          then
+            if !Clflags.dwarf_pedantic
             then
-              if !Clflags.dwarf_pedantic
-              then
-                Misc.fatal_errorf_doc
-                  "Type_shape: variant constructor with mismatched layout, has \
-                   %a but expected %a"
-                  Layout.format ly Layout.format ly2
-              else ())
-          (Array.to_list shapes) args;
-        Array.map mixed_block_shape_to_layout shapes
-      | Constructor_uniform_value ->
-        let lys =
-          List.map
-            (fun { Shape.field_name = _; field_value = _, ly } ->
-              if
-                not
-                  (Layout.equal ly (Layout.Base Scannable)
-                  || Layout.equal ly (Layout.Base Void))
-              then
-                if !Clflags.dwarf_pedantic
-                then
-                  Misc.fatal_errorf_doc
-                    "Type_shape: variant constructor with mismatched layout, \
-                     has %a but expected value or void."
-                    Layout.format ly
-                else Layout.Base Scannable
-              else ly)
-            args
-        in
-        Array.of_list lys
+              Misc.fatal_errorf_doc
+                "Type_shape: variant constructor with mismatched layout, has \
+                  %a but expected %a"
+                Layout.format ly Layout.format ly2
+            else ())
+        (Array.to_list constructor_shape) args;
+      Array.map mixed_block_shape_to_layout constructor_shape
     in
     { Shape.name;
       constr_uid = Some cstr_args.cd_uid;
@@ -563,12 +552,15 @@ module Type_decl_shape = struct
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
-          | Record_boxed ->
-            record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
-          | Record_mixed fields ->
-            record_of_labels ~shape_for_constr ~type_subst
-              (Record_mixed (Array.map mixed_block_shape_to_layout fields))
-              lbl_list
+          | Record_boxed fields ->
+            if mixed_block_shape_is_all_value fields
+            then
+              record_of_labels ~shape_for_constr ~type_subst Record_boxed
+                lbl_list
+            else
+              record_of_labels ~shape_for_constr ~type_subst
+                (Record_mixed (Array.map mixed_block_shape_to_layout fields))
+                lbl_list
           | Record_unboxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_unboxed
               lbl_list
@@ -784,7 +776,7 @@ module Type_decl_shape = struct
       let record =
         record_of_labels
           ~shape_for_constr:(fun _ ~args:_ -> None)
-          ~type_subst:[] Record_boxed lbls
+          ~type_subst:[] Shape.Record_boxed lbls
         (* CR sspies: Instead of [Record_boxed], it would be nicer to mark
            these as virtual, because they only exist for Merlin. This saves
            us from trouble when shapes that are intended for Merlin end up

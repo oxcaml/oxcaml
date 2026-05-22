@@ -118,31 +118,28 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
   | Root_initialization ->
     Misc.fatal_error "[Root_initialization] should not appear in Flambda input"
 
-let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
-  match shape with
-  | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
-  | Shape shape ->
-    (* This function is only called for uniform block shapes. We flatten
-       products of values into individual value fields. *)
-    let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
-      match elem with
-      | L.Value vk ->
-        K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
-      | Product elts -> Array.fold_left collect_value_fields acc elts
-      | Float_boxed ()
-      | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
-        Misc.fatal_error "convert_block_shape: non-uniform shape"
-    in
-    let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
-    let fields_length = List.length fields in
-    if num_fields <> fields_length
-    then
-      Misc.fatal_errorf
-        "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
-         fields"
-        num_fields fields_length;
-    fields
+let convert_block_shape ~machine_width (shape : L.mixed_block_shape) ~num_fields =
+  (* This function is only called for uniform block shapes. We flatten
+     products of values into individual value fields. *)
+  let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
+    match elem with
+    | L.Value vk ->
+      K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+    | Product elts -> Array.fold_left collect_value_fields acc elts
+    | Float_boxed ()
+    | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+      Misc.fatal_error "convert_block_shape: non-uniform shape"
+  in
+  let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
+  let fields_length = List.length fields in
+  if num_fields <> fields_length
+  then
+    Misc.fatal_errorf
+      "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
+       fields"
+      num_fields fields_length;
+  fields
 
 let check_float_array_optimisation_enabled dbg name =
   if not (Flambda_features.flat_float_array ())
@@ -1799,13 +1796,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
     let mutability = Mutability.from_lambda mutability in
-    match L.mixed_block_of_block_shape shape with
-    | None ->
+    if L.is_uniform_block_shape shape
+    then
       let shape =
         convert_block_shape ~machine_width shape ~num_fields:(List.length args)
       in
       [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
-    | Some shape ->
+    else
       (* Mixed block *)
       let shape =
         Mixed_block_shape.of_mixed_block_elements
@@ -1846,8 +1843,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Mixed_record kind_shape -> kind_shape
         | Value_only ->
           Misc.fatal_error
-            "Pmakeblock: mixed_block_of_block_shape returned Some but \
-             from_mixed_block_shape returned Value_only"
+            "Pmakeblock: non-uniform block shape produced Value_only"
       in
       [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
@@ -1896,20 +1892,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (Simple.const_int
            (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
               num_bytes)) ]
-  | Pmake_idx_field pos, [] ->
+  | Pmake_idx_field (shape, pos, path), [] ->
     needs_64_bit_target prim dbg;
-    let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
-    [H.simple_i64_expr idx_raw_value]
-  | Pmake_idx_mixed_field (shape, pos, path), [] ->
-    needs_64_bit_target prim dbg;
-    let module W = Mixed_product_bytes.Wrt_path in
-    let { W.offset_bytes; gap_bytes } =
-      match W.offset_and_gap (W.count_shape shape pos path) with
-      | Some { offset_bytes; gap_bytes } -> { W.offset_bytes; gap_bytes }
-      | None ->
-        Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
-          Debuginfo.print_compact dbg
-    in
+      let module W = Mixed_product_bytes.Wrt_path in
+      let { W.offset_bytes; gap_bytes } =
+        match W.offset_and_gap (W.count_shape shape pos path) with
+        | Some { offset_bytes; gap_bytes } -> { W.offset_bytes; gap_bytes }
+        | None ->
+          Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
+            Debuginfo.print_compact dbg
+      in
     let idx_raw_value =
       Int64.add
         (Int64.shift_left
@@ -2092,48 +2084,38 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pduprecord (repr, num_fields), [[arg]] ->
     let kind : P.Duplicate_block_kind.t =
       match repr with
-      | Record_boxed ->
+      | Record_boxed shape
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
+      | Record_boxed _ -> Mixed
       | Record_float | Record_ufloat ->
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
       | Record_inlined
-          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
+          (Ordinary { runtime_tag; _ }, shape, Variant_boxed _)
         when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
-      | Record_mixed shape
-        when Mixed_product_bytes.types_shape_is_all_value shape ->
+      | Record_inlined (_, shape, _)
+        when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
+        Mixed
+      | Record_inlined ( Ordinary { runtime_tag; _ }, _, Variant_boxed _ ) ->
+        Values
+          { tag = Tag.Scannable.create_exn runtime_tag;
+            length = Target_ocaml_int.of_int machine_width num_fields
+          }
+      | Record_inlined (Extension _, _, Variant_extensible) ->
         Values
           { tag = Tag.Scannable.zero;
-            length = Target_ocaml_int.of_int machine_width num_fields
+            (* The "+1" is because there is an extra field containing the
+                hashed constructor. *)
+            length = Target_ocaml_int.of_int machine_width (num_fields + 1)
           }
-      | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
-      | Record_inlined
-          ( Ordinary { runtime_tag; _ },
-            Constructor_uniform_value,
-            Variant_boxed _ ) ->
-        Values
-          { tag = Tag.Scannable.create_exn runtime_tag;
-            length = Target_ocaml_int.of_int machine_width num_fields
-          }
-      | Record_inlined (Extension _, shape, Variant_extensible) -> (
-        match shape with
-        | Constructor_uniform_value ->
-          Values
-            { tag = Tag.Scannable.zero;
-              (* The "+1" is because there is an extra field containing the
-                 hashed constructor. *)
-              length = Target_ocaml_int.of_int machine_width (num_fields + 1)
-            }
-        | Constructor_mixed _ ->
-          (* CR layouts v5.9: support this *)
-          Misc.fatal_error "Mixed blocks extensible variants are not supported")
       | Record_inlined (Extension _, _, _)
       | Record_inlined
           ( Ordinary _,
@@ -2556,17 +2538,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
            ( Int_comp (I.Tagged_immediate, Yielding_bool (Lt Unsigned)),
              arg1,
              arg2 )) ]
-  | Pfield (index, _int_or_ptr, sem), [[arg]] ->
-    (* CR mshinwell: make use of the int-or-ptr flag (new in OCaml 5)? *)
-    let imm = Target_ocaml_int.of_int machine_width index in
-    check_non_negative_imm imm "Pfield";
-    let mutability = convert_field_read_semantics sem in
-    let block_access : P.Block_access_kind.t =
-      Values { tag = Unknown; size = Unknown; field_kind = Any_value }
-    in
-    [ Unary
-        (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
-    ]
   | Pfloatfield (field, sem, mode), [[arg]] ->
     let imm = Target_ocaml_int.of_int machine_width field in
     check_non_negative_imm imm "Pfloatfield";
@@ -2589,9 +2560,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
-  | Pmixedfield (field_path, shape, sem), [[arg]] ->
+  | Pfield (field_path, shape, sem), [[arg]] ->
     if List.length field_path < 1
-    then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
+    then Misc.fatal_error "Pfield: field_path must be non-empty";
+    let shape =
+      match field_path with
+      | field :: _ when field >= Array.length shape ->
+        L.mixed_block_shape_of_generic_values (field + 1)
+      | _ -> shape
+    in
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:Printlambda.locality_mode
@@ -2606,7 +2583,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     List.map
       (fun new_index ->
         let imm = Target_ocaml_int.of_int machine_width new_index in
-        check_non_negative_imm imm "Pmixedfield";
+        check_non_negative_imm imm "Pfield";
         let mutability = convert_field_read_semantics sem in
         let field_elt = flattened_reordered_shape.(new_index) in
         let block_access =
@@ -2625,19 +2602,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
           prim)
       new_indexes
-  | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
-      [[block]; [value]] ) ->
-    let field_kind = convert_block_access_field_kind immediate_or_pointer in
-    let imm = Target_ocaml_int.of_int machine_width index in
-    check_non_negative_imm imm "Psetfield";
-    let init_or_assign = convert_init_or_assign initialization_or_assignment in
-    let block_access : P.Block_access_kind.t =
-      Values { tag = Unknown; size = Unknown; field_kind }
-    in
-    [ Binary
-        ( Block_set { kind = block_access; init = init_or_assign; field = imm },
-          block,
-          value ) ]
   | Psetfloatfield (field, initialization_or_assignment), [[block]; [value]] ->
     let imm = Target_ocaml_int.of_int machine_width field in
     check_non_negative_imm imm "Psetfloatfield";
@@ -2660,10 +2624,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Block_set { kind = block_access; init = init_or_assign; field = imm },
           block,
           value ) ]
-  | ( Psetmixedfield (field_path, shape, initialization_or_assignment),
+  | ( Psetfield (field_path, shape, initialization_or_assignment),
       [[block]; values] ) ->
     if List.length field_path < 1
-    then Misc.fatal_error "Psetmixedfield: field_path must be non-empty";
+    then Misc.fatal_error "Psetfield: field_path must be non-empty";
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -2679,13 +2643,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let num_values = List.length values in
     if num_indices <> num_values
     then
-      Misc.fatal_errorf "inconsistent Psetmixedfield: %d indices and %d values"
+      Misc.fatal_errorf "inconsistent Psetfield: %d indices and %d values"
         num_indices num_values;
     let exprs =
       List.map2
         (fun new_index value : H.expr_primitive ->
           let imm = Target_ocaml_int.of_int machine_width new_index in
-          check_non_negative_imm imm "Psetmixedfield";
+          check_non_negative_imm imm "Psetfield";
           let field_elt = flattened_reordered_shape.(new_index) in
           let block_access =
             H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
@@ -3218,8 +3182,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        here, either a bug in [Closure_conversion] or the wrong number of \
        arguments"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | (Pprobe_is_enabled _ | Pmake_idx_field _ | Pmake_idx_mixed_field _), _ :: _
-    ->
+  | (Pprobe_is_enabled _ | Pmake_idx_field _), _ :: _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for nullary primitive \
        %a (%a)"
@@ -3231,7 +3194,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _ | Pmixedfield _
+      | Patomic_load_field _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
@@ -3250,7 +3213,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
       | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
       | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
-      | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
+      | Psetfloatfield _ | Psetufloatfield _
       | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _

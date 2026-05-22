@@ -377,15 +377,7 @@ and fracture_prim lambda prim args loc =
     (* Bind the fields in reverse because Lprim(Pmakeblock) evaluates its arguments in
        reverse order. *)
     fracture_make_block true (List.length args - 1) [] [] (List.rev args)
-  | Pfield (pos, _ptr, _sem) ->
-    let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
-    slet_local "arg" arg (fun arg_c arg_r ->
-        SLhalves
-          { sval_comptime = SLfield (arg_c, pos);
-            sval_runtime =
-              (if arg_r == arg then lambda else Lprim (prim, [arg_r], loc))
-          })
-  | Pmixedfield (path, _shape, _sem) ->
+  | Pfield (path, _shape, _sem) ->
     let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
@@ -399,9 +391,9 @@ and fracture_prim lambda prim args loc =
   | Pgetglobal (_, Dynamic)
   | Pgetpredef _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
-  | Pufloatfield _ | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
+  | Pufloatfield _ | Psetfloatfield _ | Psetufloatfield _
   | Pduprecord _ | Pmake_unboxed_product _ | Punboxed_product_field _
-  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pmake_idx_mixed_field _
+  | Parray_element_size_in_bytes _ | Pmake_idx_field _
   | Pmake_idx_array _ | Pidx_deepen _ | Pwith_stack | Pwith_stack_bind
   | Pperform | Presume | Preperform | Pccall _ | Praise _ | Psequand | Psequor
   | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength

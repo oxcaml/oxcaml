@@ -521,6 +521,12 @@ let mk_add_extension add_extension id args =
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Univar _ | Genvar _ | Product _ -> raise_error ())
     args;
+  let ext_shape =
+    Array.of_list
+      (List.map
+         (fun (_, sort) -> mixed_block_element_of_const_sort sort)
+         args)
+  in
   add_extension id
     { ext_type_path = path_exn;
       ext_type_params = [];
@@ -535,7 +541,7 @@ let mk_add_extension add_extension id args =
                 ca_loc=Location.none
               })
             args);
-      ext_shape = Constructor_uniform_value;
+      ext_shape;
       ext_constant = args = [];
       ext_ret_type = None;
       ext_private = Asttypes.Public;
@@ -566,7 +572,7 @@ let variant constrs =
       | Cstr_record lbls ->
         Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
     in
-    Constructor_uniform_value, sorts
+    Array.map mixed_block_element_of_const_sort sorts, sorts
   in
   Type_variant (
     constrs,
@@ -717,7 +723,13 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ("pos_bol", type_int);
            ("pos_cnum", type_int) ]
          in
-         Type_record (labels, Record_boxed, None)
+         Type_record
+           ( labels,
+             Record_boxed
+               (Misc.Stdlib.Array.of_list_map
+                  (fun lbl -> mixed_block_element_of_const_sort lbl.ld_sort)
+                  labels),
+             None )
        )
        (* Fields are [int] and [string], so [immutable_data] already captures
           their direct contribution. Encoding this directly avoids predef-time

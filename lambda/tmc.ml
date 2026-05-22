@@ -88,7 +88,7 @@ module Constr : sig
   type t = {
     tag : int;
     flag: Lambda.mutable_flag;
-    shape : block_shape;
+    shape : mixed_block_shape;
     before: lambda list;
     after: lambda list;
     loc : Debuginfo.Scoped_location.t;
@@ -121,7 +121,7 @@ end = struct
   type t = {
     tag : int;
     flag: Lambda.mutable_flag;
-    shape : block_shape;
+    shape : mixed_block_shape;
     before: lambda list;
     after: lambda list;
     loc : Debuginfo.Scoped_location.t;
@@ -889,7 +889,6 @@ let rec choice ctx t =
     | Psetfield _ | Psetfield_computed _
     | Pfloatfield _ | Psetfloatfield _
     | Pufloatfield _ | Psetufloatfield _
-    | Pmixedfield _  | Psetmixedfield _
     | Pccall _
     | Praise _
     | Pnot
@@ -988,7 +987,7 @@ let rec choice ctx t =
     | Psequand | Psequor
     | Ppoll
     | Ppeek _ | Ppoke _
-    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
+    | Pmake_idx_field _ | Pidx_deepen _
     | Pmake_idx_array _
     | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _ ->
         let primargs = traverse_list ctx primargs in

@@ -155,7 +155,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       begin match cd_args with
       | Cstr_tuple [{ ca_sort = sort }]
       | Cstr_record [{ ld_sort = sort }] ->
-        [| Constructor_uniform_value, [| sort |] |], true
+        [| [| mixed_block_element_of_const_sort sort |], [| sort |] |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -165,9 +165,9 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       let shape cstr =
         match classify_variant_with_null_constructor cstr with
         | Variant_with_null_nullary ->
-          Constructor_uniform_value, [| |]
+          [| |], [| |]
         | Variant_with_null_payload { payload_arg = { ca_sort = sort; _ }; _ }
-          -> Constructor_uniform_value, [| sort |]
+          -> [| mixed_block_element_of_const_sort sort |], [| sort |]
       in
       Array.of_list (List.map shape cstrs), false
   in

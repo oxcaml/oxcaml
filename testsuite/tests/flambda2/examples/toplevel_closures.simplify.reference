@@ -9,7 +9,7 @@ and code loopify(never) size(5) newer_version_of(f_0)
         -> k * k1
         : imm tagged =
   let r_1 = %project_value_slot.[f].[r] ($camlToplevel_closures__f_2) in
-  let Pfield = %block_load.mut.[`0`] (r_1) in
+  let Pfield = %block_load.`imm`.mut.[`0`] (r_1) in
   let int_add = %int_barith.add (x, Pfield) in
   cont k (int_add)
   with { r = r }
@@ -22,8 +22,8 @@ and code loopify(never) size(8) newer_version_of(g_1)
         -> k * k1
         : imm tagged =
   let r_1 = %project_value_slot.[g].[r_1] ($camlToplevel_closures__g_3) in
-  let Pfield = %block_load.mut.[`0`] (r_1) in
-  let Pfield_1 = %block_load.mut.[`0`] (r_1) in
+  let Pfield = %block_load.`imm`.mut.[`0`] (r_1) in
+  let Pfield_1 = %block_load.`imm`.mut.[`0`] (r_1) in
   let int_add = %int_barith.add (x, Pfield_1) in
   let int_add_1 = %int_barith.add (int_add, Pfield) in
   cont k (int_add_1)

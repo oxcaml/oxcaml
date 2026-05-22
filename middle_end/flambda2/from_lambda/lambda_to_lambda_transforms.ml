@@ -868,7 +868,7 @@ let make_boxed_vec256 ~loc ~mode args =
   L.Lprim
     ( Preinterpret_tuple_as_boxed_vector Boxed_vec256,
       [ Lprim
-          ( Pmakeblock (0, Immutable, Shape [| Vec128; Vec128 |], mode),
+          ( Pmakeblock (0, Immutable, [| Vec128; Vec128 |], mode),
             args,
             loc ) ],
       loc )
@@ -884,7 +884,7 @@ let unboxed_vec256_field ~loc i arg =
       loc )
 
 let boxed_vec256_field ~loc i arg =
-  L.Lprim (Pmixedfield ([i], [| Vec128; Vec128 |], Reads_agree), [arg], loc)
+  L.Lprim (Pfield ([i], [| Vec128; Vec128 |], Reads_agree), [arg], loc)
 
 let split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride ~load =
   let arr_id = Ident.create_local "arr" in
@@ -1017,11 +1017,13 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | Psetfield (_, _, _), [L.Lprim (Pgetglobal _, [], _); _] ->
     Misc.fatal_error
       "[Psetfield (Pgetglobal ...)] is forbidden upon entry to the middle end"
-  | Pfield (index, _, _), _ when index < 0 ->
+  | Pfield (indexes, _, _), _
+    when List.exists (fun index -> index < 0) indexes ->
     Misc.fatal_error "Pfield with negative field index"
   | Pfloatfield (i, _, _), _ when i < 0 ->
     Misc.fatal_error "Pfloatfield with negative field index"
-  | Psetfield (index, _, _), _ when index < 0 ->
+  | Psetfield (indexes, _, _), _
+    when List.exists (fun index -> index < 0) indexes ->
     Misc.fatal_error "Psetfield with negative field index"
   | Pmakeblock (tag, _, _, _), _ when tag < 0 || tag >= Obj.no_scan_tag ->
     Misc.fatal_errorf "Pmakeblock with wrong or non-scannable block tag %d" tag

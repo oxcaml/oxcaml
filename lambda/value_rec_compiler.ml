@@ -43,6 +43,10 @@
 
 open Lambda
 
+let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+  Array.init (pos + 1) (fun i ->
+    Value (if i = pos then value_kind else generic_value))
+
 (** {1. Sizing} *)
 
 (* Simple blocks *)
@@ -212,7 +216,6 @@ let compute_static_size lam =
     | Psetfield _
     | Psetfield_computed _
     | Psetfloatfield _
-    | Psetmixedfield _
     | Poffsetref _
     | Pbytessetu
     | Pbytessets
@@ -243,41 +246,24 @@ let compute_static_size lam =
 
     | Pduprecord (repres, size) ->
         begin match repres with
-        | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value,
-                          (Variant_boxed _ | Variant_extensible)) ->
-            Block (Regular_block size)
-        | Record_float ->
-            Block (Float_record size)
-        | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
-        | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
+        | Record_boxed shape
+        | Record_inlined (_, shape, (Variant_boxed _ | Variant_extensible)) ->
+            if Types.mixed_product_shape_is_flat_all_value shape
             then
               Block (Regular_block
                 (all_value_mixed_block_size_types shape))
             else
               Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+        | Record_float ->
+            Block (Float_record size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         end
     | Pmakeblock (_, _, shape, _) ->
-        (* The block shape is unfortunately an option, so we rely on the
-           number of arguments instead.
-           Note that flat float arrays/records use Pmakearray, so we don't need
-           to check the tag here. *)
-        (* CR layout poly: This is no longer known before slambda eval, we
-           should merge Regular_block and Mixed_record (and fix the error
-           produced by [mixed_block_of_block_shape]). *)
-        (match Lambda.mixed_block_of_block_shape shape with
-         | None ->
-           let size = match shape with
-             | All_value -> List.length args
-             | Shape shape -> all_value_mixed_block_size shape
-           in
-           Block (Regular_block size)
-         | Some arr -> Block (Mixed_record arr))
+        if Lambda.is_uniform_block_shape shape
+        then Block (Regular_block (all_value_mixed_block_size shape))
+        else Block (Mixed_record shape)
     | Pmakelazyblock _ ->
         Block (Regular_block (List.length args))
     | Pmakearray (kind, _, _) ->
@@ -317,7 +303,6 @@ let compute_static_size lam =
     | Pfield _
     | Pfield_computed _
     | Pfloatfield _
-    | Pmixedfield _
     | Pwith_stack
     | Pwith_stack_bind
     | Pperform
@@ -393,7 +378,7 @@ let compute_static_size lam =
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
     | Parray_element_size_in_bytes _
-    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+    | Pmake_idx_field _ | Pmake_idx_array _
     | Pidx_deepen _
     | Punbox_unit ->
         Constant
@@ -530,7 +515,14 @@ let rec split_static_function lfun block_var local_idents lam :
         lfun.params
     in
     let ap_func =
-      Lprim (Pfield (0, Pointer, lifted_block_read_sem), [Lvar block_var], no_loc)
+      Lprim
+        ( Pfield
+            ( [0],
+              mixed_block_shape_with_locality_mode_for_field
+                0 Lambda.generic_value,
+              lifted_block_read_sem ),
+          [Lvar block_var],
+          no_loc )
     in
     let body =
       Lapply {
@@ -559,8 +551,10 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
-               Lprim (Pmakeblock
-                        (0, lifted_block_mut, All_value, Lambda.alloc_heap),
+      Lprim (Pmakeblock
+                        (0, lifted_block_mut,
+                         Lambda.mixed_block_shape_of_generic_values 1,
+                         Lambda.alloc_heap),
                       [Lvar v], no_loc))
   | Lfunction lfun ->
     let free_vars = Lambda.free_variables lfun.body in
@@ -568,7 +562,11 @@ let rec split_static_function lfun block_var local_idents lam :
     let free_vars_block_size, subst, block_fields_rev =
       Ident.Set.fold (fun var (i, subst, fields) ->
           let access =
-            Lprim (Pfield (i, Pointer, lifted_block_read_sem),
+            Lprim (Pfield
+                     ( [i],
+                       mixed_block_shape_with_locality_mode_for_field
+                         i Lambda.generic_value,
+                       lifted_block_read_sem),
                    [Lvar block_var],
                    no_loc)
           in
@@ -586,7 +584,12 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = new_fun; free_vars_block_size } in
     let block =
-      Lprim (Pmakeblock (0, lifted_block_mut, All_value, Lambda.alloc_heap),
+      Lprim (Pmakeblock
+               ( 0,
+                 lifted_block_mut,
+                 Lambda.mixed_block_shape_of_generic_values
+                   (List.length block_fields_rev),
+                 Lambda.alloc_heap),
              List.rev block_fields_rev,
              no_loc)
     in

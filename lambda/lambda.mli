@@ -130,27 +130,21 @@ type primitive =
   | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
-  | Pmakeblock of int * mutable_flag * block_shape * locality_mode
+  | Pmakeblock of int * mutable_flag * mixed_block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int * immediate_or_pointer * field_read_semantics
+  | Pfield of int list * mixed_block_shape_with_locality_mode * field_read_semantics
+    (** The path to [Pfield] indexes logical elements of the shape, not
+        necessarily runtime fields. Products may be flattened and mixed block
+        fields may be reordered on entry to Flambda 2. *)
   | Pfield_computed of field_read_semantics
-  | Psetfield of int * immediate_or_pointer * initialization_or_assignment
+  | Psetfield of int list * mixed_block_shape * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
-      * field_read_semantics
-    (** The index to [Pmixedfield] corresponds to an element of the shape, not
-        necessarily the index of the field at runtime, as reordering may take
-        place on entry to Flambda 2. *)
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
-  | Psetmixedfield of int list * mixed_block_shape
-      * initialization_or_assignment
-    (** The same comment about the index as for [Pmixedfield] applies to
-        [Psetmixedfield]. *)
   | Pduprecord of Types.record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
@@ -158,8 +152,7 @@ type primitive =
       (* the [layout list] is the layout of the whole product *)
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of int
-  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_field of mixed_block_shape * int * int list
     (** The lone int is the index into the mixed_block_shape, the int list is
         the path into that mixed_block_element *)
   | Pmake_idx_array of
@@ -516,7 +509,7 @@ and value_kind_non_null =
   | Pboxedintval of boxed_integer
   | Pvariant of {
       consts : int list;
-      non_consts : (int * constructor_shape) list;
+      non_consts : (int * mixed_block_shape) list;
       (** [non_consts] must be non-empty.  For constant variants [Pintval]
           must be used.  This causes a small loss of precision but it is not
           expected to be significant. *)
@@ -535,13 +528,6 @@ and layout =
   | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Ident.t
-
-and block_shape =
-  | All_value
-    (** The block shape is a uniform block of [generic_value]s, the length can
-        be determined from the application site. *)
-  | Shape of mixed_block_shape
-    (** A specific block shape, this may be a uniform block or a mixed block. *)
 
 and 'a mixed_block_element =
   | Value of value_kind
@@ -563,11 +549,7 @@ and 'a mixed_block_element =
 and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
-
-and constructor_shape =
-  | Constructor_uniform of value_kind list
-  | Constructor_mixed of mixed_block_shape
+ = locality_mode mixed_block_element array
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -661,8 +643,7 @@ val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 type structured_constant =
     Const_base of constant
-  | Const_block of int * structured_constant list
-  | Const_mixed_block of int * mixed_block_shape * structured_constant list
+  | Const_block of int * mixed_block_shape * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
   | Const_float_block of string list
@@ -1055,9 +1036,7 @@ type runtime_param =
                                              there are no other parameters) *)
 
 type module_representation =
-  | Module_value_only of { field_count : int }
-  (* All module fields are boxed. *)
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  mixed_block_shape * mixed_block_shape_with_locality_mode
   (* The module contains both values and unboxed elements. We have two shapes:
      one for allocating (used by [block_of_module_representation]) and one for
      reading (used by [mod_field]). This will be cleaned up after we add
@@ -1282,16 +1261,13 @@ val pointerness_of_separability
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
-val block_shape_of_value_kinds : value_kind list option -> block_shape
+val mixed_block_shape_of_value_kinds :
+  value_kind list -> 'a mixed_block_element array
+val mixed_block_shape_of_generic_values : int -> 'a mixed_block_element array
 
 (* Returns whether the block shape represents a block containing only values.
    Errors if there's a splice variable *)
-val is_uniform_block_shape : block_shape -> bool
-
-(* Returns [None] if contains all values (including products of values
-   and void), returns the [mixed_block_shape] if it has at least one
-   non-value. Errors if there's a splice variable *)
-val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
+val is_uniform_block_shape : mixed_block_shape -> bool
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)

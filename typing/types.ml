@@ -501,25 +501,20 @@ and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
-  | Record_inlined of tag * constructor_representation * variant_representation
-  | Record_boxed
+  | Record_inlined of tag * mixed_product_shape * variant_representation
+  | Record_boxed of mixed_product_shape
   | Record_float
   | Record_ufloat
-  | Record_mixed of mixed_product_shape
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
 
 and variant_representation =
   | Variant_unboxed
-  | Variant_boxed of (constructor_representation *
+  | Variant_boxed of (mixed_product_shape *
                       Jkind_types.Sort.Const.t array) array
   | Variant_extensible
   | Variant_with_null
-
-and constructor_representation =
-  | Constructor_uniform_value
-  | Constructor_mixed of mixed_product_shape
 
 and label_declaration =
   {
@@ -559,7 +554,7 @@ type extension_constructor =
   { ext_type_path: Path.t;
     ext_type_params: type_expr list;
     ext_args: constructor_arguments;
-    ext_shape: constructor_representation;
+    ext_shape: mixed_product_shape;
     ext_constant: bool;
     ext_ret_type: type_expr option;
     ext_private: private_flag;
@@ -829,7 +824,7 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
+    cstr_shape: mixed_product_shape;    (* Repr of the constructor itself *)
     cstr_constant: bool;
     (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
        payload. (Or equivalently, if it's represented as either a tagged int or
@@ -929,24 +924,24 @@ let rec compare_mixed_block_element e1 e2 =
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
 
-let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
-  match r1, r2 with
-  | Constructor_uniform_value, Constructor_uniform_value -> true
-  | Constructor_mixed mx1, Constructor_mixed mx2 ->
-      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
+let mixed_product_shape_is_flat_all_value =
+  Array.for_all (function
+    | Scannable _ -> true
+    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Word | Untagged_immediate | Vec128 | Vec256 | Vec512 | Product _ | Void
+      -> false)
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
-  | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-      Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation_up_to_scannable_axes cstr1 cstr2
+  | Variant_boxed shapes_and_sorts1, Variant_boxed shapes_and_sorts2 ->
+      Misc.Stdlib.Array.equal (fun (shape1, sorts1) (shape2, sorts2) ->
+          equal_mixed_product_shape_up_to_scannable_axes shape1 shape2
           && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
                sorts1 sorts2)
-        cstrs_and_sorts1
-        cstrs_and_sorts2
+        shapes_and_sorts1
+        shapes_and_sorts2
   | Variant_extensible, Variant_extensible ->
       true
   | Variant_with_null, Variant_with_null -> true
@@ -956,23 +951,21 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
 let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
-  | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
+  | Record_inlined (tag1, shp1, vr1), Record_inlined (tag2, shp2, vr2) ->
       (* Equality of tag and variant representation imply equality of
          constructor representation. *)
-      ignore (cr1 : constructor_representation);
-      ignore (cr2 : constructor_representation);
+      ignore (shp1 : mixed_product_shape);
+      ignore (shp2 : mixed_product_shape);
       equal_tag tag1 tag2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
-  | Record_boxed, Record_boxed ->
-      true
+  | Record_boxed shape1, Record_boxed shape2 ->
+      equal_mixed_product_shape_up_to_scannable_axes shape1 shape2
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
       true
-  | Record_mixed mx1, Record_mixed mx2 ->
-      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _), _ ->
+  | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
+    | Record_ufloat), _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
@@ -1057,8 +1050,7 @@ let find_unboxed_type decl =
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
-                    | Record_boxed | Record_float | Record_ufloat
-                    | Record_mixed _), _)
+                    | Record_boxed _ | Record_float | Record_ufloat), _)
   | Type_record_unboxed_product (_, Record_unboxed_product, _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
                      | Variant_extensible | Variant_with_null), _)

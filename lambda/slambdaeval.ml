@@ -312,29 +312,17 @@ and eval_lam_shallow env lam =
 
 and eval_structured_const env const =
   match const with
-  | Const_mixed_block (n, old_shape, old_consts) ->
+  | Const_block (n, old_shape, old_consts) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     let new_consts =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
     if new_shape == old_shape && new_consts == old_consts
     then const
-    else Const_mixed_block (n, new_shape, new_consts)
-  | Const_block (n, old_consts) ->
-    let new_consts =
-      Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
-    in
-    if new_consts == old_consts then const else Const_block (n, new_consts)
+    else Const_block (n, new_shape, new_consts)
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const
-
-and eval_block_shape env block_shape =
-  match block_shape with
-  | All_value -> block_shape
-  | Shape old_shape ->
-    let new_shape = eval_mixed_block_shape env old_shape in
-    if new_shape == old_shape then block_shape else Shape new_shape
 
 and eval_mixed_block_shape :
     'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
@@ -399,16 +387,16 @@ and eval_lfunction_shallow env
 and eval_prim env prim =
   match prim with
   | Pmakeblock (n, mut, old_shape, mode) ->
-    let new_shape = eval_block_shape env old_shape in
-    if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
-  | Pmixedfield (is, old_shape, sem) ->
     let new_shape = eval_mixed_block_shape env old_shape in
-    if new_shape == old_shape then prim else Pmixedfield (is, new_shape, sem)
-  | Psetmixedfield (is, old_shape, init_or_assign) ->
+    if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
+  | Pfield (is, old_shape, sem) ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape then prim else Pfield (is, new_shape, sem)
+  | Psetfield (is, old_shape, init_or_assign) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape
     then prim
-    else Psetmixedfield (is, new_shape, init_or_assign)
+    else Psetfield (is, new_shape, init_or_assign)
   | Pmake_unboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -423,11 +411,11 @@ and eval_prim env prim =
     if new_layouts == old_layouts
     then prim
     else Punboxed_product_field (i, new_layouts)
-  | Pmake_idx_mixed_field (old_shape, i, path) ->
+  | Pmake_idx_field (old_shape, i, path) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape
     then prim
-    else Pmake_idx_mixed_field (new_shape, i, path)
+    else Pmake_idx_field (new_shape, i, path)
   | Pmake_idx_array (kind, index_kind, old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element
@@ -455,10 +443,10 @@ and eval_prim env prim =
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pset_ptr (new_layout, mode)
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
-  | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
-  | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
+  | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pfield_computed _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
-  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
+  | Parray_element_size_in_bytes _ | Pwith_stack
   | Pwith_stack_bind | Pperform | Presume | Preperform | Pccall _ | Praise _
   | Psequand | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _
   | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
@@ -533,13 +521,11 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _) ->
+  | Pmakeblock (_, _, shape, _)
+  | Psetfield (_, shape, _)
+  | Pmake_idx_field (shape, _, _) ->
     assert_mixed_block_shape_contains_no_splices shape
-  | Pmixedfield (_, shape, _) ->
-    Array.iter assert_mixed_block_element_contains_no_splices shape
-  | Psetmixedfield (_, shape, _) ->
-    assert_mixed_block_shape_contains_no_splices shape
-  | Pmake_idx_mixed_field (shape, _, _) ->
+  | Pfield (_, shape, _) ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
     assert_mixed_block_element_contains_no_splices element

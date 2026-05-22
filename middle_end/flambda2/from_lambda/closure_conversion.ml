@@ -203,7 +203,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
               Or_variable.Const f)
             c))
       "float_array"
-  | Const_block (tag, consts) ->
+  | Const_block (tag, shape, consts) when Lambda.is_uniform_block_shape shape ->
     let acc, fields =
       List.fold_left_map
         (fun acc c ->
@@ -233,7 +233,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       SC.block (Tag.Scannable.create_exn tag) Immutable Value_only fields
     in
     register_const acc dbg const "const_block"
-  | Const_mixed_block (tag, shape, args) ->
+  | Const_block (tag, shape, args) ->
     let shape =
       Mixed_block_shape.of_mixed_block_elements
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -251,7 +251,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_unboxed_nativeint _ )
-      | Const_block _ | Const_mixed_block _ | Const_float_array _
+      | Const_block _ | Const_float_array _
       | Const_immstring _ | Const_float_block _ | Const_null ->
         Misc.fatal_errorf
           "In constant mixed block, a field of kind\n\
@@ -260,7 +260,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     in
     (* CR mshinwell: factor out, this is also in the Pmakemixedblock case. Or
        even better, add support for lifting mixed blocks, then remove this
-       special handling for Const_block and Const_mixed_block and use that
+       special handling for Const_block and use that
        (mshinwell has a partial patch for this). *)
     let args =
       let new_indexes_to_old_indexes =
@@ -289,7 +289,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       | Value_only ->
         (* See Note [Constant all-value mixed records] in translcore.ml *)
         Misc.fatal_error
-          "Const_mixed_block: from_mixed_block_shape returned Value_only"
+          "Const_block: from_mixed_block_shape returned Value_only"
       | Mixed_record _ as block_shape -> block_shape
     in
     let acc, fields =
@@ -1250,7 +1250,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
       | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
-      | Psequor | Pnot | Pmixedfield _ | Psetmixedfield _ | Poffsetref _
+      | Psequor | Pnot | Poffsetref _
       | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
       | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
       | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
@@ -1282,7 +1282,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
       | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pperform | Presume
-      | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
+      | Preperform | Pmake_idx_field _
       | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
       | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
       | Patomic_compare_set_field _ | Patomic_fetch_add_field
@@ -3877,7 +3877,18 @@ let final_module_block_representation acc
     ~(module_repr : Lambda.module_representation) =
   let (block_shape : K.Scannable_block_shape.t), block_access, field_count =
     match module_repr with
-    | Module_value_only { field_count } ->
+    | shape, _ when Lambda.is_uniform_block_shape shape ->
+      let rec count_fields acc (elt : unit Lambda.mixed_block_element) =
+        match elt with
+        | Value _ -> acc + 1
+        | Product elts -> Array.fold_left count_fields acc elts
+        | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
+        | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+        | Splice_variable _ ->
+          Misc.fatal_error
+            "final_module_block_representation: non-uniform shape"
+      in
+      let field_count = Array.fold_left count_fields 0 shape in
       let block_access _pos : P.Block_access_kind.t =
         Values
           { tag = Known Tag.Scannable.zero;
@@ -3888,7 +3899,7 @@ let final_module_block_representation acc
           }
       in
       Value_only, block_access, field_count
-    | Module_mixed (shape, _) ->
+    | shape, _ ->
       let shape =
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -3984,7 +3995,8 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
           let named =
             Named.create_prim
               (Unary
-                 ( Block_load { kind = block_access pos; mut = Immutable; field },
+                 ( Block_load
+                     { kind = block_access pos; mut = Immutable; field },
                    block ))
               Debuginfo.none
           in

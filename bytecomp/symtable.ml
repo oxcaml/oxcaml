@@ -228,19 +228,13 @@ let rec transl_const = function
   | Const_base(Const_nativeint i)
   | Const_base(Const_unboxed_nativeint i) -> Obj.repr i
   | Const_immstring s -> Obj.repr s
-  | Const_block(tag, fields) ->
+  | Const_block(tag, _shape, fields) ->
       let block = Obj.new_block tag (List.length fields) in
       let transl_field pos cst =
         Obj.set_field block pos (transl_const cst)
       in
       List.iteri transl_field fields;
       block
-  | Const_mixed_block _ ->
-      (* CR layouts v5.9: Support constant mixed blocks in bytecode, either by
-        dynamically allocating them once at top-level, or by supporting
-        marshaling into the cmo format for mixed blocks in bytecode.
-      *)
-      Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
   | Const_float_block fields | Const_float_array fields ->
       let res = Array.Floatarray.create (List.length fields) in
       List.iteri (fun i f -> Array.Floatarray.set res i (float_of_string f))
@@ -264,6 +258,7 @@ let init () =
       let c = slot_for_setglobal global in
       let cst = Const_block
           (Obj.object_tag,
+           Lambda.mixed_block_shape_of_generic_values 2,
            [Const_base(Const_string (name, Location.none,None));
             Const_base(Const_int (-i-1))
            ])

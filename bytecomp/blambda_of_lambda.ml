@@ -502,7 +502,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
-                  ( Pmakeblock (0, Immutable, All_value, Lambda.alloc_heap),
+                  ( Pmakeblock
+                      ( 0,
+                        Immutable,
+                        Lambda.mixed_block_shape_of_generic_values
+                          (List.length fields),
+                        Lambda.alloc_heap ),
                     fields,
                     loc )
             in
@@ -524,20 +529,29 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         assert (kind = kind');
         comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
       | _ -> unary (Ccall "caml_obj_dup"))
-    | Pmakeblock (tag, _mut, shape, _) -> (
-      match Lambda.mixed_block_of_block_shape shape with
-      | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some shape ->
+    | Pmakeblock (tag, _mut, shape, _) ->
+      if Lambda.is_uniform_block_shape shape
+      then pseudo_event (variadic (Makeblock { tag }))
+      else
         (* There is no notion of a mixed block at runtime in bytecode.
               Further, source-level unboxed types are represented as boxed in
               bytecode, so no ceremony is needed to box values before inserting
               them into the (normal, unmixed) block. *)
         let total_len = Array.length shape in
-        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag }))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
-    | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
+    | Pfield ([], _, _) -> assert false
+    | Pfield (path, shape, _sem) ->
+      let read_expr =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          (unary (Getfield (List.hd path)))
+          (List.tl path)
+      in
+      copy_unboxed_product shape ~path read_expr
+    | Punboxed_product_field (n, _) -> unary (Getfield n)
     | Parray_element_size_in_bytes _array_kind -> (
       match args with
       | [arg] ->
@@ -550,13 +564,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pget_idx _ -> binary (Ccall "caml_get_idx_bytecode")
     | Pset_idx _ -> ternary (Ccall "caml_set_idx_bytecode")
-    | Pmake_idx_field pos ->
-      Const (Const_block (0, [Const_base (Const_int pos)]))
-    | Pmake_idx_mixed_field (_, pos, path) ->
+    | Pmake_idx_field (_, pos, path) ->
       let path_consts =
         List.map (fun x -> Const_base (Const_int x)) (pos :: path)
       in
-      Const (Const_block (0, path_consts))
+      Const
+        (Const_block
+           (0,
+            Lambda.mixed_block_shape_of_generic_values
+              (List.length path_consts),
+            path_consts))
     | Pmake_idx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
@@ -592,30 +609,20 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let path_suffix_consts =
           List.map (fun x -> Const_base (Const_int x)) path
         in
-        let path_suffix = Const (Const_block (0, path_suffix_consts)) in
+        let path_suffix =
+          Const
+            (Const_block
+               ( 0,
+                 Lambda.mixed_block_shape_of_generic_values
+                   (List.length path_suffix_consts),
+                 path_suffix_consts ))
+        in
         Blambda.Prim
           (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pfield_computed _sem -> binary Getvectitem
-    | Psetfield (n, _ptr, _init) -> binary (Setfield n)
-    | Psetfield_computed (_ptr, _init) -> ternary Setvectitem
-    (* In bytecode, float#s are boxed.  So, we can use the existing float
-       instructions for the ufloat primitives. *)
-    | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
-      pseudo_event (unary (Getfloatfield n))
-    | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
-    | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
-    | Pmixedfield (path, shape, _sem) ->
-      (* Non-value mixed fields are always boxed in bytecode; they aren't
-         stored flat like they are in native code. *)
-      let read_expr =
-        List.fold_left
-          (fun expr idx -> Prim (Getfield idx, [expr]))
-          (unary (Getfield (List.hd path)))
-          (List.tl path)
-      in
-      copy_unboxed_product shape ~path read_expr
-    | Psetmixedfield (path, shape, _init) ->
+    | Psetfield ([], _, _) -> assert false
+    | Psetfield (path, shape, _init) ->
       let block, value =
         match args with
         | [block; value] -> comp_expr block, comp_expr value
@@ -633,6 +640,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           block parent_path
       in
       Prim (Setfield last_idx, [target_block; value_expr])
+    | Psetfield_computed (_ptr, _init) -> ternary Setvectitem
+    (* In bytecode, float#s are boxed.  So, we can use the existing float
+       instructions for the ufloat primitives. *)
+    | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
+      pseudo_event (unary (Getfloatfield n))
+    | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
     | Pduprecord _ -> unary (Ccall "caml_obj_dup")
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1

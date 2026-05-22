@@ -1094,7 +1094,8 @@ let transl_declaration env sdecl (id, uid) =
                        Array.make (List.length args) Jkind.Sort.Const.void
                      | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                    in
-                   Constructor_uniform_value, sorts)
+                   Array.map Types.mixed_block_element_of_const_sort sorts,
+                   sorts)
                 (Array.of_list cstrs)
             ),
           Jkind.for_non_float ~why:Boxed_variant
@@ -1115,7 +1116,11 @@ let transl_declaration env sdecl (id, uid) =
                correct representation is [Record_float], [Record_ufloat], or
                [Record_mixed].  Those cases are fixed up after we can get
                accurate sorts for the fields, in [update_decl_jkind]. *)
-              Record_boxed,
+              Record_boxed
+                (Misc.Stdlib.Array.of_list_map
+                   (fun lbl -> Types.mixed_block_element_of_const_sort
+                       lbl.Types.ld_sort)
+                   lbls'),
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
@@ -1282,14 +1287,13 @@ let rec shape_has_float_boxed shape =
     shape
 
 let record_has_float_boxed = function
-  | Record_mixed shape -> shape_has_float_boxed shape
-  | Record_unboxed | Record_inlined _ | Record_boxed
+  | Record_boxed shape -> shape_has_float_boxed shape
+  | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
 
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed -> true
-  | Record_mixed shape -> not (shape_has_float_boxed shape)
+  | Record_boxed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
@@ -1908,24 +1912,17 @@ module Element_repr = struct
         Misc.fatal_error "Element_repr.classify: unexpected missing layout"
 
   let mixed_product_shape loc ts kind =
-    let mixed =
-      List.exists
-        (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
+    let shape =
+      List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
     in
-    if not mixed then None else begin
-      let shape =
-        List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
-      in
-      (* All-value/void shapes will compile to uniform blocks, so the
-         scannable prefix length limit doesn't apply. *)
-      let mpb = Mixed_product_bytes.count_types_shape shape in
-      if not (Mixed_product_bytes.all_value mpb)
-      then
-        assert_mixed_product_support loc kind
-          ~value_prefix_len:
-            (Mixed_product_bytes.value_prefix_len mpb);
-      Some shape
-    end
+    (* All-value/void shapes will compile to uniform blocks, so the scannable
+       prefix length limit doesn't apply. *)
+    let mpb = Mixed_product_bytes.count_types_shape shape in
+    if not (Mixed_product_bytes.all_value mpb)
+    then
+      assert_mixed_product_support loc kind
+        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb);
+    shape
 end
 
 let mixed_block_element env ty jkind =
@@ -1955,15 +1952,12 @@ let update_constructor_representation
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
   in
-  match flat_suffix with
-  | None -> Constructor_uniform_value
-  | Some shape ->
-      (* CR layouts v5.9: Enable extension constructors in the flambda2
-         middle-end so that we can permit them in the source language.
-      *)
-      if is_extension_constructor then
-        raise (Error (loc, Illegal_mixed_product Extension_constructor));
-      Constructor_mixed shape
+  (* CR layouts v5.9: Enable extension constructors in the flambda2 middle-end
+     so that we can permit them in the source language. *)
+  let mpb = Mixed_product_bytes.count_types_shape flat_suffix in
+  if is_extension_constructor && not (Mixed_product_bytes.all_value mpb)
+  then raise (Error (loc, Illegal_mixed_product Extension_constructor));
+  flat_suffix
 
 
 let add_types_to_env ~shapes decls env =
@@ -2049,7 +2043,7 @@ let rec update_decl_jkind env dpath decl =
       let sort = Jkind.sort_of_jkind env jkind in
       let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
-    | _, Record_boxed ->
+    | _, Record_boxed _ ->
       let lbls, jkinds = update_label_sorts env loc lbls in
       let jkind = Jkind.for_boxed_record lbls in
       let reprs =
@@ -2093,17 +2087,10 @@ let rec update_decl_jkind env dpath decl =
           { values; floats; atomic_floats; float64s;
             non_float64_unboxed_fields; atomic_fields; voids }
         in
-        let mixed_record () =
-          let shape =
-            Element_repr.mixed_product_shape loc reprs Record
-          in
-          let shape =
-            match shape with
-            | Some x -> x
-            | None -> Misc.fatal_error "expected mixed block"
-          in
-          Record_mixed shape
+        let boxed_record_shape =
+          Element_repr.mixed_product_shape loc reprs Record
         in
+        let mixed_record () = Record_boxed boxed_record_shape in
         match summary with
         (* We store floats flatly in mixed records if all fields are
            float/float64/void. *)
@@ -2127,7 +2114,7 @@ let rec update_decl_jkind env dpath decl =
               |> Array.of_list
             in
             assert_mixed_product_support loc Record ~value_prefix_len:0;
-            Record_mixed shape
+            Record_boxed shape
         (* Forbid atomic fields in mixed blocks *)
         | { values = true; voids = true; atomic_fields = true }
         | { floats = true; voids = true; atomic_fields = true }
@@ -2173,7 +2160,7 @@ let rec update_decl_jkind env dpath decl =
         (* value-only records are stored as boxed records *)
         | { values = true; float64s = false; non_float64_unboxed_fields = false;
             voids = false }
-          -> rep
+          -> Record_boxed boxed_record_shape
         (* All-nonatomic-float and all-nonatomic-float64 records are stored as
            flat float records.
         *)
@@ -2192,7 +2179,7 @@ let rec update_decl_jkind env dpath decl =
         | { atomic_floats = true; floats; values; _ } ->
           if floats && not values
           then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
-          rep
+          Record_boxed boxed_record_shape
         | { voids=false; values=false; floats=true; atomic_floats=false;
             atomic_fields=true; float64s=true; non_float64_unboxed_fields=false
           } ->
@@ -2206,8 +2193,7 @@ let rec update_decl_jkind env dpath decl =
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
       lbls, rep, jkind
-    | _, ( Record_inlined _ | Record_float | Record_ufloat
-         | Record_mixed _)
+    | _, ( Record_inlined _ | Record_float | Record_ufloat)
     | ([] | (_ :: _)), Record_unboxed ->
       (* These are never created by [transl_declaration]. *)
       Misc.fatal_error
@@ -2280,11 +2266,7 @@ let rec update_decl_jkind env dpath decl =
         List.fold_left (fun (idx,cstrs) cstr ->
           let arg_sorts =
             match cstr_shapes.(idx) with
-            | Constructor_uniform_value, arg_sorts -> arg_sorts
-            | Constructor_mixed _, _ ->
-                fatal_error
-                  "Typedecl.update_variant_kind doesn't expect mixed \
-                   constructor as input"
+            | _, arg_sorts -> arg_sorts
           in
           let cd_args, _all_void, jkinds =
             update_constructor_arguments_sorts env cstr.Types.cd_loc
@@ -2295,11 +2277,7 @@ let rec update_decl_jkind env dpath decl =
               ~is_extension_constructor:false
               ~loc:cstr.Types.cd_loc
           in
-          let () =
-            match cstr_repr with
-            | Constructor_uniform_value -> ()
-            | Constructor_mixed _ -> cstr_shapes.(idx) <- cstr_repr, arg_sorts
-          in
+          cstr_shapes.(idx) <- cstr_repr, arg_sorts;
           let cstr = { cstr with Types.cd_args } in
           (idx+1,cstr::cstrs)
         ) (0,[]) cstrs
