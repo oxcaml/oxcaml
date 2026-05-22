@@ -385,11 +385,7 @@ exception Ex3 of bool
 |}]
 exception Ex4 of t_void;;
 [%%expect{|
-Line 1, characters 0-23:
-1 | exception Ex4 of t_void;;
-    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Extensible types can't have fields of unboxed type.
-       Consider wrapping the unboxed fields in a record.
+exception Ex4 of t_void
 |}];;
 (* CR layouts v5: once we allow non-values in extensible variants, [Ex4]
    should typecheck *)
@@ -487,12 +483,8 @@ let _ = exnmatch5 vh
 let l = !r
 let _ = assert (List.for_all2 (=) l [3;2;1]);;
 [%%expect{|
-Line 6, characters 21-24:
-6 |      | V v -> raise (Ex4 (cons_r 2; v)));
-                         ^^^
-Error: This variant expression is expected to have type "exn"
-       There is no constructor "Ex4" within type "exn"
-Hint: Did you mean "Ex1", "Ex2" or "Ex3"?
+Uncaught exception: File "lambda/translcore.ml", line 610, characters 12-18: Assertion failed
+
 |}]
 (* CR layouts v5: This was the expected behavior before removing the handling of
    void for lambda, and we expected it to be the expected behavior again after

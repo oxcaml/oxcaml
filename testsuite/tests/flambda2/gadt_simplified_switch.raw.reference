@@ -11,11 +11,11 @@
       | 0 -> k3
       | 1 -> k4)
      where k4 =
-       let Pfield = %block_load.[`0`] (x) in
+       let Pfield = %block_load.`imm`.[`0`] (x) in
        let int_add = %int_barith.add (Pfield, 1) in
        cont k1 (int_add)
      where k3 =
-       let Pfield = %block_load.[`0`] (x) in
+       let Pfield = %block_load.`imm`.[`0`] (x) in
        cont k1 (Pfield)
  in
  let $camlGadt_simplified_switch__immstring21 = "A" in

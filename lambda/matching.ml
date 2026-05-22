@@ -4578,11 +4578,13 @@ let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list pa
   let param_lambda = List.map (fun (l, _, _) -> l) paraml in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
+    let shape =
+      paraml
+      |> List.map (fun (_lam, _sort, layout) -> must_be_value layout)
+      |> mixed_block_shape_of_value_kinds
+    in
     Lprim
-      (Pmakeblock (0, Immutable,
-                   mixed_block_shape_of_generic_values
-                    (List.length param_lambda),
-                   mode),
+      (Pmakeblock (0, Immutable, shape, mode),
        param_lambda, sloc)
   in
   let arg_sort = Jkind.Sort.Const.for_tuple in

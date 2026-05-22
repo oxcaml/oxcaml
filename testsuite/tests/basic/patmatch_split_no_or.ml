@@ -17,7 +17,8 @@ let last_is_anys = function
 (let
   (last_is_anys/14 =
      (function {nlocal = 0}
-       param/16[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       param/16[value<
+                 (consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
        : int
        (catch
          (if (field_imm 0 param/16) (if (field_imm 1 param/16) (exit 1) 1)
@@ -36,7 +37,8 @@ let last_is_vars = function
 (let
   (last_is_vars/21 =
      (function {nlocal = 0}
-       param/25[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       param/25[value<
+                 (consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
        : int
        (catch
          (if (field_imm 0 param/25) (if (field_imm 1 param/25) (exit 3) 1)
@@ -81,7 +83,7 @@ let f = function
    f/32 =
      (function {nlocal = 0}
        param/34[value<
-                 (consts ()) (non_consts ([0: *, value<int>, value<int>]))>]
+                 (consts ()) (non_consts ([0: (*,value<int>,value<int>)]))>]
        : int
        (let (*match*/35 =a? (field_imm 0 param/34))
          (catch

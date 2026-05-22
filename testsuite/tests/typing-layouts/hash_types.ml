@@ -225,7 +225,6 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
-Hint: Float records don't get unboxed versions.
 |}]
 type r = { i : int } [@@unboxed]
 type bad = r#

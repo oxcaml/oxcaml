@@ -1,7 +1,7 @@
 (seq
   (ignore
     (let
-      (x =[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+      (x =[value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
          [0: 13 37])
       (makeblock 0 x)))
   (let
@@ -14,13 +14,13 @@
     (seq
       (ignore
         (let
-          (x =[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+          (x =[value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
              [0: 4 2])
           (makeblock 0 x)))
       (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] A A)
       (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] B
         (let
-          (x =[value<(consts ()) (non_consts ([0: *, *]))>] [0: "foo" "bar"])
+          (x =[value<(consts ()) (non_consts ([0: (*,*)]))>] [0: "foo" "bar"])
           (makeblock 0)))
       (let
         (f = (function {nlocal = 0} param : int 0)

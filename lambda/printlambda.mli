@@ -24,12 +24,12 @@ val lfunction : formatter -> lfunction -> unit
 val program: formatter -> program -> unit
 val primitive: formatter -> primitive -> unit
 val name_of_primitive : primitive -> string
-val variant_kind : (formatter -> value_kind -> unit) ->
+val variant_kind :
   formatter -> consts:int list -> non_consts:(int * mixed_block_shape) list ->
   unit
 val value_kind : formatter -> value_kind -> unit
 val layout : formatter -> layout -> unit
-val mixed_block_shape : formatter -> mixed_block_shape -> unit
+(* val block_shape : formatter -> block_shape -> unit *)
 val record_rep : formatter -> Types.record_representation -> unit
 val print_bigarray :
   string -> bool -> Lambda.bigarray_kind -> formatter ->
@@ -40,6 +40,4 @@ val array_kind : array_kind -> string
 val array_set_kind : formatter -> array_set_kind -> unit
 val array_ref_kind : formatter -> array_ref_kind -> unit
 
-val tag_and_constructor_shape :
-  (formatter -> value_kind -> unit) ->
-  formatter -> int * mixed_block_shape -> unit
+val tag_and_constructor_shape : formatter -> int * mixed_block_shape -> unit

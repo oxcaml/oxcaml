@@ -51,6 +51,15 @@ let mixed_block_shape_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
+let transl_mixed_product_shape_for_exprs exprs shape =
+  let exprs = Array.of_list exprs in
+  Array.mapi
+    (fun i elt ->
+      let expr, _sort = exprs.(i) in
+      Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
+        expr.exp_type elt)
+    shape
+
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
@@ -560,6 +569,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
+          let shape =
+            transl_mixed_product_shape_for_exprs args_with_sorts
+              cstr.cstr_shape
+          in
           let constant =
             match List.map extract_constant ll with
             | exception Not_constant -> None
@@ -570,7 +583,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               if !Clflags.native_code ||
                   (Mixed_product_bytes.types_shape_is_all_value cstr.cstr_shape)
               then
-                let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
                 Some (Const_block(runtime_tag, shape, constants))
               else
                 (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -586,7 +598,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 (* CR layouts v5: once all-void records are allowed, handle
                     constructors with all-void inline records, which are
                     stored as immediates *)
-                let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
                 Pmakeblock(runtime_tag, Immutable, shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
@@ -610,7 +621,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               (* CR layouts v5: once all-void records are allowed, handle
                   constructors with all-void inline records, which are stored
                   as immediates *)
-              let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
+              let shape =
+                transl_mixed_product_shape_for_exprs args_with_sorts
+                  cstr.cstr_shape
+              in
               let shape =
                 (* This corresponds to the poly variant hash.  This will
                     always stay in the same place because the reordering
@@ -2184,6 +2198,23 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     (* CR layouts v5: allow non-value fields beyond just float# *)
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
+    let transl_record_shape shape =
+      let shape_for_construction = Lambda.transl_mixed_product_shape shape in
+      Array.iter
+        (fun (lbl, definition) ->
+          let field_shape =
+            match definition with
+            | Kept (typ, _mut, _) ->
+              Typeopt.transl_mixed_block_element env lbl.lbl_loc typ
+                shape.(lbl.lbl_pos)
+            | Overridden (_lid, expr) ->
+              Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
+                expr.exp_type shape.(lbl.lbl_pos)
+          in
+          shape_for_construction.(lbl.lbl_pos) <- field_shape)
+        fields;
+      shape_for_construction
+    in
     let lv =
       Array.mapi
         (fun i (lbl, definition) ->
@@ -2280,7 +2311,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             if !Clflags.native_code ||
               (Mixed_product_bytes.types_shape_is_all_value shape)
             then
-              let shape = Lambda.transl_mixed_product_shape shape in
+              let shape = transl_record_shape shape in
               Lconst(Const_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -2293,7 +2324,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lconst
               (Const_block
                  ( runtime_tag,
-                   Lambda.transl_mixed_product_shape shape,
+                   transl_record_shape shape,
                    cl ))
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
             Lconst(match cl with [v] -> v | _ -> assert false)
@@ -2311,14 +2342,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         let loc = of_location ~scopes loc in
         match repres with
           Record_boxed shape ->
-            let shape = Lambda.transl_mixed_product_shape shape in
+            let shape = transl_record_shape shape in
             Lprim(Pmakeblock(0, mut,
                              shape,
                              Option.get mode), ll, loc)
         | Record_inlined (Ordinary {runtime_tag},
                           shape, Variant_boxed _)
           when Mixed_product_bytes.types_shape_is_all_value shape ->
-            let shape = Lambda.transl_mixed_product_shape shape in
+            let shape = transl_record_shape shape in
             Lprim(Pmakeblock(runtime_tag, mut,
                              shape,
                              Option.get mode), ll, loc)
@@ -2338,7 +2369,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             let shape =
               Array.append
                 [| Lambda.Value Lambda.generic_value |]
-                (Lambda.transl_mixed_product_shape shape)
+                (transl_record_shape shape)
             in
             let slot = transl_extension_path loc env path in
             Lprim(Pmakeblock(0,
@@ -2354,7 +2385,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             (* CR layouts v5: once all-void records are allowed, handle
               constructors with all-void inline records, which are stored as
               immediates *)
-            let shape = Lambda.transl_mixed_product_shape shape in
+            let shape = transl_record_shape shape in
             Lprim (Pmakeblock (runtime_tag, mut, shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false

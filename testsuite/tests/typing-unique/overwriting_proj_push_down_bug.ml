@@ -39,14 +39,14 @@ let proj_aliased r =
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    proj_aliased/296 =
      (function {nlocal = 0}
-       r/298[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/298[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let
          (y/299 = (field_imm 1 r/298)
-          r/300 =[value<(consts ()) (non_consts ([0: *, *]))>]
+          r/300 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
             (apply aliased_use/290 r/298))
-         (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/300
+         (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*) r/300
            y/299))))
   (apply (field_imm 1 (global Toploop!)) "proj_aliased" proj_aliased/296))
 val proj_aliased : record -> record * string = <fun>
@@ -61,14 +61,14 @@ let proj_unique r =
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    proj_unique/301 =
      (function {nlocal = 0}
-       r/303[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/303[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let
          (y/304 = (field_mut 1 r/303)
-          r/305 =[value<(consts ()) (non_consts ([0: *, *]))>]
+          r/305 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
             (apply unique_use/293 r/303))
-         (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/305
+         (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*) r/305
            y/304))))
   (apply (field_imm 1 (global Toploop!)) "proj_unique" proj_unique/301))
 val proj_unique : record @ unique -> record * string = <fun>
@@ -86,13 +86,13 @@ let match_aliased r =
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_aliased/306 =
      (function {nlocal = 0}
-       r/308[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/308[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let
-         (r/310 =[value<(consts ()) (non_consts ([0: *, *]))>]
+         (r/310 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
             (apply aliased_use/290 r/308))
-         (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/310
+         (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*) r/310
            (field_imm 1 r/308)))))
   (apply (field_imm 1 (global Toploop!)) "match_aliased" match_aliased/306))
 val match_aliased : record -> record * string = <fun>
@@ -109,14 +109,14 @@ let match_unique r =
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_unique/312 =
      (function {nlocal = 0}
-       r/314[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/314[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let
          (y/315 =o? (field_mut 1 r/314)
-          r/316 =[value<(consts ()) (non_consts ([0: *, *]))>]
+          r/316 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
             (apply unique_use/293 r/314))
-         (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/316
+         (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*) r/316
            y/315))))
   (apply (field_imm 1 (global Toploop!)) "match_unique" match_unique/312))
 val match_unique : record @ unique -> record * string = <fun>
@@ -135,14 +135,14 @@ let match_mini_anf_aliased r =
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_mini_anf_aliased/318 =
      (function {nlocal = 0}
-       r/320[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/320[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let
          (*match*/326 =[value<int>] 1
-          r/323 =[value<(consts ()) (non_consts ([0: *, *]))>]
+          r/323 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
             (apply aliased_use/290 r/320))
-         (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/323
+         (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*) r/323
            (field_imm 1 r/320)))))
   (apply (field_imm 1 (global Toploop!)) "match_mini_anf_aliased"
     match_mini_anf_aliased/318))
@@ -162,15 +162,15 @@ let match_mini_anf_unique r =
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_mini_anf_unique/328 =
      (function {nlocal = 0}
-       r/330[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/330[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let
          (y/332 =o? (field_mut 1 r/330)
           *match*/336 =[value<int>] 1
-          r/333 =[value<(consts ()) (non_consts ([0: *, *]))>]
+          r/333 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
             (apply unique_use/293 r/330))
-         (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/333
+         (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*) r/333
            y/332))))
   (apply (field_imm 1 (global Toploop!)) "match_mini_anf_unique"
     match_mini_anf_unique/328))
@@ -190,9 +190,9 @@ let match_anf_aliased r =
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_anf_aliased/338 =
      (function {nlocal = 0}
-       r/340[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/340[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (catch
          (let (y/342 =a? (field_imm 1 r/340))
            (if (%eq y/342 "")
@@ -200,10 +200,10 @@ let match_anf_aliased r =
              (let (*match*/347 =[value<int>] 1) (exit 8 (field_imm 1 r/340)))))
         with (8 y/341)
          (let
-           (r/344 =[value<(consts ()) (non_consts ([0: *, *]))>]
+           (r/344 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
               (apply aliased_use/290 r/340))
-           (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/344
-             y/341)))))
+           (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*)
+             r/344 y/341)))))
   (apply (field_imm 1 (global Toploop!)) "match_anf_aliased"
     match_anf_aliased/338))
 val match_anf_aliased : record -> record * string = <fun>
@@ -223,9 +223,9 @@ let match_anf_unique r =
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_anf_unique/350 =
      (function {nlocal = 0}
-       r/352[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/352[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (catch
          (let (y/354 =o? (field_mut 1 r/352))
            (if (%eq y/354 "")
@@ -234,10 +234,10 @@ let match_anf_unique r =
                (exit 14 y/355))))
         with (14 y/353)
          (let
-           (r/356 =[value<(consts ()) (non_consts ([0: *, *]))>]
+           (r/356 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
               (apply unique_use/293 r/352))
-           (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/356
-             y/353)))))
+           (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*)
+             r/356 y/353)))))
   (apply (field_imm 1 (global Toploop!)) "match_anf_unique"
     match_anf_unique/350))
 val match_anf_unique : record @ unique -> record * string = <fun>
@@ -270,20 +270,19 @@ let swap_inner (t : tree) =
        t/370[value<
               (consts (0))
                (non_consts ([0:
-                             value<
-                              (consts (0))
-                               (non_consts ([0: *, value<int>, *]))>,
-                             value<int>,
-                             value<
-                              (consts (0))
-                               (non_consts ([0: *, value<int>, *]))>]))>]
+                             (value<
+                               (consts (0))
+                                (non_consts ([0: (*,value<int>,*)]))>,
+                             value<int>,value<
+                                         (consts (0))
+                                          (non_consts ([0: (*,value<int>,*)]))>)]))>]
        : (consts (0))
           (non_consts ([0:
-                        value<
-                         (consts (0)) (non_consts ([0: *, value<int>, *]))>,
-                        value<int>,
-                        value<
-                         (consts (0)) (non_consts ([0: *, value<int>, *]))>]))
+                        (value<
+                          (consts (0)) (non_consts ([0: (*,value<int>,*)]))>,
+                        value<int>,value<
+                                    (consts (0))
+                                     (non_consts ([0: (*,value<int>,*)]))>)]))
        (catch
          (if t/370
            (let (*match*/379 =a? (field_imm 0 t/370))
@@ -293,90 +292,88 @@ let swap_inner (t : tree) =
                    (makeblock 0 (value<
                                   (consts (0))
                                    (non_consts ([0:
-                                                 value<
-                                                  (consts (0))
-                                                   (non_consts ([0: *,
-                                                                 value<int>,
-                                                                 *]))>,
-                                                 value<int>,
-                                                 value<
-                                                  (consts (0))
-                                                   (non_consts ([0: *,
-                                                                 value<int>,
-                                                                 *]))>]))>,
+                                                 (value<
+                                                   (consts (0))
+                                                    (non_consts ([0:
+                                                                  (*,
+                                                                  value<int>,*)]))>,
+                                                 value<int>,value<
+                                                             (consts (0))
+                                                              (non_consts (
+                                                              [0:
+                                                               (*,value<int>,*)]))>)]))>,
                      value<int>,value<
                                  (consts (0))
                                   (non_consts ([0:
-                                                value<
-                                                 (consts (0))
-                                                  (non_consts ([0: *,
-                                                                value<int>,
-                                                                *]))>,
-                                                value<int>,
-                                                value<
-                                                 (consts (0))
-                                                  (non_consts ([0: *,
-                                                                value<int>,
-                                                                *]))>]))>)
+                                                (value<
+                                                  (consts (0))
+                                                   (non_consts ([0:
+                                                                 (*,value<
+                                                                    int>,*)]))>,
+                                                value<int>,value<
+                                                            (consts (0))
+                                                             (non_consts (
+                                                             [0:
+                                                              (*,value<int>,*)]))>)]))>)
                      (makeblock 0 (value<
                                     (consts (0))
                                      (non_consts ([0:
-                                                   value<
-                                                    (consts (0))
-                                                     (non_consts ([0: *,
-                                                                   value<int>,
-                                                                   *]))>,
-                                                   value<int>,
-                                                   value<
-                                                    (consts (0))
-                                                     (non_consts ([0: *,
-                                                                   value<int>,
-                                                                   *]))>]))>,
+                                                   (value<
+                                                     (consts (0))
+                                                      (non_consts ([0:
+                                                                    (*,
+                                                                    value<
+                                                                    int>,*)]))>,
+                                                   value<int>,value<
+                                                               (consts (0))
+                                                                (non_consts (
+                                                                [0:
+                                                                 (*,value<
+                                                                    int>,*)]))>)]))>,
                        value<int>,value<
                                    (consts (0))
                                     (non_consts ([0:
-                                                  value<
-                                                   (consts (0))
-                                                    (non_consts ([0: *,
-                                                                  value<int>,
-                                                                  *]))>,
-                                                  value<int>,
-                                                  value<
-                                                   (consts (0))
-                                                    (non_consts ([0: *,
-                                                                  value<int>,
-                                                                  *]))>]))>)
+                                                  (value<
+                                                    (consts (0))
+                                                     (non_consts ([0:
+                                                                   (*,
+                                                                   value<int>,*)]))>,
+                                                  value<int>,value<
+                                                              (consts (0))
+                                                               (non_consts (
+                                                               [0:
+                                                                (*,value<int>,*)]))>)]))>)
                        (field_imm 0 *match*/379) (field_int 1 *match*/379)
                        (field_imm 0 *match*/383))
                      (field_int 1 t/370)
                      (makeblock 0 (value<
                                     (consts (0))
                                      (non_consts ([0:
-                                                   value<
-                                                    (consts (0))
-                                                     (non_consts ([0: *,
-                                                                   value<int>,
-                                                                   *]))>,
-                                                   value<int>,
-                                                   value<
-                                                    (consts (0))
-                                                     (non_consts ([0: *,
-                                                                   value<int>,
-                                                                   *]))>]))>,
+                                                   (value<
+                                                     (consts (0))
+                                                      (non_consts ([0:
+                                                                    (*,
+                                                                    value<
+                                                                    int>,*)]))>,
+                                                   value<int>,value<
+                                                               (consts (0))
+                                                                (non_consts (
+                                                                [0:
+                                                                 (*,value<
+                                                                    int>,*)]))>)]))>,
                        value<int>,value<
                                    (consts (0))
                                     (non_consts ([0:
-                                                  value<
-                                                   (consts (0))
-                                                    (non_consts ([0: *,
-                                                                  value<int>,
-                                                                  *]))>,
-                                                  value<int>,
-                                                  value<
-                                                   (consts (0))
-                                                    (non_consts ([0: *,
-                                                                  value<int>,
-                                                                  *]))>]))>)
+                                                  (value<
+                                                    (consts (0))
+                                                     (non_consts ([0:
+                                                                   (*,
+                                                                   value<int>,*)]))>,
+                                                  value<int>,value<
+                                                              (consts (0))
+                                                               (non_consts (
+                                                               [0:
+                                                                (*,value<int>,*)]))>)]))>)
                        (field_imm 2 *match*/379) (field_int 1 *match*/383)
                        (field_imm 2 *match*/383)))
                    (exit 19)))
@@ -417,21 +414,21 @@ let match_guard r =
    aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_guard/386 =
      (function {nlocal = 0}
-       r/388[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/388[value<(consts ()) (non_consts ([0: (*,*)]))>]
        : (consts ())
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
+          (non_consts ([0: (value<(consts ()) (non_consts ([0: (*,*)]))>,*)]))
        (let (y/389 =o? (field_mut 1 r/388))
          (if (caml_string_equal y/389 "")
            (let
-             (r/460 =[value<(consts ()) (non_consts ([0: *, *]))>]
+             (r/460 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
                 (apply aliased_use/290 r/388))
-             (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
+             (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*)
                r/460 y/389))
            (let
              (y/390 =o? (field_mut 1 r/388)
-              r/461 =[value<(consts ()) (non_consts ([0: *, *]))>]
+              r/461 =[value<(consts ()) (non_consts ([0: (*,*)]))>]
                 (apply unique_use/293 r/388))
-             (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
+             (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,*)
                r/461 y/390))))))
   (apply (field_imm 1 (global Toploop!)) "match_guard" match_guard/386))
 val match_guard : record @ unique -> record * string = <fun>
