@@ -156,23 +156,19 @@ let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
  | false, _ -> c3 ()
 [%%expect_asm X86_64{|
 complex_branching_on_two_comparisons:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rbx, %rcx
   movq  %rsi, %rbx
-  xorl  %eax, %eax
-  cmpq  $5, %r8
-  sete  %al
-  cmpq  $5, %rcx
+  cmpq  $5, %rax
   jne   .L0
-  cmpq  $5, %r8
+  cmpq  $5, %rcx
   jne   .L0
   movl  $1, %eax
   movq  (%rdi), %rsi
   movq  %rdi, %rbx
   jmp   *%rsi
 .L0:
-  testq %rax, %rax
-  je    .L1
+  cmpq  $5, %rcx
+  jne   .L1
   movl  $1, %eax
   movq  (%rdx), %rdi
   movq  %rdx, %rbx
