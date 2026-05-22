@@ -32,6 +32,6 @@ export LC_ALL=C
   do
       sed -n -e 's/^CAMLprim value \([a-z0-9_][a-z0-9_]*\).*/\1/p' "$prim"
   done
-  sed -n -e 's/^CAMLprim_int64_[0-9](\([a-z0-9_][a-z0-9_]*\)).*/caml_int64_\1\
+  sed -n -e 's/^CAMLprim_u\?int64_[0-9](\([a-z0-9_][a-z0-9_]*\)).*/caml_int64_\1\
 caml_int64_\1_native/p' ints.c
 ) | sort | uniq

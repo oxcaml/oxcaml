@@ -886,8 +886,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       else do_binary Sub
     | Imul -> do_binary Mul
     | Imulh { signed } -> do_imulh ~signed
-    | Idiv -> do_binary Sdiv
-    | Imod -> do_binary Srem
+    | Idiv { signed = true } -> do_binary Sdiv
+    | Idiv { signed = false } -> do_binary Udiv
+    | Imod { signed = true } -> do_binary Srem
+    | Imod { signed = false } -> do_binary Urem
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
