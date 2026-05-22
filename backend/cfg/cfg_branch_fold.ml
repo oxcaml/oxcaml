@@ -251,6 +251,14 @@ let run cfg_with_infos =
       C.iter_blocks cfg ~f:(fun _label block ->
           block.predecessors <- Label.Set.empty);
       Cfg.register_predecessors_for_all_blocks cfg;
+      (* Folding a conditional terminator to [Always] can leave behind an
+         unreachable strongly-connected component (e.g. a cycle whose only entry
+         from outside was the eliminated arm). Remove unreachable blocks so
+         later passes that require every weakly-connected component to contain a
+         block with no predecessors (notably [Cfg_dominators]) do not fail. *)
+      let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
+      let dead_labels = Cfg_simplify.Eliminate_dead_code.run cfg_with_layout in
+      Cfg_with_layout.remove_blocks cfg_with_layout dead_labels;
       (* The CFG structure changed, so cached dominators and loop infos must be
          discarded. *)
       Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
