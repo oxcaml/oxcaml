@@ -211,7 +211,7 @@ module type Axis = sig
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
   *)
-  val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison
+  val compare : 'a t -> 'b t -> int
 
   type packed = P : 'a t -> packed
 
@@ -573,7 +573,7 @@ module type S = sig
 
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
-    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
+    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.is_eq
   end
 
   module type Mode := sig

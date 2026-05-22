@@ -596,7 +596,9 @@ module Type_decl_shape = struct
                  inside of a match. For example, if [Foo] is the constructor \
                  [Foo { a : int; b : int }], then [r] is an inline record in \
                  [match e with Foo r -> ...]."
-            else unknown_shape ())
+            else unknown_shape ()
+          | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+          )
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->

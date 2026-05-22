@@ -174,6 +174,18 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
 val add_required_global: Path.t -> t -> unit
+val add_required_global_for_quote: Path.t -> t -> unit
+
+(* Return the set of interfaces referenced by quotes *)
+val quoted_intfs: unit -> Compilation_unit.Name.Set.t
+
+(* Compute the transitive closure of the dependencies of these interfaces that
+   have been loaded by typing. Always includes the input interfaces. *)
+val loaded_transitive_dependencies:
+  Compilation_unit.Name.Set.t -> Compilation_unit.Name.Set.t
+
+(* Return the set of implementations referenced by quotes *)
+val quoted_impls: unit -> Compilation_unit.Set.t
 
 val reset_probes: unit -> unit
 val add_probe: string -> unit
@@ -218,7 +230,9 @@ val locks_empty : locks
 
 val locks_is_empty : locks -> bool
 
-val mode_unit : Mode.Value.lr
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+val mode_unit : staticity:Mode.Staticity.Const.t -> Mode.Value.lr
 
 type structure_components_reason =
   | Project
@@ -332,7 +346,7 @@ val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
   ?use:bool -> loc:Location.t -> load:bool -> Global_module.Name.t -> t ->
-    Path.t * locks
+    Path.t * mode_with_locks
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
@@ -581,16 +595,18 @@ val get_unit_name: unit -> Unit_info.t option
 (* Read, save a signature to/from a file. *)
 val read_signature:
   Global_module.Name.t -> Unit_info.Artifact.t
-  -> signature
+  -> persistent_signature
         (* Arguments: module name, file name, [add_binding] flag.
            Results: signature. If [add_binding] is true, creates an entry for
            the module in the environment. *)
 val save_signature:
-  alerts:alerts -> Types.signature -> Compilation_unit.Name.t -> Cmi_format.kind
+  alerts:alerts -> persistent_signature
+  -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind, file name. *)
 val save_signature_with_imports:
-  alerts:alerts -> signature -> Compilation_unit.Name.t -> Cmi_format.kind
+  alerts:alerts -> persistent_signature
+  -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
@@ -606,13 +622,6 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
-
-(* Require that the provided compilation unit will be available at quotation
-   compile time. *)
-val require_global_for_quote: Compilation_unit.Name.t -> unit
-
-(* Return the set of compilation units referenced by quotes *)
-val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)

@@ -1023,6 +1023,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type
       | [] | _ :: _ :: _ -> assert false
     end
+  | Record_dummy _ ->
+    Misc.fatal_error
+      "Typeopt.value_kind_record: unexpected dummy representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
@@ -1035,7 +1038,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed ->
+          | Record_unboxed | Record_dummy _ ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -1056,7 +1059,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                       | Record_inlined _ | Record_boxed ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
-                      | Record_mixed _ | Record_unboxed ->
+                      | Record_mixed _ | Record_unboxed | Record_dummy _ ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1084,6 +1087,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
             [0, fields]
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
+          | Record_dummy _ -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))

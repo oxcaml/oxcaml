@@ -130,6 +130,7 @@ type t =
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
   | Unmutated_mutable of string             (* 186 *)
@@ -233,6 +234,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Untagged_external_small_int_return -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
   | Unmutated_mutable _ -> 186
@@ -596,6 +598,11 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 182;
+    names = ["untagged-external-small-int-return"];
+    description = "An external declaration returns an (int8[@untagged]) or \
+                   an (int16[@untagged])";
+    since = since 5 2 };
   { number = 183;
     names = ["redundant-kind-modifier"];
     (* CR layouts-scannable: As more axes are added, this description (and
@@ -1292,6 +1299,10 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Untagged_external_small_int_return ->
+      "Using (int8[@untagged]) or (int16[@untagged]) on C stub returns is not\n\
+       recommended since [@untagged] does not perform a sign-extension. Use\n\
+       (int8[@unboxed]) or (int16[@unboxed]) instead."
   | Redundant_kind_modifier abbrev ->
       "This kind modifier, or a stronger one, is\n\
        already implied by the kind \"" ^ abbrev ^ "\"."
