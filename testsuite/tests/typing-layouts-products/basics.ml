@@ -2176,7 +2176,7 @@ Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: The value "x" has type "a" but an expression was expected of type
-         "('a : '_representable_layout_19 & value_or_null mod separable)"
+         "('a : '_representable_layout_19 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
