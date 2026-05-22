@@ -45,8 +45,8 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
       C.basic C.instruction option =
     match pos, next_block with
     | None, Some next_block
-      when not (Array.exists (Reg.same reg) block.terminator.res) ->
-      add_to_clobbered block.terminator.res;
+      when not (Array.exists (Reg.same reg) next_block.terminator.res) ->
+      add_to_clobbered next_block.terminator.res;
       loop
         ~pos:(DLL.last_cell next_block.body)
         ~next_block:(predecessor_if_unique next_block ~cfg)
@@ -54,7 +54,7 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
     | Some cell, _ ->
       let instr : C.basic C.instruction = DLL.value cell in
       add_to_clobbered instr.res;
-      if Array.length instr.res = 1 && Reg.same reg instr.res.(0)
+      if Array.length instr.res >= 1 && Reg.same reg instr.res.(0)
       then
         begin match[@ocaml.warning "-4"] instr.desc with
         | Op Move
@@ -74,9 +74,12 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block) ~cfg :
       else loop ~pos:(DLL.prev cell) ~next_block ~reg
     | _ -> None
   in
-  loop ~pos:(DLL.last_cell block.body)
-    ~next_block:(predecessor_if_unique block ~cfg)
-    ~reg
+  if Reg.is_preassigned reg
+  then None
+  else
+    loop ~pos:(DLL.last_cell block.body)
+      ~next_block:(predecessor_if_unique block ~cfg)
+      ~reg
 
 let int_test_of_compare (cmp : Operation.integer_comparison) ~imm ~ifso ~ifnot :
     C.terminator =
@@ -250,5 +253,7 @@ let run cfg_with_infos =
       Cfg.register_predecessors_for_all_blocks cfg;
       (* The CFG structure changed, so cached dominators and loop infos must be
          discarded. *)
-      Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos);
+      Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
+      (* We extended the live ranges of comparison inputs. *)
+      Cfg_with_infos.invalidate_liveness cfg_with_infos);
     cfg_with_infos
