@@ -506,6 +506,7 @@ and record_representation =
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
+  | Record_dummy of { represent_as_float_array : bool }
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -689,6 +690,8 @@ module type Wrapped = sig
   | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
+
+  and persistent_signature = signature * Mode.Staticity.Const.t
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -971,8 +974,11 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       true
   | Record_mixed mx1, Record_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Record_dummy { represent_as_float_array = a },
+    Record_dummy { represent_as_float_array = b } ->
+      Bool.equal a b
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _), _ ->
+    | Record_ufloat | Record_mixed _ | Record_dummy _), _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
@@ -1058,7 +1064,7 @@ let find_unboxed_type decl =
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
-                    | Record_mixed _), _)
+                    | Record_mixed _ | Record_dummy _), _)
   | Type_record_unboxed_product (_, Record_unboxed_product, _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
                      | Variant_extensible | Variant_with_null), _)

@@ -49,6 +49,14 @@ val type_implementation:
 val type_interface:
   sourcefile:string -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
+
+(* If the [.mli] file has any file-level staticity modality (whether
+   [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
+   The presence of either annotation is treated as opt-in to staticity.
+
+   CR-soon zqian: all persistent modules should always be [Static]. *)
+val staticity_of_modalities:
+  Typedtree.modalities -> Mode.Staticity.Const.t
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*
