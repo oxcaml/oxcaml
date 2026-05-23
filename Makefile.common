@@ -193,10 +193,6 @@ RUNTIME_HEADERS := $(wildcard $(ROOTDIR)/$(RUNTIME_DIR)/caml/*.tbl) \
 REQUIRED_HEADERS := $(RUNTIME_HEADERS) $(wildcard *.h)
 endif
 
-%.$(O): %.c $(REQUIRED_HEADERS)
-	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
-	  $(OUTPUTOBJ)$@ -c $<
-
 $(DEPDIR):
 	$(MKDIR) $@
 

@@ -23,6 +23,10 @@ ROOTDIR = ..
 
 include $(ROOTDIR)/Makefile.common
 
+%.$(O): %.c $(REQUIRED_HEADERS)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
+
 OCAMLYACC_INCLUDE_PATH = $(ROOTDIR)/runtime
 
 OC_CPPFLAGS += -I$(OCAMLYACC_INCLUDE_PATH)
