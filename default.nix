@@ -252,9 +252,8 @@ stdenv.mkDerivation {
     autoconf --force
   '';
 
-  checkPhase = lib.optionalString ocamltest ''
-    make ci
-  '';
+  checkTarget = "ci";
+  doCheck = ocamltest;
 
   postInstall =
     # Get rid of unused artifacts
