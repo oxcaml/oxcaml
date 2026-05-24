@@ -7,6 +7,6 @@
 
 int main_os(int argc, char_os **argv)
 {
-  caml_startup(argv);
+  caml_startup((char_os const * const *)argv);
   return 0;
 }

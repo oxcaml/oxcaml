@@ -29,11 +29,11 @@ int main_os(int argc, char_os ** argv)
   /* Initializing the runtime twice, to check that it's possible to
      make nested calls to caml_startup/caml_shutdown. */
 #ifdef NO_BYTECODE_FILE
-  caml_startup(argv);
-  caml_startup(argv);
+  caml_startup((char_os const * const *)argv);
+  caml_startup((char_os const * const *)argv);
 #else
-  caml_main(argv);
-  caml_main(argv);
+  caml_main((char_os const * const *)argv);
+  caml_main((char_os const * const *)argv);
 #endif
 
   printf("Back in C code...\n");
