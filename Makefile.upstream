@@ -1279,6 +1279,7 @@ runtime_BYTECODE_STATIC_LIBRARIES += $(RUNTIME_DIR)/libcamlrun_pic.$(A)
 runtime_BYTECODE_SHARED_LIBRARIES += $(RUNTIME_DIR)/libcamlrun_shared.$(SO)
 runtime_NATIVE_STATIC_LIBRARIES += $(RUNTIME_DIR)/libasmrun_pic.$(A)
 runtime_NATIVE_SHARED_LIBRARIES += $(RUNTIME_DIR)/libasmrun_shared.$(SO)
+runtime_NATIVE_STATIC_LIBRARIES += $(RUNTIME_DIR)/libasmrunnnp_noasan.$(A)
 endif
 endif
 
@@ -1308,6 +1309,9 @@ libasmruni_OBJECTS = \
 
 libasmrunpic_OBJECTS = $(runtime_NATIVE_C_SOURCES:.c=.npic.$(O)) \
   $(runtime_ASM_OBJECTS:.$(O)=_libasmrunpic.$(O))
+
+libasmrunnnp_noasan_OBJECTS = \
+  $(runtime_NATIVE_C_SOURCES:.c=.nnp_noasan.$(O)) $(runtime_ASM_OBJECTS)
 
 libcomprmarsh_OBJECTS = $(RUNTIME_DIR)/zstd.npic.$(O)
 
@@ -1374,11 +1378,11 @@ $(RUNTIME_DIR)/caml/opnames.h : $(RUNTIME_DIR)/caml/instruct.h
 # These are provided as a temporary shim to allow cross-compilation systems
 # to supply a host C compiler and different flags and a linking macro.
 SAK_CC ?= $(CC)
-SAK_CFLAGS ?= $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS)
+SAK_CFLAGS ?= $(filter-out -fsanitize=address -fsanitize-recover=address,$(OC_CFLAGS)) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS)
 SAK_LINK ?= $(MKEXE_VIA_CC)
 
 $(SAK): $(RUNTIME_DIR)/sak.$(O)
-	$(V_MKEXE)$(call SAK_LINK,$@,$^ $(if $(filter true,$(WITH_ADDRESS_SANITIZER)),-fsanitize=address -fsanitize-recover=address))
+	$(V_MKEXE)$(call SAK_LINK,$@,$^ )
 
 $(RUNTIME_DIR)/sak.$(O): $(RUNTIME_DIR)/sak.c $(RUNTIME_DIR)/caml/misc.h $(RUNTIME_DIR)/caml/config.h
 	$(V_CC)$(SAK_CC) -c $(SAK_CFLAGS) $(OUTPUTOBJ)$@ $<
@@ -1437,6 +1441,9 @@ $(RUNTIME_DIR)/libasmrun_pic.$(A): $(libasmrunpic_OBJECTS)
 $(RUNTIME_DIR)/libasmrun_shared.$(SO): $(libasmrunpic_OBJECTS)
 	$(V_MKDLL)$(MKDLL) -o $@ $^ $(NATIVECCLIBS)
 
+$(RUNTIME_DIR)/libasmrunnnp_noasan.$(A): $(libasmrunnnp_noasan_OBJECTS)
+	$(V_MKLIB)$(call MKLIB,$@, $^)
+
 $(RUNTIME_DIR)/libcomprmarsh.$(A): $(libcomprmarsh_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
@@ -1470,6 +1477,13 @@ $(DEPDIR)/$(RUNTIME_DIR)/%.ni.$(D): \
 $(RUNTIME_DIR)/%.npic.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS) $(SHAREDLIB_CFLAGS)
 $(RUNTIME_DIR)/%.npic.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
 $(DEPDIR)/$(RUNTIME_DIR)/%.npic.$(D): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
+
+$(RUNTIME_DIR)/%.nnp_noasan.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) -UWITH_ADDRESS_SANITIZER
+$(RUNTIME_DIR)/%.nnp_noasan.$(O): OC_CFLAGS := $(filter-out -fsanitize=address -fsanitize-recover=address,$(OC_CFLAGS)) $(OC_NATIVE_CFLAGS)
+$(RUNTIME_DIR)/%.nnp_noasan.$(O): OC_LDFLAGS := $(filter-out -fsanitize=address -fsanitize-recover=address,$(OC_LDFLAGS))
+$(DEPDIR)/$(RUNTIME_DIR)/%.nnp_noasan.$(D): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) -UWITH_ADDRESS_SANITIZER
+$(DEPDIR)/$(RUNTIME_DIR)/%.nnp_noasan.$(D): OC_CFLAGS := $(filter-out -fsanitize=address -fsanitize-recover=address,$(OC_CFLAGS))
+$(DEPDIR)/$(RUNTIME_DIR)/%.nnp_noasan.$(D): OC_LDFLAGS := $(filter-out -fsanitize=address -fsanitize-recover=address,$(OC_LDFLAGS))
 
 # The major GC performs better with this flag on Intel processors
 # This is a workaround for an Intel CPU bug:
@@ -1514,7 +1528,7 @@ $(DEPDIR)/runtime:
 
 runtime_OBJECT_TYPES = % %.b %.bd %.bi %.bpic
 ifeq "$(NATIVE_COMPILER)" "true"
-runtime_OBJECT_TYPES += %.n %.nd %.ni %.np %.npic
+runtime_OBJECT_TYPES += %.n %.nd %.ni %.np %.npic %.nnp_noasan
 endif
 
 $(foreach runtime_OBJECT_TYPE, $(runtime_OBJECT_TYPES), \
@@ -1570,6 +1584,7 @@ runtime_DEP_FILES := $(addsuffix .b, \
   $(basename $(runtime_BYTECODE_C_SOURCES) $(RUNTIME_DIR)/instrtrace))
 ifeq "$(NATIVE_COMPILER)" "true"
 runtime_DEP_FILES += $(addsuffix .n, $(basename $(runtime_NATIVE_C_SOURCES)))
+runtime_DEP_FILES += $(addsuffix .nnp_noasan, $(basename $(runtime_NATIVE_C_SOURCES)))
 endif
 runtime_DEP_FILES += $(addsuffix d, $(runtime_DEP_FILES)) \
              $(addsuffix i, $(runtime_DEP_FILES)) \
