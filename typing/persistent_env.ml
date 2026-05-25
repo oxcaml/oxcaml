@@ -964,6 +964,8 @@ let read_cmi_file penv filename =
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
   add_import penv unit_name;
+  (* Register as hidden so that direct user-code references to the module
+     are still reported as unbound; only transitive lookups can reach it. *)
   let pers_sig =
     { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
   in
