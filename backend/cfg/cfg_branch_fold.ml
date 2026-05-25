@@ -11,13 +11,18 @@ type fold_result =
         arg : Reg.t array
       }
 
-let apply_fold (block : C.basic_block) (result : fold_result) =
+let apply_fold (block : C.basic_block) (result : fold_result option) : bool =
   match result with
-  | Goto target ->
-    block.terminator
-      <- { block.terminator with desc = Always target; arg = [||]; res = [||] }
-  | Replace { desc; arg } ->
-    block.terminator <- { block.terminator with desc; arg; res = [||] }
+  | None -> false
+  | Some result ->
+    let new_terminator =
+      match result with
+      | Goto target ->
+        { block.terminator with desc = C.Always target; arg = [||]; res = [||] }
+      | Replace { desc; arg } -> { block.terminator with desc; arg; res = [||] }
+    in
+    block.terminator <- new_terminator;
+    true
 
 (** [find_reaching_def reg block dominators cfg] searches for the definition of
     [reg] visible at the end of [block]'s body (right before its terminator)
@@ -234,43 +239,33 @@ let evaluate_terminator ~block (term : C.terminator C.instruction) ~cfg :
   | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
-(* Apply a fold to [block]'s terminator and report whether the successor set
-   actually changed. *)
-let apply_and_check_change (block : C.basic_block) (result : fold_result) : bool
-    =
-  let old_successors = C.successor_labels ~normal:true ~exn:false block in
-  apply_fold block result;
-  not
-    (Label.Set.equal old_successors
-       (C.successor_labels ~normal:true ~exn:false block))
-
 let process_block ~(is_loop_header : Label.t -> bool) ~(cfg : Cfg_with_infos.t)
     (block : C.basic_block) : bool =
   let raw_cfg = Cfg_with_infos.cfg cfg in
-  (* 1. Fold the block's own terminator (e.g. [Truth_test] → [Int_test] when the
-     test argument is a comparison computed in this block). *)
-  let reduced_terminator =
-    match evaluate_terminator ~block block.terminator ~cfg with
-    | None -> false
-    | Some result -> apply_and_check_change block result
+  (* 1. Fold the block's own terminator. *)
+  let reduce_terminator () =
+    evaluate_terminator ~block block.terminator ~cfg |> apply_fold block
   in
   (* 2. Thread through an empty merge successor when safe. *)
-  let skipped_successor =
+  let skip_successor () =
     match[@ocaml.warning "-4"] block.terminator.desc with
     | Always successor_label
       when (not (Label.equal block.start raw_cfg.entry_label))
            && (raw_cfg.allowed_to_be_irreducible
-              || not (is_loop_header successor_label)) -> (
+              || not (is_loop_header successor_label)) ->
       let successor_block = C.get_block_exn raw_cfg successor_label in
       if not (DLL.is_empty successor_block.body)
       then false
       else
-        match evaluate_terminator ~block successor_block.terminator ~cfg with
-        | None -> false
-        | Some result -> apply_and_check_change block result)
+        evaluate_terminator ~block successor_block.terminator ~cfg
+        |> apply_fold block
     | _ -> false
   in
-  reduced_terminator || skipped_successor
+  let changed = ref (reduce_terminator ()) in
+  while skip_successor () do
+    changed := true
+  done;
+  !changed
 
 let run cfg_with_infos =
   if not !Oxcaml_flags.cfg_value_propagation
@@ -282,11 +277,11 @@ let run cfg_with_infos =
     assert (not cfg.register_locations_are_set);
     let header_map = (Cfg_with_infos.loop_infos cfg_with_infos).header_map in
     let is_loop_header label = Label.Map.mem label header_map in
-    let registration_needed =
+    let changed =
       C.fold_blocks cfg ~init:false ~f:(fun _ block acc ->
           process_block ~is_loop_header ~cfg:cfg_with_infos block || acc)
     in
-    if registration_needed
+    if changed
     then (
       (* We may need to remove predecessors, and
          [register_predecessors_for_all_blocks] only adds predecessors, so clear

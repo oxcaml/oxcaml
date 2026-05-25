@@ -147,8 +147,7 @@ learn_from_branch:
 |}]
 
 
-(* CR ttebbi: We shouldn't materialize the boolean and some branches are
-   imposssible to take. *)
+(* CR ttebbi: We repeat the same branch twice. *)
 let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
  match x = 2, y = 2 with
  | true, true -> c1 ()
