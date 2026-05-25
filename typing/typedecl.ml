@@ -1991,6 +1991,16 @@ let mixed_block_element env ty jkind =
   let unboxed_element = Element_repr.classify env ty jkind in
   Option.map Element_repr.to_shape_element unboxed_element
 
+let check_atomic_fields_have_value_layout reprs lbls =
+  List.iter2
+    (fun (repr : Element_repr.t option) (lbl : Types.label_declaration) ->
+       if Types.is_atomic lbl.ld_mutable then
+         match repr with
+         | Some (Value_element _ | Float_element) -> ()
+         | Some (Unboxed_element _ | Void) | None ->
+           raise (Error (lbl.ld_loc, Non_value_atomic_field)))
+    reprs lbls
+
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
@@ -2014,6 +2024,8 @@ let update_constructor_representation
             ld.Types.ld_type)
             fields arg_jkinds
         in
+        check_atomic_fields_have_value_layout
+          (List.map fst arg_reprs) fields;
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
         |> Result.map_error (fun (Element_repr.Unrepresentable_element i) ->
              let bad_field = List.nth fields i in
@@ -2057,14 +2069,8 @@ let compute_record_repr
   (* Atomic fields must have layout value, independently of whether the
      record is a mixed block. A single-field record with a non-value atomic
      field would otherwise slip past the mixed-block patterns below. *)
-  List.iter2
-    (fun ((repr : Element_repr.t option), _) (lbl, _) ->
-       if Types.is_atomic lbl.Types.ld_mutable then
-         match repr with
-         | Some (Value_element _ | Float_element) -> ()
-         | Some (Unboxed_element _ | Void) | None ->
-           raise (Error (lbl.Types.ld_loc, Non_value_atomic_field)))
-    reprs lbls;
+  check_atomic_fields_have_value_layout
+    (List.map fst reprs) (List.map fst lbls);
   let mixed_record () =
     let shape =
       Element_repr.mixed_product_shape loc reprs Record
@@ -2114,6 +2120,7 @@ let compute_record_repr
      already rejected upfront with [Non_value_atomic_field]. *)
   | ~values:true, ~voids:true, ~atomic_fields:true, ..
   | ~floats:true, ~voids:true, ~atomic_fields:true, ..
+  | ~floats:true, ~float64s:true, ~atomic_fields:true, ..
   | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
   | ~values:true, ~float64s:true, ~atomic_fields:true, ..
   | ~non_float64_unboxed_fields:true, ~atomic_fields:true, ..
@@ -2167,12 +2174,6 @@ let compute_record_repr
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
     Ok Record_boxed
-  | ~voids:false, ~values:false, ~floats:true, ~atomic_floats:false,
-      ~atomic_fields:true, ~float64s:true,
-      ~non_float64_unboxed_fields:false, .. ->
-    Misc.fatal_error
-      "Typedecl.compute_record_repr: invariant broken in repr_summary \
-        (only floats, some atomic fields, no atomic floats?)"
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:_, ~atomic_fields:_, ~first_any:None, ..
