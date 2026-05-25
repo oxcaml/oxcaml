@@ -4288,7 +4288,10 @@ let open_pers_signature_cmi filename env =
   let comps =
     match get_components mda.mda_components with
     | Structure_comps c -> c
-    | Functor_comps _ -> raise Not_found
+    | Functor_comps _ ->
+        Misc.fatal_errorf
+          "open_pers_signature_cmi: %s is a functor, not a structure"
+          (Global_module.Name.to_string global_name)
   in
   let stage_locks, locks =
     partition_locks (IdTbl.get_all_locks env.modules)
