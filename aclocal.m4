@@ -773,6 +773,8 @@ AC_DEFUN([OCAML_CXX_COMPILE_STDCXX_11], [
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #if !defined(__cplusplus) || __cplusplus < 201103L
 #error "No C++11 support"
+#elif defined(__has_include) && !__has_include(<atomic>)
+#error "Missing <atomic> header"
 #endif
           ]])],
           [ocaml_cv_prog_cxx="$CC"],
