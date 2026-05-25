@@ -96,7 +96,7 @@ header:
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
-  movq  <hidden PC-relative offset>(%rip), %rdi
+  movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
   movq  -8(%rbx), %rbx
   movq  %rbx, 8(%rax)

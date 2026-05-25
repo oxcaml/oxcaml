@@ -21,7 +21,7 @@ open Intrinsics
 let neg x = Float_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  vxorpd <hidden PC-relative offset>(%rip), %xmm0, %xmm0
+  vxorpd caml_negf_mask(%rip), %xmm0, %xmm0
   ret
 |}]
 
@@ -56,7 +56,7 @@ div:
 let abs x = Float_u.abs x
 [%%expect_asm X86_64{|
 abs:
-  vandpd <hidden PC-relative offset>(%rip), %xmm0, %xmm0
+  vandpd caml_absf_mask(%rip), %xmm0, %xmm0
   ret
 |}]
 
