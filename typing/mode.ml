@@ -2749,31 +2749,23 @@ module Lattices_mono = struct
         if c <> 0 then c else Core_morph.compare m1 m2
       | Meet_const_core _, _ -> -1
       | _, Meet_const_core _ -> 1
-      | Core_imply_const (m1, c1), Core_imply_const (m2, c2) -> (
+      | Core_imply_const (m1, c1), Core_imply_const (m2, c2) ->
         let c = Core_morph.compare m1 m2 in
         if c <> 0
         then c
         else
-          match Core_morph.equal m1 m2 with
-          | Misc.Is_not_eq ->
-            Misc.fatal_error
-              "Mode.Lattices_mono.Simple_morph.compare: inconsistent core \
-               morph equality"
-          | Misc.Is_eq ->
-            let src = Core_morph.src m1 in
-            compare_total src c1 c2)
+          let Refl = Core_morph.equal m1 m2 |> Misc.get_eq_exn in
+          let src = Core_morph.src m1 in
+          compare_total src c1 c2
       | Core_imply_const _, _ -> -1
       | _, Core_imply_const _ -> 1
-      | Compose (mb1, ma1), Compose (mb2, ma2) -> (
+      | Compose (mb1, ma1), Compose (mb2, ma2) ->
         let c = compare dst mb1 mb2 in
         if c <> 0
         then c
         else
-          match equal dst mb1 mb2 with
-          | Misc.Is_not_eq ->
-            Misc.fatal_error
-              "Mode.Lattices_mono.Simple_morph.compare: inconsistent equality"
-          | Misc.Is_eq -> compare (src dst mb1) ma1 ma2)
+          let Refl = equal dst mb1 mb2 |> Misc.get_eq_exn in
+          compare (src dst mb1) ma1 ma2
       | Compose _, _ -> .
       | _, Compose _ -> .
 
@@ -3425,61 +3417,45 @@ module Lattices_mono = struct
       if c <> 0 then c else compare_total dst c1 c2
     | Const _, _ -> -1
     | _, Const _ -> 1
-    | Simple_proj (m1, ax1, src1), Simple_proj (m2, ax2, src2) -> (
+    | Simple_proj (m1, ax1, src1), Simple_proj (m2, ax2, src2) ->
       let c = compare_obj src1 src2 in
       if c <> 0
       then c
       else
-        match equal_obj src1 src2 with
-        | Misc.Is_not_eq ->
-          Misc.fatal_error
-            "Mode.Lattices_mono.compare_morph: inconsistent object equality"
-        | Misc.Is_eq -> (
-          let c = Axis.compare ax1 ax2 in
-          if c <> 0
-          then c
-          else
-            match Axis.equal ax1 ax2 with
-            | Misc.Is_not_eq ->
-              Misc.fatal_error
-                "Mode.Lattices_mono.compare_morph: inconsistent axis equality"
-            | Misc.Is_eq -> Simple_morph.compare dst m1 m2))
+        let Refl = equal_obj src1 src2 |> Misc.get_eq_exn in
+        let c = Axis.compare ax1 ax2 in
+        if c <> 0
+        then c
+        else
+          let Refl = Axis.equal ax1 ax2 |> Misc.get_eq_exn in
+          Simple_morph.compare dst m1 m2
     | Simple_proj _, _ -> -1
     | _, Simple_proj _ -> 1
-    | Max_with_simple (ax1, m1), Max_with_simple (ax2, m2) -> (
+    | Max_with_simple (ax1, m1), Max_with_simple (ax2, m2) ->
       let c = Axis.compare ax1 ax2 in
       if c <> 0
       then c
       else
-        match Axis.equal ax1 ax2 with
-        | Misc.Is_not_eq ->
-          Misc.fatal_error
-            "Mode.Lattices_mono.compare_morph: inconsistent axis equality"
-        | Misc.Is_eq -> Simple_morph.compare (proj_obj ax1 dst) m1 m2)
+        let Refl = Axis.equal ax1 ax2 |> Misc.get_eq_exn in
+        Simple_morph.compare (proj_obj ax1 dst) m1 m2
     | Max_with_simple _, _ -> -1
     | _, Max_with_simple _ -> 1
-    | Min_with_simple (ax1, m1), Min_with_simple (ax2, m2) -> (
+    | Min_with_simple (ax1, m1), Min_with_simple (ax2, m2) ->
       let c = Axis.compare ax1 ax2 in
       if c <> 0
       then c
       else
-        match Axis.equal ax1 ax2 with
-        | Misc.Is_not_eq ->
-          Misc.fatal_error
-            "Mode.Lattices_mono.compare_morph: inconsistent axis equality"
-        | Misc.Is_eq -> Simple_morph.compare (proj_obj ax1 dst) m1 m2)
+        let Refl = Axis.equal ax1 ax2 |> Misc.get_eq_exn in
+        Simple_morph.compare (proj_obj ax1 dst) m1 m2
     | Min_with_simple _, _ -> -1
     | _, Min_with_simple _ -> 1
-    | Compose (mb1, ma1), Compose (mb2, ma2) -> (
+    | Compose (mb1, ma1), Compose (mb2, ma2) ->
       let c = compare_morph dst mb1 mb2 in
       if c <> 0
       then c
       else
-        match equal_morph dst mb1 mb2 with
-        | Misc.Is_not_eq ->
-          Misc.fatal_error
-            "Mode.Lattices_mono.compare_morph: inconsistent equality"
-        | Misc.Is_eq -> compare_morph (src dst mb1) ma1 ma2)
+        let Refl = equal_morph dst mb1 mb2 |> Misc.get_eq_exn in
+        compare_morph (src dst mb1) ma1 ma2
     | Compose _, _ -> .
     | _, Compose _ -> .
 
