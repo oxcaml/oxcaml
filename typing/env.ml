@@ -4275,14 +4275,10 @@ let open_pers_signature name env =
   path, env
 
 let open_pers_signature_cmi filename env =
-  let artifact =
-    Unit_info.Artifact.from_filename
-      ~for_pack_prefix:Compilation_unit.Prefix.empty filename
-  in
   (* Register as hidden so that direct user-code references to the module
      are still reported as unbound; only transitive lookups can reach it. *)
   let global_name, _sign =
-    Persistent_env.read_artifact !persistent_env artifact
+    Persistent_env.read_cmi_file !persistent_env filename
   in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
