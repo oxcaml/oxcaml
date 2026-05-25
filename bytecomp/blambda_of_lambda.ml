@@ -677,7 +677,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           (* In bytecode, [caml_obj_dup] only does a shallow copy, so each slot
              of the duplicate would alias the corresponding slot in the source.
-             For product arrays we deep-copy every slot. *)
+             For product arrays we deep-copy every slot.
+
+             This extra copying of products is currently defensive, though: in
+             practice [Translcore] only produces [Pduparray] of a product array
+             with a [Pmakearray] argument, which the case above already handles.
+          *)
           let src_arg =
             match args with [s] -> comp_expr s | _ -> wrong_arity ~expected:1
           in
