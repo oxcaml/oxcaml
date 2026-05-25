@@ -76,7 +76,7 @@ div:
   subq  %rdi, %rax
   ret
 .L1:
-  movq  <hidden PC-relative offset>(%rip), %rax
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -145,7 +145,7 @@ unsigned_div:
   incq  %rax
   ret
 .L5:
-  movq  <hidden PC-relative offset>(%rip), %rax
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -168,7 +168,7 @@ rem:
   xorl  %eax, %eax
   ret
 .L1:
-  movq  <hidden PC-relative offset>(%rip), %rax
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -226,7 +226,7 @@ unsigned_rem:
   incq  %rbx
   jmp   .L5
 .L4:
-  movq  <hidden PC-relative offset>(%rip), %rax
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -436,7 +436,7 @@ to_int32:
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
-  movq  <hidden PC-relative offset>(%rip), %rdi
+  movq  caml_int32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
   movslq %ebx, %rbx
   movq  %rbx, 8(%rax)
@@ -462,7 +462,7 @@ to_nativeint:
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
-  movq  <hidden PC-relative offset>(%rip), %rdi
+  movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
@@ -617,7 +617,7 @@ to_int64:
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
-  movq  <hidden PC-relative offset>(%rip), %rdi
+  movq  caml_int64_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
