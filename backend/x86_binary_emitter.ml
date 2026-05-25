@@ -1143,8 +1143,14 @@ let emit_reloc_jump near_opcodes far_opcodes b loc symbol =
       (* Have we detected previously that this jump instruction needs
          to be a long one?  If not, optimistically emit a short jump and
          let the retry mechanism upgrade it on a later pass if the actual
-         offset turns out to exceed the 8-bit range. *)
-      let force_far = IntSet.mem loc !forced_long_jumps in
+         offset turns out to exceed the 8-bit range.
+
+         If the range is more than 127 instructions, we know it has to
+         become a long jump, since every instruction is at least one byte. *)
+      let force_far =
+        (target_loc - loc > 127)
+        || IntSet.mem loc !forced_long_jumps
+      in
       if force_far then (
         buf_opcodes b far_opcodes;
         record_local_reloc b (RelocLongJump symbol);
