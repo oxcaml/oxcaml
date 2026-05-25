@@ -601,3 +601,25 @@ Line 2, characters 13-41:
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
 |}]
+
+module Inline_record_non_value_atomic = struct
+  type t = A of { mutable f : float# [@atomic] }
+end
+
+[%%expect{|
+Line 2, characters 18-46:
+2 |   type t = A of { mutable f : float# [@atomic] }
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Atomic_float_with_float_hash = struct
+  type t = { mutable f : float [@atomic]; u : float# }
+end
+
+[%%expect{|
+Line 2, characters 13-41:
+2 |   type t = { mutable f : float [@atomic]; u : float# }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]
