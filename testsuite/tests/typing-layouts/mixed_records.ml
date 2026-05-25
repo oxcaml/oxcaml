@@ -53,7 +53,7 @@ Line 1, characters 11-13:
 1 | type bad = t#
                ^^
 Error: The type "t" has no unboxed version.
-Hint: Float records don't get unboxed versions.
+Hint: Records with [@@flatten_floats] don't get unboxed versions.
 |}]
 
 (* A mismatch in [@@flatten_floats] is caught in the representation check*)
@@ -110,8 +110,9 @@ type bad = { f : float } [@@flatten_floats]
 Line 1, characters 0-43:
 1 | type bad = { f : float } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;
 
 type bad = { f : float# } [@@flatten_floats]
@@ -119,8 +120,9 @@ type bad = { f : float# } [@@flatten_floats]
 Line 1, characters 0-44:
 1 | type bad = { f : float# } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;
 
 type bad = { a : float; b : float#; c : int } [@@flatten_floats]
@@ -128,8 +130,9 @@ type bad = { a : float; b : float#; c : int } [@@flatten_floats]
 Line 1, characters 0-64:
 1 | type bad = { a : float; b : float#; c : int } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;
 
 type bad = A | B [@@flatten_floats]
@@ -137,8 +140,19 @@ type bad = A | B [@@flatten_floats]
 Line 1, characters 0-35:
 1 | type bad = A | B [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+(* Regression test: [type_unboxed_default] must be [false] when
+   [@@flatten_floats] is used, so that this declaration does not
+   trigger the [unboxable-type-in-prim-decl] warning. *)
+type r = { f : float; u : float# } [@@flatten_floats]
+external id : r -> r = "%identity"
+[%%expect{|
+type r = { f : float; u : float#; }
+external id : r -> r = "%identity"
 |}];;
 
 (* When a non-float/float# field appears, [float]
@@ -421,8 +435,9 @@ type t = { a : float; b : float } [@@flatten_floats]
 Line 1, characters 0-52:
 1 | type t = { a : float; b : float } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;
 
 (* [@@flatten_floats] on all-float# record is an error *)
@@ -431,8 +446,9 @@ type t = { a : float#; b : float# } [@@flatten_floats]
 Line 1, characters 0-54:
 1 | type t = { a : float#; b : float# } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;
 
 (* [@@flatten_floats] on non-float record is an error *)
@@ -441,8 +457,9 @@ type t = { a : int; b : string } [@@flatten_floats]
 Line 1, characters 0-51:
 1 | type t = { a : int; b : string } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;
 
 (* [@@flatten_floats] on mixed record with non-float value fields is an error:
@@ -452,6 +469,7 @@ type t = { a : float; b : float#; c : int } [@@flatten_floats]
 Line 1, characters 0-62:
 1 | type t = { a : float; b : float#; c : int } [@@flatten_floats]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@@flatten_floats]" attribute is only allowed on record types
-       that mix boxed "float" and unboxed "float#" fields.
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;

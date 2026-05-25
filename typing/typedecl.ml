@@ -934,14 +934,17 @@ let transl_declaration env sdecl (id, uid) =
   in
   let unbox, unboxed_default =
     (* [unboxed_default] is [true] iff the user did not specify an explicit
-       representation attribute ([@@unboxed] or [@@represent_as_float_array]) *)
+       representation attribute ([@@unboxed], [@@represent_as_float_array],
+       or [@@flatten_floats]) *)
     match sdecl.ptype_kind with
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
     | Ptype_variant [{pcd_args = Pcstr_record [{pld_mutable=Immutable; _}]; _}]
     | Ptype_record [{pld_mutable=Immutable; _}] ->
       Option.value unboxed_attr
         ~default:(!Clflags.unboxed_types && not represent_as_float_array),
-      Option.is_none unboxed_attr && not represent_as_float_array
+      Option.is_none unboxed_attr
+      && not represent_as_float_array
+      && not flatten_floats
     | Ptype_record_unboxed_product _ -> false, false
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
@@ -5645,8 +5648,9 @@ let report_error_doc ppf = function
       "@[Layout polymorphism is unsupported in this context.@]"
   | Misplaced_flatten_floats ->
     fprintf ppf
-      "@[The %a attribute is only allowed on record types@ \
-       that mix boxed %a and unboxed %a fields.@]"
+      "@[The %a attribute is only allowed on records with one or more@ \
+       non-atomic %a fields, one or more %a fields, and all other fields@ \
+       void.@]"
       Style.inline_code "[@@flatten_floats]"
       Style.inline_code "float"
       Style.inline_code "float#"
