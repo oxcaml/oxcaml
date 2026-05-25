@@ -1686,31 +1686,18 @@ module Lattices_mono = struct
       | Regional_to_local_regionality -> Comonadic_with_regionality
       | Regional_to_global_regionality -> Comonadic_with_regionality
 
-    let compare : type a1 l1 r1 a2 b l2 r2.
+    let ord : type a b d. (a, b, d) t -> int = function
+      | Local_to_regional -> 0
+      | Regional_to_local -> 1
+      | Locality_as_regionality -> 2
+      | Regional_to_global -> 3
+      | Local_to_regional_regionality -> 4
+      | Regional_to_local_regionality -> 5
+      | Regional_to_global_regionality -> 6
+
+    let compare_total : type a1 l1 r1 a2 b l2 r2.
         (a1, b, l1 * r1) t -> (a2, b, l2 * r2) t -> int =
-     fun m1 m2 ->
-      match m1, m2 with
-      | Local_to_regional, Local_to_regional -> 0
-      | Local_to_regional, _ -> -1
-      | _, Local_to_regional -> 1
-      | Regional_to_local, Regional_to_local -> 0
-      | Regional_to_local, _ -> -1
-      | _, Regional_to_local -> 1
-      | Locality_as_regionality, Locality_as_regionality -> 0
-      | Locality_as_regionality, _ -> -1
-      | _, Locality_as_regionality -> 1
-      | Regional_to_global, Regional_to_global -> 0
-      | Regional_to_global, _ -> .
-      | _, Regional_to_global -> .
-      | Local_to_regional_regionality, Local_to_regional_regionality -> 0
-      | Local_to_regional_regionality, _ -> -1
-      | _, Local_to_regional_regionality -> 1
-      | Regional_to_local_regionality, Regional_to_local_regionality -> 0
-      | Regional_to_local_regionality, _ -> -1
-      | _, Regional_to_local_regionality -> 1
-      | Regional_to_global_regionality, Regional_to_global_regionality -> 0
-      | Regional_to_global_regionality, _ -> .
-      | _, Regional_to_global_regionality -> .
+     fun m1 m2 -> Int.compare (ord m1) (ord m2)
 
     let equal : type a1 l1 r1 a2 b l2 r2.
         (a1, b, l1 * r1) t -> (a2, b, l2 * r2) t -> (a1, a2) Misc.is_eq =
@@ -1840,13 +1827,13 @@ module Lattices_mono = struct
       | Regional_to_global -> Not_allowed_left
       | Regional_to_global_regionality -> Not_allowed_left
 
-    type ('a, 'b, 'd) composition =
-      | Id : ('a, 'a, 'd) composition
-      | Morph : ('a, 'b, 'd) t -> ('a, 'b, 'd) composition
-      | Disallowed : ('a, 'b, neither) composition
+    type ('a, 'b, 'd) compose_result =
+      | Id : ('a, 'a, 'd) compose_result
+      | Morph : ('a, 'b, 'd) t -> ('a, 'b, 'd) compose_result
+      | Disallowed : ('a, 'b, neither) compose_result
 
     let compose : type a b c d.
-        (b, c, d) t -> (a, b, d) t -> (a, c, d) composition =
+        (b, c, d) t -> (a, b, d) t -> (a, c, d) compose_result =
      fun m1 m2 ->
       match m1, m2 with
       | Local_to_regional, Regional_to_local ->
@@ -2014,14 +2001,15 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_max -> Monadic_op
       | Comonadic_to_monadic_max ar -> areality_comonadic_obj ar
 
-    let compare : type a1 d1 a2 b d2. (a1, b, d1) t -> (a2, b, d2) t -> int =
+    let compare_total : type a1 d1 a2 b d2.
+        (a1, b, d1) t -> (a2, b, d2) t -> int =
      fun m1 m2 ->
       match m1, m2 with
       | Locality_restricted l1, Locality_restricted l2 ->
-        Locality_morph.compare l1 l2
+        Locality_morph.compare_total l1 l2
       | Locality_restricted _, _ -> .
       | _, Locality_restricted _ -> .
-      | Locality_full l1, Locality_full l2 -> Locality_morph.compare l1 l2
+      | Locality_full l1, Locality_full l2 -> Locality_morph.compare_total l1 l2
       | Locality_full _, _ -> -1
       | _, Locality_full _ -> 1
       | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity -> 0
@@ -2349,11 +2337,11 @@ module Lattices_mono = struct
       | Proj_const_max : 'a obj -> ('a, 'b, disallowed * 'r) compose_proj_result
       | Proj_const_min : 'a obj -> ('a, 'b, 'l * disallowed) compose_proj_result
 
-    let compose_projection_locality_morph : type a b p l r.
-        (a, b, l * r) Locality_morph.t ->
+    let compose_projection_locality_full : type a b p l r.
         (b comonadic_with, p) Axis.t ->
+        (a, b, l * r) Locality_morph.t ->
         (a comonadic_with, p, l * r) compose_proj_result =
-     fun lm1 ax0 ->
+     fun ax0 lm1 ->
       let src = Locality_morph.src_full lm1 in
       match ax0 with
       | Forkable -> Proj_id (Forkable, src)
@@ -2419,7 +2407,7 @@ module Lattices_mono = struct
             areality_comonadic_obj areality )
       | Comonadic_to_monadic_max areality, Staticity ->
         Proj_const_max (areality_comonadic_obj areality)
-      | Locality_full lm, (_ as ax0) -> compose_projection_locality_morph lm ax0
+      | Locality_full lm, (_ as ax0) -> compose_projection_locality_full ax0 lm
       | _, _ -> .
     [@@warning "-4"]
 
@@ -2433,7 +2421,7 @@ module Lattices_mono = struct
           -> ('q, 'c comonadic_with, 'd) compose_and_max_result
       | Disallowed : ('a, 'b, neither) compose_and_max_result
 
-    let compose_max_with_simple_locality_morph : type b c q r.
+    let compose_locality_full_max_with : type b c q r.
         (b, c, disallowed * r) Locality_morph.t ->
         (b comonadic_with, q) Axis.t ->
         (q, c comonadic_with, disallowed * r) compose_and_max_result =
@@ -2476,11 +2464,11 @@ module Lattices_mono = struct
           And_max_id Portability)
       | Areality -> And_max_core (Areality, Locality_restricted lm1)
 
-    let compose_max_with_simple_core : type b c q r.
-        (b, q) Axis.t ->
+    let compose_core_max_with : type b c q r.
         (b, c, disallowed * r) t ->
+        (b, q) Axis.t ->
         (q, c, disallowed * r) compose_and_max_result =
-     fun ax1 m0 ->
+     fun m0 ax1 ->
       match (m0 : (b, c, disallowed * r) t), (ax1 : (b, q) Axis.t) with
       | Comonadic_to_monadic_max _, Portability ->
         And_max_core (Contention, Portability_to_contention_op)
@@ -2498,8 +2486,7 @@ module Lattices_mono = struct
         And_max_core (Statefulness, Visibility_op_to_statefulness)
       | Monadic_to_comonadic_max, Uniqueness ->
         And_max_core (Linearity, Uniqueness_op_to_linearity)
-      | Locality_full lm, (_ as ax0) ->
-        compose_max_with_simple_locality_morph lm ax0
+      | Locality_full lm, (_ as ax0) -> compose_locality_full_max_with lm ax0
       | Monadic_to_comonadic_min, _ -> Disallowed
       | Comonadic_to_monadic_min _, _ -> Disallowed
       | _, _ -> .
@@ -2515,7 +2502,7 @@ module Lattices_mono = struct
           -> ('q, 'c comonadic_with, 'd) compose_and_min_result
       | Disallowed : ('a, 'b, neither) compose_and_min_result
 
-    let compose_min_with_simple_locality_morph : type b c q l.
+    let compose_locality_full_min_with : type b c q l.
         (b, c, l * disallowed) Locality_morph.t ->
         (b comonadic_with, q) Axis.t ->
         (q, c comonadic_with, l * disallowed) compose_and_min_result =
@@ -2528,11 +2515,11 @@ module Lattices_mono = struct
       | Portability -> And_min_id Portability
       | Areality -> And_min_core (Areality, Locality_restricted lm1)
 
-    let compose_min_with_simple_core : type b c q l.
-        (b, q) Axis.t ->
+    let compose_core_min_with : type b c q l.
         (b, c, l * disallowed) t ->
+        (b, q) Axis.t ->
         (q, c, l * disallowed) compose_and_min_result =
-     fun ax1 m0 ->
+     fun m0 ax1 ->
       match (m0 : (b, c, l * disallowed) t), (ax1 : (b, q) Axis.t) with
       | Comonadic_to_monadic_min _, Portability ->
         And_min_core (Contention, Portability_to_contention_op)
@@ -2550,8 +2537,7 @@ module Lattices_mono = struct
         And_min_core (Statefulness, Visibility_op_to_statefulness)
       | Monadic_to_comonadic_min, Uniqueness ->
         And_min_core (Linearity, Uniqueness_op_to_linearity)
-      | Locality_full lm, (_ as ax0) ->
-        compose_min_with_simple_locality_morph lm ax0
+      | Locality_full lm, (_ as ax0) -> compose_locality_full_min_with lm ax0
       | Monadic_to_comonadic_max, _ -> Disallowed
       | Comonadic_to_monadic_max _, _ -> Disallowed
       | _, _ -> .
@@ -2728,44 +2714,44 @@ module Lattices_mono = struct
 
     let equal_val = equal
 
-    let rec compare : type a1 d1 a2 b d2.
+    let rec compare_total : type a1 d1 a2 b d2.
         b obj -> (a1, b, d1) t -> (a2, b, d2) t -> int =
      fun dst m1 m2 ->
       match m1, m2 with
       | Id, Id -> 0
       | Id, _ -> -1
       | _, Id -> 1
-      | Core m1, Core m2 -> Core_morph.compare m1 m2
+      | Core m1, Core m2 -> Core_morph.compare_total m1 m2
       | Core _, _ -> -1
       | _, Core _ -> 1
-      | Meet_const c1, Meet_const c2 -> compare_total dst c1 c2
+      | Meet_const c1, Meet_const c2 -> Lattices.compare_total dst c1 c2
       | Meet_const _, _ -> -1
       | _, Meet_const _ -> 1
-      | Imply_const c1, Imply_const c2 -> compare_total dst c1 c2
+      | Imply_const c1, Imply_const c2 -> Lattices.compare_total dst c1 c2
       | Imply_const _, _ -> -1
       | _, Imply_const _ -> 1
       | Meet_const_core (c1, m1), Meet_const_core (c2, m2) ->
-        let c = compare_total dst c1 c2 in
-        if c <> 0 then c else Core_morph.compare m1 m2
+        let c = Lattices.compare_total dst c1 c2 in
+        if c <> 0 then c else Core_morph.compare_total m1 m2
       | Meet_const_core _, _ -> -1
       | _, Meet_const_core _ -> 1
       | Core_imply_const (m1, c1), Core_imply_const (m2, c2) ->
-        let c = Core_morph.compare m1 m2 in
+        let c = Core_morph.compare_total m1 m2 in
         if c <> 0
         then c
         else
           let Refl = Core_morph.equal m1 m2 |> Misc.get_eq_exn in
           let src = Core_morph.src m1 in
-          compare_total src c1 c2
+          Lattices.compare_total src c1 c2
       | Core_imply_const _, _ -> -1
       | _, Core_imply_const _ -> 1
       | Compose (mb1, ma1), Compose (mb2, ma2) ->
-        let c = compare dst mb1 mb2 in
+        let c = compare_total dst mb1 mb2 in
         if c <> 0
         then c
         else
           let Refl = equal dst mb1 mb2 |> Misc.get_eq_exn in
-          compare (src dst mb1) ma1 ma2
+          compare_total (src dst mb1) ma1 ma2
       | Compose _, _ -> .
       | _, Compose _ -> .
 
@@ -3403,7 +3389,7 @@ module Lattices_mono = struct
       b obj -> (a1, b, d1) morph -> (a2, b, d2) morph -> int =
    fun dst m1 m2 ->
     match m1, m2 with
-    | Simple m1, Simple m2 -> Simple_morph.compare dst m1 m2
+    | Simple m1, Simple m2 -> Simple_morph.compare_total dst m1 m2
     | Simple _, _ -> -1
     | _, Simple _ -> 1
     | Const_max obj1, Const_max obj2 -> compare_obj obj1 obj2
@@ -3428,7 +3414,7 @@ module Lattices_mono = struct
         then c
         else
           let Refl = Axis.equal ax1 ax2 |> Misc.get_eq_exn in
-          Simple_morph.compare dst m1 m2
+          Simple_morph.compare_total dst m1 m2
     | Simple_proj _, _ -> -1
     | _, Simple_proj _ -> 1
     | Max_with_simple (ax1, m1), Max_with_simple (ax2, m2) ->
@@ -3437,7 +3423,7 @@ module Lattices_mono = struct
       then c
       else
         let Refl = Axis.equal ax1 ax2 |> Misc.get_eq_exn in
-        Simple_morph.compare (proj_obj ax1 dst) m1 m2
+        Simple_morph.compare_total (proj_obj ax1 dst) m1 m2
     | Max_with_simple _, _ -> -1
     | _, Max_with_simple _ -> 1
     | Min_with_simple (ax1, m1), Min_with_simple (ax2, m2) ->
@@ -3446,7 +3432,7 @@ module Lattices_mono = struct
       then c
       else
         let Refl = Axis.equal ax1 ax2 |> Misc.get_eq_exn in
-        Simple_morph.compare (proj_obj ax1 dst) m1 m2
+        Simple_morph.compare_total (proj_obj ax1 dst) m1 m2
     | Min_with_simple _, _ -> -1
     | _, Min_with_simple _ -> 1
     | Compose (mb1, ma1), Compose (mb2, ma2) ->
@@ -3681,7 +3667,7 @@ module Lattices_mono = struct
     match sm0 with
     | Id -> Max_with_simple (ax1, m1)
     | Core m0 ->
-      begin match Core_morph.compose_max_with_simple_core ax1 m0 with
+      begin match Core_morph.compose_core_max_with m0 ax1 with
       | And_max_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         Max_with_simple (ax1, Simple_morph.compose obj0 (Core m0) m1)
@@ -3695,7 +3681,7 @@ module Lattices_mono = struct
       Max_with_simple (ax1, Simple_morph.compose obj0 (Imply_const c0) m1)
     | Core_imply_const (m0, c0) -> begin
       let c0 = Axis.proj ax1 c0 in
-      match Core_morph.compose_max_with_simple_core ax1 m0 with
+      match Core_morph.compose_core_max_with m0 ax1 with
       | And_max_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         Max_with_simple
@@ -3722,7 +3708,7 @@ module Lattices_mono = struct
     match sm0 with
     | Id -> Min_with_simple (ax1, m1)
     | Core m0 ->
-      begin match Core_morph.compose_min_with_simple_core ax1 m0 with
+      begin match Core_morph.compose_core_min_with m0 ax1 with
       | And_min_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         Min_with_simple (ax1, Simple_morph.compose obj0 (Core m0) m1)
@@ -3735,7 +3721,7 @@ module Lattices_mono = struct
       let obj0 = proj_obj ax1 dst in
       Min_with_simple (ax1, Simple_morph.compose obj0 (Meet_const c0) m1)
     | Meet_const_core (c0, m0) ->
-      begin match Core_morph.compose_min_with_simple_core ax1 m0 with
+      begin match Core_morph.compose_core_min_with m0 ax1 with
       | And_min_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         let c0 = Axis.proj ax1 c0 in
