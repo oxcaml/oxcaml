@@ -850,7 +850,8 @@ type type_declaration =
     type_unboxed_version : type_declaration option;
     (* stores the unboxed version of that this type introduces: this is [Some]
        for predefined types with unboxed versions (e.g. [float]) and boxed
-       records, but [None] for aliases of these types
+       records (besides records that flattens floats or have with atomic
+       fields), but [None] for aliases of these types
 
        invariants:
        1. there are no "twice-unboxed" types: the [type_declaration] stored here

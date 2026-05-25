@@ -1264,8 +1264,8 @@ let transl_declaration env sdecl (id, uid) =
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
-      records don't have unboxed versions. These unboxed versions are removed in
-      [remove_unboxed_versions].
+      records and records with [@atomic] fields don't have unboxed versions.
+      These unboxed versions are removed in [remove_unboxed_versions].
 
    After steps 2 and 3, the set of unboxed versions decreases, so we check for
    newly-unbound unboxed paths with [check_unboxed_paths].
@@ -1309,6 +1309,7 @@ let record_gets_unboxed_version lbls repr =
   | Record_dummy { represent_as_float_array } ->
     not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
+
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
@@ -1428,8 +1429,8 @@ let derive_unboxed_versions decls env =
     decls
 
 (* Removes unboxed versions from type declarations not satisfying
-   [gets_unboxed_version]. In practice, it is float records that lose their
-   unboxed versions. See Note [Typechecking unboxed versions of types].
+   [gets_unboxed_version]. In practice, this is float records and records
+   with [@atomic] fields. See Note [Typechecking unboxed versions of types].
 
    Returns new decls and paths whose unboxed versions got removed. *)
 let remove_unboxed_versions decls =
