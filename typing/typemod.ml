@@ -4854,7 +4854,8 @@ let compute_bundle_sig ~(all_params : Global_module.t list)
     let cmi_file =
       Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
     in
-    Mty_signature (Cmi_format.read_cmi cmi_file).cmi_sign
+    let cmi_sign, _ = (Cmi_format.read_cmi cmi_file).cmi_sign in
+    Mty_signature cmi_sign
   in
   let make_md md_type =
     { md_type;
@@ -4934,7 +4935,7 @@ let functorize_interface initial_env ~all_params ~modules target modulename =
     in
     let cmi =
       Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty
-        sg name kind (Unit_info.cmi target)
+        (sg, Staticity.Dynamic) name kind (Unit_info.cmi target)
     in
     let decl_deps = Cmt_format.get_declaration_dependencies () in
     Cmt_format.save_cmt (Unit_info.cmti target) modulename
@@ -4977,10 +4978,15 @@ let functorize_implementation initial_env ~all_params ~modules target modulename
         Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
       in
       let name = Compilation_unit.to_global_name_without_prefix modulename in
-      let dclsig = Env.read_signature name cmi_artifact in
+      let dclsig, staticity = Env.read_signature name cmi_artifact in
       let cc, _shape =
+        let modes =
+          Includecore.Specific
+            ((Env.mode_unit ~staticity:Staticity.Dynamic, None),
+             Env.mode_unit ~staticity)
+        in
         Includemod.compunit initial_env ~mark:true
-          "(obtained by functorizing)" sg cmi_file dclsig shape
+          "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
       in
       save_cmt_cms None;
       cc
@@ -4998,8 +5004,9 @@ let functorize_implementation initial_env ~all_params ~modules target modulename
         Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
       in
       let cmi =
-        Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty sg
-          name kind (Unit_info.cmi target) (Array.of_list imports)
+        Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
+          (sg, Staticity.Dynamic) name kind (Unit_info.cmi target)
+          (Array.of_list imports)
       in
       save_cmt_cms (Some cmi);
       Tcoerce_none
