@@ -42,6 +42,8 @@ module type Const = sig
   include Lattice
 
   val legacy : t
+
+  val all : t list lazy_t
 end
 
 module type Const_product = sig

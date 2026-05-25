@@ -458,8 +458,6 @@ module Lattices = struct
     include Heyting with type t := t
 
     val areality : t areality
-
-    val all : t list
   end
 
   module Locality = struct
@@ -479,7 +477,7 @@ module Lattices = struct
 
     let legacy = Global
 
-    let all = [Global; Local]
+    let all = lazy [Global; Local]
 
     let print ppf = function
       | Global -> Fmt.fprintf ppf "global"
@@ -506,7 +504,7 @@ module Lattices = struct
 
     let legacy = Global
 
-    let all = [Global; Regional; Local]
+    let all = lazy [Global; Regional; Local]
 
     let print ppf = function
       | Global -> Fmt.fprintf ppf "global"
@@ -533,7 +531,7 @@ module Lattices = struct
 
     let legacy = Aliased
 
-    let all = [Unique; Aliased]
+    let all = lazy [Unique; Aliased]
 
     let print ppf = function
       | Aliased -> Fmt.fprintf ppf "aliased"
@@ -557,7 +555,7 @@ module Lattices = struct
 
     let legacy = Many
 
-    let all = [Many; Once]
+    let all = lazy [Many; Once]
 
     let print ppf = function
       | Once -> Fmt.fprintf ppf "once"
@@ -586,7 +584,7 @@ module Lattices = struct
 
     let legacy = Nonportable
 
-    let all = [Portable; Shareable; Corruptible; Nonportable]
+    let all = lazy [Portable; Shareable; Corruptible; Nonportable]
 
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
@@ -617,7 +615,7 @@ module Lattices = struct
 
     let legacy = Uncontended
 
-    let all = [Uncontended; Corrupted; Shared; Contended]
+    let all = lazy [Uncontended; Corrupted; Shared; Contended]
 
     let print ppf = function
       | Contended -> Fmt.fprintf ppf "contended"
@@ -643,7 +641,7 @@ module Lattices = struct
 
     let legacy = Forkable
 
-    let all = [Forkable; Unforkable]
+    let all = lazy [Forkable; Unforkable]
 
     let print ppf = function
       | Unforkable -> Fmt.fprintf ppf "unforkable"
@@ -667,7 +665,7 @@ module Lattices = struct
 
     let legacy = Unyielding
 
-    let all = [Unyielding; Yielding]
+    let all = lazy [Unyielding; Yielding]
 
     let print ppf = function
       | Yielding -> Fmt.fprintf ppf "yielding"
@@ -696,7 +694,7 @@ module Lattices = struct
 
     let legacy = Stateful
 
-    let all = [Stateless; Writing; Reading; Stateful]
+    let all = lazy [Stateless; Writing; Reading; Stateful]
 
     let print ppf = function
       | Stateless -> Fmt.fprintf ppf "stateless"
@@ -727,7 +725,7 @@ module Lattices = struct
 
     let legacy = Read_write
 
-    let all = [Read_write; Read; Write; Immutable]
+    let all = lazy [Read_write; Read; Write; Immutable]
 
     let print ppf = function
       | Immutable -> Fmt.fprintf ppf "immutable"
@@ -753,7 +751,7 @@ module Lattices = struct
 
     let legacy = Dynamic
 
-    let all = [Static; Dynamic]
+    let all = lazy [Static; Dynamic]
 
     let print ppf = function
       | Dynamic -> Fmt.fprintf ppf "dynamic"
@@ -796,10 +794,10 @@ module Lattices = struct
       lazy
         (let ( let* ) xs f = List.concat_map f xs in
          let ( let+ ) xs f = List.map f xs in
-         let* uniqueness = Uniqueness.all in
-         let* contention = Contention.all in
-         let* visibility = Visibility.all in
-         let+ staticity = Staticity.all in
+         let* uniqueness = Lazy.force Uniqueness.all in
+         let* contention = Lazy.force Contention.all in
+         let* visibility = Lazy.force Visibility.all in
+         let+ staticity = Lazy.force Staticity.all in
          { uniqueness; contention; visibility; staticity })
 
     (** Product values that cover every element of every axis at least once,
@@ -809,13 +807,13 @@ module Lattices = struct
         (let with_base base =
            let ( let+ ) xs f = List.map f xs in
            List.concat
-             [ (let+ uniqueness = Uniqueness.all in
+             [ (let+ uniqueness = Lazy.force Uniqueness.all in
                 { base with uniqueness });
-               (let+ contention = Contention.all in
+               (let+ contention = Lazy.force Contention.all in
                 { base with contention });
-               (let+ visibility = Visibility.all in
+               (let+ visibility = Lazy.force Visibility.all in
                 { base with visibility });
-               (let+ staticity = Staticity.all in
+               (let+ staticity = Lazy.force Staticity.all in
                 { base with staticity }) ]
          in
          with_base min @ with_base max)
@@ -945,12 +943,12 @@ module Lattices = struct
       lazy
         (let ( let* ) xs f = List.concat_map f xs in
          let ( let+ ) xs f = List.map f xs in
-         let* areality = Areality.all in
-         let* linearity = Linearity.all in
-         let* portability = Portability.all in
-         let* forkable = Forkable.all in
-         let* yielding = Yielding.all in
-         let+ statefulness = Statefulness.all in
+         let* areality = Lazy.force Areality.all in
+         let* linearity = Lazy.force Linearity.all in
+         let* portability = Lazy.force Portability.all in
+         let* forkable = Lazy.force Forkable.all in
+         let* yielding = Lazy.force Yielding.all in
+         let+ statefulness = Lazy.force Statefulness.all in
          { areality; linearity; portability; forkable; yielding; statefulness })
 
     (** Product values that cover every element of every axis at least once,
@@ -960,17 +958,17 @@ module Lattices = struct
         (let with_base base =
            let ( let+ ) xs f = List.map f xs in
            List.concat
-             [ (let+ areality = Areality.all in
+             [ (let+ areality = Lazy.force Areality.all in
                 { base with areality });
-               (let+ linearity = Linearity.all in
+               (let+ linearity = Lazy.force Linearity.all in
                 { base with linearity });
-               (let+ portability = Portability.all in
+               (let+ portability = Lazy.force Portability.all in
                 { base with portability });
-               (let+ forkable = Forkable.all in
+               (let+ forkable = Lazy.force Forkable.all in
                 { base with forkable });
-               (let+ yielding = Yielding.all in
+               (let+ yielding = Lazy.force Yielding.all in
                 { base with yielding });
-               (let+ statefulness = Statefulness.all in
+               (let+ statefulness = Lazy.force Statefulness.all in
                 { base with statefulness }) ]
          in
          with_base min @ with_base max)
@@ -1588,30 +1586,31 @@ module Lattices_mono = struct
       Obj Comonadic_with_regionality ]
 
   let get_elements : type a. full:bool -> a obj -> a list =
-   fun ~full -> function
-    | Locality -> Locality.all
-    | Regionality -> Regionality.all
-    | Uniqueness_op -> Uniqueness.all
-    | Linearity -> Linearity.all
-    | Portability -> Portability.all
-    | Forkable -> Forkable.all
-    | Yielding -> Yielding.all
-    | Statefulness -> Statefulness.all
-    | Contention_op -> Contention.all
-    | Visibility_op -> Visibility.all
-    | Staticity_op -> Staticity.all
-    | Monadic_op ->
-      Lazy.force (if full then Monadic.all else Monadic.spanning_elements)
-    | Comonadic_with_locality ->
-      Lazy.force
-        (if full
-         then Comonadic_with_locality.all
-         else Comonadic_with_locality.spanning_elements)
-    | Comonadic_with_regionality ->
-      Lazy.force
-        (if full
-         then Comonadic_with_regionality.all
-         else Comonadic_with_regionality.spanning_elements)
+   fun ~full obj ->
+    let elements : a list Lazy.t =
+      match obj with
+      | Locality -> Locality.all
+      | Regionality -> Regionality.all
+      | Uniqueness_op -> Uniqueness.all
+      | Linearity -> Linearity.all
+      | Portability -> Portability.all
+      | Forkable -> Forkable.all
+      | Yielding -> Yielding.all
+      | Statefulness -> Statefulness.all
+      | Contention_op -> Contention.all
+      | Visibility_op -> Visibility.all
+      | Staticity_op -> Staticity.all
+      | Monadic_op -> if full then Monadic.all else Monadic.spanning_elements
+      | Comonadic_with_locality ->
+        if full
+        then Comonadic_with_locality.all
+        else Comonadic_with_locality.spanning_elements
+      | Comonadic_with_regionality ->
+        if full
+        then Comonadic_with_regionality.all
+        else Comonadic_with_regionality.spanning_elements
+    in
+    Lazy.force elements
 
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
@@ -6025,6 +6024,14 @@ module Value_with (Areality : Areality) = struct
     let legacy =
       merge
         { comonadic = Comonadic.Const.legacy; monadic = Monadic.Const.legacy }
+
+    let all =
+      lazy
+        (let ( let* ) xs f = List.concat_map f xs in
+         let ( let+ ) xs f = List.map f xs in
+         let* comonadic = Lazy.force Comonadic.Const.all in
+         let+ monadic = Lazy.force Monadic.Const.all in
+         merge { comonadic; monadic })
 
     let meet m1 m2 =
       let m1 = split m1 in
