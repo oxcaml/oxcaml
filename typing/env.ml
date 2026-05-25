@@ -4275,8 +4275,6 @@ let open_pers_signature name env =
   path, env
 
 let open_pers_signature_cmi filename env =
-  (* Register as hidden so that direct user-code references to the module
-     are still reported as unbound; only transitive lookups can reach it. *)
   let global_name, _sign =
     Persistent_env.read_cmi_file !persistent_env filename
   in
