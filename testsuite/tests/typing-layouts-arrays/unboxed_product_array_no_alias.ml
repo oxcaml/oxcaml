@@ -87,6 +87,33 @@ let test_arrayget () =
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
 
+(* A whole-element [idx_mut] into a product array reads/writes the entire
+   product block.  Without deep-copying through [Pget_idx]/[Pset_idx] the
+   returned/stored value would alias the array slot. *)
+
+let test_idx_get_whole_element () =
+  let a = [| #{ x = 1; y = 1 } |] in
+  let whole : (u array, u) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  let u = Idx_mut.get a whole in
+  Idx_mut.set a
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
+      : (u array, _) idx_mut)
+    10;
+  assert (u.#y = 1);
+  assert ((array_get a 0).#y = 10)
+
+let test_idx_set_whole_element () =
+  let u = #{ x = 1; y = 1 } in
+  let a = [| #{ x = 0; y = 0 } |] in
+  let whole : (u array, u) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  Idx_mut.set a whole u;
+  Idx_mut.set a
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
+      : (u array, _) idx_mut)
+    10;
+  assert (u.#y = 1);
+  assert ((array_get a 0).#y = 10)
+
 let test_unsafe_arrayset () =
   let u = #{ x = 1; y = 1 } in
   let a = [| #{ x = 0; y = 0 } |] in
@@ -192,6 +219,29 @@ let test_ignorable_arrayget () =
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10)
 
+let test_ignorable_idx_get_whole_element () =
+  let a = [| #{ i = 1; f = #1.0 } |] in
+  let whole : (ig array, ig) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  let v = Idx_mut.get a whole in
+  Idx_mut.set a
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
+      : (ig array, _) idx_mut)
+    10;
+  assert (v.#i = 1);
+  assert ((array_get a 0).#i = 10)
+
+let test_ignorable_idx_set_whole_element () =
+  let v = #{ i = 1; f = #1.0 } in
+  let a = [| #{ i = 0; f = #0.0 } |] in
+  let whole : (ig array, ig) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  Idx_mut.set a whole v;
+  Idx_mut.set a
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
+      : (ig array, _) idx_mut)
+    10;
+  assert (v.#i = 1);
+  assert ((array_get a 0).#i = 10)
+
 let test_ignorable_makearray_dynamic () =
   let v = #{ i = 1; f = #1.0 } in
   let a = makearray_dynamic 3 v in
@@ -274,6 +324,8 @@ let () =
   test_makearray_multi ();
   test_arrayset ();
   test_arrayget ();
+  test_idx_get_whole_element ();
+  test_idx_set_whole_element ();
   test_unsafe_arrayset ();
   test_unsafe_arrayget ();
   test_makearray_dynamic ();
@@ -283,6 +335,8 @@ let () =
   test_ignorable_makearray ();
   test_ignorable_arrayset ();
   test_ignorable_arrayget ();
+  test_ignorable_idx_get_whole_element ();
+  test_ignorable_idx_set_whole_element ();
   test_ignorable_makearray_dynamic ();
   test_ignorable_arrayblit ();
   test_eval_order_makearray_dynamic ();
