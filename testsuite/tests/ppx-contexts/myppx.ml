@@ -3,8 +3,6 @@
 open Ast_mapper
 
 let () =
-  let quote_strings li =
-    List.map (Printf.sprintf "%S") li |> String.concat " " in
   let quote_option = function
     | None -> "None"
     | Some s -> Printf.sprintf "Some(%S)" s in
@@ -20,13 +18,12 @@ let () =
       Printf.eprintf "load_path: [%s]\n"
         (quote_strings !Config.load_path);
       *)
-      Printf.eprintf "open_modules: [%s]\n"
-        (quote_strings
-           (List.filter_map
-              (function
-                | Clflags.Open s -> Some s
-                | Open_cmi _ -> None)
-              !Clflags.open_args));
+      let quote_open_arg : Clflags.open_arg -> string = function
+        | Open s -> Printf.sprintf "Open(%S)" s
+        | Open_cmi s -> Printf.sprintf "Open_cmi(%S)" s
+      in
+      Printf.eprintf "open_args: [%s]\n"
+        (List.map quote_open_arg !Clflags.open_args |> String.concat " ");
       Printf.eprintf "for_package: %S\n"
         (quote_option !Clflags.for_package);
       Printf.eprintf "use_debug: %B\n"
