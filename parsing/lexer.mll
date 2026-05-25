@@ -1293,7 +1293,7 @@ and skip_hash_bang = parse
     in
       loop NoLine Initial lexbuf
 
-  let init ?(keyword_edition=None,[]) () =
+  let init ?(keyword_edition=Config.default_keyword_version,[]) () =
     populate_keywords keyword_edition;
     is_in_string := false;
     comment_start_loc := [];

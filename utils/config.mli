@@ -423,3 +423,6 @@ val has_fma : bool
 
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
+
+val default_keyword_version : (int * int) option
+(** The default set of keywords to assume when -keywords is not specified. *)
