@@ -959,8 +959,7 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
-let read_artifact penv artifact =
-  let filename = Unit_info.Artifact.filename artifact in
+let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
