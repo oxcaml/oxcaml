@@ -2060,17 +2060,32 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 let compute_record_repr
-    loc reprs lbls ~warn ~refining_block_with_any
-    ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
+    loc reprs lbls ~warn
+    ~non_float_values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
     ~represent_as_float_array
     ~flatten_floats
   =
-  (* Atomic fields must have layout value, independently of whether the
-     record is a mixed block. A single-field record with a non-value atomic
-     field would otherwise slip past the mixed-block patterns below. *)
-  check_atomic_fields_have_value_layout
-    (List.map fst reprs) (List.map fst lbls);
+  let mixed_float_float64_record () =
+    let shape =
+      List.map
+        (fun ((repr : Element_repr.t option), _lbl) ->
+          match repr with
+          | Some Float_element -> Float_boxed
+          | Some (Unboxed_element Float64) -> Float64
+          | Some Void -> Void
+          | Some (Unboxed_element (Float32
+                                  | Bits8 | Bits16 | Bits32 | Bits64
+                                  | Vec128 | Vec256 | Vec512 | Word
+                                  | Untagged_immediate | Product _))
+          | Some Value_element _ | None ->
+              Misc.fatal_error "Expected only floats and float64s")
+        reprs
+      |> Array.of_list
+    in
+    assert_mixed_product_support loc Record ~value_prefix_len:0;
+    Ok (Record_mixed shape)
+  in
   let mixed_record () =
     let shape =
       Element_repr.mixed_product_shape loc reprs Record
@@ -2082,102 +2097,73 @@ let compute_record_repr
     in
     Ok (Record_mixed shape)
   in
-  (* Important: If [refining_block_with_any] is true, we must use a plain
-      value block or mixed block. *)
-  match
-    ( ~refining_block_with_any, ~values, ~floats, ~atomic_floats,
-      ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
-      ~first_any )
-  with
-  (* If all fields are float/float64/void, we flatten the floats only when
-     opted in via [@@flatten_floats]. *)
-  | ~refining_block_with_any:false, ~values:false, ~floats:true,
-      ~atomic_floats:false, ~float64s:true,
-      ~non_float64_unboxed_fields:false, ~atomic_fields:false,
-      ~first_any:None, ..  ->
-    if flatten_floats then
-      let shape =
-        List.map
-          (fun ((repr : Element_repr.t option), _lbl) ->
-            match repr with
-            | Some Float_element -> Float_boxed
-            | Some (Unboxed_element Float64) -> Float64
-            | Some Void -> Void
-            | Some (Unboxed_element (Float32
-                                    | Bits8 | Bits16 | Bits32 | Bits64
-                                    | Vec128 | Vec256 | Vec512 | Word
-                                    | Untagged_immediate | Product _))
-            | Some Value_element _ | None ->
-                Misc.fatal_error "Expected only floats and float64s")
-          reprs
-        |> Array.of_list
-      in
-      assert_mixed_product_support loc Record ~value_prefix_len:0;
-      Ok (Record_mixed shape)
-    else
-      mixed_record ()
-  (* Forbid atomic fields in mixed blocks. Non-value atomic fields are
-     already rejected upfront with [Non_value_atomic_field]. *)
-  | ~values:true, ~voids:true, ~atomic_fields:true, ..
-  | ~floats:true, ~voids:true, ~atomic_fields:true, ..
-  | ~floats:true, ~float64s:true, ~atomic_fields:true, ..
-  | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
-  | ~values:true, ~float64s:true, ~atomic_fields:true, ..
-  | ~non_float64_unboxed_fields:true, ~atomic_fields:true, ..
-  | ~first_any:(Some _), ~atomic_fields:true, .. ->
-    let lbl, _ =
-      List.find (fun (lbl,_) -> Types.is_atomic lbl.Types.ld_mutable) lbls
-    in
-    raise (Error(lbl.Types.ld_loc, Atomic_field_in_mixed_block))
-  (* Any record with a field of kind [any] can't be represented. *)
-  | ~first_any:(Some id), .. ->
-    Result.Error (Unrepresentable_field (Ident.name id))
-  (* For other mixed blocks, float fields are stored as flat
-      only when they're unboxed.
-  *)
-  | ~values:true, ~voids:true, ~atomic_fields:false, ..
-  | ~floats:true, ~voids:true, ~atomic_fields:false, ..
-  | ~float64s:true, ~voids:true, ~atomic_fields:false, ..
-  | ~values:true, ~float64s:true, ~atomic_fields:false, ..
-  | ~non_float64_unboxed_fields:true, ~atomic_fields:false, .. ->
-    mixed_record ()
-  (* value-only records are stored as boxed records, as are records whose
-      declared types have fields of kind [any] *)
-  | ~values:true, ~float64s:false, ~non_float64_unboxed_fields: false,
-      ~voids:false, ..
-  | ~refining_block_with_any:true, .. ->
-    Ok Record_boxed
-  (* All-nonatomic-float and all-nonatomic-float64 records are stored as
-      flat float records.
-  *)
-  | ~values:false, ~floats:true, ~atomic_floats:false,
-      ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ~first_any:None, .. ->
-    Ok Record_float
-  | ~values:false, ~floats:false, ~atomic_floats:false,
-    ~float64s:true, ~non_float64_unboxed_fields:false,
-    ~voids:false, ~first_any:None, .. ->
-    if represent_as_float_array then
+  (* Atomic fields must have layout value, independently of whether the
+     record is a mixed block. A single-field record with a non-value atomic
+     field would otherwise slip past the mixed-block patterns below. *)
+  check_atomic_fields_have_value_layout
+    (List.map fst reprs) (List.map fst lbls);
+  let summary =
+    (* These partition all fields *)
+    ~non_float_values, ~floats, ~float64s, ~voids, ~non_float64_unboxed_fields
+  in
+  (* [CASE 1]. A record with a field of kind [any] can't be represented. *)
+  match first_any with
+  | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
+  | None ->
+  (* [CASE 2]. Attributes that require a particular representation *)
+  (* [@@represent_as_float_array]: all fields float64 and non-atomic *)
+  if represent_as_float_array then
+    match summary, ~atomic_fields with
+    | ( ~float64s:true, ~non_float_values:false, ~floats:false, ~voids:false,
+        ~non_float64_unboxed_fields:false ),
+      ~atomic_fields:false ->
       Ok Record_ufloat
-    else
-      mixed_record ()
-  (* Records with atomic float fields cannot use flat representation *)
-  | ~atomic_floats:true, ~first_any:None, .. ->
-    if warn && floats && not values
-    then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
+    | _ -> raise (Error (loc, Bad_represent_as_float_array_attribute))
+  (* [@@flatten_floats records]: at least one float and one float64, the rest
+    void, and all non-atomic *)
+  else if flatten_floats then
+    match summary, ~atomic_fields with
+    | ( ~floats:true, ~float64s:true, ~non_float_values:false, ~voids:false,
+        ~non_float64_unboxed_fields:false ),
+      ~atomic_fields:false ->
+      mixed_float_float64_record ()
+    | _ -> raise (Error (loc, Misplaced_flatten_floats))
+  (* [@atomic]: all values *)
+  else if atomic_fields then
+    match summary with
+    | ~non_float_values:_, ~floats:_, ~float64s:false, ~voids:false,
+        ~non_float64_unboxed_fields:false ->
+      if warn && atomic_floats && not non_float_values then
+        Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
+      Ok Record_boxed
+    | _ ->
+      let lbl, _ =
+        List.find (fun (lbl,_) -> Types.is_atomic lbl.Types.ld_mutable) lbls
+      in
+      raise (Error(lbl.Types.ld_loc, Atomic_field_in_mixed_block))
+  else
+  (* [CASE 3]. "Inferred" representations. *)
+  match summary with
+  (* Float records: all fields are [float] and none are atomic *)
+  | ~non_float_values:false, ~floats:true, ~float64s:false, ~voids:false,
+      ~non_float64_unboxed_fields:false ->
+    Ok Record_float
+  (* Boxed records: all fields are value *)
+  | ~non_float_values:_, ~floats:_, ~float64s:false, ~voids:false,
+      ~non_float64_unboxed_fields:false ->
     Ok Record_boxed
-  | ~values:false, ~floats:false, ~atomic_floats:false,
-      ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:_, ~atomic_fields:_, ~first_any:None, ..
-    [@warning "+9"] ->
-    Misc.fatal_error "Typedecl.compute_record_repr: empty record"
+  (* Mixed records: contains some unboxed type, does not flatten floats. *)
+  | ~non_float64_unboxed_fields:true, ..
+  | ~float64s:true, ..
+  | ~voids:true, .. ->
+    mixed_record ()
 
 (* For tracking what types appear in record blocks. All product layouts
    count only as a [non_float64_unboxed_field], even if it's a
    [float64 & float64] or [void & void].
 *)
 type element_repr_summary =
-  {  mutable values : bool; (* includes immediates. *)
+  {  mutable non_float_values : bool; (* includes immediates. *)
      mutable floats: bool;
      (* For purposes of this record, [floats] tracks whether any field
         has layout value and is known to be a float.
@@ -2199,7 +2185,7 @@ let compute_repr_summary env lbls jkinds =
       lbls jkinds
   in
   let repr_summary =
-    { values = false; floats = false; atomic_floats = false;
+    { non_float_values = false; floats = false; atomic_floats = false;
       atomic_fields = false; float64s = false;
       non_float64_unboxed_fields = false; voids = false; first_any = None;
     }
@@ -2226,7 +2212,7 @@ let compute_repr_summary env lbls jkinds =
                             | Vec128 | Vec256 | Vec512 | Word
                             | Untagged_immediate | Product _ ) ->
               repr_summary.non_float64_unboxed_fields <- true
-          | Value_element _ -> repr_summary.values <- true
+          | Value_element _ -> repr_summary.non_float_values <- true
           | Void ->
               repr_summary.voids <- true
           end)
@@ -2285,11 +2271,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
-      let { values; floats; atomic_floats; float64s;
+      let { non_float_values; floats; atomic_floats; float64s;
              non_float64_unboxed_fields; atomic_fields; voids;
              first_any } = repr_summary
       in
-      let refining_block_with_any = false in
       match form with
       | Legacy ->
         let ~represent_as_float_array, ~flatten_floats =
@@ -2300,12 +2285,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         in
         let rep =
           compute_record_repr loc reprs lbls ~represent_as_float_array
-            ~flatten_floats ~warn ~refining_block_with_any ~values ~floats
-            ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
-            ~voids ~first_any
+            ~flatten_floats ~warn ~non_float_values ~floats ~atomic_floats ~float64s
+            ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
         in
         if represent_as_float_array && rep <> Ok Record_ufloat then
-          raise (Error (loc, Bad_represent_as_float_array_attribute));
         if flatten_floats then begin
           match rep with
           | Ok rep when record_has_float_boxed rep -> ()
@@ -2338,21 +2321,21 @@ let update_record_kind (type rep) env loc (form : rep record_form)
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
     (* CR layouts: improve the readability of this match *)
-    let { values; floats; atomic_floats; float64s;
+    let { non_float_values; floats; atomic_floats; float64s;
             non_float64_unboxed_fields; atomic_fields; voids;
             first_any } = repr_summary
     in
-    let refining_block_with_any = true in
     match form with
     | Legacy ->
       let rep =
         compute_record_repr loc reprs lbls
           ~represent_as_float_array:false ~flatten_floats:false ~warn
-          ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
-          ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
+          ~non_float_values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
+          ~atomic_fields ~voids ~first_any
       in
       begin match rep with
-      | Ok (Record_boxed | Record_mixed _) -> ()
+      | Ok Record_boxed -> ()
+      | Ok (Record_mixed shape) when not (shape_has_float_boxed shape) -> ()
       | Ok _ ->
         Misc.fatal_error "none became something other than mixed"
       | Error _ -> ()
