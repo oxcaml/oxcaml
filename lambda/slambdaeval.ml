@@ -401,6 +401,11 @@ and eval_prim env prim =
   | Pmakeblock (n, mut, old_shape, mode) ->
     let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
+  | Pinit_module_block (n, mut, old_shape, mode, path) ->
+    let new_shape = eval_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Pinit_module_block (n, mut, new_shape, mode, path)
   | Pmixedfield (is, old_shape, sem) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmixedfield (is, new_shape, sem)
@@ -534,7 +539,8 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _) ->
+  | Pmakeblock (_, _, Shape shape, _)
+  | Pinit_module_block (_, _, Shape shape, _, _) ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape

@@ -1233,9 +1233,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Some exn_continuation -> exn_continuation
     in
     close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation
-  | (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _), []
-    ->
-    (* Special case for liftable empty block or array *)
+  | ( (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _),
+      [] ) ->
+    (* Special case for liftable empty block or array. [Pinit_module_block] is
+       intentionally excluded so that even an empty module block is bound to its
+       module symbol via [Lambda_to_flambda_primitives.convert_and_bind]. *)
     let acc, sym =
       match prim with
       | Pmakeblock (tag, _, shape, _mode) ->
@@ -1263,7 +1265,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         register_const0 acc (Static_const.empty_array array_kind) "empty_array"
       | Parrayblit _array_set_kind ->
         Misc.fatal_error "Closure_conversion.close_primitive: unimplemented"
-      | Pmakearray_dynamic _ | Pbytes_to_string | Pbytes_of_string
+      | Pmakearray_dynamic _ | Pinit_module_block _ | Pbytes_to_string
+      | Pbytes_of_string
       | Parray_of_iarray | Parray_to_iarray | Pignore | Pgetglobal _
       | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
@@ -3886,159 +3889,15 @@ let bind_static_consts_and_code acc body =
         defining_expr ~body)
     (acc, body) components
 
-(* Returns a tuple [block_shape, field_count, block_access, kind_of_field].
-   [block_access] and [kind_of_field] are function that take an index [pos] and
-   return the block_access/kind of the [pos]th field of the module. "Fields" are
-   physical, so unboxed products count as more than one field when indexing and
-   determining [field_count]. *)
-let final_module_block_representation acc
-    ~(module_repr : Lambda.module_representation) =
-  let (block_shape : K.Scannable_block_shape.t), block_access, field_count =
-    match module_repr with
-    | Module_value_only { field_count } ->
-      let block_access _pos : P.Block_access_kind.t =
-        Values
-          { tag = Known Tag.Scannable.zero;
-            size =
-              Known
-                (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
-            field_kind = Any_value
-          }
-      in
-      Value_only, block_access, field_count
-    | Module_mixed (shape, _) ->
-      let shape =
-        K.Mixed_block_lambda_shape.of_mixed_block_elements shape
-          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-      in
-      let flattened_reordered_shape =
-        K.Mixed_block_lambda_shape.flattened_reordered_shape shape
-      in
-      let block_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
-      let field_count = Array.length flattened_reordered_shape in
-      let block_access pos : P.Block_access_kind.t =
-        Lambda_to_flambda_primitives_helpers
-        .block_access_kind_of_mixed_field_element
-          ~tag:(Known Tag.Scannable.zero) ~size:Unknown ~kind_shape:block_shape
-          flattened_reordered_shape.(pos)
-      in
-      block_shape, block_access, field_count
-  in
-  let kind_of_field =
-    match block_shape with
-    | Value_only -> fun _ -> K.value
-    | Mixed_record shape ->
-      let field_kinds = K.Mixed_block_shape.field_kinds shape in
-      fun pos -> field_kinds.(pos)
-  in
-  block_shape, field_count, block_access, kind_of_field
-
-let wrap_final_module_block acc env ~program ~prog_return_cont
-    ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
-  let module_block_var = Variable.create "module_block" K.value in
-  let module_block_var_duid = Flambda_debug_uid.none in
-  let module_block_tag = Tag.Scannable.zero in
-  let block_shape, field_count, block_access, kind_of_field =
-    final_module_block_representation acc ~module_repr
-  in
-  let load_fields_body acc =
-    let env =
-      match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
-      | Some [approx] -> Env.add_var_approximation env module_block_var approx
-      | None | Some ([] | _ :: _) -> env
-    in
-    let module_block_simple =
-      let simple_var = Simple.var module_block_var in
-      match find_value_approximation env simple_var with
-      | Value_approximation.Value_symbol s -> Simple.symbol s
-      | _ -> simple_var
-    in
-    let field_vars =
-      List.init field_count (fun pos ->
-          let pos_str = string_of_int pos in
-          ( pos,
-            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
-            Flambda_debug_uid.none ))
-    in
-    let acc, body =
-      let static_const : Static_const.t =
-        let field_vars =
-          List.map
-            (fun (_, var, _) ->
-              Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
-            field_vars
-        in
-        Static_const.block module_block_tag Immutable block_shape field_vars
-      in
-      let acc, apply_cont =
-        (* Module initialisers return unit, but since that is taken care of
-           during Cmm generation, we can instead "return" [module_symbol] here
-           to ensure that its associated "let symbol" doesn't get deleted. *)
-        Apply_cont_with_acc.create acc return_cont
-          ~args:[Simple.symbol module_symbol]
-          ~dbg:Debuginfo.none
-      in
-      let acc, return = Expr_with_acc.create_apply_cont acc apply_cont in
-      let bound_static =
-        Bound_static.singleton (Bound_static.Pattern.block_like module_symbol)
-      in
-      let named =
-        Named.create_static_consts
-          (Static_const_group.create
-             [Static_const_or_code.create_static_const static_const])
-      in
-      Let_with_acc.create acc
-        (Bound_pattern.static bound_static)
-        named ~body:return
-    in
-    List.fold_left
-      (fun (acc, body) (pos, var, var_duid) ->
-        let var = VB.create var var_duid Name_mode.normal in
-        let pat = Bound_pattern.singleton var in
-        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
-        let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field with
-        | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
-          let named =
-            Named.create_prim
-              (Unary
-                 ( Block_load { kind = block_access pos; mut = Immutable; field },
-                   block ))
-              Debuginfo.none
-          in
-          Let_with_acc.create acc pat named ~body
-        | Field_contents sim ->
-          let named = Named.create_simple sim in
-          Let_with_acc.create acc pat named ~body)
-      (acc, body) (List.rev field_vars)
-  in
-  let load_fields_handler_param =
-    [BP.create module_block_var K.With_subkind.any_value module_block_var_duid]
-    |> Bound_parameters.create
-  in
-  (* This binds the return continuation that is free (or, at least, not bound)
-     in the incoming code. The handler for the continuation receives a tuple
-     with fields indexed from zero to [module_block_size_in_words]. The handler
-     extracts the fields; the variables bound to such fields are then used to
-     define the module block symbol. *)
-  let body acc =
-    let acc, body = program acc env in
-    bind_static_consts_and_code acc body
-  in
-  Let_cont_with_acc.build_non_recursive acc prog_return_cont
-    ~handler_params:load_fields_handler_param ~handler:load_fields_body ~body
-    ~is_exn_handler:false ~is_cold:false
-
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
-    ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
-    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region : mode close_program_result =
+    ~machine_width ~big_endian ~cmx_loader ~compilation_unit
+    ~module_repr:_ ~program ~prog_return_cont ~exn_continuation
+    ~toplevel_my_region ~toplevel_my_ghost_region : mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
       (Flambda2_import.Symbol.for_compilation_unit compilation_unit)
   in
-  let return_cont = Continuation.create ~sort:Toplevel_return () in
   let env, toplevel_my_region =
     Env.add_var_like env toplevel_my_region Not_user_visible
       Flambda_kind.With_subkind.region
@@ -4048,9 +3907,15 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       Flambda_kind.With_subkind.region
   in
   let acc = Acc.create ~cmx_loader ~machine_width in
+  (* [Pinit_module_block] now binds the module symbol via a static
+     [let_symbol] during primitive conversion, and the program ends by passing
+     that symbol to [prog_return_cont].  We can therefore use
+     [prog_return_cont] directly as the [Flambda_unit]'s return continuation,
+     without the previous [wrap_final_module_block] wrapping. *)
+  let return_cont = prog_return_cont in
   let acc, body =
-    wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
-      ~return_cont ~module_symbol
+    let acc, body = program acc env in
+    bind_static_consts_and_code acc body
   in
   let module_block_approximation =
     match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
