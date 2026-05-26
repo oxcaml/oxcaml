@@ -1634,7 +1634,13 @@ module Lattices_mono = struct
 
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
-       further, but we never need the missing operation) *)
+       further, but we never need the missing operation).
+
+      INVARIANT: each locality morphism below must preserve binary meets:
+        lm(x meet y) == lm(x) meet lm(y). If the invariant is broken,
+        [commute_meet_const_from_right] may no longer be correct (or implementable), and
+        we may need to change [Simple_morph.compose] and add the missing case in
+        [Simple_morph.t] *)
     type ('a, 'b, 'd) t =
       | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) t
           (** Maps local to regional, global to global *)
@@ -1941,6 +1947,11 @@ module Lattices_mono = struct
   end
 
   module Core_morph = struct
+    (* INVARIANT: each core morphism below must preserve binary meets:
+        cm(x meet y) == cm(x) meet cm(y). If the invariant is broken,
+        [commute_meet_const_from_right] may no longer be correct (or implementable), and
+        we may need to change [Simple_morph.compose] and add the missing case in
+        [Simple_morph.t] *)
     type ('a, 'b, 'd) t =
       | Locality_restricted :
           ('a, 'b, 'l * 'r) Locality_morph.t
@@ -2362,7 +2373,15 @@ module Lattices_mono = struct
     let commute_meet_const_from_right : type a b d.
         b obj -> (a, b, d) t -> a -> b =
      fun dst m c ->
-      (* All our morphisms preserve binary meets *)
+      (* All morphisms preserve binary meets. The correctness argument
+         thus goes as follows:
+
+         Consider [apply dst m (meet_const c x)].
+         [apply dst m (meet_const c x)]
+         == meet (apply dst m c) (apply dst m x) ;; [m] preserves binary meets
+         == meet_const (apply dst m c) (apply dst m x) ;; by definition of meet_const
+
+         The correct result for [commute_meet_const_from_right] is thus [apply dst m c] *)
       apply dst m c
 
     (* Commutes an implication through a morphism from the left, such that:
