@@ -623,3 +623,14 @@ Line 2, characters 13-41:
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields are not permitted in mixed blocks.
 |}]
+
+module Inline_record_atomic_in_mixed = struct
+  type t = A of { mutable f : int [@atomic]; u : int# }
+end
+
+[%%expect{|
+Line 2, characters 18-44:
+2 |   type t = A of { mutable f : int [@atomic]; u : int# }
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]

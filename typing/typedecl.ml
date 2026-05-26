@@ -1991,15 +1991,29 @@ let mixed_block_element env ty jkind =
   let unboxed_element = Element_repr.classify env ty jkind in
   Option.map Element_repr.to_shape_element unboxed_element
 
-let check_atomic_fields_have_value_layout reprs lbls =
+(* Atomic fields must have layout value and must not appear in mixed blocks
+   (records that have any non-value field). *)
+let check_atomic_fields reprs lbls =
+  let is_value (repr : Element_repr.t option) =
+    match repr with
+    | Some (Value_element _ | Float_element) -> true
+    | Some (Unboxed_element _ | Void) | None -> false
+  in
   List.iter2
-    (fun (repr : Element_repr.t option) (lbl : Types.label_declaration) ->
-       if Types.is_atomic lbl.ld_mutable then
-         match repr with
-         | Some (Value_element _ | Float_element) -> ()
-         | Some (Unboxed_element _ | Void) | None ->
-           raise (Error (lbl.ld_loc, Non_value_atomic_field)))
-    reprs lbls
+    (fun repr (lbl : Types.label_declaration) ->
+       if Types.is_atomic lbl.ld_mutable && not (is_value repr) then
+         raise (Error (lbl.ld_loc, Non_value_atomic_field)))
+    reprs lbls;
+  let has_non_value = List.exists (fun r -> not (is_value r)) reprs in
+  if has_non_value then
+    match
+      List.find_opt
+        (fun (lbl : Types.label_declaration) -> Types.is_atomic lbl.ld_mutable)
+        lbls
+    with
+    | Some (lbl : Types.label_declaration) ->
+      raise (Error (lbl.ld_loc, Atomic_field_in_mixed_block))
+    | None -> ()
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
@@ -2024,8 +2038,7 @@ let update_constructor_representation
             ld.Types.ld_type)
             fields arg_jkinds
         in
-        check_atomic_fields_have_value_layout
-          (List.map fst arg_reprs) fields;
+        check_atomic_fields (List.map fst arg_reprs) fields;
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
         |> Result.map_error (fun (Element_repr.Unrepresentable_element i) ->
              let bad_field = List.nth fields i in
@@ -2066,11 +2079,10 @@ let compute_record_repr
     ~represent_as_float_array
     ~flatten_floats
   =
-  (* Atomic fields must have layout value, independently of whether the
-     record is a mixed block. A single-field record with a non-value atomic
-     field would otherwise slip past the mixed-block patterns below. *)
-  check_atomic_fields_have_value_layout
-    (List.map fst reprs) (List.map fst lbls);
+  (* Reject atomic fields with a non-value layout or in mixed blocks. After
+     this, atomic_fields:true should imply Record_boxed (value-only or
+     atomic-float), so the match below need *)
+  check_atomic_fields (List.map fst reprs) (List.map fst lbls);
   let mixed_record () =
     let shape =
       Element_repr.mixed_product_shape loc reprs Record
@@ -2116,19 +2128,6 @@ let compute_record_repr
       Ok (Record_mixed shape)
     else
       mixed_record ()
-  (* Forbid atomic fields in mixed blocks. Non-value atomic fields are
-     already rejected upfront with [Non_value_atomic_field]. *)
-  | ~values:true, ~voids:true, ~atomic_fields:true, ..
-  | ~floats:true, ~voids:true, ~atomic_fields:true, ..
-  | ~floats:true, ~float64s:true, ~atomic_fields:true, ..
-  | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
-  | ~values:true, ~float64s:true, ~atomic_fields:true, ..
-  | ~non_float64_unboxed_fields:true, ~atomic_fields:true, ..
-  | ~first_any:(Some _), ~atomic_fields:true, .. ->
-    let lbl, _ =
-      List.find (fun (lbl,_) -> Types.is_atomic lbl.Types.ld_mutable) lbls
-    in
-    raise (Error(lbl.Types.ld_loc, Atomic_field_in_mixed_block))
   (* Any record with a field of kind [any] can't be represented. *)
   | ~first_any:(Some id), .. ->
     Result.Error (Unrepresentable_field (Ident.name id))
@@ -2174,6 +2173,12 @@ let compute_record_repr
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
     Ok Record_boxed
+  (* Any remaining atomic-bearing shape should have been rejected by
+     [check_atomic_fields] above. *)
+  | ~atomic_fields:true, .. ->
+    Misc.fatal_error
+      "Typedecl.compute_record_repr: atomic field should have been \
+       rejected by check_atomic_fields"
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:_, ~atomic_fields:_, ~first_any:None, ..
