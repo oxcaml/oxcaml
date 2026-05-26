@@ -62,7 +62,7 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
        ~init:true)
   in
   (* Visit blocks reverse-reachable from [from_block], stopping at dominators of
-     the block for which we search a definion. *)
+     the block for which we search a definition. *)
   let visit_non_dominating_predecessors ~(from_block : C.basic_block) ~reg :
       bool =
     let visited = ref Label.Set.empty in
