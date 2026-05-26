@@ -2372,10 +2372,27 @@ module Lattices_mono = struct
     let commute_imply_from_left : type a b l.
         b obj -> b -> (a, b, l * allowed) t -> a =
      fun dst c m ->
-      (* As all our morphisms preserve binary meets, implications can be
-         pushed inside of [m] by applying the left adjoint of [m] to the
-         implicant. *)
-      apply (src m) (left_adjoint dst m) c
+      (* The correctness argument for [commute_imply_from_the_left] follows from the
+         correctness argument for [commute_meet_const_from_the_right] as follows:
+
+         Consider [imply_const c (apply dst m x)]. Recall that [imply_const] is only
+         allowed on the right-hand side of a constraint; say
+         [y < imply_const c (apply dst m x)]
+         <=> [meet_const c y < apply dst m x] ;; the left adjoint of imply is meet.
+         <=> [apply src m' (meet_const c y) < x] ;; where [m'] is the left adoint of [m]
+
+         We can now apply the correctness criteria of [commute_meet_const_from_right] and
+         commute the meet through [m']:
+         <=> [meet_const (commute_meet_const_from_right src m' c) (apply src m' y) < x]
+         <=> [apply src m' y < imply_const (commute_meet_const_from_right src m' c) x]
+          ;; the right adjoint of meet is imply
+         <=> [y < apply dst m (imply_const (commute_meet_const_from_right src m' c) x)]
+          ;; the right adjoint of [m'] is [m]
+
+         We have [apply dst m (imply_const (commute_meet_const_from_right src m' c) x)]
+         equivalent to [imply_const c (apply dst m x)] as desired.
+      *)
+      commute_meet_const_from_right (src m) (left_adjoint dst m) c
 
     type ('a, 'b, 'd) compose_proj_result =
       | Proj_core :
