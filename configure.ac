@@ -892,18 +892,25 @@ AC_ARG_ENABLE([assembler-suitable-for-dissector],
     [Use LLVM assembler with large code mode for dissector. If PATH is not
      specified, llvm-mc must be on PATH.  Overrides any setting of AS])])
 
-AC_ARG_ENABLE([keyword-version],
-  [AS_HELP_STRING([--enable-keyword-version=X.Y],
+AC_ARG_ENABLE([keyword-edition],
+  [AS_HELP_STRING([--enable-keyword-edition=X.Y@<:@+keyword@:>@@<:@+...@:>@],
     [Use the keyword set of OCaml X.Y by default; keywords from later versions
      are able to be used as identifiers.])],
-  [AS_CASE([$enable_keyword_version],
+  [dnl cf. Clflags.parse_keyword_edition
+   edition="${enable_keyword_edition%%+*}"
+   keywords="${enable_keyword_edition[#]*+}"
+   test x"$keywords" != x"$enable_keyword_edition" || keywords=''
+   dnl The strange dnl' on the next line is for syntax highlighting!
+   AS_IF([test x"$(echo "$keywords" | tr -d "[[:alnum:]]'+_")" != 'x'], dnl'
+    [AC_MSG_ERROR([invalid argument to --enable-keyword-edition])])
+   keywords="$(echo "$keywords" | sed -e 's/[[^+]][[^+]]*/"&"/g;s/+/; /g')"
+   AS_CASE([$edition],
     [[[1-9]].[[0-9]]|[[1-9]].[[0-9]][[0-9]]],
-      [v="$enable_keyword_version"
-       default_keyword_version="Some (${v%.*}, ${v[#]*.})"],
-    [no], [default_keyword_version='None'],
-    [AC_MSG_ERROR([invalid argument to --enable-keyword-version])])],
-  [default_keyword_version='None'])
-AC_SUBST([default_keyword_version])
+      [default_keyword_edition="Some (${edition%.*}, ${edition[#]*.}), [[$keywords]]"],
+    [no], [default_keyword_edition='None, [[]]'],
+    [AC_MSG_ERROR([invalid argument to --enable-keyword-edition])])],
+  [default_keyword_edition='None, [[]]'])
+AC_SUBST([default_keyword_edition])
 
 AC_ARG_WITH([flexdll],
   [AS_HELP_STRING([--with-flexdll],

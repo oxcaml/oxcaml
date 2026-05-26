@@ -151,4 +151,4 @@ let objcopy = {@QS@|@objcopy@|@QS@}
 
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
 
-let default_keyword_version = @default_keyword_version@
+let default_keyword_edition = @default_keyword_edition@
