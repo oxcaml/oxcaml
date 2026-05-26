@@ -2366,8 +2366,8 @@ module Lattices_mono = struct
       apply dst m c
 
     (* Commutes an implication through a morphism from the left, such that:
-       [apply dst m (meet_const c x)] is equivalent to
-       [meet_const (commute_imply_from_left dst m c) (apply dst m x)]
+       [imply_const c (apply dst m x)] is equivalent to
+       [apply dst m (imply_const (commute_imply_from_left dst c m) x)]
     *)
     let commute_imply_from_left : type a b l.
         b obj -> b -> (a, b, l * allowed) t -> a =
