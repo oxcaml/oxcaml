@@ -8,5 +8,10 @@ a
 b
 c
 d
-Printing a float#: 1.000000
-Printing a float: 2.000000
+Refining to float64 ==
+1.000000
+Refining to float ==
+2.000000
+Refining to mixed ==
+1.000000
+10.000000
