@@ -30,9 +30,7 @@ This argument cannot be applied with label "~y"
 let f ?x ~a ?y ~z () = ()
 let g = f ?y:None ?x:None ~a:()
 [%%expect {|
-val f :
-  ('a : any) 'b ('c : any) 'd. ?x:'a -> a:'b -> ?y:'c -> z:'d -> unit -> unit =
-  <fun>
+val f : ?x:'a -> a:'b -> ?y:'c -> z:'d -> unit -> unit = <fun>
 Line 2, characters 13-17:
 2 | let g = f ?y:None ?x:None ~a:()
                  ^^^^
@@ -121,7 +119,7 @@ This argument cannot be applied with label "~b"
 
 let f ?x ?y () = ();;
 [%%expect{|
-val f : ('a : any) ('b : any). ?x:'a -> ?y:'b -> unit -> unit = <fun>
+val f : ?x:'a -> ?y:'b -> unit -> unit = <fun>
 |}]
 ;;
 

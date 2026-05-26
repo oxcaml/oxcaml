@@ -1343,7 +1343,15 @@ let f (x : t_void) =
   ()
 
 [%%expect{|
-val f : t_void -> unit = <fun>
+Line 2, characters 16-17:
+2 |   let _g ?(x2 = x) () = () in
+                    ^
+Error: This expression has type "t_void" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of t_void is void
+         because of the definition of t_void at line 1, characters 0-18.
+       But the layout of t_void must be a value layout
+         because the type argument of option has layout value_or_null.
 |}]
 
 (*********************************************************)
