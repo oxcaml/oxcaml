@@ -114,15 +114,7 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_module_allocation () =
-  let upper_bound =
-    Value.of_const
-      ~hint_comonadic:Module_allocated_on_heap
-      { Value.Const.max with areality = Global }
-  in
-  fst (Value.newvar_below upper_bound)
-
-let register_closure_allocation () : Alloc.lr * Value.lr =
+let register_allocation () : Alloc.lr * Value.lr =
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -3161,7 +3153,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_closure_allocation ()
+        register_allocation ()
       in
       let newenv =
         Env.add_closure_lock
@@ -3622,7 +3614,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
-  let md_mode = register_module_allocation () in
+  let _, md_mode = register_allocation () in
   let loc_md = location_of_structure sstr in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
@@ -4282,7 +4274,7 @@ let type_package env m p fl =
       with Ctype.Unify _ ->
         raise (Error(modl.mod_loc, env, Scoping_pack (n,ty))))
     fl';
-  let mode = register_module_allocation () in
+  let _, mode = register_allocation () in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
