@@ -46,6 +46,7 @@ struct caml_ephe_info {
      may be unmarked if these ephemerons were the target of a blit operation.
      The data field is never unmarked. */
 
+<<<<<<< OxCaml
   int must_sweep_ephe;
   /* At the beginning of [Phase_sweep_ephe] the [live] list is moved to the
      [todo] list since the ephemerons in the [live] list may contain unmarked
@@ -54,7 +55,27 @@ struct caml_ephe_info {
      exactly once per major cycle per domain. This field keeps track of whether
      this move has been done for the current cycle. */
 
+||||||| Upstream OCaml
+  int must_sweep_ephe;
+  /* At the beginning of [Phase_sweep_ephe] the [live] list is moved
+     to the [todo] list since the ephemerons in the [live] list may
+     contain unmarked keys if the blit operation was performed in
+     earlier phases. This move is done exactly once per major cycle
+     per domain. This field keeps track of whether this move has been
+     done for the current cycle. */
+
+=======
+>>>>>>> ocaml/ocaml#14733
   uintnat round;
+<<<<<<< OxCaml
+||||||| Upstream OCaml
+  /* Records the number of the round of ephemeron marking most
+   * recently completed in the current cycle. */
+=======
+  /* Records the number of the round of ephemeron marking most
+   * recently completed in the current cycle. */
+
+>>>>>>> ocaml/ocaml#14733
   struct {
     value* todop;
     uintnat round;
