@@ -2145,6 +2145,19 @@ let compute_record_repr
   (* Any record with a field of kind [any] can't be represented. *)
   | ~first_any:(Some id), .. ->
     Result.Error (Unrepresentable_field (Ident.name id))
+  | ~values:false, ~floats:false, ~atomic_floats:false,
+    ~float64s:true, ~non_float64_unboxed_fields:false,
+    ~voids:false, ~first_any:None, .. ->
+    if represent_as_float_array then begin
+      if refining_block_with_any then
+        (* CR-soon rtjoa: This fatal error is included for an abundance of
+           caution. We should make this function more defensive as a whole *)
+        Misc.fatal_error
+          "Typedecl.compute_record_repr: refining any with \
+           [@@represent_as_float_array]";
+      Ok Record_ufloat
+    end else
+      mixed_record ()
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
   *)
@@ -2167,13 +2180,6 @@ let compute_record_repr
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:false, ~first_any:None, .. ->
     Ok Record_float
-  | ~values:false, ~floats:false, ~atomic_floats:false,
-    ~float64s:true, ~non_float64_unboxed_fields:false,
-    ~voids:false, ~first_any:None, .. ->
-    if represent_as_float_array then
-      Ok Record_ufloat
-    else
-      mixed_record ()
   (* Records with atomic float fields cannot use flat representation *)
   | ~atomic_floats:true, ~first_any:None, .. ->
     if warn && floats && not values
