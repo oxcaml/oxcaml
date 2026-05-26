@@ -2081,7 +2081,7 @@ let compute_record_repr
   =
   (* Reject atomic fields with a non-value layout or in mixed blocks. After
      this, atomic_fields:true should imply Record_boxed (value-only or
-     atomic-float), so the match below need *)
+     atomic-float) *)
   check_atomic_fields (List.map fst reprs) (List.map fst lbls);
   let mixed_record () =
     let shape =
