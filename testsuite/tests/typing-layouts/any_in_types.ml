@@ -131,11 +131,17 @@ end = struct
   type t = #{ i : int; r : Rec_unboxed_record_1.t }
 end
 
-(* Refining block with any to all-float64 record *)
 type ('a : any) t = { a : 'a }
 
+(* Refining block with any to all-float64 record *)
 let () =
   let t : float# t = { a = #1.0 } in
   let f = t.a in
   Printf.printf "Printing a float#: %f\n"
     (Stdlib_upstream_compatible.Float_u.to_float f)
+
+(* Refining block with any to float record *)
+let () =
+  let x : float t = { a = 1.0 } in
+  let y = x.a +. 1.0 in
+  Printf.printf "Printing a float: %f\n" y
