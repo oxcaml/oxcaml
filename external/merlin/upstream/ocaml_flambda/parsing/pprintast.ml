@@ -377,6 +377,8 @@ let include_kind f = function
   | Functor -> pp f "@ functor"
   | Structure -> ()
 
+type function_delimiter = Arrow | Equals
+
 (* c ['a,'b] *)
 let rec class_params_def f =  function
   | [] -> ()
@@ -949,12 +951,12 @@ and expression ctxt f x =
           | [], constraint_ ->
             pp f "@[<2>(%a%a)@]"
               (function_body ctxt) body
-              (function_constraint ctxt) constraint_
+              (function_constraint ~followed_by_arrow:false ctxt) constraint_
           | _ :: _, _ ->
             pp f "@[<2>fun@;%t@]"
               (fun f ->
                 function_params_then_body
-                  ctxt f params constraint_ body ~delimiter:"->")
+                  ctxt f params constraint_ body ~delimiter:Arrow)
         end
     | Pexp_match (e, l) ->
         pp f "@[<hv0>@[<hv0>@[<2>match %a@]@ with@]%a@]"
@@ -1708,7 +1710,7 @@ and pp_print_params_then_equals ctxt f x =
   match x.pexp_desc with
   | Pexp_function (params, constraint_, body) ->
       function_params_then_body ctxt f params constraint_ body
-        ~delimiter:"="
+        ~delimiter:Equals
   | _ -> pp_print_pexp_newtype ctxt "=" f x
 
 and poly_type ctxt core_type f (vars, typ) =
@@ -2292,16 +2294,21 @@ and function_body ctxt f x =
       (item_attributes ctxt) attrs
       (case_list ctxt) cases
 
-and function_constraint ctxt f x =
-  (* We don't print [mode_annotations], which describes the whole function and goes on the
-     [let] binding. *)
+and function_constraint ~followed_by_arrow ctxt f x =
+  (* We don't print [mode_annotations], which describes the whole function and
+     goes on the [let] binding. *)
   (* Enable warning 9 to ensure that the record pattern doesn't miss any field.
   *)
   match[@ocaml.warning "+9"] x with
   | { ret_type_constraint = Some (Pconstraint ty); ret_mode_annotations; _ } ->
-
-    pp f "@;:@;%a@;"
-      (core_type2_with_optional_modes ctxt) (ty, ret_mode_annotations)
+    (* We need extra parens around the type if the next character is an arrow,
+       to avoid printing [fun x : int -> int -> x] *)
+    let print_ty =
+      if followed_by_arrow
+      then core_type1_with_optional_modes core_type1 ctxt
+      else core_type2_with_optional_modes ctxt
+    in
+    pp f "@;:@;%a@;" print_ty (ty, ret_mode_annotations)
   | { ret_type_constraint = Some (Pcoerce (ty1, ty2)); _ } ->
     pp f "@;%a:>@;%a"
       (option ~first:":@;" (core_type ctxt)) ty1
@@ -2310,6 +2317,11 @@ and function_constraint ctxt f x =
     pp f "%a" optional_at_modes ret_mode_annotations
 
 and function_params_then_body ctxt f params constraint_ body ~delimiter =
+  let followed_by_arrow, delimiter =
+    match delimiter with
+    | Arrow -> true, "->"
+    | Equals -> false, "="
+  in
   let pp_params f =
     match params with
     | [] -> ()
@@ -2317,7 +2329,7 @@ and function_params_then_body ctxt f params constraint_ body ~delimiter =
   in
   pp f "%t%a%s@;%a"
     pp_params
-    (function_constraint ctxt) constraint_
+    (function_constraint ~followed_by_arrow ctxt) constraint_
     delimiter
     (function_body (under_functionrhs ctxt)) body
 

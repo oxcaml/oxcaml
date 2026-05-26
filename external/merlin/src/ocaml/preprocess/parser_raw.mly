@@ -1172,7 +1172,6 @@ let merloc startpos ?endpos x =
 %token NONREC [@cost 1] [@symbol "nonrec"]
 %token OBJECT [@symbol "object"]
 %token OF [@symbol "of"]
-%token ONCE [@symbol "once"]
 %token OPEN [@symbol "open"]
 %token <string> OPTLABEL [@cost 2] [@recovery "_"][@printer Printf.sprintf "OPTLABEL(%S)"] [@symbol "?<label>"]
 %token OR [@symbol "or"]
@@ -1195,7 +1194,6 @@ let merloc startpos ?endpos x =
 %token RPAREN [@symbol ")"]
 %token SEMI [@symbol ";"]
 %token SEMISEMI [@symbol ";;"]
-%token UNIQUE [@symbol "unique"]
 %token HASH [@symbol "#"]
 %token HASH_SUFFIX [@symbol "# "]
 %token <string> HASHOP [@cost 2] [@recovery ""][@printer Printf.sprintf "HASHOP(%S)"] [@symbol "#<op>"]
@@ -4325,7 +4323,8 @@ jkind_decl:
   pjkind_manifest=jkind_manifest
   attrs2=post_item_attributes
     {
-      let pjkind_attributes = attrs1 @ attrs2 in
+      let docs = symbol_docs $sloc in
+      let pjkind_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let pjkind_loc = make_loc $sloc in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }
@@ -4862,10 +4861,6 @@ strict_function_or_labeled_tuple_type:
 %inline mode_legacy:
    | LOCAL
        { mkloc (Mode "local") (make_loc $sloc) }
-   | UNIQUE
-       { mkloc (Mode "unique") (make_loc $sloc) }
-   | ONCE
-       { mkloc (Mode "once") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
