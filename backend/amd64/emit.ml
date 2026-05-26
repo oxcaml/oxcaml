@@ -2609,9 +2609,10 @@ let emit_instr ~first ~last ~fallthrough i =
         (* retaddr + rbp *)
       in
       I.lea (mem64 NONE delta (Scalar RSP)) rbp
-  | Ladjust_stack_offset { delta_bytes } ->
+  | Ladjust_stack_offset { delta_bytes; pushed_slots } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
-    stack_offset := !stack_offset + delta_bytes
+    stack_offset := !stack_offset + delta_bytes;
+    pushed_stack_slots := pushed_slots
   | Lpushtrap { lbl_handler } ->
     let lbl_handler = label_to_asm_label ~section:Text lbl_handler in
     emit_push_trap_label lbl_handler;

@@ -67,7 +67,8 @@ module Vars = struct
         | Lop (Stackoffset delta) -> t.stack_offset + delta
         | Lpushtrap _ -> t.stack_offset + Proc.trap_frame_size_in_bytes
         | Lpoptrap _ -> t.stack_offset - Proc.trap_frame_size_in_bytes
-        | Ladjust_stack_offset { delta_bytes } -> t.stack_offset + delta_bytes
+        | Ladjust_stack_offset { delta_bytes; pushed_slots = _ } ->
+          t.stack_offset + delta_bytes
         | Lop (Specific op) ->
           t.stack_offset + Arch.specific_operation_stack_offset_delta op
         | Lend | Lprologue | Lepilogue_open | Lepilogue_close | Lop _

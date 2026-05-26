@@ -394,15 +394,94 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
         ->
         assert false)
 
+(* Compute the [pushed_slots] state (list of pushed slot types, top of stack
+   first) at the entry of each block, by data-flow propagation along normal CFG
+   edges. Push/pop instructions inside a block update the running state; at
+   merges every predecessor must agree. *)
+let compute_pushed_slots_per_block (cfg : Cfg.t) :
+    Cmm.machtype_component list Label.Tbl.t =
+  let pushed_slots_per_block = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
+  let apply_block_body (block : Cfg.basic_block) state =
+    DLL.fold_left block.body ~init:state
+      ~f:(fun acc (instr : Cfg.basic Cfg.instruction) ->
+        match[@ocaml.warning "-4"] instr.desc with
+        | _ when Proc.is_push_to_stack instr.desc ->
+          (instr.arg.(0) : Reg.t).typ :: acc
+        | _ when Proc.is_pop_from_stack instr.desc -> (
+          match acc with
+          | top :: rest ->
+            if not (Cmm.equal_machtype_component top instr.res.(0).typ)
+            then
+              Misc.fatal_errorf
+                "cfg_to_linear: pop type disagrees with the corresponding push \
+                 in block %a at instruction %a"
+                Label.format block.start InstructionId.format instr.id;
+            rest
+          | [] ->
+            Misc.fatal_errorf
+              "cfg_to_linear: pop from empty pushed_slots in block %a at \
+               instruction %a"
+              Label.format block.start InstructionId.format instr.id)
+        (* The trap handler entry state below assumes no [Ipush_to_stack] slots
+           are live when a [Pushtrap] executes; otherwise the handler's actual
+           push state would inherit those slots rather than be empty. *)
+        | Pushtrap _ when not (List.is_empty acc) ->
+          Misc.fatal_errorf
+            "cfg_to_linear: Pushtrap with non-empty pushed_slots in block %a \
+             at instruction %a"
+            Label.format block.start InstructionId.format instr.id
+        | _ -> acc)
+  in
+  let worklist = Queue.create () in
+  let propagate succ state =
+    match Label.Tbl.find_opt pushed_slots_per_block succ with
+    | None ->
+      Label.Tbl.add pushed_slots_per_block succ state;
+      Queue.add succ worklist
+    | Some existing ->
+      if
+        not
+          (List.equal
+             (fun a b -> Cmm.equal_machtype_component a b)
+             existing state)
+      then
+        Misc.fatal_errorf "cfg_to_linear: inconsistent pushed_slots at %a"
+          Label.format succ
+  in
+  propagate cfg.entry_label [];
+  while not (Queue.is_empty worklist) do
+    let label = Queue.pop worklist in
+    let block = Cfg.get_block_exn cfg label in
+    let entry_state = Label.Tbl.find pushed_slots_per_block label in
+    let exit_state = apply_block_body block entry_state in
+    let normal_successors =
+      Cfg.successor_labels block ~normal:true ~exn:false
+    in
+    Label.Set.iter (fun succ -> propagate succ exit_state) normal_successors;
+    (* Exception successors: when raised, the runtime unwinds to the trap
+       handler's saved SP, discarding any [Ipush_to_stack] pushes performed
+       since the matching pushtrap. So trap handlers always enter with an empty
+       push stack. *)
+    Option.iter (fun exn_label -> propagate exn_label []) block.exn
+  done;
+  pushed_slots_per_block
+
 let adjust_stack_offset body (block : Cfg.basic_block)
-    ~(prev_block : Cfg.basic_block) =
+    ~(prev_block : Cfg.basic_block) ~pushed_slots_per_block =
   let block_stack_offset = block.stack_offset in
   let prev_stack_offset = prev_block.terminator.stack_offset in
   if block_stack_offset = prev_stack_offset
   then body
   else
     let delta_bytes = block_stack_offset - prev_stack_offset in
-    to_linear_instr (Ladjust_stack_offset { delta_bytes }) ~next:body
+    let pushed_slots =
+      match Label.Tbl.find_opt pushed_slots_per_block block.start with
+      | Some s -> s
+      | None -> []
+    in
+    to_linear_instr
+      (Ladjust_stack_offset { delta_bytes; pushed_slots })
+      ~next:body
 
 let make_Llabel cfg_with_layout label =
   Linear.Llabel
@@ -417,6 +496,7 @@ let make_Llabel cfg_with_layout label =
    block more than once. *)
 let run cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
+  let pushed_slots_per_block = compute_pushed_slots_per_block cfg in
   let layout = CL.layout cfg_with_layout in
   let next = ref Linear_utils.labelled_insn_end in
   let tailrec_label = ref None in
@@ -470,7 +550,7 @@ let run cfg_with_layout =
               }
             else body
           in
-          adjust_stack_offset body block ~prev_block
+          adjust_stack_offset body block ~prev_block ~pushed_slots_per_block
       in
       next := { Linear_utils.label; insn });
   let fun_contains_calls = cfg.fun_contains_calls in

@@ -1872,7 +1872,7 @@ let emit_instr env i =
               femit_label lbltbl
         done *)
   | Lentertrap -> ()
-  | Ladjust_stack_offset { delta_bytes } ->
+  | Ladjust_stack_offset { delta_bytes; pushed_slots = _ } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
     Env.set_stack_offset env (Env.stack_offset env + delta_bytes)
   | Lpushtrap { lbl_handler } ->
