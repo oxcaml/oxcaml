@@ -1233,8 +1233,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Some exn_continuation -> exn_continuation
     in
     close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation
-  | ( (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _),
-      [] ) ->
+  | (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _), []
+    ->
     (* Special case for liftable empty block or array. [Pinit_module_block] is
        intentionally excluded so that even an empty module block is bound to its
        module symbol via [Lambda_to_flambda_primitives.convert_and_bind]. *)
@@ -1266,9 +1266,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Parrayblit _array_set_kind ->
         Misc.fatal_error "Closure_conversion.close_primitive: unimplemented"
       | Pmakearray_dynamic _ | Pinit_module_block _ | Pbytes_to_string
-      | Pbytes_of_string
-      | Parray_of_iarray | Parray_to_iarray | Pignore | Pgetglobal _
-      | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
+      | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray | Pignore
+      | Pgetglobal _ | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
       | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
       | Psequor | Pnot | Pmixedfield _ | Psetmixedfield _ | Poffsetref _
@@ -3890,9 +3889,9 @@ let bind_static_consts_and_code acc body =
     (acc, body) components
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
-    ~machine_width ~big_endian ~cmx_loader ~compilation_unit
-    ~module_repr:_ ~program ~prog_return_cont ~exn_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region : mode close_program_result =
+    ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr:_
+    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
+    ~toplevel_my_ghost_region : mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -3907,11 +3906,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       Flambda_kind.With_subkind.region
   in
   let acc = Acc.create ~cmx_loader ~machine_width in
-  (* [Pinit_module_block] now binds the module symbol via a static
-     [let_symbol] during primitive conversion, and the program ends by passing
-     that symbol to [prog_return_cont].  We can therefore use
-     [prog_return_cont] directly as the [Flambda_unit]'s return continuation,
-     without the previous [wrap_final_module_block] wrapping. *)
+  (* [Pinit_module_block] now binds the module symbol via a static [let_symbol]
+     during primitive conversion, and the program ends by passing that symbol to
+     [prog_return_cont]. We can therefore use [prog_return_cont] directly as the
+     [Flambda_unit]'s return continuation, without the previous
+     [wrap_final_module_block] wrapping. *)
   let return_cont = prog_return_cont in
   let acc, body =
     let acc, body = program acc env in

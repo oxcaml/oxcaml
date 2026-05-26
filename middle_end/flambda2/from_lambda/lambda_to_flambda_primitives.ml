@@ -3380,7 +3380,7 @@ let emit_init_module_block_let_symbol acc (path : Path.t) (tag : int)
   let field_simples =
     List.flatten args
     |> List.map (fun simple ->
-           Simple.With_debuginfo.create simple Debuginfo.none)
+        Simple.With_debuginfo.create simple Debuginfo.none)
   in
   let static_const =
     Static_const.block
