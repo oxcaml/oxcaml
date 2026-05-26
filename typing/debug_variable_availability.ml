@@ -15,10 +15,29 @@
 module VA = Type_shape.Variable_availability
 
 module Walk = struct
-  type t = { mutable current_function : VA.source_function }
+  (* [seen_idents] records the first [Shape.Uid.t] under which each
+     [Ident.t] was registered. When a later registration uses the same
+     [Ident.t] with a different uid, the new variable has been merged
+     with the original (e.g. by [enter_orpat_variables] alpha-renaming
+     the right arm of an or-pattern). Same-id-same-uid revisits are
+     just the iterator re-entering a node already registered by an
+     enclosing handler (function parameters, comprehension indices,
+     etc.) and are ignored. *)
+  type t =
+    { mutable current_function : VA.source_function;
+      seen_idents : (Ident.t, Shape.Uid.t) Hashtbl.t
+    }
 
-  let register_var t ~uid ~name ~location ~kind =
-    VA.register_source_variable t.current_function ~uid ~name ~location ~kind
+  let note_ident t ~id ~uid =
+    match Hashtbl.find_opt t.seen_idents id with
+    | None -> Hashtbl.add t.seen_idents id uid
+    | Some prev_uid ->
+      if not (Shape.Uid.equal prev_uid uid)
+      then VA.register_merged_uid ~surviving:prev_uid ~merged:uid
+
+  let register_var t ~id ~uid ~name ~location ~kind =
+    VA.register_source_variable t.current_function ~uid ~name ~location ~kind;
+    note_ident t ~id ~uid
 
   let enter_function ~display_name ~location =
     VA.register_source_function ~display_name ~location
@@ -31,8 +50,9 @@ module Walk = struct
     r
 
   let function_param t it (p : Typedtree.function_param) ~index =
-    register_var t ~uid:p.fp_param_debug_uid ~name:(Ident.name p.fp_param)
-      ~location:p.fp_loc ~kind:(Parameter index);
+    register_var t ~id:p.fp_param ~uid:p.fp_param_debug_uid
+      ~name:(Ident.name p.fp_param) ~location:p.fp_loc
+      ~kind:(Parameter index);
     match p.fp_kind with
     | Tparam_pat pat -> it.Tast_iterator.pat it pat
     | Tparam_optional_default (pat, default, _sort) ->
@@ -40,8 +60,9 @@ module Walk = struct
       it.Tast_iterator.expr it default
 
   let function_cases t it (fc : Typedtree.function_cases) ~index =
-    register_var t ~uid:fc.fc_param_debug_uid ~name:(Ident.name fc.fc_param)
-      ~location:fc.fc_loc ~kind:(Parameter index);
+    register_var t ~id:fc.fc_param ~uid:fc.fc_param_debug_uid
+      ~name:(Ident.name fc.fc_param) ~location:fc.fc_loc
+      ~kind:(Parameter index);
     List.iter (it.Tast_iterator.case it) fc.fc_cases
 
   let comprehension t it (c : Typedtree.comprehension) =
@@ -61,8 +82,9 @@ module Walk = struct
                     stop;
                     direction = _
                   } ->
-                register_var t ~uid:ident_debug_uid ~name:(Ident.name ident)
-                  ~location:pattern.ppat_loc ~kind:Comprehension_index;
+                register_var t ~id:ident ~uid:ident_debug_uid
+                  ~name:(Ident.name ident) ~location:pattern.ppat_loc
+                  ~kind:Comprehension_index;
                 it.Tast_iterator.expr it start;
                 it.Tast_iterator.expr it stop
               | Texp_comp_in { pattern; sequence } ->
@@ -90,7 +112,7 @@ module Walk = struct
       enter_anonymous_function t it e params body
     | Texp_for { for_id; for_debug_uid; for_pat; for_from; for_to; for_body; _ }
       ->
-      register_var t ~uid:for_debug_uid ~name:(Ident.name for_id)
+      register_var t ~id:for_id ~uid:for_debug_uid ~name:(Ident.name for_id)
         ~location:for_pat.ppat_loc ~kind:For_index;
       it.Tast_iterator.expr it for_from;
       it.Tast_iterator.expr it for_to;
@@ -98,7 +120,7 @@ module Walk = struct
     | Texp_letop { let_; ands; param; param_debug_uid; body; _ } ->
       it.Tast_iterator.binding_op it let_;
       List.iter (it.Tast_iterator.binding_op it) ands;
-      register_var t ~uid:param_debug_uid ~name:(Ident.name param)
+      register_var t ~id:param ~uid:param_debug_uid ~name:(Ident.name param)
         ~location:body.c_lhs.pat_loc ~kind:Letop_param;
       it.Tast_iterator.case it body
     | Texp_list_comprehension c -> comprehension t it c
@@ -125,12 +147,12 @@ module Walk = struct
 
   let pat (type k) t it (pat : k Typedtree.general_pattern) =
     (match pat.pat_desc with
-    | Tpat_var { name; uid; _ } ->
-      register_var t ~uid ~name:name.txt ~location:pat.pat_loc ~kind:Local
-    | Tpat_alias { name; uid; _ } ->
-      register_var t ~uid ~name:name.txt ~location:pat.pat_loc ~kind:Alias
-    | Tpat_fun_layout { name; uid; _ } ->
-      register_var t ~uid ~name:name.txt ~location:pat.pat_loc ~kind:Local
+    | Tpat_var { id; name; uid; _ } ->
+      register_var t ~id ~uid ~name:name.txt ~location:pat.pat_loc ~kind:Local
+    | Tpat_alias { id; name; uid; _ } ->
+      register_var t ~id ~uid ~name:name.txt ~location:pat.pat_loc ~kind:Alias
+    | Tpat_fun_layout { id; name; uid; _ } ->
+      register_var t ~id ~uid ~name:name.txt ~location:pat.pat_loc ~kind:Local
     | _ -> ());
     Tast_iterator.default_iterator.pat it pat
 
@@ -139,7 +161,11 @@ module Walk = struct
     let module_scope =
       VA.register_source_module ~display_name:unit_name ~location:Location.none
     in
-    let t = { current_function = module_scope } in
+    let t =
+      { current_function = module_scope;
+        seen_idents = Hashtbl.create 64
+      }
+    in
     let open Tast_iterator in
     (* The handlers need open recursion through the iterator, so we tie
        the knot via a ref rather than a let-rec. *)

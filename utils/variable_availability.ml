@@ -135,6 +135,8 @@ module type S = sig
 
   val record_observation : checkpoint:Checkpoint.t -> observed_id -> unit
 
+  val register_merged_uid : surviving:uid -> merged:uid -> unit
+
   val print_report : Format.formatter -> unit
 end
 
@@ -183,14 +185,19 @@ module Make (Uid : Uid) (Loc : Loc) :
     { mutable unit_name : string option;
       mutable source_functions : source_function list;
       uid_to_function : source_function Uid_tbl.t;
-      mutable observations : observation list
+      mutable observations : observation list;
+      (* [merged_into] records the surviving uid for each merged uid:
+         the source variable identified by the key has been
+         alpha-renamed to share its runtime binding with the value. *)
+      merged_into : uid Uid_tbl.t
     }
 
   let fresh_state () =
     { unit_name = None;
       source_functions = [];
       uid_to_function = Uid_tbl.create 64;
-      observations = []
+      observations = [];
+      merged_into = Uid_tbl.create 16
     }
 
   (* @agent: top-level state. Is there a good way to propagate the hash
@@ -223,6 +230,22 @@ module Make (Uid : Uid) (Loc : Loc) :
     then
       let s = !state in
       s.observations <- { checkpoint; id } :: s.observations
+
+  let register_merged_uid ~surviving ~merged =
+    if (not (is_enabled ()))
+       || Uid.equal merged Uid.no_uid
+       || Uid.equal surviving Uid.no_uid
+       || Uid.equal merged surviving
+    then ()
+    else
+      let s = !state in
+      (* If [merged] is already mapped, keep the original survivor:
+         the typedtree iterator visits left-to-right, so the first
+         registration carries the canonical survivor and subsequent
+         calls would only re-establish the same edge. *)
+      if Uid_tbl.mem s.merged_into merged
+      then ()
+      else Uid_tbl.add s.merged_into merged surviving
 
   let register_source_variable f ~uid ~name ~location ~kind =
     if Uid.equal uid Uid.no_uid
@@ -283,8 +306,31 @@ module Make (Uid : Uid) (Loc : Loc) :
       (!state).observations;
     tbl
 
+  (* Walk the merge chain starting at [uid], stopping at a cycle or at
+     a uid with no outgoing edge. Always includes [uid] itself. *)
+  let merge_chain uid =
+    let s = !state in
+    let rec loop acc visited uid =
+      if List.exists (Uid.equal uid) visited
+      then List.rev acc
+      else
+        let visited = uid :: visited in
+        let acc = uid :: acc in
+        match Uid_tbl.find_opt s.merged_into uid with
+        | None -> List.rev acc
+        | Some next -> loop acc visited next
+    in
+    loop [] [] uid
+
+  let observations_for_uid uid_to_obs uid =
+    List.concat_map
+      (fun u -> try Uid_tbl.find uid_to_obs u with Not_found -> [])
+      (merge_chain uid)
+
+  let is_merged uid = Uid_tbl.mem (!state).merged_into uid
+
   let reached_at ~uid_to_obs cp (v : source_variable) =
-    let obs = try Uid_tbl.find uid_to_obs v.uid with Not_found -> [] in
+    let obs = observations_for_uid uid_to_obs v.uid in
     List.exists (fun o -> Checkpoint.equal o.checkpoint cp) obs
 
   module Printing = struct
@@ -313,8 +359,11 @@ module Make (Uid : Uid) (Loc : Loc) :
          changes, which would make any test comparing this output flake. *)
       let w_name, w_kind = widths in
       let format_kind = string_of_source_kind v.kind in
-      let obs = try Uid_tbl.find uid_to_obs v.uid with Not_found -> [] in
+      let obs = observations_for_uid uid_to_obs v.uid in
       let status = string_of_status (status_for_variable obs) in
+      let status =
+        if is_merged v.uid then Printf.sprintf "merged; %s" status else status
+      in
       Format.fprintf ppf "  %-*s  %-*s  %s  [%a]@," w_name v.name w_kind
         format_kind status Loc.print v.location
 

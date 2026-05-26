@@ -128,6 +128,17 @@ module type S = sig
       dropped. *)
   val record_observation : checkpoint:Checkpoint.t -> observed_id -> unit
 
+  (** Record that source uid [merged] has been alpha-renamed to share
+      its runtime binding with [surviving]. After this call,
+      observations recorded against [surviving] (at any checkpoint)
+      are credited to [merged] as well, so a merged sibling shows the
+      same effective survival as the surviving uid in the report. The
+      report still lists both source-level bindings, but a merged one
+      is annotated as such. Calls involving the sentinel [Uid.no_uid],
+      or where [surviving] and [merged] are equal, are silently
+      dropped. *)
+  val register_merged_uid : surviving:uid -> merged:uid -> unit
+
   val print_report : Format.formatter -> unit
 end
 
