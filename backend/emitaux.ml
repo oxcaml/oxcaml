@@ -558,7 +558,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
   let rec loop (i : Linear.instruction) fs max_fs nontail_flag =
     match i.desc with
     | Lend -> { max_frame_size = max_fs; contains_nontail_calls = nontail_flag }
-    | Ladjust_stack_offset { delta_bytes } ->
+    | Ladjust_stack_offset { delta_bytes; pushed_slots = _ } ->
       let s = fs + delta_bytes in
       loop i.next s (max s max_fs) nontail_flag
     | Lpushtrap _ ->
