@@ -634,6 +634,84 @@ finalised under STW:
 `caml_iter_unloadable_units` is also exposed for read-only iteration
 (under STW + the units mutex).
 
+### G.1 Compactor robustness pair
+
+The compactor evacuates pool blocks, sets their old headers to
+`caml_global_heap_state.MARKED`, writes `Field(v, 0)` to a forwarding
+pointer at the new location, and then walks every heap pointer
+(`compact_update_value` in `runtime/shared_heap.c`) updating
+references via that forwarding pointer:
+
+```
+if (Has_status_val(v, NOT_MARKABLE))     return;        // safe
+if (Whsize_val(v) <= SIZECLASS_MAX) {
+  if (Has_status_val(v, caml_global_heap_state.MARKED)) {
+    *p = Field(v, 0) + infix_offset;                    // forward
+  }
+}
+```
+
+JIT static blocks live in the JIT-allocated buffer, not in any
+pool, so the evacuator never visits them. But the `Has_status_val(v,
+MARKED)` test fires on any block — pool or not — whose color bits
+match the new cycle's MARKED. If a JIT static block were ever to
+appear with that color at compaction time, the compactor would
+silently read its first data word as a forwarding pointer and
+corrupt every heap pointer to it.
+
+Today the post-rotation status of every surviving unloadable block
+is UNMARKED (the end-of-cycle pass writes survivors to the pre-
+rotation MARKED bits; the rotation maps those bits to UNMARKED), so
+the MARKED check in `compact_update_value` misses them. The safety
+argument is correct but load-bearing on the precise interleaving of
+the end-of-cycle pass, the cycle rotation, and the compactor —
+any reordering would silently re-introduce the corruption.
+
+To make the compactor's behaviour toward JIT static blocks robust
+*by construction*, the runtime flips registered unloadable static
+blocks to `NOT_MARKABLE` for the duration of `caml_compact_heap`
+and restores them to `UNMARKED` after:
+
+```
+if (compacting) {
+  Caml_global_barrier_if_final(participating_count) {
+    caml_unloadable_pre_compact();   // UNMARKED  -> NOT_MARKABLE
+  }
+  caml_compact_heap(...);            // takes NOT_MARKABLE early-out
+  Caml_global_barrier_if_final(participating_count) {
+    caml_unloadable_post_compact();  // NOT_MARKABLE -> UNMARKED
+  }
+}
+```
+
+Both `caml_unloadable_pre_compact` and `caml_unloadable_post_compact`
+walk `units_head` under `units_mutex`, applying
+`atomic_store_relaxed(Hp_atomic_val(v), With_status_hd(hd, status))`
+to each unit's `code_blocks` and `data_blocks`. Code_blocks are
+strictly speaking not reachable via standard heap walks
+(`Code_block`s are only reached via the back-pointer at `entry - 1`
+in `.text`, not via value-typed fields), so flipping them is
+defensive; data blocks are the load-bearing target. The cost is
+O(total unloadable symbols) per compaction, bounded and
+infrequent.
+
+Calls are inserted in `cycle_all_domains_callback`
+(`runtime/major_gc.c`), gated on the `compacting` decision returned
+by `should_compact_from_stw_single`. The placement is *after* the
+heap-state rotation in `cycle_major_heap_from_stw_single` and
+*after* `caml_verify_heap_from_stw` (so verify still sees blocks in
+UNMARKED state and its `Has_status_val(v, UNMARKED)` assertion
+holds). Each flip is wrapped in `Caml_global_barrier_if_final` so it
+runs once across the participating domains; the barriers also
+provide the happens-before edges needed before and after
+`caml_compact_heap`.
+
+The post-flip restores blocks to `caml_global_heap_state.UNMARKED`
+(the current — post-rotation — UNMARKED), so the next major mark
+cycle finds them ready for the standard `caml_darken` path. This
+matches what surviving unloadable blocks would have had absent the
+pair.
+
 ## H. Open issues
 
 1. **Reset cost**: walking every block in every unloadable unit at
@@ -748,6 +826,7 @@ Coverage axes currently exercised:
 | Registration, end-of-cycle pass, "born-marked" normalisation, debug tracing, `caml_unloadable_units_live_count` | `runtime/unloadable.c` |
 | `cf->owner_unloadable_unit` field, initialisation to NULL on registration | `runtime/caml/codefrag.h`, `runtime/codefrag.c` |
 | End-of-cycle pass call site (before rotation) | `runtime/major_gc.c` `cycle_major_heap_from_stw_single` |
+| Compactor robustness flip (`caml_unloadable_pre_compact` / `caml_unloadable_post_compact`) | `runtime/unloadable.c`, call site `runtime/major_gc.c` around `caml_compact_heap` |
 | Allocation status convention | `runtime/caml/shared_heap.h` `caml_allocation_status` |
 | Heap colors | `runtime/caml/shared_heap.h` |
 | Test predicate `no-address-sanitizer` + musl `disable_testcases` | `.github/workflows/build.yml` |

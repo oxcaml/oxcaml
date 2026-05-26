@@ -137,6 +137,33 @@ sit before the scannable env. Probing the next word for an infix tag
 would misclassify these. Reading the arity from the closinfo is the
 authoritative signal.
 
+### Compactor must not mistake JIT static blocks for evacuated heap blocks
+
+The compactor moves heap-pool blocks and rewrites every heap pointer
+to its new location. JIT static blocks live outside the pools and so
+are never moved; but `compact_update_value` (in
+`runtime/shared_heap.c`) treats *any* block whose status equals
+`caml_global_heap_state.MARKED` as having been evacuated and reads
+`Field(v, 0)` as a forwarding pointer. If a JIT static block ever
+appeared MARKED at compaction time, every heap reference to it would
+be silently rewritten to whatever value its first data field held.
+
+Today the post-rotation status of every surviving unloadable block
+is UNMARKED (the end-of-cycle pass writes MARKED pre-rotation; the
+rotation maps MARKED→UNMARKED), so the check misses them. That
+safety relies on the precise interleaving of the end-of-cycle pass,
+the cycle rotation, and the compactor — if any of those are
+reordered, the failure mode is silent heap-pointer corruption.
+
+The robustness fix is a two-step flip around `caml_compact_heap`:
+`caml_unloadable_pre_compact` rewrites every registered unloadable
+block (code blocks and data blocks) to NOT_MARKABLE so
+`compact_update_value` takes its NOT_MARKABLE early-out path
+unconditionally; `caml_unloadable_post_compact` restores them to
+UNMARKED so the next mark cycle can darken them by the standard
+path. Both run from STW barriers placed around the existing
+`caml_compact_heap` call in `cycle_all_domains_callback`.
+
 ### Closures crossing CU boundaries
 
 When a closure from unloadable unit A is captured in a curry-stub closure

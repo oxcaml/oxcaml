@@ -289,6 +289,76 @@ void caml_unloadable_check_and_unload_dead(void) {
   }
 }
 
+/* Robustness pair around the compactor.
+ *
+ * Without this pair, safety of compaction in the presence of registered
+ * unloadable units is load-bearing on the precise order of:
+ *
+ *   end-of-cycle pass (writes survived blocks to current MARKED bits)
+ *   -> heap-state rotation (those bits are now interpreted as UNMARKED)
+ *   -> compactor runs (only treats blocks as evacuated when their status
+ *      matches the new caml_global_heap_state.MARKED).
+ *
+ * That ordering means our static blocks are UNMARKED at compaction time,
+ * so [compact_update_value]'s MARKED-status check misses them and the
+ * "read Field(0) as a forwarding pointer" path never fires. But the
+ * invariant is implicit, and any reordering of these phases would
+ * silently turn a heap-pointer-to-static-block into a corrupted pointer
+ * (the static block's Field(0) is plain data, not a forwarding pointer).
+ *
+ * This pair makes the compactor's behaviour toward JIT static blocks
+ * robust by construction. Before compaction begins we flip every
+ * registered unloadable block (code blocks and data blocks) to
+ * NOT_MARKABLE; the compactor's pointer-update path
+ * ([compact_update_value] in [runtime/shared_heap.c]) takes its
+ * NOT_MARKABLE early-out and skips them unconditionally. After
+ * compaction we restore the post-rotation UNMARKED status so the next
+ * mark cycle can darken them normally.
+ *
+ * Both helpers run from STW (inside [Caml_global_barrier_if_final]
+ * blocks in [cycle_all_domains_callback]); they must not race with
+ * concurrent marking. The header store uses [atomic_store_relaxed] on
+ * [Hp_atomic_val] for consistency with the rest of the unloadable code
+ * and with [normalize_block_color]. */
+void caml_unloadable_pre_compact(void) {
+  caml_plat_lock_blocking(&units_mutex);
+  for (struct caml_unloadable_unit *u = units_head; u != NULL; u = u->next) {
+    for (uintnat i = 0; i < u->num_code_blocks; i++) {
+      value v = u->code_blocks[i];
+      header_t hd = Hd_val(v);
+      atomic_store_relaxed(Hp_atomic_val(v),
+                           With_status_hd(hd, NOT_MARKABLE));
+    }
+    for (uintnat i = 0; i < u->num_data_blocks; i++) {
+      value v = u->data_blocks[i];
+      header_t hd = Hd_val(v);
+      atomic_store_relaxed(Hp_atomic_val(v),
+                           With_status_hd(hd, NOT_MARKABLE));
+    }
+  }
+  caml_plat_unlock(&units_mutex);
+}
+
+void caml_unloadable_post_compact(void) {
+  status unmarked = caml_global_heap_state.UNMARKED;
+  caml_plat_lock_blocking(&units_mutex);
+  for (struct caml_unloadable_unit *u = units_head; u != NULL; u = u->next) {
+    for (uintnat i = 0; i < u->num_code_blocks; i++) {
+      value v = u->code_blocks[i];
+      header_t hd = Hd_val(v);
+      atomic_store_relaxed(Hp_atomic_val(v),
+                           With_status_hd(hd, unmarked));
+    }
+    for (uintnat i = 0; i < u->num_data_blocks; i++) {
+      value v = u->data_blocks[i];
+      header_t hd = Hd_val(v);
+      atomic_store_relaxed(Hp_atomic_val(v),
+                           With_status_hd(hd, unmarked));
+    }
+  }
+  caml_plat_unlock(&units_mutex);
+}
+
 uintnat caml_unloadable_units_registered_total(void) {
   caml_plat_lock_blocking(&units_mutex);
   uintnat r = units_registered_total;

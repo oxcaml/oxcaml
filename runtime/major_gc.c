@@ -1739,7 +1739,27 @@ static void stw_cycle_all_domains(
   caml_cycle_heap(domain->shared_heap);
 
   if (compacting) {
+#ifdef NATIVE_CODE
+    /* Robustness against the compactor mistaking a JIT static block for
+     * an evacuated heap block. The compactor's [compact_update_value]
+     * treats any block whose status equals [caml_global_heap_state.MARKED]
+     * as having been evacuated and reads [Field(v, 0)] as a forwarding
+     * pointer. Today our static blocks are UNMARKED at this point (the
+     * end-of-cycle pass writes them MARKED pre-rotation, then rotation
+     * relabels MARKED -> UNMARKED), so the check misses them — but the
+     * invariant is fragile. Flip every registered unloadable block to
+     * NOT_MARKABLE so the compactor takes its earlier early-out path
+     * unconditionally; restore to UNMARKED below. */
+    Caml_global_barrier_if_final(participating_count) {
+      caml_unloadable_pre_compact();
+    }
+#endif
     caml_compact_heap(domain, participating_count, participating);
+#ifdef NATIVE_CODE
+    Caml_global_barrier_if_final(participating_count) {
+      caml_unloadable_post_compact();
+    }
+#endif
   }
 
   /* Update GC stats (these could have significantly changed e.g. due

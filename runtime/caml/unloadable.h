@@ -133,6 +133,25 @@ void caml_iter_unloadable_units(
  * internally. */
 void caml_unloadable_check_and_unload_dead(void);
 
+/* Compactor robustness pair. [caml_unloadable_pre_compact] flips every
+ * registered unloadable static block (code blocks and data blocks) to
+ * NOT_MARKABLE; [caml_unloadable_post_compact] restores them to UNMARKED.
+ *
+ * Both run from STW around [caml_compact_heap]. The pre-call ensures
+ * the compactor's [compact_update_value] early-outs on JIT static
+ * blocks via its NOT_MARKABLE check, so a heap pointer to such a block
+ * is never mistaken for a pointer to an evacuated heap block (which
+ * would read [Field(v, 0)] as a forwarding pointer and corrupt the
+ * heap reference). The post-call returns the blocks to UNMARKED so
+ * the next mark cycle can darken them by the standard path.
+ *
+ * Without this pair, safety relies on the precise interleaving of the
+ * end-of-cycle pass, the heap-state rotation, and the compactor — see
+ * the in-source comment in [runtime/unloadable.c] for the full
+ * argument. */
+void caml_unloadable_pre_compact(void);
+void caml_unloadable_post_compact(void);
+
 /* Cumulative counters since process start. [registered] counts every
  * successful [caml_register_unloadable_unit] call; [unloaded] counts every
  * unit unlinked from the registration list by [caml_unloadable_check_and_
