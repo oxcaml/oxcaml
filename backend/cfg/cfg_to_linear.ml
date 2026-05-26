@@ -473,15 +473,15 @@ let adjust_stack_offset body (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) ~pushed_slots_per_block =
   let block_stack_offset = block.stack_offset in
   let prev_stack_offset = prev_block.terminator.stack_offset in
-  if block_stack_offset = prev_stack_offset
+  let pushed_slots =
+    match Label.Tbl.find_opt pushed_slots_per_block block.start with
+    | Some s -> s
+    | None -> []
+  in
+  if block_stack_offset = prev_stack_offset && List.is_empty pushed_slots
   then body
   else
     let delta_bytes = block_stack_offset - prev_stack_offset in
-    let pushed_slots =
-      match Label.Tbl.find_opt pushed_slots_per_block block.start with
-      | Some s -> s
-      | None -> []
-    in
     to_linear_instr
       (Ladjust_stack_offset { delta_bytes; pushed_slots })
       ~next:body
