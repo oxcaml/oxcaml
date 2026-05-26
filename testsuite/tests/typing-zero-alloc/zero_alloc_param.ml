@@ -81,16 +81,13 @@ val f : ((int -> int) [@zero_alloc arity 1]) -> int [@@zero_alloc] = <fun>
 |}];;
 
 let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
-  function g -> g 42;; (* should fail in the backend *)
+  function g -> g 42;; (* should fail in the frontend *)
 [%%expect {|
-Line 1, characters 5-15:
-1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
-         ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP13.f (camlTOP13__f_18_19_code).
-Line 2, characters 16-20:
-2 |   function g -> g 42;; (* should fail in the backend *)
-                    ^^^^
-Error: called function may allocate (indirect tailcall)
+Line 2, characters 2-20:
+2 |   function g -> g 42;; (* should fail in the frontend *)
+      ^^^^^^^^^^^^^^^^^^
+Error: The parameter type declares a "zero_alloc" requirement of arity 1,
+       but the binding pattern does not. Hint: annotate the pattern.
 |}];;
 
 let[@zero_alloc] f : ((int -> int -> int) [@zero_alloc]) -> int =
@@ -117,7 +114,7 @@ let[@zero_alloc] f (g [@zero_alloc arity 2]) x = g x;; (* should fail in the bac
 Line 1, characters 5-15:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x = g x;; (* should fail in the backend *)
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP16.f (camlTOP16__f_22_23_code).
+Error: Annotation check for zero_alloc failed on function TOP16.f (camlTOP16__f_20_21_code).
 Line 1, characters 49-52:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x = g x;; (* should fail in the backend *)
                                                      ^^^
@@ -129,7 +126,7 @@ let[@zero_alloc] f (g [@zero_alloc arity 2]) x y z = g x y z;; (* should fail in
 Line 1, characters 5-15:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x y z = g x y z;; (* should fail in the backend *)
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP17.f (camlTOP17__f_24_25_code).
+Error: Annotation check for zero_alloc failed on function TOP17.f (camlTOP17__f_22_23_code).
 Line 1, characters 53-60:
 1 | let[@zero_alloc] f (g [@zero_alloc arity 2]) x y z = g x y z;; (* should fail in the backend *)
                                                          ^^^^^^^
@@ -176,8 +173,8 @@ let _ =
 Line 3, characters 16-17:
 3 |   test_f_strict f;;  (* should fail *)
                     ^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The argument's "zero_alloc" property is required to be "strict",
        but this function is not.
 |}];;
@@ -190,7 +187,7 @@ let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
 Line 1, characters 5-15:
 1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP23.f (camlTOP23__f_32_33_code).
+Error: Annotation check for zero_alloc failed on function TOP23.f (camlTOP23__f_30_31_code).
 Line 2, characters 39-43:
 2 |   fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
                                            ^^^^
@@ -234,8 +231,8 @@ let _ =
 Line 4, characters 21-23:
 4 |   require_za_arity_1 f';; (* should fail; f' zero_alloc information is not available *)
                          ^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -255,8 +252,8 @@ rewrite the binding with explicit parameters or remove the attribute.
 Line 4, characters 21-23:
 4 |   require_za_arity_1 f';; (* should fail *)
                          ^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -271,7 +268,7 @@ let _ = require_za_arity_1 (fun[@zero_alloc] x -> (x, 123));; (* should fail in 
 Line 1, characters 33-43:
 1 | let _ = require_za_arity_1 (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                      ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP30._$.(fun) (camlTOP30__fn[:1,27--59]_38_39_code).
+Error: Annotation check for zero_alloc failed on function TOP30._$.(fun) (camlTOP30__fn[:1,27--59]_36_37_code).
 Line 1, characters 50-58:
 1 | let _ = require_za_arity_1 (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                                       ^^^^^^^^
@@ -299,7 +296,7 @@ let _ = require_za_arity_1 (fun x -> [x]);; (* should fail in the backend *)
 Line 1, characters 27-41:
 1 | let _ = require_za_arity_1 (fun x -> [x]);; (* should fail in the backend *)
                                ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP34._$.(fun) (camlTOP34__fn[:1,27--41]_46_47_code).
+Error: Annotation check for zero_alloc failed on function TOP34._$.(fun) (camlTOP34__fn[:1,27--41]_44_45_code).
 Line 1, characters 37-40:
 1 | let _ = require_za_arity_1 (fun x -> [x]);; (* should fail in the backend *)
                                          ^^^
@@ -320,8 +317,8 @@ rewrite the binding with explicit parameters or remove the attribute.
 Line 4, characters 21-24:
 4 |   require_za_arity_1 id';; (* should fail; id' is not "syntactically" a function in the let-binding; there is a warning emitted *)
                          ^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -334,8 +331,8 @@ let _ =
 Line 4, characters 21-24:
 4 |   require_za_arity_1 id';; (* should fail, as above *)
                          ^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -365,8 +362,8 @@ let _ =
 Line 4, characters 21-24:
 4 |   require_za_arity_1 id';; (* should fail *)
                          ^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -380,14 +377,14 @@ let _ =
 Line 4, characters 7-17:
 4 |   let[@zero_alloc] id' x = (id x, x) in
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP40._$.id' (camlTOP40__id'_57_59_code).
+Error: Annotation check for zero_alloc failed on function TOP40._$.id' (camlTOP40__id'_55_57_code).
 Line 4, characters 27-36:
 4 |   let[@zero_alloc] id' x = (id x, x) in
                                ^^^^^^^^^
 Error: allocation of 24 bytes
 |}];;
 
-(** Frontend analysis fails when the arguments is neither an identifier nor a
+(** Frontend analysis fails when the argument is neither an identifier nor a
     function abstraction. *)
 
 let _ =
@@ -517,7 +514,7 @@ end;;
 Line 4, characters 7-17:
 4 |   let[@zero_alloc] f' (g' [@zero_alloc arity 1]) = g' 123 456 (* should fail in the backend *)
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP52.Nonsense_matching_arity.f' (camlTOP52__f'_64_65_code).
+Error: Annotation check for zero_alloc failed on function TOP52.Nonsense_matching_arity.f' (camlTOP52__f'_62_63_code).
 Line 4, characters 51-61:
 4 |   let[@zero_alloc] f' (g' [@zero_alloc arity 1]) = g' 123 456 (* should fail in the backend *)
                                                        ^^^^^^^^^^
@@ -608,14 +605,11 @@ Error: "zero_alloc" attributes on function arguments require the argument
 let w7 : ('a. (('a -> 'a) [@zero_alloc])) -> int =
   fun (f : 'a. 'a -> 'a) -> f 123;;
 [%%expect {|
-Line 2, characters 7-23:
+Line 2, characters 2-33:
 2 |   fun (f : 'a. 'a -> 'a) -> f 123;;
-           ^^^^^^^^^^^^^^^^
-Error: This pattern matches values of type "'a. 'a -> 'a"
-       but a pattern was expected which matches values of type
-         "('a. (('a -> 'a) [@zero_alloc arity 1]))"
-       The two types must agree on "zero_alloc":
-       either both carry the annotation or neither does.
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The parameter type declares a "zero_alloc" requirement of arity 1,
+       but the binding pattern does not. Hint: annotate the pattern.
 |}];;
 
 (* Polymorphic type annotation on the argument pattern, no "zero_alloc"
@@ -691,8 +685,8 @@ let[@zero_alloc] test_with_fc_module_2 (module M : S2) x =
 Line 2, characters 16-21:
 2 |   test_f_strict M.bam;;
                     ^^^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The argument's "zero_alloc" property is required to be "strict",
        but this function is not.
 |}];;
@@ -703,8 +697,8 @@ let[@zero_alloc] test_with_fc_module_3 (module M : S3) x =
 Line 2, characters 16-21:
 2 |   test_f_strict M.bal;;
                     ^^^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -732,8 +726,8 @@ let _ =
 Line 4, characters 13-14:
 4 |   let _ = g2 f in
                  ^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The argument's "zero_alloc" property is required to be "strict",
        but this function is not.
 |}];;
@@ -766,7 +760,7 @@ let _ =
 Line 3, characters 2-72:
 3 |   let f_nonstrict x = if x < 0 then raise (Err (string_of_int x)) else x in
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP76._$.f_nonstrict (camlTOP76__f_nonstrict_82_83_code).
+Error: Annotation check for zero_alloc strict failed on function TOP76._$.f_nonstrict (camlTOP76__f_nonstrict_80_81_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:3,47--64)
 Line 3, characters 42-65:
@@ -790,7 +784,7 @@ module type S = sig val f : ((int -> int) [@zero_alloc arity 1]) -> int end
 Line 6, characters 17-50:
 6 |   let g () = X.f (fun x -> Format.printf "foo"; x)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP78.F.g.(fun) (camlTOP78__fn[:6,17--50]_86_89_code).
+Error: Annotation check for zero_alloc failed on function TOP78.F.g.(fun) (camlTOP78__fn[:6,17--50]_84_87_code).
 my specific error
 
 File "format.ml", lines 1498-1500, characters 2-18:
@@ -843,11 +837,14 @@ let _ =
   let[@zero_alloc] (f | f) = fun x -> (x, x) in
   needs_za_1 f;;
 [%%expect {|
-Line 3, characters 19-26:
+Line 3, characters 7-17:
 3 |   let[@zero_alloc] (f | f) = fun x -> (x, x) in
-                       ^^^^^^^
-Error: The "zero_alloc" attribute is only supported on patterns that bind
-       a variable.
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP84._$.f (camlTOP84__*match*_93_95_code).
+Line 3, characters 38-44:
+3 |   let[@zero_alloc] (f | f) = fun x -> (x, x) in
+                                          ^^^^^^
+Error: allocation of 24 bytes
 |}];;
 
 let _ =
@@ -870,11 +867,15 @@ let _ =
   let[@zero_alloc] (f | f) = fun x -> x - 1 in
   needs_za_1 f;;
 [%%expect {|
-Line 3, characters 19-26:
-3 |   let[@zero_alloc] (f | f) = fun x -> x - 1 in
-                       ^^^^^^^
-Error: The "zero_alloc" attribute is only supported on patterns that bind
-       a variable.
+- : int = 41
+|}];;
+
+let _ =
+  let[@zero_alloc] needs_za_1 (f[@zero_alloc arity 1]) = f 42 in
+  let (f | f) = fun x -> x - 1 in
+  needs_za_1 f;;
+[%%expect {|
+- : int = 41
 |}];;
 
 
@@ -917,8 +918,8 @@ val fn_alias : int -> int = <fun>
 Line 3, characters 27-35:
 3 | let _ = require_za_arity_1 fn_alias
                                ^^^^^^^^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -933,8 +934,8 @@ let[@zero_alloc] use_local_alias (f[@zero_alloc arity 1]) =
 Line 3, characters 21-22:
 3 |   require_za_arity_1 g
                          ^
-Error: Mismatch between the "zero_alloc" requirement of the function
-       being applied and this argument.
+Error: Mismatch between this argument and the "zero_alloc" requirement
+       of the function being applied.
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the argument's definition.
 |}];;
@@ -987,7 +988,7 @@ let _ =
 Line 2, characters 7-17:
 2 |   let[@zero_alloc] (f as g) = fun x -> (x + 123, 42) in
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP101._$.f (camlTOP101__g_111_113_code).
+Error: Annotation check for zero_alloc failed on function TOP102._$.f (camlTOP102__g_115_117_code).
 Line 2, characters 39-52:
 2 |   let[@zero_alloc] (f as g) = fun x -> (x + 123, 42) in
                                            ^^^^^^^^^^^^^
@@ -1053,7 +1054,7 @@ let _ =
 Line 7, characters 6-67:
 7 |       (fun x -> if x < 0 then raise (Err (string_of_int x)) else x) a;;
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP107._$.(fun) (camlTOP107__fn[:7,6--67]_117_121_code).
+Error: Annotation check for zero_alloc strict failed on function TOP108._$.(fun) (camlTOP108__fn[:7,6--67]_121_125_code).
 File "stdlib.ml", line 280, characters 2-19:
 Error: called function may allocate (external call to caml_format_int) (:7,41--58)
 Line 7, characters 36-59:
@@ -1073,10 +1074,11 @@ let _ =
 - : int -> int = <fun>
 |}];;
 
-(* Non-principal inference. Emits warning. *)
+(* Inference is non-principal because of zero-alloc.
+   Emit a warning when non-principal (if-then-else). *)
 let with_id (f : (('a -> 'a)[@zero_alloc arity 1]) -> 'b) = f (fun x -> x);;
 
-let _ = with_id (fun id -> id 4, id 17);;
+let _ = with_id (fun (id [@zero_alloc arity 1]) -> id 4, id 17);;
 
 let non_principal p f =
   if p then with_id f
@@ -1102,7 +1104,7 @@ let _ =
 Line 3, characters 2-16:
 3 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP112._$.g (camlTOP112__g_138_141_code).
+Error: Annotation check for zero_alloc failed on function TOP113._$.g (camlTOP113__g_142_145_code).
 Line 3, characters 12-16:
 3 |   and g x = x, x in
                 ^^^^
@@ -1119,14 +1121,16 @@ let _ =
 Line 5, characters 2-16:
 5 |   and g x = x, x in
       ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP113._$.g (camlTOP113__g_142_146_code).
+Error: Annotation check for zero_alloc strict failed on function TOP114._$.g (camlTOP114__g_146_150_code).
 Line 5, characters 12-16:
 5 |   and g x = x, x in
                 ^^^^
 Error: allocation of 24 bytes
 |}];;
 
-(* Error if zero_alloc is placed on a function parameter that is . *)
+(* Error if [@zero_alloc] is placed on a pattern that does not bind a single
+   variable. Covers function parameters and match cases; constructor patterns
+   and aliased or-patterns alike. *)
 type a = A
 let _ = fun (A [@zero_alloc arity 1]) -> A;;
 [%%expect {|
@@ -1159,4 +1163,33 @@ Line 2, characters 4-18:
         ^^^^^^^^^^^^^^
 Error: The "zero_alloc" attribute is only supported on patterns that bind
        a variable.
+|}];;
+
+(* Side-effects / impure example *)
+(* Here we cannot place [%%expect {|...|}] after a separately-defined print_num,
+   because inserting [%%expect] forces the compilation of print_num to native code
+   and completes backend analysis.
+   This means that backend analysis of print_num does not occur once it appears as
+   an argument of an application of a function with zero_alloc requirements.
+   This behaviour does not occur in any meaningful way outside of expect tests. *)
+(* CR-soon aivaskovic: see if the semantics can be changed *)
+let _ =
+  let print_num n =
+    Format.printf "allocates str %d" n;
+    n
+  in
+  let attempt_to_apply (f [@zero_alloc arity 1]) = f 42 in
+  attempt_to_apply print_num;;
+[%%expect {|
+Lines 2-4, characters 2-5:
+2 | ..let print_num n =
+3 |     Format.printf "allocates str %d" n;
+4 |     n
+Error: Annotation check for zero_alloc failed on function TOP120._$.print_num (camlTOP120__print_num_151_153_code).
+Line 3, characters 4-38:
+3 |     Format.printf "allocates str %d" n;
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (indirect call)
+File "format.ml", lines 1498-1500, characters 2-18:
+Error: called function may allocate (direct call camlCamlinternalFormat__make_printf_120_401_code) (:3,4--38)
 |}];;

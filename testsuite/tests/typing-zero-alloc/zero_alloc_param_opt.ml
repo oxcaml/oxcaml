@@ -33,8 +33,10 @@ let _ = f_requires_opt za_fn;;
 - : int = 1
 |}];;
 
-(* Passing a function with no zero_alloc to an opt parameter: fails under opt
-   mode. Under the default mode this would succeed because opt is inactive. *)
+(* Passing an unannotated function to an opt parameter succeeds in both modes.
+   The function's zero_alloc is a unification Var that absorbs the constraint
+   at the call site; the backend then verifies it; here non_za_fn is
+   non-allocating, so the check passes. *)
 let _ = f_requires_opt non_za_fn;;
 [%%expect {|
 - : int = 1

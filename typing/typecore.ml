@@ -314,6 +314,7 @@ type error =
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
   | Zero_alloc_on_non_var_pattern
+  | Missing_pattern_zero_alloc_for_type of Zero_alloc.check
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -3259,11 +3260,14 @@ and type_pat_aux
     | Ppat_var _ -> ()
     | Ppat_alias (p, _) | Ppat_constraint (p, _, _) ->
       verify_zero_alloc p.ppat_desc zero_alloc
+    | Ppat_or (p1, p2) ->
+      verify_zero_alloc p1.ppat_desc zero_alloc;
+      verify_zero_alloc p2.ppat_desc zero_alloc
     | Ppat_any | Ppat_constant _ | Ppat_interval _ | Ppat_unboxed_unit
     | Ppat_unboxed_bool _ | Ppat_unboxed_tuple _ | Ppat_variant _
     | Ppat_construct _ | Ppat_type _ | Ppat_unpack _ | Ppat_extension _
     | Ppat_exception _ | Ppat_lazy _ | Ppat_open _ | Ppat_tuple _ | Ppat_array _
-    | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_or _ ->
+    | Ppat_record _ | Ppat_record_unboxed_product _ ->
       (match Zero_alloc.get zero_alloc with
        | Default_zero_alloc -> ()
        | Check _ | Assume _ | Ignore_assert_all ->
@@ -6067,7 +6071,9 @@ let split_function_ty
   | Tpoly (_, _, Some check_poly) ->
     begin
       match zero_alloc with
-      | None -> ()
+      | None ->
+        raise
+          (Error (loc, env, Missing_pattern_zero_alloc_for_type check_poly))
       | Some check_attr ->
         let check1 =
           Zero_alloc.create_const (Zero_alloc.Check check_attr)
@@ -10907,6 +10913,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let rec sexp_is_fun sexp =
     match sexp.pexp_desc with
     | Pexp_function _ -> true
+    | Pexp_stack e
+    | Pexp_borrow e
     | Pexp_constraint (e, _, _)
     | Pexp_newtype (_, _, e) -> sexp_is_fun e
     | _ -> false
@@ -10924,6 +10932,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       in
       (match body with | Pfunction_body _ -> 0 | Pfunction_cases _ -> 1) +
       n_value_params
+    | Pexp_stack e
+    | Pexp_borrow e
     | Pexp_constraint (e, _, _)
     | Pexp_newtype (_, _, e) -> arity_of_fun e
     (* function is only ever invoked if sexp_is_fun is true *)
@@ -11193,8 +11203,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         let e =
           let za = Zero_alloc.get zero_alloc in
           match za, e.exp_desc with
-          | Default_zero_alloc, Texp_function fn
-            when existential_context <> At_toplevel ->
+          | Default_zero_alloc, Texp_function fn ->
             (match Zero_alloc.get fn.zero_alloc with
              | Default_zero_alloc ->
                (* For local lets, link fn.zero_alloc to the binding's Var so
@@ -13173,8 +13182,8 @@ let report_error ~loc env =
          for %s." ctx_str
   | Wrong_arg_zero_alloc err ->
       Location.errorf ~loc
-        "@[Mismatch between the %a requirement of the function@ \
-         being applied and this argument.@]@ %a"
+        "@[Mismatch between this argument and the %a requirement@ \
+         of the function being applied.@]@ %a"
         Style.inline_code "zero_alloc"
         Zero_alloc.print_error err
   | Unsupported_arg_zero_alloc ->
@@ -13199,6 +13208,13 @@ let report_error ~loc env =
         "@[The %a attribute is only supported on patterns that bind@ \
          a variable.@]"
         Style.inline_code "zero_alloc"
+  | Missing_pattern_zero_alloc_for_type check ->
+      Location.errorf ~loc
+        "@[The parameter type declares a %a requirement of arity %d,@ \
+         but the binding pattern does not.@ \
+         Hint: annotate the pattern.@]"
+        Style.inline_code "zero_alloc"
+        check.arity
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env
