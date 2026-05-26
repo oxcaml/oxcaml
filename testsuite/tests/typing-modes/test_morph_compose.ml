@@ -4,7 +4,15 @@
 *)
 
 let () =
-  Printf.printf
-    "running allowed composition checks with partial coverage (spanning values \
-     cover each axis element at least once; not every product combination)\n%!";
-  Mode.For_testing.check_jobs ~full:false () |> List.iter (fun job -> job ())
+  Mode.For_testing.check_composition_jobs ~full:false ()
+  |> List.iter (fun job ->
+    match job () with
+    | Ok () -> ()
+    | Error error ->
+      failwith
+        (Format_doc.asprintf "%a"
+           Mode.For_testing.print_error
+           error));
+  print_endline
+    "All partial-coverage morphism composition checks succeeded: composed \
+     morphisms agree with applying each morphism in sequence."

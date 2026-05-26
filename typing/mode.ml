@@ -4207,6 +4207,38 @@ module For_testing = struct
 
   let ( let+ ) xs f = List.map f xs
 
+  type error =
+    | Composition_check_failed :
+        { source : 'a obj;
+          middle : 'b obj;
+          target : 'c obj;
+          f : ('b, 'c, neither) morph;
+          g : ('a, 'b, neither) morph;
+          result : ('a, 'c, neither) morph;
+          input : 'a;
+          expected : 'c;
+          actual : 'c
+        }
+        -> error
+
+  let print_error ppf
+      (Composition_check_failed
+         { source; middle; target; f; g; result; input; expected; actual }) =
+    Fmt.fprintf ppf
+      "@[<v>Lattices_mono compose check failed:@,\
+       source: %a@,\
+       middle: %a@,\
+       target: %a@,\
+       f: %a@,\
+       g: %a@,\
+       result: %a@,\
+       input: %a@,\
+       expected: %a@,\
+       actual: %a@]"
+      print_obj source print_obj middle print_obj target (print_morph target) f
+      (print_morph middle) g (print_morph target) result (print source) input
+      (print target) expected (print target) actual
+
   let check_compose : type a b c.
       full:bool ->
       a obj ->
@@ -4214,45 +4246,48 @@ module For_testing = struct
       c obj ->
       (b, c, neither) morph ->
       (a, b, neither) morph ->
-      unit =
+      (unit, error) result =
    fun ~full src mid dst f g ->
     let result = compose dst f g in
-    List.iter
-      (fun input ->
+    let rec check_inputs = function
+      | [] -> Ok ()
+      | input :: inputs ->
         let expected = apply dst f (apply mid g input) in
         let actual = apply dst result input in
         if not (equal dst expected actual)
         then
-          let msg =
-            Fmt.asprintf
-              "@[<v>Lattices_mono compose check failed:@,\
-               source: %a@,\
-               middle: %a@,\
-               target: %a@,\
-               f: %a@,\
-               g: %a@,\
-               result: %a@,\
-               input: %a@,\
-               expected: %a@,\
-               actual: %a@]"
-              print_obj src print_obj mid print_obj dst (print_morph dst) f
-              (print_morph mid) g (print_morph dst) result (print src) input
-              (print dst) expected (print dst) actual
-          in
-          failwith msg)
-      (get_elements ~full src)
+          Error
+            (Composition_check_failed
+               { source = src;
+                 middle = mid;
+                 target = dst;
+                 f;
+                 g;
+                 result;
+                 input;
+                 expected;
+                 actual
+               })
+        else check_inputs inputs
+    in
+    check_inputs (get_elements ~full src)
 
-  let check_jobs ~full () =
+  let check_composition_jobs ~full () =
     let* (Obj dst) = all_objs in
     let+ (To f) = morphs_to ~full dst in
     let mid = src dst f in
     let morphs_to_mid = morphs_to ~full mid in
     fun () ->
-      List.iter
-        (fun (To g) ->
+      let rec check_morphs = function
+        | [] -> Ok ()
+        | To g :: morphs ->
           let src = src mid g in
-          check_compose ~full src mid dst f g)
-        morphs_to_mid
+          begin match check_compose ~full src mid dst f g with
+          | Ok () -> check_morphs morphs
+          | Error _ as error -> error
+          end
+      in
+      check_morphs morphs_to_mid
 end
 
 module C = Lattices_mono

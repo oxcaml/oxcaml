@@ -286,8 +286,26 @@ module type S = sig
     end
   end
 
+  (** Module for tests that validate internal mode lattice invariants. *)
   module For_testing : sig
-    val check_jobs : full:bool -> unit -> (unit -> unit) list
+    (** A failed internal invariant check. *)
+    type error
+
+    (** Print a detailed description of a failed check. *)
+    val print_error : Fmt.formatter -> error -> unit
+
+    (** Validates that morphism composition is sound.
+
+        For a selected subset of generated pair of morphisms [f : b -> c] and
+        [g : a -> b], this checks that [compose f g] and [fun x -> f (g x)]
+        agree on every selected element of [a].
+
+        The selected elements are either every possible lattice element (when
+        [full] is [true]) or a smaller spanning set where each axis value is
+        covered at least once, but every combination is not (when [full] is
+        [false]). *)
+    val check_composition_jobs :
+      full:bool -> unit -> (unit -> (unit, error) result) list
   end
 
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
