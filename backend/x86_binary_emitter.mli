@@ -17,7 +17,10 @@
 open X86_ast
 module String = Misc.Stdlib.String
 
-type section = { sec_name : string; mutable sec_instrs : asm_line array }
+type section =
+  { sec_name : X86_proc.Section_name.t;
+    mutable sec_instrs : asm_line array
+  }
 
 type data_size = B8 | B16 | B32 | B64
 

@@ -69,7 +69,8 @@ let invoke_expect_asm_callbacks () =
   asm_collected_for_expect_asm := [];
   List.iter (fun f -> f output) callbacks
 
-let record_for_expect_asm ~name ~debug_info ~asm_start =
+let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
+    ~gc_jump_pads_start ~gc_jump_pads_end =
   if
     (not (List.is_empty !expect_asm_callbacks))
     && (not (String.ends_with ~suffix:"__entry" name))
@@ -89,7 +90,11 @@ let record_for_expect_asm ~name ~debug_info ~asm_start =
     in
     let output =
       X86_gas.format_asm_for_expect_asm ~name
-        ~body:(X86_proc.output_from asm_start)
+        ~body:
+          (X86_proc.output_range ~from_pos:fun_body_start ~to_pos:fun_body_end)
+        ~hidden_gc_jump_pads:
+          (X86_proc.output_range ~from_pos:gc_jump_pads_start
+             ~to_pos:gc_jump_pads_end)
     in
     asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
 
@@ -779,7 +784,7 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
-  D.align ~fill:Zero ~bytes:4;
+  D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
 
@@ -2727,10 +2732,12 @@ let fundecl fundecl =
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
-  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~asm_start:fun_body_start;
+  let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~fun_body_start ~fun_body_end ~gc_jump_pads_start:fun_body_end
+    ~gc_jump_pads_end:(current_output_pos ());
   emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
@@ -3122,15 +3129,7 @@ let end_assembly () =
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
   D.text ();
-  (* We align to 8 bytes before the frame table. Perhaps somewhat
-     counterintuitively, we use [~fill:Zero] even though we are now in the text
-     section. The reason is that the additional padding will never be executed,
-     so there is no need to pad it with nops in the X86 binary emitter. *)
-  (* CR sspies: We should just determine the filling based on the current
-     section for the binary emitter and then remove the argument [fill]. This is
-     the only place, where it does not seem to match the current section, and it
-     seems it does not matter whether we pad with zeros or nops here. *)
-  D.align ~fill:Zero ~bytes:8;
+  D.align ~fill:Nop ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:Text "frametable";
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
@@ -3150,7 +3149,7 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
+      efa_align = (fun n -> D.align ~fill:Nop ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
           let lbl = label_to_asm_label ~section:Text lbl in

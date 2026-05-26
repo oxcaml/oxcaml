@@ -121,7 +121,8 @@ let read_unit_info filename =
       ui_arg_descr = uir.uir_arg_descr;
       ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
       ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
-      ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
+      ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
+      ui_quoted_cmx = uir.uir_quoted_cmx |> Array.to_list;
       ui_generic_fns = uir.uir_generic_fns;
       ui_export_info = uir.uir_export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
@@ -286,7 +287,8 @@ let write_unit_info info filename =
     uir_arg_descr = info.ui_arg_descr;
     uir_imports_cmi = Array.of_list info.ui_imports_cmi;
     uir_imports_cmx = Array.of_list info.ui_imports_cmx;
-    uir_quoted_globals = Array.of_list info.ui_quoted_globals;
+    uir_quoted_cmi = Array.of_list info.ui_quoted_cmi;
+    uir_quoted_cmx = Array.of_list info.ui_quoted_cmx;
     uir_format = info.ui_format;
     uir_generic_fns = info.ui_generic_fns;
     uir_export_info = info.ui_export_info;
@@ -306,6 +308,8 @@ let write_unit_info info filename =
   Digest.output oc crc)
 
 let save_unit_info filename ~main_module_block_format ~arg_descr =
+  let quoted_intfs = Env.quoted_intfs () in
+  let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
      of passing these in as arguments but, unlike most of the state that this
      module keeps track of, they're not values that get accumulated over time,
@@ -317,7 +321,8 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
       ui_arg_descr = arg_descr;
       ui_imports_cmi = Env.imports();
       ui_imports_cmx = current_unit.uib_imports_cmx;
-      ui_quoted_globals = Env.quoted_globals();
+      ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
+      ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
       ui_format = main_module_block_format;
       ui_generic_fns = current_unit.uib_generic_fns;
       ui_export_info = current_unit.uib_export_info;

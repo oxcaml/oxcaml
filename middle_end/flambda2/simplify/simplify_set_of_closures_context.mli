@@ -26,7 +26,7 @@ type t
 val create :
   dacc_prior_to_sets:DA.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
-  all_sets_of_closures:Set_of_closures.t list ->
+  all_sets_of_closures:(Set_of_closures.t * Alloc_mode.For_types.t) list ->
   closure_bound_names_all_sets:Bound_name.t Function_slot.Map.t list ->
   value_slot_types_all_sets:T.t Value_slot.Map.t list ->
   t

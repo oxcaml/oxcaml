@@ -7,6 +7,31 @@
 
 (* Preamble types for use in tests *)
 
+module M = struct
+  let ( + ) = ( +. )
+  let foo = 42
+  type 'a record = { record_field : 'a }
+  type 'a variant = Variant_tag of 'a
+  type 'a my_option = None | Some of 'a
+end
+[%%expect {|
+module M :
+  sig
+    val ( + ) : float -> float -> float
+    val foo : int
+    type 'a record = { record_field : 'a; }
+    type 'a variant = Variant_tag of 'a
+    type 'a my_option = None | Some of 'a
+  end
+|}];;
+
+module type T = sig
+  val foo : int
+end
+[%%expect {|
+module type T = sig val foo : int end
+|}];;
+
 module E = struct
   type existential = Exists : 'a -> existential
 end
@@ -22,6 +47,20 @@ type pv = [ `A | `B ]
 class cls = object method meth () = 42 end;;
 [%%expect {|
 class cls : object method meth : unit -> int end
+|}];;
+
+module Op = struct
+  let (+) x y = x ^ y
+end
+[%%expect {|
+module Op : sig val ( + ) : string -> string -> string end
+|}];;
+
+module Exc = struct
+  exception E
+end
+[%%expect {|
+module Exc : sig exception E end
 |}];;
 
 #mark_toplevel_in_quotations;;
@@ -662,62 +701,63 @@ Hint: Label "x" is defined outside any quotations.
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Match_failure ("foo", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Match_failure ("foo", 42, 100))]>
 |}];;
 
 <[ raise Out_of_memory ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Out_of_memory]>
+- : 'a expr = <[Stdlib.raise Stdlib.Out_of_memory]>
 |}];;
 
 <[ raise (Invalid_argument "arg") ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Invalid_argument "arg")]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Invalid_argument "arg")]>
 |}];;
 
 <[ raise (Failure "fail") ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Failure "fail")]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Failure "fail")]>
 |}];;
 
 <[ raise Not_found ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Not_found]>
+- : 'a expr = <[Stdlib.raise Stdlib.Not_found]>
 |}];;
 
 <[ raise (Sys_error "err") ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Sys_error "err")]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Sys_error "err")]>
 |}];;
 
 <[ raise End_of_file ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise End_of_file]>
+- : 'a expr = <[Stdlib.raise Stdlib.End_of_file]>
 |}];;
 
 <[ raise Division_by_zero ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Division_by_zero]>
+- : 'a expr = <[Stdlib.raise Stdlib.Division_by_zero]>
 |}];;
 
 <[ raise Stack_overflow ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stack_overflow]>
+- : 'a expr = <[Stdlib.raise Stdlib.Stack_overflow]>
 |}];;
 
 <[ raise Sys_blocked_io ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Sys_blocked_io]>
+- : 'a expr = <[Stdlib.raise Stdlib.Sys_blocked_io]>
 |}];;
 
 <[ raise (Assert_failure ("assert", 42, 100)) ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Assert_failure ("assert", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Stdlib.Assert_failure ("assert", 42, 100))]>
 |}];;
 
 <[ raise (Undefined_recursive_module ("M", 42, 100)) ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Undefined_recursive_module ("M", 42, 100))]>
+- : 'a expr =
+<[Stdlib.raise (Stdlib.Undefined_recursive_module ("M", 42, 100))]>
 |}];;
 
 <[ let exception E in () ]>;;
@@ -926,25 +966,24 @@ Error: Object definition using "object..end"
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 1, characters 3-23:
-1 | <[ let open List in map ]>;;
-       ^^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at line 1, characters 3-23.
+- : <[($('a) -> $('b)) -> $('a) list -> $('b) list]> expr =
+<[let open! Stdlib.List in Stdlib.List.map]>
 |}];;
-
-module M = struct
-  let foo = 42
-end;;
 
 <[ let open M in M.foo ]>;;
 [%%expect {|
-module M : sig val foo : int end
-Line 5, characters 3-22:
-5 | <[ let open M in M.foo ]>;;
-       ^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at line 5, characters 3-22.
+- : <[int]> expr = <[let open! M in M.foo]>
+|}]
+;;
+
+<[ let open struct let foo = 42 end in foo ]>;;
+[%%expect {|
+Line 1, characters 3-42:
+1 | <[ let open struct let foo = 42 end in foo ]>;;
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Opening a non-identifier module expression
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 3-42.
 |}]
 ;;
 
@@ -1081,7 +1120,7 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 <[ fun f x -> (f [@inlined]) x [@nontail] ]>
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
-<[fun f x -> ((f [@inlined]) x [@nontail])]>
+<[fun f x -> ((((f) [@inlined]) x) [@nontail])]>
 |}];;
 
 <[ fun x -> [ x ; x + 1 ] ]>
@@ -1225,8 +1264,8 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 - : <[bool -> int]> expr =
 <[
   fun x ->
-    match x with | true -> (try Stdlib.raise Exit with  | _ -> 0) | false ->
-      1
+    match x with | true -> (try Stdlib.raise Stdlib.Exit with  | _ -> 0) |
+      false -> 1
 ]>
 |}];;
 
@@ -1552,4 +1591,155 @@ Line 1, characters 31-40:
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
        as seen at line 1, characters 31-40.
+|}];;
+
+(* Correct disambiguation of infix operators. *)
+let open Op in
+<[ "abc" + "def" ]>;;
+[%%expect {|
+- : <[string]> expr = <[Op.( + ) "abc" "def"]>
+|}];;
+
+(* Infix operators are correctly parenthesised when defined in quotations. *)
+<[ let (+) x y = x ^ y in "foo" + "bar" ]>;;
+[%%expect {|
+- : <[string]> expr = <[let ( + ) = (fun x y -> x ^ y) in "foo" + "bar"]>
+|}];;
+
+<[ let (+) x y = x in let f g = g 1 2 in f (+) ]>;;
+[%%expect {|
+- : <[int]> expr =
+<[let ( + ) = (fun x y -> x) in let f = (fun g -> g 1 2) in f ( + )]>
+|}];;
+
+(* Infix operators are correctly named when used in comprehensions. *)
+<[ [2 + 3 for ( + ) in [( + ); ( * )]] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ 2 + 3 for ( + ) in [Stdlib.( + ); Stdlib.( * )] ]
+]>
+|}];;
+
+<[ [( + ) for ( + ) = 1 to 3] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ ( + ) for ( + ) = 1 to 3 ]]>
+|}];;
+
+(* Extension constructors/exceptions *)
+exception E;;
+[%%expect {|
+exception E
+|}];;
+
+<[ raise E ]>;;
+[%%expect {|
+- : 'a expr = <[Stdlib.raise (E : exn)]>
+|}];;
+
+<[ raise Exc.E ]>;;
+[%%expect {|
+- : 'a expr = <[Stdlib.raise Exc.E]>
+|}];;
+
+(** Opening modules in expressions **)
+
+<[ let open List in map length [[1]; [2; 3]] ]>
+[%%expect {|
+- : <[int list]> expr =
+<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+]>
+|}];;
+
+<[ List.(map length [[1]; [2; 3]]) ]>
+[%%expect {|
+- : <[int list]> expr =
+<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+]>
+|}];;
+
+<[ M.(0.1 + 0.2) ]>
+[%%expect {|
+- : <[float]> expr = <[let open! M in M.( + ) 0.1 0.2]>
+|}];;
+
+<[ M.{ record_field = "open" }, { M.record_field = "path" } ]>
+[%%expect {|
+- : <[string M.record * string M.record]> expr =
+<[
+  ((let open! M in { M.record_field = "open"; }),
+   { M.record_field = "path"; })
+]>
+|}];;
+
+<[ M.(Variant_tag "open"), M.Variant_tag "path" ]>
+[%%expect {|
+- : <[string M.variant * string M.variant]> expr =
+<[((let open! M in M.Variant_tag "open"), (M.Variant_tag "path"))]>
+|}];;
+
+(* Opening packed module *)
+
+<[ fun (module M : T) -> let open M in foo + 1 ]>
+[%%expect {|
+- : <[(module T) -> int]> expr =
+<[fun (module M : T) -> let open! M in M.foo + 1]>
+|}];;
+
+(* Cross-stage open *)
+
+<[ let open List in $(hd [ <[ 0 ]>; <[ 1 ]> ]) ]>
+[%%expect {|
+- : <[int]> expr = <[let open! Stdlib.List in 0]>
+|}];;
+
+let open List in <[ length [1; 2; 3] ]>
+[%%expect {|
+- : <[int]> expr = <[Stdlib.List.length ([1; 2; 3])]>
+|}];;
+
+module M1 = struct let foo1 = 42 end;;
+let open M1 in <[ foo1 ]>
+[%%expect {|
+module M1 : sig val foo1 : int end
+Line 2, characters 18-22:
+2 | let open M1 in <[ foo1 ]>
+                      ^^^^
+Error: Identifier "foo1" is used at line 2, characters 18-22,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 23-27, outside any quotations.
+|}];;
+
+<[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+[%%expect {|
+Line 1, characters 56-59:
+1 | <[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+                                                            ^^^
+Error: Identifier "foo" is used at line 1, characters 56-59,
+       outside any quotations; it is introduced at line 2, characters 2-15,
+       inside a quotation (<[ ... ]>).
+|}];;
+
+(* Attributes on let-open *)
+
+<[ let open [@inline] M in foo ]>
+[%%expect {|
+- : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
+|}];;
+
+<[ ((let open M in foo) [@inline]) ]>
+[%%expect {|
+- : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
+|}];;
+
+(** Opening modules in patterns **)
+
+<[ function M.(Variant_tag 0) -> 1 | M.Variant_tag _ -> 0 ]>
+[%%expect {|
+- : <[int M.variant -> int]> expr =
+<[function | M.Variant_tag (0) -> 1 | M.Variant_tag (_) -> 0]>
+|}];;
+
+<[ function M.(Some x) -> x | M.(None) -> 0 ]>
+[%%expect {|
+- : <[int M.my_option -> int]> expr =
+<[function | M.Some (x) -> x | M.None -> 0]>
 |}];;

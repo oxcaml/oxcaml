@@ -207,6 +207,17 @@ module Stdlib = struct
       in
       aux l1 l2 []
 
+    let mapi_result f l =
+      let rec aux l i acc =
+        match l with
+        | [] -> Ok (List.rev acc)
+        | x :: xs ->
+          match f i x with
+          | Error e -> Error e
+          | Ok x -> aux xs (i + 1) (x :: acc)
+      in
+      aux l 0 []
+
     let split_at n l =
       let rec aux n acc l =
         if n = 0
@@ -1926,15 +1937,9 @@ end
 
 type (_, _) eq = Refl : ('a, 'a) eq
 
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
-
-let comparison_result : type a b. (a, b) comparison -> int = function
-  | Less_than -> -1
-  | Equal -> 0
-  | Greater_than -> 1
+type (_, _) is_eq =
+  | Is_eq : ('a, 'a) is_eq
+  | Is_not_eq : ('a, 'b) is_eq
 
 (*********************************************)
 (* Fancy modules *)

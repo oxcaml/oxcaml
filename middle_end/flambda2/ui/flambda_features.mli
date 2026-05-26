@@ -123,6 +123,8 @@ val dump_reaper : unit -> bool
 
 val freshen_when_printing : unit -> bool
 
+val erase_in_types_depth_variables : unit -> bool
+
 module Inlining : sig
   type round_or_default =
     | Round of int

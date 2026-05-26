@@ -66,10 +66,10 @@ let do_intersect t1 t2 =
 do_intersect:
   andq  %rbx, %rax
   testq %rax, %rax
-  jne   .L106
+  jne   .L0
   movl  $100, %eax
   ret
-.L106:
+.L0:
   movl  $200, %eax
   ret
 |}]
@@ -82,11 +82,11 @@ logand_branch:
   movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
-  je    .L108
+  je    .L0
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L108:
+.L0:
   movl  $1, %eax
   ret
 |}]
@@ -107,12 +107,12 @@ combine_comparisons:
   cmpq  $41, %rbx
   setl  %al
   cmpq  $11, %rbx
-  jle   .L114
+  jle   .L0
   testq %rax, %rax
-  je    .L114
+  je    .L0
   movq  %rbx, %rax
   ret
-.L114:
+.L0:
   movl  $1, %eax
   ret
 |}]
@@ -130,12 +130,12 @@ repeat_comparisons:
   cmpq  $11, %rbx
   setg  %al
   cmpq  $11, %rbx
-  jle   .L113
+  jle   .L0
   testq %rax, %rax
-  je    .L113
+  je    .L0
   movl  $3, %eax
   ret
-.L113:
+.L0:
   movl  $5, %eax
   ret
 |}]
@@ -154,10 +154,10 @@ branch_and_return:
   setne %al
   leaq  1(%rax,%rax), %rax
   cmpq  $3, %rax
-  jne   .L107
+  jne   .L0
   movq  %rbx, %rax
   ret
-.L107:
+.L0:
   movl  $15, %eax
   ret
 |}]
@@ -172,8 +172,8 @@ two_element_list:
   movq  %rax, %rbx
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rdi
   addq  $24, %rdi
   movq  $2048, -8(%rdi)
@@ -196,15 +196,15 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jl    .L109
+  jl    .L0
   subq  %rax, %rax
   incq  %rax
   cmpq  $1, %rax
-  jne   .L111
-.L109:
+  jne   .L1
+.L0:
   movl  $7, %eax
   ret
-.L111:
+.L1:
   movl  $9, %eax
   ret
 |}]
@@ -267,8 +267,8 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   .L105
-.L106:
+  jbe   <hidden GC jump pad>
+.L0:
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -339,11 +339,11 @@ let is_int_branch (x : 'a) f = if Obj.is_int(Obj.repr x) then f()
 [%%expect_asm X86_64{|
 is_int_branch:
   testb $1, %al
-  je    .L107
+  je    .L0
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L107:
+.L0:
   movl  $1, %eax
   ret
 |}]
@@ -354,10 +354,10 @@ let is_block_branch (x : 'a) f = if not(Obj.is_int(Obj.repr x)) then f()
 [%%expect_asm X86_64{|
 is_block_branch:
   testb $1, %al
-  je    .L105
+  je    .L0
   movl  $1, %eax
   ret
-.L105:
+.L0:
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
@@ -375,13 +375,13 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-  jbe   .L105
+  jbe   .L0
   movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L105:
+.L0:
   movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret

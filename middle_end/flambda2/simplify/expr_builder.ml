@@ -291,7 +291,10 @@ let remove_unused_value_slots uacc static_const =
   let find_code_metadata code_id =
     let dacc = UA.creation_dacc uacc in
     let env = DA.denv dacc in
-    Downwards_env.find_code_exn env code_id |> Code_or_metadata.code_metadata
+    (try Downwards_env.find_code_exn env code_id
+     with Not_found ->
+       Misc.fatal_errorf "Could not find code for %a" Code_id.print code_id)
+    |> Code_or_metadata.code_metadata
   in
   Rebuilt_static_const.map_set_of_closures static_const ~find_code_metadata
     ~f:(fun set_of_closures ->
@@ -304,7 +307,6 @@ let remove_unused_value_slots uacc static_const =
           (Set_of_closures.value_slots set_of_closures)
       in
       Set_of_closures.create ~value_slots
-        (Set_of_closures.alloc_mode set_of_closures)
         (Set_of_closures.function_decls set_of_closures))
 
 let create_let_symbols uacc lifted_constant ~body =

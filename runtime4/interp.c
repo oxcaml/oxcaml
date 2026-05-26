@@ -1229,6 +1229,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(REPERFORMTERM):
     Instruct(WITH_STACK):
     Instruct(WITH_STACK_BIND):
+    Instruct(WITH_STACK_PREEMPTIBLE):
+    Instruct(WITH_STACK_BIND_PREEMPTIBLE):
       caml_fatal_error("Effect primitives not supported on runtime4");
 
 #ifndef THREADED_CODE

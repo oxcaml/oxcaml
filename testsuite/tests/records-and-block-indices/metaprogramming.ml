@@ -285,11 +285,30 @@ module Type_structure = struct
     | Unit_u -> Void
     | Int64x2_u -> Vec128
 
-  let is_flat_float_record t =
+  let record_float_flattening t =
     match t with
     | Record (ts, Boxed) ->
-      List.for_all ts ~f:(fun t -> layout t = Float64 || scrape t = Float)
-    | _ -> false
+      let has_float = List.exists ts ~f:(fun t -> scrape t = Float) in
+      let has_float_u = List.exists ts ~f:(fun t -> layout t = Float64) in
+      let flattens_floats =
+        has_float
+        && List.for_all ts ~f:(fun t -> layout t = Float64 || scrape t = Float)
+      in
+      let is_mixed_float_float64_record = has_float_u && flattens_floats in
+      Some (~flattens_floats, ~is_mixed_float_float64_record)
+    | _ -> None
+
+  let flattens_floats t =
+    match record_float_flattening t with
+    | Some (~flattens_floats, ~is_mixed_float_float64_record:_) ->
+      flattens_floats
+    | None -> false
+
+  let is_mixed_float_float64_record t =
+    match record_float_flattening t with
+    | Some (~flattens_floats:_, ~is_mixed_float_float64_record) ->
+      is_mixed_float_float64_record
+    | None -> false
 
   let rec contains_vec128 t =
     match t with
@@ -934,27 +953,10 @@ module Type_naming = struct
             | _ -> assert false
           in
           let type_name = Type.code ty in
-          let needs_flatten_floats =
-            match ty_structure with
-            | Record (ts, Boxed) ->
-              let has_float =
-                List.exists ts ~f:(fun t -> Type_structure.scrape t = Float)
-              in
-              let has_float_u =
-                List.exists ts ~f:(fun t ->
-                    Type_structure.layout t = Float64
-                    && Type_structure.scrape t <> Float
-                )
-              in
-              has_float && has_float_u
-              && List.for_all ts ~f:(fun t ->
-                  Type_structure.layout t = Float64
-                  || Type_structure.scrape t = Float
-              )
-            | _ -> false
-          in
           let attr =
-            if needs_flatten_floats then " [@@flatten_floats]" else ""
+            if Type_structure.is_mixed_float_float64_record (Type.structure ty)
+            then " [@@flatten_floats]"
+            else ""
           in
           ( id,
             sprintf "type %s = %s%s (* %s *)" type_name type_definition attr

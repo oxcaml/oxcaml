@@ -219,6 +219,7 @@ val has_layout_poly: Parsetree.attributes -> bool
 val has_curry: Parsetree.attributes -> bool
 val has_or_null : Parsetree.attributes -> bool
 val has_or_null_reexport : Parsetree.attributes -> bool
+val has_magic_staged_modes : Parsetree.attributes -> bool
 
 val tailcall : Parsetree.attributes ->
     ([`Tail|`Nontail|`Tail_if_possible] option, [`Conflict]) result

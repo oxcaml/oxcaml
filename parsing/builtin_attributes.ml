@@ -700,6 +700,9 @@ let has_or_null attrs =
 let has_or_null_reexport attrs =
   has_attribute "or_null_reexport" attrs
 
+let has_magic_staged_modes attrs =
+  has_attribute "magic_staged_modes" attrs
+
 let curry_attr loc =
   Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])
 ;;

@@ -89,7 +89,7 @@ val is_naked_float : t -> bool
 
 include Container_types.S with type t := t
 
-type flat_suffix_element = private
+type flat_suffix_element =
   | Naked_float
   | Naked_float32
   | Naked_int8
@@ -122,6 +122,9 @@ module Mixed_block_shape : sig
   val compare : t -> t -> int
 
   val print : Format.formatter -> t -> unit
+
+  val from_prefix_size_and_suffix_elements :
+    int -> flat_suffix_element list -> t
 end
 
 module Scannable_block_shape : sig

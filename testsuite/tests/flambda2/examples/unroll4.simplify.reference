@@ -5,8 +5,8 @@ let code rec loopify(never) size(26) newer_version_of(odd_2)
       odd_2_1 (n : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
-  let k = %project_value_slot.[`odd`].[`k`] (my_closure) in
-  let even = %project_function_slot.[`odd`].[`even`] (my_closure) in
+  let k = %project_value_slot.[odd].[k] (my_closure) in
+  let even = %project_function_slot.[odd].[even] (my_closure) in
   let prim = %phys_eq (n, 0) in
   switch prim
     | 0 -> k2
@@ -21,8 +21,8 @@ and code rec loopify(never) size(26) newer_version_of(even_1)
       even_1_1 (n : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
-  let k = %project_value_slot.[`even`].[`k`] (my_closure) in
-  let odd = %project_function_slot.[`even`].[`odd`] (my_closure) in
+  let k = %project_value_slot.[even].[k] (my_closure) in
+  let odd = %project_function_slot.[even].[odd] (my_closure) in
   let prim = %phys_eq (n, 0) in
   switch prim
     | 0 -> k2

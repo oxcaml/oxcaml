@@ -663,6 +663,11 @@ let add_variable_definition t var kind name_mode =
   then
     Misc.fatal_errorf "Cannot rebind %a in environment:@ %a" Name.print name
       print t;
+  if not (K.equal kind (Variable.kind var))
+  then
+    Misc.fatal_errorf
+      "Cannot define variable %a (which has kind %a) with kind %a"
+      Variable.print var K.print (Variable.kind var) K.print kind;
   let level =
     TEL.add_definition
       (One_level.level t.current_level)

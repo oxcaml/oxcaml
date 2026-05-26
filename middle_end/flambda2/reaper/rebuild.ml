@@ -83,7 +83,8 @@ type env =
     kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
-    inside_code_definition : bool
+    inside_code_definition : bool;
+    types_rewrite_context : Types_rewriter.rewrite_context
   }
 
 type rebuild_result =
@@ -397,8 +398,7 @@ let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
 let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
-    ({ Rev_expr.function_decls; value_slots; alloc_mode } :
-      Rev_expr.rev_set_of_closures) =
+    ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
     List.exists
       (fun bound_name ->
@@ -564,9 +564,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
   let function_decls =
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
-  let set_of_closures =
-    Set_of_closures.create ~value_slots alloc_mode function_decls
-  in
+  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
   let res =
     { res with
       all_slot_offsets =
@@ -763,7 +761,7 @@ let rebuild_named_default_case env (named : Named.t) =
     let prim = P.map_args (rewrite_simple env) prim in
     ( Named.create_prim prim dbg,
       Code_size.prim ~machine_width:env.machine_width prim )
-  | Set_of_closures s ->
+  | Set_of_closures (s, _alloc_mode) ->
     Misc.fatal_errorf
       "[rebuild_named_default_case] called on set of closures:@ %a@."
       Set_of_closures.print s
@@ -1001,6 +999,23 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
     Call_kind.effect_
       (Call_kind.Effect.with_stack_bind ~valuec:(rewrite_simple valuec)
          ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
+         ~dyn:(rewrite_simple dyn) ~bind:(rewrite_simple bind)
+         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
+  | Effect (With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg })
+    ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack_preemptible ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
+         ~handle_tick:(rewrite_simple handle_tick)
+         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
+  | Effect
+      (With_stack_bind_preemptible
+         { valuec; exnc; effc; handle_tick; dyn; bind; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack_bind_preemptible
+         ~valuec:(rewrite_simple valuec) ~exnc:(rewrite_simple exnc)
+         ~effc:(rewrite_simple effc)
+         ~handle_tick:(rewrite_simple handle_tick)
          ~dyn:(rewrite_simple dyn) ~bind:(rewrite_simple bind)
          ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
   | Effect (Resume { cont; f; arg }) ->
@@ -1747,7 +1762,8 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           Non_nullable
       in
       let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.uses bound_name ks
+        Types_rewriter.rewrite_kind_with_subkind env.types_rewrite_context
+          bound_name ks
       in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
@@ -1782,7 +1798,8 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
       (Code_size.prim ~machine_width:env.machine_width prim)
     ~body:hole
 
-let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
+let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
+    ~alloc_mode ~hole =
   if bound_vars_will_be_unboxed env bvs
   then
     ( rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
@@ -1828,7 +1845,7 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
     in
     let expr =
       RE.create_let bound_pattern
-        (Named.create_set_of_closures set_of_closures)
+        (Named.create_set_of_closures ~alloc_mode set_of_closures)
         ~size_of_defining_expr ~body:hole
     in
     expr, res
@@ -1966,9 +1983,10 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
         rebuild_let_expr_singleton env res bv ~defining_expr ~hole
       | Static bound_static, Static_consts group ->
         rebuild_let_expr_static_consts env res bound_static group ~hole
-      | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
+      | Set_of_closures bound_vars, Set_of_closures (set_of_closures, alloc_mode)
+        ->
         rebuild_let_expr_holed_set_of_closures env res bound_vars
-          ~set_of_closures ~hole
+          ~set_of_closures ~alloc_mode ~hole
       | ( (Singleton _ | Static _ | Set_of_closures _),
           (Named _ | Static_consts _ | Set_of_closures _) ) ->
         Misc.fatal_errorf "Bound pattern %a does not match defining expr"
@@ -2217,8 +2235,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                     results_vars return_decisions )
             in
             Or_unknown_or_bottom.Ok
-              (Types_rewriter.rewrite_result_types env.uses ~old_typing_env
-                 ~my_closure ~params:params_vars_and_keep
+              (Types_rewriter.rewrite_result_types env.types_rewrite_context
+                 ~old_typing_env ~my_closure ~params:params_vars_and_keep
                  ~results:results_vars_and_keep result_types)
       in
       Code_metadata.with_result_types result_types code_metadata
@@ -2427,7 +2445,7 @@ type result =
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env kinds
+    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context kinds
     (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
@@ -2509,7 +2527,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
                   raw_is_var_used solved_dep v (K.With_subkind.kind kind)
                 in
                 let kind =
-                  Types_rewriter.rewrite_kind_with_subkind solved_dep
+                  Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
                     (Name.var v) kind
                 in
                 (* TODO: fix this, needs the mapping between code ids of
@@ -2540,8 +2558,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       then
         Keep
           ( param,
-            Types_rewriter.rewrite_kind_with_subkind solved_dep (Name.var param)
-              kind )
+            Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
+              (Name.var param) kind )
       else Delete
     | Some fields -> Unbox fields
   in
@@ -2571,7 +2589,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       kinds;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
-      inside_code_definition = false
+      inside_code_definition = false;
+      types_rewrite_context
     }
   in
   let res =

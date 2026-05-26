@@ -212,11 +212,9 @@ let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =
     then None
     else Some function_slot
   in
-  let alloc = alloc |> alloc_mode_for_allocations env in
   { code_id; function_slot; alloc }
 
-let set_of_closures env sc =
-  let alloc = Set_of_closures.alloc_mode sc in
+let set_of_closures env sc alloc =
   let fun_decls =
     List.map
       (fun (function_slot, fun_decl) ->
@@ -324,8 +322,9 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
     match defining_expr with
     | Simple s -> ([Simple (simple env s)] : Fexpr.named list), None
     | Prim (p, _dbg) -> ([Prim (prim env p)] : Fexpr.named list), None
-    | Set_of_closures sc ->
-      let fun_decls, value_slots = set_of_closures env sc in
+    | Set_of_closures (sc, alloc_mode) ->
+      let alloc_mode = alloc_mode_for_allocations env alloc_mode in
+      let fun_decls, value_slots = set_of_closures env sc alloc_mode in
       let defining_exprs =
         List.map (fun decl : Fexpr.named -> Fexpr.Closure decl) fun_decls
       in
@@ -376,7 +375,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       Data { symbol; defining_expr }
     | Set_of_closures closure_symbols, Static_const const ->
       let set = Static_const.must_be_set_of_closures const in
-      let fun_decls, elements = set_of_closures env set in
+      let fun_decls, elements = set_of_closures env set Heap in
       let symbols_by_function_slot =
         closure_symbols |> Function_slot.Lmap.bindings
         |> Function_slot.Map.of_list
@@ -723,7 +722,7 @@ module Iter = struct
   and named let_expr (bound_pattern : Bound_pattern.t) f_c f_s n =
     match (n : Named.t) with
     | Simple _ | Prim _ | Rec_info _ -> ()
-    | Set_of_closures s ->
+    | Set_of_closures (s, _alloc_mode) ->
       let is_phantom =
         Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
       in

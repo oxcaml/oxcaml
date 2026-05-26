@@ -29,7 +29,7 @@ module Asm_symbol = Asm_targets.Asm_symbol
 
 
 type section = {
-  sec_name : string;
+  sec_name : Section_name.t;
   mutable sec_instrs : asm_line array;
 }
 
@@ -591,6 +591,9 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 buf_sym b sym offset))
   | Imm _ | Sym _ -> assert false
 
+(** [rex_always] is combined with operand-derived REX bits. Passing [no_rex]
+    here does not mean that no REX prefix will be emitted: [emit_prefix_modrm]
+    can still request REX.R, REX.B or REX.X for the operands. *)
 let emit_mod_rm_reg b rex_always opcodes rm reg =
   emit_prefix_modrm b opcodes rm reg ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
     emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
@@ -632,19 +635,18 @@ let emit_MOV b dst src =
       buf_int8L b n
   | ((Mem _ | Mem64_RIP _) as rm), ((Reg8L _ | Reg8H _) as reg) ->
       emit_mod_rm_reg b (rex_of_reg8 reg) [ 0x88 ] rm (rd_of_reg8 reg)
-  (* no REX.W *)
   (* movw *)
   | ((Mem _ | Mem64_RIP _) as rm), Reg16 reg ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b rex [ 0x89 ] rm (rd_of_reg64 reg) (* no REX.W *)
+      emit_mod_rm_reg b no_rex [ 0x89 ] rm (rd_of_reg64 reg)
   | Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b rex [ 0x8B ] rm (rd_of_reg64 reg) (* no REX.W *)
+      emit_mod_rm_reg b no_rex [ 0x8B ] rm (rd_of_reg64 reg)
   (* movl *)
-  | Reg32 reg32, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
+  | Reg32 reg32, ((Mem _ | Mem64_RIP _) as rm) ->
       let reg = rd_of_reg64 reg32 in
       emit_mod_rm_reg b 0 [ 0x8B ] rm reg
-  | ((Mem _ | Mem64_RIP _) as rm), Reg32 reg32 ->
+  | ((Reg32 _ | Mem _ | Mem64_RIP _) as rm), Reg32 reg32 ->
       let reg = rd_of_reg64 reg32 in
       emit_mod_rm_reg b 0 [ 0x89 ] rm reg
   | (Mem { typ = DWORD } as rm), ((Imm _ | Sym _) as n) ->
@@ -667,9 +669,9 @@ let emit_MOV b dst src =
       buf_int8 b (0xB8 lor reg7 reg);
       buf_int32_imm b n
   (* movq *)
-  | Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
+  | Reg64 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       emit_mod_rm_reg b rexw [ 0x8B ] rm (rd_of_reg64 reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Reg64 reg ->
+  | ((Reg64 _ | Mem _ | Mem64_RIP _) as rm), Reg64 reg ->
       emit_mod_rm_reg b rexw [ 0x89 ] rm (rd_of_reg64 reg)
   | Reg64 r64, Imm n when not (is_imm32L n) ->
       (* MOVNoneQ *)
@@ -858,10 +860,6 @@ type simple_encoding = {
   r64_rm64 : int list;
   al_imm8 : int list;
   rax_imm32 : int list;
-  rm8_imm8 : int list;
-  rm16_imm16 : int list;
-  rm64_imm32 : int list;
-  rm64_imm8 : int list;
   reg : int;
 }
 
@@ -904,24 +902,24 @@ let emit_simple_encoding enc b dst src =
   | { r64_rm64 = opcodes }, Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       buf_int8 b 0x66;
       emit_mod_rm_reg b 0 opcodes rm (rd_of_reg64 reg)
-  | ( { rm64_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg64 _ | Mem { typ = NONE | QWORD | REAL8; arch = X64 }) as rm),
       Imm n )
     when is_imm8L n ->
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x83 ] rm reg;
       buf_int8L b n
-  | ( { rm8_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg8L _ | Reg8H _ | Mem { typ = BYTE; arch = X64 }) as rm),
       Imm n ) ->
       assert (is_imm8L n);
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x80 ] rm reg;
       buf_int8L b n
-  | ( { rm64_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg32 _ | Mem { typ = DWORD | REAL4 } | Mem { typ = NONE; arch = X86 })
       as rm),
       Imm n )
     when is_imm8L n ->
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x83 ] rm reg;
       buf_int8L b n
   | { rax_imm32 = opcodes }, Reg64 RAX, ((Imm _ | Sym _) as n) ->
       emit_rex b rexw;
@@ -930,23 +928,29 @@ let emit_simple_encoding enc b dst src =
   | { rax_imm32 = opcodes }, Reg32 RAX, ((Imm _ | Sym _) as n) ->
       buf_opcodes b opcodes;
       buf_int32_imm b n
-  | ( { rm16_imm16 = opcodes; reg },
-      ((Reg16 _ | Mem { typ = WORD })
-      as rm),
+  | ( { reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
+      Imm n )
+    when is_imm8L n ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 [ 0x83 ] rm reg;
+      buf_int8L b n
+  | ( { reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
       (Imm _ as n) ) ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x81 ] rm reg;
       buf_int16_imm b n
-  | ( { rm64_imm32 = opcodes; reg },
+  | ( { reg },
       ((Reg32 _ | Mem { typ = NONE; arch = X86 } | Mem { typ = DWORD | REAL4 })
       as rm),
       ((Imm _ | Sym _) as n) ) ->
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x81 ] rm reg;
       buf_int32_imm b n
-  | ( { rm64_imm32 = opcodes; reg },
+  | ( { reg },
       ((Reg64 _ | Mem _ | Mem64_RIP _) as rm),
       ((Imm _ | Sym _) as n) ) ->
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x81 ] rm reg;
       buf_int32_imm b n
   | _ ->
       Format.eprintf "src=%a dst=%a@." print_old_arg src print_old_arg dst;
@@ -961,10 +965,6 @@ let emit_simple_encoding base reg =
       r64_rm64 = [ base + 3 ];
       al_imm8 = [ base + 4 ];
       rax_imm32 = [ base + 5 ];
-      rm8_imm8 = [ 0x80 ];
-      rm16_imm16 = [ 0x81 ];
-      rm64_imm32 = [ 0x81 ];
-      rm64_imm8 = [ 0x83 ];
       reg;
     }
 
@@ -1075,7 +1075,7 @@ let emit_mul b ~src =
   let opcode_extension = 4 in
   match src with
   | ((Reg8H _ | Reg8L _ | Mem {typ = BYTE; _} | Mem64_RIP (BYTE, _, _)) as rm) ->
-    emit_mod_rm_reg b rex [ 0xF6 ] rm opcode_extension
+    emit_mod_rm_reg b no_rex [ 0xF6 ] rm opcode_extension
   | ((Reg16 _ | Mem {typ = WORD; _} | Mem64_RIP (WORD, _, _)) as rm) ->
     buf_int8 b 0x66;
     emit_mod_rm_reg b no_rex [ 0xF7 ] rm opcode_extension
@@ -1229,13 +1229,22 @@ let emit_set b condition dst =
 
 let emit_movsx b dst src =
   match (dst, src) with
-  | (Reg64 reg | Reg32 reg), ((Mem { typ = BYTE } | Reg8L _ | Reg8H _) as rm) ->
-      let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b rex [ 0x0F; 0xBE ] rm reg
-      (* no REX.W *)
-  | (Reg64 reg | Reg32 reg), ((Mem { typ = WORD } | Reg16 _) as rm) ->
-      let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b rexw [ 0x0F; 0xBF ] rm reg
+  | Reg64 reg, ((Mem { typ = BYTE } | Reg8L _ | Reg8H _) as rm) ->
+      (* movsbq: REX.W + 0F BE /r *)
+      emit_mod_rm_reg b rexw [ 0x0F; 0xBE ] rm (rd_of_reg64 reg)
+  | Reg32 reg, ((Mem { typ = BYTE } | Reg8L _ | Reg8H _) as rm) ->
+      (* movsbl: 0F BE /r *)
+      (* This is the 32-bit destination form. [emit_mod_rm_reg] still adds
+         operand-extension REX bits such as REX.R and REX.B when needed. *)
+      emit_mod_rm_reg b no_rex [ 0x0F; 0xBE ] rm (rd_of_reg64 reg)
+  | Reg64 reg, ((Mem { typ = WORD } | Reg16 _) as rm) ->
+      (* movswq: REX.W + 0F BF /r *)
+      emit_mod_rm_reg b rexw [ 0x0F; 0xBF ] rm (rd_of_reg64 reg)
+  | Reg32 reg, ((Mem { typ = WORD } | Reg16 _) as rm) ->
+      (* movswl: 0F BF /r *)
+      (* This is the 32-bit destination form. [emit_mod_rm_reg] still adds
+         operand-extension REX bits such as REX.R and REX.B when needed. *)
+      emit_mod_rm_reg b no_rex [ 0x0F; 0xBF ] rm (rd_of_reg64 reg)
   | _ -> assert false
 
 let emit_movsxd b dst src =
@@ -1255,7 +1264,7 @@ let emit_MOVZX b dst src =
       emit_mod_rm_reg b rexw [ 0x0F; 0xB7 ] rm reg
   | Reg32 reg, ((Mem { typ = WORD } | Reg16 _) as rm) ->
       let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b 0 [ 0x0F; 0xB7 ] rm reg
+      emit_mod_rm_reg b no_rex [ 0x0F; 0xB7 ] rm reg
   | _ -> assert false
 
 let emit_neg b dst =
@@ -1422,12 +1431,7 @@ let emit_XCHG b src dst =
   | Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       (* r16, r/m16 *)
       buf_int8 b 0x66;
-      (* CR mshinwell/claude:
-      emit_XCHG r16 uses rex (0x40) as rex_always (line 1398). This forces a
-      bare REX prefix on every 16-bit XCHG, even when unnecessary. It's harmless
-      (a bare 0x40 REX is valid and has no effect) but adds a wasted byte. The
-      32-bit XCHG correctly uses no_rex. *)
-      emit_mod_rm_reg b rex [ 0x87 ] rm (rd_of_reg64 reg)
+      emit_mod_rm_reg b no_rex [ 0x87 ] rm (rd_of_reg64 reg)
   (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI.
      emit_prefix_modrm handles forced REX for the rm operand. *)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
@@ -1525,6 +1529,45 @@ let[@warning "+4"] constant b cst
     record_local_reloc b (RelocConstant (cst, B64));
     buf_int64L b 0L
 
+let emit_single_nop b n =
+  match n with
+  | 0 -> ()
+  | 1 -> buf_int8 b 0x90
+  | 2 -> buf_opcodes b [ 0x66; 0x90 ]
+  | 3 -> buf_opcodes b [ 0x0f; 0x1f; 0x00 ]
+  | 4 -> buf_opcodes b [ 0x0f; 0x1f; 0x40; 0x00 ]
+  | 5 -> buf_opcodes b [ 0x0f; 0x1f; 0x44; 0x00; 0x00 ]
+  | 6 ->
+      buf_opcodes b [ 0x66; 0x0f; 0x1f; 0x44 ];
+      buf_int16L b 0L
+  | 7 ->
+      buf_opcodes b [ 0x0f; 0x1f; 0x80 ];
+      buf_int32L b 0L
+  | 8 ->
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | 9 ->
+      buf_int8 b 0x66;
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | n when n >= 10 && n <= 15 ->
+      for _ = 10 to n do
+        buf_int8 b 0x66
+      done;
+      buf_int8 b 0x2e;
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | _ ->
+      invalid_arg
+        (Printf.sprintf "emit_single_nop: unsupported length %d" n)
+
+let emit_nop b n =
+  if n < 0 then invalid_arg (Printf.sprintf "emit_nop: negative length %d" n);
+  for _ = 1 to n / 15 do
+    emit_single_nop b 15
+  done;
+  emit_single_nop b (n mod 15)
+
 let assemble_line b loc ins =
   try
     match ins with
@@ -1583,31 +1626,14 @@ let assemble_line b loc ins =
             for _ = 1 to n do
               buf_int8 b 0x00
             done
-          | Asm_targets.Asm_directives.Nop ->
-            match n with
-            | 0 -> ()
-            | 1 -> buf_int8 b 0x90
-            | 2 -> buf_opcodes b [ 0x66; 0x90 ]
-            | 3 -> buf_opcodes b [ 0x0f; 0x1f; 0x00 ]
-            | 4 -> buf_opcodes b [ 0x0f; 0x1f; 0x40; 0x00 ]
-            | 5 -> buf_opcodes b [ 0x0f; 0x1f; 0x44; 0x00; 0x00 ]
-            | 6 ->
-                buf_opcodes b [ 0x66; 0x0f; 0x1f; 0x44 ];
-                buf_int16L b 0L
-            | 7 ->
-                buf_opcodes b [ 0x0f; 0x1f; 0x80 ];
-                buf_int32L b 0L
-            | _ ->
-                for _ = 9 to n do
-                  buf_int8 b 0x66
-                done;
-                buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
-                buf_int32L b 0L)
+          | Asm_targets.Asm_directives.Nop -> emit_nop b n)
     | Directive (D.Space { bytes = n }) ->
-        (* TODO: in text section, should be NOP *)
-        for _ = 1 to n do
-          buf_int8 b 0
-        done
+        if Section_name.is_text_like b.sec.sec_name then
+          emit_nop b n
+        else
+          for _ = 1 to n do
+            buf_int8 b 0
+          done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
     | Directive
         (D.Reloc
@@ -1643,7 +1669,7 @@ let rec assemble_section arch section =
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf
       "\nContext is: x86 binary emission of section %s:\n%!"
-      section.sec_name;
+      (Section_name.to_string section.sec_name);
     let dll =
       Oxcaml_utils.Doubly_linked_list.of_list
         (Array.to_list section.sec_instrs)
