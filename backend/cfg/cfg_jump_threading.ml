@@ -40,9 +40,9 @@ let apply_fold (block : C.basic_block) (result : fold_result option) : bool =
     only when none of its arguments has been clobbered after it, so that the
     arguments can still be used at the use point. *)
 let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
-    ~(cfg : Cfg_with_infos.t) : C.basic C.instruction option =
-  let dominators = Cfg_with_infos.dominators cfg in
-  let cfg = Cfg_with_infos.cfg cfg in
+    ~(cfg_with_infos : Cfg_with_infos.t) : C.basic C.instruction option =
+  let dominators = Cfg_with_infos.dominators cfg_with_infos in
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let clobbered = ref Reg.Set.empty in
   let add_to_clobbered arr =
     clobbered := Array.fold_right Reg.Set.add arr !clobbered
@@ -53,13 +53,9 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
     (not (Array.exists (Reg.same reg) b.terminator.res))
     &&
     (add_to_clobbered b.terminator.res;
-     DLL.fold_left b.body
-       ~f:(fun acc (instr : C.basic C.instruction) ->
-         acc
-         &&
-         (add_to_clobbered instr.res;
-          not (Array.exists (Reg.same reg) instr.res)))
-       ~init:true)
+     DLL.for_all b.body ~f:(fun (instr : C.basic C.instruction) ->
+         add_to_clobbered instr.res;
+         not (Array.exists (Reg.same reg) instr.res)))
   in
   (* Visit blocks reverse-reachable from [from_block], stopping at dominators of
      the block for which we search a definition. *)
@@ -128,41 +124,6 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
   then None
   else walk ~block ~pos:(DLL.last_cell block.body) ~reg
 
-let int_test_of_compare (cmp : Operation.integer_comparison) ~imm ~ifso ~ifnot :
-    C.terminator =
-  let module S = Scalar.Signedness in
-  let lt, eq, gt, is_signed =
-    match cmp with
-    | Ceq -> ifnot, ifso, ifnot, S.Signed
-    | Cne -> ifso, ifnot, ifso, S.Signed
-    | Clt -> ifso, ifnot, ifnot, S.Signed
-    | Cgt -> ifnot, ifnot, ifso, S.Signed
-    | Cle -> ifso, ifso, ifnot, S.Signed
-    | Cge -> ifnot, ifso, ifso, S.Signed
-    | Cult -> ifso, ifnot, ifnot, S.Unsigned
-    | Cugt -> ifnot, ifnot, ifso, S.Unsigned
-    | Cule -> ifso, ifso, ifnot, S.Unsigned
-    | Cuge -> ifnot, ifso, ifso, S.Unsigned
-  in
-  Int_test { lt; eq; gt; is_signed; imm }
-
-let float_test_of_compare (cmp : Operation.float_comparison) ~width ~ifso ~ifnot
-    : C.terminator =
-  let lt, eq, gt, uo =
-    match cmp with
-    | CFeq -> ifnot, ifso, ifnot, ifnot
-    | CFneq -> ifso, ifnot, ifso, ifso
-    | CFlt -> ifso, ifnot, ifnot, ifnot
-    | CFnlt -> ifnot, ifso, ifso, ifso
-    | CFgt -> ifnot, ifnot, ifso, ifnot
-    | CFngt -> ifso, ifso, ifnot, ifso
-    | CFle -> ifso, ifso, ifnot, ifnot
-    | CFnle -> ifnot, ifnot, ifso, ifso
-    | CFge -> ifnot, ifso, ifso, ifnot
-    | CFnge -> ifso, ifnot, ifnot, ifso
-  in
-  Float_test { width; lt; eq; gt; uo }
-
 (** Fold [term] using reaching definitions visible at [pos].
 
     - For [Truth_test] whose argument was set by an [Icomp]/[Icompf] (with its
@@ -170,11 +131,11 @@ let float_test_of_compare (cmp : Operation.float_comparison) ~width ~ifso ~ifnot
       test.
     - For tests whose arguments are known constants, produces a [Goto] to the
       statically determined arm. *)
-let evaluate_terminator ~block (term : C.terminator C.instruction) ~cfg :
-    fold_result option =
+let evaluate_terminator ~block (term : C.terminator C.instruction)
+    ~cfg_with_infos : fold_result option =
   let constant_arg arg_idx =
     match[@ocaml.warning "-4"]
-      find_reaching_def ~reg:term.arg.(arg_idx) ~block ~cfg
+      find_reaching_def ~reg:term.arg.(arg_idx) ~block ~cfg_with_infos
     with
     | Some { desc = Op (Const_int c); _ } -> Some c
     | Some _ | None -> None
@@ -182,27 +143,36 @@ let evaluate_terminator ~block (term : C.terminator C.instruction) ~cfg :
   match term.desc with
   | Truth_test { ifso; ifnot } -> (
     match[@ocaml.warning "-4"]
-      find_reaching_def ~reg:term.arg.(0) ~block ~cfg
+      find_reaching_def ~reg:term.arg.(0) ~block ~cfg_with_infos
     with
     | Some { desc = Op (Const_int c); _ } ->
       if Nativeint.equal c 0n then Some (Goto ifnot) else Some (Goto ifso)
-    | Some ({ desc = Op (Intop (Icomp cmp)); _ } as def) ->
+    | Some { desc = Op (Intop (Icomp cmp)); arg; _ } ->
       Some
         (Replace
-           { desc = int_test_of_compare cmp ~imm:None ~ifso ~ifnot;
-             arg = Array.copy def.arg
+           { desc =
+               Int_test
+                 (Select_utils.int_test_of_integer_comparison cmp
+                    ~immediate:None ~label_false:ifnot ~label_true:ifso);
+             arg = Array.copy arg
            })
-    | Some ({ desc = Op (Intop_imm (Icomp cmp, imm)); _ } as def) ->
+    | Some { desc = Op (Intop_imm (Icomp cmp, imm)); arg; _ } ->
       Some
         (Replace
-           { desc = int_test_of_compare cmp ~imm:(Some imm) ~ifso ~ifnot;
-             arg = Array.copy def.arg
+           { desc =
+               Int_test
+                 (Select_utils.int_test_of_integer_comparison cmp
+                    ~immediate:(Some imm) ~label_false:ifnot ~label_true:ifso);
+             arg = Array.copy arg
            })
-    | Some ({ desc = Op (Floatop (width, Icompf cmp)); _ } as def) ->
+    | Some { desc = Op (Floatop (width, Icompf cmp)); arg; _ } ->
       Some
         (Replace
-           { desc = float_test_of_compare cmp ~width ~ifso ~ifnot;
-             arg = Array.copy def.arg
+           { desc =
+               Float_test
+                 (Select_utils.float_test_of_float_comparison width cmp
+                    ~label_false:ifnot ~label_true:ifso);
+             arg = Array.copy arg
            })
     | Some _ | None -> None)
   | Parity_test { ifso; ifnot } ->
@@ -228,58 +198,63 @@ let evaluate_terminator ~block (term : C.terminator C.instruction) ~cfg :
     | None, _ | _, None -> None)
   | Switch labels ->
     Option.bind (constant_arg 0) (fun c ->
-        if Nativeint.equal c (Nativeint.of_int (Nativeint.to_int c))
+        if
+          Nativeint.compare c 0n >= 0
+          && Nativeint.compare c (Nativeint.of_int Int.max_int) <= 0
         then
           let idx = Nativeint.to_int c in
-          if idx >= 0 && idx < Array.length labels
-          then Some (Goto labels.(idx))
-          else None
+          if idx < Array.length labels then Some (Goto labels.(idx)) else None
         else None)
   | Float_test _ | Never | Always _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
-let process_block ~(is_loop_header : Label.t -> bool) ~(cfg : Cfg_with_infos.t)
-    (block : C.basic_block) : bool =
-  let raw_cfg = Cfg_with_infos.cfg cfg in
+let process_block ~(is_loop_header : Label.t -> bool)
+    ~(cfg_with_infos : Cfg_with_infos.t) (block : C.basic_block) : bool =
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
   (* 1. Fold the block's own terminator. *)
   let reduce_terminator () =
-    evaluate_terminator ~block block.terminator ~cfg |> apply_fold block
+    evaluate_terminator ~block block.terminator ~cfg_with_infos
+    |> apply_fold block
   in
   (* 2. Thread through an empty merge successor when safe. *)
-  let skip_successor () =
+  let rec skip_successor () =
     match[@ocaml.warning "-4"] block.terminator.desc with
     | Always successor_label
-      when (not (Label.equal block.start raw_cfg.entry_label))
-           && (raw_cfg.allowed_to_be_irreducible
+      when (not (Label.equal block.start cfg.entry_label))
+           && (cfg.allowed_to_be_irreducible
               || not (is_loop_header successor_label)) ->
-      let successor_block = C.get_block_exn raw_cfg successor_label in
+      let successor_block = C.get_block_exn cfg successor_label in
       if not (DLL.is_empty successor_block.body)
       then false
       else
-        evaluate_terminator ~block successor_block.terminator ~cfg
-        |> apply_fold block
+        let changed =
+          evaluate_terminator ~block successor_block.terminator ~cfg_with_infos
+          |> apply_fold block
+        in
+        if changed then skip_successor () |> ignore;
+        true
     | _ -> false
   in
-  let changed = ref (reduce_terminator ()) in
-  while skip_successor () do
-    changed := true
-  done;
-  !changed
+  let folded_own = reduce_terminator () in
+  let folded_successor = skip_successor () in
+  folded_own || folded_successor
 
 let run cfg_with_infos =
-  if not !Oxcaml_flags.cfg_value_propagation
+  if not !Oxcaml_flags.cfg_jump_threading
   then cfg_with_infos
   else
     let cfg =
       Cfg_with_layout.cfg (Cfg_with_infos.cfg_with_layout cfg_with_infos)
     in
-    assert (not cfg.register_locations_are_set);
+    if cfg.register_locations_are_set
+    then
+      Misc.fatal_error "Cfg_jump_threading: must run before register allocation";
     let header_map = (Cfg_with_infos.loop_infos cfg_with_infos).header_map in
     let is_loop_header label = Label.Map.mem label header_map in
     let changed =
       C.fold_blocks cfg ~init:false ~f:(fun _ block acc ->
-          process_block ~is_loop_header ~cfg:cfg_with_infos block || acc)
+          process_block ~is_loop_header ~cfg_with_infos block || acc)
     in
     if changed
     then (
