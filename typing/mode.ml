@@ -1515,9 +1515,9 @@ module Lattices_mono = struct
       | Visibility -> { t with visibility = r }
       | Staticity -> { t with staticity = r }
 
-    type 'a packed_small = Ps : ('a, 'b) t -> 'a packed_small
+    type 'a from = Ps : ('a, 'b) t -> 'a from
 
-    let all : type a. a obj -> a packed_small list = function
+    let from : type a. a obj -> a from list = function
       | Comonadic_with_locality ->
         [ Ps Areality;
           Ps Forkable;
@@ -1538,9 +1538,9 @@ module Lattices_mono = struct
       | Staticity_op ->
         []
 
-    type 'b packed_big = Pb : 'a obj * ('a, 'b) t -> 'b packed_big
+    type 'b to_ = Pb : 'a obj * ('a, 'b) t -> 'b to_
 
-    let axis_to : type b. b obj -> b packed_big list = function
+    let to_ : type b. b obj -> b to_ list = function
       | Comonadic_with_locality -> []
       | Comonadic_with_regionality -> []
       | Monadic_op -> []
@@ -3974,11 +3974,11 @@ module Lattices_mono = struct
     let projections =
       let* (Simple_morph.To m) = simple_morphs in
       let src = Simple_morph.src dst m in
-      let+ (Axis.Pb (src, ax)) = Axis.axis_to src in
+      let+ (Axis.Pb (src, ax)) = Axis.to_ src in
       To (disallow_left (Simple_proj (m, ax, src)))
     in
     let min_with =
-      let* (Axis.Ps ax) = Axis.all dst in
+      let* (Axis.Ps ax) = Axis.from dst in
       let projected = proj_obj ax dst in
       let+ (Simple_morph.To m) = Simple_morph.left_to ~full projected in
       To (disallow_left (Min_with_simple (ax, m)))
@@ -4000,11 +4000,11 @@ module Lattices_mono = struct
     let projections =
       let* (Simple_morph.To m) = simple_morphs in
       let projected = Simple_morph.src dst m in
-      let+ (Axis.Pb (src, ax)) = Axis.axis_to projected in
+      let+ (Axis.Pb (src, ax)) = Axis.to_ projected in
       To (disallow_right (Simple_proj (m, ax, src)))
     in
     let max_with =
-      let* (Axis.Ps ax) = Axis.all dst in
+      let* (Axis.Ps ax) = Axis.from dst in
       let projected = proj_obj ax dst in
       let+ (Simple_morph.To m) = Simple_morph.right_to ~full projected in
       To (disallow_right (Max_with_simple (ax, m)))
