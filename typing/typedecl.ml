@@ -2154,15 +2154,17 @@ let compute_record_repr
   *)
   | ~values:true, ~voids:true, ~atomic_fields:false, ..
   | ~floats:true, ~voids:true, ~atomic_fields:false, ..
+  | ~floats:true, ~float64s:true, ~atomic_fields:false, ..
   | ~float64s:true, ~voids:true, ~atomic_fields:false, ..
   | ~values:true, ~float64s:true, ~atomic_fields:false, ..
   | ~non_float64_unboxed_fields:true, ~atomic_fields:false, .. ->
     mixed_record ()
-  (* value-only records are stored as boxed records, as are records whose
-      declared types have fields of kind [any] *)
-  | ~values:true, ~float64s:false, ~non_float64_unboxed_fields: false,
+  (* value-only records are stored as boxed records, including records whose
+     declared types have fields of kind [any] *)
+  | ~values:true, ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:false, ..
-  | ~refining_block_with_any:true, .. ->
+  | ~refining_block_with_any:true, ~float64s:false,
+      ~non_float64_unboxed_fields:false, ~voids:false, .. ->
     Ok Record_boxed
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
       flat float records.
