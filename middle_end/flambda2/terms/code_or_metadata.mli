@@ -54,6 +54,11 @@ val code_metadata : t -> Code_metadata.t
 
 val code_present : t -> bool
 
+val map_raw_index :
+  (Oxcaml_utils.File_sections.Idx.t -> Oxcaml_utils.File_sections.Idx.t) ->
+  raw ->
+  raw
+
 (** As for [Code_metadata], the free names of a value of type [t] do not include
     the code ID, which is only kept for convenience. *)
 include Contains_names.S with type t := t

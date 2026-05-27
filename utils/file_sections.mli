@@ -39,7 +39,9 @@ module Builder : sig
   type t
 
   val create : int -> t
+  val of_file_sections : file_sections -> t
   val add : t -> Obj.t -> Idx.t
+  val add_all : t -> file_sections -> (Idx.t -> Idx.t)
   val build : t -> file_sections
   val clear : t -> unit
 end

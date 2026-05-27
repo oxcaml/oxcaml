@@ -206,7 +206,7 @@ let with_exported_offsets (t, sections) exported_offsets =
   | [] | _ :: _ :: _ ->
     Misc.fatal_error "Cannot set exported offsets on multiple units"
 
-let merge t1_opt t2_opt =
+let append t1_opt (t2_opt, idx_mapper) =
   match t1_opt, t2_opt with
   | None, None -> None
   | Some _, None | None, Some _ ->
@@ -214,8 +214,16 @@ let merge t1_opt t2_opt =
     Misc.fatal_error
       "Some pack units do not have their export info set.\n\
        Flambda doesn't support packing opaque and normal units together."
-  | Some _, Some _ ->
-    Misc.fatal_error "Packing not currently supported by Flambda"
+  | Some t1, Some t2 ->
+    let t2 =
+      List.map
+        (fun t0 ->
+          { t0 with
+            all_code = Exported_code.map_raw_index idx_mapper t0.all_code
+          })
+        t2
+    in
+    Some (t1 @ t2)
 
 let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
   Format.fprintf ppf "@[<hov>Original unit:@ %a@]@;"

@@ -307,7 +307,7 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let save_unit_info filename ~main_module_block_format ~arg_descr =
+let build_unit_info ~main_module_block_format ~arg_descr =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
@@ -315,25 +315,26 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
      module keeps track of, they're not values that get accumulated over time,
      they just get computed once. (Arguably we should remove [set_export_info]
      by the same reasoning.) *)
-  let current_unit =
-    { ui_unit = current_unit.uib_unit;
-      ui_defines = current_unit.uib_defines;
-      ui_arg_descr = arg_descr;
-      ui_imports_cmi = Env.imports();
-      ui_imports_cmx = current_unit.uib_imports_cmx;
-      ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
-      ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
-      ui_format = main_module_block_format;
-      ui_generic_fns = current_unit.uib_generic_fns;
-      ui_export_info = current_unit.uib_export_info;
-      ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
-      ui_force_link = current_unit.uib_force_link;
-      ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
-      ui_file_sections =
-        File_sections.Builder.build current_unit.uib_file_sections;
-      ui_external_symbols = current_unit.uib_external_symbols;
-    }
-  in
+  { ui_unit = current_unit.uib_unit;
+    ui_defines = current_unit.uib_defines;
+    ui_arg_descr = arg_descr;
+    ui_imports_cmi = Env.imports();
+    ui_imports_cmx = current_unit.uib_imports_cmx;
+    ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
+    ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
+    ui_format = main_module_block_format;
+    ui_generic_fns = current_unit.uib_generic_fns;
+    ui_export_info = current_unit.uib_export_info;
+    ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
+    ui_force_link = current_unit.uib_force_link;
+    ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
+    ui_file_sections =
+      File_sections.Builder.build current_unit.uib_file_sections;
+    ui_external_symbols = current_unit.uib_external_symbols;
+  }
+
+let save_unit_info filename ~main_module_block_format ~arg_descr =
+  let current_unit = build_unit_info ~main_module_block_format ~arg_descr in
   write_unit_info current_unit filename
 
 let new_const_symbol () =

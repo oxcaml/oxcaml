@@ -66,6 +66,9 @@ val read_unit_info: string -> unit_infos * Digest.t
         (* Read infos and MD5 from a [.cmx] file. *)
 val write_unit_info: unit_infos -> string -> unit
         (* Save the given infos in the given file *)
+val build_unit_info: main_module_block_format:Lambda.main_module_block_format ->
+  arg_descr:Lambda.arg_descr option ->
+  unit_infos
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->

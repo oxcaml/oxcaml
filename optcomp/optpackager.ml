@@ -161,9 +161,9 @@ end) : S = struct
             Backend.link_partial
               (Unit_info.Artifact.filename target)
               (objtemp :: objfiles));
-        main_module_block_size)
+        Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None)
 
-  let build_package_cmx linkenv cu members cmxfile ~main_module_block_size =
+  let build_package_cmx linkenv members cmxfile ui =
     let unit_names = List.map (fun m -> m.pm_name) members in
     let filter lst =
       List.filter
@@ -182,38 +182,44 @@ end) : S = struct
           match m.pm_kind with PM_intf -> accu | PM_impl info -> info :: accu)
         members []
     in
+    let file_sections =
+      Oxcaml_utils.File_sections.Builder.of_file_sections ui.ui_file_sections
+    in
+    let section_id_mapping =
+      List.map
+        (fun info ->
+          Oxcaml_utils.File_sections.Builder.add_all file_sections
+            info.ui_file_sections)
+        units
+    in
     let ui_export_info =
-      Misc.fatal_error "Not implemented"
-      (* List.fold_left
-        (fun acc info ->
-          Flambda2_cmx.Flambda_cmx_format.merge info.ui_export_info acc)
-        ui.ui_export_info units *)
+      List.fold_left2
+        (fun acc info map ->
+          Flambda2_cmx.Flambda_cmx_format.append acc (info.ui_export_info, map))
+          ui.ui_export_info
+          units
+          section_id_mapping
     in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter
       (fun info ->
         Zero_alloc_info.merge info.ui_zero_alloc_info ~into:ui_zero_alloc_info)
       units;
-    let modname = Compilation_unit.name cu in
-    let format : Lambda.main_module_block_format =
-      (* Open modules not supported with packs, so always just a record *)
-      Mb_struct
-        { mb_repr = Module_value_only { field_count = main_module_block_size } }
-    in
+    let modname = Compilation_unit.name ui.ui_unit in
     let pkg_infos =
-      { ui_unit = cu;
+      { ui_unit = ui.ui_unit;
         ui_defines =
           List.flatten (List.map (fun info -> info.ui_defines) units)
-          @ [cu];
+          @ [ui.ui_unit];
         ui_arg_descr = None;
         ui_imports_cmi =
           Import_info.create modname
-            ~crc_with_unit:(Some (cu, Env.crc_of_unit modname))
+            ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
           :: filter (Linkenv.extract_crc_interfaces linkenv);
         ui_imports_cmx = filter (Linkenv.extract_crc_implementations linkenv);
         ui_quoted_cmi = union (List.map (fun info -> info.ui_quoted_cmi) units);
         ui_quoted_cmx = union (List.map (fun info -> info.ui_quoted_cmx) units);
-        ui_format = format;
+        ui_format = ui.ui_format;
         ui_generic_fns =
           { curry_fun =
               union (List.map (fun info -> info.ui_generic_fns.curry_fun) units);
@@ -229,7 +235,8 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
-        ui_file_sections = Misc.fatal_error "Not implemented"
+        ui_file_sections =
+          Oxcaml_utils.File_sections.Builder.build file_sections;
       }
     in
     Compilenv.write_unit_info pkg_infos cmxfile
@@ -239,10 +246,8 @@ end) : S = struct
     let linkenv = Linkenv.create () in
     let members = map_left_right (read_member_info linkenv pack_path) files in
     check_units members;
-    let main_module_block_size =
-      make_package_object ~ppf_dump members target coercion
-    in
-    build_package_cmx linkenv pack_path members targetcmx ~main_module_block_size
+    let ui = make_package_object ~ppf_dump members target coercion in
+    build_package_cmx linkenv members targetcmx ui
 
   (* The entry point *)
 
