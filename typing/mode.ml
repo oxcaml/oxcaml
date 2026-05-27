@@ -1944,6 +1944,23 @@ module Lattices_mono = struct
         Morph Locality_as_regionality
       | Comonadic_with_regionality, Comonadic_with_regionality -> Id
       | Comonadic_with_locality, Comonadic_with_locality -> Id
+
+    type ('b, 'd) to_ = To : ('a, 'b, 'd) t -> ('b, 'd) to_ [@@unboxed]
+
+    let left_to : type b. b areality -> (b, left_only) to_ list = function
+      | Locality -> [To Regional_to_local]
+      | Regionality ->
+        [ To Local_to_regional;
+          To Locality_as_regionality;
+          To Local_to_regional_regionality;
+          To Regional_to_local_regionality ]
+
+    let right_to : type b. b areality -> (b, right_only) to_ list = function
+      | Locality -> [To Regional_to_local; To Regional_to_global]
+      | Regionality ->
+        [ To Locality_as_regionality;
+          To Regional_to_local_regionality;
+          To Regional_to_global_regionality ]
   end
 
   module Core_morph = struct
@@ -2745,13 +2762,15 @@ module Lattices_mono = struct
 
     type ('b, 'd) to_ = To : ('a, 'b, 'd) t -> ('b, 'd) to_ [@@unboxed]
 
+    let ( let+ ) xs f = List.map f xs
+
     let left_to : type b. b obj -> (b, left_only) to_ list = function
-      | Locality -> [To (Locality_restricted Regional_to_local)]
+      | Locality ->
+        let+ (Locality_morph.To lm) = Locality_morph.left_to Locality in
+        To (Locality_restricted lm)
       | Regionality ->
-        [ To (Locality_restricted Local_to_regional);
-          To (Locality_restricted Locality_as_regionality);
-          To (Locality_restricted Local_to_regional_regionality);
-          To (Locality_restricted Regional_to_local_regionality) ]
+        let+ (Locality_morph.To lm) = Locality_morph.left_to Regionality in
+        To (Locality_restricted lm)
       | Uniqueness_op -> [To Linearity_to_uniqueness_op]
       | Linearity -> [To Uniqueness_op_to_linearity]
       | Portability -> [To Contention_op_to_portability]
@@ -2765,22 +2784,21 @@ module Lattices_mono = struct
         [ To (Comonadic_to_monadic_min Locality);
           To (Comonadic_to_monadic_min Regionality) ]
       | Comonadic_with_locality ->
-        [To (Locality_full Regional_to_local); To Monadic_to_comonadic_min]
+        (let+ (Locality_morph.To lm) = Locality_morph.left_to Locality in
+         To (Locality_full lm))
+        @ [To Monadic_to_comonadic_min]
       | Comonadic_with_regionality ->
-        [ To (Locality_full Local_to_regional);
-          To (Locality_full Locality_as_regionality);
-          To (Locality_full Local_to_regional_regionality);
-          To (Locality_full Regional_to_local_regionality);
-          To Monadic_to_comonadic_min ]
+        (let+ (Locality_morph.To lm) = Locality_morph.left_to Regionality in
+         To (Locality_full lm))
+        @ [To Monadic_to_comonadic_min]
 
     let right_to : type b. b obj -> (b, right_only) to_ list = function
       | Locality ->
-        [ To (Locality_restricted Regional_to_local);
-          To (Locality_restricted Regional_to_global) ]
+        let+ (Locality_morph.To lm) = Locality_morph.right_to Locality in
+        To (Locality_restricted lm)
       | Regionality ->
-        [ To (Locality_restricted Locality_as_regionality);
-          To (Locality_restricted Regional_to_local_regionality);
-          To (Locality_restricted Regional_to_global_regionality) ]
+        let+ (Locality_morph.To lm) = Locality_morph.right_to Regionality in
+        To (Locality_restricted lm)
       | Uniqueness_op -> [To Linearity_to_uniqueness_op]
       | Linearity -> [To Uniqueness_op_to_linearity]
       | Portability -> [To Contention_op_to_portability]
@@ -2794,14 +2812,13 @@ module Lattices_mono = struct
         [ To (Comonadic_to_monadic_max Locality);
           To (Comonadic_to_monadic_max Regionality) ]
       | Comonadic_with_locality ->
-        [ To (Locality_full Regional_to_local);
-          To (Locality_full Regional_to_global);
-          To Monadic_to_comonadic_max ]
+        (let+ (Locality_morph.To lm) = Locality_morph.right_to Locality in
+         To (Locality_full lm))
+        @ [To Monadic_to_comonadic_max]
       | Comonadic_with_regionality ->
-        [ To (Locality_full Locality_as_regionality);
-          To (Locality_full Regional_to_local_regionality);
-          To (Locality_full Regional_to_global_regionality);
-          To Monadic_to_comonadic_max ]
+        (let+ (Locality_morph.To lm) = Locality_morph.right_to Regionality in
+         To (Locality_full lm))
+        @ [To Monadic_to_comonadic_max]
   end
 
   let proj_obj : type t r. (t, r) Axis.t -> t obj -> r obj =
