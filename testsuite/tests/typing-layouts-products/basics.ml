@@ -2010,7 +2010,7 @@ Error: This expression has type "#('a * 'b)"
            '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 type optional_record = #{ i1 : int; i2 : int }
@@ -2025,7 +2025,7 @@ Error: This expression has type "optional_record"
        The layout of optional_record is value non_pointer & value non_pointer
          because of the definition of optional_record at line 1, characters 0-46.
        But the layout of optional_record must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
        Note: The layout of immediate is value non_pointer.
 |}]
 
