@@ -37,10 +37,13 @@
 
 val reset_unit_info : unit -> unit
 
-(** [run fd_cmm cfg_with_layout] inspects [cfg_with_layout]:
-    - if it is equivalent to a previously-registered representative, returns a
-      freshly-built thunk CFG whose body is a single tail call to the
+(** [run fun_symbol cfg_with_layout] inspects [cfg_with_layout]:
+    - if it is equivalent to a previously-registered representative, rewrites
+      [cfg_with_layout] in place to a single-block thunk that tail-calls the
       representative's symbol;
-    - otherwise registers [(fd_cmm, cfg_with_layout)] as a new representative
-      and returns [cfg_with_layout] unchanged. *)
-val run : Cmm.fundecl -> Cfg_with_layout.t -> Cfg_with_layout.t
+    - otherwise registers [cfg_with_layout] (with [fun_symbol]) as a new
+      representative and returns it unchanged.
+
+    The returned [Cfg_with_layout.t] is always the same instance as the one
+    passed in. *)
+val run : Cmm.symbol -> Cfg_with_layout.t -> Cfg_with_layout.t

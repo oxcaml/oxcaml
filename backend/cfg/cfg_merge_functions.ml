@@ -48,7 +48,7 @@ let max_bucket_size = 128
 (* Cap on the number of representatives per bucket; beyond this we stop
    comparing to keep the cost bounded. *)
 type repr =
-  { fd_cmm : Cmm.fundecl;
+  { fun_symbol : Cmm.symbol;
     cfg_with_layout : Cfg_with_layout.t
   }
 
@@ -88,62 +88,66 @@ let equal_fun_level_fields (left : Cfg.t) (right : Cfg.t) =
   && List.equal Cfg.equal_codegen_option left.fun_codegen_options
        right.fun_codegen_options
 
-let equivalent ~(incoming : Cmm.fundecl) ~(incoming_cfg : Cfg_with_layout.t)
-    ~(repr : repr) =
-  let incoming_cfg_t = Cfg_with_layout.cfg incoming_cfg in
+let equivalent ~(fun_symbol : Cmm.symbol)
+    ~(cfg_with_layout : Cfg_with_layout.t) ~(repr : repr) =
+  let incoming_cfg_t = Cfg_with_layout.cfg cfg_with_layout in
   let repr_cfg_t = Cfg_with_layout.cfg repr.cfg_with_layout in
   if not (equal_fun_level_fields incoming_cfg_t repr_cfg_t)
   then false
   else
     let subst = Cfg_equiv_subst.make () in
-    (* Seed self-recursion: a `Direct incoming_sym` in [incoming]'s body must be
-       considered equivalent to a `Direct repr_sym` in [repr]'s body. *)
-    Cfg_equiv_subst.add_symbol subst incoming.fun_name repr.fd_cmm.fun_name;
+    (* Seed self-recursion: a `Direct fun_symbol` in the incoming body must be
+       considered equivalent to a `Direct repr.fun_symbol` in [repr]'s body. *)
+    Cfg_equiv_subst.add_symbol subst fun_symbol repr.fun_symbol;
     (* CR xclerc: [ignore_dbg]/[ignore_name_for_debugger] default to [true]:
        debug information must not prevent merging. Worth revisiting once we care
        about debugger fidelity for merged functions. *)
     Cfg_equiv.equiv_cfg_with_layout ~ignore_name_for_debugger:true
-      ~ignore_dbg:true subst incoming_cfg repr.cfg_with_layout
+      ~ignore_dbg:true subst cfg_with_layout repr.cfg_with_layout
 
-let build_thunk ~(fd_cmm : Cmm.fundecl) ~(repr : repr) : Cfg_with_layout.t =
-  let repr_sym = repr.fd_cmm.fun_name in
-  let fun_args = (Cfg_with_layout.cfg repr.cfg_with_layout).fun_args in
-  let loc_arg = Array.copy fun_args in
-  let next_instruction_id = InstructionId.make_sequence () in
-  let cfg =
-    Cfg.create ~fun_name:fd_cmm.fun_name.sym_name ~fun_args:loc_arg
-      ~fun_codegen_options:
-        (Cfg.of_cmm_codegen_option fd_cmm.fun_codegen_options)
-      ~fun_dbg:fd_cmm.fun_dbg ~fun_contains_calls:true
-      ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:fd_cmm.fun_poll
-      ~next_instruction_id ~fun_ret_type:fd_cmm.fun_ret_type
-      ~allowed_to_be_irreducible:false
-  in
-  cfg.register_locations_are_set <- true;
+(* Rewrite [cfg_with_layout] in place to a single-block CFG whose only
+   instruction is a tail call to [repr]'s function symbol. The ABI-relevant
+   fields ([fun_args], [fun_ret_type], [fun_codegen_options], [fun_poll],
+   [fun_dbg], [entry_label], [next_instruction_id]) are kept as-is: they are
+   either immutable in [Cfg.t] or already match what we would have set them
+   to. [arg] is left empty on the terminator: [cfg_invariants] does not
+   constrain the arity of [Tailcall_func (Direct _)], and downstream emit for
+   [Ltailcall_imm] only reads the target symbol.
+
+   CR xclerc: [fun_contains_calls] is left untouched. It is correct when the
+   original body already contained a call (it still does, just a tail call),
+   but stale when the original was a leaf: the thunk now does call (jmp)
+   another function. The field is mainly informational at this stage, but if
+   downstream consumers grow to rely on it, [fun_contains_calls] should be
+   made mutable in [Cfg.t] and updated here. *)
+let rewrite_to_thunk ~(cfg_with_layout : Cfg_with_layout.t) ~(repr : repr) =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  Stack_class.Tbl.iter cfg.fun_num_stack_slots
+    ~f:(fun stack_class _ ->
+      Stack_class.Tbl.replace cfg.fun_num_stack_slots stack_class 0);
+  Label.Tbl.reset cfg.blocks;
   let terminator : Cfg.terminator Cfg.instruction =
-    { desc = Cfg.Tailcall_func (Cfg.Direct repr_sym);
-      arg = loc_arg;
+    { desc = Cfg.Tailcall_func (Cfg.Direct repr.fun_symbol);
+      arg = [||];
       res = [||];
       dbg = Debuginfo.none;
       fdo = Fdo_info.none;
       live = Reg.Set.empty;
       stack_offset = 0;
-      id = InstructionId.get_and_incr next_instruction_id;
+      id = InstructionId.get_and_incr cfg.next_instruction_id;
       available_before = Unreachable;
       available_across = Unreachable
     }
   in
-  let entry_block =
-    Cfg.make_empty_block ~label:(Cfg.entry_label cfg) terminator
-  in
+  let entry_block = Cfg.make_empty_block ~label:cfg.entry_label terminator in
   entry_block.stack_offset <- 0;
   entry_block.can_raise <- false;
   Cfg.add_block_exn cfg entry_block;
-  let layout = DLL.make_empty () in
-  DLL.add_end layout entry_block.start;
-  Cfg_with_layout.create cfg ~layout
+  let layout = Cfg_with_layout.layout cfg_with_layout in
+  DLL.clear layout;
+  DLL.add_end layout entry_block.start
 
-let run fd_cmm cfg_with_layout =
+let run fun_symbol cfg_with_layout =
   let hash = Cfg_quick_hash.cfg_with_layout cfg_with_layout in
   let bucket =
     match Int.Tbl.find_opt buckets hash with None -> [] | Some l -> l
@@ -151,7 +155,7 @@ let run fd_cmm cfg_with_layout =
   let rec find_match = function
     | [] -> None
     | repr :: rest ->
-      if equivalent ~incoming:fd_cmm ~incoming_cfg:cfg_with_layout ~repr
+      if equivalent ~fun_symbol ~cfg_with_layout ~repr
       then Some repr
       else find_match rest
   in
@@ -162,7 +166,10 @@ let run fd_cmm cfg_with_layout =
     cfg_with_layout
   else
     match find_match bucket with
-    | Some repr -> build_thunk ~fd_cmm ~repr
+    | Some repr ->
+      rewrite_to_thunk ~cfg_with_layout ~repr;
+      cfg_with_layout
     | None ->
-      Int.Tbl.replace buckets hash ({ fd_cmm; cfg_with_layout } :: bucket);
+      Int.Tbl.replace buckets hash
+        ({ fun_symbol; cfg_with_layout } :: bucket);
       cfg_with_layout

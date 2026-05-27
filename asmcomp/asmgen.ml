@@ -486,7 +486,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   | false -> cfg_with_layout
   | true ->
     Profile.record ~accumulate:true "cfg_merge_functions"
-      (Cfg_merge_functions.run fd_cmm)
+      (Cfg_merge_functions.run fd_cmm.fun_name)
       cfg_with_layout)
   ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
