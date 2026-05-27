@@ -128,16 +128,37 @@ module type S = sig
       dropped. *)
   val record_observation : checkpoint:Checkpoint.t -> observed_id -> unit
 
-  (** Record that source uid [merged] has been alpha-renamed to share
-      its runtime binding with [surviving]. After this call,
-      observations recorded against [surviving] (at any checkpoint)
-      are credited to [merged] as well, so a merged sibling shows the
-      same effective survival as the surviving uid in the report. The
-      report still lists both source-level bindings, but a merged one
-      is annotated as such. Calls involving the sentinel [Uid.no_uid],
-      or where [surviving] and [merged] are equal, are silently
-      dropped. *)
-  val register_merged_uid : surviving:uid -> merged:uid -> unit
+  (** Reason a source binding does not appear at downstream
+      checkpoints. The report annotates each affected binding with
+      its reason so a reader can tell intentional drops apart from
+      unintentional ones. *)
+  type drop_reason =
+    | Merged_with of uid
+        (** Alpha-renamed to share a runtime binding with the given
+            uid: two or more source bindings became one runtime
+            binding. Observations recorded against the survivor are
+            also credited to this uid. *)
+    | Ignored_variable
+        (** Pattern variable not used by the body (e.g. [_x]);
+            [simplify_lets] eliminated both the binding and its
+            right-hand side. *)
+    | Function_became_catch
+        (** Local function whose name was eliminated because all of
+            its call sites were rewritten as
+            [Lstaticcatch] / [Lstaticraise] continuations by
+            [simplify_local_functions]. The function's parameters
+            retain their original duids on the catch handler. *)
+
+  (** Record that source uid [uid] was intentionally dropped by a
+      downstream pass for the given [reason]. The binding still
+      appears in the per-function listing, annotated with the
+      reason. For [Merged_with], the merge chain is followed so that
+      observations made against the survivor (at any checkpoint) are
+      counted for [uid] as well. Calls involving the sentinel
+      [Uid.no_uid], or a [Merged_with] where the survivor equals
+      [uid], are silently dropped. *)
+  val register_dropped_intentionally :
+    uid:uid -> reason:drop_reason -> unit
 
   val print_report : Format.formatter -> unit
 end

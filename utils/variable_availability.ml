@@ -135,7 +135,13 @@ module type S = sig
 
   val record_observation : checkpoint:Checkpoint.t -> observed_id -> unit
 
-  val register_merged_uid : surviving:uid -> merged:uid -> unit
+  type drop_reason =
+    | Merged_with of uid
+    | Ignored_variable
+    | Function_became_catch
+
+  val register_dropped_intentionally :
+    uid:uid -> reason:drop_reason -> unit
 
   val print_report : Format.formatter -> unit
 end
@@ -181,15 +187,21 @@ module Make (Uid : Uid) (Loc : Loc) :
       id : observed_id
     }
 
+  type drop_reason =
+    | Merged_with of uid
+    | Ignored_variable
+    | Function_became_catch
+
   type state =
     { mutable unit_name : string option;
       mutable source_functions : source_function list;
       uid_to_function : source_function Uid_tbl.t;
       mutable observations : observation list;
-      (* [merged_into] records the surviving uid for each merged uid:
-         the source variable identified by the key has been
-         alpha-renamed to share its runtime binding with the value. *)
-      merged_into : uid Uid_tbl.t
+      (* [dropped] records, for each intentionally-dropped source uid,
+         the reason a downstream pass eliminated it. Merge-chain
+         lookups (see [merge_chain]) follow only [Merged_with]
+         edges. *)
+      dropped : drop_reason Uid_tbl.t
     }
 
   let fresh_state () =
@@ -197,7 +209,7 @@ module Make (Uid : Uid) (Loc : Loc) :
       source_functions = [];
       uid_to_function = Uid_tbl.create 64;
       observations = [];
-      merged_into = Uid_tbl.create 16
+      dropped = Uid_tbl.create 16
     }
 
   (* @agent: top-level state. Is there a good way to propagate the hash
@@ -231,21 +243,24 @@ module Make (Uid : Uid) (Loc : Loc) :
       let s = !state in
       s.observations <- { checkpoint; id } :: s.observations
 
-  let register_merged_uid ~surviving ~merged =
-    if (not (is_enabled ()))
-       || Uid.equal merged Uid.no_uid
-       || Uid.equal surviving Uid.no_uid
-       || Uid.equal merged surviving
+  let register_dropped_intentionally ~uid ~reason =
+    if (not (is_enabled ())) || Uid.equal uid Uid.no_uid
     then ()
     else
-      let s = !state in
-      (* If [merged] is already mapped, keep the original survivor:
-         the typedtree iterator visits left-to-right, so the first
-         registration carries the canonical survivor and subsequent
-         calls would only re-establish the same edge. *)
-      if Uid_tbl.mem s.merged_into merged
-      then ()
-      else Uid_tbl.add s.merged_into merged surviving
+      match reason with
+      | Merged_with surviving
+        when Uid.equal surviving Uid.no_uid || Uid.equal surviving uid ->
+        ()
+      | Merged_with _ | Ignored_variable | Function_became_catch ->
+        let s = !state in
+        (* Keep the earliest registered reason: the typedtree iterator
+           visits left-to-right, so the first registration carries the
+           canonical reason (e.g. the original survivor for merges);
+           later passes that try to re-classify the same uid are
+           ignored. *)
+        if Uid_tbl.mem s.dropped uid
+        then ()
+        else Uid_tbl.add s.dropped uid reason
 
   let register_source_variable f ~uid ~name ~location ~kind =
     if Uid.equal uid Uid.no_uid
@@ -272,29 +287,35 @@ module Make (Uid : Uid) (Loc : Loc) :
         { from_ : Checkpoint.t;
           to_ : Checkpoint.t
         }
+    | Intentionally_dropped of drop_reason
 
-  let status_for_variable obs =
-    let seen_in cp =
-      List.exists (fun o -> Checkpoint.equal o.checkpoint cp) obs
-    in
-    let rec scan prev = function
-      | [] -> Present
-      | cp :: rest ->
-        if seen_in cp
-        then scan (Some cp) rest
-        else
-          match prev with
-          | None -> Missing cp
-          | Some prev_cp ->
-            (* A variable that reaches the DWARF emitter but has only
-               trivial single-label subranges is "short-lived": its
-               location list covers at most a byte or two of code. *)
-            if Checkpoint.equal prev_cp Checkpoint.Debug_info_variables
-               && Checkpoint.equal cp Checkpoint.Debug_info_nonempty_range
-            then Short_lived
-            else Dropped { from_ = prev_cp; to_ = cp }
-    in
-    scan None Checkpoint.all
+  let drop_reason_for uid = Uid_tbl.find_opt (!state).dropped uid
+
+  let status_for_variable ~uid obs =
+    match drop_reason_for uid with
+    | Some reason -> Intentionally_dropped reason
+    | None ->
+      let seen_in cp =
+        List.exists (fun o -> Checkpoint.equal o.checkpoint cp) obs
+      in
+      let rec scan prev = function
+        | [] -> Present
+        | cp :: rest ->
+          if seen_in cp
+          then scan (Some cp) rest
+          else
+            match prev with
+            | None -> Missing cp
+            | Some prev_cp ->
+              (* A variable that reaches the DWARF emitter but has only
+                 trivial single-label subranges is "short-lived": its
+                 location list covers at most a byte or two of code. *)
+              if Checkpoint.equal prev_cp Checkpoint.Debug_info_variables
+                 && Checkpoint.equal cp Checkpoint.Debug_info_nonempty_range
+              then Short_lived
+              else Dropped { from_ = prev_cp; to_ = cp }
+      in
+      scan None Checkpoint.all
 
   let observations_by_uid () =
     let tbl = Uid_tbl.create 64 in
@@ -306,34 +327,30 @@ module Make (Uid : Uid) (Loc : Loc) :
       (!state).observations;
     tbl
 
-  (* Walk the merge chain starting at [uid], stopping at a cycle or at
-     a uid with no outgoing edge. Always includes [uid] itself. *)
-  let merge_chain uid =
-    let s = !state in
-    let rec loop acc visited uid =
-      if List.exists (Uid.equal uid) visited
-      then List.rev acc
-      else
-        let visited = uid :: visited in
-        let acc = uid :: acc in
-        match Uid_tbl.find_opt s.merged_into uid with
-        | None -> List.rev acc
-        | Some next -> loop acc visited next
-    in
-    loop [] [] uid
-
   let observations_for_uid uid_to_obs uid =
-    List.concat_map
-      (fun u -> try Uid_tbl.find uid_to_obs u with Not_found -> [])
-      (merge_chain uid)
+    try Uid_tbl.find uid_to_obs uid with Not_found -> []
 
-  let is_merged uid = Uid_tbl.mem (!state).merged_into uid
+  let is_intentionally_dropped uid = Uid_tbl.mem (!state).dropped uid
+
+  let find_variable_by_uid uid =
+    let s = !state in
+    match Uid_tbl.find_opt s.uid_to_function uid with
+    | None -> None
+    | Some f -> List.find_opt (fun v -> Uid.equal v.uid uid) f.variables
 
   let reached_at ~uid_to_obs cp (v : source_variable) =
     let obs = observations_for_uid uid_to_obs v.uid in
     List.exists (fun o -> Checkpoint.equal o.checkpoint cp) obs
 
   module Printing = struct
+    let string_of_drop_reason = function
+      | Merged_with surviving ->
+        (match find_variable_by_uid surviving with
+         | Some v -> Printf.sprintf "merged with %s" v.name
+         | None -> "merged")
+      | Ignored_variable -> "ignored"
+      | Function_became_catch -> "became static-catch"
+
     let string_of_status = function
       | Present -> "present"
       | Missing cp -> Printf.sprintf "missing @ %s" (Checkpoint.display cp)
@@ -342,6 +359,7 @@ module Make (Uid : Uid) (Loc : Loc) :
         Printf.sprintf "dropped @ %s -> %s"
           (Checkpoint.display from_)
           (Checkpoint.display to_)
+      | Intentionally_dropped reason -> string_of_drop_reason reason
 
     let percent n d =
       if d = 0
@@ -360,10 +378,7 @@ module Make (Uid : Uid) (Loc : Loc) :
       let w_name, w_kind = widths in
       let format_kind = string_of_source_kind v.kind in
       let obs = observations_for_uid uid_to_obs v.uid in
-      let status = string_of_status (status_for_variable obs) in
-      let status =
-        if is_merged v.uid then Printf.sprintf "merged; %s" status else status
-      in
+      let status = string_of_status (status_for_variable ~uid:v.uid obs) in
       Format.fprintf ppf "  %-*s  %-*s  %s  [%a]@," w_name v.name w_kind
         format_kind status Loc.print v.location
 
@@ -380,18 +395,33 @@ module Make (Uid : Uid) (Loc : Loc) :
         (fun acc v -> if reached_at ~uid_to_obs cp v then acc + 1 else acc)
         0 vars
 
+    (* Bindings dropped on purpose by a downstream pass (merged,
+       ignored [_x], became a static-catch handler, ...) are excluded
+       from the survival statistics: counting them as "dropped" would
+       obscure the unintentional drops, which are what the diagnostic
+       is meant to surface. *)
+    let partition_intentional vars =
+      List.partition (fun v -> is_intentionally_dropped v.uid) vars
+
     let print_function_summary ppf ~uid_to_obs vars =
-      let n = List.length vars in
+      let intentional, tracked = partition_intentional vars in
+      let n = List.length tracked in
       let reached =
-        count_reached ~uid_to_obs Checkpoint.Debug_info_variables vars
+        count_reached ~uid_to_obs Checkpoint.Debug_info_variables tracked
       in
       let nonempty =
-        count_reached ~uid_to_obs Checkpoint.Debug_info_nonempty_range vars
+        count_reached ~uid_to_obs Checkpoint.Debug_info_nonempty_range tracked
       in
       let short = reached - nonempty in
       Format.fprintf ppf
-        "  Summary: %d / %d (%s) reached debug-info, %d / %d (%s) short-lived@,"
-        reached n (percent reached n) short reached (percent short reached)
+        "  Summary: %d / %d (%s) reached debug-info, %d / %d (%s) short-lived"
+        reached n (percent reached n) short reached (percent short reached);
+      (match intentional with
+       | [] -> ()
+       | _ -> Format.fprintf ppf
+                " (excludes %d intentionally dropped)"
+                (List.length intentional));
+      Format.fprintf ppf "@,"
 
     let print_source_function ppf ~uid_to_obs (f : source_function) =
       let vars = List.rev f.variables in
@@ -402,14 +432,25 @@ module Make (Uid : Uid) (Loc : Loc) :
       if vars <> [] then print_function_summary ppf ~uid_to_obs vars;
       Format.fprintf ppf "@]"
 
+    let count_intentional_by_reason vars =
+      List.fold_left
+        (fun (merged, ignored, became_catch) v ->
+          match drop_reason_for v.uid with
+          | Some (Merged_with _) -> merged + 1, ignored, became_catch
+          | Some Ignored_variable -> merged, ignored + 1, became_catch
+          | Some Function_became_catch -> merged, ignored, became_catch + 1
+          | None -> merged, ignored, became_catch)
+        (0, 0, 0) vars
+
     let print_unit_summary ppf ~uid_to_obs ~local_vars =
-      let total_vars = List.length local_vars in
-      if total_vars = 0
+      let intentional, tracked = partition_intentional local_vars in
+      let total_vars = List.length tracked in
+      if total_vars = 0 && intentional = []
       then ()
       else begin
         let counts =
           List.map
-            (fun cp -> cp, count_reached ~uid_to_obs cp local_vars)
+            (fun cp -> cp, count_reached ~uid_to_obs cp tracked)
             Checkpoint.all
         in
         let total_reached = List.assoc Checkpoint.Debug_info_variables counts in
@@ -424,6 +465,16 @@ module Make (Uid : Uid) (Loc : Loc) :
           (percent total_reached total_vars)
           short_lived total_reached
           (percent short_lived total_reached);
+        (match intentional with
+         | [] -> ()
+         | _ ->
+           let n_merged, n_ignored, n_catch =
+             count_intentional_by_reason intentional
+           in
+           Format.fprintf ppf
+             "  Intentionally dropped (not counted): %d total = %d merged, %d \
+              ignored, %d became static-catch@,"
+             (List.length intentional) n_merged n_ignored n_catch);
         Format.fprintf ppf
           "  (\"short-lived\" = reached debug-info but every subrange has \
            the same start and end label,@,";

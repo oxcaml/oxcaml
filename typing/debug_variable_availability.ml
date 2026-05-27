@@ -33,7 +33,9 @@ module Walk = struct
     | None -> Hashtbl.add t.seen_idents id uid
     | Some prev_uid ->
       if not (Shape.Uid.equal prev_uid uid)
-      then VA.register_merged_uid ~surviving:prev_uid ~merged:uid
+      then
+        VA.register_dropped_intentionally ~uid
+          ~reason:(Merged_with prev_uid)
 
   let register_var t ~id ~uid ~name ~location ~kind =
     VA.register_source_variable t.current_function ~uid ~name ~location ~kind;
