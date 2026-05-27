@@ -1351,7 +1351,7 @@ Error: This expression has type "t_void" but an expression was expected of type
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
        But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 (*********************************************************)
