@@ -2690,8 +2690,10 @@ let apply_modality_r modality jk =
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
-  let expanded = Base_and_axes.fully_expand_aliases env jkind.jkind in
-  match Jkind_desc.get_scannable_axes_of_fully_expanded expanded with
+  let jkind =
+    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+  in
+  match Jkind_desc.get_scannable_axes_of_fully_expanded jkind.jkind with
   | Some { nullability = Non_null; separability } ->
     let jkind = set_root_nullability jkind Maybe_null in
     let jkind =
@@ -2704,8 +2706,10 @@ let apply_or_null_l env jkind =
   | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
 
 let apply_or_null_r env jkind =
-  let expanded = Base_and_axes.fully_expand_aliases env jkind.jkind in
-  match Jkind_desc.get_scannable_axes_of_fully_expanded expanded with
+  let jkind =
+    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+  in
+  match Jkind_desc.get_scannable_axes_of_fully_expanded jkind.jkind with
   | Some { nullability = Maybe_null; separability } ->
     let jkind = set_root_nullability jkind Non_null in
     let jkind =
