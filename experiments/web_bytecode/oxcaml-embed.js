@@ -1,5 +1,5 @@
 (function () {
-  const assetVersion = "20260511-embed-margin";
+  const assetVersion = "20260527-diagnostic-sort";
   const script = document.currentScript;
   const moduleUrl = script?.dataset.moduleSrc
     ? new URL(script.dataset.moduleSrc, script.src || document.baseURI).href

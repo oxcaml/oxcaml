@@ -201,20 +201,32 @@ function buildDiagnosticDecorations(doc, markers) {
   if (!markers.length) {
     return Decoration.none;
   }
-  const builder = new RangeSetBuilder();
-  for (const marker of markers) {
-    const range = markerDocRange(doc, marker);
-    if (!range) {
-      continue;
-    }
-    builder.add(
-      range.from,
-      range.to,
-      Decoration.mark({
+  const sortedDiagnostics = markers
+    .map((marker) => {
+      const range = markerDocRange(doc, marker);
+      if (!range) {
+        return null;
+      }
+      const decoration = Decoration.mark({
         class: marker.severity === "warning"
           ? "cm-diagnostic-warning"
           : "cm-diagnostic-error",
-      }),
+      });
+      return { ...range, decoration };
+    })
+    .filter(Boolean)
+    .sort((left, right) =>
+      left.from - right.from ||
+      (left.decoration.startSide ?? 0) - (right.decoration.startSide ?? 0) ||
+      left.to - right.to ||
+      (left.decoration.endSide ?? 0) - (right.decoration.endSide ?? 0)
+    );
+  const builder = new RangeSetBuilder();
+  for (const diagnostic of sortedDiagnostics) {
+    builder.add(
+      diagnostic.from,
+      diagnostic.to,
+      diagnostic.decoration,
     );
   }
   return builder.finish();
