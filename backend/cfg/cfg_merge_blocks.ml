@@ -107,7 +107,9 @@ let run :
          lifted? *)
       if (not block.is_trap_handler) && not (Label.equal label cfg.entry_label)
       then begin
-        let block_hash = Cfg_quick_hash.basic_block block in
+        let block_hash =
+          Cfg_quick_hash.basic_block ~ignore_name_for_debugger:false block
+        in
         let curr =
           match Int.Tbl.find_opt buckets block_hash with
           | Some l -> l

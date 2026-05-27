@@ -71,25 +71,38 @@ let terminator : Cfg.terminator -> int =
   | Prim _ -> 14
 
 let rec basic_instruction_cell :
-    Cfg.basic Cfg.instruction DLL.cell option -> fuel:int -> acc:int -> int =
- fun cell ~fuel ~acc ->
+    ignore_name_for_debugger:bool ->
+    Cfg.basic Cfg.instruction DLL.cell option ->
+    fuel:int ->
+    acc:int ->
+    int =
+ fun ~ignore_name_for_debugger cell ~fuel ~acc ->
   if fuel <= 0
   then acc
   else
     match cell with
     | None -> acc
     | Some cell ->
-      let instr_hash = basic (DLL.value cell).desc in
-      basic_instruction_cell (DLL.next cell) ~fuel:(pred fuel)
-        ~acc:(hash_combine acc instr_hash)
+      let instr = DLL.value cell in
+      if ignore_name_for_debugger && Cfg.is_name_for_debugger instr
+      then
+        basic_instruction_cell ~ignore_name_for_debugger (DLL.next cell)
+          ~fuel ~acc
+      else
+        let instr_hash = basic instr.desc in
+        basic_instruction_cell ~ignore_name_for_debugger (DLL.next cell)
+          ~fuel:(pred fuel) ~acc:(hash_combine acc instr_hash)
 
-let basic_instruction_list : Cfg.basic Cfg.instruction DLL.t -> int =
- fun l ->
+let basic_instruction_list :
+    ignore_name_for_debugger:bool -> Cfg.basic Cfg.instruction DLL.t -> int =
+ fun ~ignore_name_for_debugger l ->
   (* CR-someday xclerc for xclerc: also use the list length? *)
-  basic_instruction_cell (DLL.hd_cell l) ~fuel:4 ~acc:0
+  basic_instruction_cell ~ignore_name_for_debugger (DLL.hd_cell l) ~fuel:4
+    ~acc:0
 
-let basic_block : Cfg.basic_block -> int =
- fun block ->
+let basic_block :
+    ignore_name_for_debugger:bool -> Cfg.basic_block -> int =
+ fun ~ignore_name_for_debugger block ->
   match block with
   | { start = _;
       body;
@@ -112,13 +125,13 @@ let basic_block : Cfg.basic_block -> int =
       is_trap_handler = _;
       cold = _
     } ->
-    let body_hash = basic_instruction_list body in
+    let body_hash = basic_instruction_list ~ignore_name_for_debugger body in
     let term_hash = terminator terminator_desc in
     hash_combine body_hash term_hash
 
 (* The hash walks at most [fuel] blocks of the layout: enough to discriminate
    most functions while keeping the cost bounded for very large CFGs. *)
-let cfg_with_layout cfg_with_layout =
+let cfg_with_layout ~ignore_name_for_debugger cfg_with_layout =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let layout = Cfg_with_layout.layout cfg_with_layout in
   let rec hash label_cell ~fuel ~acc =
@@ -131,6 +144,7 @@ let cfg_with_layout cfg_with_layout =
         let label = DLL.value cell in
         let block = Cfg.get_block_exn cfg label in
         hash (DLL.next cell) ~fuel:(pred fuel)
-          ~acc:(hash_combine acc (basic_block block))
+          ~acc:
+            (hash_combine acc (basic_block ~ignore_name_for_debugger block))
   in
   hash (DLL.hd_cell layout) ~fuel:4 ~acc:0

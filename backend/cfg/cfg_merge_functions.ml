@@ -148,7 +148,10 @@ let rewrite_to_thunk ~(cfg_with_layout : Cfg_with_layout.t) ~(repr : repr) =
   DLL.add_end layout entry_block.start
 
 let run fun_symbol cfg_with_layout =
-  let hash = Cfg_quick_hash.cfg_with_layout cfg_with_layout in
+  let hash =
+    Cfg_quick_hash.cfg_with_layout ~ignore_name_for_debugger:true
+      cfg_with_layout
+  in
   let bucket =
     match Int.Tbl.find_opt buckets hash with None -> [] | Some l -> l
   in
