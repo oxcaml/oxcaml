@@ -1927,35 +1927,21 @@ module Lattices_mono = struct
       | Regional_to_global_regionality, Local_to_regional_regionality ->
         Disallowed
 
-    let id_with_regional_to_locality : type a b l r.
-        (Regionality.t, Locality.t, l * r) t ->
+    (** Closest-to-identity morphism between comonadic_with axes, mapping
+        Regional to Local when the source source object is
+        Comonadic_with_regionality and the target is Comonadic_with_locality *)
+    let id_r2l : type a b l r.
         a comonadic_with obj ->
         b comonadic_with obj ->
         (a, b, l * r) compose_result =
-     fun regional_to_locality src dst ->
+     fun src dst ->
       match src, dst with
       | Comonadic_with_regionality, Comonadic_with_locality ->
-        Morph regional_to_locality
+        Morph Regional_to_local
       | Comonadic_with_locality, Comonadic_with_regionality ->
         Morph Locality_as_regionality
       | Comonadic_with_regionality, Comonadic_with_regionality -> Id
       | Comonadic_with_locality, Comonadic_with_locality -> Id
-
-    (** Closest-to-identity morphism between comonadic_with axes, using r2g for
-        regionality-to-locality. *)
-    let id_r2g : type a b.
-        a comonadic_with obj ->
-        b comonadic_with obj ->
-        (a, b, disallowed * allowed) compose_result =
-     fun src dst -> id_with_regional_to_locality Regional_to_global src dst
-
-    (** Closest-to-identity morphism between comonadic_with axes, using r2l for
-        regionality-to-locality. *)
-    let id_r2l : type a b.
-        a comonadic_with obj ->
-        b comonadic_with obj ->
-        (a, b, allowed * disallowed) compose_result =
-     fun src dst -> id_with_regional_to_locality Regional_to_local src dst
   end
 
   module Core_morph = struct
@@ -2678,31 +2664,14 @@ module Lattices_mono = struct
       | Locality_morph.Disallowed -> Disallowed
 
     (** Closest-to-identity morphism between full product objects, as enforced
-        by the [Axis.t] arguments. Uses r2g for comonadic areality and plain
-        identity for monadic axes. *)
-    let id_r2g : type a b p.
+        by the [Axis.t] arguments. No guarantees can be made over the behavior
+        of the Areality axis if the source and target Areality differ. *)
+    let id_except_for_areality : type l r a b p.
         a obj ->
         b obj ->
         (a, p) Axis.t ->
         (b, p) Axis.t ->
-        (a, b, disallowed * allowed) compose_result =
-     fun src dst ax0 ax1 ->
-      match Axis.owner src ax0, Axis.owner dst ax1 with
-      | Axis.Monadic _, Axis.Monadic _ -> Id
-      | Axis.Comonadic (src, _), Axis.Comonadic (dst, _) ->
-        Locality_morph.id_r2g src dst |> lift_locality_compose_result
-      | Axis.Monadic _, Axis.Comonadic _ -> .
-      | Axis.Comonadic _, Axis.Monadic _ -> .
-
-    (** Closest-to-identity morphism between full product objects, as enforced
-        by the [Axis.t] arguments. Uses r2l for comonadic areality and plain
-        identity for monadic axes. *)
-    let id_r2l : type a b p.
-        a obj ->
-        b obj ->
-        (a, p) Axis.t ->
-        (b, p) Axis.t ->
-        (a, b, allowed * disallowed) compose_result =
+        (a, b, l * r) compose_result =
      fun src dst ax0 ax1 ->
       match Axis.owner src ax0, Axis.owner dst ax1 with
       | Axis.Monadic _, Axis.Monadic _ -> Id
@@ -2711,15 +2680,17 @@ module Lattices_mono = struct
       | Axis.Monadic _, Axis.Comonadic _ -> .
       | Axis.Comonadic _, Axis.Monadic _ -> .
 
-    (** Lift a core morphism between projected axes to a core morphism between
-        the enclosing objects. Goes to max for axes with no dual. *)
-    let lift_max : type a b p q.
+    (** Takes a core morphism between projected axes to a core morphism between
+        product axes, such that the behavior on the projected axes is preserved.
+        There are no guarantees for all other axes in the product. Produces a
+        morphism that is not allowed on the left. *)
+    let lift_r : type l r a b p q.
         a obj ->
         b obj ->
-        (p, q, disallowed * allowed) t ->
+        (p, q, l * r) t ->
         (a, p) Axis.t ->
         (b, q) Axis.t ->
-        (a, b, disallowed * allowed) compose_result =
+        (a, b, disallowed * r) compose_result =
      fun src dst m ax0 ax1 ->
       match m, ax0, ax1, src, dst with
       | Uniqueness_op_to_linearity, Uniqueness, Linearity, _, _ ->
@@ -2735,19 +2706,21 @@ module Lattices_mono = struct
       | Statefulness_to_visibility_op, Statefulness, Visibility, _, _ ->
         Morph (Comonadic_to_monadic_max (comonadic_obj_areality src))
       | Locality_restricted lm, Areality, Areality, _, _ ->
-        Morph (Locality_full lm)
+        Morph (Locality_full (Locality_morph.disallow_left lm))
       | _, _, _, _, _ -> .
     [@@warning "-4"]
 
-    (** Lift a core morphism between projected axes to a core morphism between
-        the enclosing objects. Goes to min for axes with no dual. *)
-    let lift_min : type a b p q.
+    (** Takes a core morphism between projected axes to a core morphism between
+        product axes, such that the behavior on the projected axes is preserved.
+        There are no guarantees for all other axes in the product. Produces a
+        morphism that is not allowed on the right. *)
+    let lift_l : type l r a b p q.
         a obj ->
         b obj ->
-        (p, q, allowed * disallowed) t ->
+        (p, q, l * r) t ->
         (a, p) Axis.t ->
         (b, q) Axis.t ->
-        (a, b, allowed * disallowed) compose_result =
+        (a, b, l * disallowed) compose_result =
      fun src dst m ax0 ax1 ->
       match m, ax0, ax1, src, dst with
       | Uniqueness_op_to_linearity, Uniqueness, Linearity, _, _ ->
@@ -2763,7 +2736,7 @@ module Lattices_mono = struct
       | Statefulness_to_visibility_op, Statefulness, Visibility, _, _ ->
         Morph (Comonadic_to_monadic_min (comonadic_obj_areality src))
       | Locality_restricted lm, Areality, Areality, _, _ ->
-        Morph (Locality_full lm)
+        Morph (Locality_full (Locality_morph.disallow_right lm))
       | _, _, _, _, _ -> .
     [@@warning "-4"]
 
@@ -3360,25 +3333,29 @@ module Lattices_mono = struct
         (b, q) Axis.t ->
         (a, b, disallowed * allowed) t =
      fun src dst m ax0 ax1 ->
-      let m : (a, b, disallowed * allowed) t =
-        match m with
-        | Id -> Core_morph.id_r2g src dst ax0 ax1 |> lift_core_compose_result_r
-        | Core m ->
-          Core_morph.lift_max src dst m ax0 ax1 |> lift_core_compose_result_r
-        | Imply_const c ->
-          let c = Axis.set ax1 c (arbitrary dst) in
-          let m =
-            Core_morph.id_r2g src dst ax0 ax1 |> lift_core_compose_result_r
-          in
-          compose dst (Imply_const c) m
-        | Core_imply_const (m, c) ->
-          let m = lift_max src dst (Core m) ax0 ax1 in
-          let c = Axis.set ax0 c (arbitrary src) in
-          compose dst m (Imply_const c)
+      let push_to_max m =
+        let q_obj = proj_obj ax1 dst in
+        let c = min_with dst ax1 (max q_obj) in
+        compose dst (Imply_const c) m
       in
-      let q_obj = proj_obj ax1 dst in
-      let c = min_with dst ax1 (max q_obj) in
-      compose dst (Imply_const c) m
+      match m with
+      | Id ->
+        Core_morph.id_except_for_areality src dst ax0 ax1
+        |> lift_core_compose_result_r |> push_to_max
+      | Core m ->
+        Core_morph.lift_r src dst m ax0 ax1
+        |> lift_core_compose_result_r |> push_to_max
+      | Imply_const c ->
+        let c = Axis.set ax1 c (min dst) in
+        let m =
+          Core_morph.id_except_for_areality src dst ax0 ax1
+          |> lift_core_compose_result_r
+        in
+        compose dst (Imply_const c) m
+      | Core_imply_const (m, c) ->
+        let m = lift_max src dst (Core m) ax0 ax1 in
+        let c = Axis.set ax0 c (arbitrary src) in
+        compose dst m (Imply_const c)
     [@@warning "-4"]
 
     let rec lift_min : type a b p q.
@@ -3389,25 +3366,29 @@ module Lattices_mono = struct
         (b, q) Axis.t ->
         (a, b, allowed * disallowed) t =
      fun src dst m ax0 ax1 ->
-      let m : (a, b, allowed * disallowed) t =
-        match m with
-        | Id -> Core_morph.id_r2l src dst ax0 ax1 |> lift_core_compose_result_l
-        | Core m ->
-          Core_morph.lift_min src dst m ax0 ax1 |> lift_core_compose_result_l
-        | Meet_const c ->
-          let c = Axis.set ax1 c (arbitrary dst) in
-          let m =
-            Core_morph.id_r2l src dst ax0 ax1 |> lift_core_compose_result_l
-          in
-          compose dst (Meet_const c) m
-        | Meet_const_core (c, m) ->
-          let m = lift_min src dst (Core m) ax0 ax1 in
-          let c = Axis.set ax1 c (arbitrary dst) in
-          compose dst (Meet_const c) m
+      let push_to_min m =
+        let q_obj = proj_obj ax1 dst in
+        let c = min_with dst ax1 (max q_obj) in
+        compose dst (Meet_const c) m
       in
-      let q_obj = proj_obj ax1 dst in
-      let c = min_with dst ax1 (max q_obj) in
-      compose dst (Meet_const c) m
+      match m with
+      | Id ->
+        Core_morph.id_except_for_areality src dst ax0 ax1
+        |> lift_core_compose_result_l |> push_to_min
+      | Core m ->
+        Core_morph.lift_l src dst m ax0 ax1
+        |> lift_core_compose_result_l |> push_to_min
+      | Meet_const c ->
+        let c = Axis.set ax1 c (min dst) in
+        let m =
+          Core_morph.id_except_for_areality src dst ax0 ax1
+          |> lift_core_compose_result_l
+        in
+        compose dst (Meet_const c) m
+      | Meet_const_core (c, m) ->
+        let m = lift_min src dst (Core m) ax0 ax1 in
+        let c = Axis.set ax1 c (arbitrary dst) in
+        compose dst (Meet_const c) m
     [@@warning "-4"]
 
     let ( let* ) xs f = List.concat_map f xs
