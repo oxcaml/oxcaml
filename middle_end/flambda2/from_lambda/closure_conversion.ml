@@ -1443,7 +1443,15 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
       match defining_expr with
       | Simple simple ->
         let body_env = Env.add_simple_to_substitute env id simple kind in
-        body acc body_env
+        (* Preserve the source-level name as a phantom let so DWARF can
+             describe it, while still substituting [simple] at the use sites.
+             The phantom let has no runtime effect. *)
+        let acc, body_expr = body acc body_env in
+        let bound_pattern =
+          Bound_pattern.singleton (VB.create var uid Name_mode.phantom)
+        in
+        let named = Named.create_simple simple in
+        Let_with_acc.create acc bound_pattern named ~body:body_expr
       | Prim ((Variadic (Begin_region _, _) | Unary (End_region _, _)), _)
         when not (Flambda_features.stack_allocation_enabled ()) ->
         (* We use [body_env] to ensure the region variables are still in the

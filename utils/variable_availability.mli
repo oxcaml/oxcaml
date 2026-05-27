@@ -32,22 +32,38 @@
 (** {1 Known compiler behaviours that show up in the report}
 
     Some source-level bindings disappear during compilation as a
-    side effect of compiler optimizations. The diagnostic reports
-    these as ordinary ["dropped @ ..."] rows: the source binding
-    really is unavailable downstream, and reclassifying it as
-    intentional would be misleading rather than helpful. The known
-    cases are
+    side effect of compiler behaviours. The diagnostic reports
+    these as ordinary ["dropped @ ..."] rows. Known cases:
 
     - Identical-action case fusion in [lambda/matching.ml] (via
       [share_actions_tree] / [share_actions_sw] on top of
       [Switch.Store]) deduplicates lambda actions that are
       α-equivalent. When several match arms have such bodies, the
       matcher keeps one arm's bindings and discards the rest.
-      The problem is that this can create confusing debug info:
-      if two arms bind different source names (say [x] and [y])
-      and get fused, the surviving DWARF entry sits at one source
-      location while the runtime location it describes is named
-      differently in the other arm.  *)
+      Reclassifying this as intentional would be misleading: if
+      two arms bind different source names (say [x] and [y]) and
+      get fused, the surviving DWARF entry would sit at one
+      source location while the runtime location it describes is
+      named differently in the other arm.
+
+    - Unboxed product layouts in the [let v = e in v] case of
+      [middle_end/flambda2/from_lambda/lambda_to_flambda.ml] (the
+      [Llet (_, _, id, _, _, Lvar id') when Ident.same id id']
+      branch of [cps]): the phantom-let path only handles
+      [Singleton] layouts. Unboxed product layouts would require
+      multiple phantom lets with projected debug uids, which is
+      not yet implemented and falls back to dropping the source
+      duid.
+
+    - Promotion from [ref] to local mutable in [lambda/simplif.ml]
+      (the [Llet (Strict, _, _, _, Lprim (Pmakeblock (0, Mutable,
+      _, _), _, _), _)] case of [simplify_lets]) rewrites
+      [let v = ref e in body] into an [Lmutlet] binding. The
+      [Lmutlet] handler in
+      [middle_end/flambda2/from_lambda/lambda_to_flambda.ml]
+      currently introduces a fresh temp with
+      [Lambda.debug_uid_none] rather than propagating the source
+      duid; an existing CR at that site flags the issue. *)
 
 (** The pipeline checkpoints at which observations may be recorded.
     The constructor names match the [Compiler_hooks] passes that
