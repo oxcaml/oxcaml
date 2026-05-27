@@ -2392,21 +2392,17 @@ module Lattices_mono = struct
     let commute_meet_const_from_right : type a b d.
         b obj -> (a, b, d) t -> a -> b =
      fun dst m c ->
+      let commute_locality_morph : type r s d. (r, s, d) Locality_morph.t -> b =
+        function
+        | Local_to_regional | Regional_to_local | Locality_as_regionality
+        | Regional_to_global | Local_to_regional_regionality
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          (* same explanation as below *)
+          apply dst m c
+      in
       match m with
-      | Locality_restricted Local_to_regional
-      | Locality_restricted Regional_to_local
-      | Locality_restricted Locality_as_regionality
-      | Locality_restricted Regional_to_global
-      | Locality_restricted Local_to_regional_regionality
-      | Locality_restricted Regional_to_local_regionality
-      | Locality_restricted Regional_to_global_regionality
-      | Locality_full Local_to_regional
-      | Locality_full Regional_to_local
-      | Locality_full Locality_as_regionality
-      | Locality_full Regional_to_global
-      | Locality_full Local_to_regional_regionality
-      | Locality_full Regional_to_local_regionality
-      | Locality_full Regional_to_global_regionality
+      | Locality_restricted lm -> commute_locality_morph lm
+      | Locality_full lm -> commute_locality_morph lm
       | Uniqueness_op_to_linearity | Linearity_to_uniqueness_op
       | Contention_op_to_portability | Portability_to_contention_op
       | Visibility_op_to_statefulness | Statefulness_to_visibility_op
