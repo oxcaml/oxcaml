@@ -1773,12 +1773,8 @@ let all_void_sort_option sort =
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
-(* [update_label_sorts] additionally returns the jkinds of the labels.
-   [allow_all_void] should be [true] for inline records (so that all-void
-   inline-record constructors can be represented as immediates) and for
-   unboxed products, and [false] for ordinary boxed records (which currently
-   require at least one runtime value). *)
-let update_label_sorts env loc types ~allow_all_void =
+(* [update_label_sorts] additionally returns the jkinds of the labels. *)
+let update_label_sorts env types =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
@@ -1789,25 +1785,25 @@ let update_label_sorts env loc types ~allow_all_void =
       ld_sort, jkind
     ) types
   in
-  let sorts, jkinds = List.split sorts_and_jkinds in
-  let is_all_void () = List.for_all all_void_sort_option sorts in
-  if not allow_all_void && is_all_void () then
-    raise (Error (loc, Jkind_empty_record))
-  else sorts, jkinds
+  List.split sorts_and_jkinds
 
-let update_label_sorts_in_place env loc lbls ~allow_all_void =
+let update_label_sorts_in_place env lbls =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~allow_all_void in
+  let sorts, jkinds = update_label_sorts env types in
   let lbls =
     List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
   in
   lbls, jkinds
 
+let check_record_sorts_not_all_void loc sorts =
+  if List.for_all all_void_sort_option sorts then
+    raise (Error (loc, Jkind_empty_record))
+
 (* In addition to updated constructor arguments, returns whether
    all arguments are void, useful for detecting enumerations that
    can be [immediate]. Also returns the jkinds and the sort of each
    argument ([Cstr_tuple]) or field ([Cstr_record]). *)
-let update_constructor_arguments_sorts env loc cd_args =
+let update_constructor_arguments_sorts env cd_args =
   match cd_args with
   | Types.Cstr_tuple args ->
     let args_and_jkinds =
@@ -1828,9 +1824,7 @@ let update_constructor_arguments_sorts env loc cd_args =
     (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args)
       |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
-    let lbls, jkinds =
-      update_label_sorts_in_place env loc lbls ~allow_all_void:true
-    in
+    let lbls, jkinds = update_label_sorts_in_place env lbls in
     (* [cstr_layout] sorts are the inline record's per-field sorts (same
        convention as [Cstr_tuple]).  For an all-void inline-record constructor
        this makes [cstr_constant] in [Datarepr] derive to [true] and the
@@ -2253,11 +2247,6 @@ let compute_repr_summary env lbls jkinds =
     reprs lbls;
   reprs, repr_summary
 
-let allow_all_void_for_form
-    : type rep. rep record_form -> bool = function
-  | Legacy -> false
-  | Unboxed_product -> true
-
 (* Given a record with a temporary representation from [transl_declaration]
    computes updated labels, updated rep, and updated jkind *)
 let compute_record_kind (type rep) env loc (form : rep record_form)
@@ -2284,10 +2273,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
-    let sorts, jkinds =
-      update_label_sorts env loc types
-        ~allow_all_void:(allow_all_void_for_form form)
-    in
+    let sorts, jkinds = update_label_sorts env types in
+    (match form with
+     | Legacy -> check_record_sorts_not_all_void loc sorts
+     | Unboxed_product -> ());
     let reprs, repr_summary = compute_repr_summary env lbls jkinds in
     let jkind =
       match form with
@@ -2362,10 +2351,10 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       lbls ~warn :
     _ * (rep, _) Result.t =
   let types = List.map snd lbls in
-  let sorts, jkinds =
-    update_label_sorts env loc types
-      ~allow_all_void:(allow_all_void_for_form form)
-  in
+  let sorts, jkinds = update_label_sorts env types in
+  (match form with
+   | Legacy -> check_record_sorts_not_all_void loc sorts
+   | Unboxed_product -> ());
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
     (* CR layouts: improve the readability of this match *)
@@ -2509,8 +2498,7 @@ let rec update_decl_jkind env dpath decl =
       let cstrs =
         List.mapi (fun idx cstr ->
           let cd_args, _all_void, jkinds, arg_sorts =
-            update_constructor_arguments_sorts env cstr.Types.cd_loc
-              cstr.Types.cd_args
+            update_constructor_arguments_sorts env cstr.Types.cd_args
           in
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
@@ -3659,7 +3647,7 @@ let transl_extension_constructor_decl
       typext_params svars sargs sret_type
   in
   let args, constant, jkinds, _arg_sorts =
-    update_constructor_arguments_sorts env loc args
+    update_constructor_arguments_sorts env args
   in
   let constructor_shape =
     update_constructor_representation env args jkinds ~loc
