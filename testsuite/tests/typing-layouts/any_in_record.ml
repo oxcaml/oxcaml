@@ -117,9 +117,7 @@ val make : int64# -> int64# -> int64# t = <fun>
 
 let make_float64 (fst : float#) snd = { fst; snd }
 [%%expect{|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+val make_float64 : float# -> float# -> float# t = <fun>
 |}]
 
 let make (type a : bits64) (fst : a) (snd : a) = { fst; snd }
@@ -190,9 +188,7 @@ let test_float64_direct =
   let t = { fst = #1.0; snd = #2.0 } |> Sys.opaque_identity in
   t.snd |> box_float
 [%%expect {|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+val test_float64_direct : float = 2.
 |}]
 
 let test_float64_via_index =
@@ -200,9 +196,7 @@ let test_float64_via_index =
   let idx = ((.snd) : (('a : float64) t, 'a) idx_mut) |> Sys.opaque_identity in
   Idx_mut.get t idx |> box_float
 [%%expect {|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+val test_float64_via_index : float = 2.
 |}]
 
 let test_float64_set_direct =
@@ -210,9 +204,7 @@ let test_float64_set_direct =
   t.snd <- #42.0;
   (t |> Sys.opaque_identity).snd |> box_float
 [%%expect {|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+val test_float64_set_direct : float = 42.
 |}]
 
 let test_float64_set_via_index =
@@ -221,9 +213,7 @@ let test_float64_set_via_index =
   Idx_mut.set t idx #42.0;
   Idx_mut.get t idx |> box_float
 [%%expect {|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+val test_float64_set_via_index : float = 42.
 |}]
 
 let test_unboxed_pair_block : #(int64# * int64#) t =

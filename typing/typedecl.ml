@@ -2085,6 +2085,7 @@ let compute_record_repr
     assert_mixed_product_support loc Record ~value_prefix_len:0;
     Ok (Record_mixed shape)
   (* Forbid atomic fields in mixed (or potentially mixed) blocks *)
+  | ~refining_block_with_any:true, ~float64s:true, ~atomic_fields:true, ..
   | ~values:true, ~voids:true, ~atomic_fields:true, ..
   | ~floats:true, ~voids:true, ~atomic_fields:true, ..
   | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
@@ -2129,6 +2130,8 @@ let compute_record_repr
   | ~float64s:true, ~voids:true, ~atomic_fields:false, ..
   | ~values:true, ~float64s:true, ~atomic_fields:false, ..
   | ~non_float64_unboxed_fields:true, ~atomic_fields:false, .. ->
+    mixed_record ()
+  | ~refining_block_with_any:true, ~float64s:true, ~atomic_fields:false, .. ->
     mixed_record ()
   (* value-only records are stored as boxed records, as are records whose
       declared types have fields of kind [any] *)
