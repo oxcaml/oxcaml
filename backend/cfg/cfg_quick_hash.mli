@@ -24,3 +24,5 @@ val terminator : Cfg.terminator -> int
 val basic_instruction_list : Cfg.basic Cfg.instruction DLL.t -> int
 
 val basic_block : Cfg.basic_block -> int
+
+val cfg_with_layout : Cfg_with_layout.t -> int

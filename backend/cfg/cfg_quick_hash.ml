@@ -115,3 +115,22 @@ let basic_block : Cfg.basic_block -> int =
     let body_hash = basic_instruction_list body in
     let term_hash = terminator terminator_desc in
     hash_combine body_hash term_hash
+
+(* The hash walks at most [fuel] blocks of the layout: enough to discriminate
+   most functions while keeping the cost bounded for very large CFGs. *)
+let cfg_with_layout cfg_with_layout =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let layout = Cfg_with_layout.layout cfg_with_layout in
+  let rec hash label_cell ~fuel ~acc =
+    match label_cell with
+    | None -> acc
+    | Some cell ->
+      if fuel <= 0
+      then acc
+      else
+        let label = DLL.value cell in
+        let block = Cfg.get_block_exn cfg label in
+        hash (DLL.next cell) ~fuel:(pred fuel)
+          ~acc:(hash_combine acc (basic_block block))
+  in
+  hash (DLL.hd_cell layout) ~fuel:4 ~acc:0

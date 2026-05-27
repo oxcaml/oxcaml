@@ -659,6 +659,7 @@
   cfg_merge_blocks
   cfg_equiv_subst
   cfg_equiv
+  cfg_merge_functions
   extra_debug
   label
   printcfg
