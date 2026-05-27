@@ -909,8 +909,9 @@ let run_expect_once input_file principal log env ~backend =
     (Result.fail_with_reason reason, env, ~needs_principal:false)
   end
 
-let run_expect_twice input_file log env ~backend =
-  let corrected filename = Filename.make_filename filename "corrected" in
+let corrected filename = Filename.make_filename filename "corrected"
+
+let run_expect_twice input_file log env ~backend ~reference_file =
   let (result1, env1, ~needs_principal) =
     run_expect_once input_file false log env ~backend
   in
@@ -927,7 +928,7 @@ let run_expect_twice input_file log env ~backend =
     if Result.is_pass result2 then begin
       let output_env = Environments.add_bindings
       [
-        Builtin_variables.reference, input_file;
+        Builtin_variables.reference, reference_file;
         Builtin_variables.output, output_file
       ] env2 in
       (Result.pass, output_env)
@@ -936,7 +937,7 @@ let run_expect_twice input_file log env ~backend =
 
 let run_expect_with ~backend log env =
   let input_file = Actions_helpers.testfile env in
-  run_expect_twice input_file log env ~backend
+  run_expect_twice input_file log env ~backend ~reference_file:input_file
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"
@@ -948,6 +949,129 @@ let run_expectnat =
     ~description:"Run expect test (native code)"
     ~does_something:true
     (run_expect_with ~backend:Native)
+
+let type_declaration_of_operation : _ Scalar.Operation.t -> string =
+  function
+  | Unary (Integral (t, _)) ->
+    Printf.sprintf "%s -> %s"
+      (Scalar.Integral.to_string t)
+      (Scalar.Integral.to_string t)
+  | Unary (Floating (t, _)) ->
+    Printf.sprintf "%s -> %s"
+      (Scalar.Floating.to_string t)
+      (Scalar.Floating.to_string t)
+  | Unary (Static_cast { src; dst }) ->
+    Printf.sprintf "%s -> %s"
+      (Scalar.to_string src)
+      (Scalar.to_string dst)
+  | Binary (Integral (t, _)) ->
+    Printf.sprintf "%s -> %s -> %s"
+      (Scalar.Integral.to_string t)
+      (Scalar.Integral.to_string t)
+      (Scalar.Integral.to_string t)
+  | Binary (Shift (t, _, Int)) ->
+    Printf.sprintf "%s -> int -> %s"
+      (Scalar.Integral.to_string t)
+      (Scalar.Integral.to_string t)
+  | Binary (Floating (t, _)) ->
+    Printf.sprintf "%s -> %s -> %s"
+      (Scalar.Floating.to_string t)
+      (Scalar.Floating.to_string t)
+      (Scalar.Floating.to_string t)
+  | Binary
+      (Icmp
+         (t, (Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge)))
+    ->
+    Printf.sprintf "%s -> %s -> bool"
+      (Scalar.Integral.to_string t)
+      (Scalar.Integral.to_string t)
+  | Binary
+      (Fcmp
+         ( t,
+           ( CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge
+           | CFnge ) )) ->
+    Printf.sprintf "%s -> %s -> bool"
+      (Scalar.Floating.to_string t)
+      (Scalar.Floating.to_string t)
+  | Binary (Three_way_compare_int (_, t)) ->
+    Printf.sprintf "%s -> %s -> bool"
+      (Scalar.Integral.to_string t)
+      (Scalar.Integral.to_string t)
+  | Binary (Three_way_compare_float t) ->
+    Printf.sprintf "%s -> %s -> int"
+      (Scalar.Floating.to_string t)
+      (Scalar.Floating.to_string t)
+
+let params_of_operation : _ Scalar.Operation.t -> string =
+  function Unary _ -> "x" | Binary _ -> "x y"
+
+let codegen_test_of_operation operation =
+  let mangle_sigils s = String.split_on_char '#' s |> String.concat "_u" in
+  let val_name = Scalar.Operation.to_string operation |> mangle_sigils in
+  Printf.sprintf
+    "external %s : %s = \"%s\"\n\
+     let %s %s = %s %s\n\
+     [%%%%expect_asm X86_64{||}]\n"
+    val_name
+    (type_declaration_of_operation operation)
+    (Scalar.Operation.With_percent_prefix.to_string operation)
+    val_name
+    (params_of_operation operation)
+    val_name
+    (params_of_operation operation)
+
+let run_scalar_codegen log env =
+  let input_file = Actions_helpers.testfile env in
+  let test_stanza =
+    let ic = open_in input_file in
+    let lexbuf = Lexing.from_channel ic in
+    Location.init lexbuf input_file;
+    Lexer.init ();
+    let rec drain () =
+      match[@warning "-fragile-match"] Lexer.token lexbuf with
+      | Parser.EOF -> ()
+      | _ -> drain ()
+    in
+    drain ();
+    close_in ic;
+    match
+      List.fold_left
+        (fun acc ((_, (loc : Location.t)) as c) ->
+          match acc with
+          | Some (_, (best : Location.t)) when
+              best.loc_start.pos_cnum <= loc.loc_start.pos_cnum
+            -> acc
+          | _ -> Some c)
+        None
+        (Lexer.comments ())
+    with
+    | Some (s, _) -> s
+    | None -> ""
+  in
+  let sorted_ops =
+    List.sort
+      (fun op1 op2 ->
+         String.compare
+           (Scalar.Operation.to_string op1)
+           (Scalar.Operation.to_string op2))
+      Scalar.Operation.all
+  in
+  let intermediate_file = corrected input_file in
+  let oc = open_out intermediate_file in
+  output_string oc
+    (Printf.sprintf "(*%s*)\n\n%s"
+      test_stanza
+      (String.concat "\n" (List.map codegen_test_of_operation sorted_ops)));
+  close_out oc;
+  run_expect_twice intermediate_file log env
+    ~backend:Native ~reference_file:input_file
+
+let run_scalar_codegen =
+  Actions.make
+    ~name:"run-scalar-codegen"
+    ~description:"Create an expect_asm test for all scalar primitives"
+    ~does_something:true
+    run_scalar_codegen
 
 let make_check_tool_output name tool = Actions.make
   ~name
@@ -1687,5 +1811,6 @@ let init () =
     ocamlobjinfo;
     stack_checks;
     no_stack_checks;
-    only_default_codegen
+    only_default_codegen;
+    run_scalar_codegen
   ]
