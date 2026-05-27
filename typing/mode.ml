@@ -1357,6 +1357,23 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.print
     | Comonadic_with_regionality -> Comonadic_with_regionality.print
 
+  (* Returns an arbitrary element of a given object *)
+  let arbitrary : type a. a obj -> a = function
+    | Locality -> Locality.min
+    | Regionality -> Regionality.min
+    | Uniqueness_op -> Uniqueness_op.min
+    | Contention_op -> Contention_op.min
+    | Visibility_op -> Visibility_op.min
+    | Linearity -> Linearity.min
+    | Portability -> Portability.min
+    | Forkable -> Forkable.min
+    | Yielding -> Yielding.min
+    | Statefulness -> Statefulness.min
+    | Staticity_op -> Staticity_op.min
+    | Monadic_op -> Monadic_op.min
+    | Comonadic_with_locality -> Comonadic_with_locality.min
+    | Comonadic_with_regionality -> Comonadic_with_regionality.min
+
   let compare_obj : type a b. a obj -> b obj -> int =
    fun a b ->
     match a, b with
@@ -3349,14 +3366,14 @@ module Lattices_mono = struct
         | Core m ->
           Core_morph.lift_max src dst m ax0 ax1 |> lift_core_compose_result_r
         | Imply_const c ->
-          let c = Axis.set ax1 c (max dst) in
+          let c = Axis.set ax1 c (arbitrary dst) in
           let m =
             Core_morph.id_r2g src dst ax0 ax1 |> lift_core_compose_result_r
           in
           compose dst (Imply_const c) m
         | Core_imply_const (m, c) ->
           let m = lift_max src dst (Core m) ax0 ax1 in
-          let c = Axis.set ax0 c (max src) in
+          let c = Axis.set ax0 c (arbitrary src) in
           compose dst m (Imply_const c)
       in
       let q_obj = proj_obj ax1 dst in
@@ -3378,14 +3395,14 @@ module Lattices_mono = struct
         | Core m ->
           Core_morph.lift_min src dst m ax0 ax1 |> lift_core_compose_result_l
         | Meet_const c ->
-          let c = Axis.set ax1 c (min dst) in
+          let c = Axis.set ax1 c (arbitrary dst) in
           let m =
             Core_morph.id_r2l src dst ax0 ax1 |> lift_core_compose_result_l
           in
           compose dst (Meet_const c) m
         | Meet_const_core (c, m) ->
           let m = lift_min src dst (Core m) ax0 ax1 in
-          let c = Axis.set ax1 c (min dst) in
+          let c = Axis.set ax1 c (arbitrary dst) in
           compose dst (Meet_const c) m
       in
       let q_obj = proj_obj ax1 dst in
