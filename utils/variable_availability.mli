@@ -29,6 +29,26 @@
     depending on [Location] (which lives later in the dependency
     order). *)
 
+(** {1 Known compiler behaviours that show up in the report}
+
+    Some source-level bindings disappear during compilation as a
+    side effect of compiler optimizations. The diagnostic reports
+    these as ordinary ["dropped @ ..."] rows: the source binding
+    really is unavailable downstream, and reclassifying it as
+    intentional would be misleading rather than helpful. The known
+    cases are
+
+    - Identical-action case fusion in [lambda/matching.ml] (via
+      [share_actions_tree] / [share_actions_sw] on top of
+      [Switch.Store]) deduplicates lambda actions that are
+      α-equivalent. When several match arms have such bodies, the
+      matcher keeps one arm's bindings and discards the rest.
+      The problem is that this can create confusing debug info:
+      if two arms bind different source names (say [x] and [y])
+      and get fused, the surviving DWARF entry sits at one source
+      location while the runtime location it describes is named
+      differently in the other arm.  *)
+
 (** The pipeline checkpoints at which observations may be recorded.
     The constructor names match the [Compiler_hooks] passes that
     populate them. *)
@@ -130,18 +150,18 @@ module type S = sig
 
   (** Reason a source binding does not appear at downstream
       checkpoints. The report annotates each affected binding with
-      its reason so a reader can tell intentional drops apart from
-      unintentional ones. *)
-  type drop_reason =
+      its reason and excludes it from the survival totals so a reader
+      can tell intentional drops apart from unintentional ones. *)
+  type intentional_drop_reason =
     | Merged_with of uid
-        (** Alpha-renamed to share a runtime binding with the given
-            uid: two or more source bindings became one runtime
-            binding. Observations recorded against the survivor are
-            also credited to this uid. *)
+        (** The same [Ident.t] was reused with a fresh debug uid (e.g. an
+            or-pattern arm whose bindings have been unified by typing). The
+            named survivor's source location is shown in the report row. *)
     | Ignored_variable
-        (** Pattern variable not used by the body (e.g. [_x]);
-            [simplify_lets] eliminated both the binding and its
-            right-hand side. *)
+        (** Pattern variable not used by the body (e.g. [_x]); either
+            [Matching] never emitted a binding for it, or
+            [simplify_lets] eliminated the binding and its
+            right-hand side because the use count was zero. *)
     | Function_became_catch
         (** Local function whose name was eliminated because all of
             its call sites were rewritten as
@@ -152,13 +172,13 @@ module type S = sig
   (** Record that source uid [uid] was intentionally dropped by a
       downstream pass for the given [reason]. The binding still
       appears in the per-function listing, annotated with the
-      reason. For [Merged_with], the merge chain is followed so that
-      observations made against the survivor (at any checkpoint) are
-      counted for [uid] as well. Calls involving the sentinel
-      [Uid.no_uid], or a [Merged_with] where the survivor equals
-      [uid], are silently dropped. *)
+      reason, and is excluded from the compilation-unit survival
+      tally. Calls involving the sentinel [Uid.no_uid], or a
+      [Merged_with] where the survivor equals [uid], are silently
+      dropped. The earliest-registered reason wins: subsequent
+      attempts to re-classify the same uid are ignored. *)
   val register_dropped_intentionally :
-    uid:uid -> reason:drop_reason -> unit
+    uid:uid -> reason:intentional_drop_reason -> unit
 
   val print_report : Format.formatter -> unit
 end

@@ -135,13 +135,13 @@ module type S = sig
 
   val record_observation : checkpoint:Checkpoint.t -> observed_id -> unit
 
-  type drop_reason =
+  type intentional_drop_reason =
     | Merged_with of uid
     | Ignored_variable
     | Function_became_catch
 
   val register_dropped_intentionally :
-    uid:uid -> reason:drop_reason -> unit
+    uid:uid -> reason:intentional_drop_reason -> unit
 
   val print_report : Format.formatter -> unit
 end
@@ -187,7 +187,7 @@ module Make (Uid : Uid) (Loc : Loc) :
       id : observed_id
     }
 
-  type drop_reason =
+  type intentional_drop_reason =
     | Merged_with of uid
     | Ignored_variable
     | Function_became_catch
@@ -198,10 +198,8 @@ module Make (Uid : Uid) (Loc : Loc) :
       uid_to_function : source_function Uid_tbl.t;
       mutable observations : observation list;
       (* [dropped] records, for each intentionally-dropped source uid,
-         the reason a downstream pass eliminated it. Merge-chain
-         lookups (see [merge_chain]) follow only [Merged_with]
-         edges. *)
-      dropped : drop_reason Uid_tbl.t
+         the reason a downstream pass eliminated it. *)
+      dropped : intentional_drop_reason Uid_tbl.t
     }
 
   let fresh_state () =
@@ -287,12 +285,13 @@ module Make (Uid : Uid) (Loc : Loc) :
         { from_ : Checkpoint.t;
           to_ : Checkpoint.t
         }
-    | Intentionally_dropped of drop_reason
+    | Intentionally_dropped of intentional_drop_reason
 
-  let drop_reason_for uid = Uid_tbl.find_opt (!state).dropped uid
+  let intentional_drop_reason_for uid =
+    Uid_tbl.find_opt (!state).dropped uid
 
   let status_for_variable ~uid obs =
-    match drop_reason_for uid with
+    match intentional_drop_reason_for uid with
     | Some reason -> Intentionally_dropped reason
     | None ->
       let seen_in cp =
@@ -343,7 +342,7 @@ module Make (Uid : Uid) (Loc : Loc) :
     List.exists (fun o -> Checkpoint.equal o.checkpoint cp) obs
 
   module Printing = struct
-    let string_of_drop_reason = function
+    let string_of_intentional_drop_reason = function
       | Merged_with surviving ->
         (match find_variable_by_uid surviving with
          | Some v -> Printf.sprintf "merged with %s" v.name
@@ -359,7 +358,8 @@ module Make (Uid : Uid) (Loc : Loc) :
         Printf.sprintf "dropped @ %s -> %s"
           (Checkpoint.display from_)
           (Checkpoint.display to_)
-      | Intentionally_dropped reason -> string_of_drop_reason reason
+      | Intentionally_dropped reason ->
+        string_of_intentional_drop_reason reason
 
     let percent n d =
       if d = 0
@@ -435,7 +435,7 @@ module Make (Uid : Uid) (Loc : Loc) :
     let count_intentional_by_reason vars =
       List.fold_left
         (fun (merged, ignored, became_catch) v ->
-          match drop_reason_for v.uid with
+          match intentional_drop_reason_for v.uid with
           | Some (Merged_with _) -> merged + 1, ignored, became_catch
           | Some Ignored_variable -> merged, ignored + 1, became_catch
           | Some Function_became_catch -> merged, ignored, became_catch + 1
