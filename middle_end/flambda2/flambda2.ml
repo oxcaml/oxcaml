@@ -96,7 +96,7 @@ type run_result =
   }
 
 let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
-  slot_offsets : run_result =
+    slot_offsets : run_result =
   let module_symbol = Flambda_unit.module_symbol unit in
   let function_slots_in_normal_projections =
     NO.function_slots_in_normal_projections free_names

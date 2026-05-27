@@ -89,7 +89,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_force_link = uir.uir_force_link;
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
-            ui_file_sections = sections;
+            ui_file_sections = sections
           }
         in
         ui)

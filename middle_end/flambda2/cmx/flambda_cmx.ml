@@ -274,6 +274,4 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
       ~used_value_slots
       ~canonicalise:(fun id -> id)
-      ~exported_offsets
-      ~sections
-      all_code
+      ~exported_offsets ~sections all_code
