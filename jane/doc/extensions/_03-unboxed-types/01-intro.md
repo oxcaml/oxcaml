@@ -291,8 +291,9 @@ let box : t# -> t = fun #{ i ; s } -> { i ; s }
 type u : immediate & value = t# = #{ i : int ; s : string }
 ```
 
-Records who store boxed floats flatly (all-float and float-and-float# records)
-and `[@@unboxed]` records do not get unboxed versions.
+Records who store boxed floats flatly (all-float and float-and-float# records),
+`[@@unboxed]` records, and records with `[@atomic]` fields do not get unboxed
+versions.
 
 *Limitations and future plans*:
 * Unboxed products may only be stored in blocks via records (i.e. they are not

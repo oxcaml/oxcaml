@@ -1264,8 +1264,8 @@ let transl_declaration env sdecl (id, uid) =
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
-      records don't have unboxed versions. These unboxed versions are removed in
-      [remove_unboxed_versions].
+      records and records with [@atomic] fields don't have unboxed versions.
+      These unboxed versions are removed in [remove_unboxed_versions].
 
    After steps 2 and 3, the set of unboxed versions decreases, so we check for
    newly-unbound unboxed paths with [check_unboxed_paths].
@@ -1296,12 +1296,20 @@ let record_has_float_boxed = function
   | Record_variable ->
     fatal_error "record_has_float_boxed: unexpected variable representation"
 
-let record_gets_unboxed_version = function
+let record_has_atomic_field lbls =
+  List.exists
+    (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
+    lbls
+
+let record_gets_unboxed_version lbls repr =
+  not (record_has_atomic_field lbls) &&
+  match repr with
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed | Record_variable -> true
   | Record_dummy { represent_as_float_array } ->
     not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
+
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
@@ -1313,14 +1321,15 @@ let gets_unboxed_version decl =
        unboxed version. Please enjoy convincing yourself that this is true
        (you'll want to consult [update_record_kind]). *)
     true
-  | Type_record (_, repr, _) -> record_gets_unboxed_version repr
+  | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ ->
     None
-  | Type_record (_, repr, _) when not (record_gets_unboxed_version repr) ->
+  | Type_record (lbls, repr, _)
+    when not (record_gets_unboxed_version lbls repr) ->
     None
   | Type_record (lbls, _rep, umc) ->
     let keep_attribute a =
@@ -1420,8 +1429,8 @@ let derive_unboxed_versions decls env =
     decls
 
 (* Removes unboxed versions from type declarations not satisfying
-   [gets_unboxed_version]. In practice, it is float records that lose their
-   unboxed versions. See Note [Typechecking unboxed versions of types].
+   [gets_unboxed_version]. In practice, this is float records and records
+   with [@atomic] fields. See Note [Typechecking unboxed versions of types].
 
    Returns new decls and paths whose unboxed versions got removed. *)
 let remove_unboxed_versions decls =

@@ -5281,11 +5281,20 @@ let report_lookup_error_doc _loc env ppf = function
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
         quoted_longident lid;
+      let has_atomic_field lbls =
+        List.exists
+          (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
+          lbls
+      in
       begin match decl.type_kind with
       | Type_record (_, Record_unboxed, _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: \
              [%@%@unboxed] records don't get unboxed versions.@]"
+      | Type_record (lbls, _, _) when has_atomic_field lbls ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             Records with [%@atomic] fields don't get unboxed versions.@]"
       | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";

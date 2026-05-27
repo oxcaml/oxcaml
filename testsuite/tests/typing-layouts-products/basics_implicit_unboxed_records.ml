@@ -343,6 +343,37 @@ Error: The type "t" has no unboxed version.
 Hint: It is already an unboxed record.
 |}]
 
+(* Records with atomic fields don't get unboxed versions. *)
+type t_atomic = { i : int; mutable j : int [@atomic] }
+type u_atomic = t_atomic#
+[%%expect{|
+type t_atomic = { i : int; mutable j : int [@atomic]; }
+Line 2, characters 16-25:
+2 | type u_atomic = t_atomic#
+                    ^^^^^^^^^
+Error: The type "t_atomic" has no unboxed version.
+Hint: Records with [@atomic] fields don't get unboxed versions.
+|}]
+
+(* Same, but in a recursive group, in both orders. *)
+type t_atomic = { i : int; mutable j : int [@atomic] }
+and u_atomic = t_atomic#
+[%%expect{|
+Line 2, characters 0-24:
+2 | and u_atomic = t_atomic#
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type "t_atomic" has no unboxed version.
+|}]
+
+type u_atomic = t_atomic#
+and t_atomic = { i : int; mutable j : int [@atomic] }
+[%%expect{|
+Line 1, characters 0-25:
+1 | type u_atomic = t_atomic#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type "t_atomic" has no unboxed version.
+|}]
+
 (*************************************)
 (* Types that mode cross externality *)
 
