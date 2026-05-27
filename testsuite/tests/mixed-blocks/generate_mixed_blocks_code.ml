@@ -249,7 +249,7 @@ let type_to_string = function
   | Float32 -> "float32#"
   | Bits32 -> "int32_u"
   | Bits64 -> "int64_u"
-  | Word -> "nativeint#"
+  | Word -> "nativeint_u"
   | Str -> "string"
   | Vec128 -> "int64x2#"
   | Vec256 -> "int64x4#"

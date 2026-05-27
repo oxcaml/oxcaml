@@ -242,7 +242,7 @@ val max_untagged_int_array_length : int
     In non-native backends, equal to [max_array_length]. *)
 
 val max_unboxed_nativeint_array_length : int
-(** Maximum length of a [nativeint# array].
+(** Maximum length of a [nativeint_u array].
     In non-native backends, equal to [max_array_length]. *)
 
 val max_unboxed_vec128_array_length : int

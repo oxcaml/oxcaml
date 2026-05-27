@@ -188,8 +188,7 @@ module Type_shape = struct
     let unboxed_of_path = function
       | p when Path.same p Predef.path_unboxed_float -> Some Unboxed_float
       | p when Path.same p Predef.path_unboxed_float32 -> Some Unboxed_float32
-      | p when Path.same p Predef.path_unboxed_nativeint ->
-        Some Unboxed_nativeint
+      | p when Path.same p Predef.path_nativeint_u -> Some Unboxed_nativeint
       | p when Path.same p Predef.path_int64_u -> Some Unboxed_int64
       | p when Path.same p Predef.path_int32_u -> Some Unboxed_int32
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8

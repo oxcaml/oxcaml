@@ -260,14 +260,14 @@ Error: An unboxed product array element must be formed from all
        contained abstract types as [mod external] may resolve this error.
 |}]
 
-(* safe get indexed by nativeint# *)
+(* safe get indexed by nativeint_u *)
 external[@layout_poly] get :
-  ('a : any mod separable) . 'a iarray -> nativeint# -> 'a =
+  ('a : any mod separable) . 'a iarray -> nativeint_u -> 'a =
   "%array_safe_get_indexed_by_nativeint#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any separable). 'a iarray -> nativeint# -> 'a
+external get : ('a : any separable). 'a iarray -> nativeint_u -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -292,14 +292,14 @@ Error: An unboxed product array element must be formed from all
        contained abstract types as [mod external] may resolve this error.
 |}]
 
-(* unsafe get indexed by nativeint# *)
+(* unsafe get indexed by nativeint_u *)
 external[@layout_poly] get :
-  ('a : any mod separable) . 'a iarray -> nativeint# -> 'a =
+  ('a : any mod separable) . 'a iarray -> nativeint_u -> 'a =
   "%array_unsafe_get_indexed_by_nativeint#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any separable). 'a iarray -> nativeint# -> 'a
+external get : ('a : any separable). 'a iarray -> nativeint_u -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]

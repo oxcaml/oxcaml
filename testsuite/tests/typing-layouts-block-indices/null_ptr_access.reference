@@ -13,7 +13,7 @@ Test 4: int32_u field (flat type)
 Test 5: int64_u field (flat type)
   get: expected 20, got 20
   set: expected (10, 200), got (10, 200)
-Test 6: nativeint# field (flat type)
+Test 6: nativeint_u field (flat type)
   get: expected 20, got 20
   set: expected (10, 200), got (10, 200)
 Test 7: unboxed product of ints (value types)

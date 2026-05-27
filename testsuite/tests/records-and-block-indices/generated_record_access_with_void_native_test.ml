@@ -69,7 +69,7 @@ type packed = P : 'a -> packed
 let ref_to_force_heap_allocation : packed ref = ref (P 0)
 
 type t0 = { mutable a0 : unit_u; mutable b0 : int64_u } (* { unit_u; int64_u } *)
-type t1 = { mutable a1 : unit_u; mutable b1 : nativeint# } (* { unit_u; nativeint# } *)
+type t1 = { mutable a1 : unit_u; mutable b1 : nativeint_u } (* { unit_u; nativeint_u } *)
 type t2 = { mutable a2 : unit_u; mutable b2 : unit_u; mutable c2 : string } (* { unit_u; unit_u; string } *)
 type v3 = C3_0 of unit_u (* (| unit_u) *)
 type t4 = { mutable a4 : float; mutable b4 : v3 } (* { float; (| unit_u) } *)
@@ -152,9 +152,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (***********************************)
-  (*   t1 = { unit_u; nativeint# }   *)
-  (***********************************)
+  (************************************)
+  (*   t1 = { unit_u; nativeint_u }   *)
+  (************************************)
   let r = { a1 = (unbox_unit ()); b1 = #0n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)

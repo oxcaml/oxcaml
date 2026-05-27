@@ -452,7 +452,8 @@ let int_result ~width ~unboxed ~module_ ~examples =
   let type_ = String.lowercase_ascii module_ in
   let unboxed_sigil = if unboxed then "#" else "" in
   let tested_type =
-    if unboxed && (module_ = "Int32" || module_ = "Int64")
+    if unboxed
+       && (module_ = "Int32" || module_ = "Int64" || module_ = "Nativeint")
     then type_ ^ "_u"
     else type_ ^ unboxed_sigil
   in
@@ -475,7 +476,7 @@ let int_result ~width ~unboxed ~module_ ~examples =
 
 let indices =
   [ { boxed_type = "nativeint"
-    ; tested_type = "nativeint#"
+    ; tested_type = "nativeint_u"
     ; prim_index_name = "nativeint#"
     ; of_int = "Nativeint.of_int"
     ; unbox = "Nativeint_u.of_nativeint"

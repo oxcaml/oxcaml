@@ -2480,7 +2480,7 @@ let type_for_path loc env = function
         | "expr" -> Identifier.Type.expr
         | "eval" -> Identifier.Type.eval
         | "float#" -> Identifier.Type.unboxed_float
-        | "nativeint#" -> Identifier.Type.unboxed_nativeint
+        | "nativeint_u" -> Identifier.Type.unboxed_nativeint
         | "int32_u" -> Identifier.Type.unboxed_int32
         | "int64_u" -> Identifier.Type.unboxed_int64
         | "int8x16" -> Identifier.Type.int8x16

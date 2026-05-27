@@ -371,9 +371,9 @@ type t : any mod global aliased many immutable stateless external_ = int32_u
 type t = int32_u
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = nativeint#
+type t : any mod global aliased many immutable stateless external_ = nativeint_u
 [%%expect{|
-type t = nativeint#
+type t = nativeint_u
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int8x16#
@@ -418,11 +418,11 @@ let x : (_ : value mod contended) = 10
 val x : int = 10
 |}]
 
-let f (x : nativeint#) =
+let f (x : nativeint_u) =
   let _ : (_ : word mod portable many aliased) = x in
   ()
 [%%expect {|
-val f : nativeint# -> unit = <fun>
+val f : nativeint_u -> unit = <fun>
 |}]
 
 type t_value : value

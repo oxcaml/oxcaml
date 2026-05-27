@@ -132,10 +132,10 @@ let () =
   Printf.printf "%d\n" (Int64_u.to_int r.i);
   print_newline ()
 
-type mixed_nativeint_record = { j : nativeint#; mutable i : nativeint# }
+type mixed_nativeint_record = { j : nativeint_u; mutable i : nativeint_u }
 
 let () =
-  print_endline "Mixed block record (nativeint# field)";
+  print_endline "Mixed block record (nativeint_u field)";
   let r = { j = -#100n; i = #1n } in
   let x = Idx_mut.get r (.i) in
   Printf.printf "%d\n" (Nativeint_u.to_int x);

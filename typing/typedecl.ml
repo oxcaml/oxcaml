@@ -4144,7 +4144,7 @@ let is_upstream_compatible_non_value_unbox env ty =
         Predef.path_unboxed_float;
         Predef.path_int32_u;
         Predef.path_int64_u;
-        Predef.path_unboxed_nativeint;
+        Predef.path_nativeint_u;
       ]
   | _ ->
     false

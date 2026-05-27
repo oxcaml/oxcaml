@@ -170,11 +170,11 @@ let () =
   ()
 
 (**********************************************************)
-(* Test 6: nativeint# field (flat type, not GC-scannable) *)
+(* Test 6: nativeint_u field (flat type, not GC-scannable) *)
 
-type pt_nativeint = { x : int; mutable y : nativeint# }
+type pt_nativeint = { x : int; mutable y : nativeint_u }
 
-let[@inline never] set_nativeint_field pt (y : nativeint#) =
+let[@inline never] set_nativeint_field pt (y : nativeint_u) =
   let y_addr = Int64_u.add (addr_of_value pt) #8L in
   set_ptr_local #(Null, y_addr) y
 
@@ -184,9 +184,9 @@ let[@inline never] get_nativeint_field pt =
   get_ptr_local #(Null, y_addr)
 
 let () =
-  print_endline "Test 6: nativeint# field (flat type)";
+  print_endline "Test 6: nativeint_u field (flat type)";
   let pt = stack_ { x = 10; y = #20n } in
-  let i : nativeint# = get_nativeint_field pt in
+  let i : nativeint_u = get_nativeint_field pt in
   Printf.printf "  get: expected 20, got %nd\n" (Nativeint_u.to_nativeint i);
   set_nativeint_field pt #200n;
   let pt = Sys.opaque_identity pt in

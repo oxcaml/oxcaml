@@ -33,23 +33,23 @@ type t =
   | Mixed2 of float * float#
   | Mixed3 of float * float# * float#
   | Mixed4 of string * float# * int32_u
-  | Mixed5 of float * float# * int * int32_u * nativeint# * int64_u
+  | Mixed5 of float * float# * int * int32_u * nativeint_u * int64_u
   | Mixed6 of float * int32_u * float#
-  | Mixed7 of float * int64_u * float# * nativeint#
+  | Mixed7 of float * int64_u * float# * nativeint_u
   | Mixed8 of float * int32_u * float# * int64_u * float#
   | Mixed9 of float * float# * float32#
   | Mixed10 of float * float32# * float# * int64_u * float#
-  | Mixed11 of float * int32_u * float32# * float# * int64_u * nativeint#
+  | Mixed11 of float * int32_u * float32# * float# * int64_u * nativeint_u
   | Uniform2 of float * float
   (* "I"mixed for "i"nlined records. *)
   | Imixed1 of { x1 : float# }
   | Imixed2 of { mutable x1 : float; mutable x2 : float# }
   | Imixed3 of { x1 : float; x2 : float#; x3 : float# }
   | Imixed4 of { mutable x1: string; mutable x2 : float#; mutable x3 : int32_u }
-  | Imixed5 of { x1: float; x2 : float#; x3 : int; x4: int32_u; x5 : nativeint#;
+  | Imixed5 of { x1: float; x2 : float#; x3 : int; x4: int32_u; x5 : nativeint_u;
                  x6 : int64_u }
   | Imixed6 of { mutable x1: float; mutable x2 : int32_u; mutable x3 : float# }
-  | Imixed7 of { x1: float; x2 : int64_u; x3 : float#; x4 : nativeint# }
+  | Imixed7 of { x1: float; x2 : int64_u; x3 : float#; x4 : nativeint_u }
   | Imixed8 of { mutable x1: float; mutable x2 : int32_u; mutable x3 : float#;
                  mutable x4 : int64_u; mutable x5 : float# }
   | Imixed9 of { x1: float; x2 : float#; x3 : float32# }
@@ -57,7 +57,7 @@ type t =
                   mutable x3 : float#; mutable x4 : int64_u; mutable x5 : float#
                 }
   | Imixed11 of { x1 : float; x2 : int32_u; x3 : float32#; x4 : float#;
-                  x5 : int64_u; x6 : nativeint# }
+                  x5 : int64_u; x6 : nativeint_u }
 
 let sprintf = Printf.sprintf
 

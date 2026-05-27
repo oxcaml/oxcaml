@@ -118,12 +118,12 @@ let int64u_array_element_size = size_in_bytes ([||] : int64_u array)
 let _ = check_int64u ~init:#42L ~element_size:int64u_array_element_size
 
 (* unboxed nativeints *)
-let check_nativeintu ~(init : nativeint#) ~element_size =
+let check_nativeintu ~(init : nativeint_u) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      Block_checks.check_empty_array_is_uniform ~array_type:"nativeint#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"nativeint_u" (Obj.repr x)
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
@@ -135,13 +135,13 @@ let check_nativeintu ~(init : nativeint#) ~element_size =
       assert (tag = expected_tag);
       (* Check mixed block has zero scannable fields *)
       match Sys.backend_type with
-      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"nativeint#" (Obj.repr x) 0
+      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"nativeint_u" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
   List.iter check_one array_sizes_to_check
 
-let nativeintu_array_element_size = size_in_bytes ([||] : nativeint# array)
+let nativeintu_array_element_size = size_in_bytes ([||] : nativeint_u array)
 
 let _ = check_nativeintu ~init:#42n ~element_size:nativeintu_array_element_size
 

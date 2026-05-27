@@ -81,14 +81,14 @@ type t9 = #{ a9 : float; b9 : float } (* #{ float; float } *)
 type t10 = { mutable a10 : int; mutable b10 : t9 } (* { int; #{ float; float } } *)
 type t11 = #{ a11 : int64x2#; b11 : int } (* #{ int64x2#; int } *)
 type t12 = { mutable a12 : int; mutable b12 : t11 } (* { int; #{ int64x2#; int } } *)
-type t13 = { mutable a13 : int64_u; mutable b13 : nativeint# } (* { int64_u; nativeint# } *)
+type t13 = { mutable a13 : int64_u; mutable b13 : nativeint_u } (* { int64_u; nativeint_u } *)
 type t14 = { mutable a14 : int32_u } (* { int32_u } *)
 type t15 = { mutable a15 : int32_u; mutable b15 : int } (* { int32_u; int } *)
 type t16 = { mutable a16 : int32_u; mutable b16 : int; mutable c16 : int } (* { int32_u; int; int } *)
 type t17 = { mutable a17 : int32_u; mutable b17 : int32_u } (* { int32_u; int32_u } *)
 type t18 = #{ a18 : int32_u; b18 : int32_u } (* #{ int32_u; int32_u } *)
 type t19 = { mutable a19 : int32_u; mutable b19 : t18 } (* { int32_u; #{ int32_u; int32_u } } *)
-type t20 = { mutable a20 : nativeint#; mutable b20 : nativeint# } (* { nativeint#; nativeint# } *)
+type t20 = { mutable a20 : nativeint_u; mutable b20 : nativeint_u } (* { nativeint_u; nativeint_u } *)
 type t21 = { mutable a21 : float } (* { float } *)
 type t22 = { mutable a22 : float; mutable b22 : int } (* { float; int } *)
 type t23 = { mutable a23 : float; mutable b23 : int; mutable c23 : int } (* { float; int; int } *)
@@ -821,9 +821,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*************************************)
-  (*   t13 = { int64_u; nativeint# }   *)
-  (*************************************)
+  (**************************************)
+  (*   t13 = { int64_u; nativeint_u }   *)
+  (**************************************)
   let r = stack_ { a13 = #0L; b13 = #1n } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -1234,9 +1234,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************************)
-  (*   t20 = { nativeint#; nativeint# }   *)
-  (****************************************)
+  (******************************************)
+  (*   t20 = { nativeint_u; nativeint_u }   *)
+  (******************************************)
   let r = stack_ { a20 = #0n; b20 = #1n } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)

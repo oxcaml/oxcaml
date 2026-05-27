@@ -63,7 +63,7 @@ type t5 = { mutable a5 : int; mutable b5 : t4 } (* { int; #{ int } } *)
 type t6 = #{ a6 : int; b6 : int } (* #{ int; int } *)
 type t7 = { mutable a7 : int; mutable b7 : t6 } (* { int; #{ int; int } } *)
 type t8 = { mutable a8 : int64 } (* { int64 } *)
-type t9 = { mutable a9 : int64; mutable b9 : nativeint# } (* { int64; nativeint# } *)
+type t9 = { mutable a9 : int64; mutable b9 : nativeint_u } (* { int64; nativeint_u } *)
 type t10 = { mutable a10 : int64; mutable b10 : unit_u } (* { int64; unit_u } *)
 type t11 = { mutable a11 : int32_u; mutable b11 : int } (* { int32_u; int } *)
 type t12 = { mutable a12 : int32_u; mutable b12 : int; mutable c12 : int32_u } (* { int32_u; int; int32_u } *)
@@ -72,7 +72,7 @@ type t14 = #{ a14 : int; b14 : int32_u } (* #{ int; int32_u } *)
 type t15 = { mutable a15 : int32_u; mutable b15 : t14 } (* { int32_u; #{ int; int32_u } } *)
 type t16 = #{ a16 : int32_u; b16 : int32_u } (* #{ int32_u; int32_u } *)
 type t17 = { mutable a17 : int32_u; mutable b17 : t16 } (* { int32_u; #{ int32_u; int32_u } } *)
-type t18 = { mutable a18 : nativeint#; mutable b18 : int64_u } (* { nativeint#; int64_u } *)
+type t18 = { mutable a18 : nativeint_u; mutable b18 : int64_u } (* { nativeint_u; int64_u } *)
 type t19 = { mutable a19 : unit_u; mutable b19 : int32_u } (* { unit_u; int32_u } *)
 type t20 = { mutable a20 : unit_u; mutable b20 : string; mutable c20 : string } (* { unit_u; string; string } *)
 type t21 = { mutable a21 : float; mutable b21 : int; mutable c21 : float } (* { float; int; float } *)
@@ -94,7 +94,7 @@ type t36 = { mutable a36 : string; mutable b36 : t35 } (* { string; #{ string; s
 type v37 = C37_0 of unit_u (* (| unit_u) *)
 type t38 = { mutable a38 : v37; mutable b38 : int64_u } (* { (| unit_u); int64_u } *)
 type t39 = { mutable a39 : v37; mutable b39 : int32_u } (* { (| unit_u); int32_u } *)
-type t40 = { mutable a40 : v37; mutable b40 : nativeint# } (* { (| unit_u); nativeint# } *)
+type t40 = { mutable a40 : v37; mutable b40 : nativeint_u } (* { (| unit_u); nativeint_u } *)
 type t41 = { mutable a41 : t4; mutable b41 : int } (* { #{ int }; int } *)
 type t42 = { mutable a42 : t6; mutable b42 : int32_u } (* { #{ int; int }; int32_u } *)
 type t43 = { mutable a43 : t14; mutable b43 : int } (* { #{ int; int32_u }; int } *)
@@ -208,9 +208,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (**********************************)
-  (*   t9 = { int64; nativeint# }   *)
-  (**********************************)
+  (***********************************)
+  (*   t9 = { int64; nativeint_u }   *)
+  (***********************************)
   let r = { a9 = 0L; b9 = #1n } in
   mark_test_run 8;
   let test = Int.equal (Obj.size (Obj.repr r)) 2 in
@@ -299,9 +299,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*************************************)
-  (*   t18 = { nativeint#; int64_u }   *)
-  (*************************************)
+  (**************************************)
+  (*   t18 = { nativeint_u; int64_u }   *)
+  (**************************************)
   let r = { a18 = #0n; b18 = #1L } in
   mark_test_run 15;
   let test = Int.equal (Obj.size (Obj.repr r)) 2 in
@@ -520,9 +520,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************************)
-  (*   t40 = { (| unit_u); nativeint# }   *)
-  (****************************************)
+  (*****************************************)
+  (*   t40 = { (| unit_u); nativeint_u }   *)
+  (*****************************************)
   let r = { a40 = (C37_0 (unbox_unit ())); b40 = #0n } in
   mark_test_run 32;
   let test = Int.equal (Obj.size (Obj.repr r)) 2 in

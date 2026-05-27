@@ -56,7 +56,7 @@ let ref_to_force_heap_allocation : packed ref = ref (P 0)
 
 type t0 = { mutable a0 : int; mutable b0 : unit_u } (* { int; unit_u } *)
 type t1 = { mutable a1 : int32_u; mutable b1 : unit_u } (* { int32_u; unit_u } *)
-type t2 = { mutable a2 : nativeint#; mutable b2 : unit_u } (* { nativeint#; unit_u } *)
+type t2 = { mutable a2 : nativeint_u; mutable b2 : unit_u } (* { nativeint_u; unit_u } *)
 type t3 = { mutable a3 : unit_u; mutable b3 : unit_u; mutable c3 : string } (* { unit_u; unit_u; string } *)
 type t4 = { mutable a4 : unit_u; mutable b4 : float } (* { unit_u; float } *)
 type t5 = { mutable a5 : unit_u; mutable b5 : string; mutable c5 : string } (* { unit_u; string; string } *)
@@ -207,9 +207,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (***********************************)
-  (*   t2 = { nativeint#; unit_u }   *)
-  (***********************************)
+  (************************************)
+  (*   t2 = { nativeint_u; unit_u }   *)
+  (************************************)
   let r = stack_ { a2 = #0n; b2 = (unbox_unit ()) } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)

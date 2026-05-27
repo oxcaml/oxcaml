@@ -115,9 +115,9 @@ type t_unboxed_float = <[float#]>;;
 type t_unboxed_float = <[float#]>
 |}];;
 
-type t_unboxed_nativeint = <[nativeint#]>;;
+type t_unboxed_nativeint = <[nativeint_u]>;;
 [%%expect {|
-type t_unboxed_nativeint = <[nativeint#]>
+type t_unboxed_nativeint = <[nativeint_u]>
 |}];;
 
 type t_unboxed_int32 = <[int32_u]>;;

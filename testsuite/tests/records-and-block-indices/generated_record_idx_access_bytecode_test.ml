@@ -55,7 +55,7 @@ type packed = P : 'a -> packed
 let ref_to_force_heap_allocation : packed ref = ref (P 0)
 
 type t0 = { mutable a0 : int } (* { int } *)
-type t1 = { mutable a1 : int; mutable b1 : nativeint# } (* { int; nativeint# } *)
+type t1 = { mutable a1 : int; mutable b1 : nativeint_u } (* { int; nativeint_u } *)
 type t2 = { mutable a2 : int; mutable b2 : float } (* { int; float } *)
 type t3 = #{ a3 : int } (* #{ int } *)
 type t4 = { mutable a4 : int; mutable b4 : t3 } (* { int; #{ int } } *)
@@ -74,8 +74,8 @@ type t16 = #{ a16 : int32_u; b16 : int } (* #{ int32_u; int } *)
 type t17 = { mutable a17 : int32_u; mutable b17 : t16 } (* { int32_u; #{ int32_u; int } } *)
 type t18 = #{ a18 : int32_u; b18 : int32_u } (* #{ int32_u; int32_u } *)
 type t19 = { mutable a19 : int32_u; mutable b19 : t18 } (* { int32_u; #{ int32_u; int32_u } } *)
-type t20 = { mutable a20 : nativeint#; mutable b20 : int64_u } (* { nativeint#; int64_u } *)
-type t21 = { mutable a21 : nativeint#; mutable b21 : int32_u } (* { nativeint#; int32_u } *)
+type t20 = { mutable a20 : nativeint_u; mutable b20 : int64_u } (* { nativeint_u; int64_u } *)
+type t21 = { mutable a21 : nativeint_u; mutable b21 : int32_u } (* { nativeint_u; int32_u } *)
 type t22 = { mutable a22 : unit_u; mutable b22 : float } (* { unit_u; float } *)
 type t23 = { mutable a23 : float } (* { float } *)
 type t24 = { mutable a24 : float; mutable b24 : int } (* { float; int } *)
@@ -139,9 +139,9 @@ let to_run () =
   mark_test_run 2;
   let test = sub_eq (Idx_mut.get r ((.a0) : (t0, _) idx_mut)) next_r.a0 in
   if not test then failwithf "test 2 failed";
-  (********************************)
-  (*   t1 = { int; nativeint# }   *)
-  (********************************)
+  (*********************************)
+  (*   t1 = { int; nativeint_u }   *)
+  (*********************************)
   let eq = (fun { a1 = a11; b1 = b11 } { a1 = a12; b1 = b12 } -> (fun a b -> Int.equal a b) a11 a12 && (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) b11 b12) in
   let r = { a1 = 0; b1 = #1n } in
   (* Paths of depth 1 *)
@@ -640,9 +640,9 @@ let to_run () =
   mark_test_run 74;
   let test = sub_eq (Idx_mut.get r ((.b19.#b18) : (t19, _) idx_mut)) next_r.b19.#b18 in
   if not test then failwithf "test 74 failed";
-  (*************************************)
-  (*   t20 = { nativeint#; int64_u }   *)
-  (*************************************)
+  (**************************************)
+  (*   t20 = { nativeint_u; int64_u }   *)
+  (**************************************)
   let eq = (fun { a20 = a201; b20 = b201 } { a20 = a202; b20 = b202 } -> (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) a201 a202 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) b201 b202) in
   let r = { a20 = #0n; b20 = #1L } in
   (* Paths of depth 1 *)
@@ -670,9 +670,9 @@ let to_run () =
   mark_test_run 78;
   let test = sub_eq (Idx_mut.get r ((.b20) : (t20, _) idx_mut)) next_r.b20 in
   if not test then failwithf "test 78 failed";
-  (*************************************)
-  (*   t21 = { nativeint#; int32_u }   *)
-  (*************************************)
+  (**************************************)
+  (*   t21 = { nativeint_u; int32_u }   *)
+  (**************************************)
   let eq = (fun { a21 = a211; b21 = b211 } { a21 = a212; b21 = b212 } -> (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) a211 a212 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) b211 b212) in
   let r = { a21 = #0n; b21 = #1l } in
   (* Paths of depth 1 *)

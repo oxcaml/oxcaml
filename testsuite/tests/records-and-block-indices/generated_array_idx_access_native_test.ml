@@ -70,8 +70,8 @@ let ref_to_force_heap_allocation : packed ref = ref (P 0)
 
 type t0 = #{ a0 : int; b0 : int } (* #{ int; int } *)
 type t1 = #{ a1 : int; b1 : int64 } (* #{ int; int64 } *)
-type t2 = #{ a2 : int32_u; b2 : nativeint# } (* #{ int32_u; nativeint# } *)
-type t3 = #{ a3 : nativeint#; b3 : nativeint# } (* #{ nativeint#; nativeint# } *)
+type t2 = #{ a2 : int32_u; b2 : nativeint_u } (* #{ int32_u; nativeint_u } *)
+type t3 = #{ a3 : nativeint_u; b3 : nativeint_u } (* #{ nativeint_u; nativeint_u } *)
 type t4 = #{ a4 : float#; b4 : float# } (* #{ float#; float# } *)
 type t5 = #{ a5 : float# } (* #{ float# } *)
 type t6 = #{ a6 : float#; b6 : t5 } (* #{ float#; #{ float# } } *)
@@ -263,9 +263,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (*************************************)
-  (*   t2 = #{ int32_u; nativeint# }   *)
-  (*************************************)
+  (**************************************)
+  (*   t2 = #{ int32_u; nativeint_u }   *)
+  (**************************************)
   let eq = (fun #{ a2 = a21; b2 = b21 } #{ a2 = a22; b2 = b22 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a21 a22 && (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) b21 b22) in
   let mk_value i = #{ a2 = Int32_u.of_int (i + 0); b2 = Nativeint_u.of_int (i + 1) } in
   (* Create an array of size [size] *)
@@ -309,9 +309,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (****************************************)
-  (*   t3 = #{ nativeint#; nativeint# }   *)
-  (****************************************)
+  (******************************************)
+  (*   t3 = #{ nativeint_u; nativeint_u }   *)
+  (******************************************)
   let eq = (fun #{ a3 = a31; b3 = b31 } #{ a3 = a32; b3 = b32 } -> (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) a31 a32 && (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) b31 b32) in
   let mk_value i = #{ a3 = Nativeint_u.of_int (i + 0); b3 = Nativeint_u.of_int (i + 1) } in
   (* Create an array of size [size] *)

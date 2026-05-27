@@ -40,10 +40,10 @@ module _ = Test_gen_u_array.Test (Nativeint_array)
 
 
 module Nativeint_u_array0 : Gen_u_array.S0
-                            with type element_t = nativeint#
+                            with type element_t = nativeint_u
                             and type ('a : any) array_t = 'a array = struct
 
-  type element_t = nativeint#
+  type element_t = nativeint_u
   type ('a : any) array_t = 'a array
   type element_arg = unit -> element_t
   type t = element_t array

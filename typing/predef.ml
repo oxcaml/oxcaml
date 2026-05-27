@@ -46,6 +46,7 @@ and ident_iarray = ident_create "iarray"
 and ident_list = ident_create "list"
 and ident_option = ident_create "option"
 and ident_nativeint = ident_create "nativeint"
+and ident_nativeint_u = ident_create "nativeint_u"
 and ident_int8 = ident_create "int8"
 and ident_int16 = ident_create "int16"
 and ident_int32 = ident_create "int32"
@@ -103,6 +104,7 @@ and path_iarray = Pident ident_iarray
 and path_list = Pident ident_list
 and path_option = Pident ident_option
 and path_nativeint = Pident ident_nativeint
+and path_nativeint_u = Pident ident_nativeint_u
 and path_int8 = Pident ident_int8
 and path_int16 = Pident ident_int16
 and path_int32 = Pident ident_int32
@@ -149,7 +151,6 @@ let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_unit = Path.unboxed_version path_unit
 and path_unboxed_bool = Path.unboxed_version path_bool
 and path_unboxed_float32 = Path.unboxed_version path_float32
-and path_unboxed_nativeint = Path.unboxed_version path_nativeint
 and path_unboxed_char = Path.unboxed_version path_char
 and path_unboxed_int = Path.unboxed_version path_int
 and path_unboxed_int8 = Path.unboxed_version path_int8
@@ -192,6 +193,7 @@ and type_iarray t = newgenty (Tconstr(path_iarray, [t], ref Mnil))
 and type_list t = newgenty (Tconstr(path_list, [t], ref Mnil))
 and type_option t = newgenty (Tconstr(path_option, [t], ref Mnil))
 and type_nativeint = newgenty (Tconstr(path_nativeint, [], ref Mnil))
+and type_nativeint_u = newgenty (Tconstr(path_nativeint_u, [], ref Mnil))
 and type_int32 = newgenty (Tconstr(path_int32, [], ref Mnil))
 and type_int64 = newgenty (Tconstr(path_int64, [], ref Mnil))
 and type_int32_u = newgenty (Tconstr(path_int32_u, [], ref Mnil))
@@ -211,8 +213,6 @@ and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
 and type_unboxed_bool = newgenty (Tconstr(path_unboxed_bool, [], ref Mnil))
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
-and type_unboxed_nativeint =
-      newgenty (Tconstr(path_unboxed_nativeint, [], ref Mnil))
 and type_unboxed_char = newgenty (Tconstr(path_unboxed_char, [], ref Mnil))
 and type_unboxed_int = newgenty (Tconstr(path_unboxed_int, [], ref Mnil))
 and type_unboxed_int8 = newgenty (Tconstr(path_unboxed_int8, [], ref Mnil))
@@ -663,7 +663,8 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~jkind:list_jkind
   |> add_type ident_nativeint
       ~jkind:Jkind.Const.Builtin.immutable_data
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
+  |> add_type ident_nativeint_u
+       ~jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
   |> add_type1 ident_option
        ~variance:Variance.covariant
        ~separability:Separability.Ind

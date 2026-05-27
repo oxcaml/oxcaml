@@ -101,10 +101,10 @@ let test_empty_arrays () =
     (Obj.repr empty_float32);
 
   let empty_nativeint =
-    check_allocation "empty nativeint#" false
-      (fun () -> ([| |] : nativeint# array))
+    check_allocation "empty nativeint_u" false
+      (fun () -> ([| |] : nativeint_u array))
   in
-  Block_checks.check_empty_array_is_uniform ~array_type:"empty nativeint#"
+  Block_checks.check_empty_array_is_uniform ~array_type:"empty nativeint_u"
     (Obj.repr empty_nativeint);
 
   let empty_float =
@@ -334,12 +334,12 @@ let test_float32_arrays () =
 
   Printf.printf "float32# array tests passed\n"
 
-(* Test nativeint# arrays *)
+(* Test nativeint_u arrays *)
 let test_nativeint_arrays () =
-  Printf.printf "\nTesting nativeint# arrays:\n";
+  Printf.printf "\nTesting nativeint_u arrays:\n";
 
   let arr1 =
-    check_allocation "nativeint# [42n]" false (fun () -> [: #42n :])
+    check_allocation "nativeint_u [42n]" false (fun () -> [: #42n :])
   in
   let tag1 = Obj.tag (Obj.repr arr1) in
   let expected_tag =
@@ -351,11 +351,11 @@ let test_nativeint_arrays () =
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"nativeint# single" (Obj.repr arr1) 0
+         ~array_type:"nativeint_u single" (Obj.repr arr1) 0
    | Bytecode | Other _ -> ());
 
   let arr2 =
-    check_allocation "nativeint# [1n; 2n; 3n]" false
+    check_allocation "nativeint_u [1n; 2n; 3n]" false
       (fun () -> [: #1n; #2n; #3n :])
   in
   let tag2 = Obj.tag (Obj.repr arr2) in
@@ -363,10 +363,10 @@ let test_nativeint_arrays () =
   (match Sys.backend_type with
    | Native ->
        Block_checks.check_mixed_block_scannable_size
-         ~array_type:"nativeint# triple" (Obj.repr arr2) 0
+         ~array_type:"nativeint_u triple" (Obj.repr arr2) 0
    | Bytecode | Other _ -> ());
 
-  Printf.printf "nativeint# array tests passed\n"
+  Printf.printf "nativeint_u array tests passed\n"
 
 (* Test float# arrays *)
 let test_float_arrays () =

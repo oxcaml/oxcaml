@@ -4,7 +4,7 @@ external getenv : string -> string = "caml_sys_getenv"
 
 type t_int64 = { x : int64_u; y : int }
 type t_int32 = { x : int32_u; y : int }
-type t_nativeint = { x : nativeint#; y : int }
+type t_nativeint = { x : nativeint_u; y : int }
 type t_float = { x : float#; y : int }
 type t_float32 = { x : float32#; y : int }
 
@@ -35,6 +35,6 @@ let unboxed_float32 : t_float32 =
 
 let the_unboxed_int64 : int64_u = unboxed_int64.x
 let the_unboxed_int32 : int32_u = unboxed_int32.x
-let the_unboxed_nativeint : nativeint# = unboxed_nativeint.x
+let the_unboxed_nativeint : nativeint_u = unboxed_nativeint.x
 let the_unboxed_float : float# = unboxed_float.x
 let the_unboxed_float32 : float32# = unboxed_float32.x

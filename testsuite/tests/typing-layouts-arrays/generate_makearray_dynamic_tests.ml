@@ -267,7 +267,7 @@ end = struct
   }
 
   let nativeint_u = {
-    ty_code = "nativeint#";
+    ty_code = "nativeint_u";
     value_code = (fun i -> "#" ^ Int.to_string i ^ "n");
     mk_value_code = "Nativeint_u.of_int i";
     eq = "(fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b)))";

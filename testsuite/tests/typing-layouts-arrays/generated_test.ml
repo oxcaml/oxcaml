@@ -89,7 +89,7 @@ let () =
   let _ : float# = #0. in
   let _ : int32_u = #0l in
   let _ : int64_u = #0L in
-  let _ : nativeint# = #0n in
+  let _ : nativeint_u = #0n in
   let _ : ur1 = (#{ a = #0L; b = #0. } : ur1) in
   let _ : ur3 = (#{ a = #0L } : ur3) in
   let _ : ur4 = (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
@@ -156,7 +156,7 @@ let () =
   mark_test_run 12;
   let test = not (eq #1L #2L) in
   if not test then failwithf "test 12 failed";
-  let eq : nativeint# @ local -> nativeint# @ local -> bool = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
+  let eq : nativeint_u @ local -> nativeint_u @ local -> bool = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   mark_test_run 13;
   let test = eq (mk_value 1) #1n in
@@ -403,7 +403,7 @@ let () =
   let _ = (makearray_dynamic_uninit 1 : float# array) in
   let _ = (makearray_dynamic_uninit 1 : int32_u array) in
   let _ = (makearray_dynamic_uninit 1 : int64_u array) in
-  let _ = (makearray_dynamic_uninit 1 : nativeint# array) in
+  let _ = (makearray_dynamic_uninit 1 : nativeint_u array) in
   let _ = (makearray_dynamic_uninit 1 : ur1 array) in
   let _ = (makearray_dynamic_uninit 1 : ur3 array) in
   let _ = (makearray_dynamic_uninit 1 : ur4 array) in
@@ -866,13 +866,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic size #0n in
+  let a : nativeint_u array = makearray_dynamic size #0n in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -3807,13 +3807,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic_local size #0n in
+  let a : nativeint_u array = makearray_dynamic_local size #0n in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -6744,13 +6744,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic_uninit size in
+  let a : nativeint_u array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7979,13 +7979,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic_uninit_local size in
+  let a : nativeint_u array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do

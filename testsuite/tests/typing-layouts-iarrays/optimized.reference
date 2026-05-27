@@ -23,7 +23,7 @@ Length: 5
 Elements: 0 1 2 3 4 
 Unsafe get: 0 1 2 3 4 
 Out of bounds access raised Invalid_argument
-Testing nativeint#
+Testing nativeint_u
 Length: 5
 Elements: 0 1 2 3 4 
 Unsafe get: 0 1 2 3 4 

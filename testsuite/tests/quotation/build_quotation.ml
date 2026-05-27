@@ -619,7 +619,7 @@ Error: Identifier "Int'" is used at line 2, characters 27-31,
 
 <[ fun () -> #25n ]>;;
 [%%expect {|
-- : <[unit -> nativeint#]> expr = <[fun () -> #25n]>
+- : <[unit -> nativeint_u]> expr = <[fun () -> #25n]>
 |}];;
 
 <[ fun () -> #25l ]>;;

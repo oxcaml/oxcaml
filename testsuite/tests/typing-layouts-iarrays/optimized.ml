@@ -120,7 +120,7 @@ let test_int64 () =
   
 
 let test_nativeint () =
-  Printf.printf "Testing nativeint#\n";
+  Printf.printf "Testing nativeint_u\n";
   let len = 5 in
   let arr_mut = make_mutable len (Nativeint_u.of_nativeint 0n) in
   for i = 0 to len - 1 do

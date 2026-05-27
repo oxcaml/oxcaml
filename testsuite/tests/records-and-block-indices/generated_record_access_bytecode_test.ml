@@ -65,7 +65,7 @@ type t7 = #{ a7 : float } (* #{ float } *)
 type t8 = { mutable a8 : int; mutable b8 : t7 } (* { int; #{ float } } *)
 type t9 = { mutable a9 : int64; mutable b9 : int64 } (* { int64; int64 } *)
 type t10 = { mutable a10 : int64_u; mutable b10 : int } (* { int64_u; int } *)
-type t11 = { mutable a11 : int64_u; mutable b11 : nativeint# } (* { int64_u; nativeint# } *)
+type t11 = { mutable a11 : int64_u; mutable b11 : nativeint_u } (* { int64_u; nativeint_u } *)
 type t12 = { mutable a12 : int32_u } (* { int32_u } *)
 type t13 = { mutable a13 : int32_u; mutable b13 : int } (* { int32_u; int } *)
 type t14 = { mutable a14 : int32_u; mutable b14 : int64 } (* { int32_u; int64 } *)
@@ -73,10 +73,10 @@ type t15 = { mutable a15 : int32_u; mutable b15 : int32_u; mutable c15 : int32_u
 type t16 = { mutable a16 : int32_u; mutable b16 : float } (* { int32_u; float } *)
 type t17 = #{ a17 : int32_u } (* #{ int32_u } *)
 type t18 = { mutable a18 : int32_u; mutable b18 : t17 } (* { int32_u; #{ int32_u } } *)
-type t19 = { mutable a19 : nativeint# } (* { nativeint# } *)
-type t20 = { mutable a20 : nativeint#; mutable b20 : int } (* { nativeint#; int } *)
-type t21 = { mutable a21 : nativeint#; mutable b21 : int64_u } (* { nativeint#; int64_u } *)
-type t22 = { mutable a22 : nativeint#; mutable b22 : nativeint# } (* { nativeint#; nativeint# } *)
+type t19 = { mutable a19 : nativeint_u } (* { nativeint_u } *)
+type t20 = { mutable a20 : nativeint_u; mutable b20 : int } (* { nativeint_u; int } *)
+type t21 = { mutable a21 : nativeint_u; mutable b21 : int64_u } (* { nativeint_u; int64_u } *)
+type t22 = { mutable a22 : nativeint_u; mutable b22 : nativeint_u } (* { nativeint_u; nativeint_u } *)
 type t23 = { mutable a23 : float; mutable b23 : int } (* { float; int } *)
 type t24 = { mutable a24 : float; mutable b24 : float; mutable c24 : int } (* { float; float; int } *)
 type t25 = #{ a25 : float; b25 : float# } (* #{ float; float# } *)
@@ -713,9 +713,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*************************************)
-  (*   t11 = { int64_u; nativeint# }   *)
-  (*************************************)
+  (**************************************)
+  (*   t11 = { int64_u; nativeint_u }   *)
+  (**************************************)
   let r = { a11 = #0L; b11 = #1n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1203,9 +1203,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************)
-  (*   t19 = { nativeint# }   *)
-  (****************************)
+  (*****************************)
+  (*   t19 = { nativeint_u }   *)
+  (*****************************)
   let r = { a19 = #0n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1250,9 +1250,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*********************************)
-  (*   t20 = { nativeint#; int }   *)
-  (*********************************)
+  (**********************************)
+  (*   t20 = { nativeint_u; int }   *)
+  (**********************************)
   let r = { a20 = #0n; b20 = 1 } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1319,9 +1319,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*************************************)
-  (*   t21 = { nativeint#; int64_u }   *)
-  (*************************************)
+  (**************************************)
+  (*   t21 = { nativeint_u; int64_u }   *)
+  (**************************************)
   let r = { a21 = #0n; b21 = #1L } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1388,9 +1388,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************************)
-  (*   t22 = { nativeint#; nativeint# }   *)
-  (****************************************)
+  (******************************************)
+  (*   t22 = { nativeint_u; nativeint_u }   *)
+  (******************************************)
   let r = { a22 = #0n; b22 = #1n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)

@@ -20,7 +20,7 @@ type t_any_mod_separable : any mod separable
 type t1 = float# iarray
 type t2 = int32_u iarray
 type t3 = int64_u iarray
-type t4 = nativeint# iarray
+type t4 = nativeint_u iarray
 type t5 = t_any_mod_separable iarray
 type t6 = float32# iarray
 
@@ -36,7 +36,7 @@ type t_any_mod_separable : any separable
 type t1 = float# iarray
 type t2 = int32_u iarray
 type t3 = int64_u iarray
-type t4 = nativeint# iarray
+type t4 = nativeint_u iarray
 type t5 = t_any_mod_separable iarray
 type t6 = float32# iarray
 type ('a : float64) t1' = 'a iarray
@@ -70,7 +70,7 @@ val v3 : int64_u iarray = [:<abstr>:]
 
 let v4 = [: #1n :]
 [%%expect{|
-val v4 : nativeint# iarray = [:<abstr>:]
+val v4 : nativeint_u iarray = [:<abstr>:]
 |}];;
 
 let v5 = [: #1.s :]
@@ -157,14 +157,14 @@ Error: Floatarray primitives can't be used on arrays containing
        unboxed types.
 |}];;
 
-external get : nativeint# iarray -> int -> float = "%floatarray_safe_get"
-let d (x : nativeint# iarray) = get x 0
+external get : nativeint_u iarray -> int -> float = "%floatarray_safe_get"
+let d (x : nativeint_u iarray) = get x 0
 
 [%%expect{|
-external get : nativeint# iarray -> int -> float = "%floatarray_safe_get"
-Line 2, characters 32-39:
-2 | let d (x : nativeint# iarray) = get x 0
-                                    ^^^^^^^
+external get : nativeint_u iarray -> int -> float = "%floatarray_safe_get"
+Line 2, characters 33-40:
+2 | let d (x : nativeint_u iarray) = get x 0
+                                     ^^^^^^^
 Error: Floatarray primitives can't be used on arrays containing
        unboxed types.
 |}];;
@@ -189,7 +189,7 @@ external[@layout_poly] get :
 let f1 (x : float# iarray) = get x 0
 let f2 (x : int32_u iarray) = get x 0
 let f3 (x : int64_u iarray) = get x 0
-let f4 (x : nativeint# iarray) = get x 0
+let f4 (x : nativeint_u iarray) = get x 0
 let f5 (x : float32# iarray) = get x 0
 
 [%%expect{|
@@ -198,7 +198,7 @@ external get : ('a : any separable). 'a iarray -> int -> 'a
 val f1 : float# iarray -> float# = <fun>
 val f2 : int32_u iarray -> int32_u = <fun>
 val f3 : int64_u iarray -> int64_u = <fun>
-val f4 : nativeint# iarray -> nativeint# = <fun>
+val f4 : nativeint_u iarray -> nativeint_u = <fun>
 val f5 : float32# iarray -> float32# = <fun>
 |}];;
 
@@ -316,11 +316,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42n in
                                            ^^^^
-Error: This expression has type "nativeint#"
+Error: This expression has type "nativeint_u"
        but an expression was expected of type "('a : value_maybe_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
+       The layout of nativeint_u is word
+         because it is the primitive type nativeint_u.
+       But the layout of nativeint_u must be a value layout
          because it's the type of an array element.
 |}]
 

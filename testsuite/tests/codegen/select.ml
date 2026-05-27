@@ -100,7 +100,7 @@ select_int64:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_nativeint b (x : nativeint#) (y : nativeint#) =
+let select_nativeint b (x : nativeint_u) (y : nativeint_u) =
   Builtins.select_nativeint b x y
 [%%expect_asm X86_64{|
 select_nativeint:

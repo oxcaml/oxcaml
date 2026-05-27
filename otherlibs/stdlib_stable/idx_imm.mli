@@ -55,6 +55,6 @@ external unsafe_create_into_iarray_indexed_by_int64
 [@@layout_poly]
 
 external unsafe_create_into_iarray_indexed_by_nativeint
-  : ('a : any mod non_float). nativeint# -> ('a iarray, 'a) idx_imm
+  : ('a : any mod non_float). nativeint_u -> ('a iarray, 'a) idx_imm
   = "%unsafe_array_idx_indexed_by_nativeint#"
 [@@layout_poly]

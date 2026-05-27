@@ -232,7 +232,7 @@ float_unsafe_set_plain:
   ret
 |}]
 
-let nativeint_unsafe_get (a : nativeint# array) (i : int) =
+let nativeint_unsafe_get (a : nativeint_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 nativeint_unsafe_get:
@@ -240,8 +240,8 @@ nativeint_unsafe_get:
   ret
 |}]
 
-let nativeint_unsafe_set (a : nativeint# array) (i : int)
-    (v : nativeint#) =
+let nativeint_unsafe_set (a : nativeint_u array) (i : int)
+    (v : nativeint_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 nativeint_unsafe_set:

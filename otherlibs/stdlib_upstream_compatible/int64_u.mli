@@ -205,11 +205,11 @@ val to_int32_u : t -> int32_u
    is taken modulo 2{^32}, i.e. the top 32 bits are lost
    during the conversion.  *)
 
-val of_nativeint_u : nativeint# -> t
+val of_nativeint_u : nativeint_u -> t
 (** Convert the given unboxed native integer (type [nativeint])
    to an unboxed 64-bit integer (type [int64_u]). *)
 
-val to_nativeint_u : t -> nativeint#
+val to_nativeint_u : t -> nativeint_u
 (** Convert the given unboxed 64-bit integer (type [int64_u]) to an
    unboxed native integer.  On 32-bit platforms, the 64-bit integer
    is taken modulo 2{^32}.  On 64-bit platforms,

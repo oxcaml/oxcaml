@@ -8,7 +8,7 @@ empty int16#: OK - no allocation
 empty int8#: OK - no allocation
 empty int#: OK - no allocation
 empty float32#: OK - no allocation
-empty nativeint#: OK - no allocation
+empty nativeint_u: OK - no allocation
 empty float#: OK - no allocation
 Empty array tests passed
 
@@ -55,10 +55,10 @@ float32# [1.0s; 2.0s]: OK - no allocation
 float32# [1.0s; 2.0s; 3.0s]: OK - no allocation
 float32# array tests passed
 
-Testing nativeint# arrays:
-nativeint# [42n]: OK - no allocation
-nativeint# [1n; 2n; 3n]: OK - no allocation
-nativeint# array tests passed
+Testing nativeint_u arrays:
+nativeint_u [42n]: OK - no allocation
+nativeint_u [1n; 2n; 3n]: OK - no allocation
+nativeint_u array tests passed
 
 Testing float# arrays:
 float# [42.0]: OK - no allocation

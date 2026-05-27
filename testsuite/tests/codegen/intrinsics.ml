@@ -104,7 +104,7 @@ module Nativeint = struct
 end
 
 module Nativeint_u = struct
-  type t = nativeint#
+  type t = nativeint_u
 
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable =
     "%box_nativeint" [@@warning "-187"]
@@ -529,7 +529,7 @@ module Int16_u = struct
   external of_int8_u : int8# -> t @@ portable = "%int16#_of_int8#"
   external of_nativeint : (nativeint[@local_opt]) -> t @@ portable
     = "%int16#_of_nativeint"
-  external of_nativeint_u : nativeint# -> t @@ portable
+  external of_nativeint_u : nativeint_u -> t @@ portable
     = "%int16#_of_nativeint#"
   external to_float : t -> (float[@local_opt]) @@ portable = "%float_of_int16#"
   external to_float_u : t -> float# @@ portable = "%float#_of_int16#"
@@ -547,7 +547,7 @@ module Int16_u = struct
   external to_int8_u : t -> int8# @@ portable = "%int8#_of_int16#"
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
     = "%nativeint_of_int16#"
-  external to_nativeint_u : t -> nativeint# @@ portable
+  external to_nativeint_u : t -> nativeint_u @@ portable
     = "%nativeint#_of_int16#"
 
   external popcount : t -> t = "" "caml_popcnt_int16"
@@ -623,7 +623,7 @@ module Int8_u = struct
   external of_int8 : int8 -> t @@ portable = "%int8#_of_int8"
   external of_nativeint : (nativeint[@local_opt]) -> t @@ portable
     = "%int8#_of_nativeint"
-  external of_nativeint_u : nativeint# -> t @@ portable = "%int8#_of_nativeint#"
+  external of_nativeint_u : nativeint_u -> t @@ portable = "%int8#_of_nativeint#"
   external to_float : t -> (float[@local_opt]) @@ portable = "%float_of_int8#"
   external to_float_u : t -> float# @@ portable = "%float#_of_int8#"
   external to_float32 : t -> (float32[@local_opt]) @@ portable
@@ -640,7 +640,7 @@ module Int8_u = struct
   external to_int8 : t -> int8 @@ portable = "%int8_of_int8#"
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
     = "%nativeint_of_int8#"
-  external to_nativeint_u : t -> nativeint# @@ portable = "%nativeint#_of_int8#"
+  external to_nativeint_u : t -> nativeint_u @@ portable = "%nativeint#_of_int8#"
 
   external popcount : t -> t = "" "caml_int8_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
@@ -1038,8 +1038,8 @@ module Builtins = struct
     [@@warning "-187"]
 
   external select_nativeint :
-    bool -> (nativeint#[@unboxed]) -> (nativeint#[@unboxed])
-    -> (nativeint#[@unboxed]) @@ portable
+    bool -> (nativeint_u[@unboxed]) -> (nativeint_u[@unboxed])
+    -> (nativeint_u[@unboxed]) @@ portable
     = "caml_csel_value" "caml_csel_nativeint_unboxed"
     [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
     [@@warning "-187"]
@@ -1203,82 +1203,82 @@ module Builtins = struct
   (* Native pointer load/store *)
 
   external native_pointer_load_int64 :
-    nativeint# -> int64_u
+    nativeint_u -> int64_u
     = "" "caml_native_pointer_load_unboxed_int64"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_int64 :
-    nativeint# -> int64_u -> unit
+    nativeint_u -> int64_u -> unit
     = "" "caml_native_pointer_store_unboxed_int64"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_int32 :
-    nativeint# -> int32_u
+    nativeint_u -> int32_u
     = "" "caml_native_pointer_load_unboxed_int32"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_int32 :
-    nativeint# -> int32_u -> unit
+    nativeint_u -> int32_u -> unit
     = "" "caml_native_pointer_store_unboxed_int32"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_nativeint :
-    nativeint# -> nativeint#
+    nativeint_u -> nativeint_u
     = "" "caml_native_pointer_load_unboxed_nativeint"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_nativeint :
-    nativeint# -> nativeint# -> unit
+    nativeint_u -> nativeint_u -> unit
     = "" "caml_native_pointer_store_unboxed_nativeint"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_float :
-    nativeint# -> float#
+    nativeint_u -> float#
     = "" "caml_native_pointer_load_unboxed_float"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_float :
-    nativeint# -> float# -> unit
+    nativeint_u -> float# -> unit
     = "" "caml_native_pointer_store_unboxed_float"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_uint8 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_unsigned_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_uint8 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_unsigned_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_sint8 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_signed_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_sint8 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_signed_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_uint16 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_unsigned_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_uint16 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_unsigned_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_sint16 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_signed_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_sint16 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_signed_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 

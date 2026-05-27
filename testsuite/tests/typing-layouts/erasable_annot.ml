@@ -261,9 +261,9 @@ external f_3 : (float#[@unboxed]) -> bool -> string  = "foo" "bar";;
 external f_3 : (float# [@unboxed]) -> bool -> string = "foo" "bar"
 |}];;
 
-external f_4 : string -> (nativeint#[@unboxed])  = "foo" "bar";;
+external f_4 : string -> (nativeint_u[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_4 : string -> (nativeint# [@unboxed]) = "foo" "bar"
+external f_4 : string -> (nativeint_u [@unboxed]) = "foo" "bar"
 |}];;
 
 external f_5 : int64 -> int64_u  = "foo" "bar" [@@unboxed];;
@@ -327,12 +327,18 @@ external f_3 : (float'# [@unboxed]) -> bool -> string = "foo" "bar"
 
 external f_4 : string -> (nativeint''#[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_4 : string -> (nativeint''# [@unboxed]) = "foo" "bar"
+Line 1, characters 26-38:
+1 | external f_4 : string -> (nativeint''#[@unboxed])  = "foo" "bar";;
+                              ^^^^^^^^^^^^
+Error: The type "nativeint''" has no unboxed version.
 |}];;
 
 external f_4b : string -> (int nativeint'#[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_4b : string -> (int nativeint'# [@unboxed]) = "foo" "bar"
+Line 1, characters 31-42:
+1 | external f_4b : string -> (int nativeint'#[@unboxed])  = "foo" "bar";;
+                                   ^^^^^^^^^^^
+Error: The type "nativeint'" has no unboxed version.
 |}];;
 
 external f_5 : int64 -> string int64'#  = "foo" "bar" [@@unboxed];;

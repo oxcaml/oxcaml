@@ -211,9 +211,9 @@ constant_folding:
 
 
 
-type ptr = nativeint#
+type ptr = nativeint_u
 external memcmp :
-  ptr -> ptr -> len:nativeint# -> int32_u
+  ptr -> ptr -> len:nativeint_u -> int32_u
   @@ portable
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]

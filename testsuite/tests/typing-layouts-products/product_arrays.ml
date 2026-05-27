@@ -1563,17 +1563,17 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 (*******************************************)
-(* Test 18: safe get indexed by nativeint# *)
+(* Test 18: safe get indexed by nativeint_u *)
 
 (* An array poly version works at valid product layouts. *)
 external[@layout_poly] get :
-  ('a : any mod separable) . 'a array -> nativeint# -> 'a =
+  ('a : any mod separable) . 'a array -> nativeint_u -> 'a =
   "%array_safe_get_indexed_by_nativeint#"
 
 let f_scannable (x : #(int * float * string) array) = get x #42n
 let f_ignorable (x : #(float# * int * int64_u * bool) array) = get x #42n
 [%%expect{|
-external get : ('a : any separable). 'a array -> nativeint# -> 'a
+external get : ('a : any separable). 'a array -> nativeint_u -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1600,38 +1600,38 @@ Error: An unboxed product array element must be formed from all
 
 (* And similarly if we specialize it at declaration time. *)
 external get_scannable :
-  #(int * float * string) array -> nativeint# -> #(int * float * string) =
+  #(int * float * string) array -> nativeint_u -> #(int * float * string) =
   "%array_safe_get_indexed_by_nativeint#"
 let get_scannable_app a i = get_scannable a i
 
 external get_ignorable :
-  #(float# * int * int64_u * bool) array -> nativeint#
+  #(float# * int * int64_u * bool) array -> nativeint_u
   -> #(float# * int * int64_u * bool) =
   "%array_safe_get_indexed_by_nativeint#"
 let get_ignorable_app a i = get_ignorable a i
 [%%expect{|
 external get_scannable :
-  #(int * float * string) array -> nativeint# -> #(int * float * string)
+  #(int * float * string) array -> nativeint_u -> #(int * float * string)
   = "%array_safe_get_indexed_by_nativeint#"
 val get_scannable_app :
-  #(int * float * string) array -> nativeint# -> #(int * float * string) =
+  #(int * float * string) array -> nativeint_u -> #(int * float * string) =
   <fun>
 external get_ignorable :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool)
+  nativeint_u -> #(float# * int * int64_u * bool)
   = "%array_safe_get_indexed_by_nativeint#"
 val get_ignorable_app :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool) = <fun>
+  nativeint_u -> #(float# * int * int64_u * bool) = <fun>
 |}]
 
 external get_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#) =
+  #(string * float#) array -> nativeint_u -> #(string * float#) =
   "%array_safe_get_indexed_by_nativeint#"
 let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#)
+  #(string * float#) array -> nativeint_u -> #(string * float#)
   = "%array_safe_get_indexed_by_nativeint#"
 Line 4, characters 22-33:
 4 | let get_bad_app a i = get_bad a i
@@ -1657,12 +1657,12 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 external get_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) =
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#) =
   "%array_safe_get_indexed_by_nativeint#"
 let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 [%%expect{|
 external get_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#)
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#)
   = "%array_safe_get_indexed_by_nativeint#"
 Line 4, characters 37-63:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
@@ -1672,11 +1672,11 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 (*******************************************)
-(* Test 19: safe set indexed by nativeint# *)
+(* Test 19: safe set indexed by nativeint_u *)
 
 (* An array poly version works at valid product layouts. *)
 external[@layout_poly] set :
-  ('a : any mod separable) . 'a array -> nativeint# -> 'a -> unit =
+  ('a : any mod separable) . 'a array -> nativeint_u -> 'a -> unit =
   "%array_safe_set_indexed_by_nativeint#"
 
 let f_scannable (x : #(int * float * string) array) = set x #42n #(1, 2.0, "3")
@@ -1684,7 +1684,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42n #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64_u * bool) array) =
   set x #42n #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any separable). 'a array -> nativeint# -> 'a -> unit
+external set : ('a : any separable). 'a array -> nativeint_u -> 'a -> unit
   = "%array_safe_set_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64_u * bool) array -> unit = <fun>
@@ -1708,40 +1708,40 @@ Error: An unboxed product array element must be formed from all
 
 (* And similarly if we specialize it at declaration time. *)
 external set_scannable :
-  #(int * float * string) array -> nativeint# -> #(int * float * string)
+  #(int * float * string) array -> nativeint_u -> #(int * float * string)
   -> unit =
   "%array_safe_set_indexed_by_nativeint#"
 let set_scannable_app a i x = set_scannable a i x
 
 external set_ignorable :
-  #(float# * int * int64_u * bool) array -> nativeint#
+  #(float# * int * int64_u * bool) array -> nativeint_u
   -> #(float# * int * int64_u * bool) -> unit =
   "%array_safe_set_indexed_by_nativeint#"
 let set_ignorable_app a i x = set_ignorable a i x
 [%%expect{|
 external set_scannable :
   #(int * float * string) array ->
-  nativeint# -> #(int * float * string) -> unit
+  nativeint_u -> #(int * float * string) -> unit
   = "%array_safe_set_indexed_by_nativeint#"
 val set_scannable_app :
   #(int * float * string) array ->
-  nativeint# -> #(int * float * string) -> unit = <fun>
+  nativeint_u -> #(int * float * string) -> unit = <fun>
 external set_ignorable :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool) -> unit
+  nativeint_u -> #(float# * int * int64_u * bool) -> unit
   = "%array_safe_set_indexed_by_nativeint#"
 val set_ignorable_app :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool) -> unit = <fun>
+  nativeint_u -> #(float# * int * int64_u * bool) -> unit = <fun>
 |}]
 
 external set_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#) -> unit =
+  #(string * float#) array -> nativeint_u -> #(string * float#) -> unit =
   "%array_safe_set_indexed_by_nativeint#"
 let set_bad_app a i x = set_bad a i x
 [%%expect{|
 external set_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#) -> unit
+  #(string * float#) array -> nativeint_u -> #(string * float#) -> unit
   = "%array_safe_set_indexed_by_nativeint#"
 Line 4, characters 24-37:
 4 | let set_bad_app a i x = set_bad a i x
@@ -1767,12 +1767,12 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 external set_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) -> unit =
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#) -> unit =
   "%array_safe_set_indexed_by_nativeint#"
 let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 [%%expect{|
 external set_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) -> unit
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#) -> unit
   = "%array_safe_set_indexed_by_nativeint#"
 Line 4, characters 39-73:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
@@ -1782,17 +1782,17 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 (*********************************************)
-(* Test 20: unsafe get indexed by nativeint# *)
+(* Test 20: unsafe get indexed by nativeint_u *)
 
 (* An array poly version works at valid product layouts. *)
 external[@layout_poly] get :
-  ('a : any mod separable) . 'a array -> nativeint# -> 'a =
+  ('a : any mod separable) . 'a array -> nativeint_u -> 'a =
   "%array_unsafe_get_indexed_by_nativeint#"
 
 let f_scannable (x : #(int * float * string) array) = get x #42n
 let f_ignorable (x : #(float# * int * int64_u * bool) array) = get x #42n
 [%%expect{|
-external get : ('a : any separable). 'a array -> nativeint# -> 'a
+external get : ('a : any separable). 'a array -> nativeint_u -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1819,38 +1819,38 @@ Error: An unboxed product array element must be formed from all
 
 (* And similarly if we specialize it at declaration time. *)
 external get_scannable :
-  #(int * float * string) array -> nativeint# -> #(int * float * string) =
+  #(int * float * string) array -> nativeint_u -> #(int * float * string) =
   "%array_unsafe_get_indexed_by_nativeint#"
 let get_scannable_app a i = get_scannable a i
 
 external get_ignorable :
-  #(float# * int * int64_u * bool) array -> nativeint#
+  #(float# * int * int64_u * bool) array -> nativeint_u
   -> #(float# * int * int64_u * bool) =
   "%array_unsafe_get_indexed_by_nativeint#"
 let get_ignorable_app a i = get_ignorable a i
 [%%expect{|
 external get_scannable :
-  #(int * float * string) array -> nativeint# -> #(int * float * string)
+  #(int * float * string) array -> nativeint_u -> #(int * float * string)
   = "%array_unsafe_get_indexed_by_nativeint#"
 val get_scannable_app :
-  #(int * float * string) array -> nativeint# -> #(int * float * string) =
+  #(int * float * string) array -> nativeint_u -> #(int * float * string) =
   <fun>
 external get_ignorable :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool)
+  nativeint_u -> #(float# * int * int64_u * bool)
   = "%array_unsafe_get_indexed_by_nativeint#"
 val get_ignorable_app :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool) = <fun>
+  nativeint_u -> #(float# * int * int64_u * bool) = <fun>
 |}]
 
 external get_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#) =
+  #(string * float#) array -> nativeint_u -> #(string * float#) =
   "%array_unsafe_get_indexed_by_nativeint#"
 let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#)
+  #(string * float#) array -> nativeint_u -> #(string * float#)
   = "%array_unsafe_get_indexed_by_nativeint#"
 Line 4, characters 22-33:
 4 | let get_bad_app a i = get_bad a i
@@ -1876,12 +1876,12 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 external get_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) =
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#) =
   "%array_unsafe_get_indexed_by_nativeint#"
 let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 [%%expect{|
 external get_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#)
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#)
   = "%array_unsafe_get_indexed_by_nativeint#"
 Line 4, characters 37-63:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
@@ -1891,11 +1891,11 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 (*********************************************)
-(* Test 21: unsafe set indexed by nativeint# *)
+(* Test 21: unsafe set indexed by nativeint_u *)
 
 (* An array poly version works at valid product layouts. *)
 external[@layout_poly] set :
-  ('a : any mod separable) . 'a array -> nativeint# -> 'a -> unit =
+  ('a : any mod separable) . 'a array -> nativeint_u -> 'a -> unit =
   "%array_unsafe_set_indexed_by_nativeint#"
 
 let f_scannable (x : #(int * float * string) array) = set x #42n #(1, 2.0, "3")
@@ -1903,7 +1903,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42n #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64_u * bool) array) =
   set x #42n #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any separable). 'a array -> nativeint# -> 'a -> unit
+external set : ('a : any separable). 'a array -> nativeint_u -> 'a -> unit
   = "%array_unsafe_set_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64_u * bool) array -> unit = <fun>
@@ -1927,40 +1927,40 @@ Error: An unboxed product array element must be formed from all
 
 (* And similarly if we specialize it at declaration time. *)
 external set_scannable :
-  #(int * float * string) array -> nativeint# -> #(int * float * string)
+  #(int * float * string) array -> nativeint_u -> #(int * float * string)
   -> unit =
   "%array_unsafe_set_indexed_by_nativeint#"
 let set_scannable_app a i x = set_scannable a i x
 
 external set_ignorable :
-  #(float# * int * int64_u * bool) array -> nativeint#
+  #(float# * int * int64_u * bool) array -> nativeint_u
   -> #(float# * int * int64_u * bool) -> unit =
   "%array_unsafe_set_indexed_by_nativeint#"
 let set_ignorable_app a i x = set_ignorable a i x
 [%%expect{|
 external set_scannable :
   #(int * float * string) array ->
-  nativeint# -> #(int * float * string) -> unit
+  nativeint_u -> #(int * float * string) -> unit
   = "%array_unsafe_set_indexed_by_nativeint#"
 val set_scannable_app :
   #(int * float * string) array ->
-  nativeint# -> #(int * float * string) -> unit = <fun>
+  nativeint_u -> #(int * float * string) -> unit = <fun>
 external set_ignorable :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool) -> unit
+  nativeint_u -> #(float# * int * int64_u * bool) -> unit
   = "%array_unsafe_set_indexed_by_nativeint#"
 val set_ignorable_app :
   #(float# * int * int64_u * bool) array ->
-  nativeint# -> #(float# * int * int64_u * bool) -> unit = <fun>
+  nativeint_u -> #(float# * int * int64_u * bool) -> unit = <fun>
 |}]
 
 external set_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#) -> unit =
+  #(string * float#) array -> nativeint_u -> #(string * float#) -> unit =
   "%array_unsafe_set_indexed_by_nativeint#"
 let set_bad_app a i x = set_bad a i x
 [%%expect{|
 external set_bad :
-  #(string * float#) array -> nativeint# -> #(string * float#) -> unit
+  #(string * float#) array -> nativeint_u -> #(string * float#) -> unit
   = "%array_unsafe_set_indexed_by_nativeint#"
 Line 4, characters 24-37:
 4 | let set_bad_app a i x = set_bad a i x
@@ -1986,12 +1986,12 @@ Error: Unboxed vector types are not yet supported in arrays of unboxed
 |}]
 
 external set_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) -> unit =
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#) -> unit =
   "%array_unsafe_set_indexed_by_nativeint#"
 let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 [%%expect{|
 external set_ignorable_with_vec :
-  #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) -> unit
+  #(int * int32x4#) array -> nativeint_u -> #(int * int32x4#) -> unit
   = "%array_unsafe_set_indexed_by_nativeint#"
 Line 4, characters 39-73:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)

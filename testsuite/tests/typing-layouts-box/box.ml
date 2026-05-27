@@ -9,7 +9,7 @@
 type t1 = float# box
 type t2 = int32_u box
 type t3 = int64_u box
-type t4 = nativeint# box
+type t4 = nativeint_u box
 type t5 = int# box
 type t6 = #(int64_u * string) box
 type 'a t7 = 'a ref# box
@@ -17,7 +17,7 @@ type 'a t7 = 'a ref# box
 type t1 = float
 type t2 = int32_u box
 type t3 = int64_u box
-type t4 = nativeint
+type t4 = nativeint_u box
 type t5 = int
 type t6 = int64_u * string
 type 'a t7 = 'a ref
@@ -299,11 +299,15 @@ let check_word : type (a : word). a -> a box -> unit =
 val check_word : ('a : word). 'a -> 'a box -> unit = <fun>
 |}]
 
-type unat = nativeint#
+type unat = nativeint_u
 let test_word (u : unat) (b : nativeint) = check_word u b;;
 [%%expect{|
-type unat = nativeint#
-val test_word : unat -> nativeint -> unit = <fun>
+type unat = nativeint_u
+Line 2, characters 56-57:
+2 | let test_word (u : unat) (b : nativeint) = check_word u b;;
+                                                            ^
+Error: This expression has type "nativeint"
+       but an expression was expected of type "unat box" = "nativeint_u box"
 |}]
 
 (* Test 15: Parameterized box type alias *)

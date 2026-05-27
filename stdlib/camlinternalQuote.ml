@@ -1059,7 +1059,7 @@ module Identifier = struct
 
     let unboxed_float = TBuiltin "float#" |> mk
 
-    let unboxed_nativeint = TBuiltin "nativeint#" |> mk
+    let unboxed_nativeint = TBuiltin "nativeint_u" |> mk
 
     let unboxed_int32 = TBuiltin "int32_u" |> mk
 

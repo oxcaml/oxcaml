@@ -213,7 +213,7 @@ let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_11) in
 cont done ($camlTOP8)
 |}]
 
-let match_naked_nativeint (t : t) : nativeint# =
+let match_naked_nativeint (t : t) : nativeint_u =
   match t with
   | A -> #5n
   | B -> #10n

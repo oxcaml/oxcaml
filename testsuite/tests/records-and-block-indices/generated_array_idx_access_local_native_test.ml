@@ -78,8 +78,8 @@ type t6 = #{ a6 : int; b6 : t1 } (* #{ int; #{ int; int } } *)
 type t7 = #{ a7 : int32_u } (* #{ int32_u } *)
 type t8 = #{ a8 : int; b8 : t7 } (* #{ int; #{ int32_u } } *)
 type t9 = #{ a9 : int64_u; b9 : int64_u } (* #{ int64_u; int64_u } *)
-type t10 = #{ a10 : int32_u; b10 : nativeint# } (* #{ int32_u; nativeint# } *)
-type t11 = #{ a11 : nativeint# } (* #{ nativeint# } *)
+type t10 = #{ a10 : int32_u; b10 : nativeint_u } (* #{ int32_u; nativeint_u } *)
+type t11 = #{ a11 : nativeint_u } (* #{ nativeint_u } *)
 type t12 = #{ a12 : string; b12 : string } (* #{ string; string } *)
 type t13 = #{ a13 : int64x2# } (* #{ int64x2# } *)
 type t14 = #{ a14 : v3 } (* #{ (| unit_u) } *)
@@ -562,9 +562,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (**************************************)
-  (*   t10 = #{ int32_u; nativeint# }   *)
-  (**************************************)
+  (***************************************)
+  (*   t10 = #{ int32_u; nativeint_u }   *)
+  (***************************************)
   let eq = (fun #{ a10 = a101; b10 = b101 } #{ a10 = a102; b10 = b102 } -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a101 a102 && (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) b101 b102) in
   let mk_value i = #{ a10 = Int32_u.of_int (i + 0); b10 = Nativeint_u.of_int (i + 1) } in
   (* Create an array of size [size] *)
@@ -608,9 +608,9 @@ let test size =
   done;
   Gc.compact ();
 
-  (*****************************)
-  (*   t11 = #{ nativeint# }   *)
-  (*****************************)
+  (******************************)
+  (*   t11 = #{ nativeint_u }   *)
+  (******************************)
   let eq = (fun #{ a11 = a111 } #{ a11 = a112 } -> (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) a111 a112) in
   let mk_value i = #{ a11 = Nativeint_u.of_int (i + 0) } in
   (* Create an array of size [size] *)
