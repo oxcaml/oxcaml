@@ -2382,12 +2382,6 @@ module Lattices_mono = struct
     (* Commutes a meet through a morphism from the right, such that:
        [apply dst m (meet_const c x)] is equivalent to
        [meet_const (commute_meet_const_from_right dst m c) (apply dst m x)]
-
-       PRECONDITION: All [Core_morph.t] preserves binary meets:
-        m(x meet y) == m(x) meet m(y). Without this precondition,
-        [commute_meet_const_from_right] may no longer be implementable, and
-        we will need to change the implementation of [Simple_morph.compose], as well as
-        add the missing cases in [Simple_morph.t].
     *)
     let commute_meet_const_from_right : type a b d.
         b obj -> (a, b, d) t -> a -> b =
@@ -2397,7 +2391,7 @@ module Lattices_mono = struct
         | Local_to_regional | Regional_to_local | Locality_as_regionality
         | Regional_to_global | Local_to_regional_regionality
         | Regional_to_local_regionality | Regional_to_global_regionality ->
-          (* same explanation as below *)
+          (* See explanation below *)
           apply dst m c
       in
       match m with
@@ -2408,7 +2402,14 @@ module Lattices_mono = struct
       | Visibility_op_to_statefulness | Statefulness_to_visibility_op
       | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
       | Monadic_to_comonadic_max | Comonadic_to_monadic_max _ ->
-        (* If all morphisms preserve binary meets, the correctness argument
+        (* The following proof depends on the fact that [Core_morph.t] preserves binary
+           meets: m(x meet y) == m(x) meet m(y).
+
+           Without this condition, [commute_meet_const_from_right] may no longer be
+           implementable, and we will need to change the implementation of
+           [Simple_morph.compose], as well as add the missing cases in [Simple_morph.t].
+
+           If all morphisms preserve binary meets, the correctness argument
            goes as follows:
 
            Consider [apply dst m (meet_const c x)].
