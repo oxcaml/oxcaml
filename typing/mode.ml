@@ -1635,13 +1635,7 @@ module Lattices_mono = struct
 
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
-       further, but we never need the missing operation).
-
-      INVARIANT: each locality morphism below must preserve binary meets:
-        lm(x meet y) == lm(x) meet lm(y). If the invariant is broken,
-        [commute_meet_const_from_right] may no longer be correct (or implementable), and
-        we may need to change [Simple_morph.compose] and add the missing case in
-        [Simple_morph.t] *)
+       further, but we never need the missing operation). *)
     type ('a, 'b, 'd) t =
       | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) t
           (** Maps local to regional, global to global *)
@@ -1948,11 +1942,6 @@ module Lattices_mono = struct
   end
 
   module Core_morph = struct
-    (* INVARIANT: each core morphism below must preserve binary meets:
-        cm(x meet y) == cm(x) meet cm(y). If the invariant is broken,
-        [commute_meet_const_from_right] may no longer be correct (or implementable), and
-        we may need to change [Simple_morph.compose] and add the missing case in
-        [Simple_morph.t] *)
     type ('a, 'b, 'd) t =
       | Locality_restricted :
           ('a, 'b, 'l * 'r) Locality_morph.t
@@ -2370,20 +2359,49 @@ module Lattices_mono = struct
     (* Commutes a meet through a morphism from the right, such that:
        [apply dst m (meet_const c x)] is equivalent to
        [meet_const (commute_meet_const_from_right dst m c) (apply dst m x)]
+
+       PRECONDITION: All [Core_morph.t] preserves binary meets:
+        m(x meet y) == m(x) meet m(y). Without this precondition,
+        [commute_meet_const_from_right] may no longer be implementable, and
+        we will need to change the implementation of [Simple_morph.compose], as well as
+        add the missing cases in [Simple_morph.t].
     *)
     let commute_meet_const_from_right : type a b d.
         b obj -> (a, b, d) t -> a -> b =
      fun dst m c ->
-      (* All morphisms preserve binary meets. The correctness argument
-         thus goes as follows:
+      match m with
+      | Locality_restricted Local_to_regional
+      | Locality_restricted Regional_to_local
+      | Locality_restricted Locality_as_regionality
+      | Locality_restricted Regional_to_global
+      | Locality_restricted Local_to_regional_regionality
+      | Locality_restricted Regional_to_local_regionality
+      | Locality_restricted Regional_to_global_regionality
+      | Locality_full Local_to_regional
+      | Locality_full Regional_to_local
+      | Locality_full Locality_as_regionality
+      | Locality_full Regional_to_global
+      | Locality_full Local_to_regional_regionality
+      | Locality_full Regional_to_local_regionality
+      | Locality_full Regional_to_global_regionality
+      | Uniqueness_op_to_linearity | Linearity_to_uniqueness_op
+      | Contention_op_to_portability | Portability_to_contention_op
+      | Visibility_op_to_statefulness | Statefulness_to_visibility_op
+      | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
+      | Monadic_to_comonadic_max | Comonadic_to_monadic_max _ ->
+        (* If all morphisms preserve binary meets, the correctness argument
+           goes as follows:
 
-         Consider [apply dst m (meet_const c x)].
-         [apply dst m (meet_const c x)]
-         == meet (apply dst m c) (apply dst m x) ;; [m] preserves binary meets
-         == meet_const (apply dst m c) (apply dst m x) ;; by definition of meet_const
+           Consider [apply dst m (meet_const c x)].
+           [apply dst m (meet_const c x)]
+           == meet (apply dst m c) (apply dst m x) ;; [m] preserves binary
+           meets
+           == meet_const (apply dst m c) (apply dst m x) ;; by definition of
+           meet_const
 
-         The correct result for [commute_meet_const_from_right] is thus [apply dst m c] *)
-      apply dst m c
+           The correct result for [commute_meet_const_from_right] is thus
+           [apply dst m c]. *)
+        apply dst m c
 
     (* Commutes an implication through a morphism from the left, such that:
        [imply_const c (apply dst m x)] is equivalent to
