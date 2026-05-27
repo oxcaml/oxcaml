@@ -485,6 +485,16 @@ Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
 
+external f10_11 : string -> (int16#[@unsafe_unextended])  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 18-56:
+1 | external f10_11 : string -> (int16#[@unsafe_unextended])  = "foo" "bar";;
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: The "[@unsafe_unextended]" attribute is not allowed on C stub returns.
+|}];;
+
 (*************************************************)
 (* Test 11: bits16 banned in extensible variants *)
 
