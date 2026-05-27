@@ -912,8 +912,8 @@ let builtin_values =
 
 let builtin_idents = List.rev !builtin_idents
 
-(* Externally, this is the jkind of an optional argument, as opposed to the jkind of the
-   argument to the [option] type. *)
+(* Externally, this is the jkind of an optional argument, as opposed to the
+   jkind of the argument to the [option] type. *)
 (* CR-soon lmaurer: Remove this when these are once again the same. *)
 let option_argument_jkind =
   Jkind.Builtin.value_or_null ~why:Optional_argument
