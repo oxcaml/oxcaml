@@ -86,12 +86,13 @@ let rec basic_instruction_cell :
       let instr = DLL.value cell in
       if ignore_name_for_debugger && Cfg.is_name_for_debugger instr
       then
-        basic_instruction_cell ~ignore_name_for_debugger (DLL.next cell)
-          ~fuel ~acc
+        basic_instruction_cell ~ignore_name_for_debugger (DLL.next cell) ~fuel
+          ~acc
       else
         let instr_hash = basic instr.desc in
         basic_instruction_cell ~ignore_name_for_debugger (DLL.next cell)
-          ~fuel:(pred fuel) ~acc:(hash_combine acc instr_hash)
+          ~fuel:(pred fuel)
+          ~acc:(hash_combine acc instr_hash)
 
 let basic_instruction_list :
     ignore_name_for_debugger:bool -> Cfg.basic Cfg.instruction DLL.t -> int =
@@ -100,8 +101,7 @@ let basic_instruction_list :
   basic_instruction_cell ~ignore_name_for_debugger (DLL.hd_cell l) ~fuel:4
     ~acc:0
 
-let basic_block :
-    ignore_name_for_debugger:bool -> Cfg.basic_block -> int =
+let basic_block : ignore_name_for_debugger:bool -> Cfg.basic_block -> int =
  fun ~ignore_name_for_debugger block ->
   match block with
   | { start = _;
@@ -144,7 +144,6 @@ let cfg_with_layout ~ignore_name_for_debugger cfg_with_layout =
         let label = DLL.value cell in
         let block = Cfg.get_block_exn cfg label in
         hash (DLL.next cell) ~fuel:(pred fuel)
-          ~acc:
-            (hash_combine acc (basic_block ~ignore_name_for_debugger block))
+          ~acc:(hash_combine acc (basic_block ~ignore_name_for_debugger block))
   in
   hash (DLL.hd_cell layout) ~fuel:4 ~acc:0

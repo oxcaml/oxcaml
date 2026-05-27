@@ -95,8 +95,7 @@ let equal_codegen_option (l : codegen_option) (r : codegen_option) =
           loc = r_loc
         } ) ->
     Bool.equal l_strict r_strict
-    && Bool.equal l_nrn r_nrn
-    && Bool.equal l_nr r_nr
+    && Bool.equal l_nrn r_nrn && Bool.equal l_nr r_nr
     && equal_location l_loc r_loc
   | ( Check_zero_alloc
         { strict = l_strict; loc = l_loc; custom_error_msg = l_msg },

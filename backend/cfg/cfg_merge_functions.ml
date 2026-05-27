@@ -88,8 +88,8 @@ let equal_fun_level_fields (left : Cfg.t) (right : Cfg.t) =
   && List.equal Cfg.equal_codegen_option left.fun_codegen_options
        right.fun_codegen_options
 
-let equivalent ~(fun_symbol : Cmm.symbol)
-    ~(cfg_with_layout : Cfg_with_layout.t) ~(repr : repr) =
+let equivalent ~(fun_symbol : Cmm.symbol) ~(cfg_with_layout : Cfg_with_layout.t)
+    ~(repr : repr) =
   let incoming_cfg_t = Cfg_with_layout.cfg cfg_with_layout in
   let repr_cfg_t = Cfg_with_layout.cfg repr.cfg_with_layout in
   if not (equal_fun_level_fields incoming_cfg_t repr_cfg_t)
@@ -109,21 +109,20 @@ let equivalent ~(fun_symbol : Cmm.symbol)
    instruction is a tail call to [repr]'s function symbol. The ABI-relevant
    fields ([fun_args], [fun_ret_type], [fun_codegen_options], [fun_poll],
    [fun_dbg], [entry_label], [next_instruction_id]) are kept as-is: they are
-   either immutable in [Cfg.t] or already match what we would have set them
-   to. [arg] is left empty on the terminator: [cfg_invariants] does not
-   constrain the arity of [Tailcall_func (Direct _)], and downstream emit for
+   either immutable in [Cfg.t] or already match what we would have set them to.
+   [arg] is left empty on the terminator: [cfg_invariants] does not constrain
+   the arity of [Tailcall_func (Direct _)], and downstream emit for
    [Ltailcall_imm] only reads the target symbol.
 
    CR xclerc: [fun_contains_calls] is left untouched. It is correct when the
-   original body already contained a call (it still does, just a tail call),
-   but stale when the original was a leaf: the thunk now does call (jmp)
-   another function. The field is mainly informational at this stage, but if
-   downstream consumers grow to rely on it, [fun_contains_calls] should be
-   made mutable in [Cfg.t] and updated here. *)
+   original body already contained a call (it still does, just a tail call), but
+   stale when the original was a leaf: the thunk now does call (jmp) another
+   function. The field is mainly informational at this stage, but if downstream
+   consumers grow to rely on it, [fun_contains_calls] should be made mutable in
+   [Cfg.t] and updated here. *)
 let rewrite_to_thunk ~(cfg_with_layout : Cfg_with_layout.t) ~(repr : repr) =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  Stack_class.Tbl.iter cfg.fun_num_stack_slots
-    ~f:(fun stack_class _ ->
+  Stack_class.Tbl.iter cfg.fun_num_stack_slots ~f:(fun stack_class _ ->
       Stack_class.Tbl.replace cfg.fun_num_stack_slots stack_class 0);
   Label.Tbl.reset cfg.blocks;
   let terminator : Cfg.terminator Cfg.instruction =
@@ -173,6 +172,5 @@ let run fun_symbol cfg_with_layout =
       rewrite_to_thunk ~cfg_with_layout ~repr;
       cfg_with_layout
     | None ->
-      Int.Tbl.replace buckets hash
-        ({ fun_symbol; cfg_with_layout } :: bucket);
+      Int.Tbl.replace buckets hash ({ fun_symbol; cfg_with_layout } :: bucket);
       cfg_with_layout
