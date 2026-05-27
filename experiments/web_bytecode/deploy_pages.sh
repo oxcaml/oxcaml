@@ -42,14 +42,18 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
 fi
 
 require_file "$script_dir/index.html"
+require_file "$script_dir/index-diagnostic-sort.html"
 require_file "$script_dir/embed_demo.html"
 require_file "$script_dir/embed_styling.html"
 require_file "$script_dir/app.js"
+require_file "$script_dir/app-diagnostic-sort.js"
 require_file "$script_dir/backend.js"
 require_file "$script_dir/backend_direct.js"
 require_file "$script_dir/backend_worker.js"
 require_file "$script_dir/oxcaml-embed.js"
+require_file "$script_dir/oxcaml-embed-diagnostic-sort.js"
 require_file "$script_dir/oxcaml-embed-module.js"
+require_file "$script_dir/oxcaml-embed-module-diagnostic-sort.js"
 require_file "$script_dir/playground_prelude.js"
 require_file "$script_dir/runtime_shims.js"
 require_file "$script_dir/sample_catalog.js"
@@ -63,14 +67,18 @@ fi
 
 mkdir -p "$stage_dir/build"
 cp "$script_dir/index.html" "$stage_dir/index.html"
+cp "$script_dir/index-diagnostic-sort.html" "$stage_dir/index-diagnostic-sort.html"
 cp "$script_dir/embed_demo.html" "$stage_dir/embed_demo.html"
 cp "$script_dir/embed_styling.html" "$stage_dir/embed_styling.html"
 cp "$script_dir/app.js" "$stage_dir/app.js"
+cp "$script_dir/app-diagnostic-sort.js" "$stage_dir/app-diagnostic-sort.js"
 cp "$script_dir/backend.js" "$stage_dir/backend.js"
 cp "$script_dir/backend_direct.js" "$stage_dir/backend_direct.js"
 cp "$script_dir/backend_worker.js" "$stage_dir/backend_worker.js"
 cp "$script_dir/oxcaml-embed.js" "$stage_dir/oxcaml-embed.js"
+cp "$script_dir/oxcaml-embed-diagnostic-sort.js" "$stage_dir/oxcaml-embed-diagnostic-sort.js"
 cp "$script_dir/oxcaml-embed-module.js" "$stage_dir/oxcaml-embed-module.js"
+cp "$script_dir/oxcaml-embed-module-diagnostic-sort.js" "$stage_dir/oxcaml-embed-module-diagnostic-sort.js"
 cp "$script_dir/playground_prelude.js" "$stage_dir/playground_prelude.js"
 cp "$script_dir/runtime_shims.js" "$stage_dir/runtime_shims.js"
 cp "$script_dir/sample_catalog.js" "$stage_dir/sample_catalog.js"
@@ -81,6 +89,8 @@ cp -R "$build_dir/browser_fs" "$stage_dir/build/browser_fs"
 
 perl -0pi -e 's#^const buildBase = .*;$#const buildBase = "./build";#m' \
   "$stage_dir/app.js"
+perl -0pi -e 's#^const buildBase = .*;$#const buildBase = "./build";#m' \
+  "$stage_dir/app-diagnostic-sort.js"
 perl -0pi -e 's#^const buildBase = .*;$#const buildBase = "./build";#m' \
   "$stage_dir/backend_direct.js"
 
