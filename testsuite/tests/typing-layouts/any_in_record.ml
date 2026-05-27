@@ -294,6 +294,64 @@ type ('a : any) r = { t : 'a; }
 val f : ('a r, 'a) idx_imm = <abstr>
 |}]
 
+(* Any errors *)
+
+type a : any
+type t = { a : a }
+[%%expect{|
+type a : any
+type t = { a : a; }
+|}]
+
+let f { a } = ()
+[%%expect{|
+Line 1, characters 6-11:
+1 | let f { a } = ()
+          ^^^^^
+Error: Record element types must have a representable layout.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field in a record being projected from.
+|}]
+
+let i = (.a)
+[%%expect{|
+Line 1, characters 10-11:
+1 | let i = (.a)
+              ^
+Error: Record element types must have a representable layout.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field in a record type into which a
+         block index (idx_imm or idx_mut) is being created.
+|}]
+
+let f t = { t with a = assert false }
+[%%expect{|
+Line 1, characters 23-35:
+1 | let f t = { t with a = assert false }
+                           ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field involved in a functional update.
+|}]
+
+let f = { a = assert false }
+[%%expect{|
+Line 1, characters 14-26:
+1 | let f = { a = assert false }
+                  ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field being assigned a value.
+|}]
+
 (* Abstract kinds errors *)
 
 kind_ k
