@@ -1533,56 +1533,57 @@ module Lattices_mono = struct
       | Visibility -> { t with visibility = r }
       | Staticity -> { t with staticity = r }
 
-    type 'a from = Ps : ('a, 'b) t -> 'a from
+    type 'a from = From : ('a, 'b) t -> 'a from
 
     let from : type a. a obj -> a from list = function
       | Comonadic_with_locality ->
-        [ Ps Areality;
-          Ps Forkable;
-          Ps Yielding;
-          Ps Linearity;
-          Ps Statefulness;
-          Ps Portability ]
+        [ From Areality;
+          From Forkable;
+          From Yielding;
+          From Linearity;
+          From Statefulness;
+          From Portability ]
       | Comonadic_with_regionality ->
-        [ Ps Areality;
-          Ps Forkable;
-          Ps Yielding;
-          Ps Linearity;
-          Ps Statefulness;
-          Ps Portability ]
-      | Monadic_op -> [Ps Uniqueness; Ps Visibility; Ps Contention; Ps Staticity]
+        [ From Areality;
+          From Forkable;
+          From Yielding;
+          From Linearity;
+          From Statefulness;
+          From Portability ]
+      | Monadic_op ->
+        [From Uniqueness; From Visibility; From Contention; From Staticity]
       | Locality | Regionality | Uniqueness_op | Linearity | Portability
       | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
       | Staticity_op ->
         []
 
-    type 'b to_ = Pb : 'a obj * ('a, 'b) t -> 'b to_
+    type 'b to_ = To : 'a obj * ('a, 'b) t -> 'b to_
 
     let to_ : type b. b obj -> b to_ list = function
       | Comonadic_with_locality -> []
       | Comonadic_with_regionality -> []
       | Monadic_op -> []
-      | Locality -> [Pb (Comonadic_with_locality, Areality)]
-      | Regionality -> [Pb (Comonadic_with_regionality, Areality)]
-      | Uniqueness_op -> [Pb (Monadic_op, Uniqueness)]
+      | Locality -> [To (Comonadic_with_locality, Areality)]
+      | Regionality -> [To (Comonadic_with_regionality, Areality)]
+      | Uniqueness_op -> [To (Monadic_op, Uniqueness)]
       | Linearity ->
-        [ Pb (Comonadic_with_locality, Linearity);
-          Pb (Comonadic_with_regionality, Linearity) ]
+        [ To (Comonadic_with_locality, Linearity);
+          To (Comonadic_with_regionality, Linearity) ]
       | Portability ->
-        [ Pb (Comonadic_with_locality, Portability);
-          Pb (Comonadic_with_regionality, Portability) ]
+        [ To (Comonadic_with_locality, Portability);
+          To (Comonadic_with_regionality, Portability) ]
       | Forkable ->
-        [ Pb (Comonadic_with_locality, Forkable);
-          Pb (Comonadic_with_regionality, Forkable) ]
+        [ To (Comonadic_with_locality, Forkable);
+          To (Comonadic_with_regionality, Forkable) ]
       | Yielding ->
-        [ Pb (Comonadic_with_locality, Yielding);
-          Pb (Comonadic_with_regionality, Yielding) ]
+        [ To (Comonadic_with_locality, Yielding);
+          To (Comonadic_with_regionality, Yielding) ]
       | Statefulness ->
-        [ Pb (Comonadic_with_locality, Statefulness);
-          Pb (Comonadic_with_regionality, Statefulness) ]
-      | Contention_op -> [Pb (Monadic_op, Contention)]
-      | Visibility_op -> [Pb (Monadic_op, Visibility)]
-      | Staticity_op -> [Pb (Monadic_op, Staticity)]
+        [ To (Comonadic_with_locality, Statefulness);
+          To (Comonadic_with_regionality, Statefulness) ]
+      | Contention_op -> [To (Monadic_op, Contention)]
+      | Visibility_op -> [To (Monadic_op, Visibility)]
+      | Staticity_op -> [To (Monadic_op, Staticity)]
 
     type ('a, 'p) owner =
       | Monadic : (Monadic_op.t, 'p) t -> (Monadic_op.t, 'p) owner
@@ -1652,7 +1653,8 @@ module Lattices_mono = struct
 
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
-       further, but we never need the missing operation). *)
+	       further, but we never need the missing operation). *)
+    (* New morphisms must be added to [left_to] and [right_to]. *)
     type ('a, 'b, 'd) t =
       | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) t
           (** Maps local to regional, global to global *)
@@ -1945,6 +1947,7 @@ module Lattices_mono = struct
   end
 
   module Core_morph = struct
+    (* New morphisms must be added to [left_to] and [right_to]. *)
     type ('a, 'b, 'd) t =
       | Locality_restricted :
           ('a, 'b, 'l * 'r) Locality_morph.t
@@ -2740,10 +2743,9 @@ module Lattices_mono = struct
       | _, _, _, _, _ -> .
     [@@warning "-4"]
 
-    type ('b, 'd) packed_to = To : ('a, 'b, 'd) t -> ('b, 'd) packed_to
-    [@@unboxed]
+    type ('b, 'd) to_ = To : ('a, 'b, 'd) t -> ('b, 'd) to_ [@@unboxed]
 
-    let left_to : type b. b obj -> (b, left_only) packed_to list = function
+    let left_to : type b. b obj -> (b, left_only) to_ list = function
       | Locality -> [To (Locality_restricted Regional_to_local)]
       | Regionality ->
         [ To (Locality_restricted Local_to_regional);
@@ -2771,7 +2773,7 @@ module Lattices_mono = struct
           To (Locality_full Regional_to_local_regionality);
           To Monadic_to_comonadic_min ]
 
-    let right_to : type b. b obj -> (b, right_only) packed_to list = function
+    let right_to : type b. b obj -> (b, right_only) to_ list = function
       | Locality ->
         [ To (Locality_restricted Regional_to_local);
           To (Locality_restricted Regional_to_global) ]
@@ -2827,6 +2829,7 @@ module Lattices_mono = struct
   let max_with dst ax a = Axis.set ax a (max dst)
 
   module Simple_morph = struct
+    (* New morphisms must be added to [left_to] and [right_to]. *)
     type ('a, 'b, 'd) t =
       | Id : ('a, 'a, 'd) t  (** identity morphism *)
       | Core : ('a, 'b, 'd) Core_morph.t -> ('a, 'b, 'd) t
@@ -3395,10 +3398,9 @@ module Lattices_mono = struct
 
     let ( let+ ) xs f = List.map f xs
 
-    type ('b, 'd) packed_to = To : ('a, 'b, 'd) t -> ('b, 'd) packed_to
-    [@@unboxed]
+    type ('b, 'd) to_ = To : ('a, 'b, 'd) t -> ('b, 'd) to_ [@@unboxed]
 
-    let left_to : type b. full:bool -> b obj -> (b, left_only) packed_to list =
+    let left_to : type b. full:bool -> b obj -> (b, left_only) to_ list =
      fun ~full dst ->
       let constants =
         List.map (fun c -> To (Meet_const c)) (get_elements ~full dst)
@@ -3412,8 +3414,7 @@ module Lattices_mono = struct
       in
       (To Id :: core_morphs) @ constants @ meet_const_cores
 
-    let right_to : type b. full:bool -> b obj -> (b, right_only) packed_to list
-        =
+    let right_to : type b. full:bool -> b obj -> (b, right_only) to_ list =
      fun ~full dst ->
       let constants =
         List.map (fun c -> To (Imply_const c)) (get_elements ~full dst)
@@ -3429,6 +3430,7 @@ module Lattices_mono = struct
       (To Id :: core_morphs) @ constants @ core_imply_consts
   end
 
+  (* New morphisms must be added to [left_to] and [right_to]. *)
   type ('a, 'b, 'd) morph =
     | Simple : ('a, 'b, 'd) Simple_morph.t -> ('a, 'b, 'd) morph
     | Const_max : 'a obj -> ('a, 'c, disallowed * 'r) morph
@@ -4014,9 +4016,9 @@ module Lattices_mono = struct
 
   let ( let+ ) xs f = List.map f xs
 
-  type 'b packed_to = To : ('a, 'b, neither) morph -> 'b packed_to [@@unboxed]
+  type 'b to_ = To : ('a, 'b, neither) morph -> 'b to_ [@@unboxed]
 
-  let generate_left_morphs_to : type b. full:bool -> b obj -> b packed_to list =
+  let left_to : type b. full:bool -> b obj -> b to_ list =
    fun ~full dst ->
     let simple_morphs = Simple_morph.left_to ~full dst in
     let simple =
@@ -4027,11 +4029,11 @@ module Lattices_mono = struct
     let projections =
       let* (Simple_morph.To m) = simple_morphs in
       let src = Simple_morph.src dst m in
-      let+ (Axis.Pb (src, ax)) = Axis.to_ src in
+      let+ (Axis.To (src, ax)) = Axis.to_ src in
       To (disallow_left (Simple_proj (m, ax, src)))
     in
     let min_with =
-      let* (Axis.Ps ax) = Axis.from dst in
+      let* (Axis.From ax) = Axis.from dst in
       let projected = proj_obj ax dst in
       let+ (Simple_morph.To m) = Simple_morph.left_to ~full projected in
       To (disallow_left (Min_with_simple (ax, m)))
@@ -4041,8 +4043,7 @@ module Lattices_mono = struct
     in
     simple @ projections @ min_with @ const_min
 
-  let generate_right_morphs_to : type b. full:bool -> b obj -> b packed_to list
-      =
+  let right_to : type b. full:bool -> b obj -> b to_ list =
    fun ~full dst ->
     let simple_morphs = Simple_morph.right_to ~full dst in
     let simple =
@@ -4053,11 +4054,11 @@ module Lattices_mono = struct
     let projections =
       let* (Simple_morph.To m) = simple_morphs in
       let projected = Simple_morph.src dst m in
-      let+ (Axis.Pb (src, ax)) = Axis.to_ projected in
+      let+ (Axis.To (src, ax)) = Axis.to_ projected in
       To (disallow_right (Simple_proj (m, ax, src)))
     in
     let max_with =
-      let* (Axis.Ps ax) = Axis.from dst in
+      let* (Axis.From ax) = Axis.from dst in
       let projected = proj_obj ax dst in
       let+ (Simple_morph.To m) = Simple_morph.right_to ~full projected in
       To (disallow_right (Max_with_simple (ax, m)))
@@ -4067,8 +4068,7 @@ module Lattices_mono = struct
     in
     simple @ projections @ max_with @ const_max
 
-  let generate_morphs_to ~full dst =
-    generate_left_morphs_to ~full dst @ generate_right_morphs_to ~full dst
+  let generate_morphs_to ~full dst = left_to ~full dst @ right_to ~full dst
 
   type 'a covered =
     { full_coverage : 'a;
@@ -4112,7 +4112,7 @@ module Lattices_mono = struct
   let morphs_to_comonadic_with_regionality =
     morphs_to_obj Comonadic_with_regionality
 
-  let morphs_to : type b. full:bool -> b obj -> b packed_to list =
+  let morphs_to : type b. full:bool -> b obj -> b to_ list =
    fun ~full -> function
     | Locality -> force_by_coverage ~full morphs_to_locality
     | Regionality -> force_by_coverage ~full morphs_to_regionality
