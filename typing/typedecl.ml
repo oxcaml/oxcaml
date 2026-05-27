@@ -4023,9 +4023,9 @@ let make_native_repr
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
   | Native_repr_attr_present Unsafe_unextended, Sort (Base Bits8) ->
-    Unextended_int8
+    Unextended_bits8
   | Native_repr_attr_present Unsafe_unextended, Sort (Base Bits16) ->
-    Unextended_int16
+    Unextended_bits16
   | Native_repr_attr_present Unsafe_unextended,
     (Poly | Sort (Product _ | Base (Scannable | Void | Bits32 | Bits64 | Word |
       Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 | Vec512))) ->

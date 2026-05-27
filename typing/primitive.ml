@@ -42,8 +42,8 @@ type native_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
-  | Unextended_int8
-  | Unextended_int16
+  | Unextended_bits8
+  | Unextended_bits16
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -107,8 +107,8 @@ let check_ocaml_value = function
   | _, Unboxed_vector _
   | _, Unboxed_or_untagged_integer _
   | _, Unpacked_product _
-  | _, Unextended_int8
-  | _, Unextended_int16 -> Bad_attribute
+  | _, Unextended_bits8
+  | _, Unextended_bits16 -> Bad_attribute
 
 let is_builtin_prim_name name = String.length name > 0 && name.[0] = '%'
 
@@ -293,8 +293,8 @@ let print p osig_val_decl =
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint) ->
       true
-    | _, Unextended_int8
-    | _, Unextended_int16
+    | _, Unextended_bits8
+    | _, Unextended_bits16
     | _, Same_as_ocaml_repr (Base Void) -> false
       (* The [@unboxed] attribute is not supported on void in our compiler
          or the upstream compiler. *)
@@ -315,8 +315,8 @@ let print p osig_val_decl =
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint)
     | _, Unpacked_product _
-    | _, Unextended_int8
-    | _, Unextended_int16
+    | _, Unextended_bits8
+    | _, Unextended_bits16
     | _, Repr_poly -> false
   in
   let all_unboxed = for_all needs_unboxed_attribute in
@@ -363,7 +363,7 @@ let print p osig_val_decl =
                                    | Untagged_int16) ->
        if all_untagged then [] else [oattr_untagged]
      | Unpacked_product _ -> [oattr_unpacked]
-     | Unextended_int8 | Unextended_int16 -> [oattr_unsafe_unextended]
+     | Unextended_bits8 | Unextended_bits16 -> [oattr_unsafe_unextended]
      | Same_as_ocaml_repr _->
        if all_unboxed || not (needs_unboxed_attribute (m, repr))
        then []
@@ -443,50 +443,50 @@ let equal_native_repr nr1 nr2 =
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
                | Unboxed_vector _ | Same_as_ocaml_repr _
-               | Unpacked_product _ | Unextended_int8 | Unextended_int16)
+               | Unpacked_product _ | Unextended_bits8 | Unextended_bits16)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
     | Unboxed_vector _ | Same_as_ocaml_repr _
-    | Unpacked_product _ | Unextended_int8 | Unextended_int16), Repr_poly
+    | Unpacked_product _ | Unextended_bits8 | Unextended_bits16), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unpacked_product _ |
-     Unextended_int8 | Unextended_int16) -> false
+     Unextended_bits8 | Unextended_bits16) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unpacked_product _ |
-     Unextended_int8 | Unextended_int16) -> false
+     Unextended_bits8 | Unextended_bits16) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_or_untagged_integer _ | Unpacked_product _ |
-     Unextended_int8 | Unextended_int16) -> false
+     Unextended_bits8 | Unextended_bits16) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unpacked_product _ |
-     Unextended_int8 | Unextended_int16) -> false
+     Unextended_bits8 | Unextended_bits16) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_or_untagged_integer _ |
-     Unextended_int8 | Unextended_int16) -> false
-  | Unextended_int8, Unextended_int8 -> true
-  | Unextended_int8,
+     Unextended_bits8 | Unextended_bits16) -> false
+  | Unextended_bits8, Unextended_bits8 -> true
+  | Unextended_bits8,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_or_untagged_integer _ |
-     Unpacked_product _ | Unextended_int16) -> false
-  | Unextended_int16, Unextended_int16 -> true
-  | Unextended_int16,
+     Unpacked_product _ | Unextended_bits16) -> false
+  | Unextended_bits16, Unextended_bits16 -> true
+  | Unextended_bits16,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_or_untagged_integer _ |
-     Unpacked_product _ | Unextended_int8) -> false
+     Unpacked_product _ | Unextended_bits8) -> false
 
 let equal_effects ef1 ef2 =
   match ef1, ef2 with
@@ -529,8 +529,8 @@ module Repr_check = struct
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
-    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_int8
-    | Unextended_int16 -> false
+    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_bits8
+    | Unextended_bits16 -> false
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
@@ -556,7 +556,7 @@ module Repr_check = struct
       if not builtin && sort_contains_bits8_or_bits16 s
       then [Small_int_arg]
       else []
-    | Unextended_int8 | Unextended_int16
+    | Unextended_bits8 | Unextended_bits16
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> []
 
@@ -565,7 +565,7 @@ module Repr_check = struct
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
-    | Unextended_int8 | Unextended_int16 -> [Unextended_return]
+    | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
     | Same_as_ocaml_repr (Product [s1; s2]) ->
       if (sort_is_product s1) ||
          (sort_is_product s2)
