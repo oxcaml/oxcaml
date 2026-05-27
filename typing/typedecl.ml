@@ -534,7 +534,7 @@ let set_private_row env loc p decl =
 (* Makes sure a type is representable. When called with a type variable, will
    lower [any] to a sort variable if [allow_unboxed = true], and to [value]
    if [allow_unboxed = false]. *)
-let check_representable ~why env loc kloc typ =
+let constrain_to_representable ~why env loc kloc typ =
   match Ctype.type_sort ~why ~fixed:false env typ with
   | Ok _ -> ()
   | Error err -> raise (Error (loc,Jkind_sort {env; kloc; typ; err}))
@@ -593,7 +593,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          let ty = ld.ld_type.ctyp_type in
          let ty = match get_desc ty with Tpoly(t,[]) -> t | _ -> ty in
          if extension then begin
-           check_representable ~why:(Extension_label_declaration ld.ld_id)
+           constrain_to_representable
+             ~why:(Extension_label_declaration ld.ld_id)
              env ld.ld_loc kloc ty
          end;
          {Types.ld_id = ld.ld_id;
@@ -624,7 +625,8 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
     if extension then begin
-      check_representable ~why:(Extension_constructor_declaration idx)
+      constrain_to_representable
+        ~why:(Extension_constructor_declaration idx)
         env loc kloc ca.ca_type.ctyp_type
     end;
     {
@@ -2395,7 +2397,8 @@ let update_record_representation
     | Unboxed_product -> Record_unboxed_product
   in
   List.iter
-    (fun (_lbl, ld_type) -> check_representable ~why env loc kloc ld_type)
+    (fun (_lbl, ld_type) ->
+       constrain_to_representable ~why env loc kloc ld_type)
     lbls_and_types;
   let sorts, rep =
     let warn =
