@@ -88,10 +88,15 @@ let reset unit_info =
   Env.set_unit_name (Some unit_info);
   current_unit.uib_unit <- compilation_unit;
   current_unit.uib_defines <- [compilation_unit];
+  current_unit.uib_imports_cmx <- [];
+  current_unit.uib_generic_fns <-
+    { curry_fun = []; apply_fun = []; send_fun = [] };
+  current_unit.uib_export_info <- None;
+  Zero_alloc_info.reset current_unit.uib_zero_alloc_info;
   current_unit.uib_force_link <- !Clflags.link_everything;
   current_unit.uib_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
-  Zero_alloc_info.reset current_unit.uib_zero_alloc_info;
+  current_unit.uib_external_symbols <- [];
   File_sections.Builder.clear current_unit.uib_file_sections
 
 let record_external_symbols () =
