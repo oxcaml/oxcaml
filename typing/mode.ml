@@ -1156,15 +1156,16 @@ module Lattices = struct
     | Comonadic_with_locality -> Locality
     | Comonadic_with_regionality -> Regionality
 
-  let comonadic_with_obj : type a. a obj -> a comonadic_with obj =
-   fun a0 ->
-    match a0 with
-    | Locality -> Comonadic_with_locality
-    | Regionality -> Comonadic_with_regionality
+  let to_areality : type a. a obj -> a areality = function
+    | Locality -> Locality
+    | Regionality -> Regionality
     | Uniqueness_op | Linearity | Monadic_op | Comonadic_with_regionality
     | Comonadic_with_locality | Contention_op | Visibility_op | Portability
     | Forkable | Yielding | Statefulness | Staticity_op ->
       assert false
+
+  let comonadic_with_obj : type a. a obj -> a comonadic_with obj =
+   fun a0 -> to_areality a0 |> areality_comonadic_obj
 
   let is_opposite : type a. a obj -> bool = function
     | Locality -> false
