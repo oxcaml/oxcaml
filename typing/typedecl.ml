@@ -111,7 +111,7 @@ type error =
   | Unavailable_type_constructor of Path.t
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
-  | Incompatible_native_repr_attributes
+  | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
@@ -3768,20 +3768,15 @@ let get_native_repr_attribute attrs ~global_repr =
   with
   | None, None, None, None, None -> Native_repr_attr_absent
   | None, None, None, None, Some repr -> Native_repr_attr_present repr
-  | None, None, None, Some _, None
-  | Some _, None, None, Some _, None
-  | None, Some _, None, Some _, None ->
-    (* We allow declarations like [int8#[@unboxed][@unsafe_unextended]], in
-       which case we ignore the [[@unboxed]]/[[@untagged]] attribute. *)
-    Native_repr_attr_present Unsafe_unextended
   | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
   | None, Some _, None, None, None -> Native_repr_attr_present Untagged
   | None, None, Some _, None, None -> Native_repr_attr_present Unpacked
+  | None, None, None, Some _, None -> Native_repr_attr_present Unsafe_unextended
   | Some { Location.loc }, _, _, _, _
   | _, Some { Location.loc }, _, _, _
   | _, _, Some { Location.loc }, _, _
   | _, _, _, Some { Location.loc }, _ ->
-    raise (Error (loc, Incompatible_native_repr_attributes))
+    raise (Error (loc, Multiple_native_repr_attributes))
 
 let is_upstream_compatible_non_value_unbox env ty =
   (* CR layouts v2.5: This needs to be updated when we support unboxed
@@ -5197,8 +5192,8 @@ let report_error_doc ppf = function
         "cannot be checked"
   | Val_in_structure ->
       fprintf ppf "Value declarations are only allowed in signatures"
-  | Incompatible_native_repr_attributes ->
-      fprintf ppf "Incompatible %a/%a/%a/%a attributes"
+  | Multiple_native_repr_attributes ->
+      fprintf ppf "Too many %a/%a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
