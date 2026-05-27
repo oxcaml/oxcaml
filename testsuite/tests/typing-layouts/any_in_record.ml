@@ -115,6 +115,13 @@ let make (fst : int64#) (snd : int64#) = { fst; snd }
 val make : int64# -> int64# -> int64# t = <fun>
 |}]
 
+let make_float64 (fst : float#) snd = { fst; snd }
+[%%expect{|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 let make (type a : bits64) (fst : a) (snd : a) = { fst; snd }
 [%%expect{|
 val make : ('a : bits64). 'a -> 'a -> 'a t = <fun>
@@ -123,6 +130,11 @@ val make : ('a : bits64). 'a -> 'a -> 'a t = <fun>
 external box_int64 : int64# -> int64 = "%box_int64"
 [%%expect {|
 external box_int64 : int64# -> int64 = "%box_int64"
+|}]
+
+external box_float : float# -> float = "%box_float"
+[%%expect {|
+external box_float : float# -> float = "%box_float"
 |}]
 
 (* Test that typing and genprintval work when the actual type has kind value *)
@@ -172,6 +184,46 @@ let test_set_via_index =
   Idx_mut.get t idx |> box_int64
 [%%expect {|
 val test_set_via_index : int64 = 42L
+|}]
+
+let test_float64_direct =
+  let t = { fst = #1.0; snd = #2.0 } |> Sys.opaque_identity in
+  t.snd |> box_float
+[%%expect {|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let test_float64_via_index =
+  let t = { fst = #1.0; snd = #2.0 } |> Sys.opaque_identity in
+  let idx = ((.snd) : (('a : float64) t, 'a) idx_mut) |> Sys.opaque_identity in
+  Idx_mut.get t idx |> box_float
+[%%expect {|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let test_float64_set_direct =
+  let t = { fst = #1.0; snd = #2.0 } |> Sys.opaque_identity in
+  t.snd <- #42.0;
+  (t |> Sys.opaque_identity).snd |> box_float
+[%%expect {|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let test_float64_set_via_index =
+  let t = { fst = #1.0; snd = #2.0 } |> Sys.opaque_identity in
+  let idx = ((.snd) : (('a : float64) t, 'a) idx_mut) |> Sys.opaque_identity in
+  Idx_mut.set t idx #42.0;
+  Idx_mut.get t idx |> box_float
+[%%expect {|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let test_unboxed_pair_block : #(int64# * int64#) t =
