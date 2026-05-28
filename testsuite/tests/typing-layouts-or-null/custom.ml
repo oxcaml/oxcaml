@@ -231,7 +231,7 @@ type ('a : value_or_null) widened_bad_jkind =
 [@@or_null]
 
 [%%expect{|
-type ('a : value maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
+type ('a : value_maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
 |}]
 
 type ('a : any) widened_any : value_or_null =
@@ -240,7 +240,7 @@ type ('a : any) widened_any : value_or_null =
 [@@or_null]
 
 [%%expect{|
-type ('a : value maybe_separable) widened_any = A | B of 'a [@@or_null]
+type ('a : value_maybe_separable) widened_any = A | B of 'a [@@or_null]
 |}]
 
 type ('a : value_or_null) widened_nullable : value_or_null =
@@ -249,7 +249,7 @@ type ('a : value_or_null) widened_nullable : value_or_null =
 [@@or_null]
 
 [%%expect{|
-type ('a : value maybe_separable) widened_nullable = A | B of 'a [@@or_null]
+type ('a : value_maybe_separable) widened_nullable = A | B of 'a [@@or_null]
 |}]
 
 type ('a : immediate) widened_immediate : value_or_null =

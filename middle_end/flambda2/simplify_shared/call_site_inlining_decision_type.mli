@@ -34,7 +34,7 @@ type t =
         is_a_functor : bool
       }
   | Attribute_always
-  | Replay_history_says_must_inline
+  | Replay_history_says_must_inline of t
   | Begin_unrolling of int
   | Continue_unrolling
   | Definition_says_inline of { was_inline_always : bool }

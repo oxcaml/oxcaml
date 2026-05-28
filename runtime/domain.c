@@ -2289,6 +2289,10 @@ static void caml_do_tick_all_domains(void)
 static void* caml_tick(void *arg)
 {
   (void)arg;
+  /* OpenOnload uses LD_PRELOAD to replace epoll_wait with a busy-polling
+     version, which makes the epoll_wait ticker extremely expensive */
+  if (!caml_tick_use_usleep && caml_globalsym("onload_is_present") != NULL)
+    caml_tick_use_usleep = 1;
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)

@@ -65,7 +65,7 @@ Line 5, characters 8-9:
             ^
 Error: Syntax error
 Line 2, characters 26-28:
-2 | type r = local_ string @  -> unique_ string @ ;;
+2 | type r = local_ string @  -> string @ ;;
                               ^^
 Error: Syntax error: "mode expression" expected.
 Line 2, characters 37-39:

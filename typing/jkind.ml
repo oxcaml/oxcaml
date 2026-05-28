@@ -1898,11 +1898,32 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let apply_kind_modifier env t (modifier : 'a Location.loc option)
-      (f : Scannable_axes.t -> 'a -> Warnings.loc -> Scannable_axes.t) =
-    match modifier with
+  module Scannable_axis = struct
+    type t =
+      | Nullability of Nullability.t
+      | Separability of Separability.t
+
+    let lower_axes (sa : Scannable_axes.t) (axis : t) =
+      match axis with
+      | Nullability axis ->
+        { sa with nullability = Nullability.meet sa.nullability axis }
+      | Separability axis ->
+        { sa with separability = Separability.meet sa.separability axis }
+
+    let annot_of_nullability_annot :
+        Nullability.t Location.loc option -> t Location.loc option =
+      Option.map (Location.map (fun x -> Nullability x))
+
+    let annot_of_separability_annot :
+        Separability.t Location.loc option -> t Location.loc option =
+      Option.map (Location.map (fun x -> Separability x))
+  end
+
+  let apply_scannable_axis ?prior_annot env
+      (axis : Scannable_axis.t Location.loc option) t =
+    match axis with
     | None -> t
-    | Some { txt = modifier; loc } -> (
+    | Some { txt = axis; loc } -> (
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
       | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
@@ -1910,40 +1931,18 @@ module Const = struct
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
         | Some sa ->
+          let sa' = Scannable_axis.lower_axes sa axis in
+          (match prior_annot with
+          | Some (abbrev, rev_axes) when Scannable_axes.equal sa sa' ->
+            Location.prerr_warning loc
+              (Warnings.Redundant_kind_modifier
+                 (Format.asprintf "%a%s" Pprintast.longident abbrev
+                    (String.concat ""
+                       (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+          | _ -> ());
           { t with
-            base =
-              Layout
-                (Layout.Const.set_root_scannable_axes layout (f sa modifier loc))
+            base = Layout (Layout.Const.set_root_scannable_axes layout sa')
           }))
-
-  let set_nullability ~abbrev env (nul : Nullability.t Location.loc option) t =
-    apply_kind_modifier env t nul (fun sa nullability loc ->
-        if nullability = sa.nullability
-        then
-          Location.prerr_warning loc
-            (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a" Pprintast.longident abbrev));
-        { sa with nullability })
-
-  let set_separability ~abbrev env (sep : Separability.t Location.loc option) t
-      =
-    apply_kind_modifier env t sep (fun sa separability loc ->
-        if separability = sa.separability
-        then
-          Location.prerr_warning loc
-            (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a" Pprintast.longident abbrev));
-        { sa with separability })
-
-  let meet_nullability env (nul : Nullability.t Location.loc option) t =
-    apply_kind_modifier env t nul (fun sa nullability _loc ->
-        { sa with nullability = Nullability.meet sa.nullability nullability })
-
-  let meet_separability env (sep : Separability.t Location.loc option) t =
-    apply_kind_modifier env t sep (fun sa separability _loc ->
-        { sa with
-          separability = Separability.meet sa.separability separability
-        })
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -1971,50 +1970,19 @@ module Const = struct
       with_bounds
     }
 
-  let transl_scannable_axes sa_annots =
-    let set_or_warn ~loc ~to_ ~to_string cur_axis =
-      match cur_axis with
-      | Some overridden_by ->
-        Location.prerr_warning loc
-          (Warnings.Overridden_kind_modifier
-             (to_string (Location.get_txt overridden_by)));
-        cur_axis
-      | None -> Some (Location.mkloc to_ loc)
-    in
-    (* This will compute and report errors from right-to-left, which enables
-       better error messages while traversing the list only once. It comes at
-       the cost of warnings being reported in a slightly weirder order. *)
-    List.fold_right
-      (fun ({ txt; loc } : string Location.loc) (nullability, separability) ->
-        match txt with
-        | "non_pointer" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_pointer ~to_string separability) )
-        | "non_pointer64" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_pointer64 ~to_string separability) )
-        | "non_float" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_float ~to_string separability) )
-        | "separable" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Separable ~to_string separability) )
-        | "maybe_separable" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Maybe_separable ~to_string separability) )
-        | "non_null" ->
-          ( Nullability.(set_or_warn ~loc ~to_:Non_null ~to_string nullability),
-            separability )
-        | "maybe_null" ->
-          ( Nullability.(set_or_warn ~loc ~to_:Maybe_null ~to_string nullability),
-            separability )
-        | _ -> raise ~loc (Unknown_kind_modifier txt))
-      sa_annots (None, None)
+  let transl_scannable_axis ({ txt; loc } : string Location.loc) =
+    match txt with
+    | "non_pointer" ->
+      Location.mkloc (Scannable_axis.Separability Non_pointer) loc
+    | "non_pointer64" ->
+      Location.mkloc (Scannable_axis.Separability Non_pointer64) loc
+    | "non_float" -> Location.mkloc (Scannable_axis.Separability Non_float) loc
+    | "separable" -> Location.mkloc (Scannable_axis.Separability Separable) loc
+    | "maybe_separable" ->
+      Location.mkloc (Scannable_axis.Separability Maybe_separable) loc
+    | "non_null" -> Location.mkloc (Scannable_axis.Nullability Non_null) loc
+    | "maybe_null" -> Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
+    | _ -> raise ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2028,7 +1996,6 @@ module Const = struct
     | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p in
-      let nullability, separability = transl_scannable_axes sa_annot in
       if
         sa_annot <> []
         &&
@@ -2040,10 +2007,16 @@ module Const = struct
           (Warnings.Ignored_kind_modifier
              ( Format.asprintf "%a" Pprintast.longident name.txt,
                List.map Location.get_txt sa_annot ));
-      jkind_without_sa
-      |> set_nullability ~abbrev:name.txt env nullability
-      |> set_separability ~abbrev:name.txt env separability
-      |> allow_left |> allow_right
+      let jkind, _abbrev =
+        List.fold_left
+          (fun (jkind, rev_axes) axis ->
+            ( apply_scannable_axis ~prior_annot:(name.txt, rev_axes) env
+                (Some (transl_scannable_axis axis))
+                jkind,
+              axis.Location.txt :: rev_axes ))
+          (jkind_without_sa, []) sa_annot
+      in
+      allow_left jkind |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
@@ -2056,8 +2029,12 @@ module Const = struct
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
-      |> meet_nullability env nullability
-      |> meet_separability env separability
+      (* For scannable axes in mod bounds, we do not print redundancy warnings,
+         as scannable axes in mod bounds will be deprecated anyway *)
+      |> apply_scannable_axis env
+           (Scannable_axis.annot_of_nullability_annot nullability)
+      |> apply_scannable_axis env
+           (Scannable_axis.annot_of_separability_annot separability)
     | Pjk_product ts ->
       let jkinds =
         List.map

@@ -1,0 +1,29 @@
+(library
+ (name merlin_analysis)
+ (public_name merlin-lib.analysis)
+ (flags
+  :standard
+  -open Ocaml_utils
+  -open Ocaml_parsing
+  -open Ocaml_preprocess
+  -open Ocaml_typing
+  -open Merlin_utils
+  -open Merlin_specific
+  -open Merlin_extend
+  -open Merlin_kernel
+  -open Merlin_index_format)
+ (libraries
+  merlin_config
+  merlin_specific
+  merlin_extend
+  merlin_kernel
+  merlin_utils
+  merlin_index_format
+  merlin_sherlodoc
+  ocaml_parsing
+  ocaml_preprocess
+  query_protocol
+  ocaml_typing
+  ocaml_utils
+  str
+  unix))

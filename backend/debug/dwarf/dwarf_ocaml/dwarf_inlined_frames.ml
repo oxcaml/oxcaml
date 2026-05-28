@@ -168,8 +168,8 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
          otherwise suffice for backtraces. *)
       (* XXX maybe this can work for parameters, if we pass the uids through
          in order to construct the correct DIE here? *)
-      [ DAH.create_name (Asm_symbol.encode fun_symbol);
-        DAH.create_linkage_name ~linkage_name:demangled_name;
+      [ DAH.create_name demangled_name;
+        DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
         DAH.create_external ~is_visible_externally:true ]
   in
   let block : Debuginfo.item = List.hd (Debuginfo.to_items block) in

@@ -499,7 +499,7 @@ let x = `A Null
 let y = `B (This "idea")
 
 [%%expect{|
-val x : ('a : value maybe_separable). [> `A of 'a or_null ] = `A Null
+val x : ('a : value_maybe_separable). [> `A of 'a or_null ] = `A Null
 val y : [> `B of string or_null ] = `B (This "idea")
 |}]
 
@@ -525,8 +525,8 @@ let f arr = [| This x for x in arr |]
 let g arr = [: This x for x in arr :]
 
 [%%expect{|
-val f : ('a : value maybe_separable). 'a array -> 'a or_null array = <fun>
-val g : ('a : value maybe_separable). 'a iarray -> 'a or_null iarray = <fun>
+val f : ('a : value_maybe_separable). 'a array -> 'a or_null array = <fun>
+val g : ('a : value_maybe_separable). 'a iarray -> 'a or_null iarray = <fun>
 |}]
 
 

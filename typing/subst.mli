@@ -120,13 +120,20 @@ val module_declaration: scoping -> t -> module_declaration -> module_declaration
 val compose: t -> t -> t
 
 module Ikind_substitution : sig
-  type lookup_result =
+  type type_lookup_result =
     | Lookup_identity
     | Lookup_path of Path.t
     | Lookup_type_fun of type_expr list * type_expr
 
+  type jkind_lookup_result =
+    | Lookup_jkind_identity
+    | Lookup_jkind_path of Path.t
+    | Lookup_jkind_const of jkind_const_desc_lr
+
   val substitute_decl_ikind_with_lookup :
-    (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
+    (lookup_type:(Path.t -> type_lookup_result) ->
+     lookup_jkind:(Path.t -> jkind_lookup_result) ->
+     type_ikind -> type_ikind) ref
 end
 
 module Unsafe: sig

@@ -68,7 +68,7 @@ module type S =
     val outval_of_value :
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
-          Env.t -> t -> type_expr -> Outcometree.out_value
+          Env.t -> t -> Types.Lpoly.t -> type_expr -> Outcometree.out_value
   end
 
 module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
@@ -290,7 +290,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
 
-    let outval_of_value max_steps max_depth check_depth env obj ty =
+    let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
+      if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"
+      else
 
       let printer_steps = ref max_steps in
 
@@ -561,7 +563,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                             Variant_unboxed)
                           | Record_unboxed
                               -> Outval_record_unboxed
-                          | Record_boxed _ | Record_float | Record_ufloat
+                          | Record_boxed | Record_float | Record_ufloat
                           | Record_inlined (_, Constructor_uniform_value, _)
                               -> Outval_record_boxed
                           | Record_inlined (_, Constructor_mixed mixed, _)

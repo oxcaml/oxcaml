@@ -2542,6 +2542,8 @@ Line 1, characters 13-33:
                  ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [%send] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 external f : int -> int -> float# = "%sendself";;
@@ -2551,6 +2553,8 @@ Line 1, characters 13-33:
                  ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [%sendself] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 external f : int -> float# -> int -> int -> int = "%sendcache";;
@@ -2560,6 +2564,8 @@ Line 1, characters 13-47:
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [%sendcache] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 (*********************************************************)

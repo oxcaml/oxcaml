@@ -645,6 +645,38 @@ clz:
   ret
 |}]
 
+let shl x y = Int8_u.shl x y
+[%%expect_asm X86_64{|
+shl:
+  movq  %rbx, %rcx
+  andl  $7, %ecx
+  salq  %cl, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
+|}]
+
+let sar x y = Int8_u.sar x y
+[%%expect_asm X86_64{|
+sar:
+  movq  %rbx, %rcx
+  andl  $7, %ecx
+  sarq  %cl, %rax
+  ret
+|}]
+
+let shr x y = Int8_u.shr x y
+[%%expect_asm X86_64{|
+shr:
+  movq  %rbx, %rcx
+  andl  $7, %ecx
+  andl  $255, %eax
+  shrq  %cl, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
+|}]
+
 let select x y z = Int8_u.select x y z
 [%%expect_asm X86_64{|
 select:

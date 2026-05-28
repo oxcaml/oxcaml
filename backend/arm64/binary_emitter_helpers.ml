@@ -41,6 +41,11 @@ let should_save_binary_sections () = !Oxcaml_flags.verify_binary_emitter
 let begin_emission () =
   if should_use_binary_emitter ()
   then (
+    (* If a previous compilation aborted between [end_emission] and
+       [Proc.flush_pending_jit_run] (e.g. an exception inside [gen ()] after
+       [end_assembly] had already stashed the hook), drop the stale thunk so it
+       does not run later against a different compilation's state. *)
+    Proc.clear_pending_jit_run ();
     (* When saving binary sections (for verification), emit relocations for all
        symbol references to match assembler behavior *)
     if should_save_binary_sections ()
@@ -183,12 +188,13 @@ let end_emission () =
     (* Save sections to files if needed for verification or explicit saving *)
     if should_save_binary_sections ()
     then save_sections_to_files sections section_tbl;
-    (* Call the JIT hook if registered *)
+    (* Defer the JIT hook invocation until [Proc.assemble_file] time so that any
+       recursive compilation triggered by the loaded code does not interfere
+       with the outer compilation's [Compilenv]/zero-alloc bookkeeping. *)
     match BE.For_jit.Internal_assembler.get () with
     | None -> ()
     | Some hook ->
-      (* The hook expects (string * assembled_section) list and returns a file
-         writer function. We ignore the file writer for JIT. Use the aggregated
-         sections where all .text.* are merged into .text. *)
-      let _file_writer = hook sections_for_jit in
-      ())
+      Proc.set_pending_jit_run (fun () ->
+          (* The hook returns a file writer we don't use for JIT. *)
+          let _file_writer : string -> unit = hook sections_for_jit in
+          ()))

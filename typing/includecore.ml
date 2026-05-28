@@ -1024,7 +1024,7 @@ module Record_diffing = struct
         | _, Record_mixed _ ->
            Some (Record_mismatch (Mixed_representation Second))
 
-        | Record_boxed _, Record_boxed _ -> None
+        | Record_boxed, Record_boxed -> None
         end
       | Unboxed_product ->
         begin match rep1, rep2 with

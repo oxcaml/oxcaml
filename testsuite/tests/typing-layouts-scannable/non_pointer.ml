@@ -20,9 +20,9 @@ type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
 type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
-type t : value non_pointer & value maybe_separable & float64
+type t : value non_pointer & value_maybe_separable & float64
 [%%expect{|
-type t : value non_pointer & value maybe_separable & float64
+type t : value non_pointer & value_maybe_separable & float64
 |}]
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
@@ -38,10 +38,10 @@ type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
 
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
@@ -52,10 +52,10 @@ type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
 
-type ('a : value maybe_separable) accepts_maybeptr_val
+type ('a : value_maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 [%%expect{|
-type ('a : value maybe_separable) accepts_maybeptr_val
+type ('a : value_maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 |}]
 
@@ -249,10 +249,10 @@ Error: This type "t_maybeptr_val" should be an instance of type
 
 (* unboxed records *)
 
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
@@ -293,7 +293,7 @@ let f x =
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
-let f (type a : value maybe_separable) (x : a) =
+let f (type a : value_maybe_separable) (x : a) =
   let require_np (y : (_ : value non_pointer)) = () in
   require_np y
 [%%expect{|
@@ -311,7 +311,7 @@ val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
 let f (type a : value non_pointer) (x : a) =
-  (* here, y is value maybe_separable *)
+  (* here, y is value_maybe_separable *)
   let g y = () in
   g x
 [%%expect{|
@@ -319,7 +319,7 @@ val f : ('a : value non_pointer). 'a -> unit = <fun>
 |}]
 
 let f (t : (_ : value non_pointer & value)) =
-  (* here, x is value maybe_separable *)
+  (* here, x is value_maybe_separable *)
   let g (type a : value non_pointer) (x : a) = () in
   let #(np, v) = t in
   g np
@@ -457,7 +457,7 @@ Error: Signature mismatch:
 module M1 : sig
   type ('a : value non_pointer) t : value
 end = struct
-  type ('a : value maybe_separable) t = t_nonptr_val
+  type ('a : value_maybe_separable) t = t_nonptr_val
 end
 [%%expect{|
 module M1 : sig type ('a : value non_pointer) t end

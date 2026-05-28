@@ -49,7 +49,7 @@ let dir_trace ppf lid =
               Format.fprintf ppf "%a is already traced (under the name %a).@."
               Printtyp.path path
               Printtyp.path opath
-          | None ->
+          | None when Types.Lpoly.is_empty_exn desc.val_lpoly ->
               (* Instrument the old closure *)
               traced_functions :=
                 { path = path;
@@ -63,6 +63,8 @@ let dir_trace ppf lid =
                  to the instrumentation function *)
               set_code_pointer clos tracing_function_ptr;
               Format.fprintf ppf "%a is now traced.@." Printtyp.longident lid
+          | None ->
+              Format.fprintf ppf "layout poly is not supported for tracing.@."
           end else
             Format.fprintf ppf "%a is not a function.@." Printtyp.longident lid
     end

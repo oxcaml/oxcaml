@@ -55,9 +55,10 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
                                     let untagged = %untag_imm (Pccall_3) in
                                     switch untagged
                                       | 0 -> k (0)
-                                      | 1 -> k1
-                                               pop(regular k1)
-                                               ($camlString_switch__Pmakeblock35)))))))
+                                      | 1 ->
+                                        k1
+                                          pop(regular k1)
+                                          ($camlString_switch__Pmakeblock35)))))))
 in
 let $camlString_switch__of_string_1 = closure of_string_0_1 @of_string in
 let $camlString_switch = Block 0 ($camlString_switch__of_string_1) in

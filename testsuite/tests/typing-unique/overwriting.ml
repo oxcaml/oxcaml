@@ -8,7 +8,7 @@ type record_update = { x : string; y : string }
 type record_update = { x : string; y : string; }
 |}]
 
-let update (unique_ r : record_update) =
+let update (r : record_update @ unique) =
   let x = overwrite_ r with { x = "foo" } in
   x.x
 [%%expect{|
@@ -21,7 +21,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : record_update) =
+let update (r : record_update @ unique) =
   let x = overwrite_ r with ({ x = "foo" } : record_update) in
   x.x
 [%%expect{|
@@ -77,7 +77,7 @@ Line 2, characters 21-22:
    - the resulting value can be local/global
    - the value written in the record can be local/global *)
 
-let gc_soundness_bug (local_ unique_ r) (local_ x) =
+let gc_soundness_bug (r @ local unique) (local_ x) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 31-32:
@@ -89,7 +89,7 @@ Error: This value is "local"
          which is expected to be "global".
 |}]
 
-let disallowed_by_locality (local_ unique_ r) (local_ x) =
+let disallowed_by_locality (r @ local unique) (local_ x) =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 22-23:
@@ -101,7 +101,7 @@ Error: This value is "local" to the parent region
          which is expected to be "global".
 |}]
 
-let gc_soundness_bug (unique_ r) (local_ x) =
+let gc_soundness_bug (r @ unique) (local_ x) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 31-32:
@@ -113,7 +113,7 @@ Error: This value is "local"
          which is expected to be "global".
 |}]
 
-let disallowed_by_locality (unique_ r) (local_ x) =
+let disallowed_by_locality (r @ unique) (local_ x) =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 22-23:
@@ -125,7 +125,7 @@ Error: This value is "local" to the parent region
          which is expected to be "global".
 |}]
 
-let gc_soundness_no_bug (local_ unique_ r) x =
+let gc_soundness_no_bug (r @ local unique) x =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 11-34:
@@ -140,7 +140,7 @@ Uncaught exception: Misc.Fatal_error
 (* This code should fail if we used a real allocation { r with x } here.
    But we don't: the overwritten record may be regional in this case since
    no allocation takes place. We check four related cases below. *)
-let returning_regional (local_ unique_ r) x =
+let returning_regional (r @ local unique) x =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 2-25:
@@ -189,7 +189,7 @@ Line 3, characters 22-23:
 Error: The value "r" is local, so it cannot be used inside an exclave_
 |}]
 
-let disallowed_by_regionality (local_ unique_ r) x =
+let disallowed_by_regionality (r @ local unique) x =
   let r = overwrite_ r with { x } in
   let ref = ref r in
   ref
@@ -200,7 +200,7 @@ Line 3, characters 16-17:
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
-let gc_soundness_no_bug (unique_ r) x =
+let gc_soundness_no_bug (r @ unique) x =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 11-34:
@@ -212,7 +212,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let gc_soundness_no_bug (unique_ r) x =
+let gc_soundness_no_bug (r @ unique) x =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 2-25:
@@ -864,7 +864,7 @@ type 'a mutable_record = { mutable m : 'a }
 let mutable_field_aliased r =
   let y = OptionA "foo" in
   r.m <- y;
-  (unique_ r), y
+  (r : @ unique), y
 [%%expect{|
 type 'a mutable_record = { mutable m : 'a; }
 val mutable_field_aliased :
@@ -872,13 +872,13 @@ val mutable_field_aliased :
 |}]
 
 let mutable_field_aliased r =
-  unique_ r.m
+  (r.m : @ unique)
 [%%expect{|
-Line 2, characters 10-13:
-2 |   unique_ r.m
-              ^^^
+Line 2, characters 3-6:
+2 |   (r.m : @ unique)
+       ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 2, characters 10-11.
+         because it is the field "m" (with some modality) of the record at line 2, characters 3-4.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1065,7 +1065,7 @@ type tuple_unlabeled = string * string
 type tuple_unlabeled = string * string
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with (_, _) in
   x
 [%%expect{|
@@ -1078,7 +1078,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with ("foo", _) in
   x
 [%%expect{|
@@ -1091,7 +1091,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with ("foo", "bar") in
   x
 [%%expect{|
@@ -1104,7 +1104,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with ("foo", "bar", "baz") in
 x
 [%%expect{|
@@ -1121,7 +1121,7 @@ type tuple_labeled = x:string * y:string
 type tuple_labeled = x:string * y:string
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", _) in
   x
 [%%expect{|
@@ -1134,7 +1134,7 @@ Error: This expression has type "x:string * 'a"
 |}]
 
 (* CR uniqueness: Would be good to support [~y:_], without the parentheses, if possible *)
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:(_), ~y:(_)) in
   x
 [%%expect{|
@@ -1147,7 +1147,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", ~y:(_)) in
   x
 [%%expect{|
@@ -1160,7 +1160,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", ~y:"bar") in
   x
 [%%expect{|
@@ -1180,13 +1180,13 @@ Uncaught exception: Misc.Fatal_error
    Currently these are syntax errors. *)
 
 (*
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", ..) in
   x
 [%%expect{|
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo") in
   x
 [%%expect{|

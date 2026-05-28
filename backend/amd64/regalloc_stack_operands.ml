@@ -263,7 +263,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Intop_imm ((Imulh _ | Imul | Idiv | Imod), _))
   | Op (Specific (Irdtsc | Irdpmc))
-  | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
+  | Op (Intop (Ipopcnt | Iclz | Ictz))
   | Op (Intop_atomic _)
   | Op
       ( Move | Spill | Reload
@@ -283,7 +283,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
-  | Op (Intop_imm ((Ipopcnt | Iclz _ | Ictz _), _))
+  | Op (Intop_imm ((Ipopcnt | Iclz | Ictz), _))
   | Stack_check _
   | Op (Specific (Illvm_intrinsic _)) ->
     (* should not happen *)

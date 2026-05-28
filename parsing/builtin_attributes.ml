@@ -131,6 +131,7 @@ let builtin_attrs =
   ; "regalloc_param"
   ; "implicit_kind"
   ; "flatten_floats"
+  ; "represent_as_float_array"
   ]
 
 let builtin_attrs =
@@ -519,6 +520,9 @@ let has_unboxed attrs = has_attribute "unboxed" attrs
 let has_boxed attrs = has_attribute "boxed" attrs
 
 let has_flatten_floats attrs = has_attribute "flatten_floats" attrs
+
+let has_represent_as_float_array attrs =
+  has_attribute "represent_as_float_array" attrs
 
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs

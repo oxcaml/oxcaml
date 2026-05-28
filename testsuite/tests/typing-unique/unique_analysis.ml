@@ -5,7 +5,7 @@
 (* This file is to test uniqueness_analysis.ml *)
 
 (* First some helper functions *)
-let unique_id : unique_ 'a -> unique_ 'a = fun x -> x
+let unique_id : 'a @ unique -> 'a @ unique = fun x -> x
 [%%expect{|
 val unique_id : 'a @ unique -> 'a @ unique = <fun>
 |}]
@@ -15,7 +15,7 @@ let aliased_id : 'a -> 'a = fun x -> x
 val aliased_id : 'a -> 'a = <fun>
 |}]
 
-let ignore_once: once_ 'a -> unit = fun x -> ()
+let ignore_once: 'a @ once -> unit = fun x -> ()
 
 type box = { x : int }
 [%%expect{|
@@ -23,7 +23,7 @@ val ignore_once : 'a @ once -> unit = <fun>
 type box = { x : int; }
 |}]
 
-let update : unique_ box -> unique_ box = unique_id
+let update : box @ unique -> box @ unique = unique_id
 [%%expect{|
 val update : box @ unique -> box @ unique = <fun>
 |}]
@@ -31,35 +31,35 @@ val update : box @ unique -> box @ unique = <fun>
 
 (* testing Texp_ifthenelse  *)
 
-let branching (unique_ x) = unique_ if true then x else x
+let branching (x @ unique) = (if true then x else x : @ unique)
 [%%expect{|
 val branching : 'a @ unique -> 'a = <fun>
 |}]
 
 (* Uniqueness and linearity have similar restrictions on control-flow.
    Therefore, in the rest we will only constrain uniqueness *)
-let branching (once_ x) = if true then x else x
+let branching (x @ once) = (if true then x else x : @ unique)
 [%%expect{|
-val branching : 'a @ once -> 'a @ once = <fun>
+val branching : 'a @ unique once -> 'a @ once = <fun>
 |}]
 
 let branching b =
-  let unique_ r = { x = 23 } in
+  let (r @ unique) = { x = 23 } in
   if b then update r
        else update r
 [%%expect{|
 val branching : bool -> box = <fun>
 |}]
 
-let sequence (unique_ x) = unique_ let y = x in (x, y)
+let sequence (x @ unique) = (let y = x in (x, y) : @ unique)
 [%%expect{|
-Line 1, characters 52-53:
-1 | let sequence (unique_ x) = unique_ let y = x in (x, y)
-                                                        ^
+Line 1, characters 46-47:
+1 | let sequence (x @ unique) = (let y = x in (x, y) : @ unique)
+                                                  ^
 Error: This value is used here, but it is also being used as unique at:
-Line 1, characters 49-50:
-1 | let sequence (unique_ x) = unique_ let y = x in (x, y)
-                                                     ^
+Line 1, characters 43-44:
+1 | let sequence (x @ unique) = (let y = x in (x, y) : @ unique)
+                                               ^
 
 |}]
 
@@ -88,116 +88,116 @@ Line 3, characters 18-19:
 
 |}]
 
-let children_unique (unique_ xs : float list) =
+let children_unique (xs : float list @ unique) =
   match xs with
   | [] -> (0., [])
-  | x :: xx -> unique_ (x, xx)
+  | x :: xx -> ((x, xx) : @ unique)
 [%%expect{|
 val children_unique : float list @ unique -> float * float list = <fun>
 |}]
 
-let borrow_match (unique_ fs : 'a list) =
+let borrow_match (fs : 'a list @ unique) =
   match fs with
   | [] -> []
-  | x :: xs as gs -> unique_ gs
+  | x :: xs as gs -> (gs : @ unique)
 [%%expect{|
 val borrow_match : 'a list @ unique -> 'a list = <fun>
 |}]
 
-let borrow_match (unique_ fs : 'a list) =
+let borrow_match (fs : 'a list @ unique) =
   match fs with
     | [] -> []
-    | x :: xs -> unique_ fs
+    | x :: xs -> (fs : @ unique)
 [%%expect{|
 val borrow_match : 'a list @ unique -> 'a list = <fun>
 |}]
 
-let dup_child (unique_ fs : 'a list) =
+let dup_child (fs : 'a list @ unique) =
   match fs with
   | [] -> ([], [])
-  | x :: xs as gs -> (unique_ gs), xs
+  | x :: xs as gs -> ((gs : @ unique)), xs
 [%%expect{|
-Line 4, characters 35-37:
-4 |   | x :: xs as gs -> (unique_ gs), xs
-                                       ^^
+Line 4, characters 40-42:
+4 |   | x :: xs as gs -> ((gs : @ unique)), xs
+                                            ^^
 Error: This value is used here,
        but it is part of a value that is also being used as unique at:
-Line 4, characters 21-33:
-4 |   | x :: xs as gs -> (unique_ gs), xs
-                         ^^^^^^^^^^^^
+Line 4, characters 21-38:
+4 |   | x :: xs as gs -> ((gs : @ unique)), xs
+                         ^^^^^^^^^^^^^^^^^
 
 |}]
 
-let dup_child (unique_ fs : 'a list) =
+let dup_child (fs : 'a list @ unique) =
   match fs with
   | [] -> ([], [])
-  | x :: xs as gs -> gs, unique_ xs
+  | x :: xs as gs -> gs, (xs : @ unique)
 [%%expect{|
-Line 4, characters 25-35:
-4 |   | x :: xs as gs -> gs, unique_ xs
-                             ^^^^^^^^^^
+Line 4, characters 25-40:
+4 |   | x :: xs as gs -> gs, (xs : @ unique)
+                             ^^^^^^^^^^^^^^^
 Error: This value is used here as unique,
        but it is part of a value that is also being used at:
 Line 4, characters 21-23:
-4 |   | x :: xs as gs -> gs, unique_ xs
+4 |   | x :: xs as gs -> gs, (xs : @ unique)
                          ^^
 
 |}]
-let dup_child (unique_ fs : 'a list) =
+let dup_child (fs : 'a list @ unique) =
   match fs with
   | [] -> ([], [])
-  | x :: xs as gs -> (unique_ xs), gs
+  | x :: xs as gs -> ((xs : @ unique)), gs
 [%%expect{|
-Line 4, characters 35-37:
-4 |   | x :: xs as gs -> (unique_ xs), gs
-                                       ^^
+Line 4, characters 40-42:
+4 |   | x :: xs as gs -> ((xs : @ unique)), gs
+                                            ^^
 Error: This value is used here,
        but part of it is also being used as unique at:
-Line 4, characters 21-33:
-4 |   | x :: xs as gs -> (unique_ xs), gs
-                         ^^^^^^^^^^^^
+Line 4, characters 21-38:
+4 |   | x :: xs as gs -> ((xs : @ unique)), gs
+                         ^^^^^^^^^^^^^^^^^
 
 |}]
-let dup_child (unique_ fs : 'a list) =
+let dup_child (fs : 'a list @ unique) =
   match fs with
   | [] -> ([], [])
-  | x :: xs as gs -> xs, unique_ gs
+  | x :: xs as gs -> xs, (gs : @ unique)
 [%%expect{|
-Line 4, characters 25-35:
-4 |   | x :: xs as gs -> xs, unique_ gs
-                             ^^^^^^^^^^
+Line 4, characters 25-40:
+4 |   | x :: xs as gs -> xs, (gs : @ unique)
+                             ^^^^^^^^^^^^^^^
 Error: This value is used here as unique,
        but part of it is also being used at:
 Line 4, characters 21-23:
-4 |   | x :: xs as gs -> xs, unique_ gs
+4 |   | x :: xs as gs -> xs, (gs : @ unique)
                          ^^
 
 |}]
 
 
 
-let or_patterns1 : unique_ float list -> float list -> float =
+let or_patterns1 : float list @ unique -> float list -> float =
   fun x y -> match x, y with
-  | z :: _, _ | _, z :: _ -> unique_ z
+  | z :: _, _ | _, z :: _ -> (z : @ unique)
   | _, _ -> 42.0
 [%%expect{|
-Line 3, characters 37-38:
-3 |   | z :: _, _ | _, z :: _ -> unique_ z
-                                         ^
+Line 3, characters 30-31:
+3 |   | z :: _, _ | _, z :: _ -> (z : @ unique)
+                                  ^
 Error: This value is "aliased"
          because it is contained (via constructor "::") in the value at line 3, characters 19-25
          which is "aliased".
        However, the highlighted expression is expected to be "unique".
 |}]
 
-let or_patterns2 : float list -> unique_ float list -> float =
+let or_patterns2 : float list -> float list @ unique -> float =
   fun x y -> match x, y with
-  | z :: _, _ | _, z :: _ -> unique_ z
+  | z :: _, _ | _, z :: _ -> (z : @ unique)
   | _, _ -> 42.0
 [%%expect{|
-Line 3, characters 37-38:
-3 |   | z :: _, _ | _, z :: _ -> unique_ z
-                                         ^
+Line 3, characters 30-31:
+3 |   | z :: _, _ | _, z :: _ -> (z : @ unique)
+                                  ^
 Error: This value is "aliased"
          because it is contained (via constructor "::") in the value at line 3, characters 4-10
          which is "aliased".
@@ -205,7 +205,7 @@ Error: This value is "aliased"
 |}]
 
 let or_patterns3 p =
-  let unique_ x = 3 in let unique_ y = 4 in
+  let (x @ unique) = 3 in let (y @ unique) = 4 in
   match p, x, y with
   | true, z, _ | false, _, z -> let _ = unique_id z in unique_id y
 [%%expect{|
@@ -220,7 +220,7 @@ Line 4, characters 50-51:
 |}]
 
 let or_patterns4 p =
-  let unique_ x = 3 in let unique_ y = 4 in
+  let (x @ unique) = 3 in let (y @ unique) = 4 in
   match p, x, y with
   | true, z, _ | false, _, z -> let _ = unique_id x in unique_id y
 [%%expect{|
@@ -228,7 +228,7 @@ val or_patterns4 : bool -> int = <fun>
 |}]
 
 let or_patterns5 p =
-  let unique_ x = 3 in let unique_ y = 4 in
+  let (x @ unique) = 3 in let (y @ unique) = 4 in
   match p, x, y with
   | true, z, _ | false, _, z -> let _ = unique_id z in unique_id x
 [%%expect{|
@@ -243,16 +243,16 @@ Line 4, characters 50-51:
 |}]
 
 let mark_top_aliased =
-  let unique_ xs = 2 :: 3 :: [] in
+  let (xs @ unique) = 2 :: 3 :: [] in
   match xs with
   | x :: xx ->
       let _ = unique_id xs in
-      unique_ xx
+      (xx : @ unique)
   | [] -> []
 [%%expect{|
-Line 6, characters 6-16:
-6 |       unique_ xx
-          ^^^^^^^^^^
+Line 6, characters 6-21:
+6 |       (xx : @ unique)
+          ^^^^^^^^^^^^^^^
 Error: This value is used here,
        but it is part of a value that has already been used as unique at:
 Line 5, characters 24-26:
@@ -262,14 +262,14 @@ Line 5, characters 24-26:
 |}]
 
 let mark_top_aliased =
-  let unique_ xs = 2 :: 3 :: [] in
+  let (xs @ unique) = 2 :: 3 :: [] in
   let _ = unique_id xs in
   match xs with
-  | x :: xx -> unique_ xx
+  | x :: xx -> (xx : @ unique)
   | [] -> []
 [%%expect{|
 Line 5, characters 4-11:
-5 |   | x :: xx -> unique_ xx
+5 |   | x :: xx -> (xx : @ unique)
         ^^^^^^^
 Error: This value is read from here,
        but it has already been used as unique at:
@@ -297,7 +297,7 @@ val mark_aliased_in_one_branch : bool -> float @ unique -> float * float =
 
 let expr_tuple_match f x y =
   match f x, y with
-  | (a, b), c -> unique_ (a, c)
+  | (a, b), c -> ((a, c) : @ unique)
 [%%expect{|
 val expr_tuple_match :
   ('a -> 'b * 'c @ unique) -> 'a -> 'd @ unique -> 'b * 'd = <fun>
@@ -305,7 +305,7 @@ val expr_tuple_match :
 
 let expr_tuple_match f x y =
   match f x, y with
-  | (a, b) as t, c -> let d = unique_id t in unique_ (c, d)
+  | (a, b) as t, c -> let d = unique_id t in ((c, d) : @ unique)
 [%%expect{|
 val expr_tuple_match :
   ('a -> 'b * 'c @ unique) -> 'a -> 'd @ unique -> 'd * ('b * 'c) = <fun>
@@ -313,15 +313,15 @@ val expr_tuple_match :
 
 let expr_tuple_match f x y =
   match f x, y with
-  | (a, b) as t, c -> let d = unique_id t in unique_ (a, d)
+  | (a, b) as t, c -> let d = unique_id t in ((a, d) : @ unique)
 [%%expect{|
-Line 3, characters 54-55:
-3 |   | (a, b) as t, c -> let d = unique_id t in unique_ (a, d)
-                                                          ^
+Line 3, characters 47-48:
+3 |   | (a, b) as t, c -> let d = unique_id t in ((a, d) : @ unique)
+                                                   ^
 Error: This value is used here,
        but it is part of a value that has already been used as unique at:
 Line 3, characters 40-41:
-3 |   | (a, b) as t, c -> let d = unique_id t in unique_ (a, d)
+3 |   | (a, b) as t, c -> let d = unique_id t in ((a, d) : @ unique)
                                             ^
 
 |}]
@@ -368,7 +368,7 @@ Line 2, characters 12-13:
 |}]
 
 let unique_match_on a b =
-  let unique_ t = (a, b) in t
+  let (t @ unique) = (a, b) in t
 [%%expect{|
 val unique_match_on : 'a @ unique -> 'b @ unique -> 'a * 'b = <fun>
 |}]
@@ -378,33 +378,33 @@ type ('a, 'b) record = { foo : 'a; bar : 'b }
 type ('a, 'b) record = { foo : 'a; bar : 'b; }
 |}]
 
-let match_function : unique_ 'a * 'b -> 'a * ('a * 'b) =
+let match_function : ('a * 'b) @ unique -> 'a * ('a * 'b) =
   function
-  | (a, b) as t -> unique_ (a, t)
+  | (a, b) as t -> ((a, t) : @ unique)
 [%%expect{|
-Line 3, characters 31-32:
-3 |   | (a, b) as t -> unique_ (a, t)
-                                   ^
+Line 3, characters 24-25:
+3 |   | (a, b) as t -> ((a, t) : @ unique)
+                            ^
 Error: This value is used here,
        but part of it is also being used as unique at:
-Line 3, characters 28-29:
-3 |   | (a, b) as t -> unique_ (a, t)
-                                ^
+Line 3, characters 21-22:
+3 |   | (a, b) as t -> ((a, t) : @ unique)
+                         ^
 
 |}]
 
 let tuple_parent_marked a b =
   match (a, b) with
-  | ((_, a), b) as t -> unique_ (a, t)
+  | ((_, a), b) as t -> ((a, t) : @ unique)
 [%%expect{|
-Line 3, characters 36-37:
-3 |   | ((_, a), b) as t -> unique_ (a, t)
-                                        ^
+Line 3, characters 29-30:
+3 |   | ((_, a), b) as t -> ((a, t) : @ unique)
+                                 ^
 Error: This value is used here,
        but part of it is also being used as unique at:
-Line 3, characters 33-34:
-3 |   | ((_, a), b) as t -> unique_ (a, t)
-                                     ^
+Line 3, characters 26-27:
+3 |   | ((_, a), b) as t -> ((a, t) : @ unique)
+                              ^
 
 |}]
 
@@ -432,7 +432,7 @@ type point = { dim : int; x : float; y : float; z : float; }
 let record_mode_vars (p : point) =
   let x = unique_id p.x in
   let y = (p.y, p.y) in
-  (x, y, unique_ p.z)
+  (x, y, (p.z : @ unique))
 [%%expect{|
 val record_mode_vars : point @ unique -> float * (float * float) * float =
   <fun>
@@ -441,7 +441,7 @@ val record_mode_vars : point @ unique -> float * (float * float) * float =
 let record_mode_vars (p : point) =
   let x = unique_id p.x in
   let y = (p.x, p.y) in
-  (x, y, unique_ p.z)
+  (x, y, (p.z : @ unique))
 [%%expect{|
 Line 3, characters 11-14:
 3 |   let y = (p.x, p.y) in
@@ -456,7 +456,7 @@ Line 2, characters 20-23:
 let record_mode_vars (p : point) =
   let y = (p.x, p.y) in
   let x = unique_id p.x in
-  (x, y, unique_ p.z)
+  (x, y, (p.z : @ unique))
 [%%expect{|
 Line 3, characters 20-23:
 3 |   let x = unique_id p.x in
@@ -470,7 +470,7 @@ Line 2, characters 11-14:
 
 (* testing Texp_function; closure over implicit borrowing *)
 let foo () =
-  let unique_ r = {dim=1; x=2.0; y=3.0; z=4.0} in
+  let (r @ unique) = {dim=1; x=2.0; y=3.0; z=4.0} in
   let _bar () = match r with
     | {dim; x; y; z} -> ()
    in
@@ -499,7 +499,7 @@ val foo : unit -> point = <fun>
 |}]
 
 let foo () =
-  let unique_ r = {dim=1; x=2.0; y=3.0; z=4.0} in
+  let (r @ unique) = {dim=1; x=2.0; y=3.0; z=4.0} in
   let _l = lazy (r.z) in
   unique_id r
 [%%expect{|
@@ -589,7 +589,7 @@ val foo : unit -> unit = <fun>
 
  (* Similarly for linearity *)
 let foo () =
-  let r = once_ {x = Value.mk (); y = Value.mk ()} in
+  let r = ({x = Value.mk (); y = Value.mk ()} : @ once) in
   ignore_once r.y;
   ignore_once r;
 [%%expect{|
@@ -597,7 +597,7 @@ val foo : unit -> unit = <fun>
 |}]
 
 let foo () =
-  let r = once_ {x = Value.mk (); y = Value.mk ()} in
+  let r = ({x = Value.mk (); y = Value.mk ()} : @ once) in
   ignore_once r.x;
   ignore_once r;
 [%%expect{|
@@ -633,7 +633,7 @@ Line 3, characters 21-24:
 (* testing record update in the presense of modalities *)
 let foo () =
   let r = {x = Value.mk (); y = Value.mk ()} in
-  ignore (unique_ {r with x = Value.mk ()});
+  ignore (({r with x = Value.mk ()} : @ unique));
   (* r.y has been used aliased; in the following we will use r as unique *)
   ignore (unique_id r)
 [%%expect{|
@@ -642,7 +642,7 @@ val foo : unit -> unit = <fun>
 
 let foo () =
   let r = {x = Value.mk (); y = Value.mk ()} in
-  ignore (unique_ {r with y = Value.mk ()});
+  ignore (({r with y = Value.mk ()} : @ unique));
   (* r.x has been used unique; in the following we will use r as unique *)
   ignore (unique_id r)
 [%%expect{|
@@ -651,9 +651,9 @@ Line 5, characters 20-21:
                         ^
 Error: This value is used here,
        but part of it has already been used as unique at:
-Line 3, characters 19-20:
-3 |   ignore (unique_ {r with y = Value.mk ()});
-                       ^
+Line 3, characters 12-13:
+3 |   ignore (({r with y = Value.mk ()} : @ unique));
+                ^
 
 |}]
 
@@ -676,7 +676,7 @@ val foo : unit -> unit = <fun>
 
  (* Similarly for linearity *)
 let foo () =
-  let r = once_ (R_aliased (Value.mk (), Value.mk ())) in
+  let r = (R_aliased (Value.mk (), Value.mk ()) : @ once) in
   let R_aliased (_, y) = r in
   ignore_once y;
   ignore_once r;
@@ -685,7 +685,7 @@ val foo : unit -> unit = <fun>
 |}]
 
 let foo () =
-  let r = once_ (R_aliased (Value.mk (), Value.mk ())) in
+  let r = (R_aliased (Value.mk (), Value.mk ()) : @ once) in
   let R_aliased (x, _) = r in
   ignore_once x;
   ignore_once r;
@@ -793,7 +793,7 @@ Line 3, characters 20-21:
 
 let foo () =
   let t = #("hello", "world") in
-  let unique_use_tuple : ('a : value & value). unique_ 'a -> unit = fun _ -> () in
+  let unique_use_tuple : ('a : value & value). 'a @ unique -> unit = fun _ -> () in
   unique_use_tuple t;
   let #(_, _) = t in
   ()

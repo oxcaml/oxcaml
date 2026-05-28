@@ -97,11 +97,11 @@ let find_compatible_allocations :
           | Static_cast _ | Dls_get | Tls_get | Domain_index
           | Intop
               ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-              | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ )
+              | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ )
           | Int128op (Iadd128 | Isub128 | Imul64 _)
           | Intop_imm
               ( ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-                | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ ),
+                | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ ),
                 _ )
           | Intop_atomic _ ) ->
         loop allocations (DLL.next cell) ~curr_mode ~curr_size)

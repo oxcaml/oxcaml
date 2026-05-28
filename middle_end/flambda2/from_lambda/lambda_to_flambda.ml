@@ -49,7 +49,9 @@ let name_for_function (func : Lambda.lfunction) =
   (* Name anonymous functions by their source location, if known, when using the
      Flat name-mangling scheme. *)
   let mangling_scheme_locates_anonymous_functions =
-    match Config.name_mangling_scheme with Flat -> false | Structured -> true
+    match Compilation_unit.name_mangling_scheme_for_current_unit () with
+    | Flat -> false
+    | Structured -> true
   in
   match func.loc with
   | Loc_unknown -> "fn"

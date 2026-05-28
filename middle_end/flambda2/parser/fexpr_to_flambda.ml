@@ -430,22 +430,34 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let acc, ac = apply_cont env acc ac in
     acc, Flambda.Expr.create_apply_cont ac
   | Switch { scrutinee; cases } ->
-    let acc, arms =
+    let (acc, build_let_ks), arms =
       List.fold_left_map
-        (fun acc (case, apply) ->
-          (* CR mshinwell: Should get machine_width from fexpr context when
-             available *)
-          let acc, apply = apply_cont env acc apply in
-          acc, (Target_ocaml_int.of_int machine_width case, apply))
-        acc cases
+        (fun (acc, build_let_ks) (case, apply) ->
+          match (apply : Fexpr.apply_or_inlined_cont) with
+          | Named_cont apply ->
+            (* CR mshinwell: Should get machine_width from fexpr context when
+               available *)
+            let acc, apply = apply_cont env acc apply in
+            ( (acc, build_let_ks),
+              (Target_ocaml_int.of_int machine_width case, apply) )
+          | Inlined_goto body ->
+            let (acc : Acc.t), build_let, (apply : Apply_cont_expr.t) =
+              inlined_goto env acc body
+            in
+            let build_let_ks (acc : Acc.t) body =
+              let acc, let_k = build_let acc body in
+              build_let_ks acc let_k
+            in
+            ( (acc, build_let_ks),
+              (Target_ocaml_int.of_int machine_width case, apply) ))
+        (acc, fun acc e -> acc, e)
+        cases
     in
     let arms = Target_ocaml_int.Map.of_list arms in
-    let switch =
-      Flambda.Expr.create_switch
-        (Flambda.Switch.create ~condition_dbg:Debuginfo.none
-           ~scrutinee:(simple env scrutinee) ~arms)
-    in
-    acc, switch
+    build_let_ks acc
+    @@ Flambda.Expr.create_switch
+         (Flambda.Switch.create ~condition_dbg:Debuginfo.none
+            ~scrutinee:(simple env scrutinee) ~arms)
   | Let_symbol { bindings; value_slots; body } ->
     (* Desugar the abbreviated form for a single set of closures *)
     let found_explicit_set = ref false in
@@ -591,6 +603,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             params_and_body;
             code_size;
             is_tupled;
+            stub;
             loopify;
             result_mode
           } ->
@@ -711,7 +724,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           Code.create code_id ~params_and_body ~free_names_of_params_and_body
             ~newer_version_of ~params_arity ~param_modes
             ~first_complex_local_param:(Flambda_arity.num_params params_arity)
-            ~result_arity ~result_types:Unknown ~result_mode ~stub:false ~inline
+            ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
             ~is_a_functor:false ~is_opaque:false ~recursive
@@ -841,6 +854,23 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     in
     acc, Flambda.Expr.create_apply apply
   | Invalid { message } -> acc, Flambda.Expr.create_invalid (Message message)
+
+and inlined_goto env acc (handler_body : Fexpr.expr) =
+  let acc, handler = expr env acc handler_body in
+  let handler =
+    Flambda.Continuation_handler.create Bound_parameters.empty
+      ~free_names_of_handler:Unknown ~is_exn_handler:false ~is_cold:false
+      ~handler
+  in
+  (* no need to propagate env, nothing here can nor should be used elsewhere *)
+  let cont = Continuation.create ~name:"branch_k" ~sort:Normal_or_exn () in
+  let apply = Flambda.Apply_cont.create cont ~args:[] ~dbg:Debuginfo.none in
+  let build_let acc body =
+    ( acc,
+      Flambda.Let_cont.create_non_recursive cont handler ~body
+        ~free_names_of_body:Unknown )
+  in
+  acc, build_let, apply
 
 let bind_all_code_ids env (unit : Fexpr.flambda_unit) =
   let rec go env (e : Fexpr.expr) =

@@ -502,7 +502,7 @@ and module_representation = Jkind_types.Sort.t array
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
-  | Record_boxed of Jkind_types.Sort.Const.t array
+  | Record_boxed
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
@@ -650,6 +650,8 @@ module Lpoly = struct
   let get_exn t = match !t with
     | Pending _ -> Misc.fatal_error "layout is pending generalization"
     | Determined l -> l
+
+  let is_empty_exn t = List.is_empty @@ get_exn t
 
   let determined l = ref (Determined l)
   let pending ~loc = ref (Pending loc)
@@ -961,15 +963,15 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
-  | Record_boxed sorts1, Record_boxed sorts2 ->
-      Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
+  | Record_boxed, Record_boxed ->
+      true
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
       true
   | Record_mixed mx1, Record_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
+  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
     | Record_ufloat | Record_mixed _), _ ->
       false
 
@@ -1055,7 +1057,7 @@ let find_unboxed_type decl =
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
-                    | Record_boxed _ | Record_float | Record_ufloat
+                    | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _), _)
   | Type_record_unboxed_product (_, Record_unboxed_product, _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed

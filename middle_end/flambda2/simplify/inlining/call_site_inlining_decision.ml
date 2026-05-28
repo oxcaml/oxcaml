@@ -123,7 +123,22 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
-  UA.cost_metrics uacc
+  let cost_metrics_of_lifted_constants =
+    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+    then
+      let lifted_constants = UA.lifted_constants uacc in
+      Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
+        ~f:(fun cost_metrics lifted_constant ->
+          List.fold_left
+            (fun cost_metrics definition ->
+              Cost_metrics.( + ) cost_metrics
+                (Rebuilt_static_const.cost_metrics
+                   (Lifted_constant.Definition.defining_expr definition)))
+            cost_metrics
+            (Lifted_constant.definitions lifted_constant))
+    else Cost_metrics.zero
+  in
+  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
 let argument_types_useful dacc apply =
   if
@@ -197,7 +212,7 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
         | Doing_speculative_inlining | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
         | Never_inlined_attribute | Attribute_always
-        | Replay_history_says_must_inline | Begin_unrolling _
+        | Replay_history_says_must_inline _ | Begin_unrolling _
         | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
           ->
           (* These can't be returned by the speculative inlining cases below. *)
@@ -248,7 +263,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     then
       Misc.fatal_errorf
         "Deciding not to inline an [Apply], but the replay_history says we \
-         should inline"
+         should inline.@ Replay_history: %a"
+        Replay_history.print
+        (DE.replay_history (DA.denv dacc))
   in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in
@@ -339,7 +356,17 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               fail_if_must_inline ();
               Recursion_depth_exceeded)
             else if must_inline
-            then Replay_history_says_must_inline
+            then
+              match
+                Replay_history.replay_inlining_decision
+                  (DE.replay_history (DA.denv dacc))
+              with
+              | Still_recording ->
+                Misc.fatal_errorf
+                  "Internal assumption broken: DE.says must_inline\n\
+                  \                  (presumably because of the replay \
+                   history), but the replay history is still recoding."
+              | Replayed decision -> Replay_history_says_must_inline decision
             else
               might_inline dacc ~apply ~code_or_metadata ~function_type
                 ~simplify_expr ~return_arity

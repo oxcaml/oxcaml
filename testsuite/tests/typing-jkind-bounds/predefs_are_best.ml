@@ -30,7 +30,7 @@ type t : immediate
 |}]
 
 module M : sig
-  type t : immediate non_float with string
+  type t : immutable_data with string
 end = struct
   type t = int list
 end

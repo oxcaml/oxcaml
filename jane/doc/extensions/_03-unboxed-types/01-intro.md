@@ -45,7 +45,9 @@ The `value` layout describes the representation of "vanilla" OCaml values. In Ox
 The most general of the `value`-like layouts is `scannable`, whose only requirement of its elements is that they can be scanned by the GC.
 We call the sublayouts of `scannable` the "value layouts" (choosing to emphasize the more familiar layout, `value`, instead of the top of the lattice, `scannable`).
 
-All value layouts can be written as modifications of each other; for example, `value` is `scannable non_null separable`. Below, we describe the two axes that modify value layouts, also known as the "scannable axes": nullability and separability.
+For all abbreviations, see the [kinds documentation](../../kinds/syntax).
+
+Below, we describe the two axes that modify value layouts, also known as the "scannable axes": nullability and separability.
 
 ### Nullability
 
@@ -55,7 +57,7 @@ type. The axis has two possible values, with `non_null < maybe_null`. A type may
 be `non_null` only if none of its values are `NULL`.
 
 The kind of values with `NULL` added as a possibility is written
-`value_or_null`, which is equivalent to `value maybe_null maybe_separable`.
+`value_or_null`.
 
 Types that don't have `NULL` as a possible value are
 compatible with `or_null`, a non-allocating option type that is built into
@@ -75,15 +77,15 @@ This axis has five possible values, with `non_pointer < non_pointer64 < non_floa
 - A type is `non_float` if none of its values are floats.
 - A type is `separable` if either all or none of its values are floats. In order for the float array optimization to be sound, only `separable` types may be stored in `array`s.
 
-The `value_or_null` layout is considered `maybe_separable`, since `float or_null` has both float
-and non-float elements. However, all types in vanilla OCaml are `separable`.
+The `value_or_null` layout is `maybe_separable`, since `float or_null` has both
+float and non-float elements. However, all types in vanilla OCaml are
+`separable`.
 
 ### Using scannable axes
 
-Scannable axes written after a value layout overwrite the previous value of the axis. They can also be written after non-value layouts, but have no effect, e.g. `float64 = float64 non_null = float64 maybe_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout. For example, `float64` and `value` are both sublayouts of `any non_null`, but not `value maybe_null`.
+Scannable axes can be written after a layout to lower the axis. For example, `value non_pointer` lowers `value` to have separability `non_pointer`, but `value maybe_separable` is equivalent to `value` (because `value` is already `separable`, which is lower than `maybe_separable`). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout.
 
-We also support the `mod` syntax for scannable axes, which only lowers the scannable axis (takes the meet). For example, `value mod non_pointer` is equivalent to `value non_pointer`, but `value mod maybe_separable` is equivalent to `value`.
-(This support is meant to be transitional; we expect to remove this eventually. New code should write the scannable axes before the `mod`.)
+The `mod` syntax may also be written with scannable axes, and has the same effect, but should be considered deprecated: we will remove this syntax so that `mod` is reserved for modal axes.
 
 ### Relationship between `immediate` and value layouts
 

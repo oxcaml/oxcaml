@@ -157,6 +157,7 @@ type error =
   | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
+  | Bad_represent_as_float_array_attribute
 
 open Typedtree
 
@@ -1114,7 +1115,7 @@ let transl_declaration env sdecl (id, uid) =
                correct representation is [Record_float], [Record_ufloat], or
                [Record_mixed].  Those cases are fixed up after we can get
                accurate sorts for the fields, in [update_decl_jkind]. *)
-              Record_boxed (Array.make (List.length lbls) Jkind.Sort.Const.void),
+              Record_boxed,
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
@@ -1282,12 +1283,12 @@ let rec shape_has_float_boxed shape =
 
 let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
-  | Record_unboxed | Record_inlined _ | Record_boxed _
+  | Record_unboxed | Record_inlined _ | Record_boxed
   | Record_float | Record_ufloat -> false
 
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed _ -> true
+  | Record_boxed -> true
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1310,6 +1311,14 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
          if both have unboxed versions (because the unboxed version is a second
          alias). *)
       not (Builtin_attributes.attr_equals_builtin a "deprecated_mutable")
+    in
+    let keep_decl_attribute a =
+      (* [@@represent_as_float_array] records don't have unboxed versions, but
+         we still produce one for the phase of typechecking where every record
+         has an unboxed version (see Note [Typechecking unboxed versions of
+         types]). For those unboxed versions, we don't keep the attribute, since
+         it's not valid on an unboxed record. *)
+      not (Builtin_attributes.attr_equals_builtin a "represent_as_float_array")
     in
     let lbls_unboxed =
       List.map
@@ -1379,7 +1388,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_is_newtype = false;
         type_expansion_scope = Btype.lowest_level;
         type_loc = decl.type_loc;
-        type_attributes = decl.type_attributes;
+        type_attributes = List.filter keep_decl_attribute decl.type_attributes;
         type_unboxed_default = false;
         type_uid = Uid.unboxed_version decl.type_uid;
         type_unboxed_version = None;
@@ -1737,34 +1746,23 @@ let check_abbrev env sdecl (id, decl) =
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
-(* [update_label_sorts] additionally returns whether all the jkinds
-   were void, and the jkinds of the labels *)
-(* CR reisenberg: remove all_void return *)
-let update_label_sorts env loc lbls named =
-  (* [named] is [Some sorts] for top-level records (we will update the
-     sorts) and [None] for inlined records. *)
+(* [update_label_sorts] additionally returns the jkinds of the labels *)
+let update_label_sorts env loc lbls =
   (* CR layouts v5: it wouldn't be too hard to support records that are all
      void.  just needs a bit of refactoring in translcore *)
-  let update =
-    match named with
-    | None -> fun _ _ -> ()
-    | Some sorts -> fun idx sort -> sorts.(idx) <- sort
-  in
   let lbls_and_jkinds =
-    List.mapi (fun idx (Types.{ld_type} as lbl) ->
+    List.map (fun (Types.{ld_type} as lbl) ->
       let jkind = Ctype.type_jkind env ld_type in
       (* Next line guaranteed to be safe because of [check_representable] *)
       let sort = Jkind.sort_of_jkind env jkind in
       let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
-      update idx ld_sort;
       {lbl with ld_sort}, jkind
     ) lbls
   in
   let lbls, jkinds = List.split lbls_and_jkinds in
   if List.for_all (fun l -> Jkind.Sort.Const.all_void l.ld_sort) lbls then
     raise (Error (loc, Jkind_empty_record))
-  else lbls, false, jkinds
-(* CR layouts v5: return true for a record with all voids *)
+  else lbls, jkinds
 
 (* In addition to updated constructor arguments, returns whether
    all arguments are void, useful for detecting enumerations that
@@ -1793,11 +1791,9 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
       (fun { ca_sort } -> Jkind_types.Sort.Const.(all_void ca_sort)) args,
     jkinds
   | Types.Cstr_record lbls ->
-    let lbls, all_void, jkinds =
-      update_label_sorts env loc lbls None
-    in
+    let lbls, jkinds = update_label_sorts env loc lbls in
     update 0 Jkind.Sort.Const.scannable;
-    Types.Cstr_record lbls, all_void, jkinds
+    Types.Cstr_record lbls, false, jkinds
 
 let assert_mixed_product_support =
   let required_reserved_header_bits = 8 in
@@ -2032,6 +2028,14 @@ let rec update_decl_jkind env dpath decl =
          voids : bool;
     }
   end in
+  let represent_as_float_array =
+    Builtin_attributes.has_represent_as_float_array decl.type_attributes
+  in
+  if represent_as_float_array then begin
+    match decl.type_kind with
+    | Type_record _ -> ()
+    | _ -> raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute))
+  end;
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with
@@ -2045,10 +2049,8 @@ let rec update_decl_jkind env dpath decl =
       let sort = Jkind.sort_of_jkind env jkind in
       let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
-    | _, Record_boxed sorts ->
-      let lbls, _all_void, jkinds =
-        update_label_sorts env loc lbls (Some sorts)
-      in
+    | _, Record_boxed ->
+      let lbls, jkinds = update_label_sorts env loc lbls in
       let jkind = Jkind.for_boxed_record lbls in
       let reprs =
         List.map2
@@ -2090,6 +2092,17 @@ let rec update_decl_jkind env dpath decl =
         let summary : Imm_element_rep.element_repr_summary =
           { values; floats; atomic_floats; float64s;
             non_float64_unboxed_fields; atomic_fields; voids }
+        in
+        let mixed_record () =
+          let shape =
+            Element_repr.mixed_product_shape loc reprs Record
+          in
+          let shape =
+            match shape with
+            | Some x -> x
+            | None -> Misc.fatal_error "expected mixed block"
+          in
+          Record_mixed shape
         in
         match summary with
         (* We store floats flatly in mixed records if all fields are
@@ -2156,15 +2169,7 @@ let rec update_decl_jkind env dpath decl =
         | { float64s = true; voids = true; atomic_fields = false }
         | { values = true; float64s = true; atomic_fields = false }
         | { non_float64_unboxed_fields = true; atomic_fields = false } ->
-            let shape =
-              Element_repr.mixed_product_shape loc reprs Record
-            in
-            let shape =
-              match shape with
-              | Some x -> x
-              | None -> Misc.fatal_error "expected mixed block"
-            in
-            Record_mixed shape
+            mixed_record ()
         (* value-only records are stored as boxed records *)
         | { values = true; float64s = false; non_float64_unboxed_fields = false;
             voids = false }
@@ -2179,7 +2184,10 @@ let rec update_decl_jkind env dpath decl =
         | { values = false; floats = false; atomic_floats = false;
             float64s = true; non_float64_unboxed_fields = false;
             voids = false } ->
-          Record_ufloat
+          if represent_as_float_array then
+            Record_ufloat
+          else
+            mixed_record ()
         (* Records with atomic float fields cannot use flat representation *)
         | { atomic_floats = true; floats; values; _ } ->
           if floats && not values
@@ -2334,6 +2342,8 @@ let rec update_decl_jkind env dpath decl =
       }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
+      if represent_as_float_array && rep <> Record_ufloat then
+        raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute));
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
@@ -5431,6 +5441,11 @@ let report_error_doc ppf = function
     fprintf ppf "@[<v>The kind %a is cyclic%a@]"
       (Style.as_inline_code Printtyp.path) path
       Reaching_path.pp_kind_colon reaching_path
+  | Bad_represent_as_float_array_attribute ->
+    fprintf ppf
+      "@[%a can only be used on records whose fields \
+       are all float64.@]"
+      Style.inline_code "[@@represent_as_float_array]"
 
 
 let () =

@@ -549,11 +549,11 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz _ | Ictz _
+               | Iasr | Ipopcnt | Iclz | Ictz
                )
        | Int128op (Iadd128 | Isub128 | Imul64 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ ),_)
+                    | Ilsr | Iasr | Ipopcnt | Iclz | Ictz ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -681,6 +681,14 @@ let slot_offset loc ~stack_class ~stack_offset ~fun_contains_calls
 let assemble_file infile outfile =
   X86_proc.assemble_file infile outfile
 
+(* On amd64 the deferred-JIT-hook mechanism is implemented inside [X86_proc]
+   via the [binary_content] ref written by the registered internal assembler.
+   These entry points exist only so that the cross-architecture interface in
+   [proc.mli] is uniform. *)
+let set_pending_jit_run _ = ()
+
+let clear_pending_jit_run () = ()
+
 (* Precolored_regs is not always the same as [all_phys_regs], as some physical registers
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
@@ -704,7 +712,7 @@ let operation_supported = function
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
-  | Cclz _ | Cctz _
+  | Cclz | Cctz
   | Ccmpi _ | Caddv | Cadda
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _

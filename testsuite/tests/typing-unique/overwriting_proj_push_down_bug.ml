@@ -22,7 +22,7 @@ let aliased_use x = x
 val aliased_use : 'a -> 'a = <fun>
 |}]
 
-let unique_use (unique_ x) = x
+let unique_use (x @ unique) = x
 [%%expect{|
 (let (unique_use/293 = (function {nlocal = 0} x/295? x/295))
   (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/293))
@@ -437,7 +437,7 @@ let match_guard r =
 val match_guard : record @ unique -> record * string = <fun>
 |}]
 
-let match_guard_unique (unique_ r) =
+let match_guard_unique (r @ unique) =
   match r with
   | { y } when String.equal ((unique_use r).x) "" -> y
   | _ -> ""
@@ -461,7 +461,7 @@ type option_record = { x : string option; y : string option }
 type option_record = { x : string option; y : string option; }
 |}]
 
-let check_heap_alloc_in_overwrite (unique_ r : option_record) =
+let check_heap_alloc_in_overwrite (r : option_record @ unique) =
   overwrite_ r with { x = Some "" }
 [%%expect{|
 Line 2, characters 2-35:
@@ -473,7 +473,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let check_heap_alloc_in_overwrite (local_ unique_ r : option_record) =
+let check_heap_alloc_in_overwrite (r : option_record @ local unique) =
   overwrite_ r with { x = Some "" }
 [%%expect{|
 Line 2, characters 2-35:
@@ -494,7 +494,7 @@ type mutable_record = { mutable x : string; y : string }
 type mutable_record = { mutable x : string; y : string; }
 |}]
 
-let update (unique_ r : mutable_record) =
+let update (r : mutable_record @ unique) =
   let x = overwrite_ r with { x = "foo" } in
   x.x
 [%%expect{|
@@ -507,7 +507,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : mutable_record) =
+let update (r : mutable_record @ unique) =
   let x = overwrite_ r with { y = "foo" } in
   x.x
 [%%expect{|

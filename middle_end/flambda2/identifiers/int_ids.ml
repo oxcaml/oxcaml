@@ -834,7 +834,7 @@ module Code_id = struct
       !previous_name_stamp
     in
     let linkage_name =
-      match Config.name_mangling_scheme with
+      match Compilation_unit.name_mangling_scheme_for_current_unit () with
       | Flat ->
         let name =
           if Flambda_features.Expert.shorten_symbol_names ()
