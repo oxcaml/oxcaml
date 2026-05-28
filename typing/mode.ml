@@ -2222,7 +2222,7 @@ module Report = struct
         a ->
         other:a ->
         [`First | `Second] =
-     fun b a_obj x y ~other ->
+     fun b a_obj x _y ~other ->
       (* CR-someday zqian: in the case where each of [x] and [y] can be
          responsible independently, for not satisfying [~other], we currently
          arbitrarily prioritize `Second. In the future we might want to
@@ -2230,20 +2230,8 @@ module Report = struct
          element in a [join]. This requires inspecting the [solver.ml] to ensure
          the ordering in the [join] list is preserved. *)
       match b with
-      | Meet ->
-        if C.le a_obj other x
-        then begin
-          assert (not (C.le a_obj other y));
-          `Second
-        end
-        else `First
-      | Join ->
-        if C.le a_obj x other
-        then begin
-          assert (not (C.le a_obj y other));
-          `Second
-        end
-        else `First
+      | Meet -> if C.le a_obj other x then `Second else `First
+      | Join -> if C.le a_obj x other then `Second else `First
 
     type 'd side =
       | Left : left_only side

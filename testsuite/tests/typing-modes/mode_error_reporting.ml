@@ -32,6 +32,12 @@ let run () =
   trigger := Awaiting (fun () -> push k)
 
 [%%expect{|
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 3, characters 33-37:
+3 |   trigger := Awaiting (fun () -> push k)
+                                     ^^^^
+Error: The value "push" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at line 3, characters 22-40
+         which is expected to be "portable"
+         because it is contained (via constructor "Awaiting") (with some modality) in the value at line 3, characters 13-40.
 |}]
