@@ -1342,6 +1342,7 @@ let gets_unboxed_version decl =
     true
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
   | Type_abstract _ -> manifest_is_box decl
+
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with

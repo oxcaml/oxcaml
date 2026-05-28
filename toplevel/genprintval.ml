@@ -692,6 +692,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               | ty -> tree_of_val depth obj ty
               end
           | Tbox _ -> begin
+              (* CR box: print the inner value once we support the box
+                 primitive *)
               match Ctype.expand_head env ty with
               | ty' when eq_type ty ty' ->
                 Oval_stuff "<box>"

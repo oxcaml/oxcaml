@@ -366,7 +366,7 @@ module Type_shape = struct
           | Tquote_eval _ -> unknown_shape_any
           | Tunivar _ -> unknown_shape_any
           | Tof_kind _ -> unknown_shape_any
-          | Tbox _ -> unknown_shape_any
+          | Tbox _ -> unknown_shape_value
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
         in
