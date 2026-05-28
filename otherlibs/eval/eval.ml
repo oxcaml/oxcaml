@@ -89,6 +89,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_force_link = uir.uir_force_link;
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+            ui_static_data = uir.uir_static_data;
             ui_file_sections = sections
           }
         in
@@ -208,7 +209,8 @@ let eval (expr : 'a expr) =
      }] *)
   let lambda =
     let { Slambda.slv_comptime = _; slv_runtime = raw_lambda } =
-      Slambda.eval Fun.id tlambda_program.code
+      Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id
+        tlambda_program.code
     in
     Simplif.simplify_lambda
       ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf

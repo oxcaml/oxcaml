@@ -77,6 +77,10 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
+    ui_static_data: Slambdaeval.value Slambdaeval.Or_missing.t;
+                                  (* Compile-time (comptime) value of the unit's
+                                     main module block, as produced by
+                                     [Slambda.eval]. *)
     ui_file_sections: Oxcaml_utils.File_sections.t;
   }
 
@@ -98,6 +102,7 @@ type unit_infos_raw =
                                       relative to byte immediately after
                                       this record *)
     uir_external_symbols: string array;
+    uir_static_data: Slambdaeval.value Slambdaeval.Or_missing.t;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

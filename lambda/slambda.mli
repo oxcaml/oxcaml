@@ -32,11 +32,20 @@ type value_halves = Slambdaeval.halves =
     slv_runtime : lambda
   }
 
-(** [eval inspect tlambda] fractures [tlambda] into [slambda], passes it through
-    [inspect], then evaluates it. It returns a [value_halves] so that the caller
-    can save/manipulate the compile-time part of the value represented by the
-    [tlambda].
+(** [eval ~cu_static_data inspect tlambda] fractures [tlambda] into [slambda],
+    passes it through [inspect], then evaluates it. It returns a [value_halves]
+    so that the caller can save/manipulate the compile-time part of the value
+    represented by the [tlambda].
 
     [inspect] can arbitrarily modify the [slambda] but it's expected to be used
-    by drivers to print the slambda if requested and return it unchanged. *)
-val eval : (slambda -> slambda) -> lambda -> value_halves
+    by drivers to print the slambda if requested and return it unchanged.
+
+    [cu_static_data] is invoked when evaluation encounters a reference to a
+    static global from another compilation unit; it should return the
+    compile-time value associated with that unit. *)
+val eval :
+  cu_static_data:
+    (Compilation_unit.t -> Slambdaeval.value Slambdaeval.Or_missing.t) ->
+  (slambda -> slambda) ->
+  lambda ->
+  value_halves

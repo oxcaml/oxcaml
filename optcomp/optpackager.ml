@@ -161,9 +161,9 @@ end) : S = struct
             Backend.link_partial
               (Unit_info.Artifact.filename target)
               (objtemp :: objfiles));
-        Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None)
+        main_module_block_format)
 
-  let build_package_cmx linkenv members cmxfile ui =
+  let build_package_cmx linkenv members cmxfile main_module_block_format =
     let unit_names = List.map (fun m -> m.pm_name) members in
     let filter lst =
       List.filter
@@ -181,6 +181,17 @@ end) : S = struct
         (fun m accu ->
           match m.pm_kind with PM_intf -> accu | PM_impl info -> info :: accu)
         members []
+    in
+    let static_data =
+      Slambdaeval.Or_missing.Present
+        (Slambdaeval.SLVrecord
+           (Misc.Stdlib.Array.of_list_map
+              (fun info -> info.ui_static_data)
+              units))
+    in
+    let ui =
+      Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
+        ~static_data
     in
     let file_sections =
       Oxcaml_utils.File_sections.Builder.of_file_sections ui.ui_file_sections
@@ -233,6 +244,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_static_data = Slambdaeval.Or_missing.Missing;
         ui_file_sections =
           Oxcaml_utils.File_sections.Builder.build file_sections
       }
@@ -244,8 +256,10 @@ end) : S = struct
     let linkenv = Linkenv.create () in
     let members = map_left_right (read_member_info linkenv pack_path) files in
     check_units members;
-    let ui = make_package_object ~ppf_dump members target coercion in
-    build_package_cmx linkenv members targetcmx ui
+    let main_module_block_format =
+      make_package_object ~ppf_dump members target coercion
+    in
+    build_package_cmx linkenv members targetcmx main_module_block_format
 
   (* The entry point *)
 
