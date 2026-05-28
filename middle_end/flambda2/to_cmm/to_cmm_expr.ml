@@ -827,9 +827,7 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
       Env.flush_delayed_lets ~mode:Flush_everything env res
     in
     let body_cmm, free_vars, symbol_inits, res = expr env res body in
-    let cmm =
-      C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-    in
+    let cmm = C.make_phantom_let backend_var_with_prov defining_expr body_cmm in
     let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
   in
@@ -837,20 +835,22 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
   | Singleton bound_var, Simple simple ->
     Simple.pattern_match' simple
       ~var:(fun var ~coercion:_ ->
-        let To_cmm_env.{ expr = { cmm; _ }; _ } =
-          C.simple ~dbg:Debuginfo.none env res (Simple.var var)
-        in
-        match cmm with
-        | Cvar backend_var ->
-          make_phantom_let env res bound_var
-            (Some (Cmm.Cphantom_var backend_var))
-            ~body
-        | _ -> expr env res body)
+        try
+          let To_cmm_env.{ expr = { cmm; _ }; _ } =
+            C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+          in
+          match cmm with
+          | Cvar backend_var ->
+            make_phantom_let env res bound_var
+              (Some (Cmm.Cphantom_var backend_var)) ~body
+          | _ -> expr env res body
+        with _ ->
+          (* XXX hack for error on typecore.ml *)
+          expr env res body)
       ~symbol:(fun sym ~coercion:_ ->
         let sym_name = Symbol.linkage_name_as_string sym in
         make_phantom_let env res bound_var
-          (Some (Cmm.Cphantom_const_symbol sym_name))
-          ~body)
+          (Some (Cmm.Cphantom_const_symbol sym_name)) ~body)
       ~const:(fun const ->
         match Reg_width_const.descr const with
         | Tagged_immediate i ->
@@ -860,21 +860,20 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
             Targetint.of_int64 (Targetint_32_64.to_int64 targetint_32_64)
           in
           make_phantom_let env res bound_var
-            (Some (Cmm.Cphantom_const_int targetint))
-            ~body
+            (Some (Cmm.Cphantom_const_int targetint)) ~body
         | _ -> expr env res body)
   | ( Singleton bound_var,
       Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) )
-    ->
+    -> (
     let tag_opt =
       match (block_kind : P.Block_kind.t) with
       | Values (tag, _) -> Some (Tag.Scannable.to_int tag)
       | Naked_floats -> Some (Tag.to_int Tag.double_array_tag)
       | Mixed (tag, _) -> Some (Tag.Scannable.to_int tag)
     in
-    (match tag_opt with
+    match tag_opt with
     | None -> expr env res body
-    | Some tag ->
+    | Some tag -> (
       let rec translate_args args =
         match args with
         | [] -> Some []
@@ -897,25 +896,24 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
         make_phantom_let env res bound_var
           (Some (Cmm.Cphantom_block { tag; fields }))
           ~body
-      | None -> expr env res body)
+      | None -> expr env res body))
   | ( Singleton bound_var,
       Prim (Unary (Block_load { kind = _; mut = _; field }, arg), _dbg) ) -> (
     match Simple.must_be_var arg with
-    | Some (var, _coercion) ->
+    | Some (var, _coercion) -> (
       let To_cmm_env.{ expr = { cmm; _ }; _ } =
         C.simple ~dbg:Debuginfo.none env res (Simple.var var)
       in
-      (match cmm with
+      match cmm with
       | Cvar backend_var ->
         let field_int =
-          Targetint_32_64.to_int_checked
-            (Target_system.Machine_width.Sixty_four)
+          Targetint_32_64.to_int_checked Target_system.Machine_width.Sixty_four
             (Target_ocaml_int.to_targetint
-               (Target_system.Machine_width.Sixty_four)
-               field)
+               Target_system.Machine_width.Sixty_four field)
         in
         make_phantom_let env res bound_var
-          (Some (Cmm.Cphantom_read_field { var = backend_var; field = field_int }))
+          (Some
+             (Cmm.Cphantom_read_field { var = backend_var; field = field_int }))
           ~body
       | _ -> expr env res body)
     | None -> expr env res body)
