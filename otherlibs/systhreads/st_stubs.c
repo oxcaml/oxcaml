@@ -63,6 +63,7 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #include "caml/debugger.h"
 #include "caml/domain.h"
 #include "caml/fail.h"
+#include "caml/runtime_events.h"
 #include "caml/fiber.h"
 #include "caml/io.h"
 #include "caml/memory.h"
@@ -748,6 +749,8 @@ static void thread_detach_from_runtime(void)
 {
   caml_thread_t th = This_thread;
   CAMLassert(th == Active_thread);
+  /* Clean up per-thread perf counters before detaching */
+  caml_runtime_events_thread_stop();
   /* PR#5188, PR#7220: some of the global runtime state may have
      changed as the thread was running, so we save it in the
      This_thread data to make sure that the cleanup logic
@@ -800,6 +803,7 @@ static void * caml_thread_start(void * v)
   caml_acquire_domain_lock();
 
   thread_init_current(th);
+  caml_runtime_events_thread_start();
 
   clos = Start_closure(Active_thread->descr);
   caml_modify(&(Start_closure(Active_thread->descr)), Val_unit);
@@ -870,6 +874,7 @@ CAMLexport int caml_c_thread_register(void)
   /* If it fails, we release the lock and return an error. */
   if (th == NULL) goto out_err;
   thread_init_current(th);
+  caml_runtime_events_thread_start();
   /* We can now allocate the thread descriptor on the major heap */
   th->descr = caml_thread_new_descriptor(Val_unit);  /* no closure */
 

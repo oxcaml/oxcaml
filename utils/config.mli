@@ -392,5 +392,10 @@ val has_f16c : bool
 val has_fma : bool
 (* Whether the compiler was configured on a machine with FMA *)
 
+val perf_counters_supported : bool
+(* Whether the runtime was built with Linux x86-64 hardware
+   performance-counter support (see runtime/runtime_events.c). Only
+   meaningful for runtime5 builds. *)
+
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)

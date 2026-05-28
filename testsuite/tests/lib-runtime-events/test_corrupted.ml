@@ -16,8 +16,8 @@
 
 (* CR mslater for nbarnes: this test currently fails on arm64 *)
 
-  let runtime_begin _ _ _ = ()
-  let runtime_end _ _ _ = ()
+  let runtime_begin _ _ _ _ = ()
+  let runtime_end _ _ _ _ = ()
   let runtime_counter _ _ _ _ = ()
   let alloc _ _ _ = ()
   let lifecycle _ _ _ _ = ()
@@ -49,7 +49,7 @@
     let n = Unix.read fd buf 0 (Bytes.length buf) in
     assert (n = Bytes.length buf);
     let version = Bytes.get_int64_ne buf 0 in
-    assert (version = 1L);
+    assert (version = 2L);
     (* this needs to be updated if on-disk layout changes *)
     let data_offset = Bytes.get_int64_ne buf (6*8) in
 
@@ -122,7 +122,7 @@
         Bytes.blit_string original 0 buf 0 (Bytes.length buf);
       done;
       (* restore metadata header, so we have a valid ring again *)
-      write_metadata_header 0 1L (* version *);
+      write_metadata_header 0 2L (* version *);
 
       for is_runtime = 0 to 1 do
         for event_type = 0 to 15 (* event type is 4 bits *) do

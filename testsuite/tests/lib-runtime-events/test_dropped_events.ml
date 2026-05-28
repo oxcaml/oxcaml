@@ -46,7 +46,7 @@ let callbacks =
   let open Runtime_events in
   let evs = Runtime_events.Callbacks.create ()
   in
-  let id_callback d ts c i =
+  let id_callback _d _ts _c i _perf =
     assert (i = 0)
   in
   Callbacks.add_user_event Runtime_events.Type.int id_callback evs

@@ -3254,6 +3254,14 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_FMA]) has_fma=yes, [])
 
+AC_SUBST([perf_counters_supported])
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#if !(defined(__linux__) && defined(__x86_64__))
+#error perf counters not supported on this target
+#endif
+int main(void) { return 0; }
+]])], perf_counters_supported=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 ocamlc_cflags="$ocamlc_cflags $common_cflags $sharedlib_cflags $CFLAGS"

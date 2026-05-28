@@ -65,6 +65,10 @@
       (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
 
+   (func (export "caml_ml_runtime_events_perf_counters_active")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
    (func (export "caml_ml_runtime_events_create_cursor")
       (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))

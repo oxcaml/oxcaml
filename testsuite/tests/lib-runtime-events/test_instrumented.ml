@@ -21,7 +21,7 @@ let lost_event_words = ref 0
 let alloc domain_id ts counts =
   total_blocks := Array.fold_left ( + ) !total_blocks counts
 
-let runtime_end domain_id ts phase =
+let runtime_end domain_id ts phase _perf_samples =
   match phase with
   | EV_MINOR ->
     total_minors := !total_minors + 1

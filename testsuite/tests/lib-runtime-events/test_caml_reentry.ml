@@ -15,7 +15,7 @@ let () =
     start ();
     let cursor = create_cursor None in
     let empty_callbacks = Callbacks.create () in
-    let runtime_begin domain_id ts phase =
+    let runtime_begin domain_id ts phase _perf_samples =
       match phase with
       | EV_MINOR ->
         ignore(read_poll cursor empty_callbacks None)

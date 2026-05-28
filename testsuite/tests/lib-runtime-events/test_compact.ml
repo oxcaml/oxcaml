@@ -55,7 +55,7 @@ let last = ref NONE
 let () =
     start ();
     let cursor = create_cursor None in
-    let runtime_begin domain_id ts phase =
+    let runtime_begin domain_id ts phase _perf_samples =
       match phase with
       | EV_COMPACT ->
         begin
@@ -79,7 +79,7 @@ let () =
           state := RELEASING
         end
       | _ -> () in
-      let runtime_end domain_id ts phase =
+      let runtime_end domain_id ts phase _perf_samples =
         match phase with
         | EV_COMPACT ->
           begin
