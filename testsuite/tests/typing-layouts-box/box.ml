@@ -97,7 +97,7 @@ Error: This expression has type "'a box" but an expression was expected of type
          "r"
 |}]
 
-(* Test 4: box types unify with themselves in function types *)
+(* Test 5: box types unify with themselves in function types *)
 
 let eq_box (x : int box) (y : int box) = x = y;;
 [%%expect{|
@@ -109,7 +109,7 @@ let eq_float_box (x : float# box) (y : float# box) = x = y;;
 val eq_float_box : float -> float -> bool = <fun>
 |}]
 
-(* Test 5: box in module signatures *)
+(* Test 6: box in module signatures *)
 
 module type S = sig
   type t = float# box
@@ -127,7 +127,7 @@ end;;
 module M : S
 |}]
 
-(* Test 6: Using the module's type *)
+(* Test 7: Using the module's type *)
 
 let use_m : float = M.x;;
 [%%expect{|
@@ -135,7 +135,7 @@ val use_m : float = 1.
 |}]
 
 
-(* Test 10: Polymorphic box with explicit jkind annotation *)
+(* Test 8: Polymorphic box with explicit jkind annotation *)
 
 let check_boxed_by : type (a : float64). a -> a box -> unit =
   fun _ _ -> ();;
@@ -150,7 +150,7 @@ type uf = float#
 val test_check : uf -> float -> unit = <fun>
 |}]
 
-(* Test 11: Multiple levels of type aliasing - the inner type of box
+(* Test 9: Multiple levels of type aliasing - the inner type of box
    must be fully expanded to find the unboxed type *)
 
 type f = float#
@@ -169,7 +169,7 @@ type h = g
 val test_three_levels : float -> float = <fun>
 |}]
 
-(* Test 12: box on types without unboxed versions *)
+(* Test 10: box on types without unboxed versions *)
 
 type abstract_type
 type boxed_abstract = abstract_type box;;
@@ -178,7 +178,7 @@ type abstract_type
 type boxed_abstract = abstract_type box
 |}]
 
-(* Test 13: float32# box = float32 *)
+(* Test 11: float32# box = float32 *)
 
 type t_f32 = float32# box;;
 [%%expect{|
@@ -195,7 +195,7 @@ let g_f32 (x : float32) : float32# box = x;;
 val g_f32 : float32 -> float32 = <fun>
 |}]
 
-(* Test 14: Implicit unboxed records - t# box = t
+(* Test 12: Implicit unboxed records - t# box = t
    Mixed records (not float-only) have implicit unboxed versions *)
 
 type mixed_record = { i : int; s : string };;
@@ -236,7 +236,7 @@ let float_point_no_unboxed (p : float_point# box) : float_point = p;;
 val float_point_no_unboxed : float_point -> float_point = <fun>
 |}]
 
-(* Test 15: Boxing unboxed tuples *)
+(* Test 13: Boxing unboxed tuples *)
 
 type ut = #(int * string);;
 [%%expect{|
@@ -253,7 +253,7 @@ let eq_ut (x : #(int * string) box) (y : ut box) = x = y;;
 val eq_ut : int * string -> int * string -> bool = <fun>
 |}]
 
-(* Test 16: Additional jkinds - bits32, bits64, word *)
+(* Test 14: Additional jkinds - bits32, bits64, word *)
 
 let check_bits32 : type (a : bits32). a -> a box -> unit =
   fun _ _ -> ();;
@@ -294,7 +294,7 @@ type unat = nativeint#
 val test_word : unat -> nativeint -> unit = <fun>
 |}]
 
-(* Test 17: Parameterized box type alias *)
+(* Test 15: Parameterized box type alias *)
 
 type ('a : float64) boxed = 'a box;;
 [%%expect{|
@@ -313,7 +313,7 @@ type alias_float = float#
 val use_boxed_alias : float -> float = <fun>
 |}]
 
-(* Test 18: Nested box - float# box expands to float, but float is not an
+(* Test 16: Nested box - float# box expands to float, but float is not an
    unboxed version, so float box does NOT expand further to float.
    This tests that box only expands for actual unboxed versions. *)
 
@@ -339,7 +339,7 @@ let nested_eq (x : nested) (y : float# box box) = x = y;;
 val nested_eq : float box -> float box -> bool = <fun>
 |}]
 
-(* Test 19: Type error cases *)
+(* Test 17: Type error cases *)
 
 let mismatch1 (x : float# box) : int = x;;
 [%%expect{|
@@ -372,7 +372,7 @@ Error: This expression has type "float" but an expression was expected of type
          "int64"
 |}]
 
-(* Test 20: Type inference *)
+(* Test 18: Type inference *)
 
 let infer1 x = (x : float# box);;
 [%%expect{|
@@ -393,7 +393,7 @@ type ufl = float#
 val infer3 : float -> float = <fun>
 |}]
 
-(* Test 21: Distinct vs same underlying box types *)
+(* Test 19: Distinct vs same underlying box types *)
 
 type t_float_box = float# box
 type t_int32_box = int32# box;;
@@ -427,7 +427,7 @@ let same_underlying (x : ta) (y : tb) = x = y;;
 val same_underlying : ta -> tb -> bool = <fun>
 |}]
 
-(* Test 22: With constraints in module types *)
+(* Test 20: With constraints in module types *)
 
 module type S_box = sig
   type t
@@ -455,7 +455,7 @@ let use_m_float_box : float = M_float_box.x;;
 val use_m_float_box : float = 1.
 |}]
 
-(* Test 23: Functors with box *)
+(* Test 21: Functors with box *)
 
 module type UNBOXED = sig
   type t : float64
@@ -465,11 +465,11 @@ end;;
 module type UNBOXED = sig type t : float64 val zero : t end
 |}]
 
-(* This demonstrates the limitation: can't coerce U.t to U.t box generically *)
+(* Can't yet convert U.t to U.t box generically *)
 module type BOXED = sig
   type unboxed : float64
   type t = unboxed box
-  (* CR box: once we have the box operator, have [zero] be boxed *)
+  (* CR box: once we have the box primitive, change to [val zero : t] *)
   val zero : unboxed
 end;;
 [%%expect{|
@@ -489,7 +489,7 @@ module MakeBoxed :
 |}]
 
 
-(* Test 24: First-class modules *)
+(* Test 22: First-class modules *)
 
 module type T_FCM = sig
   type t = float# box
@@ -520,7 +520,7 @@ let fcm_as_float : float = extract_fcm ();;
 val fcm_as_float : float = 3.14
 |}]
 
-(* Test 25: box on value types (int, string)
+(* Test 23: box on value types (int, string)
 
    Values like int and string are NOT "unboxed versions" of anything,
    but they can still be extra-boxed. *)
@@ -572,7 +572,7 @@ let int_box_eq (x : int box) (y : int box) = x = y;;
 val int_box_eq : int box -> int box -> bool = <fun>
 |}]
 
-(* Test 26: Recursive types with box *)
+(* Test 24: Recursive types with box *)
 
 type 'a tree = Leaf | Node of 'a * 'a tree * 'a tree
 
@@ -602,7 +602,7 @@ let sum_float_tree (t : float_tree) = sum_tree t;;
 val sum_float_tree : float_tree -> float = <fun>
 |}]
 
-(* Test 27: Polymorphic box unification with concrete boxed types *)
+(* Test 25: Polymorphic box unification with concrete boxed types *)
 
 let f_box : 'a box -> 'a box = fun x -> x;;
 [%%expect{|
@@ -640,7 +640,7 @@ Error: This expression has type "string" but an expression was expected of type
          "'a box"
 |}]
 
-(* Test 28: Subtyping with polymorphic variants and box *)
+(* Test 26: Subtyping with polymorphic variants and box *)
 
 type ab = [ `A | `B ]
 type a  = [ `A ];;
@@ -672,7 +672,7 @@ let coerce_unbox (x : [ `A of int32# box ]) =
 val coerce_unbox : [ `A of int32 ] -> [ `A of int32 | `B ] = <fun>
 |}]
 
-(* Test 29: Recursive type declarations with box
+(* Test 27: Recursive type declarations with box
    These test well-foundedness and infinite size checks *)
 
 type a_rec = { a_rec : a_rec box } [@@unboxed];;
@@ -702,7 +702,7 @@ and c2 = { c1_field : c1 box; }
 |}]
 
 
-(* Test 30: [any] in [box] is representable *)
+(* Test 28: [any] in [box] is representable *)
 
 type t : any
 type foo = t box
@@ -715,7 +715,7 @@ val f : t box -> t box = <fun>
 |}]
 
 
-(* Test 31: GADTs *)
+(* Test 29: GADTs *)
 
 let require_boxed (_ : _ box) = ()
 type 'a st = T : string st
@@ -771,7 +771,7 @@ Error: This pattern matches values of type "string st"
        The type constructor "$0" would escape its scope
 |}]
 
-(* Test 32: [(T box)#] = [T] -- the unboxed version of a [_ box] alias is
+(* Test 30: [(T box)#] = [T] -- the unboxed version of a [_ box] alias is
    the inner type. *)
 
 type t = int box
@@ -798,7 +798,7 @@ val probe : 'a uu -> 'a = <fun>
 val probe_inv : 'a -> 'a uu = <fun>
 |}]
 
-(* Test: [box] on object types *)
+(* Test 31: [box] on object types *)
 
 type obj = < m : int >
 type t_obj_box = obj box;;
@@ -820,7 +820,7 @@ type obj_more = < m : int; n : int >
 val widen : < m : int; n : int > box -> < m : int > box = <fun>
 |}]
 
-(* Test 33: shadowing the predef [box] disambiguates with [box/2] *)
+(* Test 32: shadowing the predef [box] disambiguates with [box/2] *)
 
 let id_box (x : 'a box) : 'a box = x
 type 'a box = Mine of 'a
