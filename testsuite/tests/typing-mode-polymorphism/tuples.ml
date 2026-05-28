@@ -1,12 +1,6 @@
 (* TEST
- flags += "-extension mode_polymorphism_alpha";
+ flags += "-extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
  expect;
-*)
-
-(*
- * This file tests that mode polymorphism works, without printing mode variables.
- * The modes printed are not always representative of the underlying modes: they have
- * been zapped in order to be printed
 *)
 
 let use_uncontended (x @ uncontended) = ()
@@ -15,23 +9,28 @@ let use_unique (x @ unique) = ()
 let use_static (x @ static) = ()
 let use_global (x @ global) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
-val use_portable : 'a @ portable -> unit = <fun>
-val use_unique : 'a @ unique -> unit = <fun>
-val use_static : 'a -> unit = <fun>
-val use_global : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
+val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
+val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
+val use_static : 'a @ 'n -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 (* Since a tuple is returned in tail-position, its allocation will be global *)
 let prod x y = (x, y)
 [%%expect{|
-val prod : 'a -> 'b -> 'a * 'b = <fun>
+val prod :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
 |}]
 
 (* With exclave_ the tuple is local *)
 let prod_local (x @ local) (y @ local) = exclave_ (x, y)
 [%%expect{|
-val prod_local : 'a @ local -> 'b @ local -> 'a * 'b @ local = <fun>
+val prod_local :
+  'a @ [< 'm > local] ->
+  ('b @ [< 'n > local] -> 'a * 'b @ [> 'n | 'm | local]) @ [> close('m) | local] =
+  <fun>
 |}]
 
 (* [prod] is polymorphic on the other axes *)
@@ -40,7 +39,9 @@ let foo (x @ portable) (y @ portable) =
   use_portable b;
   use_portable a
 [%%expect{|
-val foo : 'a @ portable -> 'b @ portable -> unit = <fun>
+val foo :
+  'a @ [< 'm @@ past & global portable] ->
+  ('b @ [< global portable] -> unit @ 'n) @ [> 'm] = <fun>
 |}]
 
 (* But the returned tuple will be the meet of its arguments *)
@@ -59,7 +60,7 @@ Error: This value is "nonportable"
 
 let dupl x = (x, x)
 [%%expect{|
-val dupl : 'a -> 'a * 'a = <fun>
+val dupl : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] = <fun>
 |}]
 
 (* The arguments must be global *)
@@ -116,19 +117,21 @@ Error: This value is "aliased" but is expected to be "unique".
 (* mode polymorphism works over tuples *)
 let swap (a, b) = (b, a)
 [%%expect{|
-val swap : 'a * 'b -> 'b * 'a = <fun>
+val swap : 'a * 'b @ [< 'm & global] -> 'b * 'a @ [> 'm] = <fun>
 |}]
 
 let swap_local (a, b) = exclave_ (b, a)
 [%%expect{|
-val swap_local : 'a * 'b -> 'b * 'a @ local = <fun>
+val swap_local : 'a * 'b @ [< 'm] -> 'b * 'a @ [> 'm | local] = <fun>
 |}]
 
 let foo (x @ portable) (y @ portable) =
   let p = swap (x, y) in
   use_portable p
 [%%expect{|
-val foo : 'a @ portable -> 'b @ portable -> unit = <fun>
+val foo :
+  'a @ [< 'm @@ past & global portable] ->
+  ('b @ [< global portable] -> unit @ 'n) @ [> 'm] = <fun>
 |}]
 
 let foo (x @ local) (y @ local) =
