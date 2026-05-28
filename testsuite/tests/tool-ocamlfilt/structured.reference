@@ -1,7 +1,7 @@
 Foo.Bar.baz
 Stdlib.map
 Foo.MyObj
-Foo.<inlining>.Bar.qux
+Foo.<specialization_of>.Bar.qux
 Foo.>>=
 Foo.let*
 Foo.func'sub'
@@ -20,5 +20,5 @@ Foo.Bar.fn(foo.ml:5:10).baz.fn_1_2
 Functor2.combined.fn(foo.ml:8:12).fn_1_3_code
 Foo.mod(foo.ml:2:10).init.fn_5_6
 Foo.bar.partial(foo.ml:9:15)
-Foo.Bar.<inlining>.Baz.qux
+Foo.Bar.<specialization_of>.Baz.qux
 Foo.Bar.Shape.area

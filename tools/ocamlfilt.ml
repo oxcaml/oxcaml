@@ -219,8 +219,10 @@ module Structured = struct
         Buffer.add_string result
           (format_anonymous_location "partial" (decode_next ()))
       | 'I' ->
-        (* Inline_marker *)
-        Buffer.add_string result "<inlining>"
+        (* Inline_marker: the function body was specialized (copied) into the
+           current compilation unit, not inlined at a particular call site, so
+           we print [<specialization_of>] rather than [<inlining>]. *)
+        Buffer.add_string result "<specialization_of>"
       | _ -> err ()
     done;
     if !pos = start_pos then err ();

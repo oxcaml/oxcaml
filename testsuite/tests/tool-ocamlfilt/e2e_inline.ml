@@ -32,7 +32,7 @@
    [@inline never] so they must survive as their own symbols
    post-inlining. Those surviving closures are what produces the
    structured-mangling [I] (inlining) path items here, e.g.
-   [E2e_inline.<inlining>.E2e_inline_lib.chain4.fn_N_N_code]. *)
+   [E2e_inline.<specialization_of>.E2e_inline_lib.chain4.fn_N_N_code]. *)
 
 let inline_squares x y =
   E2e_inline_lib.square x + E2e_inline_lib.square y
@@ -82,8 +82,8 @@ let local_inline x =
 
 (* Functor-defined function inlined cross-module: the surviving
    [scale_all] closure mangles with both the functor path and the
-   [<inlining>] marker, as
-   [E2e_inline.<inlining>.E2e_inline_lib.Scaler.scale_all.fn]. *)
+   [<specialization_of>] marker, as
+   [E2e_inline.<specialization_of>.E2e_inline_lib.Scaler.scale_all.fn]. *)
 module Scaler3 = E2e_inline_lib.Scaler (struct
   let factor = 3
 end)
@@ -92,14 +92,14 @@ let use_functor xs = Scaler3.scale_all xs
 
 (* First-class module produced by an [@inline always] lib function:
    the module body inlines in and its [@inline never] method survives
-   as [E2e_inline.<inlining>.E2e_inline_lib.pack_op.apply]. *)
+   as [E2e_inline.<specialization_of>.E2e_inline_lib.pack_op.apply]. *)
 let use_first_class x =
   let (module Op) = E2e_inline_lib.pack_op 5 in
   Op.apply x
 
 (* Transitive inlining through [E2e_inline_mid]: the lib closure is
    attributed straight to [E2e_inline_lib]
-   ([E2e_inline.<inlining>.E2e_inline_lib.relayed.fn]); the
+   ([E2e_inline.<specialization_of>.E2e_inline_lib.relayed.fn]); the
    [E2e_inline_mid] hop never appears, so an inlining chain of length
    two is indistinguishable from a direct one. *)
 let use_transitive x = E2e_inline_mid.relay x 100

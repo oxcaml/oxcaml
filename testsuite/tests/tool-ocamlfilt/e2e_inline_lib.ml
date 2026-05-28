@@ -53,7 +53,7 @@ let[@inline always] chain4 a =
 
 (* A first-class module producer. [@inline always], so the produced
    module body is inlined into the caller; its [@inline never] method
-   survives as a symbol reached through the [<inlining>] marker. *)
+   survives as a symbol reached through the [<specialization_of>] marker. *)
 module type OP = sig
   val apply : int -> int
 end
@@ -65,7 +65,7 @@ let[@inline always] pack_op d : (module OP) =
 
 (* A functor whose [@inline always] method keeps a non-inlinable
    closure. Inlining the body into another unit mangles the surviving
-   closure under both the functor path and the [<inlining>] marker. *)
+   closure under both the functor path and the [<specialization_of>] marker. *)
 module Scaler (K : sig
   val factor : int
 end) =
