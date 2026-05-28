@@ -3251,6 +3251,9 @@ let read_signature modname cmi =
   let mty, staticity = read_pers_mod modname cmi in
   Subst.Lazy.force_signature mty, staticity
 
+let import_cmi_for_link filename =
+  Persistent_env.import_cmi_for_link !persistent_env filename
+
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
 

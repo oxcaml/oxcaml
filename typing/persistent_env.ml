@@ -975,6 +975,24 @@ let read_cmi_file penv filename =
   in
   modname, pers_name.pn_sign
 
+type loaded_cmi = {
+  cu : Compilation_unit.t option;
+  params : Global_module.Parameter_name.t list;
+  sign_with_globals : Signature_with_global_bindings.t;
+}
+
+let import_cmi_for_link penv filename =
+  let cmi = read_cmi_lazy filename in
+  let unit_name = cmi.cmi_name in
+  add_import penv unit_name;
+  let pers_sig =
+    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
+  in
+  let import = acknowledge_import penv ~check:true unit_name pers_sig in
+  { cu = import.imp_impl;
+    params = import.imp_params;
+    sign_with_globals = import.imp_raw_sign }
+
 let find ~allow_hidden penv f name ~allow_excess_args =
   (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
      name).ps_val

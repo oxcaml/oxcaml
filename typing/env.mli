@@ -631,6 +631,17 @@ val save_signature_with_imports:
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
 
+(* [import_cmi_for_link filename] adds the cmi to the import table for CRC
+   tracking and consistency checking, but does not register it as a persistent
+   name in the type-checking environment.  Unlike [read_signature], it does not
+   run the parameter-accessibility check, so it can be used to import
+   parameterised modules into compilations that do not themselves declare those
+   parameters (e.g., [-functorize], whose bundle is implicitly parameterised by
+   the union of its inputs).  Returns the loaded cmi's compilation unit,
+   declared parameters, and signature-with-globals so the caller need not
+   re-read the file. *)
+val import_cmi_for_link: string -> Persistent_env.loaded_cmi
+
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
 

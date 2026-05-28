@@ -13,7 +13,7 @@
    main_functorize_derived.ml \
    main_functorize_share.ml \
    main_functorize_type_share.ml \
-   message.mli message.ml with_message.ml \
+   message.mli message.ml with_message.ml pure_alias.ml \
    bad_mix_bundles.ml \
    bad_mix_share.ml \
    test_functorize.reference \
@@ -36,7 +36,7 @@
 
    set OCAMLPARAM = "";
 
-   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int message with_message bundle bundle2 bundle_derived bundle_share bundle_msg bundle_stopafter bundle_cmifile bundle_phases bundle_onestep bundle_cms bundle_bad bundle_swap bundle_crc";
+   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int message with_message pure_alias bundle bundle2 bundle_derived bundle_share bundle_msg bundle_pure_alias bundle_stopafter bundle_cmifile bundle_phases bundle_onestep bundle_cms bundle_bad bundle_swap bundle_crc";
    script;
 
    src = "p.mli p__.ml";
@@ -77,6 +77,10 @@
 
    src = "with_message.ml";
    dst = "with_message/";
+   copy;
+
+   src = "pure_alias.ml";
+   dst = "pure_alias/";
    copy;
 
    src = "bundle_bad.mli";
@@ -542,6 +546,33 @@
    module = "";
    program = "bundle_msg/bundle_msg.cmo";
    all_modules = "message/message.cmo with_message/with_message.cmo";
+   ocamlc.byte;
+ }
+
+ {
+   (* Alias-only parameterised module: [pure_alias] declares [-parameter P]
+      but its body never mentions P, so its [cu_format] collapses to
+      [Rp_unit].  Two-phase functorize must still agree across phases that
+      [P] is a bundle parameter — phase 2 (cmo) has to recover [P] from
+      [cmi_params] rather than from the runtime layout.  Pass only
+      [pure_alias.cmo] as input so the transitive dep [Message] is
+      discovered from cmi_globals via the topology scan. *)
+
+   flags = "$flg -parameter P -I p -I pure_alias";
+   module = "pure_alias/pure_alias.ml";
+   ocamlc.byte;
+
+   flags = "$flg -functorize -I p -I message -I pure_alias";
+   module = "";
+   program = "bundle_pure_alias/bundle_pure_alias.cmi";
+   all_modules = "pure_alias/pure_alias.cmi";
+   ocamlc.byte;
+
+   flags = "$flg -functorize -I p -I message -I pure_alias \
+     -cmi-file bundle_pure_alias/bundle_pure_alias.cmi";
+   module = "";
+   program = "bundle_pure_alias/bundle_pure_alias.cmo";
+   all_modules = "pure_alias/pure_alias.cmo";
    ocamlc.byte;
  }
 

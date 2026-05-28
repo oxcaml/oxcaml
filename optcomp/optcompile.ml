@@ -152,12 +152,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           main_module_block_repr : Lambda.module_representation;
           arg_descr : Lambda.arg_descr option
         }
-    | Functorization of
-        { initial_env : Env.t;
-          all_params : Global_module.t list;
-          modules_cu : Compilation_unit.t list;
-          modules : (Compilation_unit.t * Lambda.main_module_block_format) list
-        }
 
   let starting_point_of_compiler_pass start_from =
     match (start_from : Clflags.Compiler_pass.t), Backend.emit with
@@ -220,20 +214,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
       compile_from_tlambda info impl ~as_arg_for ~keep_symbol_tables
-    | Functorization { initial_env; all_params; modules_cu; modules } ->
-      if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      let coercion =
-        Typemod.functorize_implementation initial_env ~all_params
-          ~modules:modules_cu info.target info.module_name
-      in
-      if not Clflags.(should_stop_after Compiler_pass.Typing)
-      then begin
-        let program =
-          Translmod.transl_functorize info.module_name ~all_params ~modules
-            ~coercion
-        in
-        compile_from_tlambda info program ~as_arg_for:None ~keep_symbol_tables
-      end
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
@@ -265,104 +245,54 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
     { Instantiator.ui_unit; ui_arg_descr; ui_format }
 
-  let read_unit_info_of_cmx file : Functorizer.unit_info =
+  let read_unit_info_of_cmx file : Functorizer.impl_unit_info =
     let unit_info, _crc = Compilenv.read_unit_info file in
-    { Functorizer.ui_unit = unit_info.ui_unit; ui_format = unit_info.ui_format }
+    Functorizer.impl_unit_info_with_cmi_data ~ui_unit:unit_info.ui_unit
+      ~ui_format:unit_info.ui_format
 
-  let find_unit_info_by_name_cmx name : Functorizer.unit_info =
+  let find_unit_info_by_name_cmx name : Functorizer.impl_unit_info =
     let filename =
       Load_path.find_normalized
         (String.uncapitalize_ascii name ^ ext_flambda_obj)
     in
     read_unit_info_of_cmx filename
 
-  let compile_lambda_program ~source_file ~output_prefix ~compilation_unit
-      ~initial_env ~all_params ~modules_cu ~modules =
-    implementation_aux
-      ~start_from:
-        (Functorization { initial_env; all_params; modules_cu; modules })
-      ~source_file ~output_prefix ~keep_symbol_tables:false
-      ~compilation_unit:(Exactly compilation_unit)
-
   let instantiate ~src ~args targetcmx =
     Instantiator.instantiate ~src ~args targetcmx
       ~expected_extension:ext_flambda_obj ~read_unit_info
       ~compile:(instance ~keep_symbol_tables:false)
 
-  let find_unit_info_by_name_cmi name : Functorizer.unit_info =
-    let filename =
-      Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
-    in
-    Functorizer.read_unit_info_of_cmi filename
-
-  let make_compilation_unit target =
-    let output_basename =
-      Filename.basename (Filename.remove_extension target)
-    in
-    Compilation_unit.of_string (String.capitalize_ascii output_basename)
-
-  (* Interface mode: input is .cmi files. Outputs .cmi + .cmti + .cmsi. *)
-  let functorize_intf initial_env files target =
-    let src_infos = List.map Functorizer.read_unit_info_of_cmi files in
-    let all_modules =
-      Functorizer.collect_all_modules
-        ~find_unit_info_by_name:find_unit_info_by_name_cmi src_infos
-    in
-    let all_params = Functorizer.collect_all_params all_modules in
-    let compilation_unit = make_compilation_unit target in
-    let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
-    let target_artifact =
-      Unit_info.Artifact.from_filename ~for_pack_prefix target
-    in
-    let unit_info =
-      Unit_info.of_artifact Intf target_artifact ~dummy_source_file:target
-    in
-    Env.set_unit_name (Some unit_info);
-    let modules_cu =
-      List.map (fun (ui : Functorizer.unit_info) -> ui.ui_unit) all_modules
-    in
-    Misc.try_finally
-      (fun () ->
-        Typemod.functorize_interface initial_env ~all_params ~modules:modules_cu
-          unit_info compilation_unit)
-      ~exceptionally:(fun () -> Misc.remove_file target)
-
-  (* Implementation mode: input is .cmx files. Reads individual CMIs via
-     [Typemod.functorize_implementation] for CRC consistency, then outputs .cmx
-     + .cmi + .cmt + .cms. Respects -stop-after typing. *)
+  (* Implementation mode: input is .cmx files. Outputs .cmx + .cmi + .cmt +
+     .cms. Respects -stop-after typing. Input files are read inside
+     [with_info]'s callback so each input's cmi is registered as an import of
+     the bundle. *)
   let functorize_impl initial_env files target =
-    let src_infos = List.map read_unit_info_of_cmx files in
-    let all_modules =
-      Functorizer.collect_all_modules
-        ~find_unit_info_by_name:find_unit_info_by_name_cmx src_infos
-    in
-    let all_params = Functorizer.collect_all_params all_modules in
     let output_prefix = Filename.remove_extension target in
-    let compilation_unit = make_compilation_unit target in
-    let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
-    let target_artifact =
-      Unit_info.Artifact.from_filename ~for_pack_prefix target
-    in
-    let unit_info =
-      Unit_info.of_artifact Impl target_artifact ~dummy_source_file:target
-    in
-    Env.set_unit_name (Some unit_info);
-    let modules_cu =
-      List.map (fun (ui : Functorizer.unit_info) -> ui.ui_unit) all_modules
-    in
+    let compilation_unit = Functorizer.make_compilation_unit target in
+    let source_file = List.hd files in
+    with_info ~source_file ~output_prefix
+      ~compilation_unit:(Exactly compilation_unit) ~kind:Impl
+      ~dump_ext:Backend.ext_flambda_obj
+    @@ fun info ->
+    if !Oxcaml_flags.internal_assembler
+    then Emitaux.binary_backend_available := true;
+    Compilenv.reset info.target;
+    if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
     Misc.try_finally
       (fun () ->
-        let modules =
-          List.map
-            (fun (ui : Functorizer.unit_info) -> ui.ui_unit, ui.ui_format)
-            all_modules
+        let compile_program info program =
+          compile_from_tlambda info program ~as_arg_for:None
+            ~keep_symbol_tables:false
         in
-        let source_file = List.hd files in
-        compile_lambda_program ~source_file ~output_prefix ~compilation_unit
-          ~initial_env ~all_params ~modules_cu ~modules)
+        Functorizer.functorize_impl_with ~initial_env ~info ~input_files:files
+          ~read_unit_info_of_input:read_unit_info_of_cmx
+          ~find_intf_unit_info_by_name:Functorizer.find_unit_info_by_name_cmi
+          ~find_impl_unit_info_by_name:find_unit_info_by_name_cmx
+          ~compile_program)
       ~exceptionally:(fun () ->
         Misc.remove_file target;
-        Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmi unit_info)))
+        Misc.remove_file
+          (Unit_info.Artifact.filename (Unit_info.cmi info.target)))
 
   let functorize ~ppf_dump:_ initial_env files target =
     let files =
@@ -376,7 +306,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     match files with
     | [] -> Misc.fatal_error "No input files for -functorize"
     | first :: _ when Filename.check_suffix first ".cmi" ->
-      functorize_intf initial_env files target
+      Functorizer.functorize_intf initial_env files target
     | _ -> functorize_impl initial_env files target
 end
 

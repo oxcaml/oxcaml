@@ -87,15 +87,14 @@ val package_units:
 
 val functorize_interface:
   Env.t ->
-  all_params:Global_module.t list ->
-  modules:Compilation_unit.t list ->
+  sg:Types.signature ->
   Unit_info.t ->
   Compilation_unit.t ->
   unit
 
 val functorize_implementation:
   Env.t ->
-  all_params:Global_module.t list ->
+  sg:Types.signature ->
   modules:Compilation_unit.t list ->
   Unit_info.t ->
   Compilation_unit.t ->

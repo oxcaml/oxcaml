@@ -4846,88 +4846,14 @@ let package_units initial_env objfiles target_cmi modulename =
     Tcoerce_none
   end
 
-(* Bundling of parameterized modules into a single bundle functor. *)
-
-let compute_bundle_sig ~(all_params : Global_module.t list)
-    ~(modules : Compilation_unit.t list) : Types.signature =
-  let find_module_type name =
-    let cmi_file =
-      Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
-    in
-    let cmi_sign, _ = (Cmi_format.read_cmi cmi_file).cmi_sign in
-    Mty_signature cmi_sign
-  in
-  let make_md md_type =
-    { md_type;
-      md_modalities = Modality.(Const.id |> of_const);
-      md_attributes = [];
-      md_loc = Location.none;
-      md_uid = Uid.internal_not_actually_unique
-    }
-  in
-  let param_local_idents =
-    List.map
-      (fun (gm : Global_module.t) ->
-        (gm, Ident.create_local gm.Global_module.head))
-      all_params
-  in
-  let module_local_idents =
-    List.map
-      (fun cu ->
-        let name = Compilation_unit.name_as_string cu in
-        (name, Ident.create_local name))
-      modules
-  in
-  let add_to_subst name local_id s =
-    Subst.add_module
-      (Ident.create_global
-         (Global_module.Name.create_no_args name))
-      (Pident local_id) s
-  in
-  let subst =
-    let s = Subst.identity in
-    let s =
-      List.fold_left
-        (fun s (gm, id) -> add_to_subst gm.Global_module.head id s)
-        s param_local_idents
-    in
-    List.fold_left
-      (fun s (name, id) -> add_to_subst name id s)
-      s module_local_idents
-  in
-  let result_items =
-    List.map
-      (fun cu ->
-        let name = Compilation_unit.name_as_string cu in
-        let local_id = List.assoc name module_local_idents in
-        let mt = Subst.modtype Keep subst (find_module_type name) in
-        Sig_module (local_id, Mp_present, make_md mt, Trec_not, Exported))
-      modules
-  in
-  let with_unit =
-    Mty_functor (Unit, Mty_signature result_items, Mode.Alloc.legacy)
-  in
-  let functor_type =
-    List.fold_right
-      (fun (global, param_id) body ->
-        let param_type = find_module_type global.Global_module.head in
-        Mty_functor
-          ( Named (Some param_id, param_type, Mode.Alloc.legacy),
-            body,
-            Mode.Alloc.legacy ))
-      param_local_idents with_unit
-  in
-  [ Sig_module
-      ( Ident.create_local "Func",
-        Mp_present,
-        make_md functor_type,
-        Trec_not,
-        Exported ) ]
+(* Bundling of parameterized modules into a single bundle functor.
+   [compute_bundle_sig] (which builds [sg]) lives in [Functorizer]; these
+   functions just consume the precomputed signature and handle the typing-side
+   work of saving / checking the bundle's cmi. *)
 
 (* Like [emit_signature] in [Compile_common]: save .cmi + .cmti + .cmsi. *)
-let functorize_interface initial_env ~all_params ~modules target modulename =
+let functorize_interface initial_env ~sg target modulename =
   Ident.reinit ();
-  let sg = compute_bundle_sig ~all_params ~modules in
   if not !Clflags.dont_write_files then begin
     let name = Compilation_unit.name modulename in
     let kind =
@@ -4949,10 +4875,9 @@ let functorize_interface initial_env ~all_params ~modules target modulename =
    [-cmi-file] is given, loads that CMI via [Env.read_signature] (adding the
    bundle self-reference CRC) and performs an inclusion check; no new CMI is
    written.  Otherwise generates a fresh CMI + saves .cmt + .cms. *)
-let functorize_implementation initial_env ~all_params ~modules target modulename
+let functorize_implementation initial_env ~sg ~modules target modulename
     : Typedtree.module_coercion =
   Ident.reinit ();
-  let sg = compute_bundle_sig ~all_params ~modules in
   let shape =
     let uid = Uid.of_compilation_unit_id modulename in
     List.fold_left
@@ -4991,14 +4916,6 @@ let functorize_implementation initial_env ~all_params ~modules target modulename
       save_cmt_cms None;
       cc
     | None ->
-      let unit_names = List.map Compilation_unit.name modules in
-      let imports =
-        List.filter
-          (fun import ->
-            let name = Import_info.name import in
-            not (List.mem name unit_names))
-          (Env.imports ())
-      in
       let name = Compilation_unit.name modulename in
       let kind =
         Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
@@ -5006,7 +4923,7 @@ let functorize_implementation initial_env ~all_params ~modules target modulename
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
           (sg, Staticity.Dynamic) name kind (Unit_info.cmi target)
-          (Array.of_list imports)
+          (Array.of_list (Env.imports ()))
       in
       save_cmt_cms (Some cmi);
       Tcoerce_none
