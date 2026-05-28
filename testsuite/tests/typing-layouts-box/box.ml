@@ -820,7 +820,37 @@ type obj_more = < m : int; n : int >
 val widen : < m : int; n : int > box -> < m : int > box = <fun>
 |}]
 
-(* Test 32: shadowing the predef [box] disambiguates with [box/2] *)
+(* Test 32: Box creates an unboxed version *)
+
+type t = string box
+type u = t#
+[%%expect{|
+type t = string box
+type u = t#
+|}]
+
+(* Test 33: multiple layers of [box] *)
+
+type int_b = int box
+type int_b_b = int_b box
+type int_b_b_u = int_b_b#
+let check : int_b_b_u -> int_b = fun x -> x
+type int_b_b_u_u = int_b_b_u#
+let check : int_b_b_u_u -> int = fun x -> x
+type int_b_b_u_u_u = int_b_b_u_u#
+let check : int_b_b_u_u_u -> int# = fun x -> x
+[%%expect{|
+type int_b = int box
+type int_b_b = int box box
+type int_b_b_u = int box
+val check : int box -> int box = <fun>
+type int_b_b_u_u = int_b_b_u#
+val check : int_b_b_u_u -> int = <fun>
+type int_b_b_u_u_u = int_b_b_u_u#
+val check : int_b_b_u_u_u -> int# = <fun>
+|}]
+
+(* Test 34: shadowing the predef [box] disambiguates with [box/2] *)
 
 let id_box (x : 'a box) : 'a box = x
 type 'a box = Mine of 'a
