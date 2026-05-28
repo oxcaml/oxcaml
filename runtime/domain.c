@@ -614,6 +614,7 @@ static uintnat fresh_domain_unique_id(void) {
 }
 
 static inline void domain_root_register(value *root, value t);
+static inline void domain_root_set(value *root, value t);
 static inline void domain_root_remove(value *root);
 
 /* must be run on the domain's thread */
@@ -826,6 +827,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
+
+  /* Note that we do not make domain_state->preemption a domain_root, since as
+     long as it's a block (between being allocated and being initialized) it
+     must not be seen by the GC. */
+  domain_state->preemption = Val_unit;
 
   domain_state->parser_trace = 0;
 
@@ -1865,6 +1871,42 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
+/* If a preemption is pending, allocate a 3-word continuation for the preemption
+   and store it in Caml_state->preemption
+
+  The resulting preemption will not be fully initialized, so after this function
+  is run care must be taken not to enter the GC before returning from
+  caml_garbage_collection.
+*/
+void caml_domain_setup_preemption(void) {
+  CAMLparam0();
+  CAMLlocal1(cont);
+  /* Check if there is a pending preemption */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+  cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
+  /* Check if there is still a pending preemption. This might not be true if the
+     caml_alloc_3 also called the GC, which itself called
+  `  caml_domain_setup_preemption`. */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+#ifdef DEBUG
+  Field(cont, 0) = Debug_free_minor;
+  Field(cont, 1) = Debug_free_minor;
+  Field(cont, 2) = Debug_free_minor;
+#endif
+  Caml_state->preemption = cont;
+  CAMLreturn0;
+}
+
+void caml_domain_reset_preemption(void) {
+  if (Is_block(Caml_state->preemption)) {
+    Caml_state->preemption = Val_long(1);
+  }
+}
+
 /*  This function is async-signal-safe as [all_domains] and
     [caml_params->max_domains] are set before signal handlers are installed and
     do not change afterwards. */
@@ -1925,7 +1967,8 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
      action_pending if needed. */
   if (caml_check_pending_signals() ||
       atomic_load_relaxed(&Caml_state->requested_tick) ||
-      caml_memprof_pending_external_interrupt(dom_st))
+      caml_memprof_pending_external_interrupt(dom_st) ||
+      Is_block(Caml_state->preemption))
     caml_set_action_pending(dom_st);
 }
 
@@ -2194,11 +2237,24 @@ static void tick_thread_wake(void) {}
 
 #endif
 
-void caml_process_tick(void)
+value caml_process_tick_exn(void)
 {
-  if (atomic_exchange(&Caml_state->requested_tick, false)) {
+  CAMLparam0();
+  CAMLlocal1(res);
+  if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
+                               memory_order_acquire)) {
     caml_domain_tick_hook();
+
+    res = caml_tick_fiber_exn(Caml_state->current_stack);
+    if (Is_exception_result(res)) {
+      CAMLreturn(res);
+    }
+
+    if (res == Val_true) {
+      Caml_state->preemption = Val_long(1);
+    }
   }
+  CAMLreturn(Val_unit);
 }
 
 CAMLextern void caml_stop_tick_thread(void)
@@ -2289,6 +2345,10 @@ static void caml_do_tick_all_domains(void)
 static void* caml_tick(void *arg)
 {
   (void)arg;
+  /* OpenOnload uses LD_PRELOAD to replace epoll_wait with a busy-polling
+     version, which makes the epoll_wait ticker extremely expensive */
+  if (!caml_tick_use_usleep && caml_globalsym("onload_is_present") != NULL)
+    caml_tick_use_usleep = 1;
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)

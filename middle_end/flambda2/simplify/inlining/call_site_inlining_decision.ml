@@ -123,7 +123,22 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
-  UA.cost_metrics uacc
+  let cost_metrics_of_lifted_constants =
+    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+    then
+      let lifted_constants = UA.lifted_constants uacc in
+      Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
+        ~f:(fun cost_metrics lifted_constant ->
+          List.fold_left
+            (fun cost_metrics definition ->
+              Cost_metrics.( + ) cost_metrics
+                (Rebuilt_static_const.cost_metrics
+                   (Lifted_constant.Definition.defining_expr definition)))
+            cost_metrics
+            (Lifted_constant.definitions lifted_constant))
+    else Cost_metrics.zero
+  in
+  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
 let argument_types_useful dacc apply =
   if
@@ -259,14 +274,15 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     fail_if_must_inline ();
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
-    let code_or_metadata =
-      DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
-    in
-    if not (Code_or_metadata.code_present code_or_metadata)
-    then (
+    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    | exception Not_found ->
       fail_if_must_inline ();
-      Missing_code)
-    else
+      Missing_code
+    | code_or_metadata when not (Code_or_metadata.code_present code_or_metadata)
+      ->
+      fail_if_must_inline ();
+      Missing_code
+    | code_or_metadata -> (
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
          1. We see an [@unrolled n] annotation (with n > 0) on an apply
@@ -365,7 +381,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else (
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
-          | `Always -> Attribute_always))
+          | `Always -> Attribute_always)))
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =

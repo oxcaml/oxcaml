@@ -1055,29 +1055,14 @@ module Builtins = struct
     = "" "caml_int64_clz_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external int64_clz_nonzero :
-    (int64[@unboxed]) -> (int[@untagged])
-    = "" "caml_int64_clz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
   external int32_clz :
     (int32[@unboxed]) -> (int[@untagged])
     = "" "caml_int32_clz_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external int32_clz_nonzero :
-    (int32[@unboxed]) -> (int[@untagged])
-    = "" "caml_int32_clz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
   external nativeint_clz :
     (nativeint[@unboxed]) -> (int[@untagged])
     = "" "caml_nativeint_clz_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external nativeint_clz_nonzero :
-    (nativeint[@unboxed]) -> (int[@untagged])
-    = "" "caml_nativeint_clz_nonzero_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (* Count trailing zeros *)
@@ -1092,29 +1077,14 @@ module Builtins = struct
     = "" "caml_int64_ctz_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external int64_ctz_nonzero :
-    (int64[@unboxed]) -> (int[@untagged])
-    = "" "caml_int64_ctz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
   external int32_ctz :
     (int32[@unboxed]) -> (int[@untagged])
     = "" "caml_int32_ctz_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external int32_ctz_nonzero :
-    (int32[@unboxed]) -> (int[@untagged])
-    = "" "caml_int32_ctz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
   external nativeint_ctz :
     (nativeint[@unboxed]) -> (int[@untagged])
     = "" "caml_nativeint_ctz_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external nativeint_ctz_nonzero :
-    (nativeint[@unboxed]) -> (int[@untagged])
-    = "" "caml_nativeint_ctz_nonzero_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (* Population count *)

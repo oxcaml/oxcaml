@@ -16,8 +16,8 @@ let code inline(never) loopify(never) size(7) newer_version_of(u_4)
         : imm tagged =
   let g_into_g_field_x = u_into_my_closure_field_g_field_x in
   let g_into_g_field_y = u_into_my_closure_field_g_field_y in
-  let y = g_into_g_field_y in
   let x = g_into_g_field_x in
+  let y = g_into_g_field_y in
   apply direct(id_2_1) inlining_state(depth(1))
     $camlArguments_for_unboxed_closure__id_6 (y) -> k2 * k1
     where k2 (apply_result : imm tagged) =

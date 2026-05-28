@@ -77,6 +77,16 @@ val fold_left : 'a t -> f:('b -> 'a -> 'b) -> init:'b -> 'b
 
 val fold_right : 'a t -> f:('a -> 'b -> 'b) -> init:'b -> 'b
 
+(** Folding the range of cells from [right_incl] to [left_excl]. If [right_incl]
+    is [None], then the effective range is empty. Otherwise, if [left_excl] is
+    [None], then the range extends to the beginning of the list. *)
+val fold_right_range :
+  right_incl:'a cell option ->
+  left_excl:'a cell option ->
+  f:('a -> 'b -> 'b) ->
+  init:'b ->
+  'b
+
 val find_cell_opt : 'a t -> f:('a -> bool) -> 'a cell option
 
 val find_opt : 'a t -> f:('a -> bool) -> 'a option
@@ -87,10 +97,13 @@ val for_all : 'a t -> f:('a -> bool) -> bool
 
 val for_alli : 'a t -> f:(int -> 'a -> bool) -> bool
 
-val to_list : 'a t -> 'a list
+(** The range of cells from [left_incl] to [right_excl]. If [left_incl] is
+    [None], then the result is the empty list. Otherwise, if [right_excl] is
+    [None], then the range extends to the end of the list.*)
+val range_to_list :
+  left_incl:'a cell option -> right_excl:'a cell option -> 'a list
 
-(** the list suffix from the provided cell (exclusive) *)
-val suffix : 'a cell -> 'a list
+val to_list : 'a t -> 'a list
 
 val to_array : 'a t -> 'a array
 

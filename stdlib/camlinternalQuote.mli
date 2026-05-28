@@ -480,6 +480,8 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
+
+  val magic_staged_modes : t
 end
 
 module Vb_attribute : sig
@@ -652,6 +654,8 @@ and Exp_desc : sig
   val let_exception : Name.t -> Exp.t -> t
 
   val let_op : Identifier.Value.t list -> Exp.t list -> Case.t -> t
+
+  val let_open : Identifier.Module.t -> Exp.t -> t
 
   val exclave : Exp.t -> t
 

@@ -12,7 +12,7 @@ let $camlInlined_rec__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let `apply` = %project_value_slot.[`fact`].[`apply`] (my_closure) in
+   let `apply` = %project_value_slot.[fact].[`apply`] (my_closure) in
    (let prim = %int_comp.ne (n, 0) in
     let int_notequal = %tag_imm (prim) in
     (let untagged = %untag_imm (int_notequal) in

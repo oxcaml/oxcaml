@@ -27,9 +27,7 @@
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let length_aux =
-     %project_value_slot.[`length`].[`length_aux`] (my_closure)
-   in
+   let length_aux = %project_value_slot.[length].[length_aux] (my_closure) in
    apply direct(length_aux_0)
      (length_aux : _ -> imm tagged) (0, l) -> k1 * k2
  in
@@ -110,10 +108,9 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let cmp = %project_value_slot.[`rev_merge`].[`cmp`] (my_closure) in
-   let rev_append =
-     %project_value_slot.[`rev_merge`].[`rev_append`] (my_closure)
+   let rev_append = %project_value_slot.[rev_merge].[rev_append] (my_closure)
    in
+   let cmp = %project_value_slot.[rev_merge].[cmp] (my_closure) in
    (let prim = %is_int (l1) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -208,10 +205,10 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let cmp = %project_value_slot.[`rev_merge_rev`].[`cmp_1`] (my_closure) in
    let rev_append =
-     %project_value_slot.[`rev_merge_rev`].[`rev_append_1`] (my_closure)
+     %project_value_slot.[rev_merge_rev].[rev_append_1] (my_closure)
    in
+   let cmp = %project_value_slot.[rev_merge_rev].[cmp_1] (my_closure) in
    (let prim = %is_int (l1) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -303,14 +300,13 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let chop = %project_value_slot.[`sort`].[`chop`] (my_closure) in
-   let cmp = %project_value_slot.[`sort`].[`cmp_2`] (my_closure) in
+   let chop = %project_value_slot.[sort].[chop] (my_closure) in
+   let cmp = %project_value_slot.[sort].[cmp_2] (my_closure) in
+   let rev_merge = %project_value_slot.[sort].[rev_merge] (my_closure) in
    let rev_merge_rev =
-     %project_value_slot.[`sort`].[`rev_merge_rev`] (my_closure)
+     %project_value_slot.[sort].[rev_merge_rev] (my_closure)
    in
-   let rev_merge = %project_value_slot.[`sort`].[`rev_merge`] (my_closure) in
-   let rev_sort = %project_function_slot.[`sort`].[`rev_sort`] (my_closure)
-   in
+   let rev_sort = %project_function_slot.[sort].[rev_sort] (my_closure) in
    (let prim = %int_comp.ne (n, 2) in
     let int_notequal = %tag_imm (prim) in
     (let untagged = %untag_imm (int_notequal) in
@@ -518,10 +514,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k10
-                                                                   | 1 -> 
-                                                                   k11)
+                                                                   | 0 -> k10
+                                                                   | 1 -> k11)
                                                                   where 
                                                                     k11 =
                                                                     cont k8
@@ -543,9 +537,9 @@
                                                                     (int_lessthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k11
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k12)
                                                                     where 
                                                                     k12 =
@@ -688,10 +682,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k9
-                                                                   | 1 -> 
-                                                                   k10)
+                                                                   | 0 -> k9
+                                                                   | 1 -> k10)
                                                                   where 
                                                                     k10 =
                                                                     cont k7
@@ -713,9 +705,9 @@
                                                                     (int_lessthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k10
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k11)
                                                                     where 
                                                                     k11 =
@@ -887,15 +879,13 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let chop = %project_value_slot.[`rev_sort`].[`chop`] (my_closure) in
-   let rev_merge =
-     %project_value_slot.[`rev_sort`].[`rev_merge`] (my_closure)
-   in
+   let chop = %project_value_slot.[rev_sort].[chop] (my_closure) in
+   let cmp = %project_value_slot.[rev_sort].[cmp_2] (my_closure) in
+   let rev_merge = %project_value_slot.[rev_sort].[rev_merge] (my_closure) in
    let rev_merge_rev =
-     %project_value_slot.[`rev_sort`].[`rev_merge_rev`] (my_closure)
+     %project_value_slot.[rev_sort].[rev_merge_rev] (my_closure)
    in
-   let cmp = %project_value_slot.[`rev_sort`].[`cmp_2`] (my_closure) in
-   let sort = %project_function_slot.[`rev_sort`].[`sort`] (my_closure) in
+   let sort = %project_function_slot.[rev_sort].[sort] (my_closure) in
    (let prim = %int_comp.ne (n, 2) in
     let int_notequal = %tag_imm (prim) in
     (let untagged = %untag_imm (int_notequal) in
@@ -1104,10 +1094,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k10
-                                                                   | 1 -> 
-                                                                   k11)
+                                                                   | 0 -> k10
+                                                                   | 1 -> k11)
                                                                   where 
                                                                     k11 =
                                                                     cont k8
@@ -1129,9 +1117,9 @@
                                                                     (int_greaterthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k11
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k12)
                                                                     where 
                                                                     k12 =
@@ -1274,10 +1262,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k9
-                                                                   | 1 -> 
-                                                                   k10)
+                                                                   | 0 -> k9
+                                                                   | 1 -> k10)
                                                                   where 
                                                                     k10 =
                                                                     cont k7
@@ -1299,9 +1285,9 @@
                                                                     (int_greaterthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k10
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k11)
                                                                     where 
                                                                     k11 =
@@ -1474,11 +1460,11 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
+   let length = %project_value_slot.[sort_uniq].[length] (my_closure) in
    let rev_append =
-     %project_value_slot.[`sort_uniq`].[`rev_append_2`] (my_closure)
+     %project_value_slot.[sort_uniq].[rev_append_2] (my_closure)
    in
-   let chop = %project_value_slot.[`sort_uniq`].[`chop_1`] (my_closure) in
-   let length = %project_value_slot.[`sort_uniq`].[`length`] (my_closure) in
+   let chop = %project_value_slot.[sort_uniq].[chop_1] (my_closure) in
    let rev_merge = closure rev_merge_5 @rev_merge
    with { rev_append = rev_append; cmp = cmp }
    in
@@ -1517,9 +1503,8 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let cmp = %project_value_slot.[`sort_1`].[`cmp_3`] (my_closure) in
-   let rev_sort =
-     %project_function_slot.[`sort_1`].[`rev_sort_1`] (my_closure)
+   let cmp = %project_value_slot.[sort_1].[cmp_3] (my_closure) in
+   let rev_sort = %project_function_slot.[sort_1].[rev_sort_1] (my_closure)
    in
    apply direct(rev_sort_11)
      (rev_sort ~ depth my_depth -> next_depth
@@ -1533,9 +1518,8 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let cmp = %project_value_slot.[`rev_sort_1`].[`cmp_3`] (my_closure) in
-   let sort = %project_function_slot.[`rev_sort_1`].[`sort_1`] (my_closure)
-   in
+   let cmp = %project_value_slot.[rev_sort_1].[cmp_3] (my_closure) in
+   let sort = %project_function_slot.[rev_sort_1].[sort_1] (my_closure) in
    (let prim = %int_comp.ne (n, 2) in
     let int_notequal = %tag_imm (prim) in
     (let untagged = %untag_imm (int_notequal) in

@@ -1,0 +1,4 @@
+(test
+ (name kernel_test)
+ (flags :standard -open Ocaml_parsing)
+ (libraries alcotest ocaml_parsing merlin-lib.kernel))

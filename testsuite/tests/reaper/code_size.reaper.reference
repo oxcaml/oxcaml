@@ -10,7 +10,7 @@ in
 let $camlCode_size__h_4 = closure h_2_1 @h in
 let code loopify(never) size(6) newer_version_of(g_1)
       g_1_1 (y) my_closure _region _ghost_region my_depth -> k * k1 =
-  let x = %project_value_slot.[`g`].[`unboxed_field_x`] (my_closure) in
+  let x = %project_value_slot.[g].[unboxed_field_x] (my_closure) in
   (let Pmakeblock_into_Pmakeblock_field_0 = x in
    apply direct(h_2_1)
      $camlCode_size__h_4 (Pmakeblock_into_Pmakeblock_field_0) -> k2 * k1)

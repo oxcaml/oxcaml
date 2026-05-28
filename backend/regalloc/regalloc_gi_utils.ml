@@ -484,16 +484,17 @@ module Hardware_registers = struct
       (reg : Reg.t) (interval : Interval.t) : Hardware_register.t option =
     let reg_class = Regs.Reg_class.of_machtype reg.typ in
     let hardware_regs = Regs.Reg_class_tbl.find t reg_class in
-    let rec find = function
-      | [] -> None
-      | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+    let rec find aff =
+      match Regalloc_affinity.next aff with
+      | None -> None
+      | Some { Regalloc_affinity.priority = _; phys_reg } ->
         let reg_index_in_class : int = Regs.index_in_class phys_reg in
         let hardware_reg : Hardware_register.t =
           hardware_regs.(reg_index_in_class)
         in
         if not (overlap hardware_reg interval)
         then Some hardware_reg
-        else find tl
+        else find aff
     in
     find (Regalloc_affinity.get affinities reg)
 

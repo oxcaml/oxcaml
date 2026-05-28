@@ -133,12 +133,34 @@ void caml_orphan_alloc_stats(caml_domain_state *domain) {
    all of these events could happen during domain termination. */
 static struct gc_stats* sampled_gc_stats;
 
+/* Bitmap indicating which entries in sampled_gc_stats may be nonzero */
+static uint8_t* sampled_gc_stats_nonzero;
+
+/* All set bits in sampled_gc_stats_nonzero are <= this index */
+static atomic_uintnat sampled_gc_stats_nonzero_max;
+
 void caml_init_gc_stats (uintnat max_domains)
 {
   sampled_gc_stats =
     caml_stat_calloc_noexc(max_domains, sizeof(struct gc_stats));
-  if (sampled_gc_stats == NULL)
+  sampled_gc_stats_nonzero =
+    caml_stat_calloc_noexc(max_domains, sizeof(uint8_t));
+  if (sampled_gc_stats == NULL || sampled_gc_stats_nonzero == NULL)
     caml_fatal_error("Failed to allocate sampled_gc_stats");
+}
+
+static void update_nonzero_bitmap(caml_domain_state* domain, uint8_t val)
+{
+  uintnat id = (uintnat)domain->id;
+  if (sampled_gc_stats_nonzero[id] != val) {
+    sampled_gc_stats_nonzero[id] = val;
+    if (val) {
+      uintnat curr_max = sampled_gc_stats_nonzero_max;
+      while (curr_max < id &&
+             !atomic_compare_exchange_strong(&sampled_gc_stats_nonzero_max,
+                                             &curr_max, id));
+    }
+  }
 }
 
 /* Update the sampled stats for the given domain during a STW section. */
@@ -157,9 +179,11 @@ void caml_collect_gc_stats_sample_stw(caml_domain_state* domain)
        insufficient as further stat updates may come after the current
        STW section.)  */
     memset(stats, 0, sizeof(*stats));
+    update_nonzero_bitmap(domain, 0);
   } else {
     caml_collect_alloc_stats_sample(domain, &stats->alloc_stats);
     caml_collect_heap_stats_sample(domain->shared_heap, &stats->heap_stats);
+    update_nonzero_bitmap(domain, 1);
   }
 }
 
@@ -186,13 +210,15 @@ void caml_compute_gc_stats(struct gc_stats* buf)
   pool_max = buf->heap_stats.pool_max_words;
   large_max = buf->heap_stats.large_max_words;
 
-  for (i=0; i<caml_params->max_domains; i++) {
+  uintnat nonzero_max = sampled_gc_stats_nonzero_max;
+  for (i=0; i<=nonzero_max; i++) {
     /* For allocation stats, we use the live stats of the current domain
        and the sampled stats of other domains.
 
        For the heap stats, we always used the sampled stats. */
     struct gc_stats* s = &sampled_gc_stats[i];
     if (i != my_id) {
+      if (!sampled_gc_stats_nonzero[i]) continue;
       caml_accum_alloc_stats(&buf->alloc_stats, &s->alloc_stats);
       caml_accum_heap_stats(&buf->heap_stats, &s->heap_stats);
     }

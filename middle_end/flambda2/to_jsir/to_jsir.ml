@@ -125,7 +125,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let fvar = Bound_var.var v in
       To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
           create_let_prim ~env ~res fvar p)
-    | Set_of_closures bound_vars, Set_of_closures soc ->
+    | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode) ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
       (* Definitions within this group can reference each others' symbols
@@ -397,6 +397,39 @@ and apply_expr ~env ~res e =
           let unit = Pc (Int Targetint.zero) in
           ( "%with_stack_bind",
             [Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg; unit],
+            res )
+        | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
+          let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let unit = Pc (Int Targetint.zero) in
+          ( "%with_stack_preemptible",
+            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg; unit],
+            res )
+        | With_stack_bind_preemptible
+            { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
+          let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
+          let dyn, res = To_jsir_shared.simple ~env ~res dyn in
+          let bind, res = To_jsir_shared.simple ~env ~res bind in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let unit = Pc (Int Targetint.zero) in
+          ( "%with_stack_bind_preemptible",
+            [ Pv valuec;
+              Pv exnc;
+              Pv effc;
+              Pv handle_tick;
+              Pv dyn;
+              Pv bind;
+              Pv f;
+              Pv arg;
+              unit ],
             res )
         | Resume { cont; f; arg } ->
           let cont, res = To_jsir_shared.simple ~env ~res cont in

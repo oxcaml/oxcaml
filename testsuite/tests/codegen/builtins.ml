@@ -38,15 +38,6 @@ clz64:
   ret
 |}]
 
-let clz64_nonzero x =
-  Builtins.int64_clz_nonzero (Int64_u.to_int64 x)
-[%%expect_asm X86_64{|
-clz64_nonzero:
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count leading zeros - int32 *)
 
 (* CR ttebbi: Could use lzcntl directly instead of zero-extend + lzcntq
@@ -61,32 +52,12 @@ clz32:
   ret
 |}]
 
-let clz32_nonzero x =
-  Builtins.int32_clz_nonzero (Int32_u.to_int32 x)
-[%%expect_asm X86_64{|
-clz32_nonzero:
-  movl  %eax, %eax
-  lzcnt %rax, %rax
-  addq  $-32, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count leading zeros - nativeint *)
 
 let clz_native x =
   Builtins.nativeint_clz (Nativeint_u.to_nativeint x)
 [%%expect_asm X86_64{|
 clz_native:
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
-let clz_native_nonzero x =
-  Builtins.nativeint_clz_nonzero (Nativeint_u.to_nativeint x)
-[%%expect_asm X86_64{|
-clz_native_nonzero:
   lzcnt %rax, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -117,15 +88,6 @@ ctz64:
   ret
 |}]
 
-let ctz64_nonzero x =
-  Builtins.int64_ctz_nonzero (Int64_u.to_int64 x)
-[%%expect_asm X86_64{|
-ctz64_nonzero:
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count trailing zeros - int32 *)
 
 (* CR ttebbi: We should use the 32bit tzcnt instruction. *)
@@ -139,30 +101,12 @@ ctz32:
   ret
 |}]
 
-let ctz32_nonzero x =
-  Builtins.int32_ctz_nonzero (Int32_u.to_int32 x)
-[%%expect_asm X86_64{|
-ctz32_nonzero:
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count trailing zeros - nativeint *)
 
 let ctz_native x =
   Builtins.nativeint_ctz (Nativeint_u.to_nativeint x)
 [%%expect_asm X86_64{|
 ctz_native:
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
-let ctz_native_nonzero x =
-  Builtins.nativeint_ctz_nonzero (Nativeint_u.to_nativeint x)
-[%%expect_asm X86_64{|
-ctz_native_nonzero:
   tzcnt %rax, %rax
   leaq  1(%rax,%rax), %rax
   ret

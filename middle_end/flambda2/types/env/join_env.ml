@@ -1601,8 +1601,8 @@ let cut_for_join typing_env ~cut_after =
   in
   incremental_equations, symbol_projections
 
-let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
-    joined_envs equations_to_join symbol_projections_to_join =
+let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+    source_env joined_envs equations_to_join symbol_projections_to_join =
   try
     let empty_bindings =
       Bindings_in_target_env.from_source_env
@@ -1666,7 +1666,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
         bindings source_env
     in
     let target_env =
-      ME.add_env_extension ~meet_type target_env
+      ME.add_env_extension ~meet_expanded_head target_env
         (TEE.from_map
            (equations
              : Type_in_target_env.t Name_in_target_env.Map.t
@@ -1851,8 +1851,8 @@ module Analysis = struct
       t.canonical_definitions_at_normal_mode init
 end
 
-let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
-    joined_envs =
+let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
+    source_env joined_envs =
   let joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index typing_env
@@ -1867,13 +1867,13 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
       (Index.Map.empty, Index.Map.empty, Index.Map.empty)
   in
   let target_env, _ =
-    cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
-      joined_envs equations_to_join symbol_projections_to_join
+    cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+      source_env joined_envs equations_to_join symbol_projections_to_join
   in
   target_env
 
-let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_type ~cut_after
-    source_env joined_envs =
+let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
+    ~cut_after source_env joined_envs =
   let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index (external_id, typing_env)
@@ -1893,8 +1893,8 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_type ~cut_after
   in
   let source_env = ME.create source_env in
   let target_env, bindings =
-    cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
-      joined_envs equations_to_join symbol_projections_to_join
+    cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+      source_env joined_envs equations_to_join symbol_projections_to_join
   in
   let target_env = ME.typing_env target_env in
   let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
@@ -1931,7 +1931,7 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * t =
 
 (** {2:extensions Join of extensions} *)
 
-let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
+let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
   let joined_envs_and_extensions =
     List.fold_left
       (fun joined_envs_and_extensions (index, extension) ->
@@ -1947,7 +1947,7 @@ let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
         match
-          ME.add_env_extension_strict ~meet_type (ME.create typing_env)
+          ME.add_env_extension_strict ~meet_expanded_head (ME.create typing_env)
             extension
         with
         | Bottom ->
@@ -2131,11 +2131,11 @@ let join_aliases_in_env_extension ~joined_envs ~bindings equations_to_join =
         in
         equations_in_target_env, equations_to_join, bindings)
 
-let n_way_join_env_extension ~n_way_join_type ~meet_type t extensions :
+let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
     _ Or_bottom.t =
   let joined_equations =
     try
-      prepare_nested_join ~meet_type ~bindings:t.bindings
+      prepare_nested_join ~meet_expanded_head ~bindings:t.bindings
         ~joined_envs:t.joined_envs extensions
     with Misc.Fatal_error ->
       let bt = Printexc.get_raw_backtrace () in

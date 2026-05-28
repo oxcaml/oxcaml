@@ -2,10 +2,6 @@ Boxed record
 1.000000
 2.000000
 
-Float record
-1.000000
-2.000000
-
 Mixed block record
 1.000000
 2.000000
@@ -15,14 +11,6 @@ Mixed block record (float32# field)
 2.000000
 
 Nested mixed block record
-1.000000
-2.000000
-
-Mixed float record (float field)
-1.000000
-2.000000
-
-Mixed float record (float# field)
 1.000000
 2.000000
 

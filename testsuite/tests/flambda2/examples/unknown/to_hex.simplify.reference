@@ -175,7 +175,7 @@ apply ccall
                              %num_conv.[`imm`].[`nativeint`] (cse_param)
                            in
                            let prim_3 =
-                             %num_conv.[`tagged_imm`].[`nativeint`] (i)
+                             %num_conv.[tagged_imm].[`nativeint`] (i)
                            in
                            let prim_4 =
                              %int_comp.`nativeint`.unsigned.lt
@@ -199,11 +199,11 @@ apply ccall
                                  where k4 (apply_result : imm tagged) =
                                    let int_mul = %int_barith.mul (i, 2) in
                                    let prim_4 =
-                                     %num_conv.[`tagged_imm`].[`int8`]
+                                     %num_conv.[tagged_imm].[int8]
                                        (apply_result)
                                    in
                                    let prim_5 =
-                                     %num_conv.[`tagged_imm`].[`nativeint`]
+                                     %num_conv.[tagged_imm].[`nativeint`]
                                        (int_mul)
                                    in
                                    let Pbytessetu =
@@ -222,11 +222,11 @@ apply ccall
                                           %int_barith.add (int_mul, 1)
                                         in
                                         let prim_6 =
-                                          %num_conv.[`tagged_imm`].[`int8`]
+                                          %num_conv.[tagged_imm].[int8]
                                             (apply_result_1)
                                         in
                                         let prim_7 =
-                                          %num_conv.[`tagged_imm`].[`nativeint`]
+                                          %num_conv.[tagged_imm].[`nativeint`]
                                             (int_add)
                                         in
                                         let Pbytessetu_1 =
