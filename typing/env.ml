@@ -4294,9 +4294,8 @@ let open_pers_signature_cmi filename env =
   let stage_locks, locks =
     partition_locks (IdTbl.get_all_locks env.modules)
   in
-  check_cross_quotation ~errors:false ~loc_use:Location.none
-    ~loc_def:Location.none env path Longident.(Lident (Path.name path))
-    stage_locks;
+  assert_does_not_cross_quotation ~loc_use:Location.none
+    ~loc_def:Location.none env path stage_locks;
   let env = add_components None path env comps locks in
   path, env
 
