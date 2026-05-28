@@ -64,16 +64,23 @@ let type_declaration_of_operation : _ Scalar.Operation.t -> string =
       (Scalar.Floating.to_string t)
       (Scalar.Floating.to_string t)
 
+let params_of_operation : _ Scalar.Operation.t -> string =
+  function Unary _ -> "x" | Binary _ -> "x y"
+
 let codegen_test_of_operation operation =
   let mangle_sigils s = String.split_on_char '#' s |> String.concat "_u" in
   let val_name = Scalar.Operation.to_string operation |> mangle_sigils in
   Printf.sprintf
-    "\nexternal %s : %s = \"%s\"\nlet %s = %s\n[%%%%expect_asm X86_64{||}]"
+    "\nexternal %s : %s = \"%s\"\n\
+     let %s %s = %s %s\n\
+     [%%%%expect_asm X86_64{||}]"
     val_name
     (type_declaration_of_operation operation)
     (Scalar.Operation.With_percent_prefix.to_string operation)
     val_name
+    (params_of_operation operation)
     val_name
+    (params_of_operation operation)
 
 let _ =
   let sorted_ops =
