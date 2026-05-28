@@ -4283,14 +4283,7 @@ let open_pers_signature_cmi filename env =
   in
   let path = Pident (Ident.create_global global_name) in
   use_module ~use:true ~loc:Location.none path mda;
-  let comps =
-    match get_components mda.mda_components with
-    | Structure_comps c -> c
-    | Functor_comps _ ->
-        Misc.fatal_errorf
-          "open_pers_signature_cmi: %s is a functor, not a structure"
-          (Global_module.Name.to_string global_name)
-  in
+  let comps = find_structure_components path env in
   let stage_locks, locks =
     partition_locks (IdTbl.get_all_locks env.modules)
   in
