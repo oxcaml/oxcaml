@@ -260,9 +260,9 @@ end = struct
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-      | `Alias (p, id, _, duid, sort, _, _) ->
+      | `Alias (sub_p, id, _, duid, sort, _, _) ->
           aux
-            ( (General.view p, patl),
+            ( (General.view sub_p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
       | `Record ([], _, _, _) as view -> stop p view
@@ -1705,7 +1705,14 @@ and precompile_or ~arg ~arg_sort (cls : Simple.clause list) ors args def k =
               (* variables bound in the or-pattern
                  that are used in the orpm actions *)
               Typedtree.pat_bound_idents_full orp
-              |> List.filter (fun (id, _, _, _, _) -> Ident.Set.mem id pm_fv)
+              |> List.filter (fun (id, _, _, uid, _) ->
+                  let is_free = Ident.Set.mem id pm_fv in
+                  if not is_free then
+                    Type_shape.Variable_availability
+                    .register_dropped_intentionally ~uid
+                      ~reason:Ignored_variable;
+                  is_free
+                  )
               |> List.map (fun (id, _, ty, uid, id_sort) ->
                   (id, uid, Typeopt.layout orp.pat_env orp.pat_loc id_sort ty))
             in

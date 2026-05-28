@@ -265,8 +265,38 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
       ()
 
+module VA = Type_shape.Variable_availability
+
+let observed_id_of_provenance p : VA.observed_id =
+  match V.Provenance.debug_uid p with
+  | Uid u -> Source_uid u
+  | Proj { uid; unboxed_field } ->
+    Projected_source_uid { source_uid = uid; field = unboxed_field }
+
+let subrange_is_trivial sub =
+  (* Same start and end label means the range covers at most the gap between
+     [start_pos_offset] and [end_pos_offset], which the compute_ranges API
+     documents as typically zero or one byte — too small to be useful. *)
+  Label.equal (ARV.Subrange.start_pos sub) (ARV.Subrange.end_pos sub)
+
+let range_has_nontrivial_subrange range =
+  ARV.Range.fold range ~init:false ~f:(fun acc sub ->
+      acc || not (subrange_is_trivial sub))
+
+let record_va_observations_for_range range =
+  if !Clflags.dump_variable_availability
+  then
+    match ARV.Range_info.provenance (ARV.Range.info range) with
+    | None -> ()
+    | Some p ->
+      let id = observed_id_of_provenance p in
+      VA.record_observation ~checkpoint:Debug_info_variables id;
+      if range_has_nontrivial_subrange range
+      then VA.record_observation ~checkpoint:Debug_info_nonempty_range id
+
 let iterate_over_variable_like_things state ~available_ranges_vars ~f =
   ARV.iter available_ranges_vars ~f:(fun var range ->
+      record_va_observations_for_range range;
       let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
       f var ~ident_for_type ~range)
 

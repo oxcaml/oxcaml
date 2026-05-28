@@ -691,7 +691,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           Apply_cont_rewrite.print rewrite;
       let new_phantom_params =
         Bound_parameters.filter
-          (fun param -> NO.mem_var free_names (BP.var param))
+          (fun param ->
+            let var = BP.var param in
+            Variable.user_visible var || NO.mem_var free_names var)
           (Apply_cont_rewrite.get_unused_params rewrite)
       in
       let handler, uacc =
@@ -792,7 +794,9 @@ let rebuild_single_recursive_handler cont
       in
       let new_phantom_params =
         Bound_parameters.filter
-          (fun param -> NO.mem_var free_names (BP.var param))
+          (fun param ->
+            let var = BP.var param in
+            Variable.user_visible var || NO.mem_var free_names var)
           (Apply_cont_rewrite.get_unused_params rewrite)
       in
       let handler, uacc =

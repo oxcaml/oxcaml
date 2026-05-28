@@ -427,13 +427,10 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   in
   let optimize = !Clflags.native_code || not !Clflags.debug in
   let optimize_except_alias_bindings =
-    (* This doesn't yet include Alias bindings of variables to variables
-       because of what is described in this CR.  Other used-once Alias
-       bindings will not be substituted out when we want to preserve them
-       for DWARF.  (They will only be let-bound again by Flambda 2
-       anyway, even if substituted - it's just a matter of placement.) *)
-    (* CR mshinwell: Fix bug whereby Alias bindings of variables to variables
-      are being generated (probably by Matching) with the wrong layout. *)
+    (* The debug info degrades when we substitute let x = y in ... bindings. We
+       disable their simplification when [dwarf_wants_to_prevent_substitutions].
+       Flambda2 runs more simplification subsequently, which should take care of
+       these. *)
     optimize && not dwarf_wants_to_prevent_substitutions
   in
 
@@ -494,7 +491,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       end
   | Lfunction fn ->
       count_lfunction fn
-  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize ->
+  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       (* v will be replaced by w in l2, so each occurrence of v in l2
          increases w's refcount *)
       count (bind_var bv v) l2;
@@ -585,14 +582,17 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
    tail call later on. *)
 
   let mklet str kind v duid e1 e2 =
+    (* [let v = e in v]: collapsing this to [e] would drop the source name [v],
+       so we keep the binding when debug info would like to preserve
+       substitutions. *)
     match e2 with
-    | Lvar w when optimize && Ident.same v w -> e1
+    | Lvar w when optimize_except_alias_bindings && Ident.same v w -> e1
     | _ -> Llet (str, kind,v,duid,e1,e2)
   in
 
   let mkmutlet kind v duid e1 e2 =
     match e2 with
-    | Lmutvar w when optimize && Ident.same v w -> e1
+    | Lmutvar w when optimize_except_alias_bindings && Ident.same v w -> e1
     | _ -> Lmutlet (kind,v,duid,e1,e2)
   in
 
@@ -638,7 +638,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       | kind, ret_mode, body ->
           lfunction ~kind ~params ~return:outer_return ~body ~attr:attr1 ~loc ~mode ~ret_mode
       end
-  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize ->
+  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       Hashtbl.add subst v (simplif (Lvar w));
       simplif l2
   | Llet(Strict, kind, v, duid,
@@ -663,14 +663,20 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       end
   | Llet(Alias, kind, v, duid, l1, l2) ->
       begin match count_var v with
-        0 -> simplif l2
+        0 ->
+          Type_shape.Variable_availability.register_dropped_intentionally
+            ~uid:duid ~reason:Ignored_variable;
+          simplif l2
       | 1 when optimize_except_alias_bindings ->
           Hashtbl.add subst v (simplif l1); simplif l2
       | _ -> Llet(Alias, kind, v, duid, simplif l1, simplif l2)
       end
   | Llet(StrictOpt, kind, v, duid, l1, l2) ->
       begin match count_var v with
-        0 -> simplif l2
+        0 ->
+          Type_shape.Variable_availability.register_dropped_intentionally
+            ~uid:duid ~reason:Ignored_variable;
+          simplif l2
       | _ -> mklet StrictOpt kind v duid (simplif l1) (simplif l2)
       end
   | Llet(str, kind, v, duid, l1, l2) ->
@@ -1122,7 +1128,9 @@ let simplify_local_functions lam =
   let rec rewrite lam0 =
     let lam =
       match lam0 with
-      | Llet (_, _, id, _duid, _, cont) when Hashtbl.mem static_id id ->
+      | Llet (_, _, id, duid, _, cont) when Hashtbl.mem static_id id ->
+          Type_shape.Variable_availability.register_dropped_intentionally
+            ~uid:duid ~reason:Function_became_catch;
           rewrite cont
       | Lapply {ap_func = Lvar id; ap_args; _} when Hashtbl.mem static_id id ->
          let st = Hashtbl.find static_id id in

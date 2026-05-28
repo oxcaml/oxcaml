@@ -54,6 +54,26 @@ module type S = sig
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 end
 
+(* Register [Compiler_hooks] callbacks for the [Variable_availability]
+   diagnostic. The caller is expected to gate this on
+   [Clflags.dump_variable_availability] so that no hooks are installed when the
+   diagnostic is off. The Flambda 2 side registers its own hooks at the entry of
+   [Flambda2.lambda_to_cmm] because [ocamloptcomp] cannot reference the Flambda
+   2 lib directly. *)
+let register_debug_variable_availability_hooks_without_flambda2 () =
+  let module CH = Compiler_hooks in
+  CH.register CH.Typed_tree_impl (fun impl ->
+      let unit_name =
+        Compilation_unit.full_path_as_string
+          (Compilation_unit.get_current_exn ())
+      in
+      Type_shape.Variable_availability.reset ();
+      Debug_variable_availability.collect_from_typedtree ~unit_name impl);
+  CH.register CH.Raw_lambda
+    (Debug_variable_availability.observe_lambda_program ~checkpoint:Raw_lambda);
+  CH.register CH.Lambda
+    (Debug_variable_availability.observe_lambda_program ~checkpoint:Lambda)
+
 module Make (Backend : Optcomp_intf.Backend) : S = struct
   let tool_name = "ocamlopt"
 
@@ -188,8 +208,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       Compile_common.implementation
         ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
-        ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
-          Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
+        ~hook_typed_tree:(Compiler_hooks.execute Compiler_hooks.Typed_tree_impl)
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
     | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->

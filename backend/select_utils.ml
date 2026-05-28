@@ -606,7 +606,20 @@ end
 
 let make_stack_offset stack_ofs = Cfg.Op (Stackoffset stack_ofs)
 
+let record_cmm_observation_for_provenance p =
+  let module VA = Type_shape.Variable_availability in
+  if !Clflags.dump_variable_availability
+  then
+    let id =
+      match Backend_var.Provenance.debug_uid p with
+      | Uid u -> VA.Source_uid u
+      | Proj { uid; unboxed_field } ->
+        VA.Projected_source_uid { source_uid = uid; field = unboxed_field }
+    in
+    VA.record_observation ~checkpoint:Cmm id
+
 let make_name_for_debugger ~ident ~which_parameter ~provenance ~regs =
+  Option.iter record_cmm_observation_for_provenance provenance;
   Cfg.Op
     (Operation.Name_for_debugger { ident; which_parameter; provenance; regs })
 
@@ -682,10 +695,10 @@ let maybe_emit_naming_op env sub_cfg ~bound_name regs =
     then
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
-        Operation.Name_for_debugger
-          { ident = bound_name; provenance; which_parameter = None; regs }
+        make_name_for_debugger ~ident:bound_name ~which_parameter:None
+          ~provenance ~regs
       in
-      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
+      insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]
 
 let join env (opt_r1 : _ Or_never_returns.t) sub_cfg1
     (opt_r2 : _ Or_never_returns.t) sub_cfg2 ~bound_name : _ Or_never_returns.t

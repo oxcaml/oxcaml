@@ -145,6 +145,8 @@ let flambda_to_flambda0 : type m.
     flambda_result =
  fun ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
      ~close_prog_metadata ~code_slot_offsets raw_flambda ->
+  if !Clflags.dump_variable_availability
+  then Flambda2_debug.Variable_availability_hooks.register_hooks ();
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
   dump_fexpr_annot ~prefixname "raw" raw_flambda;
