@@ -2293,20 +2293,6 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
-(* Try to expand a Tbox type directly. Returns [Some ty] if the box can be
-   eliminated, [None] if the inner type needs to be expanded first. *)
-let try_simplifying_box t =
-  match get_desc t with
-  | Tconstr (p, args, _) ->
-      begin match Path.boxed_version p with
-      | Some boxed_p -> Some (newconstr boxed_p args)
-      | None -> None
-      end
-  | Tunboxed_tuple tys ->
-      (* #(a * b * ...) box_ = (a * b * ...) *)
-      Some (newty (Ttuple tys))
-  | _ -> None
-
 let rec try_expand_once_gen expand_abbrev env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
@@ -2317,12 +2303,8 @@ let rec try_expand_once_gen expand_abbrev env ty =
   | Tquote_eval t ->
       try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
   | Tbox t ->
-      begin match try_simplifying_box t with
-      | Some ty -> ty
-      | None ->
-          let t' = try_expand_once_gen expand_abbrev env t in
-          newty (Tbox t')
-      end
+      let t' = try_expand_once_gen expand_abbrev env t in
+      newty (Tbox t')
   | _ -> raise Cannot_expand
 
 let try_unbox_desc env = function
@@ -2384,110 +2366,14 @@ let try_expand_safe env ty =
 
 (* Perform one of the following head-position beta reductions via rewrites:
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
-   * Cancel a quote-splice pair. *)
+   * Cancel a quote-splice pair.
+   * Simplify a [Tbox] over a type with a unboxed version. *)
 let rec try_reduce_once env t =
-  let path_must_be_toplevel env path =
-    if not (Env.path_is_toplevel_in_quotations env path) then
-      raise Cannot_expand
-  in
-  let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
-  | Tquote_eval t -> begin
-    match get_desc t with
-    | Tvar _ | Tunivar _ -> raise Cannot_expand
-    (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
-    | Tarrow (a, t1, t2, c) ->
-      (* Reduce the parameter type's [Tpoly] immediately *)
-      let t1' = new_quote_eval_ty t1 |> try_reduce_once env in
-      let t2' = new_quote_eval_ty t2 in
-      Tarrow (a, t1', t2', c)
-    (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
-    | Ttuple tl ->
-      Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
-    (* [<[t box]> eval]  ==>  [<[t]> eval box] *)
-    | Tbox t ->
-      Tbox (new_quote_eval_ty t)
-    (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
-    | Tunboxed_tuple tl ->
-      Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
-    (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
-    | Tconstr (p, tl, a) ->
-      path_must_be_toplevel env p;
-      Tconstr (p, List.map new_quote_eval_ty tl, a)
-    (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
-    | Tobject (t, ct) ->
-      (* Attempt to reduce the field list immediately:
-         - If the object type is open, then its tail ([Tvar] or [Tunivar])
-           will [raise Cannot_expand]. [Cannot_expand] propagates to here
-           so the [Tobject] does not reduce at all.
-           Alternatively, the object type has a private row type given by
-           a [Tconstr], in which case we will reduce if it is top-level.
-         - If the object type is closed, its final element is a [Tnil] and
-           the entire [Tobject] will reduce just fine. *)
-      (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
-         to support open object types here. *)
-      Tobject (
-        try_reduce_once env (new_quote_eval_ty t),
-        ref (
-          Option.map
-            (fun (p, tl) ->
-              path_must_be_toplevel env p;
-              p, List.map new_quote_eval_ty tl)
-            !ct))
-    (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
-    | Tfield (s, k, t_method, t_rest) ->
-      Tfield (
-        s, k,
-        (* If the method type's [Tpoly] is present, we reduce it. *)
-        try_reduce_poly env (new_quote_eval_ty t_method),
-        (* Immediately reduce other fields to make sure we don't get stuck. *)
-        try_reduce_once env (new_quote_eval_ty t_rest))
-    | Tnil -> Tnil
-    (* reduce in subterm *)
-    | Tquote _ | Tsplice _ | Tquote_eval _ ->
-      Tquote_eval (try_reduce_once (incr_stage env) t)
-    (* [<[ < > ]> eval] ==> [< >] *)
-    (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
-    | Tvariant row ->
-      (* Immediately beta-reduce [more] -- only reduces closed variant types *)
-      (* CR metaprogramming jbachurski: We should not need a restriction to
-         closed row types, and allow having [Tquote_eval] on row variables.
-         As is, this is incomplete and order-dependent. Same for [Tobject]. *)
-      let more = row_more row |> new_quote_eval_ty |> try_reduce_once env in
-      Tvariant (copy_row new_quote_eval_ty true row false more)
-    (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
-        where {t/x} is a substitution of t for x. *)
-    | Tpoly (t, tl) ->
-      (* We quantify again, but with the univars [tl'] at an outer stage.
-          This means all instances of univars [tl] have to be replaced
-          by a corresponding instance in [tl'] spliced. *)
-      let copy tv =
-        newty3 ~level:(get_level tv) ~scope:(get_scope tv) (get_desc tv)
-        |> new_splice_ty
-      in
-      let tl', t' =
-        For_copy.with_scope (fun copy_scope ->
-          instance_poly' copy_scope ~keep_names:true
-            ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
-      in
-      let tl' =
-        List.map
-          (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false)
-          tl'
-      in
-      Tpoly (new_quote_eval_ty t', tl')
-    (* [<[(sort 'a). t]> eval] ==> [(sort 'a). <[t]> eval] *)
-    | Trepr (t, sl) ->
-      Trepr (new_quote_eval_ty t, sl)
-    (*     [<[ module S with type typ = t ]> eval]
-        ==> [module S with type typ = <[t]> eval] *)
-    | Tpackage (p, fl) ->
-      path_must_be_toplevel env p;
-      Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
-    (* It is safe not to expand [Tof_kind], and we do not need to currently *)
-    | Tof_kind _ -> raise Cannot_expand
-    | Tlink _ | Tsubst _ -> assert false
-    end |> newty2 ~level:(get_level t)
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> newty2 ~level:(get_level t)
+  | Tbox t ->
+    try_reduce_box t |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
     match get_desc t with
     (* [$<[ t ]>] ==> [t] ]>] *)
@@ -2508,6 +2394,119 @@ let rec try_reduce_once env t =
     | Tquote_eval _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
     | _ -> raise Cannot_expand
     end
+  | _ -> raise Cannot_expand
+
+and try_reduce_quote_eval env t =
+  let path_must_be_toplevel env path =
+    if not (Env.path_is_toplevel_in_quotations env path) then
+      raise Cannot_expand
+  in
+  let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
+  match get_desc t with
+  | Tvar _ | Tunivar _ -> raise Cannot_expand
+  (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
+  | Tarrow (a, t1, t2, c) ->
+    (* Reduce the parameter type's [Tpoly] immediately *)
+    let t1' = new_quote_eval_ty t1 |> try_reduce_once env in
+    let t2' = new_quote_eval_ty t2 in
+    Tarrow (a, t1', t2', c)
+  (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
+  | Ttuple tl ->
+    Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+  (* [<[t box]> eval]  ==>  [<[t]> eval box] *)
+  | Tbox t ->
+    Tbox (new_quote_eval_ty t)
+  (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
+  | Tunboxed_tuple tl ->
+    Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+  (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
+  | Tconstr (p, tl, a) ->
+    path_must_be_toplevel env p;
+    Tconstr (p, List.map new_quote_eval_ty tl, a)
+  (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
+  | Tobject (t, ct) ->
+    (* Attempt to reduce the field list immediately:
+       - If the object type is open, then its tail ([Tvar] or [Tunivar])
+         will [raise Cannot_expand]. [Cannot_expand] propagates to here
+         so the [Tobject] does not reduce at all.
+         Alternatively, the object type has a private row type given by
+         a [Tconstr], in which case we will reduce if it is top-level.
+       - If the object type is closed, its final element is a [Tnil] and
+         the entire [Tobject] will reduce just fine. *)
+    (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
+       to support open object types here. *)
+    Tobject (
+      try_reduce_once env (new_quote_eval_ty t),
+      ref (
+        Option.map
+          (fun (p, tl) ->
+            path_must_be_toplevel env p;
+            p, List.map new_quote_eval_ty tl)
+          !ct))
+  (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
+  | Tfield (s, k, t_method, t_rest) ->
+    Tfield (
+      s, k,
+      (* If the method type's [Tpoly] is present, we reduce it. *)
+      try_reduce_poly env (new_quote_eval_ty t_method),
+      (* Immediately reduce other fields to make sure we don't get stuck. *)
+      try_reduce_once env (new_quote_eval_ty t_rest))
+  | Tnil -> Tnil
+  (* reduce in subterm *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+    Tquote_eval (try_reduce_once (incr_stage env) t)
+  (* [<[ < > ]> eval] ==> [< >] *)
+  (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
+  | Tvariant row ->
+    (* Immediately beta-reduce [more] -- only reduces closed variant types *)
+    (* CR metaprogramming jbachurski: We should not need a restriction to
+       closed row types, and allow having [Tquote_eval] on row variables.
+       As is, this is incomplete and order-dependent. Same for [Tobject]. *)
+    let more = row_more row |> new_quote_eval_ty |> try_reduce_once env in
+    Tvariant (copy_row new_quote_eval_ty true row false more)
+  (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
+      where {t/x} is a substitution of t for x. *)
+  | Tpoly (t, tl) ->
+    (* We quantify again, but with the univars [tl'] at an outer stage.
+        This means all instances of univars [tl] have to be replaced
+        by a corresponding instance in [tl'] spliced. *)
+    let copy tv =
+      newty3 ~level:(get_level tv) ~scope:(get_scope tv) (get_desc tv)
+      |> new_splice_ty
+    in
+    let tl', t' =
+      For_copy.with_scope (fun copy_scope ->
+        instance_poly' copy_scope ~keep_names:true
+          ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
+    in
+    let tl' =
+      List.map
+        (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false)
+        tl'
+    in
+    Tpoly (new_quote_eval_ty t', tl')
+  (* [<[(sort 'a). t]> eval] ==> [(sort 'a). <[t]> eval] *)
+  | Trepr (t, sl) ->
+    Trepr (new_quote_eval_ty t, sl)
+  (*  [<[ module S with type typ = t ]> eval]
+      ==> [module S with type typ = <[t]> eval] *)
+  | Tpackage (p, fl) ->
+    path_must_be_toplevel env p;
+    Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
+  (* It is safe not to expand [Tof_kind], and we do not need to currently *)
+  | Tof_kind _ -> raise Cannot_expand
+  | Tlink _ | Tsubst _ -> assert false
+
+and try_reduce_box t =
+  match get_desc t with
+  (* [t# box] ==> [t] *)
+  | Tconstr (p, args, _) ->
+    begin match Path.boxed_version p with
+    | Some boxed_p -> Tconstr (boxed_p, args, ref Mnil)
+    | None -> raise Cannot_expand
+    end
+  (* [#(t1 * t2) box] ==> [t1 * t2] *)
+  | Tunboxed_tuple tys -> Ttuple tys
   | _ -> raise Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
