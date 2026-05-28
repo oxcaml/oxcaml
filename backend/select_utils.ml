@@ -109,6 +109,22 @@ let phantom_vars_from_env env =
   then None
   else Some env.phantom_lets
 
+(* Record a Cmm-checkpoint observation for the [Variable_availability]
+   diagnostic from a [Backend_var.Provenance.t]. Used internally by
+   [make_name_for_debugger] (for the [Name_for_debugger] op path) and by
+   [env_add_phantom_let] (for phantom lets, which do not emit a naming op). *)
+let record_cmm_observation_for_provenance p =
+  let module VA = Type_shape.Variable_availability in
+  if !Clflags.dump_variable_availability
+  then
+    let id =
+      match Backend_var.Provenance.debug_uid p with
+      | Uid u -> VA.Source_uid u
+      | Proj { uid; unboxed_field } ->
+        VA.Projected_source_uid { source_uid = uid; field = unboxed_field }
+    in
+    VA.record_observation ~checkpoint:Cmm id
+
 let rec combine_traps trap_stack = function
   | [] -> trap_stack
   | Push t :: l -> combine_traps (Operation.Specific_trap (t, trap_stack)) l
@@ -178,6 +194,13 @@ let env_add_phantom_let var env =
 
      2. The defining expressions are recorded separately in the environment and
      eventually stored in the CFG's fun_phantom_lets field. *)
+  (* Also record the [Variable_availability] observation for the Cmm
+     checkpoint here. Phantom lets do not produce a [Name_for_debugger] op
+     (the path that ordinarily records the observation, via
+     [make_name_for_debugger] below), so without this call a source uid
+     bound only at phantom mode would never be seen at the Cmm checkpoint
+     by the diagnostic. *)
+  Option.iter record_cmm_observation_for_provenance (VP.provenance var);
   let var = VP.var var in
   { env with phantom_lets = V.Set.add var env.phantom_lets }
 
@@ -626,18 +649,6 @@ module Stack_offset_and_exn = struct
 end
 
 let make_stack_offset stack_ofs = Cfg.Op (Stackoffset stack_ofs)
-
-let record_cmm_observation_for_provenance p =
-  let module VA = Type_shape.Variable_availability in
-  if !Clflags.dump_variable_availability
-  then
-    let id =
-      match Backend_var.Provenance.debug_uid p with
-      | Uid u -> VA.Source_uid u
-      | Proj { uid; unboxed_field } ->
-        VA.Projected_source_uid { source_uid = uid; field = unboxed_field }
-    in
-    VA.record_observation ~checkpoint:Cmm id
 
 let make_name_for_debugger ~ident ~which_parameter ~provenance ~regs =
   Option.iter record_cmm_observation_for_provenance provenance;

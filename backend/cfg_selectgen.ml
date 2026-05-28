@@ -502,14 +502,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | exception Not_found -> ()
     | regs, provenance, _mut ->
       let naming_op =
-        Operation.Name_for_debugger
-          { ident = referenced_var;
-            provenance;
-            which_parameter = None;
-            regs
-          }
+        SU.make_name_for_debugger ~ident:referenced_var ~which_parameter:None
+          ~provenance ~regs
       in
-      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
+      insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]
 
   let ensure_referenced_vars_named env sub_cfg
       (defining_expr : Cmm.phantom_defining_expr option) =
@@ -846,10 +842,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         then (
           let ident = VP.var var in
           let naming_op =
-            Operation.Name_for_debugger
-              { ident; provenance; which_parameter = None; regs }
+            SU.make_name_for_debugger ~ident ~which_parameter:None ~provenance
+              ~regs
           in
-          insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+          insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
         Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
