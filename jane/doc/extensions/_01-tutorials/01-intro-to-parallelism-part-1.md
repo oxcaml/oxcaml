@@ -126,8 +126,8 @@ The other, domain B, accesses the variables:
 
 ```ocaml
 (* ... *)
-if !initialised then
-  if !price_of_gold < really_good_price_for_gold then
+if initialised then
+  if price_of_gold < really_good_price_for_gold then
     buy_lots_of_gold ()
 (* ... *)
 ```
@@ -141,7 +141,7 @@ B reads `initialised` and sees that it's `false`, and then domain A sets
 checks `initialised`, and then if gold is cheap, domain B heads to the market.
 
 The one thing we want _not_ to happen is for domain B to see that
-`!initialised` is `true` and yet find that `price_of_gold` is still stuck at
+`initialised` is `true` and yet find that `price_of_gold` is still stuck at
 its initial value of `0.0`, thus causing us to `buy_lots_of_gold ()` no matter
 the price. Our intuitive method reassures us that this cannot happen: domain A
 doesn't set `initialised` to `true` until it's already done setting
