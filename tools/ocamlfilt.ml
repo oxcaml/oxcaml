@@ -107,16 +107,16 @@ module Structured = struct
             full_len )
 
   and decode_split_parts sym =
+    let initial_raw_pos =
+      try String.index sym '_' + 1
+      with Not_found ->
+        invalid_arg
+          (Printf.sprintf "\"%s\" is not a valid component of a mangled name"
+             sym)
+    in
     let res = Buffer.create (String.length sym) in
     let esc_pos = ref 0
-    and raw_pos =
-      ref
-        (try String.index sym '_' + 1
-         with Not_found ->
-           invalid_arg
-             (Printf.sprintf "\"%s\" is not a valid component of a mangled name"
-                sym))
-    in
+    and raw_pos = ref initial_raw_pos in
     let rec loop () =
       match unbase26 sym !esc_pos with
       | Some (nb, l) ->
