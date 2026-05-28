@@ -3485,6 +3485,13 @@ let assert_does_not_cross_quotation ~loc_use ~loc_def env path locks =
         (Location.Doc.loc ~capitalize_first:false) loc_def
         (Location.Doc.loc ~capitalize_first:false) loc_use
 
+let locks_for_pers_mod ~loc_use ~loc_def env path =
+  let stage_locks, locks =
+    partition_locks (IdTbl.get_all_locks env.modules)
+  in
+  assert_does_not_cross_quotation env ~loc_use ~loc_def path stage_locks;
+  locks
+
 let report_module_unbound ~errors ~loc env reason =
   match reason with
   | Mod_unbound_illegal_recursion { container; unbound } ->
@@ -4284,11 +4291,10 @@ let open_pers_signature_cmi filename env =
   let path = Pident (Ident.create_global global_name) in
   use_module ~use:true ~loc:Location.none path mda;
   let comps = find_structure_components path env in
-  let stage_locks, locks =
-    partition_locks (IdTbl.get_all_locks env.modules)
+  let locks =
+    locks_for_pers_mod ~loc_use:Location.none
+      ~loc_def:Location.none env path
   in
-  assert_does_not_cross_quotation ~loc_use:Location.none
-    ~loc_def:Location.none env path stage_locks;
   let env = add_components None path env comps locks in
   path, env
 
@@ -4368,7 +4374,6 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
 let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
-  let locks = IdTbl.get_all_locks env.modules in
   let path, loc_def, mode =
     if !Clflags.transparent_modules && not load then
       let path, () =
@@ -4385,8 +4390,9 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       in
       path, mda.mda_declaration.md_loc, mda.mda_mode
   in
-  let stage_locks, locks = partition_locks locks in
-  assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
+  let locks =
+    locks_for_pers_mod ~loc_use:loc ~loc_def env path
+  in
   path, (mode, locks)
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
