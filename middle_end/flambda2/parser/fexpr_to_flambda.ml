@@ -323,7 +323,10 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let bound_vars, env =
       let convert_binding env (var, _) : Bound_var.t * env =
         let var, var_duid, env = fresh_var env var Flambda_kind.value in
-        let var = Bound_var.create var var_duid Name_mode.normal in
+        let var =
+          Bound_var.create var var_duid Name_mode.normal ~dbg:Debuginfo.none
+            ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         var, env
       in
       map_accum_left convert_binding env vars_and_closure_bindings
@@ -354,7 +357,10 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let named = defining_expr env d in
     let id, id_duid, env = fresh_var env var (Flambda.Named.kind named) in
     let acc, body = expr env acc body in
-    let var = Bound_var.create id id_duid Name_mode.normal in
+    let var =
+      Bound_var.create id id_duid Name_mode.normal ~dbg:Debuginfo.none
+        ~is_parameter:Bound_var.Is_parameter.local_var
+    in
     let bound = Bound_pattern.singleton var in
     let let_expr =
       Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
@@ -390,7 +396,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             let var, var_duid, env =
               fresh_var env param (Flambda_kind.With_subkind.kind kind)
             in
-            let param = Bound_parameter.create var kind var_duid in
+            let param =
+              Bound_parameter.create var kind var_duid ~dbg:Debuginfo.none
+            in
             env, param :: args)
           params (env, [])
       in
@@ -641,7 +649,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
                 let var, var_duid, env =
                   fresh_var env param (Flambda_kind.With_subkind.kind kind)
                 in
-                let param = Bound_parameter.create var kind var_duid in
+                let param =
+                  Bound_parameter.create var kind var_duid ~dbg:Debuginfo.none
+                in
                 param, env)
               env params
           in

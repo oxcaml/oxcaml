@@ -19,7 +19,7 @@ open! Int_replace_polymorphic_compare
 open! Asm_targets
 open! Dwarf_low
 open! Dwarf_high
-module ARV = Available_ranges_vars
+module ARAV = Available_ranges_all_vars
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
@@ -33,6 +33,12 @@ type proto_dies_for_var =
 
 let arch_size_addr = Targetint.of_int_exn Arch.size_addr
 
+(* When set, phantom-variable location descriptions for [Lphantom_var] are
+   wrapped in a single-piece composite ([DW_OP_piece]). This is a GDB-specific
+   workaround for stack-underflow on unavailable referenced variables; LLVM
+   debuggers do not currently support [DW_OP_piece] in this position. *)
+let use_dw_op_piece = false
+
 let proto_dies_for_variable var ~proto_dies_for_vars =
   match Backend_var.Tbl.find proto_dies_for_vars var with
   | exception Not_found -> None
@@ -40,6 +46,7 @@ let proto_dies_for_variable var ~proto_dies_for_vars =
 
 let normal_type_for_var ?reference ~parent ident_for_type is_parameter =
   let name_attribute =
+    (* CR mshinwell: remove [ident_for_type] now we use uids *)
     match ident_for_type with
     | None -> []
     | Some (compilation_unit, var) ->
@@ -78,19 +85,194 @@ let reg_location_description reg ~offset ~need_rvalue : location_description =
   in
   Simple simple_loc_desc
 
+(* Helper functions for phantom variable DIE references *)
+let die_location_of_variable_lvalue state var ~proto_dies_for_vars =
+  match proto_dies_for_variable var ~proto_dies_for_vars with
+  | None -> None
+  | Some { value_die_lvalue; _ } ->
+    let location =
+      SLDL.Lvalue.location_from_another_die ~die_label:value_die_lvalue
+        ~compilation_unit_header_label:(DS.compilation_unit_header_label state)
+    in
+    Some location
+
+let die_location_of_variable_rvalue state var ~proto_dies_for_vars =
+  match proto_dies_for_variable var ~proto_dies_for_vars with
+  | None -> None
+  | Some { value_die_lvalue; _ } ->
+    (* For rvalues, we reference the same DIE but the debugger knows to evaluate
+       it as an rvalue *)
+    let location =
+      SLDL.Rvalue.location_from_another_die ~die_label:value_die_lvalue
+        ~compilation_unit_header_label:(DS.compilation_unit_header_label state)
+    in
+    Some location
+
+(* Phantom variables are always immutable, so we emit lvalue descriptions for
+   consistency with normal variables, and emit rvalue descriptions only when
+   required. *)
+let rec phantom_var_location_description state
+    ~(defining_expr : Linear.phantom_defining_expr) ~need_rvalue
+    ~proto_dies_for_vars ~parent : location_description option =
+  let module SLD = Simple_location_description in
+  let lvalue lvalue = Some (Simple (SLDL.compile (SLDL.of_lvalue lvalue))) in
+  let lvalue_without_address lvalue =
+    Some (Simple (SLDL.compile (SLDL.of_lvalue_without_address lvalue)))
+  in
+  let rvalue rvalue = Some (Simple (SLDL.compile (SLDL.of_rvalue rvalue))) in
+  match defining_expr with
+  | Lphantom_const_int i ->
+    let i = SLDL.Rvalue.signed_int_const i in
+    if need_rvalue
+    then rvalue i
+    else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue i)
+  | Lphantom_const_symbol symbol ->
+    let symbol = SLDL.Rvalue.const_symbol (Asm_symbol.create_global symbol) in
+    if need_rvalue
+    then rvalue symbol
+    else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue symbol)
+  | Lphantom_read_symbol_field { sym; field } ->
+    let symbol = Asm_symbol.create_global sym in
+    let field = Targetint.of_int field in
+    if need_rvalue
+    then rvalue (SLDL.Rvalue.read_symbol_field symbol ~field)
+    else lvalue (SLDL.Lvalue.in_symbol_field symbol ~field)
+  | Lphantom_var var ->
+    (* The original encoding wraps the [location_from_another_die] reference
+       in a single-piece composite location description ([DW_OP_piece]). This
+       prevents GDB from producing a stack-underflow error when the referenced
+       variable becomes unavailable at certain program points. LLVM-based
+       debuggers do not currently support [DW_OP_piece] in this position, so
+       the simple (non-composite) form is used by default; flip
+       [use_dw_op_piece] below to restore the original encoding. *)
+    if use_dw_op_piece
+    then
+      if need_rvalue
+      then (
+        match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
+        | None -> None
+        | Some rvalue ->
+          let location = SLDL.compile (SLDL.of_rvalue rvalue) in
+          let composite =
+            Composite_location_description
+            .pieces_of_simple_location_descriptions
+              [location, arch_size_addr]
+          in
+          Some (Composite composite))
+      else (
+        match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+        | None -> None
+        | Some lvalue ->
+          let location = SLDL.compile (SLDL.of_lvalue lvalue) in
+          let composite =
+            Composite_location_description
+            .pieces_of_simple_location_descriptions
+              [location, arch_size_addr]
+          in
+          Some (Composite composite))
+    else if need_rvalue
+    then (
+      match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
+      | None -> None
+      | Some r -> rvalue r)
+    else (
+      match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+      | None -> None
+      | Some l -> lvalue l)
+  | Lphantom_read_field { var; field } ->
+    (* For now, show field access as unavailable since we cannot dereference
+       values built with implicit pointers. *)
+    None
+  | Lphantom_offset_var { var; offset_in_words } -> (
+    match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+    | None -> None
+    | Some location ->
+      let offset_in_words = Targetint.of_int_exn offset_in_words in
+      if need_rvalue
+      then None
+      else lvalue (SLDL.Lvalue.offset_pointer location ~offset_in_words))
+  | Lphantom_block { tag; fields } ->
+    (* A phantom block construction: instead of the block existing in the target
+       program's address space, it is going to be conjured up in the debugger's
+       address space using DWARF instructions. References between such blocks
+       use "implicit pointers" rather than normal pointers in the target's
+       address space. *)
+    let header =
+      (* Create a proper OCaml block header with the tag and field count *)
+      let header_value =
+        Cmm_helpers.black_block_header tag (List.length fields)
+      in
+      SLDL.compile
+        (SLDL.of_rvalue
+           (SLDL.Rvalue.signed_int_const
+              (Targetint.of_int64 (Int64.of_nativeint header_value))))
+    in
+    let header_size = arch_size_addr in
+    let field_size = arch_size_addr in
+    (* Process each field - get its rvalue location *)
+    let field_pieces =
+      List.map
+        (fun field_var ->
+          let simple_location_description =
+            match
+              die_location_of_variable_rvalue state field_var
+                ~proto_dies_for_vars
+            with
+            | None ->
+              (* This field isn't accessible - use empty location *)
+              []
+            | Some rvalue -> SLDL.compile (SLDL.of_rvalue rvalue)
+          in
+          simple_location_description, field_size)
+        fields
+    in
+    (* Combine header and fields into a composite location description *)
+    let all_pieces = (header, header_size) :: field_pieces in
+    let composite_location_description =
+      Composite_location_description.pieces_of_simple_location_descriptions
+        all_pieces
+    in
+    (* Create a Proto_die for the phantom block with the composite location,
+       then return an implicit pointer to it *)
+    let proto_die =
+      Proto_die.create ~parent ~tag:Variable
+        ~attribute_values:
+          [ DAH.create_composite_location_description
+              composite_location_description ]
+        ()
+    in
+    let offset_in_bytes = Targetint.zero in
+    let die_label = Proto_die.reference proto_die in
+    let version =
+      match !Dwarf_flags.gdwarf_version with
+      | Four -> Dwarf_version.four
+      | Five -> Dwarf_version.five
+    in
+    if need_rvalue
+    then
+      rvalue (SLDL.Rvalue.implicit_pointer ~offset_in_bytes ~die_label version)
+    else
+      lvalue_without_address
+        (SLDL.Lvalue_without_address.implicit_pointer ~offset_in_bytes
+           ~die_label version)
+
 let single_location_description state ~parent ~subrange ~proto_dies_for_vars
     ~need_rvalue =
   let location_description =
-    let subrange_info = ARV.Subrange.info subrange in
-    let reg = ARV.Subrange_info.reg subrange_info in
-    let offset = ARV.Subrange_info.offset subrange_info in
-    reg_location_description reg ~offset ~need_rvalue
+    match ARAV.Subrange.info subrange with
+    | Non_phantom { reg; offset } ->
+      Some (reg_location_description reg ~offset ~need_rvalue)
+    | Phantom defining_expr ->
+      phantom_var_location_description state ~defining_expr ~need_rvalue
+        ~proto_dies_for_vars ~parent
   in
   match location_description with
-  | Simple simple ->
-    Single_location_description.of_simple_location_description simple
-  | Composite composite ->
-    Single_location_description.of_composite_location_description composite
+  | None -> None
+  | Some (Simple simple) ->
+    Some (Single_location_description.of_simple_location_description simple)
+  | Some (Composite composite) ->
+    Some
+      (Single_location_description.of_composite_location_description composite)
 
 type location_list_entry =
   | Dwarf_4 of Dwarf_4_location_list_entry.t
@@ -99,13 +281,13 @@ type location_list_entry =
 let location_list_entry state ~start_of_code_symbol ~subrange
     single_location_description : location_list_entry =
   let start_pos =
-    Asm_label.create_int Text (ARV.Subrange.start_pos subrange |> Label.to_int)
+    Asm_label.create_int Text (ARAV.Subrange.start_pos subrange |> Label.to_int)
   in
-  let start_pos_offset = ARV.Subrange.start_pos_offset subrange in
+  let start_pos_offset = ARAV.Subrange.start_pos_offset subrange in
   let end_pos =
-    Asm_label.create_int Text (ARV.Subrange.end_pos subrange |> Label.to_int)
+    Asm_label.create_int Text (ARAV.Subrange.end_pos subrange |> Label.to_int)
   in
-  let end_pos_offset = ARV.Subrange.end_pos_offset subrange in
+  let end_pos_offset = ARAV.Subrange.end_pos_offset subrange in
   match !Dwarf_flags.gdwarf_version with
   | Four ->
     let location_list_entry =
@@ -141,8 +323,8 @@ let location_list_entry state ~start_of_code_symbol ~subrange
 let dwarf_for_variable state ~value_type_proto_die ~function_symbol
     ~function_proto_die ~proto_dies_for_vars (var : Backend_var.t)
     ~ident_for_type ~range =
-  let range_info = ARV.Range.info range in
-  let provenance = ARV.Range_info.provenance range_info in
+  let range_info = ARAV.Range.info range in
+  let provenance = ARAV.Range_info.provenance range_info in
   let (parent_proto_die : Proto_die.t), hidden =
     match provenance with
     | None ->
@@ -151,7 +333,7 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       function_proto_die, true
     | Some _provenance -> function_proto_die, false
   in
-  let is_parameter = ARV.Range_info.is_parameter range_info in
+  let is_parameter = ARAV.Range_info.is_parameter range_info in
   let type_and_name_attributes =
     match type_die_reference_for_var var ~proto_dies_for_vars with
     | None -> []
@@ -199,28 +381,30 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       | Continuous_code_section { code_begin; _ } -> code_begin, []
     in
     let dwarf_4_location_list_entries, location_list =
-      ARV.Range.fold range
+      ARAV.Range.fold range
         ~init:([], Location_list.create ())
         ~f:(fun (dwarf_4_location_list_entries, location_list) subrange ->
-          let single_location_description =
+          match
             single_location_description state ~parent:(Some function_proto_die)
               ~subrange ~proto_dies_for_vars ~need_rvalue:false
-          in
-          let location_list_entry =
-            location_list_entry state ~start_of_code_symbol ~subrange
-              single_location_description
-          in
-          match location_list_entry with
-          | Dwarf_4 location_list_entry ->
-            let dwarf_4_location_list_entries =
-              location_list_entry :: dwarf_4_location_list_entries
+          with
+          | None -> dwarf_4_location_list_entries, location_list
+          | Some single_location_description -> (
+            let location_list_entry =
+              location_list_entry state ~start_of_code_symbol ~subrange
+                single_location_description
             in
-            dwarf_4_location_list_entries, location_list
-          | Dwarf_5 location_list_entry ->
-            let location_list =
-              Location_list.add location_list location_list_entry
-            in
-            dwarf_4_location_list_entries, location_list)
+            match location_list_entry with
+            | Dwarf_4 location_list_entry ->
+              let dwarf_4_location_list_entries =
+                location_list_entry :: dwarf_4_location_list_entries
+              in
+              dwarf_4_location_list_entries, location_list
+            | Dwarf_5 location_list_entry ->
+              let location_list =
+                Location_list.add location_list location_list_entry
+              in
+              dwarf_4_location_list_entries, location_list))
     in
     match !Dwarf_flags.gdwarf_version with
     | Four ->
@@ -258,12 +442,20 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       (* Ensure that parameters appear in the correct order in the debugger. *)
       Some index
   in
-  if not hidden
-  then
-    Proto_die.create_ignore ?reference ?sort_priority
-      ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
-      ~attribute_values:(type_and_name_attributes @ location_attribute_value)
-      ()
+  (* Even when [hidden] is set (the variable has no provenance and so should
+     not be visible to the user in the debugger) we still emit a DIE for the
+     variable, because phantom variables may reference it via their
+     [Lphantom_var] location description. Without a target DIE, those
+     references would resolve to an empty location list. We mark such DIEs
+     as [DW_AT_artificial] and omit the name. *)
+  let attribute_values =
+    if hidden
+    then DAH.create_artificial () :: location_attribute_value
+    else type_and_name_attributes @ location_attribute_value
+  in
+  Proto_die.create_ignore ?reference ?sort_priority
+    ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
+    ~attribute_values ()
 
 module VA = Type_shape.Variable_availability
 
@@ -277,16 +469,16 @@ let subrange_is_trivial sub =
   (* Same start and end label means the range covers at most the gap between
      [start_pos_offset] and [end_pos_offset], which the compute_ranges API
      documents as typically zero or one byte — too small to be useful. *)
-  Label.equal (ARV.Subrange.start_pos sub) (ARV.Subrange.end_pos sub)
+  Label.equal (ARAV.Subrange.start_pos sub) (ARAV.Subrange.end_pos sub)
 
 let range_has_nontrivial_subrange range =
-  ARV.Range.fold range ~init:false ~f:(fun acc sub ->
+  ARAV.Range.fold range ~init:false ~f:(fun acc sub ->
       acc || not (subrange_is_trivial sub))
 
 let record_va_observations_for_range range =
   if !Clflags.dump_variable_availability
   then
-    match ARV.Range_info.provenance (ARV.Range.info range) with
+    match ARAV.Range_info.provenance (ARAV.Range.info range) with
     | None -> ()
     | Some p ->
       let id = observed_id_of_provenance p in
@@ -294,22 +486,83 @@ let record_va_observations_for_range range =
       if range_has_nontrivial_subrange range
       then VA.record_observation ~checkpoint:Debug_info_nonempty_range id
 
-let iterate_over_variable_like_things state ~available_ranges_vars ~f =
-  ARV.iter available_ranges_vars ~f:(fun var range ->
-      record_va_observations_for_range range;
-      let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
-      f var ~ident_for_type ~range)
+(* A variable belongs to a particular frame DIE iff its provenance location
+   identifies the same inlining context as the frame's [scope_key] (the full
+   inlining path from the function down to and including the frame itself).
+
+   For an inlined-subroutine DIE, [scope_key] is the inlining stack of the
+   frame. A variable bound inside that inlined region has its [bound_var.dbg]
+   passed through [Inlined_debuginfo.rewrite] when the enclosing function is
+   inlined; this prepends each enclosing apply's debuginfo and stamps the
+   variable's own [dbg] with the inlined function's [function_symbol] and the
+   inlining [uid]. Two locations identify the same inlining context iff each
+   pair of corresponding items agrees on those tags. We deliberately ignore
+   the line/column of items, because a variable's [dbg] (set in
+   [closure_conversion] to the function's declaration loc) and an
+   instruction's [dbg] (some op location inside the inlined body) will share
+   [uid] and [function_symbol] but not their line numbers.
+
+   For the function's main subprogram, [scope_key] is [Debuginfo.none]. A
+   variable belongs at the function level iff its location has no inlining
+   tags, i.e. none of its items name an inlined function. This admits both
+   the legacy convention ([bound_var.dbg = none] gives an empty location) and
+   the convention introduced by [closure_conversion] for parameters
+   ([bound_var.dbg = function loc] gives a single item with no inlining
+   tags, since [Inlined_debuginfo.rewrite] only stamps items that came from
+   inside an inlined body). *)
+let inlining_contexts_match (loc1 : Debuginfo.t) (loc2 : Debuginfo.t) =
+  let items1 = Debuginfo.to_items loc1 in
+  let items2 = Debuginfo.to_items loc2 in
+  let rec loop (items1 : Debuginfo.item list) (items2 : Debuginfo.item list) =
+    match items1, items2 with
+    | [], [] -> true
+    | [], _ :: _ | _ :: _, [] -> false
+    | i1 :: items1, i2 :: items2 ->
+      Option.equal String.equal i1.dinfo_uid i2.dinfo_uid
+      && Option.equal String.equal i1.dinfo_function_symbol
+           i2.dinfo_function_symbol
+      && loop items1 items2
+  in
+  loop items1 items2
+
+let location_has_no_inlining_tags (loc : Debuginfo.t) =
+  List.for_all
+    (fun (item : Debuginfo.item) ->
+      Option.is_none item.dinfo_function_symbol
+      && Option.is_none item.dinfo_uid)
+    (Debuginfo.to_items loc)
+
+let matches_frame_path ~frame_path range =
+  let range_info = ARAV.Range.info range in
+  match ARAV.Range_info.provenance range_info with
+  | None ->
+    (* These ones are further filtered - see above. *)
+    true
+  | Some provenance ->
+    let location = Backend_var.Provenance.location provenance in
+    if Debuginfo.is_none frame_path
+    then location_has_no_inlining_tags location
+    else inlining_contexts_match location frame_path
+
+let iterate_over_variable_like_things _state ~available_ranges_all_vars
+    ~frame_path ~f =
+  ARAV.iter available_ranges_all_vars ~f:(fun var range ->
+      if matches_frame_path ~frame_path range
+      then (
+        record_va_observations_for_range range;
+        let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
+        f var ~ident_for_type ~range))
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
-    available_ranges_vars =
+    ~frame_path available_ranges_all_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
-  iterate_over_variable_like_things state ~available_ranges_vars
+  iterate_over_variable_like_things state ~available_ranges_all_vars ~frame_path
     ~f:(fun var ~ident_for_type:_ ~range:_ ->
       let value_die_lvalue = Proto_die.create_reference () in
       let type_die = Proto_die.create_reference () in
       assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
-  iterate_over_variable_like_things state ~available_ranges_vars
+  iterate_over_variable_like_things state ~available_ranges_all_vars ~frame_path
     ~f:
       (dwarf_for_variable state ~value_type_proto_die ~function_symbol
          ~function_proto_die ~proto_dies_for_vars)

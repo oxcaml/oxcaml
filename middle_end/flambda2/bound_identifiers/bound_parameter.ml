@@ -19,14 +19,15 @@ module Simple = Int_ids.Simple
 type t =
   { param : Variable.t;
     uid : Flambda_debug_uid.t;
-    kind : Flambda_kind.With_subkind.t
+    kind : Flambda_kind.With_subkind.t;
+    dbg : Debuginfo.t
   }
 
 include Container_types.Make (struct
   type nonrec t = t
 
-  let compare { param = param1; kind = kind1; uid = uid1 }
-      { param = param2; kind = kind2; uid = uid2 } =
+  let compare { param = param1; kind = kind1; uid = uid1; dbg = _ }
+      { param = param2; kind = kind2; uid = uid2; dbg = _ } =
     let c = Variable.compare param1 param2 in
     if c <> 0
     then c
@@ -36,7 +37,7 @@ include Container_types.Make (struct
 
   let equal t1 t2 = compare t1 t2 = 0
 
-  let hash { param; kind; uid } =
+  let hash { param; kind; uid; dbg = _ } =
     Hashtbl.hash
       ( Variable.hash param,
         Flambda_kind.With_subkind.hash kind,
@@ -46,7 +47,7 @@ include Container_types.Make (struct
     if !Clflags.dump_debug_uids
     then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
 
-  let [@ocamlformat "disable"] print ppf { param; kind; uid } =
+  let [@ocamlformat "disable"] print ppf { param; kind; uid; dbg = _ } =
     Format.fprintf ppf "@[(%t%a%a%t @<1>\u{2237} %a)@]"
       Flambda_colours.parameter
       Variable.print param
@@ -55,17 +56,24 @@ include Container_types.Make (struct
       Flambda_kind.With_subkind.print kind
 end)
 
-let create param kind uid = { param; kind; uid }
+let create param kind uid ~dbg = { param; kind; uid; dbg }
 
 let var t = t.param
 
 let var_and_uid t = t.param, t.uid
+
+let var_and_uid_and_debuginfo t = t.param, t.uid, t.dbg
 
 let name t = Name.var (var t)
 
 let simple t = Simple.var (var t)
 
 let kind t = t.kind
+
+let dbg t = t.dbg
+
+let add_inlined_debuginfo t inlined_debuginfo =
+  { t with dbg = Inlined_debuginfo.rewrite inlined_debuginfo t.dbg }
 
 let with_kind t kind = { t with kind }
 
@@ -75,12 +83,12 @@ let is_renamed_version_of t t' =
   Flambda_kind.With_subkind.equal t.kind t'.kind
   && Variable.is_renamed_version_of t.param t'.param
 
-let free_names { param; kind = _; uid = _ } =
+let free_names { param; kind = _; uid = _; dbg = _ } =
   Name_occurrences.singleton_variable param Name_mode.normal
 
-let apply_renaming { param; kind; uid } renaming =
+let apply_renaming { param; kind; uid; dbg } renaming =
   let param = Renaming.apply_variable renaming param in
-  create param kind uid
+  create param kind uid ~dbg
 
-let ids_for_export { param; kind = _; uid = _ } =
+let ids_for_export { param; kind = _; uid = _; dbg = _ } =
   Ids_for_export.add_variable Ids_for_export.empty param

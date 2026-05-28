@@ -722,7 +722,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       let phantom_uid = Flambda_debug_uid.of_lambda_debug_uid duid in
       let bound_pattern =
         Bound_pattern.singleton
-          (Bound_var.create var phantom_uid Name_mode.phantom)
+          (Bound_var.create var phantom_uid Name_mode.phantom
+             ~dbg:Debuginfo.none
+             ~is_parameter:Bound_var.Is_parameter.local_var)
       in
       let named =
         Flambda.Named.create_prim

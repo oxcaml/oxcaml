@@ -517,7 +517,8 @@ let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
                 (* Variables with [Name_mode.in_types] do not exist at runtime,
                    so we do not equip them with a [Flambda_debug_uid.t]. See
                    #3967. *)
-                Name_mode.in_types))
+                Name_mode.in_types ~dbg:Debuginfo.none
+                ~is_parameter:Bound_var.Is_parameter.local_var))
           kind)
       level1 env
   in
@@ -530,7 +531,8 @@ let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
                 (* Variables with [Name_mode.in_types] do not exist at runtime,
                    so we do not equip them with a [Flambda_debug_uid.t]. See
                    #3967. *)
-                Name_mode.in_types))
+                Name_mode.in_types ~dbg:Debuginfo.none
+                ~is_parameter:Bound_var.Is_parameter.local_var))
           kind)
       level2 env
   in

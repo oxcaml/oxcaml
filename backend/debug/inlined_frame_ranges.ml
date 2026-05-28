@@ -159,27 +159,67 @@ module Inlined_frames = struct
     let print ppf () = Format.pp_print_string ppf "()"
   end
 
-  let available_before (insn : L.instruction) =
-    let get_parents (dbg : Debuginfo.item list) : Debuginfo.t list =
-      match List.rev dbg with
-      | [] | [_] -> []
-      | _ :: parents ->
-        let rec loop (t : Debuginfo.item list) =
-          match t with
-          | [] -> []
-          | _ :: tl -> Debuginfo.of_items (List.rev t) :: loop tl
-        in
-        loop parents
-    in
-    let insn_dbg = Debuginfo.to_items insn.dbg in
-    match insn_dbg with
-    | [] -> None
+  (* Given a non-empty Debuginfo.t, return the list of all non-empty prefixes:
+     the value itself and each of its parents (the path with progressively fewer
+     deeper frames). *)
+  let dbg_and_parents dbg =
+    let items = Debuginfo.to_items dbg in
+    match items with
+    | [] -> []
     | _ :: _ ->
-      Some (Key.Set.Ok (Key.Raw_set.of_list (insn.dbg :: get_parents insn_dbg)))
+      let rec parents (t : Debuginfo.item list) =
+        match List.rev t with
+        | [] | [_] -> []
+        | _ :: rest ->
+          let prefix = List.rev rest in
+          Debuginfo.of_items prefix :: parents prefix
+      in
+      dbg :: parents items
 
-  let available_across insn =
-    (* A single [Linear] instruction never spans inlined frames. *)
-    available_before insn
+  let available_before (fundecl : L.fundecl) (insn : L.instruction) =
+    (* Inlined-frame keys are derived from two sources:
+
+       1. The instruction's own [dbg] (and all its parents): an instruction
+       physically located inside an inlined frame keeps that frame alive.
+
+       2. Each phantom variable in [phantom_available_before]: its provenance
+       location is the inlining context at which the variable was bound, so it
+       keeps the corresponding inlined frame alive even when no instruction
+       physically resides in that frame (which can happen if the inlined body
+       was completely fused into surrounding code by the optimizer).
+
+       There is no separate "phantom available across" field on instructions;
+       phantom availability does not change during a single instruction, so the
+       contribution to [available_across] is identical. *)
+    let dbg_keys =
+      match Debuginfo.to_items insn.dbg with
+      | [] -> []
+      | _ :: _ -> dbg_and_parents insn.dbg
+    in
+    let phantom_keys =
+      match insn.phantom_available_before with
+      | None -> []
+      | Some vars ->
+        Backend_var.Set.fold
+          (fun var acc ->
+            match Backend_var.Map.find var fundecl.fun_phantom_lets with
+            | exception Not_found -> acc
+            | None, _defining_expr -> acc
+            | Some provenance, _defining_expr ->
+              let location = Backend_var.Provenance.location provenance in
+              if Debuginfo.is_none location
+              then acc
+              else List.rev_append (dbg_and_parents location) acc)
+          vars []
+    in
+    match dbg_keys, phantom_keys with
+    | [], [] -> None
+    | _ -> Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_keys @ phantom_keys)))
+
+  let available_across fundecl insn =
+    (* A single [Linear] instruction never spans inlined frames; phantom
+       availability also does not change across an instruction. *)
+    available_before fundecl insn
 
   let must_restart_ranges_upon_any_change () = false
 end

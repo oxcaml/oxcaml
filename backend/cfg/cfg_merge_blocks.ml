@@ -30,7 +30,8 @@ end = struct
           live = _;
           stack_offset = left_stack_offset;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         },
         { desc = right_desc;
           id = _;
@@ -41,7 +42,8 @@ end = struct
           live = _;
           stack_offset = right_stack_offset;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         } ) ->
       Int.equal left_stack_offset right_stack_offset
       && Misc.Stdlib.Array.equal equal_reg left_arg right_arg

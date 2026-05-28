@@ -165,13 +165,20 @@ module type S_functor = sig
       with type subrange_state := Subrange_state.t
 
   (** How to retrieve from an instruction those keys that are available
-      immediately before the instruction starts executing. *)
-  val available_before : L.instruction -> Key.Set.t option
+      immediately before the instruction starts executing. The [fundecl] is
+      provided so implementations can consult per-function context (such as
+      [fun_phantom_lets]) when computing keys. *)
+  val available_before : L.fundecl -> L.instruction -> Key.Set.t option
 
   (** How to retrieve from an instruction those keys that are available between
       the points at which the instruction reads its arguments and writes its
-      results. *)
-  val available_across : L.instruction -> Key.Set.t option
+      results. There is no separate "phantom available across" field on
+      instructions: implementations that combine [phantom_available_before]
+      into their key sets should treat the phantom-derived contribution as
+      identical for [available_before] and [available_across] (equivalently,
+      "phantom available after [prev]" equals "phantom available before
+      [next]"). *)
+  val available_across : L.fundecl -> L.instruction -> Key.Set.t option
 end
 
 (** This module type is the result type of the [Compute_ranges.Make] functor.
