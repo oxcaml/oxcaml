@@ -3510,8 +3510,14 @@ and type_pat_aux
                match arg.ca_sort with
                | Some sort -> Jkind.Sort.of_const sort
                | None ->
-                   Jkind.Sort.new_var ~level:(get_current_level ())
-                   |> Jkind.Sort.of_var
+                   (match
+                      Ctype.type_sort ~why:Constructor_arg_projection
+                        ~fixed:false !!penv arg.ca_type
+                    with
+                    | Ok sort -> sort
+                    | Error _ ->
+                        Jkind.Sort.new_var ~level:(get_current_level ())
+                        |> Jkind.Sort.of_var)
              in
              type_pat ~alloc_mode tps Value p arg.ca_type sort)
           sargs args
