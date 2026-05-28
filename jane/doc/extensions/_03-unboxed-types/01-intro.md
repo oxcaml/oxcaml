@@ -316,7 +316,7 @@ For example, it's fine to write this function type:
 ```ocaml
 val f : ('a : any). 'a -> 'a (* valid as a type signature *)
 ```
-> (See the [previous section](#layout-annotation) to learn more about the layout annotation used here)
+> (See the [previous section](#layout-annotations) to learn more about the layout annotation used here)
 
 But it's not possible to implement a function of that type:
 
