@@ -223,7 +223,7 @@ let _ = fun a b -> match a, b with
                                  (non_consts ([0: value<int>, value<int>]))>)
         x/327 p/328))
     (let
-      (x/329 =a[value<(consts ()) (non_consts ([0: ]))>] b/326
+      (x/329 =a[value<int>] b/326
        p/330 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
          (makeblock 0 a/325 b/326))
       (makeblock 0 (value<int>,value<
@@ -267,7 +267,7 @@ let _ = fun a b -> match a, b with
            (makeblock 0 a/331 b/332))
         (exit 10 x/339 p/340))
       (let
-        (x/337 =a[value<(consts ()) (non_consts ([0: ]))>] b/332
+        (x/337 =a[value<int>] b/332
          p/338 =a[value<
                    (consts ()) (non_consts ([0: value<int>, value<int>]))>]
            (makeblock 0 a/331 b/332))
