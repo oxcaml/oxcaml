@@ -350,9 +350,10 @@ let new_const_symbol () =
 let require_global global_ident =
   if equal_up_to_pack_prefix global_ident current_unit.uib_unit
   then ()
-  else ignore
-    (get_global_export_info global_ident
-      : Flambda2_cmx.Flambda_cmx_format.t option)
+  else
+    ignore
+      (get_global_export_info global_ident
+       : Flambda2_cmx.Flambda_cmx_format.t option)
 
 (* Error report *)
 
