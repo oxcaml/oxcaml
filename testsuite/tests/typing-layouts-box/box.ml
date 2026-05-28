@@ -665,6 +665,13 @@ Error: Type "[ `A | `B ] box" is not a subtype of "[ `A ] box"
        The second variant type does not allow tag(s) "`B"
 |}]
 
+(* [int32# box] unifies with [int32] across a subtype coercion *)
+let coerce_unbox (x : [ `A of int32# box ]) =
+  (x :> [ `A of int32 | `B ]);;
+[%%expect{|
+val coerce_unbox : [ `A of int32 ] -> [ `A of int32 | `B ] = <fun>
+|}]
+
 (* Test 29: Recursive type declarations with box
    These test well-foundedness and infinite size checks *)
 
@@ -789,6 +796,28 @@ type ('a : any) my_box = 'a box
 type 'a uu = 'a my_box#
 val probe : 'a uu -> 'a = <fun>
 val probe_inv : 'a -> 'a uu = <fun>
+|}]
+
+(* Test: [box] on object types *)
+
+type obj = < m : int >
+type t_obj_box = obj box;;
+[%%expect{|
+type obj = < m : int >
+type t_obj_box = < m : int > box
+|}]
+
+let obj_box_eq (x : obj box) (y : obj box) = x = y;;
+[%%expect{|
+val obj_box_eq : < m : int > box -> < m : int > box -> bool = <fun>
+|}]
+
+(* Object subtyping is preserved through [box] *)
+type obj_more = < m : int; n : int >
+let widen (x : obj_more box) = (x :> obj box);;
+[%%expect{|
+type obj_more = < m : int; n : int >
+val widen : < m : int; n : int > box -> < m : int > box = <fun>
 |}]
 
 (* Test 33: shadowing the predef [box] disambiguates with [box/2] *)
