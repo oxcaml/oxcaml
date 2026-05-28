@@ -278,8 +278,21 @@ let process_call cfg_with_infos (block : Cfg.basic_block) =
 let run (cfg_with_infos : Cfg_with_infos.t) =
   if !Oxcaml_flags.cfg_push_pop_around_calls
   then begin
+    if !Oxcaml_flags.dump_cfg
+    then begin
+      (* Force liveness computation so that the printed CFG includes it. *)
+      let (_ : Cfg_with_infos.liveness) =
+        Cfg_with_infos.liveness cfg_with_infos
+      in
+      Format.eprintf "*** Before push_pop_around_calls@.%a@."
+        Printcfg.cfg_with_infos cfg_with_infos
+    end;
     let cfg = Cfg_with_infos.cfg cfg_with_infos in
     Cfg.iter_blocks cfg ~f:(fun _label block ->
         process_call cfg_with_infos block);
-    Cfg_with_infos.invalidate_liveness cfg_with_infos
+    Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    if !Oxcaml_flags.dump_cfg
+    then
+      Format.eprintf "*** After push_pop_around_calls@.%a@."
+        Printcfg.cfg_with_infos cfg_with_infos
   end
