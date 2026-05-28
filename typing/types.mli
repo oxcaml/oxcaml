@@ -856,10 +856,8 @@ type type_declaration =
        records (besides records that flattens floats or have with atomic
        fields), but [None] for aliases of these types
 
-       invariants:
-       1. there are no "twice-unboxed" types: the [type_declaration] stored here
-          itself has [type_unboxed_version = None].
-       2. the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
+       invariant:
+       the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
     *)
   }
 

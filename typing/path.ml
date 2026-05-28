@@ -23,16 +23,7 @@ and extra_ty =
   | Pext_ty
   | Punboxed_ty
 
-(* Create the unboxed version of a path, ensuring the invariant that there
-   are no "twice unboxed" paths. (It would be nice to enforce this at the type
-   level, but that would be a pervasive change.) *)
-let unboxed_version t =
-  match t with
-  | Pident _ | Pdot _ | Papply _
-  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) ->
-    Pextra_ty (t, Punboxed_ty)
-  | Pextra_ty (_, Punboxed_ty) ->
-    Misc.fatal_error "Path.unboxed_version"
+let unboxed_version t = Pextra_ty (t, Punboxed_ty)
 
 let boxed_version t =
   match t with
