@@ -12,30 +12,50 @@
 (*                                                                        *)
 (**************************************************************************)
 
+exception Not_interested
+
+[@@@warning "-nonreturning-statement"]
+
 let type_declaration_of_operation : _ Scalar.Operation.t -> string =
+  let inspect_int : _ Scalar.Integral.t -> unit =
+    function Naked _ -> () | Value _ -> raise Not_interested
+  in
+  let inspect_float _ = raise Not_interested in
+  let inspect_scalar : _ Scalar.t -> unit = function
+    | Naked (Floating _) -> raise Not_interested
+    | Naked (Integral _) -> ()
+    | Value _ -> raise Not_interested
+  in
   function
   | Unary (Integral (t, _)) ->
+    inspect_int t;
     Printf.sprintf "%s -> %s"
       (Scalar.Integral.to_string t)
       (Scalar.Integral.to_string t)
   | Unary (Floating (t, _)) ->
+    inspect_float t;
     Printf.sprintf "%s -> %s"
       (Scalar.Floating.to_string t)
       (Scalar.Floating.to_string t)
   | Unary (Static_cast { src; dst }) ->
+    inspect_scalar src;
+    inspect_scalar dst;
     Printf.sprintf "%s -> %s"
       (Scalar.to_string src)
       (Scalar.to_string dst)
   | Binary (Integral (t, _)) ->
+    inspect_int t;
     Printf.sprintf "%s -> %s -> %s"
       (Scalar.Integral.to_string t)
       (Scalar.Integral.to_string t)
       (Scalar.Integral.to_string t)
   | Binary (Shift (t, _, Int)) ->
+    inspect_int t;
     Printf.sprintf "%s -> int -> %s"
       (Scalar.Integral.to_string t)
       (Scalar.Integral.to_string t)
   | Binary (Floating (t, _)) ->
+    inspect_float t;
     Printf.sprintf "%s -> %s -> %s"
       (Scalar.Floating.to_string t)
       (Scalar.Floating.to_string t)
@@ -44,6 +64,7 @@ let type_declaration_of_operation : _ Scalar.Operation.t -> string =
       (Icmp
          (t, (Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge)))
     ->
+    inspect_int t;
     Printf.sprintf "%s -> %s -> bool"
       (Scalar.Integral.to_string t)
       (Scalar.Integral.to_string t)
@@ -52,14 +73,17 @@ let type_declaration_of_operation : _ Scalar.Operation.t -> string =
          ( t,
            ( CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge
            | CFnge ) )) ->
+    inspect_float t;
     Printf.sprintf "%s -> %s -> bool"
       (Scalar.Floating.to_string t)
       (Scalar.Floating.to_string t)
   | Binary (Three_way_compare_int (_, t)) ->
+    inspect_int t;
     Printf.sprintf "%s -> %s -> bool"
       (Scalar.Integral.to_string t)
       (Scalar.Integral.to_string t)
   | Binary (Three_way_compare_float t) ->
+    inspect_float t;
     Printf.sprintf "%s -> %s -> int"
       (Scalar.Floating.to_string t)
       (Scalar.Floating.to_string t)
@@ -67,13 +91,16 @@ let type_declaration_of_operation : _ Scalar.Operation.t -> string =
 let codegen_test_of_operation operation =
   let mangle_sigils s = String.split_on_char '#' s |> String.concat "_u" in
   let val_name = Scalar.Operation.to_string operation |> mangle_sigils in
-  Printf.sprintf
-    "\nexternal %s : %s = \"%s\"\nlet %s = %s\n[%%%%expect_asm X86_64{||}]"
-    val_name
-    (type_declaration_of_operation operation)
-    (Scalar.Operation.With_percent_prefix.to_string operation)
-    val_name
-    val_name
+  try
+    Printf.sprintf
+      "external %s : %s = \"%s\"\nlet %s = %s\n[%%%%expect_asm X86_64{||}]\n\n"
+      val_name
+      (type_declaration_of_operation operation)
+      (Scalar.Operation.With_percent_prefix.to_string operation)
+      val_name
+      val_name
+  with
+  | Not_interested -> ""
 
 let _ =
   let sorted_ops =
@@ -84,5 +111,5 @@ let _ =
            (Scalar.Operation.to_string op2))
       Scalar.Operation.all
   in
-  List.iter (fun op -> print_endline (codegen_test_of_operation op)) sorted_ops
+  List.iter (fun op -> print_string (codegen_test_of_operation op)) sorted_ops
 
