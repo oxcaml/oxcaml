@@ -331,6 +331,16 @@ let cfg : Format.formatter -> Cfg.t -> unit =
   Array.sort ~cmp:Label.compare labels;
   format fmt cfg labels None
 
+let cfg_with_liveness :
+    Format.formatter ->
+    Cfg.t ->
+    Cfg_liveness.Liveness.domain InstructionId.Tbl.t ->
+    unit =
+ fun fmt cfg liveness ->
+  let labels = cfg.blocks |> Label.Tbl.to_seq_keys |> Array.of_seq in
+  Array.sort ~cmp:Label.compare labels;
+  format fmt cfg labels (Some liveness)
+
 let cfg_with_layout : Format.formatter -> Cfg_with_layout.t -> unit =
  fun fmt cfg_with_layout ->
   let labels = cfg_with_layout |> Cfg_with_layout.layout |> DLL.to_array in
