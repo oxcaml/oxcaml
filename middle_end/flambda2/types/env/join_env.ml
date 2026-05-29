@@ -826,6 +826,12 @@ module Bindings_in_target_env : sig
   val new_bindings :
     t -> since:t -> definition_in_joined_envs Name_in_target_env.Map.t
 
+  (* Assuming that [since] derives from [t], extract the created variables from
+     [t], adding them to [since]. Any information about the created variables
+     besides their kind (in particular, their [definition_in_joined_env]) is
+     forgotten, and they won't appear in the [new_bindings]. *)
+  val forget_definition_of_created_variables : t -> since:t -> t
+
   val fold_created_variables :
     (Variable_in_target_env.t -> K.t -> 'a -> 'a) -> t -> 'a -> 'a
 
@@ -944,6 +950,11 @@ end = struct
     Name_in_target_env.Map.diff_shared
       (fun _ new_definition _old_definition -> Some new_definition)
       t.definitions_in_joined_envs since.definitions_in_joined_envs
+
+  let forget_definition_of_created_variables t ~since =
+    (* We still need to record the fact that we created those variables in order
+       to add them to the target environment at the end of the join. *)
+    { since with created_variables = t.created_variables }
 
   let source_env { source_env; _ } = source_env
 
@@ -1957,19 +1968,18 @@ let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
           joined_envs_and_extensions
         | Ok env ->
           let level = ME.cut env ~cut_after in
-          let extension = TEL.as_extension_without_bindings level in
           Index.Map.add index
-            (ME.typing_env env, extension)
+            (ME.typing_env env, level)
             joined_envs_and_extensions)
       Index.Map.empty extensions
   in
   Index.Map.mapi
-    (fun index (env, diff_ext) ->
+    (fun index (env, diff_level) ->
       let previous_equations =
         Joined_envs.equations_in_nth_joined_env joined_envs index
       in
       let diff_equations =
-        Type_in_one_joined_env.create_equations (TEE.to_map diff_ext)
+        Type_in_one_joined_env.create_equations (TEL.equations diff_level)
       in
       (* The call below to [replay_definition_of_aliases_in_target_env] is only
          relevant when doing a nested join (join of env extensions); for a
@@ -2159,9 +2169,26 @@ let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
          join of env extensions, we might need additional rounds for
          completeness (see comment in [n_way_join_simples]) -- in practice one
          round should be plenty. *)
-      let equations, { bindings; _ } =
+      let equations, { bindings = bindings_after_extension; _ } =
         n_way_join_round ~n_way_join_type { joined_envs; bindings }
           concrete_types_to_join alias_types_in_target_env
+      in
+      (* It is possible for the call to [add_env_extension] in
+         [prepare_nested_join] above to create new variables, which do not exist
+         in the parent environments. These variables must not leak into the
+         [bindings]: since they don't exist in the parent joined environments,
+         we won't be able to find a type for them in the target environment
+         outside of the extension.
+
+         For now, we avoid this problem by simply forgetting about the
+         definition of new variables (in the target env) during the join of
+         extensions. This means that in some cases we might create the same
+         variable twice (e.g. we might create a variable to represent {0, 1}
+         inside an env extension and then another one outside of the env
+         extension), but not incorrect, only slighly inefficient. *)
+      let bindings =
+        Bindings_in_target_env.forget_definition_of_created_variables
+          bindings_after_extension ~since:bindings
       in
       Ok
         ( TEE.from_map
