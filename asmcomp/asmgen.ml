@@ -544,6 +544,14 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
+  (if !Oxcaml_flags.ssa_bounds_check_elim
+   then
+     let removed = Bounds_check_elim.run ssa in
+     if !Oxcaml_flags.dump_ssa && removed > 0
+     then
+       Format.fprintf ppf_dump
+         "*** SSA after Bounds_check_elim (%d removed)@.@.%a" removed
+         Ssa_print.print ssa);
   try Cfg_of_ssa.convert ~funcnames ssa
   with exn -> report_pipeline_error exn ssa
 

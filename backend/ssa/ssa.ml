@@ -255,6 +255,8 @@ struct
       then common_dominator a b.dominator_info.dominator
       else
         common_dominator a.dominator_info.dominator b.dominator_info.dominator
+
+    let set_terminator (b : t) (term : t terminator) = b.terminator <- term
   end
 
   type block = Block.t

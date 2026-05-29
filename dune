@@ -714,6 +714,7 @@
   termination
   dead_induction_var
   delete_empty_loops
+  bounds_check_elim
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

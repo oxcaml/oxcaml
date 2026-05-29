@@ -1,25 +1,19 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
-(** Dominator analysis over the SSA CFG (Cooper-Harvey-Kennedy algorithm).
+(** Dominator / predecessor / successor queries over a finished SSA graph.
 
-    Each [Ssa.t] is traversed once to build the immediate-dominator tree and
-    DFS in/out times, giving O(1) [dominates] queries. The predecessor map
-    computed as a by-product is also cached and exposed, since most loop and
-    control-flow analyses need it. *)
+    The dominator tree is computed once by [Ssa.finish_graph] and exposed on
+    [Block]; this module just gathers the queries the loop analyses need behind
+    a single name, so they do not have to depend on the precise [Block] API. *)
 
-type t
+module Make (S : Ssa.Finished_graph) : sig
+  (** [dominates a b] is [true] iff every path from the function entry to [b]
+      passes through [a]. *)
+  val dominates : S.Block.t -> S.Block.t -> bool
 
-val compute : Ssa.t -> t
+  (** CFG predecessors of a block. *)
+  val predecessors : S.Block.t -> S.Block.t list
 
-(** [dominates t a b] is [true] iff every path from the function entry to
-    [b] must pass through [a]. *)
-val dominates : t -> Ssa.block -> Ssa.block -> bool
-
-(** CFG predecessors of [b], derived from walking every block's terminator
-    successors in the input graph. *)
-val predecessors : t -> Ssa.block -> Ssa.block list
-
-(** CFG successors of [b], derived from its terminator. Stateless — exposed
-    here because every consumer of dominator info also wants the successor
-    function that was used to build it. *)
-val successors : Ssa.block -> Ssa.block list
+  (** All successors of a block, including the implicit trap successor. *)
+  val successors : S.Block.t -> S.Block.t list
+end

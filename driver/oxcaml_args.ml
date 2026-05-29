@@ -398,6 +398,12 @@ let mk_ssa_simplify f =
 let mk_no_ssa_simplify f =
   ("-no-ssa-simplify", Arg.Unit f, " Disable the SSA simplification pass")
 
+let mk_ssa_bounds_check_elim f =
+  ( "-ssa-bounds-check-elim",
+    Arg.Unit f,
+    " Eliminate provably-redundant array bounds checks in the SSA pipeline \
+     (EXPERIMENTAL)" )
+
 let mk_ssa_validate f =
   ( "-ssa-validate",
     Arg.Unit f,
@@ -1334,6 +1340,7 @@ module type Oxcaml_options = sig
   val no_use_ssa : unit -> unit
   val ssa_simplify : unit -> unit
   val no_ssa_simplify : unit -> unit
+  val ssa_bounds_check_elim : unit -> unit
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
@@ -1524,6 +1531,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_use_ssa F.no_use_ssa;
       mk_ssa_simplify F.ssa_simplify;
       mk_no_ssa_simplify F.no_ssa_simplify;
+      mk_ssa_bounds_check_elim F.ssa_bounds_check_elim;
       mk_ssa_validate F.ssa_validate;
       mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
@@ -1929,6 +1937,7 @@ module Oxcaml_options_impl = struct
   let no_use_ssa () = Oxcaml_flags.use_ssa := false
   let ssa_simplify = set' Oxcaml_flags.ssa_simplify
   let no_ssa_simplify () = Oxcaml_flags.ssa_simplify := false
+  let ssa_bounds_check_elim = set' Oxcaml_flags.ssa_bounds_check_elim
   let ssa_validate = set' Oxcaml_flags.ssa_validate
   let no_ssa_validate () = Oxcaml_flags.ssa_validate := false
   let internal_assembler = set' Oxcaml_flags.internal_assembler
@@ -2349,6 +2358,7 @@ module Extra_params = struct
     match name with
     | "use-ssa" -> set' Oxcaml_flags.use_ssa
     | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
+    | "ssa-bounds-check-elim" -> set' Oxcaml_flags.ssa_bounds_check_elim
     | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter

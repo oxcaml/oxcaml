@@ -266,6 +266,12 @@ module type Finished_graph = sig
     val dominates : t -> t -> bool
 
     val common_dominator : t -> t -> t
+
+    (** Replace a block's terminator. For in-place control-flow rewrites on a
+        finished graph (e.g. bypassing a loop). The caller is responsible for
+        keeping the graph well-formed (argument arities, predecessors, trap
+        stacks); metadata computed by [finish_graph] is not refreshed. *)
+    val set_terminator : t -> block terminator -> unit
   end
 
   module Instruction : sig
