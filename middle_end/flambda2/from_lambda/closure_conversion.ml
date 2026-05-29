@@ -1470,7 +1470,23 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
       match defining_expr with
       | Simple simple ->
         let body_env = Env.add_simple_to_substitute env id simple kind in
-        body acc body_env
+        let insert_phantom_let =
+          match user_visible with
+          | IR.Not_user_visible -> false
+          | IR.User_visible ->
+            Flambda_features.debug ()
+            && Flambda_features.Expert.phantom_lets ()
+            && not (Flambda_debug_uid.equal uid Flambda_debug_uid.none)
+        in
+        if not insert_phantom_let
+        then body acc body_env
+        else
+          let bound_pattern =
+            Bound_pattern.singleton (VB.create var uid Name_mode.phantom)
+          in
+          let named = Named.create_simple simple in
+          let acc, body_expr = body acc body_env in
+          Let_with_acc.create acc bound_pattern named ~body:body_expr
       | Prim ((Variadic (Begin_region _, _) | Unary (End_region _, _)), _)
         when not (Flambda_features.stack_allocation_enabled ()) ->
         (* We use [body_env] to ensure the region variables are still in the
