@@ -25,6 +25,11 @@ module C = struct
   include To_cmm_shared
 end
 
+(* Syntactic equivalence of Cmm expressions, modulo debug info. Used to merge
+   switch arms whose translations turn out to be identical even though they
+   differed at the Flambda level (see [switch]). *)
+let cmm_equivalent = Cmm_peephole_engine.Cmm_comparator.equivalent
+
 (* Note about flushing of environments: this module treats the delayed bindings
    in [To_cmm_env] environments (see to_cmm_env.mli for more information) in a
    linear manner. Flushes are inserted to preserve this property. This ensures
@@ -1367,6 +1372,26 @@ and switch env res switch =
     let first_arm, res = aux res (Target_ocaml_int.Map.min_binding arms) in
     let second_arm, res = aux res (Target_ocaml_int.Map.max_binding arms) in
     match first_arm, second_arm with
+    (* If the two arms translate to syntactically equivalent Cmm (modulo debug
+       info), there is no need to dispatch on the scrutinee: every execution
+       computes the same value. We keep the scrutinee under [sequence] to
+       preserve its effects and coeffects; later passes (DCE/CSE) can drop it if
+       it turns out to be pure. This commonly fires when the match compiler
+       produces per-arm field accesses that disagree at the Lambda level (e.g.
+       [Pmixedfield]s on constructors with different total field counts) but
+       resolve to the same [Block_load] / [Cload] in Cmm. *)
+    | ( (_, then_, then_free_vars, then_inits, _),
+        (_, else_, else_free_vars, else_inits, _) )
+      when cmm_equivalent then_ else_ ->
+      let free_vars =
+        Backend_var.Set.union scrutinee_free_vars
+          (Backend_var.Set.union then_free_vars else_free_vars)
+      in
+      let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
+      let cmm, free_vars, symbol_inits =
+        wrap (C.sequence scrutinee then_) free_vars symbol_inits
+      in
+      cmm, free_vars, symbol_inits, res
     (* These switches are actually if-then-elses. On such switches,
        transl_switch_clambda will introduce a let-binding of the scrutinee
        before creating an if-then-else, introducing an indirection that might
@@ -1409,16 +1434,27 @@ and switch env res switch =
       let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
       cmm, free_vars, symbol_inits, res)
   (* General case *)
-  | n ->
+  | _ ->
     (* transl_switch_clambda expects an [index] array such that index.(d) is the
        index in [cases] of the expression to execute when [e] matches [d]. *)
     let max_d, _ = Target_ocaml_int.Map.max_binding arms in
     let m = prepare_discriminant ~must_tag:must_tag_discriminant max_d in
-    let cases = Array.make (n + 1) None in
-    let index = Array.make (m + 1) n in
-    let _, res, free_vars, symbol_inits =
+    (* [no_case] marks discriminants with no arm; those are filled in with an
+       unreachable case below. *)
+    let no_case = -1 in
+    let index = Array.make (m + 1) no_case in
+    (* We deduplicate arms whose Cmm translations are syntactically equivalent
+       (modulo debug info), pointing several discriminants at a single case.
+       This is the n-ary generalisation of the binary collapse above: arms can
+       differ at the Flambda level (e.g. distinct [Apply_cont]s that the
+       switch-arm merger cannot combine) yet translate to identical Cmm. When
+       only one distinct case remains, the whole switch collapses to just the
+       scrutinee (kept for its effects) followed by the common action. [rev_cases]
+       maps an already-emitted case index to its representative action. *)
+    let rev_cases, num_cases, res, free_vars, symbol_inits =
       Target_ocaml_int.Map.fold
-        (fun discriminant action (i, res, free_vars, symbol_inits) ->
+        (fun discriminant action
+             (rev_cases, num_cases, res, free_vars, symbol_inits) ->
           let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res
               =
             make_arm ~must_tag_discriminant env res (discriminant, action)
@@ -1435,26 +1471,59 @@ and switch env res switch =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
-          cases.(i) <- Some cmm_action;
-          index.(d) <- i;
-          i + 1, res, free_vars, symbol_inits)
+          let existing =
+            List.find_map
+              (fun (i, repr) ->
+                if cmm_equivalent repr cmm_action then Some i else None)
+              rev_cases
+          in
+          match existing with
+          | Some i ->
+            index.(d) <- i;
+            rev_cases, num_cases, res, free_vars, symbol_inits
+          | None ->
+            index.(d) <- num_cases;
+            ( (num_cases, cmm_action) :: rev_cases,
+              num_cases + 1,
+              res,
+              free_vars,
+              symbol_inits ))
         arms
-        (0, res, scrutinee_free_vars, Env.Symbol_inits.empty)
+        ([], 0, res, scrutinee_free_vars, Env.Symbol_inits.empty)
     in
-    let needs_unreachable = Array.exists (fun idx -> Int.equal idx n) index in
-    let cases, res =
-      match needs_unreachable with
-      | false -> Array.sub cases 0 n, res
-      | true ->
+    let needs_unreachable =
+      Array.exists (fun idx -> Int.equal idx no_case) index
+    in
+    let cases =
+      Array.make (num_cases + if needs_unreachable then 1 else 0) None
+    in
+    List.iter (fun (i, cmm_action) -> cases.(i) <- Some cmm_action) rev_cases;
+    let res =
+      if needs_unreachable
+      then (
         let unreachable, res =
           C.invalid res ~message:"unreachable switch case"
         in
-        cases.(n) <- Some unreachable;
-        cases, res
+        cases.(num_cases) <- Some unreachable;
+        Array.iteri
+          (fun d idx -> if Int.equal idx no_case then index.(d) <- num_cases)
+          index;
+        res)
+      else res
     in
-    (* CR-someday poechsel: Put a more precise value kind here *)
-    let expr =
-      C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
-    in
-    let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
-    cmm, free_vars, symbol_inits, res
+    if Int.equal num_cases 1 && not needs_unreachable
+    then
+      (* Every arm computes the same value, so dispatching is unnecessary. *)
+      let cmm, free_vars, symbol_inits =
+        wrap
+          (C.sequence scrutinee (Option.get cases.(0)))
+          free_vars symbol_inits
+      in
+      cmm, free_vars, symbol_inits, res
+    else
+      (* CR-someday poechsel: Put a more precise value kind here *)
+      let expr =
+        C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
+      in
+      let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
+      cmm, free_vars, symbol_inits, res
