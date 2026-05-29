@@ -37,6 +37,16 @@ type error =
 
 exception Error of Location.t * error
 
+(* Filled by [Typecore]. Given the *instantiated* arguments of a constructor
+   whose layout was [Cstr_layout_variable] at typedecl time (i.e. it has an
+   argument of kind [any]), recompute its [constructor_representation]. Returns
+   [None] (conservative) on any failure; must not raise, since it runs at
+   lambda-translation time. See [Typeopt.value_kind_variant]. *)
+let constructor_representation_for_value_kind :
+  (Env.t -> Location.t -> Types.constructor_arguments ->
+   Types.constructor_representation option) ref =
+  ref (fun _ _ _ -> None)
+
 (* Expand a type, looking through ordinary synonyms, private synonyms, links,
    and [@@unboxed] types. The returned type will be therefore be none of these
    cases (except in case of missing cmis).
@@ -698,7 +708,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           || Path.same p Predef.path_iarray) ->
     let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
-  | Tconstr(p, _, _) -> begin
+  | Tconstr(p, args, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
          with with-kinds, [decl.type_jkind] will mention variables bound
          by the parameters of the declaration. The code below loses this
@@ -724,7 +734,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
-                         ~num_nodes_visited cstrs rep)
+                         ~num_nodes_visited ~params:decl.type_params ~args
+                         cstrs rep)
         | Type_record (_, Record_variable, _) ->
           num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
@@ -877,7 +888,7 @@ and value_kind_mixed_block
   num_nodes_visited, Constructor_mixed (Array.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
-      (cstrs : Types.constructor_declaration list) rep =
+      ~params ~args (cstrs : Types.constructor_declaration list) rep =
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
@@ -901,6 +912,26 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
+    (* Substitute the instantiated [args] for the declaration's [params] in a
+       constructor's argument types, so that a [Cstr_layout_variable]
+       constructor (one with an argument of kind [any]) can have its
+       representation recomputed.  Mirrors the unboxed-product instantiation
+       above; [args] is already level-corrected by [scrape_ty]. *)
+    let instantiate_cd_args (cd_args : Types.constructor_arguments) =
+      let params = List.map Ctype.correct_levels params in
+      let instantiate ty =
+        Ctype.apply env params (Ctype.correct_levels ty) args
+      in
+      match cd_args with
+      | Types.Cstr_tuple cas ->
+        Types.Cstr_tuple
+          (List.map (fun (ca : Types.constructor_argument) ->
+             { ca with ca_type = instantiate ca.ca_type }) cas)
+      | Types.Cstr_record lds ->
+        Types.Cstr_record
+          (List.map (fun (ld : Types.label_declaration) ->
+             { ld with ld_type = instantiate ld.ld_type }) lds)
+    in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
       let num_nodes_visited, shape =
@@ -975,15 +1006,30 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       (num_nodes_visited, Pintval)
     else
       let _idx, result =
-        List.fold_left (fun (idx, result) constructor ->
+        List.fold_left
+          (fun (idx, result) (constructor : Types.constructor_declaration) ->
           idx+1,
           match result with
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            match cstr_layouts.(idx) with
-            | Cstr_layout_variable -> None
-            | Cstr_layout_known { shape = cstr_shape; _ } ->
+            let cstr_shape_opt, constructor =
+              match cstr_layouts.(idx) with
+              | Cstr_layout_known { shape; _ } -> Some shape, constructor
+              | Cstr_layout_variable ->
+                (* The constructor has an argument of kind [any], so its shape
+                   was undetermined at typedecl time.  Now that the type is
+                   instantiated, recompute it from the instantiated arguments,
+                   which we also use below when recurring into the fields. *)
+                (match instantiate_cd_args constructor.cd_args with
+                 | exception Ctype.Cannot_apply -> None, constructor
+                 | cd_args ->
+                   !constructor_representation_for_value_kind env loc cd_args,
+                   { constructor with cd_args })
+            in
+            match cstr_shape_opt with
+            | None -> None
+            | Some cstr_shape ->
                 let (is_mutable, num_nodes_visited), fields =
                   for_one_constructor constructor ~depth ~num_nodes_visited
                     ~cstr_shape
@@ -1013,7 +1059,13 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | None -> (num_nodes_visited, Pgenval)
       | Some (num_nodes_visited, _, consts, _, non_consts) ->
         match non_consts with
-        | [] -> assert false  (* See [List.for_all is_constant], above *)
+        | [] ->
+          (* Every constructor turned out to be constant.  For
+             [Cstr_layout_known] constructors this is caught by
+             [List.for_all is_constant] above, but a [Cstr_layout_variable]
+             constructor whose [any] argument resolves to a void type also lands
+             here. *)
+          (num_nodes_visited, Pintval)
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
       end
