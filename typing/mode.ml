@@ -800,6 +800,9 @@ module Lattices = struct
          let+ staticity = Lazy.force Staticity.all in
          { uniqueness; contention; visibility; staticity })
 
+    (* CR-someday ageorges: the following code manually enumerates axes. It would be nice
+       to use the later definition of Lattices.Monadic.Axis.all *)
+
     (** Product values that cover every element of every axis at least once,
         without enumerating every product combination. *)
     let spanning_elements =
@@ -950,6 +953,9 @@ module Lattices = struct
          let* yielding = Lazy.force Yielding.all in
          let+ statefulness = Lazy.force Statefulness.all in
          { areality; linearity; portability; forkable; yielding; statefulness })
+
+    (* CR-someday ageorges: the following code manually enumerates axes. It would be nice
+       to use the later definition of Lattices.Comonadic_with.Axis.all *)
 
     (** Product values that cover every element of every axis at least once,
         without enumerating every product combination. *)
