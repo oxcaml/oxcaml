@@ -77,6 +77,14 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
+(* Filled by [Typecore]. Given the *instantiated* arguments of a constructor
+   whose layout was [Cstr_layout_variable] at typedecl time, recompute its
+   [constructor_representation]. Returns [None] (conservative) on any failure
+   and must not raise, since it runs at lambda-translation time. *)
+val constructor_representation_for_value_kind :
+  (Env.t -> Location.t -> Types.constructor_arguments ->
+   Types.constructor_representation option) ref
+
 val transl_mixed_block_element :
   Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
   -> unit Lambda.mixed_block_element

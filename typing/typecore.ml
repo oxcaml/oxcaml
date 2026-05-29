@@ -3093,6 +3093,47 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
         | Error err -> Error err
       end
 
+(* Fill the forward reference used by [Typeopt.value_kind] to recompute the
+   representation of a [Cstr_layout_variable] constructor (one with an argument
+   of kind [any]) once the variant type is instantiated.  This reuses the same
+   machinery as [representation_for_tuple_constructor], but runs at
+   lambda-translation time, so it must never raise: any failure maps to [None],
+   which makes [value_kind] fall back to its conservative result. *)
+let () =
+  Typeopt.constructor_representation_for_value_kind :=
+    (fun env loc cd_args ->
+       let arg_types =
+         match (cd_args : Types.constructor_arguments) with
+         | Cstr_tuple args ->
+           List.map (fun (a : Types.constructor_argument) -> a.ca_type) args
+         | Cstr_record lbls ->
+           List.map (fun (l : Types.label_declaration) -> l.ld_type) lbls
+       in
+       match
+         Misc.Stdlib.List.map_option
+           (fun ty ->
+              (* [fixed:true] so we never mutate the jkind of a type variable:
+                 an uninstantiated argument of kind [any] simply yields [Error],
+                 and hence the conservative [value_kind]. *)
+              match
+                Ctype.type_jkind_and_sort env ty
+                  ~why:Constructor_arg_assignment ~fixed:true
+              with
+              | Ok (jkind, _sort) -> Some jkind
+              | Error _ -> None)
+           arg_types
+       with
+       | None -> None
+       | Some jkinds ->
+         begin match
+           Typedecl.update_constructor_representation env cd_args jkinds
+             ~loc ~is_extension_constructor:false
+         with
+         | Ok shape -> Some shape
+         | Error _ -> None
+         | exception Typedecl.Error _ -> None
+         end)
+
 (* Typing of patterns *)
 
 (* "untyped" cases are prior to checking the pattern. *)
