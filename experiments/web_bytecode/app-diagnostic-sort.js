@@ -302,6 +302,28 @@ const keywordTokens = new Set([
   "while",
   "with",
 ]);
+const modeAnnotationTokens = [
+  "aliased",
+  "contended",
+  "exclusive",
+  "external",
+  "global",
+  "internal",
+  "local",
+  "many",
+  "nonportable",
+  "once",
+  "portable",
+  "separate",
+  "shareable",
+  "shared",
+  "uncontended",
+  "unique",
+];
+const modeAnnotationPattern = new RegExp(
+  `@@?[ \\t\\r\\n]*(?:${modeAnnotationTokens.join("|")})\\b`,
+  "g",
+);
 const moduleIntroducers = new Set(["open", "include", "module", "functor", "inherit"]);
 const declarationIntroducers = new Set(["let", "and", "external", "method", "val"]);
 const parameterIntroducers = new Set(["fun", "function"]);
@@ -473,7 +495,7 @@ function collectSupplementalSyntaxRanges(source) {
     }
   };
 
-  pushMatches(/@[ \t\r\n]*local\b/g, "tok-annotation");
+  pushMatches(modeAnnotationPattern, "tok-annotation");
   return ranges;
 }
 
@@ -713,7 +735,7 @@ function classifySyntaxToken(tokens, index, source) {
   return Array.from(new Set(classes)).join(" ");
 }
 
-function buildSyntaxDecorations(source) {
+function collectClassifiedSyntaxRanges(source) {
   const tokens = tokenizeSyntax(source);
   const ranges = [];
   for (let index = 0; index < tokens.length; index += 1) {
@@ -724,6 +746,11 @@ function buildSyntaxDecorations(source) {
     }
     ranges.push({ from: token.from, to: token.to, className });
   }
+  return ranges;
+}
+
+function buildSyntaxDecorations(source) {
+  const ranges = collectClassifiedSyntaxRanges(source);
   ranges.push(...collectSupplementalSyntaxRanges(source));
   ranges.sort((left, right) => left.from - right.from || left.to - right.to);
   const builder = new RangeSetBuilder();
@@ -734,18 +761,21 @@ function buildSyntaxDecorations(source) {
 }
 
 function highlightedSyntaxHtml(source) {
-  const tokens = tokenizeSyntax(source);
+  const ranges = [
+    ...collectSupplementalSyntaxRanges(source),
+    ...collectClassifiedSyntaxRanges(source),
+  ].sort((left, right) =>
+    left.from - right.from || (right.to - right.from) - (left.to - left.from)
+  );
   let cursor = 0;
   let html = "";
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    const className = classifySyntaxToken(tokens, index, source);
-    if (!className) {
+  for (const { from, to, className } of ranges) {
+    if (from < cursor) {
       continue;
     }
-    html += escapeHtml(source.slice(cursor, token.from));
-    html += `<span class="${className}">${escapeHtml(source.slice(token.from, token.to))}</span>`;
-    cursor = token.to;
+    html += escapeHtml(source.slice(cursor, from));
+    html += `<span class="${className}">${escapeHtml(source.slice(from, to))}</span>`;
+    cursor = to;
   }
   html += escapeHtml(source.slice(cursor));
   return html;
