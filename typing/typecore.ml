@@ -3495,7 +3495,7 @@ and type_pat_aux
         { containing = Constructor (constr.cstr_name, Modality);
           container = (loc, Pattern) }
       in
-      let ctor_args =
+      let ctor_args, jkinds_to_check =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
@@ -3506,18 +3506,42 @@ and type_pat_aux
               Mode.Value.join [ alloc_mode; constructor_mode ]
              in
              let alloc_mode = simple_pat_mode alloc_mode in
-             let sort =
+             (* We need a sort for [type_pat], but it's not available in
+                [ca_sort] for constructors containing [any]. In that case, we
+                create a new sort var, and store it in [jkind_to_check] to make
+                sure it actually lines up with the type. See the comment
+                starting with "Tie the knot" just below. *)
+             let sort, jkind_to_check =
                match arg.ca_sort with
-               | Some sort -> Jkind.Sort.of_const sort
                | None ->
-                   Jkind.Sort.new_var ~level:(get_current_level ())
-                   |> Jkind.Sort.of_var
+                 let jkind, sort =
+                   Jkind.of_new_sort_var ~why:Constructor_arg_projection
+                     ~level:(get_current_level ())
+                 in
+                 sort, Some jkind
+               | Some s ->
+                 Jkind.Sort.of_const s, None
              in
-             type_pat ~alloc_mode tps Value p arg.ca_type sort)
+             type_pat ~alloc_mode tps Value p arg.ca_type sort, jkind_to_check)
           sargs args
+        |> List.split
       in
       let repr, sorts =
         let types = List.map (fun arg -> arg.pat_type, arg.pat_loc) ctor_args in
+        (* Tie the knot: make sure the type matches the sort variable we created
+           above, for args whose [ca_sort] is [None] *)
+        List.iter2 (fun arg jkind_to_check ->
+          Option.iter (fun jkind ->
+            match constrain_type_jkind !!penv arg.pat_type jkind with
+            | Ok () -> ()
+            | Error e ->
+              raise (Error (arg.pat_loc, !!penv,
+                (Constructor_arg_projection_not_rep (arg.pat_type, e)))))
+            jkind_to_check)
+          ctor_args jkinds_to_check;
+        (* CR rtjoa: The enforcement above that the constructor argument is
+           representable, and the call to [representation_for_tuple_constructor]
+           below, are quite redundant. We should refactor. *)
         match
           representation_for_tuple_constructor !!penv constr args ~loc ~types
             ~containing_type:expected_ty ~why:Constructor_arg_projection
