@@ -2183,6 +2183,9 @@ let end_assembly () =
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
   let frametable_section : Asm_targets.Asm_section.t =
+    (* This is inconsistent with x86, where the non-rodata section is [Text]
+       instead of [Data]. Now that [frametables_in_rodata] is the default, it's
+       unclear how much this matters. *)
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
   in
   D.switch_to_section frametable_section;
