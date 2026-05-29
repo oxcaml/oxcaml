@@ -2868,6 +2868,35 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
         | Error err -> Error err
       end
 
+(* Fill [Typeopt]'s forward reference (it cannot depend on [Typedecl]
+   directly).  Computes the representation of a constructor whose
+   declaration-time representation was variable (an [any] argument), for the
+   given already-instantiated arguments.  This runs at lambda-translation time,
+   so it must not raise: any error maps to the conservative [None]. *)
+let () =
+  Typeopt.constructor_representation_for_value_kind :=
+    fun env ~loc cd_args ->
+      match
+        let arg_jkinds =
+          match (cd_args : Types.constructor_arguments) with
+          | Cstr_tuple fields ->
+            List.map
+              (fun (ca : Types.constructor_argument) ->
+                 Ctype.type_jkind_purely env ca.ca_type)
+              fields
+          | Cstr_record labels ->
+            List.map
+              (fun (lbl : Types.label_declaration) ->
+                 Ctype.type_jkind_purely env lbl.ld_type)
+              labels
+        in
+        Typedecl.update_constructor_representation env cd_args arg_jkinds
+          ~loc ~is_extension_constructor:false
+      with
+      | Ok shape -> Some shape
+      | Error _ -> None
+      | exception Typedecl.Error _ -> None
+
 (* Typing of patterns *)
 
 (* "untyped" cases are prior to checking the pattern. *)
