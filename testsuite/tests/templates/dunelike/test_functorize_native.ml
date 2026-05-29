@@ -14,6 +14,11 @@
    main_functorize_share.ml \
    main_functorize_type_share.ml \
    message.mli message.ml with_message.ml pure_alias.ml \
+   main_pure_alias.ml \
+   test_functorize_pure_alias.reference \
+   plain.mli plain.ml uses_plain.ml main_uses_plain.ml \
+   test_functorize_uses_plain.reference \
+   bad_non_param_input.reference \
    bad_mix_bundles.ml \
    bad_mix_share.ml \
    test_functorize.reference \
@@ -36,7 +41,7 @@
 
    set OCAMLPARAM = "";
 
-   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int message with_message pure_alias bundle bundle2 bundle_derived bundle_share bundle_msg bundle_pure_alias bundle_stopafter bundle_cmifile bundle_phases bundle_onestep bundle_cms bundle_bad bundle_swap bundle_crc";
+   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int message with_message pure_alias plain uses_plain bundle bundle2 bundle_derived bundle_share bundle_msg bundle_pure_alias bundle_uses_plain bundle_bad_non_param bundle_stopafter bundle_cmifile bundle_phases bundle_onestep bundle_cms bundle_bad bundle_swap bundle_crc";
    script;
 
    src = "p.mli p__.ml";
@@ -81,6 +86,14 @@
 
    src = "pure_alias.ml";
    dst = "pure_alias/";
+   copy;
+
+   src = "plain.mli plain.ml";
+   dst = "plain/";
+   copy;
+
+   src = "uses_plain.ml";
+   dst = "uses_plain/";
    copy;
 
    src = "bundle_bad.mli";
@@ -551,12 +564,12 @@
 
  {
    (* Alias-only parameterised module: [pure_alias] declares [-parameter P]
-      but its body never mentions P, so its [cu_format] collapses to
-      [Rp_unit].  Two-phase functorize must still agree across phases that
-      [P] is a bundle parameter — phase 2 (cmo) has to recover [P] from
-      [cmi_params] rather than from the runtime layout.  Pass only
-      [pure_alias.cmx] as input so the transitive dep [Message] is
-      discovered from cmi_globals via the topology scan. *)
+      but its body never mentions P; its body [module Message = Message]
+      aliases a sibling parameterised module.  Two-phase functorize must
+      agree on the bundle's signature across phases (the original
+      [cu_format = [Rp_unit]] bug); path compression in [compute_bundle_sig]
+      ensures the alias chain is collapsed so the bundle's signature is
+      well-formed when later consumed by a client. *)
 
    flags = "$flg -parameter P -I p -I pure_alias";
    module = "pure_alias/pure_alias.ml";
@@ -574,6 +587,100 @@
    program = "bundle_pure_alias/bundle_pure_alias.cmx";
    all_modules = "pure_alias/pure_alias.cmx";
    ocamlopt.byte;
+
+   (* Consumer: apply the bundle's functor and access values through both
+      the direct path ([Inst.Message]) and the alias chain
+      ([Inst.Pure_alias.Message]).  Pre-path-compression, the alias chain
+      failed because the saved bundle's signature treated the alias target
+      as a global reference. *)
+
+   flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
+   module = "main_pure_alias.ml";
+   ocamlopt.byte;
+
+   flags = "";
+   module = "";
+   program = "$test_build_directory/test_functorize_pure_alias.exe";
+   all_modules = "\
+     message/message.cmx \
+     pure_alias/pure_alias.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     bundle_pure_alias/bundle_pure_alias.cmx \
+     main_pure_alias.cmx \
+   ";
+   ocamlopt.byte;
+
+   stdout = "test_functorize_pure_alias.output";
+   stderr = "test_functorize_pure_alias.output";
+   output = "test_functorize_pure_alias.output";
+   run;
+
+   reference = "test_functorize_pure_alias.reference";
+   check-program-output;
+ }
+
+ {
+   (* Non-parameterised root: [uses_plain] is parameterised by P and
+      references [Plain] (a non-parameterised module).  Path compression
+      should stop at [Plain] without interning it into the bundle, so the
+      bundle's signature is just [functor (P) () -> sig module Uses_plain
+      end] with [Plain] left as a global. *)
+
+   flags = "$flg -I plain";
+   module = "plain/plain.mli plain/plain.ml";
+   ocamlopt.byte;
+
+   flags = "$flg -parameter P -I p -I plain -I uses_plain";
+   module = "uses_plain/uses_plain.ml";
+   ocamlopt.byte;
+
+   flags = "$flg -functorize -I p -I plain -I uses_plain";
+   module = "";
+   program = "bundle_uses_plain/bundle_uses_plain.cmx";
+   all_modules = "uses_plain/uses_plain.cmx";
+   ocamlopt.byte;
+
+   flags = "$flg -I bundle_uses_plain -I p -I p_int -I plain";
+   module = "main_uses_plain.ml";
+   ocamlopt.byte;
+
+   flags = "";
+   module = "";
+   program = "$test_build_directory/test_functorize_uses_plain.exe";
+   all_modules = "\
+     plain/plain.cmx \
+     uses_plain/uses_plain.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     bundle_uses_plain/bundle_uses_plain.cmx \
+     main_uses_plain.cmx \
+   ";
+   ocamlopt.byte;
+
+   stdout = "test_functorize_uses_plain.output";
+   stderr = "test_functorize_uses_plain.output";
+   output = "test_functorize_uses_plain.output";
+   run;
+
+   reference = "test_functorize_uses_plain.reference";
+   check-program-output;
+
+   (* User error: passing a non-parameterised module as functorize input
+      should be rejected with a clear message rather than silently
+      producing an empty/useless bundle. *)
+   {
+     flags = "$flg -functorize -I plain";
+     module = "";
+     program = "bundle_bad_non_param/bundle_bad_non_param.cmi";
+     all_modules = "plain/plain.cmi";
+     ocamlopt_byte_exit_status = "2";
+     compiler_output = "bad_non_param_input.output";
+     ocamlopt.byte;
+
+     compiler_reference = "bad_non_param_input.reference";
+     check-ocamlopt.byte-output;
+   }
  }
 
  {

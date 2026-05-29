@@ -61,10 +61,21 @@ val transl_instance:
         -> arg_block_idx:int option
         -> program
 
+type bundle_module = {
+  cu : Compilation_unit.t;
+  format : main_module_block_format;
+  exposed : bool;
+      (** [true] iff [cu] is one of the bundle's exposed modules; [false] iff
+          [cu] is a hidden dep instantiated only to satisfy other modules'
+          runtime requirements.  Hidden modules are still bound at the top of
+          the bundle's functor body (so dependents can reference them) but
+          do not appear in the bundle's returned struct. *)
+}
+
 val transl_functorize:
       Compilation_unit.t
         -> all_params:Global_module.t list
-        -> modules:(Compilation_unit.t * main_module_block_format) list
+        -> modules:bundle_module list
         -> coercion:module_coercion
         -> program
 

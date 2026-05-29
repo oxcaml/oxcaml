@@ -1476,18 +1476,26 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
   transl_instance_impl instance_unit ~runtime_args
     ~main_module_block_repr ~arg_block_idx
 
+type bundle_module = {
+  cu : Compilation_unit.t;
+  format : main_module_block_format;
+  exposed : bool;
+}
+
 (* Build a "bundle functor" Lambda.program for -functorize.
    The output module is itself an instantiating functor: when applied to
    concrete argument blocks for all parameters, it instantiates each module in
-   [modules] in topological order and returns a struct containing all the
-   resulting blocks.
+   [modules] in topological order and returns a struct containing the
+   resulting blocks of the *exposed* modules.  Hidden modules
+   ([exposed=false]) are still instantiated and stored in [block_map] so
+   dependent exposed modules can reference them, but they don't appear in the
+   returned struct.
 
    [all_params] is the deduplicated list of Global_module.t values that appear
    as Rp_argument_block entries across all modules, in first-encounter order.
    [modules] is the full topologically-sorted list (deps before users). *)
 let transl_functorize compilation_unit ~all_params
-      ~modules:(modules : (Compilation_unit.t * main_module_block_format) list)
-      ~coercion
+      ~(modules : bundle_module list) ~coercion
     : program =
   let module GM = Global_module in
   (* One lambda ident per parameter, named after the parameter head *)
@@ -1509,7 +1517,7 @@ let transl_functorize compilation_unit ~all_params
   let block_map : (string, lambda) Hashtbl.t = Hashtbl.create 16 in
   let bindings =
     List.map
-      (fun (cu, fmt) ->
+      (fun { cu; format = fmt; exposed } ->
         let cu_name = Compilation_unit.name_as_string cu in
         let block_var = Ident.create_local (cu_name ^ "__block") in
         let call_lam =
@@ -1561,18 +1569,20 @@ let transl_functorize compilation_unit ~all_params
             }
         in
         Hashtbl.add block_map cu_name (Lvar block_var);
-        (block_var, call_lam))
+        block_var, call_lam, exposed)
       modules
   in
   let result_block =
     Lprim (
       Pmakeblock (0, Immutable, All_value, alloc_heap),
-      List.map (fun (v, _) -> Lvar v) bindings,
+      List.filter_map
+        (fun (v, _, exposed) -> if exposed then Some (Lvar v) else None)
+        bindings,
       Loc_unknown)
   in
   let body =
     List.fold_right
-      (fun (v, rhs) acc ->
+      (fun (v, rhs, _exposed) acc ->
         Llet (Strict, layout_module, v, debug_uid_none, rhs, acc))
       bindings
       result_block
@@ -1613,7 +1623,7 @@ let transl_functorize compilation_unit ~all_params
   in
   let required_globals =
     List.fold_left
-      (fun set (cu, _) -> Compilation_unit.Set.add cu set)
+      (fun set { cu; _ } -> Compilation_unit.Set.add cu set)
       Compilation_unit.Set.empty
       modules
   in
