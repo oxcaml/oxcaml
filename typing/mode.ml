@@ -5013,6 +5013,10 @@ module Report = struct
     match C.equal_obj a_obj b_obj with
     | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
     | Misc.Is_not_eq -> (
+      (* CR-someday ageorges: Strictly speaking, these are not in fact equal. Here we
+         are doing a hack so that we in fact skip the Skip hint of an alloc_as_value
+         morphism. However, a proper solution is to instead define a specific hint for
+         this morphism. *)
       match a_obj, b_obj with
       | Locality, Regionality ->
         Misc.Le_result.equal ~le:(C.le b_obj)
