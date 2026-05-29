@@ -723,7 +723,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
              then
                (* Optimization: update [v.upper] based on [mupper u].*)
                let mu_upper = mupper obj mu in
-               if not (C.le obj mu_upper v.upper)
+               if not (C.le obj v.upper mu_upper)
                then update_upper ~log obj v mu_upper (mupper_hint mu));
             r)
       in
