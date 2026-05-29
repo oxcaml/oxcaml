@@ -585,14 +585,17 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
    tail call later on. *)
 
   let mklet str kind v duid e1 e2 =
+    (* [let v = e in v]: collapsing this to [e] would drop the source name [v],
+       so we keep the binding when debug info would like to preserve
+       substitutions. *)
     match e2 with
-    | Lvar w when optimize && Ident.same v w -> e1
+    | Lvar w when optimize_except_alias_bindings && Ident.same v w -> e1
     | _ -> Llet (str, kind,v,duid,e1,e2)
   in
 
   let mkmutlet kind v duid e1 e2 =
     match e2 with
-    | Lmutvar w when optimize && Ident.same v w -> e1
+    | Lmutvar w when optimize_except_alias_bindings && Ident.same v w -> e1
     | _ -> Lmutlet (kind,v,duid,e1,e2)
   in
 
