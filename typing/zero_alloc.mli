@@ -57,6 +57,12 @@ val create_var : Location.t -> int -> t
    [const] and has no effect. *)
 val get : t -> const
 
+(* True iff [t] is structurally [Const Default_zero_alloc].
+   Unlike [get t = Default_zero_alloc], this returns [false] for a [Var] whose
+   [desc] happens to be [None]; the [Var] still carries information that's worth
+   preserving for later mutation. *)
+val is_default_const : t -> bool
+
 (* For types.ml's backtracking mechanism. *)
 type change
 val set_change_log : (change -> unit) -> unit
@@ -66,6 +72,10 @@ val undo_change : change -> unit
 type error
 val error_is_arity_mismatch : error -> bool
 val print_error : Format_doc.formatter -> error -> unit
+
+(* An [error] indicating that two zero_alloc views should agree but don't:
+   one carries an annotation while the other does not. *)
+val one_missing : error
 
 (* [sub ~context t1 t2] checks whether the zero_alloc check t1 is stronger than
    the zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.

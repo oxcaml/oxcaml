@@ -454,6 +454,11 @@ type expected_mode =
 
         Each location points to the corresponding sub-pattern of [Ppat_tuple].
     *)
+
+    zero_alloc : Zero_alloc.t;
+    (** Incoming [zero_alloc] information. Not strictly a mode, but there are
+        ways in this zero_alloc is mode-like (in particular, how it is
+        type-checked). *)
   }
 
 type position_and_mode = {
@@ -523,7 +528,8 @@ let mode_default mode =
   { position = RNontail;
     mode = Value.disallow_left mode;
     strictly_local = false;
-    tuple_modes = None }
+    tuple_modes = None;
+    zero_alloc = Zero_alloc.default }
 
 let mode_legacy = mode_default Value.legacy
 
@@ -627,7 +633,8 @@ let mode_exclave expected_mode =
      |> alloc_as_value
   in
   { (mode_default mode)
-    with strictly_local = true
+    with strictly_local = true;
+         zero_alloc = expected_mode.zero_alloc;
   }
 
 let mode_strictly_local expected_mode =
@@ -6251,39 +6258,8 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, zero_alloc, spat) =
       Some env_alloc_mode, mode_default exp_mode
     else None, exp_mode
   in
+  let exp_mode = { exp_mode with zero_alloc } in
   attrs, zero_alloc, pat_mode, env_alloc_mode, exp_mode, spat
-
-let add_zero_alloc_attribute expr zero_alloc_attribute =
-  let open Builtin_attributes in
-  let to_string : zero_alloc_attribute -> string = function
-    | Check { strict; loc = _} ->
-      Printf.sprintf "assert_zero_alloc%s"
-        (if strict then " strict" else "")
-    | Assume { strict; loc = _} ->
-      Printf.sprintf "assume_zero_alloc%s"
-        (if strict then " strict" else "")
-    | Ignore_assert_all ->
-      "ignore_zero_alloc"
-    | Default_zero_alloc -> assert false
-  in
-  match expr.exp_desc with
-  | Texp_function fn ->
-    begin match zero_alloc_attribute with
-    | Default_zero_alloc -> expr
-    | za ->
-      begin match Zero_alloc.get fn.zero_alloc with
-      | Default_zero_alloc -> ()
-      | Ignore_assert_all | Assume _ | Check _ ->
-        Location.prerr_warning expr.exp_loc
-          (Warnings.Duplicated_attribute (to_string za));
-      end;
-      (* Here, we may be throwing away a zero_alloc variable. There's no need
-         to set it, because it can't have gotten anywhere else yet. *)
-      let zero_alloc = Zero_alloc.create_const za in
-      let exp_desc = Texp_function { fn with zero_alloc } in
-      { expr with exp_desc }
-    end
-  | _ -> expr
 
 let check_arg_compatible ~loc ~zero_alloc_expected env zero_alloc =
   match Zero_alloc.sub ~context:Fun_param zero_alloc zero_alloc_expected with
@@ -6293,16 +6269,37 @@ let check_arg_compatible ~loc ~zero_alloc_expected env zero_alloc =
     then raise (Error (loc, env, Incompatible_param_zero_alloc e))
     else raise (Error (loc, env, Wrong_arg_zero_alloc e))
 
-let add_parsed_zero_alloc_attribute ~default_arity vb =
+let add_parsed_zero_alloc_attribute ~default_arity other_zero_alloc vb =
+  let open Zero_alloc in
   let val_attr =
     Builtin_attributes.get_zero_alloc_attribute
       (Function_definition default_arity)
       vb.pvb_attributes
   in
+  let to_string :
+    Builtin_attributes.zero_alloc_attribute -> string = function
+    | Check { strict } ->
+      Printf.sprintf "assert_zero_alloc%s"
+        (if strict then " strict" else "")
+    | Assume { strict } ->
+      Printf.sprintf "assume_zero_alloc%s"
+        (if strict then " strict" else "")
+    | Ignore_assert_all -> "ignore_zero_alloc"
+    | Default_zero_alloc -> assert false
+  in
   let zero_alloc =
-    match val_attr with
-    | Default_zero_alloc -> Zero_alloc.create_var vb.pvb_loc default_arity
-    | Ignore_assert_all | Assume _ | Check _ -> Zero_alloc.create_const val_attr
+    match val_attr, other_zero_alloc with
+    | Default_zero_alloc, Default_zero_alloc ->
+      create_var vb.pvb_expr.pexp_loc default_arity
+    | _, Default_zero_alloc -> create_const val_attr
+    | Default_zero_alloc, _ -> create_const other_zero_alloc
+    | _, _ ->
+      (* The binding and the lambda each carry their own [@zero_alloc]
+         attribute. Warn about the duplicate and keep the one from the
+         binding. *)
+      Location.prerr_warning vb.pvb_loc
+        (Warnings.Duplicated_attribute (to_string val_attr));
+      create_const val_attr
   in
   vb, zero_alloc
 
@@ -9839,7 +9836,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                 { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
               ret_sort;
               alloc_mode;
-              zero_alloc = Zero_alloc.default
+              zero_alloc = mode.zero_alloc
             }
         }
       in
@@ -10919,7 +10916,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     | Pexp_newtype (_, _, e) -> sexp_is_fun e
     | _ -> false
   in
-  let rec arity_of_fun sexp =
+  let rec arity_and_seen_za_of_fun sexp =
     match sexp.pexp_desc with
     | Pexp_function (params, _, body) ->
       let n_value_params =
@@ -10930,17 +10927,26 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                | Pparam_newtype _ -> false)
              params)
       in
-      (match body with | Pfunction_body _ -> 0 | Pfunction_cases _ -> 1) +
-      n_value_params
+      let n_value_params =
+        (match body with | Pfunction_body _ -> 0 | Pfunction_cases _ -> 1) +
+        n_value_params
+      in
+      let zero_alloc =
+        Builtin_attributes.get_zero_alloc_attribute
+          (Function_definition n_value_params)
+          sexp.pexp_attributes
+      in
+      Some (n_value_params, zero_alloc)
     | Pexp_stack e
     | Pexp_borrow e
     | Pexp_constraint (e, _, _)
-    | Pexp_newtype (_, _, e) -> arity_of_fun e
-    (* function is only ever invoked if sexp_is_fun is true *)
-    | _ -> assert false
+    | Pexp_newtype (_, _, e) -> arity_and_seen_za_of_fun e
+    | _ -> None
   in
   let vb_is_fun { pvb_expr = sexp; _ } = sexp_is_fun sexp in
-  let vb_fun_arity { pvb_expr = sexp; _ } = arity_of_fun sexp in
+  let vb_fun_arity_and_za { pvb_expr = sexp; _ } =
+    arity_and_seen_za_of_fun sexp
+  in
   let entirely_functions = List.for_all vb_is_fun spat_sexp_list in
   let rec_mode_var =
     match rec_flag with
@@ -10961,16 +10967,16 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let spat_sexp_list =
     List.map
       (fun vb ->
-         if vb_is_fun vb then
-           let default_arity = vb_fun_arity vb in
-           add_parsed_zero_alloc_attribute ~default_arity vb
-         else begin
+         match vb_fun_arity_and_za vb with
+         | Some (default_arity, other_zero_alloc) ->
+           add_parsed_zero_alloc_attribute ~default_arity other_zero_alloc vb
+         | None ->
            if Builtin_attributes.has_attribute "zero_alloc" vb.pvb_attributes
            then
              Location.prerr_warning vb.pvb_loc
                Warnings.Zero_alloc_on_nonfunction;
            (vb, Zero_alloc.default)
-         end)
+      )
       spat_sexp_list
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
@@ -11197,25 +11203,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let l = List.combine sorts l in
   let l =
     List.map2
-      (fun (s, ((_,p,_), (e, _))) (pvb, zero_alloc) ->
+      (fun (s, ((_,p,_), (e, _))) (pvb, _) ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
-        let e =
-          let za = Zero_alloc.get zero_alloc in
-          match za, e.exp_desc with
-          | Default_zero_alloc, Texp_function fn ->
-            (match Zero_alloc.get fn.zero_alloc with
-             | Default_zero_alloc ->
-               (* For local lets, link fn.zero_alloc to the binding's Var so
-                  that mutations from body type-checking (sub_var_const_exn at
-                  call sites) are visible to the backend.  Module-level
-                  inference uses the signature-comparison path instead, which
-                  correctly constrains the Var created by the function
-                  expression itself. *)
-               { e with exp_desc = Texp_function { fn with zero_alloc } }
-             | _ -> e)
-          | _ -> add_zero_alloc_attribute e za
-        in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
@@ -11606,15 +11596,25 @@ and type_n_ary_function
               (filter_ty_ret_exn ret_ty Nolabel ~force_tpoly:true : type_expr)
     end;
     let zero_alloc =
-      Builtin_attributes.get_zero_alloc_attribute
-        (Function_definition syntactic_arity)
-        attributes
-    in
-    let zero_alloc =
-      match zero_alloc with
-      | Default_zero_alloc -> Zero_alloc.create_var loc syntactic_arity
-      | Ignore_assert_all | Check _ | Assume _ ->
-        Zero_alloc.create_const zero_alloc
+      if Zero_alloc.is_default_const expected_mode.zero_alloc then
+        (* No incoming zero_alloc information, so this is the only place we'll
+           see the [@zero_alloc] attribute on the function.
+           Create a fresh Var if absent so call sites can constrain it later. *)
+        let za =
+          Builtin_attributes.get_zero_alloc_attribute
+            (Function_definition syntactic_arity)
+            attributes
+        in
+        match za with
+        | Default_zero_alloc -> Zero_alloc.create_var loc syntactic_arity
+        | Ignore_assert_all | Check _ | Assume _ -> Zero_alloc.create_const za
+      else
+        (* Incoming zero_alloc information is used.
+           This typically means that the function is the body of a let binding;
+           then, the [@zero_alloc] attribute has already been read on both the
+           let and on the function.
+           We should not read the attribute twice. *)
+        expected_mode.zero_alloc
     in
     let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
     re

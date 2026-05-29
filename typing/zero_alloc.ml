@@ -83,6 +83,10 @@ let get (t : t) =
     | Some { strict; opt; custom_error_msg; } ->
       Check { loc; arity; strict; opt; custom_error_msg }
 
+let is_default_const = function
+  | Const Default_zero_alloc -> true
+  | Const (Ignore_assert_all | Check _ | Assume _) | Var _ -> false
+
 type check_context =
   | Signature
   | Fun_param
@@ -110,6 +114,8 @@ let error_is_arity_mismatch = function
 
 exception Error of error
 
+let one_missing = One_missing
+
 let print_error ppf error =
   let pr fmt = Format_doc.fprintf ppf fmt in
   match error with
@@ -123,12 +129,12 @@ let print_error ppf error =
      | Fun_param ->
        pr "@ Hint: Add a \"zero_alloc\" attribute to the argument's definition."
      | Type_constraint | Default -> ())
-  | Less_general (Parameter_requirement check_type) ->
-    pr "The argument's \"zero_alloc\" property is required to be \"%s\",@ \
+  | Less_general (Parameter_requirement Strict) ->
+    pr "The argument's \"zero_alloc\" property is required to be \"strict\",@ \
         but this function is not."
-      (match check_type with
-       | Strict -> "strict"
-       | Opt -> "opt")
+  | Less_general (Parameter_requirement Opt) ->
+    pr "The argument's \"zero_alloc\" check is \"opt\", but the parameter@ \
+        requires a non-\"opt\" check."
   | Incompatible check_type ->
     pr "There is a mismatch between the two \"zero_alloc\" assumptions:@ \
         the \"%s\" payloads need to match exactly."
