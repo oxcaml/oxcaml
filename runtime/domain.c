@@ -2229,6 +2229,104 @@ static bool tick_thread_wait(void)
   return timer_fired;
 }
 
+ /* Some gnarly LD_PRELOAD hacks replace epoll_wait with an
+    implementation that busy-waits. This is hugely wasteful for the
+    tick thread, so we fall back to caml_tick_use_usleep if we suspect
+    we are in this situation.
+
+    To determine this, we look at the tick thread's count of voluntary
+    context switches, after TICK_COUNT_TO_CHECK ticks. We should be
+    taking at least one voluntary context switch per tick. If
+    epoll_wait is busy waiting, we will be taking approximately
+    zero.
+*/
+
+#define TICK_COUNT_TO_CHECK 100
+
+/* Some strange kernel configs prevent reading part or all of procfs */
+static bool can_check_context_switches = true;
+
+/* Puts the number of voluntary context switches made by the current
+ * thread into *switches_p, and returns true. If it's not possible to
+ * determine the number, returns false. */
+
+static bool voluntary_context_switches(uintnat *switches_p)
+{
+  if (!can_check_context_switches) {
+    return false;
+  }
+  pid_t tid = (pid_t)syscall(SYS_gettid);
+  static char path[64] = {};
+  if (path[0] == '\0') {
+    snprintf(path, sizeof(path), "/proc/self/task/%d/status", tid);
+  }
+  FILE *f = fopen(path, "r");
+  if (!f) {
+    CAML_GC_MESSAGE(DOMAIN,
+                    "Couldn't open procfs task status '%s'\n", path);
+    can_check_context_switches = false;
+    return false;
+  }
+
+  char line[256];
+  unsigned long count = ULONG_MAX;
+  while (fgets(line, sizeof(line), f)) {
+    if (sscanf(line, "voluntary_ctxt_switches: %lu", &count) == 1)
+      break;
+  }
+  fclose(f);
+  if (count == ULONG_MAX) {
+    CAML_GC_MESSAGE(DOMAIN,
+                    "Couldn't find context switch count.\n");
+    can_check_context_switches = false;
+    return false;
+  }
+  *switches_p = count;
+  return true;
+}
+
+/* Called after each tick, to check whether a sensible number of
+ * voluntary context switches are taking place. If we determine that
+ * they are not, set caml_tick_use_usleep to true. */
+
+static void check_context_is_switching(void)
+{
+  static bool context_switches_check_done = false;
+  static uintnat checks = 0;
+  static uintnat context_switches = UINTNAT_MAX;
+
+  if (context_switches_check_done) {
+    return; /* Only do the check once */
+  }
+
+  if (context_switches == UINTNAT_MAX) {
+    /* Initial context switch count */
+    if (!voluntary_context_switches(&context_switches)) {
+      caml_tick_use_usleep = true; /* Fail safe */
+      return;
+    }
+  }
+  ++ checks;
+  if (checks < TICK_COUNT_TO_CHECK) {
+    return;
+  }
+
+  context_switches_check_done = true;
+  uintnat old_context_switches = context_switches;
+  if (!voluntary_context_switches(&context_switches)) {
+    caml_tick_use_usleep = true; /* Fail safe */
+    return;
+  }
+
+  uintnat delta = context_switches - old_context_switches;
+  if (2 * delta < checks) {
+    CAML_GC_MESSAGE(DOMAIN,
+      "Disabling epoll-based ticker due to low context switches (%lu/%lu)\n",
+                    (unsigned long)delta, (unsigned long)checks);
+    caml_tick_use_usleep = true;
+  }
+}
+
 #else /* !HAS_INTERRUPTIBLE_TICK */
 
 static int tick_thread_open_fds(void) { return 0; }
@@ -2372,8 +2470,8 @@ static void* caml_tick(void *arg)
       tick_thread_arm_timer(interval);
       if (tick_thread_wait()) {
         caml_do_tick_all_domains();
+        check_context_is_switching();
       }
-
       /* If we were interrupted (rather than the timer going off), we loop back
          to recalculate the interval and re-arm the timer. */
     }
