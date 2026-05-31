@@ -5295,9 +5295,16 @@ let report_lookup_error_doc _loc env ppf = function
           fprintf ppf
             "@.@[@{<hint>Hint@}: \
              Records with [%@atomic] fields don't get unboxed versions.@]"
-      | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
+      | Type_record (_, (Record_float | Record_ufloat), _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
+      | Type_record (_, Record_mixed _, _) ->
+          (* A [Record_mixed] only lacks an unboxed version when its shape
+             contains a [Float_boxed] element, which only happens via
+             [@@flatten_floats]. *)
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Records with [%@%@flatten_floats] don't get \
+             unboxed versions.@]";
       | Type_record_unboxed_product _ ->
           fprintf ppf "@.@[@{<hint>Hint@}: It is already an unboxed record.@]";
       | _ -> ()
