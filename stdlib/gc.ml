@@ -245,8 +245,8 @@ type suspended_collection_work = int
    type.
 *)
 
-external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work @@ nonportable
+external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
   = "caml_ml_gc_ramp_up"
 
-external ramp_down : suspended_collection_work -> unit @@ nonportable
+external ramp_down : suspended_collection_work -> unit
   = "caml_ml_gc_ramp_down"
