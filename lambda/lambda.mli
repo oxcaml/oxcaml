@@ -995,7 +995,7 @@ and lkindtemplate =
     ktmpl_return: layout;
     ktmpl_body: lambda;
     ktmpl_mode: locality_mode;
-    ktmpl_free_vars: layout Ident.Map.t;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_loc: scoped_location;
   }
 

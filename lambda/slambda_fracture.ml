@@ -336,19 +336,19 @@ let rec fracture_lam lambda : slambda =
         ktmpl_return;
         ktmpl_body;
         ktmpl_mode;
-        ktmpl_free_vars;
+        ktmpl_env;
         ktmpl_loc
       } ->
-    let free_vars = Ident.Map.to_list ktmpl_free_vars in
+    let env = Ident.Map.to_list ktmpl_env in
     let free_vars_shape_locality_mode =
       Misc.Stdlib.Array.of_list_map
-        (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
-        free_vars
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
     in
     let free_vars_shape_unit =
       Misc.Stdlib.Array.of_list_map
-        (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
-        free_vars
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
     in
     let get_free_var_prim =
       match Lambda.is_uniform_block_shape (Shape free_vars_shape_unit) with
@@ -369,7 +369,7 @@ let rec fracture_lam lambda : slambda =
           in
           let _, body =
             List.fold_left
-              (fun (i, lam) (ident, layout) ->
+              (fun (i, lam) (ident, (_, layout)) ->
                 ( i + 1,
                   Llet
                     ( Alias,
@@ -378,7 +378,7 @@ let rec fracture_lam lambda : slambda =
                       debug_uid_none,
                       Lprim (get_free_var_prim i, [Lvar closure_id], ktmpl_loc),
                       lam ) ))
-              (0, body_r) free_vars
+              (0, body_r) env
           in
           (* This relies on all templates currently being generated from
              [let poly_] which means all arguments are erased, this will need to
@@ -399,7 +399,7 @@ let rec fracture_lam lambda : slambda =
                   ~mode:ktmpl_mode ~ret_mode:ktmpl_mode
             })
     in
-    let free_var_capture = List.map (fun (ident, _) -> Lvar ident) free_vars in
+    let free_var_capture = List.map (fun (_, (lam, _)) -> lam) env in
     SLhalves
       { sval_comptime =
           SLtemplate

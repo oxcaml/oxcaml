@@ -1034,7 +1034,7 @@ and lkindtemplate =
     ktmpl_return: layout;
     ktmpl_body: lambda;
     ktmpl_mode: locality_mode;
-    ktmpl_free_vars: layout Ident.Map.t;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_loc: scoped_location;
   }
 
@@ -1759,7 +1759,10 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice _ as l -> fatal_error_invalid_constructor l
-  | Lkindtemplate {ktmpl_free_vars} -> Ident.Map.keys ktmpl_free_vars
+  | Lkindtemplate {ktmpl_env} ->
+      Ident.Map.fold
+        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
+        ktmpl_env Ident.Set.empty
   | Lkindinstantiate {kinst_func = fn} ->
       free_variables fn
 
@@ -2009,8 +2012,14 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lkindinstantiate { inst with kinst_func = subst s l inst.kinst_func }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
-    | Lkindtemplate _ ->
-        Misc.fatal_error "I've got no idea what to do here"
+    | Lkindtemplate ({ktmpl_env} as ktmpl) ->
+        Lkindtemplate
+          { ktmpl with
+            ktmpl_env =
+              Ident.Map.map
+                (fun (lam, layout) -> (subst s l lam, layout))
+                ktmpl_env;
+          }
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2186,9 +2195,18 @@ let shallow_map ~tail ~non_tail:f lam =
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
   | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
-                    ktmpl_mode; ktmpl_free_vars; ktmpl_loc } ->
+                    ktmpl_mode; ktmpl_env = old_env; ktmpl_loc } ->
       let new_body = f old_body in
-      if old_body == new_body
+      let env_changed = ref false in
+      let new_env =
+        Ident.Map.map
+          (fun (old_lam, layout) ->
+            let new_lam = f old_lam in
+            env_changed := !env_changed || old_lam != new_lam;
+            (new_lam, layout))
+          old_env
+      in
+      if old_body == new_body && not !env_changed
       then lam
       else
         Lkindtemplate {
@@ -2196,7 +2214,7 @@ let shallow_map ~tail ~non_tail:f lam =
           ktmpl_return;
           ktmpl_body = new_body;
           ktmpl_mode;
-          ktmpl_free_vars;
+          ktmpl_env = new_env;
           ktmpl_loc;
         }
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->

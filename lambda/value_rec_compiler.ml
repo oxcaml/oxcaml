@@ -184,10 +184,11 @@ let compute_static_size lam =
       assert false
     | Lsplice _ ->
       fatal_error_invalid_constructor lam
-    | Lkindtemplate { ktmpl_free_vars; _ } ->
+    | Lkindtemplate { ktmpl_env; _ } ->
       let shape =
-        Ident.Map.data ktmpl_free_vars
-        |> Misc.Stdlib.Array.of_list_map Lambda.mixed_block_element_of_layout
+        Misc.Stdlib.Array.of_list_map
+          (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
+          (Ident.Map.data ktmpl_env)
       in
       (match Lambda.mixed_block_of_block_shape (Shape shape) with
        | None ->

@@ -4433,13 +4433,13 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
     let env_alloc_mode = Translmode.transl_alloc_mode env_alloc_mode in
-    let free_vars =
+    let env =
       Lambda.free_variables param
       |> Ident.Set.to_list
       |> List.filter_map (fun ident ->
           let path = Path.Pident ident in
           match Env.find_module path pat.pat_env with
-          | _ -> Some (ident, layout_any_value)
+          | _ -> Some (ident, (Lvar ident, layout_any_value))
           | exception Not_found ->
             let value_desc =
               try Env.find_value path pat.pat_env
@@ -4456,10 +4456,10 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
               let layout =
                 Typeopt.layout pat.pat_env val_loc const_sort val_type
               in
-              Some (ident, layout)
+              Some (ident, (Lvar ident, layout))
             | Val_prim _ -> None
             | Val_ivar _ | Val_self _ | Val_anc _ ->
-              Some (ident, layout_any_value))
+              Some (ident, (Lvar ident, layout_any_value)))
       |> Ident.Map.of_list
     in
     let f =
@@ -4467,7 +4467,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
         ktmpl_return = layout;
         ktmpl_body = param;
         ktmpl_mode = env_alloc_mode;
-        ktmpl_free_vars = free_vars;
+        ktmpl_env = env;
         ktmpl_loc = Scoped_location.of_location ~scopes loc;
       }
     in
