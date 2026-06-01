@@ -461,10 +461,43 @@ let mk_add_type1 add_type type_ident
           position = 1;
           arity = 1}
       ))
+      ?unboxed_jkind
+      ?unboxed_manifest
     ~variance ~separability env =
   let param = newgenvar param_jkind in
   let type_jkind = Jkind.mark_best (jkind param) in
   let type_ikind = ikind_of_jkind ~params:[param] type_jkind in
+  let type_uid = Uid.of_predef_id type_ident in
+  let type_unboxed_version = match unboxed_jkind, unboxed_manifest with
+    | None, None -> None
+    | None, Some _ -> Misc.fatal_error "unboxed manifest but no unboxed jkind"
+    | Some unboxed_jkind, _ ->
+      let type_jkind =
+        Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
+      in
+      let type_jkind = Jkind.mark_best type_jkind in
+      let type_ikind = ikind_of_jkind ~params:[] type_jkind in
+      let type_kind = Type_abstract Definition in
+      let type_manifest = Option.map (fun f -> f param) unboxed_manifest in
+      Some {
+        type_params = [param];
+        type_arity = 1;
+        type_kind;
+        type_jkind;
+        type_ikind;
+        type_loc = Location.none;
+        type_private = Asttypes.Public;
+        type_manifest;
+        type_variance = [variance];
+        type_separability = Types.Separability.default_signature ~arity:1;
+        type_is_newtype = false;
+        type_expansion_scope = lowest_level;
+        type_attributes = [];
+        type_unboxed_default = false;
+        type_uid = Uid.unboxed_version type_uid;
+        type_unboxed_version = None;
+      }
+  in
   let decl =
     {type_params = [param];
       type_arity = 1;
@@ -480,8 +513,8 @@ let mk_add_type1 add_type type_ident
       type_expansion_scope = lowest_level;
       type_attributes = [];
       type_unboxed_default = false;
-      type_uid = Uid.of_predef_id type_ident;
-      type_unboxed_version = None;
+      type_uid;
+      type_unboxed_version;
     }
   in
   add_type type_ident decl env
@@ -659,6 +692,8 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            position = 1;
            arity = 1;
          }))
+       ~unboxed_jkind:Jkind.Const.Builtin.any
+       ~unboxed_manifest:(fun param -> param)
   |> add_type1 ident_list
        ~variance:Variance.covariant
        ~separability:Separability.Ind
