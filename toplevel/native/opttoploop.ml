@@ -833,8 +833,6 @@ let loop ppf =
       let phr = try !parse_toplevel_phrase lb with Exit -> raise PPerror in
       let phr = preprocess_phrase ppf phr  in
       Env.reset_cache_toplevel ();
-      if !Clflags.dump_parsetree then Printast.top_phrase ppf phr;
-      if !Clflags.dump_source then Pprintast.top_phrase ppf phr;
       ignore(execute_phrase true ppf phr)
     with
     | End_of_file -> raise (Compenv.Exit_with_status 0)
