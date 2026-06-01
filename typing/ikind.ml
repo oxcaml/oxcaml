@@ -453,7 +453,7 @@ module Solver = struct
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tbox t ->
-        let base = Ldd.const Axis_lattice.immutable_data in
+        let base = Ldd.const Axis_lattice.mutable_data in
         Ldd.join base (kind ~use_tables:true ctx t)
       | Types.Tfield _ ->
         failwith "Tfield shouldn't appear in kind"
