@@ -18,6 +18,7 @@
 
 #ifndef CAML_FIBER_H
 #define CAML_FIBER_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

@@ -17,6 +17,7 @@
 
 #ifndef _instrtrace_
 #define _instrtrace_
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

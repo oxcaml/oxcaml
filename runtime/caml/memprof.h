@@ -15,6 +15,7 @@
 
 #ifndef CAML_MEMPROF_H
 #define CAML_MEMPROF_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

@@ -6,7 +6,6 @@
 #if OCAML_VERSION >= 41200
 #define CAML_INTERNALS
 #include <caml/codefrag.h>
-#undef CAML_INTERNALS
 #endif
 #include <caml/alloc.h>
 #include <caml/memory.h>
@@ -89,9 +88,9 @@ CAMLprim value ml_owee_code_pointer_symbol(value cp)
   return caml_copy_string(result);
 }
 
-static inline char * get_bstr(value v_bstr, value v_pos) 
-{ 
-  return (char *) Caml_ba_data_val(v_bstr) + Long_val(v_pos); 
+static inline char * get_bstr(value v_bstr, value v_pos)
+{
+  return (char *) Caml_ba_data_val(v_bstr) + Long_val(v_pos);
 }
 
 CAMLprim value owee_blit_string_bigstring_stub(
@@ -111,4 +110,3 @@ CAMLprim value owee_blit_bytes_bigstring_stub(
   memcpy(bstr, str, Long_val(v_len));
   return Val_unit;
 }
-

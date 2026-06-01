@@ -27,6 +27,7 @@
 
 #ifndef CAML_RUNTIME_EVENTS_H
 #define CAML_RUNTIME_EVENTS_H
+#include "guard.h"
 
 #include "mlvalues.h"
 #include <stdint.h>

@@ -17,6 +17,7 @@
 
 #ifndef CAML_INTEXT_H
 #define CAML_INTEXT_H
+#include "guard.h"
 
 #include "misc.h"
 #include "mlvalues.h"

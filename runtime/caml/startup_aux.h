@@ -15,6 +15,7 @@
 
 #ifndef CAML_STARTUP_AUX_H
 #define CAML_STARTUP_AUX_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 

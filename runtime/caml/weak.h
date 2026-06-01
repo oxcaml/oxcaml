@@ -17,6 +17,7 @@
 
 #ifndef CAML_WEAK_H
 #define CAML_WEAK_H
+#include "guard.h"
 
 #include "mlvalues.h"
 #include "memory.h"

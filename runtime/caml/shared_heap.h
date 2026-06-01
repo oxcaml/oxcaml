@@ -15,6 +15,7 @@
 /**************************************************************************/
 #ifndef CAML_SHARED_HEAP_H
 #define CAML_SHARED_HEAP_H
+#include "guard.h"
 
 #ifdef CAML_INTERNALS
 
