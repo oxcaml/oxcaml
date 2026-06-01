@@ -61,6 +61,8 @@ let main unix argv ppf ~flambda2 =
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
     Compmisc.read_clflags_from_env ();
+    if !Clflags.dump_variable_availability then
+      Optcompile.register_debug_variable_availability_hooks_without_flambda2 ();
     (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
        enabled *)
     if Config.oxcaml_dwarf &&

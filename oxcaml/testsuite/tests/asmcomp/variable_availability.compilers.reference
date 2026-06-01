@@ -1,0 +1,83 @@
+Variable availability for Variable_availability
+
+Module Variable_availability  _none_:0
+      arith | local          12:4-9          dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+    branchy | local          17:4-11         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+    counted | local          27:4-11         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+destructure | local          35:4-15         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+  capturing | local          39:4-13         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+     merged | local          54:4-10         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+  local_fun | local          61:4-13         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+    ignored | local          67:4-11         dropped  flambda2-in->flambda2-simpl   [ok]   module-level
+
+Function arith  variable_availability.ml:12-15:0-29
+x | param[0]       12:10-11        present
+y | param[1]       12:12-13        present
+z | local          13:6-7          present
+w | local          14:6-7          present
+
+Function branchy  variable_availability.ml:17-25:0-31
+a | param[0]       17:12-13        present
+b | param[1]       17:14-15        present
+c | local          18:6-7          present
+d | local          21:8-9          present
+e | local          24:8-9          present
+
+Function counted  variable_availability.ml:27-33:0-26
+   n | param[0]       27:12-13        present
+ acc | local          28:6-9          dropped  lambda->flambda2-in           [gap]  lmutlet-loses-duid
+   i | for            29:6-7          present
+step | local          30:8-12         present
+
+Function destructure  variable_availability.ml:35-37:0-29
+pair | param[0]       35:16-20        present
+   x | local          36:6-7          dropped  raw-lambda->lambda            [gap]  (unknown)
+   y | local          36:9-10         dropped  raw-lambda->lambda            [gap]  (unknown)
+
+Function capturing  variable_availability.ml:39-45:0-28
+  init | param[0]       39:14-18        present
+  base | local          40:6-10         present
+bumped | local          41:6-12         dropped  flambda2-in->flambda2-simpl   [gap]  (unknown)
+  bump | local          42:8-12         dropped  flambda2-in->flambda2-simpl   [gap]  (unknown)
+
+Function bump  variable_availability.ml:42:4-47
+n | param[0]       42:13-14        dropped  flambda2-in->flambda2-simpl   [gap]  (unknown)
+
+Function merged  variable_availability.ml:54-56:0-45
+e | param[0]       54:11-12        present
+x | local          56:9-10         dropped  raw-lambda->lambda            [gap]  (unknown)
+x | local          56:19-20        dropped  typing->raw-lambda            [ok]   merged-with-x
+
+Function local_fun  variable_availability.ml:61-63:0-47
+cond | param[0]       61:14-18        present
+   x | param[1]       61:19-20        present
+   g | local          62:6-7          dropped  raw-lambda->lambda            [ok]   became-static-catch
+
+Function g  variable_availability.ml:62:2-39
+y | param[0]       62:8-9          present
+
+Function ignored  variable_availability.ml:67-69:0-32
+   pair | param[0]       67:12-16        present
+   kept | local          68:6-10         dropped  raw-lambda->lambda            [gap]  (unknown)
+_unused | local          68:12-19        dropped  raw-lambda->lambda            [ok]   ignored
+
+Compilation-unit summary: 39 total variables; 11 excluded (ok-drops); 20/28 reach debug info (71.43%)
+
+Pass-by-pass survival:
+  typing          28  (100.00%)
+  raw-lambda      28  (100.00%)
+  lambda          24  ( 85.71%)  (-4)
+  flambda2-in     23  ( 82.14%)  (-1)
+  flambda2-simpl  20  ( 71.43%)  (-3)
+  flambda2-out    20  ( 71.43%)
+  cmm             20  ( 71.43%)
+  debug-info      20  ( 71.43%)
+
+Drop reasons:
+became-static-catch | 1  (ok)
+            ignored | 1  (ok)
+             merged | 1  (ok)
+       module-level | 8  (ok)
+          (unknown) | 7  (gap)
+ lmutlet-loses-duid | 1  (gap)
+
