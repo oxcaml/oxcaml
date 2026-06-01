@@ -32,7 +32,7 @@ let symbol_prefix () =
   | IA32 | X86_64 | AArch64 -> (
     match Target_system.derived_system () with
     | Linux | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin | FreeBSD | NetBSD
-    | OpenBSD | Generic_BSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
+    | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
       "" (* checked ok. *)
     | MacOS_like -> "_" (* checked ok. *))
   | ARM | POWER | Z | Riscv -> ""

@@ -27,7 +27,6 @@ type derived_system =
   | FreeBSD
   | NetBSD
   | OpenBSD
-  | Generic_BSD
   | Solaris
   | Dragonfly
   | GNU
@@ -75,7 +74,6 @@ type system = private
   | FreeBSD
   | NetBSD
   | OpenBSD
-  | Generic_BSD
   | Solaris
   | Dragonfly
   | GNU
