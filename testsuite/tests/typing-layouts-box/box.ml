@@ -852,11 +852,16 @@ val check : int_b_b_u_u_u -> int# = <fun>
 
 (* Test 34: shadowing the predef [box] disambiguates with [box/2] *)
 
-let id_box (x : 'a box) : 'a box = x
-type 'a box = Mine of 'a
-let still_id = id_box
+module Shadowing = struct
+  let id_box (x : 'a box) : 'a box = x
+  type 'a box = Mine of 'a
+  let still_id = id_box
+end
 [%%expect{|
-val id_box : ('a : any). 'a box -> 'a box = <fun>
-type 'a box = Mine of 'a
-val still_id : ('a : any). 'a box/2 -> 'a box/2 = <fun>
+module Shadowing :
+  sig
+    val id_box : ('a : any). 'a box -> 'a box
+    type 'a box = Mine of 'a
+    val still_id : ('a : any). 'a box/2 -> 'a box/2
+  end
 |}]
