@@ -3489,6 +3489,8 @@ let locks_for_pers_mod ~loc_use ~loc_def env path =
   let stage_locks, locks =
     partition_locks (IdTbl.get_all_locks env.modules)
   in
+  (* Tripwire: persistent paths are toplevel-scoped, so this should never
+     fire. *)
   assert_does_not_cross_quotation env ~loc_use ~loc_def path stage_locks;
   locks
 
