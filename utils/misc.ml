@@ -1941,6 +1941,10 @@ type (_, _) is_eq =
   | Is_eq : ('a, 'a) is_eq
   | Is_not_eq : ('a, 'b) is_eq
 
+let get_eq_exn : type a b. (a, b) is_eq -> (a, b) eq = function
+  | Is_eq -> Refl
+  | Is_not_eq -> fatal_error "Propositional equality does not hold"
+
 (*********************************************)
 (* Fancy modules *)
 
