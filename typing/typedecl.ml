@@ -5217,8 +5217,7 @@ let report_error_doc ppf = function
                    Only types with product layouts can be marked %a.@]"
         Style.inline_code "unpacked"
   | Cannot_unbox_or_untag_type Unsafe_unextended ->
-      fprintf ppf "@[Don't know how to unextend this type.@ \
-                   Only types with layout bits8 or bits16 can be marked %a.@]"
+      fprintf ppf "@[Only types with layout bits8 or bits16 can be marked %a.@]"
         Style.inline_code "unsafe_unextended"
   | Deep_unbox_or_untag_attribute kind ->
       fprintf ppf

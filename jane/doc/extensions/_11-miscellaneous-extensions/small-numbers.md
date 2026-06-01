@@ -143,20 +143,30 @@ noticeable performance decrease compared to C.
 
 Both tagged and untagged `int8`s and `int16`s may be passed to C stubs, though
 parameters of layout `bits8` and `bits16` (such as `int8#`) are banned by
-default.
+default. Small int parameters should be sign/zero-extended to 32 bits
+before being passed to C stubs.
 
 ```ocaml
+external sign_extend_int16 : int16# -> int32# = "%int32#_of_int16#"
+external sign_extend_int8 : int8# -> int32# = "%int32#_of_int8#"
+
 external int16_stub : (int16[@unboxed]) -> (int16[@unboxed]) =
   "tagged_int16_stub" "untagged_int16_stub"
 
-external int16_hash_stub : (int16[@unboxed]) -> int16# =
+external int16_hash_stub : int32# -> int16# =
   "tagged_int16_stub" "untagged_int16_stub"
+
+let int16_hash_stub (x : int16#) : int16# =
+  int16_hash_stub (sign_extend_int16 x)
 
 external int8_stub : (int8[@unboxed]) -> (int8[@unboxed]) =
   "tagged_int8_stub" "untagged_int8_stub"
 
-external int8_hash_stub : (int8[@unboxed]) -> int8# =
+external int8_hash_stub : int32# -> int8# =
   "tagged_int8_stub" "untagged_int8_stub"
+
+let int8_hash_stub (x : int8#) : int8# =
+  int8_hash_stub (sign_extend_int8 x)
 ```
 
 Parameters of layout `bits8` and `bits16` are banned since Clang expects such

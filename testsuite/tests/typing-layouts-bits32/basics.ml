@@ -465,8 +465,7 @@ external f10_11 : (int32#[@unsafe_unextended]) -> unit
 Line 1, characters 19-25:
 1 | external f10_11 : (int32#[@unsafe_unextended]) -> unit
                        ^^^^^^
-Error: Don't know how to unextend this type.
-       Only types with layout bits8 or bits16 can be marked "unsafe_unextended".
+Error: Only types with layout bits8 or bits16 can be marked "unsafe_unextended".
 |}];;
 
 (*************************************************)
