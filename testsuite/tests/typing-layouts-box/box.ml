@@ -865,3 +865,137 @@ module Shadowing :
     val still_id : ('a : any). 'a box/2 -> 'a box/2
   end
 |}]
+
+(* Test 35: type compatibility *)
+
+module Abs_value : sig
+  type t
+end = struct
+  type t
+end
+[%%expect{|
+module Abs_value : sig type t end
+|}]
+
+module Abs_value_value : sig
+  type t : value & value
+end = struct
+  type t : value & value
+end
+[%%expect{|
+module Abs_value_value : sig type t : value & value end
+|}]
+
+module Abs_value2 : sig
+  type t
+end = struct
+  type t
+end
+[%%expect{|
+module Abs_value2 : sig type t end
+|}]
+
+module Abs_untagged_immediate : sig
+  type t : untagged_immediate
+end = struct
+  type t : untagged_immediate
+end
+[%%expect{|
+module Abs_untagged_immediate : sig type t : untagged_immediate end
+|}]
+
+module Abs_bits64 : sig
+  type t : bits64
+end = struct
+  type t = int64#
+end
+[%%expect{|
+module Abs_bits64 : sig type t : bits64 end
+|}]
+
+(* Comparing box with other type constructors *)
+
+(* A boxed aliasable type is compatible with a type with an unboxed version
+   (thus [eq] can't be refuted) *)
+let f (eq : (Abs_untagged_immediate.t box, int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+Line 2, characters 16-17:
+2 |   match eq with _ -> .
+                    ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "Equal"
+|}]
+
+(* as well as *aliasable* type that could be hiding an unboxed version.
+   (Techically, this exact test case is conservative, as a type cannot be the
+   unboxed version of itself due to the cyclic type check) *)
+let f (eq : (Abs_value.t box, Abs_value.t) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+Line 2, characters 16-17:
+2 |   match eq with _ -> .
+                    ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "Equal"
+|}]
+
+(* We can refute the below, as we can see that the unboxed version of [int]
+   isn't [value] *)
+let f (eq : (Abs_value.t box, int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : (Abs_value.t box, int) Type.eq -> unit = <fun>
+|}]
+
+(* Boxed types are also incompatible with un-aliasable type without unboxed
+   versions *)
+let f (eq : (Abs_value.t box, string) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : (Abs_value.t box, string) Type.eq -> unit = <fun>
+|}]
+
+(* ['a box] and ['b box] are compatible if ['a] and ['b] are *)
+
+let f (eq : (Abs_value.t box, Abs_value2.t box) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+Line 2, characters 16-17:
+2 |   match eq with _ -> .
+                    ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "Equal"
+|}]
+
+let f (eq : (int box, string box) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : (int box, string box) Type.eq -> unit = <fun>
+|}]
+
+
+let f (eq : (Abs_value.t box, Abs_bits64.t box) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : (Abs_value.t box, Abs_bits64.t box) Type.eq -> unit = <fun>
+|}]
+
+(* ['a box] is compatible with tuples *)
+
+let f (eq : (Abs_value_value.t box, int * int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+Line 2, characters 16-17:
+2 |   match eq with _ -> .
+                    ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "Equal"
+|}]
+
+(* We refute this one because #(int * int) is not [value] *)
+let f (eq : (Abs_value.t box, int * int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : (Abs_value.t box, int * int) Type.eq -> unit = <fun>
+|}]
