@@ -1310,13 +1310,13 @@ let record_gets_unboxed_version lbls repr =
     not represent_as_float_array
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 
-let manifest_is_box decl =
+let manifest_is_box env decl =
   match decl.type_kind, decl.type_manifest with
   | Type_abstract _, Some ty ->
-    (match get_desc ty with Tbox _ -> true | _ -> false)
+    (match get_desc (Ctype.expand_head env ty) with Tbox _ -> true | _ -> false)
   | _ -> false
 
-let gets_unboxed_version decl =
+let gets_unboxed_version env decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
   | Type_open | Type_record_unboxed_product _
@@ -1328,7 +1328,7 @@ let gets_unboxed_version decl =
        (you'll want to consult [update_record_kind]). *)
     true
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
-  | Type_abstract _ -> manifest_is_box decl
+  | Type_abstract _ -> manifest_is_box env decl
 
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
@@ -1337,7 +1337,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   | Type_abstract _ ->
     (match decl.type_manifest with
      | Some ty ->
-       (match get_desc ty with
+       (match get_desc (Ctype.expand_head env ty) with
         | Tbox inner ->
           (* The unboxed version of [type t = T box] has manifest [T].
              Use [any] as a placeholder jkind; [check_abbrev] (called below)
@@ -1453,7 +1453,7 @@ let derive_unboxed_versions decls env =
   let path_in_group_has_unboxed_version =
     Path.Map.of_seq
       (List.to_seq decls |>
-       Seq.map (fun (id, d) -> Path.Pident id, gets_unboxed_version d))
+       Seq.map (fun (id, d) -> Path.Pident id, gets_unboxed_version env d))
   in
   List.map
     (fun (id, d) ->
@@ -1468,10 +1468,12 @@ let derive_unboxed_versions decls env =
    with [@atomic] fields. See Note [Typechecking unboxed versions of types].
 
    Returns new decls and paths whose unboxed versions got removed. *)
-let remove_unboxed_versions decls =
+let remove_unboxed_versions env decls =
   List.fold_left_map
     (fun removed (id, d) ->
-      match Option.is_some d.type_unboxed_version, gets_unboxed_version d with
+       match
+         Option.is_some d.type_unboxed_version, gets_unboxed_version env d
+       with
       | false, false | true, true -> removed, (id, d)
       | true, false ->
         Path.Set.add (Pident id) removed,
@@ -3633,7 +3635,7 @@ let transl_type_decl env rec_flag sdecl_list =
         |> update_decls_jkind new_env
         |> normalize_decl_jkinds new_env
       in
-      let removed, decls = remove_unboxed_versions decls in
+      let removed, decls = remove_unboxed_versions new_env decls in
       if not (Path.Set.is_empty removed) then
         check_unboxed_paths decls
           ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);

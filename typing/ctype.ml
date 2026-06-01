@@ -2515,15 +2515,18 @@ let rec try_reduce env ty =
   try try_reduce env ty'
   with Cannot_expand -> ty'
 
-(* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
-   so we special-case its abbreviation expansion there. *)
-let expand_eval_abbrev env ty =
+(* [Predef]'s [eval] and [box] are special -- we want to always expand it in
+   [reduce_head], so we special-case its abbreviation expansion there. *)
+let expand_reducible_abbrevs env ty =
   match get_desc ty with
-  | Tconstr (path, [_], _) when Path.same path Predef.path_eval ->
+  | Tconstr (path, [_], _) when Path.same path Predef.path_eval
+                             || Path.same path Predef.path_box ->
     try_expand_once env ty
   | _ -> raise Cannot_expand
 
-let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
+
+let try_expand_reducible_abbrevs_once =
+   try_expand_once_gen expand_reducible_abbrevs
 
 (* Fully expand the head of a type. *)
 let try_expand_head
@@ -2538,10 +2541,10 @@ let try_expand_head
   try loop try_once env ty
   with Cannot_expand -> try_reduce env ty
 
-let reduce_head ~expand_eval env ty =
+let reduce_head ~expand_reducible_abbrevs env ty =
   let try_once =
-    if expand_eval
-    then try_expand_eval_once
+    if expand_reducible_abbrevs
+    then try_expand_reducible_abbrevs_once
     else (fun _env _ty -> raise Cannot_expand)
   in
   try try_expand_head try_once env ty
@@ -6242,7 +6245,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
-              let t2 = reduce_head ~expand_eval:false env t2 in
+              let t2 = reduce_head ~expand_reducible_abbrevs:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like

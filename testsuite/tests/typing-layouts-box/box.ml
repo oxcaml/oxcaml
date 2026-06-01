@@ -35,7 +35,7 @@ type t = u box;;
 let f (x : t) : float = x;;
 [%%expect{|
 type u = float#
-type t = float
+type t = u box
 val f : t -> float = <fun>
 |}]
 
@@ -43,12 +43,12 @@ type ('a : any) b = 'a box
 type t1' = float# b
 [%%expect{|
 type ('a : any) b = 'a box
-type t1' = float
+type t1' = float# b
 |}]
 
 let g' (x : float# b) : float# b = x;;
 [%%expect{|
-val g' : float -> float = <fun>
+val g' : float# b -> float# b = <fun>
 |}]
 
 (* Test 3: [float# box] unifies with [float] *)
@@ -159,14 +159,14 @@ let test_multi_alias (x : g box) : float = x;;
 [%%expect{|
 type f = float#
 type g = f
-val test_multi_alias : float -> float = <fun>
+val test_multi_alias : g box -> float = <fun>
 |}]
 
 type h = g
 let test_three_levels (x : h box) : float = x;;
 [%%expect{|
 type h = g
-val test_three_levels : float -> float = <fun>
+val test_three_levels : h box -> float = <fun>
 |}]
 
 (* Test 10: box on types without unboxed versions *)
@@ -217,7 +217,7 @@ type umixed = mixed_record#
 type boxed_umixed = umixed box;;
 [%%expect{|
 type umixed = mixed_record#
-type boxed_umixed = mixed_record
+type boxed_umixed = umixed box
 |}]
 
 let convert_alias (x : boxed_umixed) : mixed_record = x;;
@@ -245,12 +245,12 @@ type ut = #(int * string)
 
 type boxed_ut = ut box;;
 [%%expect{|
-type boxed_ut = int * string
+type boxed_ut = ut box
 |}]
 
 let eq_ut (x : #(int * string) box) (y : ut box) = x = y;;
 [%%expect{|
-val eq_ut : int * string -> int * string -> bool = <fun>
+val eq_ut : int * string -> ut box -> bool = <fun>
 |}]
 
 (* Test 14: Additional jkinds - bits32, bits64, word *)
@@ -303,14 +303,14 @@ type ('a : float64) boxed = 'a box
 
 let use_boxed (x : float# boxed) : float = x;;
 [%%expect{|
-val use_boxed : float -> float = <fun>
+val use_boxed : float# boxed -> float = <fun>
 |}]
 
 type alias_float = float#
 let use_boxed_alias (x : alias_float boxed) : float = x;;
 [%%expect{|
 type alias_float = float#
-val use_boxed_alias : float -> float = <fun>
+val use_boxed_alias : alias_float boxed -> float = <fun>
 |}]
 
 (* Test 16: Nested box - float# box expands to float, but float is not an
@@ -328,7 +328,7 @@ let nested_to_float (x : nested) : float = x;;
 Line 1, characters 43-44:
 1 | let nested_to_float (x : nested) : float = x;;
                                                ^
-Error: This expression has type "float box"
+Error: This expression has type "nested" = "float box"
        but an expression was expected of type "float"
        Type "float" is not compatible with type "float#"
 |}]
@@ -336,7 +336,7 @@ Error: This expression has type "float box"
 (* But nested types still unify with each other *)
 let nested_eq (x : nested) (y : float# box box) = x = y;;
 [%%expect{|
-val nested_eq : float box -> float box -> bool = <fun>
+val nested_eq : nested -> float box -> bool = <fun>
 |}]
 
 (* Test 17: Type error cases *)
@@ -346,8 +346,8 @@ let mismatch1 (x : float# box) : int = x;;
 Line 1, characters 39-40:
 1 | let mismatch1 (x : float# box) : int = x;;
                                            ^
-Error: This expression has type "float" but an expression was expected of type
-         "int"
+Error: This expression has type "float# box" = "float"
+       but an expression was expected of type "int"
 |}]
 
 let mismatch2 (x : int32# box) : int64 = x;;
@@ -355,8 +355,8 @@ let mismatch2 (x : int32# box) : int64 = x;;
 Line 1, characters 41-42:
 1 | let mismatch2 (x : int32# box) : int64 = x;;
                                              ^
-Error: This expression has type "int32" but an expression was expected of type
-         "int64"
+Error: This expression has type "int32# box" = "int32"
+       but an expression was expected of type "int64"
 |}]
 
 type uf1 = float#
@@ -368,8 +368,8 @@ type uf2 = int64#
 Line 3, characters 40-41:
 3 | let mismatch3 (x : uf1 box) : uf2 box = x;;
                                             ^
-Error: This expression has type "float" but an expression was expected of type
-         "int64"
+Error: This expression has type "uf1 box" = "float"
+       but an expression was expected of type "uf2 box" = "int64"
 |}]
 
 (* Test 18: Type inference *)
@@ -390,7 +390,7 @@ type ufl = float#
 let infer3 (x : ufl box) = x +. 1.0;;
 [%%expect{|
 type ufl = float#
-val infer3 : float -> float = <fun>
+val infer3 : ufl box -> float = <fun>
 |}]
 
 (* Test 19: Distinct vs same underlying box types *)
@@ -418,8 +418,8 @@ type tb = ub box;;
 [%%expect{|
 type ua = float#
 type ub = float#
-type ta = float
-type tb = float
+type ta = ua box
+type tb = ub box
 |}]
 
 let same_underlying (x : ta) (y : tb) = x = y;;
@@ -651,7 +651,7 @@ type a = [ `A ]
 
 let coerce_box (x : a box) : ab box = (x :> ab box);;
 [%%expect{|
-val coerce_box : [ `A ] box -> [ `A | `B ] box = <fun>
+val coerce_box : a box -> ab box = <fun>
 |}]
 
 (* Also test the other direction fails *)
@@ -660,8 +660,8 @@ let coerce_box_fail (x : ab box) : a box = (x :> a box);;
 Line 1, characters 43-55:
 1 | let coerce_box_fail (x : ab box) : a box = (x :> a box);;
                                                ^^^^^^^^^^^^
-Error: Type "[ `A | `B ] box" is not a subtype of "[ `A ] box"
-       Type "[ `A | `B ]" is not a subtype of "[ `A ]"
+Error: Type "ab box" = "[ `A | `B ] box" is not a subtype of "a box" = "[ `A ] box"
+       Type "ab" = "[ `A | `B ]" is not a subtype of "a" = "[ `A ]"
        The second variant type does not allow tag(s) "`B"
 |}]
 
@@ -711,7 +711,7 @@ let f (foo : foo) = foo
 [%%expect{|
 type t : any
 type foo = t box
-val f : t box -> t box = <fun>
+val f : foo -> foo = <fun>
 |}]
 
 
@@ -768,6 +768,7 @@ Line 4, characters 4-5:
         ^
 Error: This pattern matches values of type "string st"
        but a pattern was expected which matches values of type "$0 box st"
+       Type "string" is not compatible with type "$0 box"
        The type constructor "$0" would escape its scope
 |}]
 
@@ -804,12 +805,12 @@ type obj = < m : int >
 type t_obj_box = obj box;;
 [%%expect{|
 type obj = < m : int >
-type t_obj_box = < m : int > box
+type t_obj_box = obj box
 |}]
 
 let obj_box_eq (x : obj box) (y : obj box) = x = y;;
 [%%expect{|
-val obj_box_eq : < m : int > box -> < m : int > box -> bool = <fun>
+val obj_box_eq : obj box -> obj box -> bool = <fun>
 |}]
 
 (* Object subtyping is preserved through [box] *)
@@ -817,7 +818,7 @@ type obj_more = < m : int; n : int >
 let widen (x : obj_more box) = (x :> obj box);;
 [%%expect{|
 type obj_more = < m : int; n : int >
-val widen : < m : int; n : int > box -> < m : int > box = <fun>
+val widen : obj_more box -> obj box = <fun>
 |}]
 
 (* Test 32: Box creates an unboxed version *)
@@ -841,9 +842,9 @@ type int_b_b_u_u_u = int_b_b_u_u#
 let check : int_b_b_u_u_u -> int# = fun x -> x
 [%%expect{|
 type int_b = int box
-type int_b_b = int box box
-type int_b_b_u = int box
-val check : int box -> int box = <fun>
+type int_b_b = int_b box
+type int_b_b_u = int_b_b#
+val check : int_b_b_u -> int_b = <fun>
 type int_b_b_u_u = int_b_b_u#
 val check : int_b_b_u_u -> int = <fun>
 type int_b_b_u_u_u = int_b_b_u_u#
