@@ -2201,7 +2201,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
     | None ->
       let acc, body = body acc in
       acc, body, return, return_continuation
-    | Some k ->
+    | Some (k, _) ->
       let vars_with_kinds = variables_for_unboxing "result" k in
       let unboxed_return_continuation =
         Continuation.create ~sort:Return ~name:"unboxed_return" ()
@@ -2849,7 +2849,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         my_closure )
     | Unboxed_calling_convention
         (unboxed_params, unboxed_return, unboxed_function_slot) ->
-      let unboxed_return = Option.map fst unboxed_return in
       compute_body_of_unboxed_function acc my_region alloc_region my_closure
         ~unarized_params params_arity ~unarized_param_modes function_slot
         compute_body return return_continuation unboxed_params unboxed_return
