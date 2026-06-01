@@ -4870,67 +4870,6 @@ let functorize_interface initial_env ~sg target modulename =
       Cmt_format.Functorize initial_env None decl_deps
   end
 
-(* Analogous to [package_units]: always reads individual CMIs (populating
-   [Env.imports ()] with constituent CRCs for linker consistency).  When
-   [-cmi-file] is given, loads that CMI via [Env.read_signature] (adding the
-   bundle self-reference CRC) and performs an inclusion check; no new CMI is
-   written.  Otherwise generates a fresh CMI + saves .cmt + .cms. *)
-let functorize_implementation initial_env ~sg ~modules target modulename
-    : Typedtree.module_coercion =
-  Ident.reinit ();
-  let shape =
-    let uid = Uid.of_compilation_unit_id modulename in
-    List.fold_left
-      (fun map cu ->
-        let name = Compilation_unit.name_as_string cu in
-        let id = Ident.create_persistent name in
-        Shape.Map.add_module map id (Shape.for_persistent_unit name))
-      Shape.Map.empty modules
-    |> Shape.str ~uid
-  in
-  if not !Clflags.dont_write_files then begin
-    let save_cmt_cms cmi_opt =
-      let decl_deps = Cmt_format.get_declaration_dependencies () in
-      Cmt_format.save_cmt (Unit_info.cmt target) modulename
-        Cmt_format.Functorize initial_env cmi_opt None;
-      Cms_format.save_cms (Unit_info.cms target) modulename
-        Cmt_format.Functorize initial_env None decl_deps
-    in
-    match !Clflags.cmi_file with
-    | Some cmi_file ->
-      let for_pack_prefix = Compilation_unit.for_pack_prefix modulename in
-      let cmi_artifact =
-        Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
-      in
-      let name = Compilation_unit.to_global_name_without_prefix modulename in
-      let dclsig, staticity = Env.read_signature name cmi_artifact in
-      let cc, _shape =
-        let modes =
-          Includecore.Specific
-            ((Env.mode_unit ~staticity:Staticity.Dynamic, None),
-             Env.mode_unit ~staticity)
-        in
-        Includemod.compunit initial_env ~mark:true
-          "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
-      in
-      save_cmt_cms None;
-      cc
-    | None ->
-      let name = Compilation_unit.name modulename in
-      let kind =
-        Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
-      in
-      let cmi =
-        Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
-          (sg, Staticity.Dynamic) name kind (Unit_info.cmi target)
-          (Array.of_list (Env.imports ()))
-      in
-      save_cmt_cms (Some cmi);
-      Tcoerce_none
-  end else
-    Tcoerce_none
-
-
 (* Error report *)
 
 

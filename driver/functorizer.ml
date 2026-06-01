@@ -84,313 +84,244 @@ let impl_unit_info_with_cmi_data ~(ui_unit : CU.t)
   let intf = { intf with ui_unit } in
   { intf; ui_format }
 
+(* ----- Bundle insertion helper -----
+
+   A [bundle] is the under-construction list of instantiated modules, in
+   topological order (deps appear before users).  Each module's signature
+   has already had its [bound_globals] substituted to reference earlier
+   modules / parameters.
+
+   The companion [bindings] map records, for every globally-named compunit
+   already accounted for, the Local Ident it is bound to — either as a
+   functor parameter or as a bundled module.  Plain (non-parameterised)
+   compunits never go into the bundle and so never appear in [bindings];
+   they remain global references at link time.
+
+   Parameter declaration order is the caller's responsibility: when the
+   caller wraps the resulting bundle in functor layers, it picks the order
+   in which parameter idents in [bindings] (those whose names don't appear
+   in the bundle as modules) become functor parameters. *)
+
+type bundle_module = {
+  bm_id : Ident.t;
+  bm_sign : Types.signature;
+}
+
+type bundle = bundle_module list
+
+module Bindings = Misc.Stdlib.String.Map
+
+type bindings = Ident.t Bindings.t
+
+let empty_bundle : bundle = []
+
+let empty_bindings : bindings = Bindings.empty
+
+(* Load the cmi for compunit [name] via [Env.import_cmi_for_link]. *)
+let load_cmi name : Persistent_env.loaded_cmi =
+  let cmi_file =
+    Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
+  in
+  Env.import_cmi_for_link cmi_file
+
+let classify_cmi (loaded : Persistent_env.loaded_cmi) =
+  match loaded.cu with
+  | None -> `Parameter
+  | Some _ -> if loaded.params = [] then `Plain else `Parameterised
+
+(* Insert [swg] into [bundle] as a module declaration named [name].
+
+   The caller is responsible for pre-registering every parameter the bundle
+   should expose; this helper rejects unknown [Parameter] compunits in
+   [bound_globals] rather than guessing an order.
+
+   To break cycles in [bound_globals] (e.g. [-no-alias-deps] approximations
+   that produce mutual cmi-globals references), [name]'s Local Ident is
+   recorded in [bindings] up-front, before processing [bound_globals].
+
+   For each entry in [swg.bound_globals]:
+     - if its head is already in [bindings] (an earlier insert, the new
+       module itself, an ancestor on the recursion stack, or a
+       caller-registered parameter), the existing Ident is reused;
+     - otherwise the dep's cmi is loaded:
+         * [Parameterised]: [insert_module] is invoked recursively;
+         * [Parameter]: error — caller must have added it;
+         * [Plain]: no substitution — the reference stays as a global.
+
+   The collected substitution is applied to [swg]'s signature, then the new
+   entry is appended to [bundle]. *)
+let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~bundle
+    ~bindings : bundle * bindings =
+  if Bindings.mem name bindings
+  then
+    Misc.fatal_errorf "Functorizer.insert_module: %s already in bundle" name;
+  let new_id = Ident.create_local name in
+  let bindings = Bindings.add name new_id bindings in
+  let loaded = load_cmi name in
+  (* First pass: walk [bound_globals] for its side-effect — insert any
+     missing parameterised dep modules into the bundle and grow [bindings]
+     accordingly. *)
+  let process_bound (bundle, bindings) ((gm, _prec) : GM.With_precision.t) =
+    let head = gm.GM.head in
+    if Bindings.mem head bindings then bundle, bindings
+    else
+      let loaded = load_cmi head in
+      match classify_cmi loaded with
+      | `Plain -> bundle, bindings
+      | `Parameter ->
+        Misc.fatal_errorf
+          "Functorizer.insert_module: parameter %s not pre-registered in \
+           bindings (the caller must add parameters before calling \
+           insert_module)"
+          head
+      | `Parameterised ->
+        insert_module ~name:head loaded.sign_with_globals ~bundle ~bindings
+  in
+  let bundle, bindings =
+    Array.fold_left process_bound (bundle, bindings) swg.bound_globals
+  in
+  (* The signature can reference exactly two flavours of global compunit:
+       - heads of [bound_globals] entries — other parameterised modules
+         this one depends on;
+       - the compunit's own declared parameters ([cmi_params]) — these
+         may appear only nested inside [bound_globals] entries (e.g.,
+         [P] as the [{P}] in [Basic{P}]) and so wouldn't be picked up by
+         iterating [bound_globals] alone.
+     Build subst entries for both.  Plain compunits aren't in [bindings];
+     skipping them leaves their references as globals (correct). *)
+  let add_subst_for head s =
+    match Bindings.find_opt head bindings with
+    | None -> s
+    | Some id ->
+      let name_id = Ident.create_global (GM.Name.create_no_args head) in
+      Subst.add_module name_id (Path.Pident id) s
+  in
+  let subst =
+    let s = Subst.identity in
+    let s =
+      Array.fold_left
+        (fun s ((gm, _) : GM.With_precision.t) -> add_subst_for gm.GM.head s)
+        s swg.bound_globals
+    in
+    List.fold_left
+      (fun s p -> add_subst_for (GM.Parameter_name.to_string p) s)
+      s loaded.params
+  in
+  let sign_lazy, _staticity = swg.sign in
+  let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
+  let sign = Subst.Lazy.force_signature sign_lazy in
+  let bundle = bundle @ [{ bm_id = new_id; bm_sign = sign }] in
+  bundle, bindings
+
+let make_md md_type : Types.module_declaration =
+  {
+    md_type;
+    md_modalities = Mode.Modality.(Const.id |> of_const);
+    md_attributes = [];
+    md_loc = Location.none;
+    md_uid = Types.Uid.internal_not_actually_unique;
+  }
+
 type bundle_sig = {
-  signature : Types.signature;
+  body : Types.signature;
+      (** [Sig_module] entries for each bundled module, in topo order. *)
+  param_ids : Ident.t list;
+      (** Local idents for the functor's parameters, in declaration order. *)
+  modules : intf_unit_info list;
+      (** Metadata for each bundled module, in topo order. *)
+}
+
+(* Build the bundle's body signature from a set of input intf_unit_infos.
+   Inputs must all be parameterised compunits.  For each, [insert_module]
+   appends a substituted module declaration to the bundle and recursively
+   pulls in any transitive deps. *)
+let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
+  (* Collect parameter names across all inputs (declaration order: each
+     input's [cmi_params] in order, deduped on first appearance), then
+     register each as a Local Ident in the initial bindings. *)
+  let param_ids =
+    let seen = Hashtbl.create 4 in
+    List.concat_map
+      (fun (ui : intf_unit_info) ->
+        List.filter_map
+          (fun p ->
+            let p_name = GM.Parameter_name.to_string p in
+            if Hashtbl.mem seen p_name then None
+            else begin
+              Hashtbl.add seen p_name ();
+              Some (Ident.create_local p_name)
+            end)
+          ui.ui_params)
+      src_infos
+  in
+  let initial_bindings =
+    List.fold_left
+      (fun bindings id -> Bindings.add (Ident.name id) id bindings)
+      empty_bindings param_ids
+  in
+  let bundle, _bindings =
+    List.fold_left
+      (fun (bundle, bindings) (ui : intf_unit_info) ->
+        let name = CU.name_as_string ui.ui_unit in
+        let loaded = load_cmi name in
+        (match classify_cmi loaded with
+        | `Parameterised -> ()
+        | `Parameter ->
+          Compenv.fatal
+            (Printf.sprintf "functorize input '%s' is a parameter module" name)
+        | `Plain ->
+          Compenv.fatal
+            (Printf.sprintf "functorize input '%s' is not a parameterised module"
+               name));
+        insert_module ~name loaded.sign_with_globals ~bundle ~bindings)
+      (empty_bundle, initial_bindings) src_infos
+  in
+  let body =
+    List.map
+      (fun bm ->
+        Types.Sig_module
+          ( bm.bm_id,
+            Mp_present,
+            make_md (Mty_signature bm.bm_sign),
+            Trec_not,
+            Exported ))
+      bundle
+  in
+  let modules =
+    List.map
+      (fun bm ->
+        let name = Ident.name bm.bm_id in
+        let loaded = load_cmi name in
+        let ui_unit =
+          match loaded.cu with Some cu -> cu | None -> assert false
+        in
+        { ui_unit; ui_params = loaded.params; ui_deps = [] })
+      bundle
+  in
+  { body; param_ids; modules }
+
+type bundle_functor_type = {
+  functor_type : Types.module_type;
+      (** [Mty_functor(Named p, ... Mty_functor(Unit, body))] — one
+          [Mty_functor(Named ...)] layer per parameter, in declaration
+          order. *)
   all_params : GM.t list;
   all_modules : intf_unit_info list;
 }
 
-(* Build the bundle's signature from a set of input intf_unit_infos.
-
-   Uses alias-chain compression to discover the "real" set of bundle modules:
-   for each reference to another module in an input's signature, follow the
-   alias chain until we hit something that's either (a) a non-parameterised
-   compunit (leave as a global reference; no need to bundle), or (b) the
-   most-simplified form inside a parameterised cmi (intern that compunit as
-   a real bundle module).  This avoids the cycle that arises with
-   [-no-alias-deps]: alias-only intermediate modules (like dune's [d__]
-   wrappers) don't appear in the bundle; only the modules at the *end* of
-   each alias chain do. *)
-let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
-  let make_md md_type : Types.module_declaration =
-    {
-      md_type;
-      md_modalities = Mode.Modality.(Const.id |> of_const);
-      md_attributes = [];
-      md_loc = Location.none;
-      md_uid = Types.Uid.internal_not_actually_unique;
-    }
-  in
-  let load name : Persistent_env.loaded_cmi =
-    let cmi_file =
-      Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
-    in
-    Env.import_cmi_for_link cmi_file
-  in
+(* Wrap [compute_bundle_sig]'s output as a functor type:
+     [Mty_functor (Unit, body)] inside [Mty_functor (Named p, ...)] layers
+     for each parameter, in declaration order. *)
+let compute_bundle_functor_type (src_infos : intf_unit_info list) :
+    bundle_functor_type =
+  let { body; param_ids; modules } = compute_bundle_sig src_infos in
   let signature_of_compunit name : Types.signature =
-    let loaded = load name in
+    let loaded = load_cmi name in
     let sign, _ = loaded.sign_with_globals.sign in
     Subst.Lazy.force_signature sign
   in
-  (* Parameters: each parameter compunit gets a Local ident; references to it
-     get substituted via this map. *)
-  let param_locals : (string, Ident.t) Hashtbl.t = Hashtbl.create 4 in
-  let param_order : Ident.t list ref = ref [] in
-  let intern_param name =
-    match Hashtbl.find_opt param_locals name with
-    | Some id -> id
-    | None ->
-        let id = Ident.create_local name in
-        Hashtbl.add param_locals name id;
-        param_order := id :: !param_order;
-        id
-  in
-  (* Real (bundled) modules: each gets a Local ident.  Holds the rewritten
-     signature once processed. *)
-  let real_locals : (string, Ident.t) Hashtbl.t = Hashtbl.create 16 in
-  let real_order : string list ref = ref [] in
-  let real_signatures : (string, Types.signature) Hashtbl.t =
-    Hashtbl.create 16
-  in
-  let queue : string Queue.t = Queue.create () in
-  let intern_real name =
-    match Hashtbl.find_opt real_locals name with
-    | Some id -> id
-    | None ->
-        let id = Ident.create_local name in
-        Hashtbl.add real_locals name id;
-        real_order := name :: !real_order;
-        (* Intern any parameters this module declares.  References to
-         parameters appear in type expressions (e.g., [val x : P.t]) that
-         the rewrite walk doesn't traverse, so we register them eagerly
-         based on the cmi's declared [cmi_params]. *)
-        let loaded = load name in
-        List.iter
-          (fun p ->
-            let _ : Ident.t = intern_param (GM.Parameter_name.to_string p) in
-            ())
-          loaded.params;
-        Queue.push name queue;
-        id
-  in
-  (* Classify a compunit by its cmi.  Returns:
-       - [`Parameter] if the cmi is [-as-parameter] (no signature body to
-         include; we just record a parameter binding).
-       - [`Parameterised] if [cmi_params <> []]; intern as a real bundle
-         module.
-       - [`Plain] otherwise; leave references as globals. *)
-  let classify name =
-    let loaded = load name in
-    match loaded.cu with
-    | None -> `Parameter
-    | Some _ -> if loaded.params = [] then `Plain else `Parameterised
-  in
-  (* Navigate [parent_mty] to find a sub-module named [field] and return its
-     declaration. *)
-  let find_module_in_sig field (items : Types.signature) =
-    List.find_map
-      (function
-        | Types.Sig_module (id, _, md, _, _) when Ident.name id = field ->
-            Some md
-        | _ -> None)
-      items
-  in
-  (* Given a path whose root is a Global compunit, return the [md_type] it
-     points to (with aliases NOT yet followed at this step). *)
-  let rec md_type_of_path = function
-    | Path.Pident i when Ident.is_global i ->
-        Types.Mty_signature (signature_of_compunit (Ident.name i))
-    | Path.Pdot (parent, field) -> (
-        let parent_mty = md_type_of_path parent in
-        let parent_sig =
-          match parent_mty with
-          | Types.Mty_signature s -> s
-          | Types.Mty_alias inner -> (
-              (* If we hit an alias while navigating, resolve it to the signature *)
-              match md_type_of_path inner with
-              | Types.Mty_signature s -> s
-              | _ ->
-                  Misc.fatal_errorf
-                    "compute_bundle_sig: alias %s doesn't resolve to a \
-                     signature"
-                    (Path.name inner))
-          | _ ->
-              Misc.fatal_errorf
-                "compute_bundle_sig: parent of %s is not a signature" field
-        in
-        match find_module_in_sig field parent_sig with
-        | Some md -> md.md_type
-        | None ->
-            Misc.fatal_errorf "compute_bundle_sig: field %s not in parent sig"
-              field)
-    | other ->
-        Misc.fatal_errorf "compute_bundle_sig: unsupported path %s"
-          (Path.name other)
-  in
-  (* Compress an alias chain.  If the path's root is a non-parameterised
-     compunit, stop immediately: such a reference doesn't need bundling
-     (main.ml will resolve it as a normal global at link time).  Otherwise
-     follow aliases until we either bottom out at the most-simplified form,
-     then substitute the root with a Local if the terminal points into a
-     parameterised compunit or to a parameter compunit. *)
-  let rec path_root_name = function
-    | Path.Pident i when Ident.is_global i -> Some (Ident.name i)
-    | Path.Pdot (p, _) -> path_root_name p
-    | _ -> None
-  in
-  let rec compress_path p =
-    match path_root_name p with
-    | None -> p
-    | Some name -> (
-        match classify name with
-        | `Plain -> p
-        | `Parameter -> substitute_root p
-        | `Parameterised -> (
-            match md_type_of_path p with
-            | Types.Mty_alias inner -> compress_path inner
-            | _ -> substitute_root p))
-  and substitute_root = function
-    | Path.Pident i when Ident.is_global i -> (
-        let name = Ident.name i in
-        match classify name with
-        | `Parameter -> Path.Pident (intern_param name)
-        | `Parameterised -> Path.Pident (intern_real name)
-        | `Plain -> Path.Pident i)
-    | Path.Pdot (parent, field) -> Path.Pdot (substitute_root parent, field)
-    | other -> other
-  in
-  (* Walk a module type, applying [compress_path] to every alias path and
-     [substitute_root] to other module references. *)
-  let rec rewrite_modtype = function
-    | Types.Mty_alias p -> Types.Mty_alias (compress_path p)
-    | Types.Mty_signature items ->
-        Types.Mty_signature (List.map rewrite_item items)
-    | Types.Mty_functor (param, body, mres) ->
-        Types.Mty_functor
-          (rewrite_functor_param param, rewrite_modtype body, mres)
-    | Types.Mty_ident p -> Types.Mty_ident (substitute_root p)
-    | Types.Mty_strengthen (mty, p, a) ->
-        Types.Mty_strengthen (rewrite_modtype mty, substitute_root p, a)
-  and rewrite_functor_param : Types.functor_parameter -> Types.functor_parameter
-      = function
-    | Types.Named (id, arg, marg) -> Types.Named (id, rewrite_modtype arg, marg)
-    | Types.Unit -> Types.Unit
-  and rewrite_item = function
-    | Types.Sig_module (id, pres, md, rs, vis) ->
-        let md = { md with md_type = rewrite_modtype md.md_type } in
-        Types.Sig_module (id, pres, md, rs, vis)
-    | other -> other
-  in
-  (* Every input must be a parameterised module; a non-parameterised input
-     has no business being in a bundle (the bundle's purpose is to package
-     parameterised modules for instantiation). *)
-  List.iter
-    (fun (ui : intf_unit_info) ->
-      let name = CU.name_as_string ui.ui_unit in
-      match classify name with
-      | `Parameterised ->
-          let _ : Ident.t = intern_real name in
-          ()
-      | `Parameter ->
-          Compenv.fatal
-            (Printf.sprintf "functorize input '%s' is a parameter module" name)
-      | `Plain ->
-          Compenv.fatal
-            (Printf.sprintf
-               "functorize input '%s' is not a parameterised module" name))
-    src_infos;
-  (* Process the queue.  Rewriting may intern more real_locals or
-     param_locals, which get queued and processed in turn. *)
-  while not (Queue.is_empty queue) do
-    let name = Queue.pop queue in
-    if not (Hashtbl.mem real_signatures name) then begin
-      let sg = signature_of_compunit name in
-      let rewritten = List.map rewrite_item sg in
-      Hashtbl.add real_signatures name rewritten
-    end
-  done;
-  (* Build a [Subst.t] mapping [Pident (Global X)] -> [Pident <local X>] for
-     every parameter and every real module we've interned, and apply it to
-     each rewritten signature.  This second pass catches paths inside type
-     expressions, value descriptions, and other non-[Mty_alias] structures
-     that [rewrite_modtype] above didn't touch. *)
-  let subst =
-    let s = Subst.identity in
-    let s =
-      Hashtbl.fold
-        (fun name id s ->
-          Subst.add_module
-            (Ident.create_global (GM.Name.create_no_args name))
-            (Path.Pident id) s)
-        param_locals s
-    in
-    Hashtbl.fold
-      (fun name id s ->
-        Subst.add_module
-          (Ident.create_global (GM.Name.create_no_args name))
-          (Path.Pident id) s)
-      real_locals s
-  in
-  Hashtbl.filter_map_inplace
-    (fun _name sg ->
-      match Subst.modtype Keep subst (Types.Mty_signature sg) with
-      | Types.Mty_signature sg' -> Some sg'
-      | _ -> Some sg)
-    real_signatures;
-  (* Topologically sort real_locals by dep edges discovered in rewritten
-     signatures: a real module A depends on real module B iff A's rewritten
-     signature contains a reference to B's Local. *)
-  let deps_of_real name =
-    let sg = Hashtbl.find real_signatures name in
-    let deps = ref [] in
-    let rec scan_path = function
-      | Path.Pident i when not (Ident.is_global i) -> (
-          let n = Ident.name i in
-          match Hashtbl.find_opt real_locals n with
-          | Some id when Ident.same id i && n <> name -> deps := n :: !deps
-          | _ -> ())
-      | Path.Pdot (p, _) -> scan_path p
-      | _ -> ()
-    in
-    let rec scan_mty = function
-      | Types.Mty_alias p -> scan_path p
-      | Types.Mty_signature items -> List.iter scan_item items
-      | Types.Mty_functor (param, body, _) ->
-          scan_functor_param param;
-          scan_mty body
-      | Types.Mty_ident p -> scan_path p
-      | Types.Mty_strengthen (m, p, _) ->
-          scan_mty m;
-          scan_path p
-    and scan_functor_param : Types.functor_parameter -> unit = function
-      | Types.Named (_, arg, _) -> scan_mty arg
-      | Types.Unit -> ()
-    and scan_item = function
-      | Types.Sig_module (_, _, md, _, _) -> scan_mty md.md_type
-      | _ -> ()
-    in
-    List.iter scan_item sg;
-    !deps
-  in
-  let visited : (string, unit) Hashtbl.t = Hashtbl.create 16 in
-  let topo : string list ref = ref [] in
-  let rec dfs name =
-    if not (Hashtbl.mem visited name) then begin
-      Hashtbl.add visited name ();
-      List.iter dfs (deps_of_real name);
-      topo := name :: !topo
-    end
-  in
-  (* Visit in reverse-insertion order so user-provided inputs are leaves *)
-  List.iter dfs (List.rev !real_order);
-  let bundle_names = List.rev !topo in
-  (* Build bundle signature items in topo order *)
-  let result_items =
-    List.map
-      (fun name ->
-        let local_id = Hashtbl.find real_locals name in
-        let sg = Hashtbl.find real_signatures name in
-        Types.Sig_module
-          (local_id, Mp_present, make_md (Mty_signature sg), Trec_not, Exported))
-      bundle_names
-  in
   let with_unit =
-    Types.Mty_functor (Unit, Mty_signature result_items, Mode.Alloc.legacy)
-  in
-  let param_globals_ordered =
-    (* all_params order: parameters as they were interned, in reverse of
-       insertion (since we use a list ref accumulator) *)
-    List.rev !param_order
+    Types.Mty_functor (Unit, Mty_signature body, Mode.Alloc.legacy)
   in
   let functor_type =
     List.fold_right
@@ -401,38 +332,26 @@ let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
           ( Named (Some param_id, param_type, Mode.Alloc.legacy),
             body,
             Mode.Alloc.legacy ))
-      param_globals_ordered with_unit
-  in
-  let signature =
-    [
-      Types.Sig_module
-        ( Ident.create_local "Func",
-          Mp_present,
-          make_md functor_type,
-          Trec_not,
-          Exported );
-    ]
+      param_ids with_unit
   in
   let all_params =
     List.map
       (fun id -> GM.create_exn (Ident.name id) [] ~hidden_args:[])
-      param_globals_ordered
+      param_ids
   in
-  let all_modules =
-    (* For backwards compat with callers that read [all_modules] to compute
-       the impl-side topo: synthesize an intf_unit_info for each real module
-       interned.  We don't have the original ui_params for non-input deps,
-       so leave it empty (the impl phase will re-read the cmi anyway). *)
-    List.map
-      (fun name ->
-        let ui_unit =
-          match (load name).cu with Some cu -> cu | None -> assert false
-        in
-        let params = (load name).params in
-        { ui_unit; ui_params = params; ui_deps = [] })
-      bundle_names
-  in
-  { signature; all_params; all_modules }
+  { functor_type; all_params; all_modules = modules }
+
+(* Wrap [functor_type] in a single-element signature [Sig_module Func] —
+   the conventional shape of a bundle's saved cmi. *)
+let wrap_as_func_module (functor_type : Types.module_type) : Types.signature =
+  [
+    Types.Sig_module
+      ( Ident.create_local "Func",
+        Mp_present,
+        make_md functor_type,
+        Trec_not,
+        Exported );
+  ]
 
 let make_compilation_unit target =
   let output_basename = Filename.basename (Filename.remove_extension target) in
@@ -454,7 +373,8 @@ let functorize_intf initial_env files target =
   in
   Env.set_unit_name (Some unit_info);
   let src_infos = List.map read_intf_unit_info_of_cmi files in
-  let { signature = sg; _ } = compute_bundle_sig src_infos in
+  let { functor_type; _ } = compute_bundle_functor_type src_infos in
+  let sg = wrap_as_func_module functor_type in
   Misc.try_finally
     (fun () ->
       Typemod.functorize_interface initial_env ~sg unit_info compilation_unit)
@@ -474,15 +394,69 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
   let src_intfs =
     List.map (fun (impl : impl_unit_info) -> impl.intf) src_impls
   in
-  let { signature = sg; all_params; all_modules } =
-    compute_bundle_sig src_intfs
+  let { functor_type; all_params; all_modules } =
+    compute_bundle_functor_type src_intfs
   in
+  let sg = wrap_as_func_module functor_type in
   let modules_cu =
     List.map (fun (ui : intf_unit_info) -> ui.ui_unit) all_modules
   in
+  let target = info.target in
+  let modulename = info.module_name in
+  Ident.reinit ();
   let coercion =
-    Typemod.functorize_implementation initial_env ~sg ~modules:modules_cu
-      info.target info.module_name
+    if !Clflags.dont_write_files then Typedtree.Tcoerce_none
+    else
+      let save_cmt_cms cmi_opt =
+        let decl_deps = Cmt_format.get_declaration_dependencies () in
+        Cmt_format.save_cmt (Unit_info.cmt target) modulename
+          Cmt_format.Functorize initial_env cmi_opt None;
+        Cms_format.save_cms (Unit_info.cms target) modulename
+          Cmt_format.Functorize initial_env None decl_deps
+      in
+      match !Clflags.cmi_file with
+      | Some cmi_file ->
+        let shape =
+          let uid = Types.Uid.of_compilation_unit_id modulename in
+          List.fold_left
+            (fun map cu ->
+              let name = CU.name_as_string cu in
+              let id = Ident.create_persistent name in
+              Shape.Map.add_module map id (Shape.for_persistent_unit name))
+            Shape.Map.empty modules_cu
+          |> Shape.str ~uid
+        in
+        let for_pack_prefix = CU.for_pack_prefix modulename in
+        let cmi_artifact =
+          Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
+        in
+        let name = CU.to_global_name_without_prefix modulename in
+        let dclsig, staticity = Env.read_signature name cmi_artifact in
+        let cc, _shape =
+          let modes =
+            Includecore.Specific
+              ( (Env.mode_unit ~staticity:Mode.Staticity.Dynamic, None),
+                Env.mode_unit ~staticity )
+          in
+          Includemod.compunit initial_env ~mark:true
+            "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
+        in
+        save_cmt_cms None;
+        cc
+      | None ->
+        let name = CU.name modulename in
+        let kind =
+          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+        in
+        let cmi =
+          Env.save_signature_with_imports
+            ~alerts:Misc.Stdlib.String.Map.empty
+            (sg, Mode.Staticity.Dynamic)
+            name kind (Unit_info.cmi target)
+            (Array.of_list (Env.imports ()))
+        in
+        save_cmt_cms (Some cmi);
+        Typedtree.Tcoerce_none
   in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
     (* Locate each exposed module's impl: from [src_impls] (a user-provided
@@ -498,12 +472,6 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
     in
     let exposed_impls =
       List.map (fun (ui : intf_unit_info) -> find_impl ui.ui_unit) all_modules
-    in
-    let exposed_names =
-      List.fold_left
-        (fun acc (ui : intf_unit_info) ->
-          CU.Name.Set.add (CU.name ui.ui_unit) acc)
-        CU.Name.Set.empty all_modules
     in
     (* Phase B may discover impl-level deps that Phase A didn't surface (i.e.,
        a module's [cu_format] references a parameterised module that's not in
@@ -561,19 +529,63 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
         let name = CU.name_as_string impl.intf.ui_unit in
         dfs ~required_by:name name)
       exposed_impls;
-    let modules =
-      List.rev_map
-        (fun (impl : impl_unit_info) : Translmod.bundle_module ->
-          {
-            cu = impl.intf.ui_unit;
-            format = impl.ui_format;
-            exposed = CU.Name.Set.mem (CU.name impl.intf.ui_unit) exposed_names;
-          })
-        !topo
+    (* Functor parameter idents: one per [all_params], in declaration order. *)
+    let param_idents =
+      List.map (fun gm -> Ident.create_local (gm.GM.head ^ "_arg")) all_params
+    in
+    let param_map : Ident.t GM.Parameter_name.Map.t =
+      List.fold_left2
+        (fun m gm id ->
+          let p_name = GM.Parameter_name.of_string gm.GM.head in
+          GM.Parameter_name.Map.add p_name id m)
+        GM.Parameter_name.Map.empty
+        all_params param_idents
+    in
+    (* Build instantiations in runtime-dep order; populate [block_map]
+       incrementally so each module's runtime args can refer to earlier
+       let-bindings. *)
+    let block_map : (string, Ident.t) Hashtbl.t = Hashtbl.create 16 in
+    let instantiations =
+      List.map
+        (fun (impl : impl_unit_info) : Translmod.instantiation ->
+          let cu = impl.intf.ui_unit in
+          let cu_name = CU.name_as_string cu in
+          let ident = Ident.create_local (cu_name ^ "__block") in
+          let args : Translmod.runtime_arg list =
+            match impl.ui_format with
+            | Mb_struct _ -> []
+            | Mb_instantiating_functor { mb_runtime_params; _ } ->
+              List.map
+                (fun (rp : Lambda.runtime_param) : Translmod.runtime_arg ->
+                  match rp with
+                  | Rp_argument_block global -> (
+                    match GM.find_in_parameter_map global param_map with
+                    | Some id -> Lvar id
+                    | None ->
+                      Misc.fatal_errorf
+                        "transl_functorize: no argument-block mapping for %s"
+                        global.GM.head)
+                  | Rp_main_module_block global -> (
+                    match Hashtbl.find_opt block_map global.GM.head with
+                    | Some id -> Lvar id
+                    | None ->
+                      Misc.fatal_errorf
+                        "transl_functorize: missing block for dep module %s \
+                         (dependency ordering bug?)"
+                        global.GM.head)
+                  | Rp_unit -> Unit)
+                mb_runtime_params
+          in
+          Hashtbl.add block_map cu_name ident;
+          { ident; cu; args })
+        (List.rev !topo)
+    in
+    let exposed_modules =
+      List.map (fun (ui : intf_unit_info) -> ui.ui_unit) all_modules
     in
     let program =
-      Translmod.transl_functorize info.module_name ~all_params ~modules
-        ~coercion
+      Translmod.transl_functorize info.module_name ~params:param_idents
+        ~instantiations ~modules:exposed_modules ~coercion
     in
     compile_program info program
   end

@@ -53,6 +53,9 @@ type runtime_arg =
     }
   | (* A module to pass in its entirety *)
     Main_module_block of Compilation_unit.t
+  | (* An in-scope local ident — either a functor parameter or an earlier
+       let-binding.  Used by [transl_functorize] but not [transl_instance]. *)
+    Lvar of Ident.t
   | Unit
 
 val transl_instance:
@@ -61,21 +64,24 @@ val transl_instance:
         -> arg_block_idx:int option
         -> program
 
-type bundle_module = {
+type instantiation = {
+  ident : Ident.t;
+      (** The let-binding's local ident, the name dependents use to refer
+          to this instantiation in subsequent [instantiations]. *)
   cu : Compilation_unit.t;
-  format : main_module_block_format;
-  exposed : bool;
-      (** [true] iff [cu] is one of the bundle's exposed modules; [false] iff
-          [cu] is a hidden dep instantiated only to satisfy other modules'
-          runtime requirements.  Hidden modules are still bound at the top of
-          the bundle's functor body (so dependents can reference them) but
-          do not appear in the bundle's returned struct. *)
+      (** The compunit being instantiated; feeds into [required_globals]. *)
+  args : runtime_arg list;
+      (** [[]]: the compunit is a plain [Mb_struct] — emit [Pgetglobal cu].
+          Non-empty: the compunit is an [Mb_instantiating_functor] — emit an
+          [Lapply] of its instantiating functor with these arguments.  In a
+          functor body, [args] typically uses [Lvar] / [Unit]. *)
 }
 
 val transl_functorize:
       Compilation_unit.t
-        -> all_params:Global_module.t list
-        -> modules:bundle_module list
+        -> params:Ident.t list
+        -> instantiations:instantiation list
+        -> modules:Compilation_unit.t list
         -> coercion:module_coercion
         -> program
 

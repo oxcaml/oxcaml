@@ -1406,12 +1406,13 @@ type runtime_arg =
       ra_main_repr : module_representation;
     }
   | Main_module_block of Compilation_unit.t
+  | Lvar of Ident.t
   | Unit
 
 let unit_of_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
-  | Unit -> None
+  | Lvar _ | Unit -> None
 
 let transl_runtime_arg arg =
   match arg with
@@ -1421,6 +1422,8 @@ let transl_runtime_arg arg =
              Loc_unknown)
   | Main_module_block cu ->
       Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
+  | Lvar id ->
+      Lambda.Lvar id
   | Unit ->
       lambda_unit
 
@@ -1476,147 +1479,116 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
   transl_instance_impl instance_unit ~runtime_args
     ~main_module_block_repr ~arg_block_idx
 
-type bundle_module = {
+type instantiation = {
+  ident : Ident.t;
   cu : Compilation_unit.t;
-  format : main_module_block_format;
-  exposed : bool;
+  args : runtime_arg list;
 }
 
-(* Build a "bundle functor" Lambda.program for -functorize.
-   The output module is itself an instantiating functor: when applied to
-   concrete argument blocks for all parameters, it instantiates each module in
-   [modules] in topological order and returns a struct containing the
-   resulting blocks of the *exposed* modules.  Hidden modules
-   ([exposed=false]) are still instantiated and stored in [block_map] so
-   dependent exposed modules can reference them, but they don't appear in the
-   returned struct.
+let transl_instantiation_rhs cu args =
+  match args with
+  | [] -> Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
+  | _ :: _ ->
+    let func =
+      Lprim
+        ( mod_field 0 (Module_value_only { field_count = 1 }),
+          [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
+          Loc_unknown )
+    in
+    Lapply
+      { ap_func = func;
+        ap_args = List.map transl_runtime_arg args;
+        ap_result_layout = layout_module;
+        ap_loc = Loc_unknown;
+        ap_inlined = Always_inlined;
+        ap_tailcall = Default_tailcall;
+        ap_specialised = Default_specialise;
+        ap_mode = alloc_heap;
+        ap_region_close = Rc_normal;
+        ap_probe = None
+      }
 
-   [all_params] is the deduplicated list of Global_module.t values that appear
-   as Rp_argument_block entries across all modules, in first-encounter order.
-   [modules] is the full topologically-sorted list (deps before users). *)
-let transl_functorize compilation_unit ~all_params
-      ~(modules : bundle_module list) ~coercion
-    : program =
-  let module GM = Global_module in
-  (* One lambda ident per parameter, named after the parameter head *)
-  let param_globals_vars =
-    List.map
-      (fun global -> global, Ident.create_local (global.GM.head ^ "_arg"))
-      all_params
-  in
-  let unit_ident = Ident.create_local "*unit*" in
-  let param_map : lambda GM.Parameter_name.Map.t =
-    List.fold_left
-      (fun m (global, var) ->
-        let p_name = GM.Parameter_name.of_string global.GM.head in
-        GM.Parameter_name.Map.add p_name (Lvar var) m)
-      GM.Parameter_name.Map.empty
-      param_globals_vars
-  in
-  (* Maps module head name -> lambda for its already-instantiated block *)
-  let block_map : (string, lambda) Hashtbl.t = Hashtbl.create 16 in
-  let bindings =
-    List.map
-      (fun { cu; format = fmt; exposed } ->
-        let cu_name = Compilation_unit.name_as_string cu in
-        let block_var = Ident.create_local (cu_name ^ "__block") in
-        let call_lam =
-          match fmt with
-          | Mb_struct _ ->
-            Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
-          | Mb_instantiating_functor { mb_runtime_params; _ } ->
-            let func =
-              Lprim (
-                mod_field 0 (Module_value_only { field_count = 1 }),
-                [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
-                Loc_unknown)
-            in
-            let args =
-              List.map
-                (fun (rp : runtime_param) ->
-                  match rp with
-                  | Rp_argument_block global ->
-                    begin match GM.find_in_parameter_map global param_map with
-                    | Some lam -> lam
-                    | None ->
-                      Misc.fatal_errorf
-                        "transl_functorize: no argument-block mapping for %s"
-                        global.GM.head
-                    end
-                  | Rp_main_module_block global ->
-                    begin match Hashtbl.find_opt block_map global.GM.head with
-                    | Some lam -> lam
-                    | None ->
-                      Misc.fatal_errorf
-                        "transl_functorize: missing block for dep module %s \
-                         (dependency ordering bug?)"
-                        global.GM.head
-                    end
-                  | Rp_unit -> lambda_unit)
-                mb_runtime_params
-            in
-            Lapply {
-              ap_func = func;
-              ap_args = args;
-              ap_result_layout = layout_module;
-              ap_loc = Loc_unknown;
-              ap_inlined = Always_inlined;
-              ap_tailcall = Default_tailcall;
-              ap_specialised = Default_specialise;
-              ap_mode = alloc_heap;
-              ap_region_close = Rc_normal;
-              ap_probe = None;
-            }
-        in
-        Hashtbl.add block_map cu_name (Lvar block_var);
-        block_var, call_lam, exposed)
-      modules
+(* Build a "bundle functor" Lambda.program for -functorize.
+
+   - [params]: functor parameter idents in declaration order.
+   - [instantiations]: let-bindings at the top of the functor body, in
+     runtime-dependency order (each entry's rhs is already fully resolved
+     w.r.t. parameter and dep idents).
+   - [modules]: compunits to expose in the bundle's returned struct, in
+     [all_modules] order; each must correspond to one of the
+     [instantiations].
+   - [coercion]: coercion from the generated signature to the user's
+     specified signature (e.g. via [-cmi-file]). *)
+(* Build the body of the bundle's outer functor: a Llet chain over the
+   [instantiations] (deps first) culminating in a Pmakeblock that carries
+   one field per entry in [modules], in [modules] order.  Each module is
+   located in [instantiations] by compunit name. *)
+let functorize_bundle_body
+      ~(instantiations : instantiation list)
+      ~(modules : Compilation_unit.t list) : lambda =
+  let cu_to_ident : (string, Ident.t) Hashtbl.t = Hashtbl.create 16 in
+  List.iter
+    (fun { ident; cu; _ } ->
+      Hashtbl.replace cu_to_ident (Compilation_unit.name_as_string cu) ident)
+    instantiations;
+  let lookup_ident cu =
+    match
+      Hashtbl.find_opt cu_to_ident (Compilation_unit.name_as_string cu)
+    with
+    | Some id -> id
+    | None ->
+      Misc.fatal_errorf
+        "transl_functorize: exposed module %s not in instantiations"
+        (Compilation_unit.name_as_string cu)
   in
   let result_block =
-    Lprim (
-      Pmakeblock (0, Immutable, All_value, alloc_heap),
-      List.filter_map
-        (fun (v, _, exposed) -> if exposed then Some (Lvar v) else None)
-        bindings,
-      Loc_unknown)
+    Lprim
+      ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+        List.map (fun cu -> Lambda.Lvar (lookup_ident cu)) modules,
+        Loc_unknown )
   in
-  let body =
-    List.fold_right
-      (fun (v, rhs, _exposed) acc ->
-        Llet (Strict, layout_module, v, debug_uid_none, rhs, acc))
-      bindings
-      result_block
-  in
+  List.fold_right
+    (fun { ident; cu; args } acc ->
+      let rhs = transl_instantiation_rhs cu args in
+      Llet (Strict, layout_module, ident, debug_uid_none, rhs, acc))
+    instantiations result_block
+
+let transl_functorize compilation_unit
+      ~(params : Ident.t list)
+      ~(instantiations : instantiation list)
+      ~(modules : Compilation_unit.t list)
+      ~coercion : program =
+  let body = functorize_bundle_body ~instantiations ~modules in
   let mk_param layout name =
     { name;
       debug_uid = debug_uid_none;
       layout;
       attributes = default_param_attribute;
-      mode = alloc_heap }
+      mode = alloc_heap
+    }
   in
-  let params =
-    List.map (mk_param layout_module) (List.map snd param_globals_vars)
+  let unit_ident = Ident.create_local "*unit*" in
+  let func_params =
+    List.map (mk_param layout_module) params
     @ [mk_param layout_unit unit_ident]
   in
   let func =
-    lfunction
-      ~params
+    lfunction ~params:func_params
       ~kind:(Curried { nlocal = 0 })
       ~return:layout_module
-      ~attr:{ default_function_attribute with
-              is_a_functor = true;
-              inline = Always_inline }
-      ~loc:Loc_unknown
-      ~body
-      ~mode:alloc_heap
-      ~ret_mode:alloc_heap
+      ~attr:
+        { default_function_attribute with
+          is_a_functor = true;
+          inline = Always_inline
+        }
+      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let code =
     apply_coercion Loc_unknown Strict coercion
-      (Lprim (
-        Pmakeblock (0, Immutable, All_value, alloc_heap),
-        [func],
-        Loc_unknown))
+      (Lprim
+         ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+           [func],
+           Loc_unknown ))
   in
   let main_module_block_format =
     Mb_struct { mb_repr = Module_value_only { field_count = 1 } }
@@ -1624,14 +1596,14 @@ let transl_functorize compilation_unit ~all_params
   let required_globals =
     List.fold_left
       (fun set { cu; _ } -> Compilation_unit.Set.add cu set)
-      Compilation_unit.Set.empty
-      modules
+      Compilation_unit.Set.empty instantiations
   in
   { compilation_unit;
     main_module_block_format;
     arg_block_idx = None;
     required_globals;
-    code }
+    code
+  }
 
 (* Error report *)
 

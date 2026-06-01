@@ -92,14 +92,6 @@ val functorize_interface:
   Compilation_unit.t ->
   unit
 
-val functorize_implementation:
-  Env.t ->
-  sg:Types.signature ->
-  modules:Compilation_unit.t list ->
-  Unit_info.t ->
-  Compilation_unit.t ->
-  Typedtree.module_coercion
-
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:
   loc:Location.t ->
