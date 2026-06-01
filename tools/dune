@@ -171,7 +171,8 @@
 (executable
  (name ocamlfilt)
  (modes byte native)
- (modules ocamlfilt))
+ (modules ocamlfilt)
+ (libraries ocamlcommon))
 
 (install
  (files

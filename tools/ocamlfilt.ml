@@ -33,205 +33,34 @@
 (* Helper functions *)
 let is_digit = function '0' .. '9' -> true | _ -> false
 
-let incr_n r n = r := !r + n
-
 (** Structured name demangler
 
-    See [Structured_mangling] for a detailed explanation of that name-mangling
-    scheme *)
+    Parsing the mangled symbol into a {!Structured_mangling.Parsed.path} is
+    delegated to {!Structured_mangling.Parsed.parse}, so that the encoder and
+    decoder live next to each other and can be tested as inverses. This module
+    only chooses how to render the parsed path as human-readable text. *)
 module Structured = struct
-  (** {1 Identifier decoding} *)
+  let starts_with_prefix = Structured_mangling.Parsed.starts_with_prefix
 
-  let unbase26 str pos =
-    let rec aux n p =
-      match str.[p] with
-      | 'A' .. 'Z' ->
-        aux ((n * 26) + (Char.code str.[p] - Char.code 'A')) (p + 1)
-      | _ -> n, p - pos
-    in
-    match str.[pos] with
-    | '_' -> None
-    | 'A' .. 'Z' -> Some (aux 0 pos)
-    | _ -> invalid_arg "No base26 number to decode"
+  let format_anonymous_location prefix line col file_opt =
+    let file = Option.value ~default:"" file_opt in
+    Printf.sprintf "%s(%s:%d:%d)" prefix file line col
 
-  let unhex h1 h2 =
-    let value = function
-      | '0' .. '9' as c -> Char.code c - Char.code '0'
-      | 'a' .. 'f' as c -> Char.code c - Char.code 'a' + 10
-      | c ->
-        invalid_arg
-          (Printf.sprintf "Cannot decode as lowercase hexadecimal digit: %c" c)
-    in
-    Char.chr ((value h1 lsl 4) lor value h2)
+  let render_path_item (item : Structured_mangling.Parsed.path_item) =
+    match item with
+    | Compilation_unit s | Module s | Class s | Function s -> s
+    | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
+    | Anonymous_module (l, c, f) -> format_anonymous_location "mod" l c f
+    | Partial_function (l, c, f) -> format_anonymous_location "partial" l c f
+    (* Inline_marker: the function body was specialized (copied) into the
+       current compilation unit, not inlined at a particular call site, so we
+       print [<specialization_of>] rather than [<inlining>]. *)
+    | Inline_marker -> "<specialization_of>"
 
-  let unhexes buf str pos =
-    let rec loop i =
-      match str.[i] with
-      | '0' .. '9' | 'a' .. 'f' ->
-        Buffer.add_char buf (unhex str.[i] str.[i + 1]);
-        loop (i + 2)
-      | _ -> i - pos
-    in
-    loop pos
+  let pp_path (path, suffix) =
+    String.concat "." (List.map render_path_item path) ^ suffix
 
-  let undecimal str pos =
-    let rec len pos' =
-      if pos' < String.length str && is_digit str.[pos']
-      then len (pos' + 1)
-      else pos' - pos
-    in
-    match len pos with
-    | 0 -> None
-    | len ->
-      Option.map (fun n -> n, len) (int_of_string_opt (String.sub str pos len))
-
-  (* Decode a single identifier at position [pos] in string [str]. Return an
-     optional pair of the decoded identifier and its length *)
-  let rec decode str pos =
-    (* Check for escaping flag 'u' *)
-    let is_escaped = pos < String.length str && str.[pos] = 'u' in
-    let flag_len = if is_escaped then (* 'u' *) 1 else 0 in
-    (* Decode length *)
-    match undecimal str (pos + flag_len) with
-    | None -> None
-    | Some (payload_len, length_len) ->
-      let full_len = flag_len + length_len + payload_len in
-      if payload_len <= 0 || pos + full_len > String.length str
-      then None
-      else
-        let payload =
-          String.sub str (pos + flag_len + length_len) payload_len
-        in
-        Some
-          ( (if is_escaped then decode_split_parts payload else payload),
-            full_len )
-
-  and decode_split_parts sym =
-    let initial_raw_pos =
-      try String.index sym '_' + 1
-      with Not_found ->
-        invalid_arg
-          (Printf.sprintf "\"%s\" is not a valid component of a mangled name"
-             sym)
-    in
-    let res = Buffer.create (String.length sym) in
-    let esc_pos = ref 0
-    and raw_pos = ref initial_raw_pos in
-    let rec loop () =
-      match unbase26 sym !esc_pos with
-      | Some (nb, l) ->
-        if nb > 0
-        then (
-          Buffer.add_substring res sym !raw_pos nb;
-          incr_n raw_pos nb);
-        incr_n esc_pos l;
-        incr_n esc_pos (unhexes res sym !esc_pos);
-        loop ()
-      | None ->
-        let len = String.length sym - !raw_pos in
-        if len > 0 then Buffer.add_substring res sym !raw_pos len
-    in
-    loop ();
-    Buffer.contents res
-
-  (** {1 Pretty-printing function} *)
-
-  (* Format anonymous location from filename_line_col to
-     prefix(filename:line:col) *)
-  let format_anonymous_location prefix loc =
-    (* Find last two underscores *)
-    let len = String.length loc in
-    let rec find_underscores i count first second =
-      if i < 0
-      then first, second, count
-      else if loc.[i] = '_'
-      then
-        match count with
-        | 0 -> find_underscores (i - 1) 1 i second
-        | 1 -> find_underscores (i - 1) 2 i first
-        | _ -> first, second, count
-      else find_underscores (i - 1) count first second
-    in
-    let first, second, count = find_underscores (len - 1) 0 (-1) (-1) in
-    if count >= 2
-    then
-      let filename = String.sub loc 0 first in
-      let line = String.sub loc (first + 1) (second - first - 1) in
-      let col = String.sub loc (second + 1) (len - second - 1) in
-      Printf.sprintf "%s(%s:%s:%s)" prefix filename line col
-    else loc
-
-  (** {1 Path demangling} *)
-
-  (* Linux prefix *)
-  let ocaml_prefix = "_Caml"
-
-  (* macOS prefix with two underscores *)
-  let alternate_ocaml_prefix = "__Caml"
-
-  let starts_with_prefix sym =
-    String.starts_with ~prefix:ocaml_prefix sym
-    || String.starts_with ~prefix:alternate_ocaml_prefix sym
-
-  let unmangle_ident_exn sym =
-    let err () =
-      invalid_arg
-        (Printf.sprintf "not a valid runlength mangled symbol: \"%s\"" sym)
-    in
-    let start_pos =
-      String.length
-        (if String.starts_with ~prefix:ocaml_prefix sym
-         then ocaml_prefix
-         else if String.starts_with ~prefix:alternate_ocaml_prefix sym
-         then alternate_ocaml_prefix
-         else err ())
-    in
-    let result = Buffer.create 64 in
-    let add_sep buf = if Buffer.length buf > 0 then Buffer.add_char buf '.' in
-    let pos = ref start_pos in
-    let decode_next () =
-      match decode sym !pos with
-      | None -> err ()
-      | Some (decoded, l) ->
-        incr_n pos l;
-        decoded
-    in
-    (* Parse path items *)
-    while !pos < String.length sym && sym.[!pos] <> '_' do
-      let path_type = sym.[!pos] in
-      incr pos;
-      add_sep result;
-      match path_type with
-      | 'U' | 'M' | 'O' | 'F' ->
-        (* Compilation_unit, Module, Class or Function: add the corresponding
-           identifier as is *)
-        Buffer.add_string result (decode_next ())
-      | 'L' ->
-        (* Anonymous_function *)
-        Buffer.add_string result
-          (format_anonymous_location "fn" (decode_next ()))
-      | 'S' ->
-        (* Anonymous_module *)
-        Buffer.add_string result
-          (format_anonymous_location "mod" (decode_next ()))
-      | 'P' ->
-        (* Partial_function *)
-        Buffer.add_string result
-          (format_anonymous_location "partial" (decode_next ()))
-      | 'I' ->
-        (* Inline_marker: the function body was specialized (copied) into the
-           current compilation unit, not inlined at a particular call site, so
-           we print [<specialization_of>] rather than [<inlining>]. *)
-        Buffer.add_string result "<specialization_of>"
-      | _ -> err ()
-    done;
-    if !pos = start_pos then err ();
-    if !pos < String.length sym
-    then Buffer.add_substring result sym !pos (String.length sym - !pos);
-    Buffer.contents result
-
-  let unmangle sym =
-    try Some (unmangle_ident_exn sym) with Invalid_argument _ -> None
+  let unmangle sym = Option.map pp_path (Structured_mangling.Parsed.parse sym)
 end
 
 module FlatCommon = struct
@@ -472,34 +301,31 @@ let demangle_with_format format str =
   | Flat1 -> Flat1.unmangle str
   | Structured -> Structured.unmangle str
 
+(* Mirroring c++filt / rustfilt: print the demangled form when we recognise
+   the symbol, otherwise pass the input through unchanged. The exit code is
+   always 0 so the tool is safe to drop into a shell pipeline. *)
 let process_line format line =
   match demangle_with_format format line with
-  | Some demangled ->
-    print_endline demangled;
-    true
-  | None ->
-    Printf.eprintf "Failed to demangle: %s\n" line;
-    false
+  | Some demangled -> print_endline demangled
+  | None -> print_endline line
 
 let process_stdin format () =
-  let rec aux res =
+  let rec aux () =
     match In_channel.input_line In_channel.stdin with
-    | Some line -> aux (process_line format line && res)
-    | None -> res
+    | Some line ->
+      process_line format line;
+      aux ()
+    | None -> ()
   in
-  aux true
+  aux ()
 
-let process_symbols format symbols =
-  List.fold_left (fun res sym -> process_line format sym && res) true symbols
+let process_symbols format symbols = List.iter (process_line format) symbols
 
 let main format symbols =
   let format = Option.value ~default:Auto format in
-  if
-    not
-      (match symbols with
-      | [] -> process_stdin format ()
-      | symbols -> process_symbols format symbols)
-  then exit 1
+  match symbols with
+  | [] -> process_stdin format ()
+  | symbols -> process_symbols format symbols
 
 (* Command line interface *)
 let usage_msg =

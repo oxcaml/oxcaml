@@ -1,15 +1,18 @@
 #!/bin/sh
-# Test that ocamlfilt correctly rejects invalid symbols
+# Test that ocamlfilt correctly rejects invalid symbols. Like c++filt /
+# rustfilt, ocamlfilt passes unrecognised input through unchanged on stdout
+# rather than failing, so "rejected" here means "output equals input".
 OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
 
 check_reject () {
   format=$1
   input=$2
-  if ${OCAMLFILT} --format "$format" "$input" >/dev/null 2>&1; then
-    echo "UNEXPECTED PASS: $input"
-    exit 1
-  else
+  output=$(${OCAMLFILT} --format "$format" "$input" 2>/dev/null)
+  if [ "$output" = "$input" ]; then
     echo "rejected: $input"
+  else
+    echo "UNEXPECTED DEMANGLE: $input -> $output"
+    exit 1
   fi
 }
 

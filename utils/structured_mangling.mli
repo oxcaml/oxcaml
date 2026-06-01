@@ -79,3 +79,35 @@ type path = path_item list
 (** Transform a {!Compilation_unit.t} and a {!path} into a mangled name suitable
     for creating a {!LinkageName.t} *)
 val mangle_ident : Compilation_unit.t -> path -> string
+
+(** Inverse direction: parse a mangled symbol back into a structured path.
+    caller. *)
+module Parsed : sig
+  (** A parsed path item mirrors {!path_item}, except that the compilation unit
+      is represented as the raw decoded linkage string (it may still contain
+      [__] pack separators) since parsing cannot recover a
+      {!Compilation_unit.t}. *)
+  type path_item =
+    | Compilation_unit of string (* TODO Potential to use Compilation_unit.of_string and unify this type with earlier path_item *)
+    | Inline_marker
+    | Module of string
+    | Anonymous_module of int * int * string option
+    | Class of string
+    | Function of string
+    | Anonymous_function of int * int * string option
+    | Partial_function of int * int * string option
+
+  type path = path_item list
+
+  (** [starts_with_prefix sym] is [true] iff [sym] starts with one of the
+      prefixes the structured mangler emits ([_Caml] or its macOS-flavoured
+      [__Caml] variant). Useful for dispatching between mangling schemes
+      without committing to parsing the rest. *)
+  val starts_with_prefix : string -> bool
+
+  (** [parse sym] returns the structured path encoded by [sym] together with any
+      trailing suffix (e.g. [_<n>] ids appended by the compiler after the
+      mangled path). Accepts both [_Caml] and [__Caml] prefixes. Returns [None]
+      if [sym] is not a valid structured mangled symbol. *)
+  val parse : string -> (path * string) option
+end

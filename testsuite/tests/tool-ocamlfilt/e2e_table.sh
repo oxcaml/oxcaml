@@ -37,8 +37,17 @@ EXCLUDE=${2:?"missing exclude-pattern argument"}
 OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
 TAB="$(printf '\t')"
 
+# ocamlfilt mirrors c++filt and passes unrecognised input through unchanged
+# on stdout. For this table we want to distinguish "format X demangled the
+# symbol" from "format X did not recognise it", so we re-emit [(error)]
+# whenever the output equals the input.
 ocamlfilt_or_error () {
-  "$OCAMLFILT" --format "$1" "$2" 2>/dev/null || echo "(error)"
+  out=$("$OCAMLFILT" --format "$1" "$2" 2>/dev/null)
+  if [ "$out" = "$2" ]; then
+    echo "(error)"
+  else
+    echo "$out"
+  fi
 }
 
 SYMS="${test_build_directory}/e2e_table.syms"
