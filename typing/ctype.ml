@@ -4209,6 +4209,16 @@ let rec mcomp type_pairs env t1 t2 =
           mcomp type_pairs (incr_stage env) (new_splice_ty t1') s2
         | (_, Tsplice s2, _, _) when target2 ->
           mcomp type_pairs (decr_stage env) (new_quote_ty t1') s2
+        | (Tbox t, Tconstr (p, args, _), _, _)
+        | (Tconstr (p, args, _), Tbox t, _, _) ->
+          begin match Env.find_type p env with
+          | { type_unboxed_version = Some _ } ->
+            mcomp type_pairs env
+              (newconstr (Path.unboxed_version p) args) t
+          | ({ type_unboxed_version = None } as decl)->
+            if is_aliasable p decl then () else raise Incompatible
+          | exception Not_found -> ()
+          end
         (* Flexible cases *)
         (* - If [flexible1], then [t1'] is now a [Tvar].
            - If [flexible2], then [t2'] is now a [Tvar]. *)
@@ -4256,6 +4266,14 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
+        | (Tbox t1, Tbox t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tbox t, Ttuple tl, _, _) ->
+            mcomp type_pairs env t
+              (newty2 ~level:(get_level t2') (Tunboxed_tuple tl))
+        | (Ttuple tl, Tbox t, _, _) ->
+            mcomp type_pairs env t
+              (newty2 ~level:(get_level t1') (Tunboxed_tuple tl))
         | (Tnil, Tnil, _, _) ->
             ()
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
