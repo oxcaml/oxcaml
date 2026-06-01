@@ -970,14 +970,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         (List.combine (List.combine stl args) params);
       let constr =
         newconstr path (List.map (fun ctyp -> ctyp.ctyp_type) args) in
-      (* Eagerly expand if this is a box_ type alias *)
-      let constr =
-        match decl.type_manifest with
-        | Some manifest when
-            (match get_desc manifest with Tbox _ -> true | _ -> false) ->
-            Ctype.expand_head env constr
-        | _ -> constr
-      in
       ctyp (Ttyp_constr (path, lid, args)) constr
   | Ptyp_object (fields, o) ->
       let ty, fields = transl_fields env ~policy ~row_context o fields in
