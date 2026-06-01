@@ -193,14 +193,6 @@ module type Sort = sig
     (** These names are generated lazily and only when this function is called,
         and are not guaranteed to be efficient to create *)
     val name : var -> string
-
-    val equal : var -> var -> bool
-
-    val compare : var -> var -> int
-
-    val output : out_channel -> var -> unit
-
-    val print : Format.formatter -> var -> unit
   end
 
   val void : t

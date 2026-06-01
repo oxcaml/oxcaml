@@ -1,6 +1,6 @@
 (* TEST
  flags = "-extension layout_poly_alpha";
- expect;
+ expect.opt;
 *)
 
 (* CR-soon zqian: Layout poly currently raises in lambda and middle-end.
@@ -8,11 +8,6 @@ Therefore, in the following typing tests, we intentionally write the wrong
 signature such that the inferred signature can be printed and inspected, and we
 never go to lambda. We should add the corresponding positive tests once they can
 go through lambda and middle-end. *)
-
-let poly_ id x = x
-[%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
-|}]
 
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
@@ -450,8 +445,8 @@ val b : float# = <abstr>
 
 (* closure conversion - uniform block *)
 let #(a, b) =
-  let x = Sys.opaque_identity true in
-  let y = Sys.opaque_identity "true" in
+  let x = true in
+  let y = "true" in
   let poly_ f z = if x then #(y, z) else #("false", z) in
   #(f 1, f #2L)
 [%%expect{|
@@ -461,8 +456,8 @@ val b : #(string * int64#) = #("true", <abstr>)
 
 (* closure conversion - mixed block *)
 let #(a, b) =
-  let x = Sys.opaque_identity true in
-  let y = Sys.opaque_identity #1s in
+  let x = true in
+  let y = #1s in
   let poly_ f z = if x then #(y, z) else #(#2s, z) in
   #(f 1, f #2L)
 

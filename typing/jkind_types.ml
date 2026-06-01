@@ -375,16 +375,6 @@ module Sort = struct
 
     let name { id; _ } =
       "'_representable_layout_" ^ Int.to_string (get_print_number id)
-
-    let equal = ( == )
-
-    let compare { id = a; _ } { id = b; _ } = Int.compare a b
-
-    let output oc { id; _ } =
-      output_string oc "l_";
-      output_binary_int oc id
-
-    let print ppf { id; _ } = Format.fprintf ppf "layout_%i" id
   end
 
   (*** debug printing **)
