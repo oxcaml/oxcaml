@@ -81,7 +81,7 @@ val transl_functorize:
       Compilation_unit.t
         -> params:Ident.t list
         -> instantiations:instantiation list
-        -> modules:Compilation_unit.t list
+        -> modules:Ident.t list
         -> coercion:module_coercion
         -> program
 

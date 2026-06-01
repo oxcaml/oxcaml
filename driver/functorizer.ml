@@ -213,6 +213,66 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~bundle
   let bundle = bundle @ [{ bm_id = new_id; bm_sign = sign }] in
   bundle, bindings
 
+(* Insert an instantiation for compunit [name] into [instantiations] and
+   return its Local Ident.  Idempotent: if [name] is already in [bindings],
+   returns the existing Ident without modifying [instantiations].
+   Otherwise looks up [name]'s impl via [find_impl_unit_info_by_name],
+   recursively inserts any [Rp_main_module_block] runtime dep not already
+   in [bindings], then appends a fresh entry.
+
+   The caller must pre-register every functor parameter ident in
+   [bindings] under the parameter's name. *)
+let rec insert_instantiation ~name ~find_impl_unit_info_by_name
+    ~instantiations ~bindings =
+  match Bindings.find_opt name bindings with
+  | Some id -> id, instantiations, bindings
+  | None ->
+    let impl =
+      try find_impl_unit_info_by_name name
+      with Not_found ->
+        Location.raise_errorf ~loc:Location.none
+          "Cannot find impl for module '%s'." name
+    in
+    let new_id = Ident.create_local (name ^ "__block") in
+    let bindings = Bindings.add name new_id bindings in
+    let runtime_params =
+      match impl.ui_format with
+      | Mb_struct _ -> []
+      | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
+    in
+    let instantiations, bindings =
+      List.fold_left
+        (fun (instantiations, bindings) (rp : Lambda.runtime_param) ->
+          match rp with
+          | Rp_main_module_block global ->
+            let _, instantiations, bindings =
+              insert_instantiation ~name:global.GM.head
+                ~find_impl_unit_info_by_name ~instantiations ~bindings
+            in
+            instantiations, bindings
+          | Rp_argument_block _ | Rp_unit -> instantiations, bindings)
+        (instantiations, bindings) runtime_params
+    in
+    let resolve_lvar head =
+      match Bindings.find_opt head bindings with
+      | Some id -> id
+      | None ->
+        Misc.fatal_errorf "insert_instantiation: %s not in bindings" head
+    in
+    let args =
+      List.map
+        (fun (rp : Lambda.runtime_param) : Translmod.runtime_arg ->
+          match rp with
+          | Rp_argument_block global -> Lvar (resolve_lvar global.GM.head)
+          | Rp_main_module_block global -> Lvar (resolve_lvar global.GM.head)
+          | Rp_unit -> Unit)
+        runtime_params
+    in
+    let inst : Translmod.instantiation =
+      { ident = new_id; cu = impl.intf.ui_unit; args }
+    in
+    new_id, instantiations @ [inst], bindings
+
 let make_md md_type : Types.module_declaration =
   {
     md_type;
@@ -459,133 +519,47 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
         Typedtree.Tcoerce_none
   in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
-    (* Locate each exposed module's impl: from [src_impls] (a user-provided
-       input), or via [find_impl_unit_info_by_name] (a transitive dep that
-       Phase A discovered from cmi_globals). *)
-    let find_impl ui_unit =
-      try
-        List.find
-          (fun (impl : impl_unit_info) -> CU.equal impl.intf.ui_unit ui_unit)
-          src_impls
-      with Not_found ->
-        find_impl_unit_info_by_name (CU.name_as_string ui_unit)
-    in
-    let exposed_impls =
-      List.map (fun (ui : intf_unit_info) -> find_impl ui.ui_unit) all_modules
-    in
-    (* Phase B may discover impl-level deps that Phase A didn't surface (i.e.,
-       a module's [cu_format] references a parameterised module that's not in
-       its [cmi_globals]).  These are hidden deps: they're instantiated once
-       inside the bundle's body so other modules can reference them, but they
-       don't appear in the bundle's returned struct.  In practice this branch
-       is rarely taken — the type-checker's [penv.globals] usually captures
-       every parameterised reference, so [cmi_globals] is a superset of impl
-       deps. *)
-    let impl_deps_of (impl : impl_unit_info) =
-      match impl.ui_format with
-      | Mb_struct _ -> []
-      | Mb_instantiating_functor { mb_runtime_params; _ } ->
-          List.filter_map
-            (fun (rp : Lambda.runtime_param) ->
-              match rp with
-              | Rp_main_module_block global -> Some global.GM.head
-              | Rp_argument_block _ | Rp_unit -> None)
-            mb_runtime_params
-    in
-    (* DFS from exposed_impls following impl_deps_of edges; load hidden deps
-       on demand.  Output is a topologically sorted list in which every
-       module's runtime deps appear before it. *)
-    let loaded : (string, impl_unit_info) Hashtbl.t = Hashtbl.create 16 in
-    List.iter
-      (fun (impl : impl_unit_info) ->
-        Hashtbl.replace loaded (CU.name_as_string impl.intf.ui_unit) impl)
-      exposed_impls;
-    let visited : (string, unit) Hashtbl.t = Hashtbl.create 16 in
-    let topo : impl_unit_info list ref = ref [] in
-    let rec dfs ~required_by name =
-      if not (Hashtbl.mem visited name) then begin
-        Hashtbl.add visited name ();
-        let impl =
-          match Hashtbl.find_opt loaded name with
-          | Some impl -> impl
-          | None ->
-              let impl =
-                try find_impl_unit_info_by_name name
-                with Not_found ->
-                  Location.raise_errorf ~loc:Location.none
-                    "Cannot find '%s' for module '%s',@ required by '%s'."
-                    (String.uncapitalize_ascii name)
-                    name required_by
-              in
-              Hashtbl.add loaded name impl;
-              impl
-        in
-        List.iter (dfs ~required_by:name) (impl_deps_of impl);
-        topo := impl :: !topo
-      end
-    in
-    List.iter
-      (fun (impl : impl_unit_info) ->
-        let name = CU.name_as_string impl.intf.ui_unit in
-        dfs ~required_by:name name)
-      exposed_impls;
     (* Functor parameter idents: one per [all_params], in declaration order. *)
     let param_idents =
       List.map (fun gm -> Ident.create_local (gm.GM.head ^ "_arg")) all_params
     in
-    let param_map : Ident.t GM.Parameter_name.Map.t =
+    let initial_bindings =
       List.fold_left2
-        (fun m gm id ->
-          let p_name = GM.Parameter_name.of_string gm.GM.head in
-          GM.Parameter_name.Map.add p_name id m)
-        GM.Parameter_name.Map.empty
-        all_params param_idents
+        (fun bindings gm id -> Bindings.add gm.GM.head id bindings)
+        empty_bindings all_params param_idents
     in
-    (* Build instantiations in runtime-dep order; populate [block_map]
-       incrementally so each module's runtime args can refer to earlier
-       let-bindings. *)
-    let block_map : (string, Ident.t) Hashtbl.t = Hashtbl.create 16 in
-    let instantiations =
-      List.map
-        (fun (impl : impl_unit_info) : Translmod.instantiation ->
-          let cu = impl.intf.ui_unit in
-          let cu_name = CU.name_as_string cu in
-          let ident = Ident.create_local (cu_name ^ "__block") in
-          let args : Translmod.runtime_arg list =
-            match impl.ui_format with
-            | Mb_struct _ -> []
-            | Mb_instantiating_functor { mb_runtime_params; _ } ->
-              List.map
-                (fun (rp : Lambda.runtime_param) : Translmod.runtime_arg ->
-                  match rp with
-                  | Rp_argument_block global -> (
-                    match GM.find_in_parameter_map global param_map with
-                    | Some id -> Lvar id
-                    | None ->
-                      Misc.fatal_errorf
-                        "transl_functorize: no argument-block mapping for %s"
-                        global.GM.head)
-                  | Rp_main_module_block global -> (
-                    match Hashtbl.find_opt block_map global.GM.head with
-                    | Some id -> Lvar id
-                    | None ->
-                      Misc.fatal_errorf
-                        "transl_functorize: missing block for dep module %s \
-                         (dependency ordering bug?)"
-                        global.GM.head)
-                  | Rp_unit -> Unit)
-                mb_runtime_params
+    (* Locate each module's impl: from [src_impls] (a user-provided input) by
+       name, or via [find_impl_unit_info_by_name] (a transitive dep loaded
+       from the load path). *)
+    let find_impl_by_name name =
+      try
+        List.find
+          (fun (impl : impl_unit_info) ->
+            String.equal (CU.name_as_string impl.intf.ui_unit) name)
+          src_impls
+      with Not_found -> find_impl_unit_info_by_name name
+    in
+    (* Iterate [all_modules] (cmi-level topo order).  [insert_instantiation]
+       pulls in any transitive impl-level deps (e.g., a [Rp_main_module_block]
+       that Phase A's cmi_globals walk didn't surface) and returns the
+       module's Local Ident — which we collect into [exposed_idents] for
+       the bundle's returned struct. *)
+    let instantiations, _bindings, exposed_idents_rev =
+      List.fold_left
+        (fun (instantiations, bindings, ids) (ui : intf_unit_info) ->
+          let name = CU.name_as_string ui.ui_unit in
+          let id, instantiations, bindings =
+            insert_instantiation ~name
+              ~find_impl_unit_info_by_name:find_impl_by_name ~instantiations
+              ~bindings
           in
-          Hashtbl.add block_map cu_name ident;
-          { ident; cu; args })
-        (List.rev !topo)
+          instantiations, bindings, id :: ids)
+        ([], initial_bindings, []) all_modules
     in
-    let exposed_modules =
-      List.map (fun (ui : intf_unit_info) -> ui.ui_unit) all_modules
-    in
+    let exposed_idents = List.rev exposed_idents_rev in
     let program =
       Translmod.transl_functorize info.module_name ~params:param_idents
-        ~instantiations ~modules:exposed_modules ~coercion
+        ~instantiations ~modules:exposed_idents ~coercion
     in
     compile_program info program
   end

@@ -1521,30 +1521,14 @@ let transl_instantiation_rhs cu args =
      specified signature (e.g. via [-cmi-file]). *)
 (* Build the body of the bundle's outer functor: a Llet chain over the
    [instantiations] (deps first) culminating in a Pmakeblock that carries
-   one field per entry in [modules], in [modules] order.  Each module is
-   located in [instantiations] by compunit name. *)
+   one field per ident in [modules], in [modules] order. *)
 let functorize_bundle_body
       ~(instantiations : instantiation list)
-      ~(modules : Compilation_unit.t list) : lambda =
-  let cu_to_ident : (string, Ident.t) Hashtbl.t = Hashtbl.create 16 in
-  List.iter
-    (fun { ident; cu; _ } ->
-      Hashtbl.replace cu_to_ident (Compilation_unit.name_as_string cu) ident)
-    instantiations;
-  let lookup_ident cu =
-    match
-      Hashtbl.find_opt cu_to_ident (Compilation_unit.name_as_string cu)
-    with
-    | Some id -> id
-    | None ->
-      Misc.fatal_errorf
-        "transl_functorize: exposed module %s not in instantiations"
-        (Compilation_unit.name_as_string cu)
-  in
+      ~(modules : Ident.t list) : lambda =
   let result_block =
     Lprim
       ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-        List.map (fun cu -> Lambda.Lvar (lookup_ident cu)) modules,
+        List.map (fun id -> Lambda.Lvar id) modules,
         Loc_unknown )
   in
   List.fold_right
@@ -1556,7 +1540,7 @@ let functorize_bundle_body
 let transl_functorize compilation_unit
       ~(params : Ident.t list)
       ~(instantiations : instantiation list)
-      ~(modules : Compilation_unit.t list)
+      ~(modules : Ident.t list)
       ~coercion : program =
   let body = functorize_bundle_body ~instantiations ~modules in
   let mk_param layout name =

@@ -99,6 +99,19 @@ val insert_module :
           - failing (parameter compunit, caller bug);
           - leaving the reference as a global (plain compunit). *)
 
+val insert_instantiation :
+  name:string ->
+  find_impl_unit_info_by_name:(string -> impl_unit_info) ->
+  instantiations:Translmod.instantiation list ->
+  bindings:bindings ->
+  Ident.t * Translmod.instantiation list * bindings
+(** Impl-side analogue of [insert_module].  Idempotent: if [name] is
+    already in [bindings], returns the existing Ident.  Otherwise looks up
+    [name]'s [impl_unit_info] via the callback, recursively inserts any
+    [Rp_main_module_block] runtime dep, and appends a fresh
+    [Translmod.instantiation].  The caller must pre-register every functor
+    parameter ident in [bindings] under the parameter's name. *)
+
 type bundle_sig = {
   body : Types.signature;
       (** [Sig_module] entries for each bundled module, in topo order. *)
