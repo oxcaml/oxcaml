@@ -481,26 +481,13 @@ module type S =
   sig val foo1 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
 |}]
 
-(* Fresh layout variables assigned as kinds for type variables specifically
-   introduced in the type scheme *)
+(* When quantified, type variables still have kind value *)
 module type S = sig
   val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
 end
 [%%expect {|
-module type S =
-  sig val foo2 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
+module type S = sig val foo2 : 'a -> 'b -> #('a * 'b) end
 |}]
-
-(* The ordering of the explicitly-quantified type variables matters most in
-   determining the order of layouts. *)
-module type S = sig
-  val poly_ ordering : 'a 'b. 'b -> 'a
-end
-[%%expect {|
-module type S =
-  sig val ordering : layout_ l l0. ('b : l0) ('a : l). 'b -> 'a end
-|}]
-
 
 (* Type scheme with a subset of polymorphic type variables that are explicitly
    forall-bound *)
@@ -509,15 +496,15 @@ module type S = sig
 end
 [%%expect {|
 module type S =
-  sig val foo3 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
+  sig val foo3 : layout_ l. ('a : value) ('b : l). 'a -> 'b -> #('a * 'b) end
 |}]
 
 module type S = sig
-  val poly_ foo4 : 'a. 'a -> 'b -> #('a * 'b)
+  val poly_ foo4 : 'a. 'b -> 'a -> #('a * 'b)
 end
 [%%expect {|
 module type S =
-  sig val foo4 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
+  sig val foo4 : layout_ l. ('b : l) ('a : value). 'b -> 'a -> #('a * 'b) end
 |}]
 
 (* Interaction between "val poly_" and "layout_". Currently errors.
@@ -534,7 +521,7 @@ Error: The "layout_" keyword is not supported inside layout-polymorphic
        value descriptions introduced using "val poly_".
 |}]
 
-(* Interaction with type variables that are constrained. *)
+(* Interaction with type variables that are explicitly constrained. *)
 module type S = sig
   val poly_ baz1 : 'a ('b : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
 end
@@ -542,8 +529,8 @@ end
 module type S =
   sig
     val baz1 :
-      layout_ l l0.
-        ('a : l) ('b : immediate) ('c : l0).
+      layout_ l.
+        ('a : value) ('b : immediate) ('c : l).
           'a -> #('b * 'c) -> #('a * 'b * 'c)
   end
 |}]
@@ -555,8 +542,8 @@ end
 module type S =
   sig
     val baz2 :
-      layout_ l l0.
-        ('a : immediate) ('b : l) ('c : l0).
+      layout_ l.
+        ('a : immediate) ('b : value) ('c : l).
           'a -> #('b * 'c) -> #('a * 'b * 'c)
   end
 |}]
@@ -568,8 +555,8 @@ end
 module type S =
   sig
     val baz3 :
-      layout_ l l0.
-        ('b : l) ('a : immediate) ('c : l0).
+      layout_ l.
+        ('b : value) ('a : immediate) ('c : l).
           'b -> #('a * 'c) -> #('b * 'a * 'c)
   end
 |}]
@@ -580,10 +567,7 @@ end
 [%%expect {|
 module type S =
   sig
-    val baz4 :
-      layout_ l l0.
-        ('b : l) ('a : immediate) ('c : l0).
-          'b -> #('a * 'c) -> #('b * 'a * 'c)
+    val baz4 : 'b ('a : immediate) 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
   end
 |}]
 
@@ -601,28 +585,31 @@ module type S =
 |}]
 
 (* "value" is special and usually a default.
-   It is not a default inside "val poly_". *)
+   It is still a default when quantified in "val poly_" type schemes. *)
 module type S = sig
-  val poly_ baz6 : ('a : value) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+  val poly_ baz6 : ('a : value) 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
 end
 [%%expect {|
 module type S =
   sig
     val baz6 :
-      layout_ l. ('a : value) ('b : l). 'a -> #('a * 'b) -> #('a * 'b)
+      layout_ l.
+        ('a : value) ('b : value) ('c : l).
+          'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
-(* "value_or_null" should be printed *)
+(* "value_or_null" gets swallowed *)
 module type S = sig
-  val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b) -> #('a * 'b)
+  val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
 end
 [%%expect {|
 module type S =
   sig
     val baz7 :
       layout_ l.
-        ('a : value_or_null) ('b : l). 'a -> #('a * 'b) -> #('a * 'b)
+        ('a : value_or_null) ('b : value) ('c : l).
+          'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
