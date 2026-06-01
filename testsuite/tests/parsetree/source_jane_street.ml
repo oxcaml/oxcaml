@@ -1721,13 +1721,16 @@ Uncaught exception: Misc.Fatal_error
 
 module type S_poly = sig
   val poly_ f : 'a. 'a -> 'a
-  val poly_ g : 'a 'b. 'a -> 'b -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+  val poly_ h : 'a -> 'b -> 'a
 end
 [%%expect{|
 module type S_poly =
   sig
-    val f : layout_ l. ('a : l). 'a -> 'a
-    val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+    val f : 'a -> 'a
+    val g :
+      layout_ l. ('a : value) ('b : value) ('c : l). 'a -> 'b -> 'c -> 'a
+    val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
   end
 |}]
 

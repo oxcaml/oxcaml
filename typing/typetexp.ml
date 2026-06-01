@@ -59,10 +59,6 @@ type valdecl_lpoly_flag =
   | Lpoly
   | Lmono
 
-let is_poly_valdecl = function
-  | Lpoly -> true
-  | Lmono -> false
-
 (* a description of the jkind on an explicitly quantified universal
    variable, containing whether the jkind was a default
    (e.g. [let f : 'a. 'a -> 'a = ...]) or explicit
@@ -1652,8 +1648,8 @@ let transl_type_scheme_mono env styp =
   remove_mode_and_jkind_variables typ.ctyp_type;
   typ
 
-let transl_type_scheme_poly env attrs loc vars inner_type =
-  let typed_vars, univars, typ =
+let transl_type_scheme_poly ~generalize_layouts env attrs loc vars inner_type =
+  let run () =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
       let vars = List.map (fun (n, jkind) -> (n, jkind, Env.stage env)) vars in
@@ -1670,67 +1666,45 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       in
       (typed_vars, univars, typ)
     end
-    ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
+      ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
+  in
+  let (typed_vars, univars, typ), sort_vars =
+    if generalize_layouts then Jkind_types.Sort.generalize_with run
+    else run (), []
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
   remove_mode_and_jkind_variables typ.ctyp_type;
-  { ctyp_desc = Ttyp_poly (typed_vars, typ);
-    ctyp_type = typ.ctyp_type;
-    ctyp_env = env;
-    ctyp_loc = loc;
-    ctyp_attributes = attrs }
+  (sort_vars,
+   { ctyp_desc = Ttyp_poly (typed_vars, typ);
+     ctyp_type = typ.ctyp_type;
+     ctyp_env = env;
+     ctyp_loc = loc;
+     ctyp_attributes = attrs })
 
 let transl_type_scheme_lmono env styp =
   match styp.ptyp_desc with
   | Ptyp_poly (vars, st) ->
-    transl_type_scheme_poly env styp.ptyp_attributes
-      styp.ptyp_loc vars st
+    transl_type_scheme_poly ~generalize_layouts:false env
+      styp.ptyp_attributes styp.ptyp_loc vars st
   | _ ->
-    transl_type_scheme_mono env styp
+    [], transl_type_scheme_mono env styp
 
 let transl_type_scheme_poly_val env styp =
-  let vars, styp =
-    match styp.ptyp_desc with
-    | Ptyp_poly (vars, styp) -> vars, styp
-    | _ -> [], styp
-  in
-  let cty, preregistered =
-    with_local_level
-      begin fun () ->
-        TyVarEnv.reset ();
-        let preregistered =
-          List.map
-            (fun (name_loc, jkind_opt) ->
-              let name = name_loc.txt in
-              let jkind =
-                match jkind_opt with
-                | Some jkind_annot ->
-                  jkind_of_annotation env
-                    (Type_variable ("'" ^ name)) [] jkind_annot
-                | None ->
-                  let level = get_current_level () in
-                  Jkind.of_new_legacy_sort ~why:Unification_var ~level
-              in
-              let var = newvar ~name jkind in
-              TyVarEnv.add name var jkind (Env.stage env);
-              var)
-            vars
-        in
-        let cty =
+  let (vars_free, cty), body_sort_vars =
+    Jkind_types.Sort.generalize_with (fun () ->
+      with_local_level begin fun () ->
+        match styp.ptyp_desc with
+        | Ptyp_poly (vars, styp) ->
+          transl_type_scheme_poly ~generalize_layouts:true env
+            styp.ptyp_attributes styp.ptyp_loc vars styp
+        | _ ->
+          [],
           transl_simple_type ~new_var_jkind:Sort env ~closed:false
             Alloc.Const.legacy styp
-        in
-        cty, preregistered
       end
-      ~post:(fun (cty, _) -> generalize_ctyp cty)
+        ~post:(fun (_, cty) -> generalize_ctyp cty))
   in
-  let ty = cty.ctyp_type in
-  let declared_sort_vars =
-    List.concat_map generalize_layout_variables preregistered
-  in
-  let ety = Subst.type_expr Subst.identity ty in
-  let body_sort_vars = generalize_layout_variables ety in
-  let sort_vars = declared_sort_vars @ body_sort_vars in
+  let sort_vars = vars_free @ body_sort_vars in
   let vars_names_loc =
     List.map (fun v -> mknoloc (Jkind_types.Sort.Var.name v)) sort_vars
   in
@@ -1750,7 +1724,8 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         (env', (id, v) :: pairs))
       (env, []) vars
     in
-    let cty = transl_type_scheme_lmono env' inner_type in
+    let vars_empty, cty = transl_type_scheme_lmono env' inner_type in
+    assert (List.is_empty vars_empty);
     let ty = cty.ctyp_type in
     (* Replace references to the ident with a Var at generic_level *)
     let seen = Hashtbl.create 8 in
@@ -1795,18 +1770,18 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
   end
 
 let transl_type_scheme env styp valdecl_flag =
-  let is_val_poly = is_poly_valdecl valdecl_flag in
-  match styp.ptyp_desc with
-  | Ptyp_newlayout (vars, st) ->
+  match styp.ptyp_desc, valdecl_flag with
+  | Ptyp_newlayout _, Lpoly ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
       Language_extension.Alpha;
-    if is_val_poly then
-      raise (Error (styp.ptyp_loc, env, Val_poly_and_layout));
+    raise (Error (styp.ptyp_loc, env, Val_poly_and_layout));
+  | Ptyp_newlayout (vars, st), Lmono ->
+    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
+      Language_extension.Alpha;
     transl_type_scheme_newlayout env styp.ptyp_attributes
       styp.ptyp_loc vars st
-  | _ ->
-    if is_val_poly then transl_type_scheme_poly_val env styp
-    else [], transl_type_scheme_lmono env styp
+  | _, Lpoly -> transl_type_scheme_poly_val env styp
+  | _, Lmono -> transl_type_scheme_lmono env styp
 
 (* Error report *)
 
