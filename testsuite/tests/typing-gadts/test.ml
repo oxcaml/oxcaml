@@ -643,7 +643,13 @@ let f (type a) (x : a t) y =
     in M.z
 ;;
 [%%expect{|
-val f : 'a t -> 'a -> 'a = <fun>
+Line 3, characters 46-47:
+3 |     let module M = struct type b = a let z = (y : b) end
+                                                  ^
+Error: This expression has type "'a" but an expression was expected of type
+         "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
 |}];;
 
 let f (type a) (x : a t) y =
