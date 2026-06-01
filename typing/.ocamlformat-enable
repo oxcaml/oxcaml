@@ -24,6 +24,8 @@ vicuna_traverse_typed_tree.ml
 vicuna_traverse_typed_tree.mli
 type_shape.mli
 type_shape.ml
+debug_variable_availability.ml
+debug_variable_availability.mli
 scalar.ml
 scalar.mli
 ikinds/*

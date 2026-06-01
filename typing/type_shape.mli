@@ -128,3 +128,8 @@ val print_table_all_type_decls : Format.formatter -> unit
 val print_table_all_type_shapes : Format.formatter -> unit
 
 val print_debug_uid_tables : Format.formatter -> unit
+
+(** Instance of the [Variable_availability] diagnostic, owned by this module.
+    Holds the table of registered source variables and observation points. *)
+module Variable_availability :
+  Variable_availability.S with type uid = Shape.Uid.t and type loc = Location.t

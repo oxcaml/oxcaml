@@ -937,6 +937,10 @@ let mk_dletreclambda f =
   "-dletreclambda", Arg.Unit f,
   " Dump Lambda terms going into Value_rec_compiler"
 
+let mk_dvariable_availability f =
+  "-dvariable-availability", Arg.Unit f,
+  " Dump source-variable availability across compilation passes"
+
 let mk_drawclambda f =
   "-drawclambda", Arg.Unit f, " (undocumented)"
 
@@ -1214,6 +1218,7 @@ module type Core_options = sig
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
   val _dletreclambda : unit -> unit
+  val _dvariable_availability : unit -> unit
 
 end
 
@@ -1612,6 +1617,7 @@ struct
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
     mk_dletreclambda F._dletreclambda;
+    mk_dvariable_availability F._dvariable_availability;
     mk_dinstr F._dinstr;
     mk_dcamlprimc F._dcamlprimc;
     mk_dtimings F._dtimings;
@@ -1720,6 +1726,7 @@ struct
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
     mk_dletreclambda F._dletreclambda;
+    mk_dvariable_availability F._dvariable_availability;
     mk_dinstr F._dinstr;
     mk_debug_ocaml F._debug_ocaml;
 
@@ -1903,6 +1910,7 @@ struct
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
     mk_dletreclambda F._dletreclambda;
+    mk_dvariable_availability F._dvariable_availability;
     mk_drawclambda F._drawclambda;
     mk_dclambda F._dclambda;
     mk_dcmm_invariants F._dcmm_invariants;
@@ -2065,6 +2073,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
     mk_dletreclambda F._dletreclambda;
+    mk_dvariable_availability F._dvariable_availability;
     mk_drawclambda F._drawclambda;
     mk_dclambda F._dclambda;
     mk_dcmm_invariants F._dcmm_invariants;
@@ -2209,6 +2218,7 @@ struct
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
     mk_dletreclambda F._dletreclambda;
+    mk_dvariable_availability F._dvariable_availability;
     mk_dtimings F._dtimings;
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
@@ -2437,6 +2447,7 @@ module Default = struct
     let _dlambda = set dump_lambda
     let _dblambda = set dump_blambda
     let _dletreclambda = set dump_letreclambda
+    let _dvariable_availability = set dump_variable_availability
     let _dparsetree = set dump_parsetree
     let _dtlambda = set dump_tlambda
     let _dslambda = set dump_slambda

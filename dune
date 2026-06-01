@@ -188,6 +188,7 @@
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
+  variable_availability
   ;; PARSING
   location
   longident
@@ -243,6 +244,7 @@
   envaux
   includecore
   type_shape
+  debug_variable_availability
   tast_iterator
   tast_mapper
   signature_group
@@ -879,6 +881,7 @@
    %{dep:external/gc-timings/gc_timings.a}
    %{dep:ocamloptcomp.a}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.a}
+   %{dep:middle_end/flambda2/debug/flambda2_debug.a}
    %{dep:middle_end/flambda2/flambda2.a})))
 
 (rule
@@ -921,6 +924,7 @@
    %{dep:external/gc-timings/gc_timings.cma}
    %{dep:ocamloptcomp.cma}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cma}
+   %{dep:middle_end/flambda2/debug/flambda2_debug.cma}
    %{dep:middle_end/flambda2/flambda2.cma})))
 
 (rule
@@ -963,6 +967,7 @@
    %{dep:external/gc-timings/gc_timings.cmxa}
    %{dep:ocamloptcomp.cmxa}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa}
+   %{dep:middle_end/flambda2/debug/flambda2_debug.cmxa}
    %{dep:middle_end/flambda2/flambda2.cmxa})))
 
 (install

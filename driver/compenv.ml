@@ -446,6 +446,8 @@ let read_one_param ppf position name v =
 
   | "flambda-verbose" ->
       set "flambda-verbose" [ dump_flambda_verbose ] v
+  | "variable-availability" ->
+      set "variable-availability" [ dump_variable_availability ] v
   | "flambda-invariants" ->
     set_flambda_invariants ppf ~name v flambda_invariant_checks
   | "cmm-invariants" ->

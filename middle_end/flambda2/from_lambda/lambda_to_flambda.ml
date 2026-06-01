@@ -535,10 +535,12 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     CC.close_let_rec acc ccenv ~function_declarations:[func] ~body
       ~current_region:
         (Env.current_region env |> Option.map Env.Region_stack_element.region)
-  | Lmutlet (layout, id, _duid, defining_expr, body) ->
+  | Lmutlet (layout, id, duid, defining_expr, body) ->
     (* CR sspies: Mutable lets currently do not propagate debugging uids
        correctly. *)
     (* CR mshinwell: user-visibleness needs thinking about here *)
+    Type_shape.Variable_availability.register_gap ~uid:duid
+      ~cause:Lmutlet_handler_loses_duid;
     let temp_id = Ident.create_local "let_mutable" in
     let temp_id_duid = Lambda.debug_uid_none in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
@@ -699,13 +701,15 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           body new_ids_with_kinds new_values acc ccenv)
       k_exn
   | Llet
-      ((Strict | Alias | StrictOpt), _layout, id, _duid, defining_expr, Lvar id')
+      ((Strict | Alias | StrictOpt), _layout, id, duid, defining_expr, Lvar id')
     when Ident.same id id' ->
     (* CR sspies: To propagate the debug UID here correctly, insert a phantom
        let here once they are available in the compiler. *)
     (* Simplif already simplifies such bindings, but we can generate new ones
        when translating primitives (see the Lprim case below). *)
     (* This case must not be moved above the case for let-bound primitives. *)
+    Type_shape.Variable_availability.register_gap ~uid:duid
+      ~cause:Missing_phantom_let_for_let_optimization;
     cps acc env ccenv defining_expr k k_exn
   | Llet ((Strict | Alias | StrictOpt), layout, id, duid, defining_expr, body)
     ->

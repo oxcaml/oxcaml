@@ -41,6 +41,7 @@
   ocamlcommon
   ocamlbytecomp
   ocamloptcomp
+  flambda2_debug
   flambda2_lattices
   flambda2_cmx
   flambda2_from_lambda

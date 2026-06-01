@@ -167,8 +167,15 @@ let flambda_to_flambda0 : type m.
            Inlining_report.output_then_forget_decisions ~output_prefix
          in
          Compiler_hooks.execute Inlining_tree inlining_tree);
+      Flambda2_debug.Debug_variable_availability.observe
+        ~checkpoint:Flambda2_input ~all_code:code raw_flambda;
       raw_flambda, offsets, reachable_names, cmx, code
     | Normal, Normal ->
+      (* The raw-flambda unit still carries its code inline (unlike classic
+         mode, where closure conversion lifts it into a separate
+         [Exported_code.t]), so there is no [all_code] to observe yet. *)
+      Flambda2_debug.Debug_variable_availability.observe
+        ~checkpoint:Flambda2_input raw_flambda;
       let round = 0 in
       let { Simplify.free_names;
             final_typing_env;
@@ -188,6 +195,8 @@ let flambda_to_flambda0 : type m.
          in
          Compiler_hooks.execute Inlining_tree inlining_tree);
       Compiler_hooks.execute Flambda2 flambda;
+      Flambda2_debug.Debug_variable_availability.observe
+        ~checkpoint:Flambda2_simplified ~all_code flambda;
       let last_pass_name = "simplify" in
       print_flambda last_pass_name
         (Flambda_features.dump_simplify ())
@@ -239,6 +248,8 @@ let flambda_to_flambda0 : type m.
           slot_offsets
       in
       Compiler_hooks.execute Reaped_flambda2 flambda;
+      Flambda2_debug.Debug_variable_availability.observe
+        ~checkpoint:Flambda2_output ~all_code flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
   in
   (match cmx with
