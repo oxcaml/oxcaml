@@ -1113,12 +1113,13 @@ let transl_implementation compilation_unit impl ~loc =
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
   let body, (repr, arg_block_idx) =
-    Translobj.transl_label_init (fun () ->
-      let body, repr, arg_block_idx =
-        transl_implementation_module ~loc ~scopes compilation_unit
-          impl
-      in
-      body, (repr, arg_block_idx))
+    Typeopt.with_cache (fun () ->
+      Translobj.transl_label_init (fun () ->
+        let body, repr, arg_block_idx =
+          transl_implementation_module ~loc ~scopes compilation_unit
+            impl
+        in
+        body, (repr, arg_block_idx)))
   in
   let body, main_module_block_format =
     match has_parameters () with
