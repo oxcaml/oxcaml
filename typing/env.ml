@@ -2019,7 +2019,12 @@ let find_type_expansion_opt path env =
 let find_jkind_expansion path env =
   let decl = find_jkind path env in
   match decl.jkind_manifest with
-  | None -> raise Not_found
+  | None ->
+      (* CR-someday lmaurer: Raising [Not_found] here makes it impossible to
+         differentiate an abstract kind (normal) from a path missing from the
+         environment (big error). We should instead be returning [None] or
+         [`Kind_is_abstract] or some such. *)
+      raise Not_found
   | Some body -> body
 
 let find_modtype_expansion_lazy path env =
@@ -5041,7 +5046,7 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Module type definition using %a"
         (Style.inline_code) "sig..end"
   | Open_qt ->
-      fprintf ppf "Opening modules"
+      fprintf ppf "Opening a non-identifier module expression"
   | Object_field_with_attribute_qt ->
       fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
@@ -5276,14 +5281,30 @@ let report_lookup_error_doc _loc env ppf = function
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
         quoted_longident lid;
+      let has_atomic_field lbls =
+        List.exists
+          (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
+          lbls
+      in
       begin match decl.type_kind with
       | Type_record (_, Record_unboxed, _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: \
              [%@%@unboxed] records don't get unboxed versions.@]"
-      | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
+      | Type_record (lbls, _, _) when has_atomic_field lbls ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             Records with [%@atomic] fields don't get unboxed versions.@]"
+      | Type_record (_, (Record_float | Record_ufloat), _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
+      | Type_record (_, Record_mixed _, _) ->
+          (* A [Record_mixed] only lacks an unboxed version when its shape
+             contains a [Float_boxed] element, which only happens via
+             [@@flatten_floats]. *)
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Records with [%@%@flatten_floats] don't get \
+             unboxed versions.@]";
       | Type_record_unboxed_product _ ->
           fprintf ppf "@.@[@{<hint>Hint@}: It is already an unboxed record.@]";
       | _ -> ()

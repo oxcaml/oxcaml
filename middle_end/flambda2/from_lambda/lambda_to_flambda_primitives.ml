@@ -239,17 +239,11 @@ type converted_array_ref_kind =
   | Array_ref_kind of Array_ref_kind.t
   | Float_array_opt_dynamic_ref of L.locality_mode
 
-let convert_array_ref_kind _dbg (kind : L.array_ref_kind) :
+let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     converted_array_ref_kind =
   match kind with
   | Pgenarray_ref mode ->
-    (* CR mshinwell: We can't check this because of the translations of
-       primitives for Obj.size, Obj.field and Obj.set_field, which can be used
-       both on arrays and blocks. We should probably propagate the "%obj_..."
-       primitives which these functions use all the way to the middle end. Then
-       this check could be reinstated for all normal cases.
-
-       check_float_array_optimisation_enabled (); *)
+    check_float_array_optimisation_enabled dbg "Pgenarray_ref";
     Float_array_opt_dynamic_ref mode
   | Paddrarray_ref -> Array_ref_kind (No_float_array_opt Values)
   | Pgcignorableaddrarray_ref ->
@@ -409,13 +403,11 @@ type converted_array_set_kind =
   | Array_set_kind of Array_set_kind.t
   | Float_array_opt_dynamic_set of Alloc_mode.For_assignments.t
 
-let convert_array_set_kind _dbg (kind : L.array_set_kind) :
+let convert_array_set_kind dbg (kind : L.array_set_kind) :
     converted_array_set_kind =
   match kind with
   | Pgenarray_set mode ->
-    (* CR mshinwell: see CR in [convert_array_ref_kind] above
-
-       check_float_array_optimisation_enabled (); *)
+    check_float_array_optimisation_enabled dbg "Pgenarray_set";
     Float_array_opt_dynamic_set (Alloc_mode.For_assignments.from_lambda mode)
   | Paddrarray_set mode ->
     Array_set_kind
@@ -2143,6 +2135,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined (Null, _, _) ->
         Misc.fatal_errorf "Cannot handle record kind for Pduprecord: %a"
           Printlambda.primitive prim
+      | Record_dummy _ ->
+        Misc.fatal_error "convert_lprim: Pduprecord: dummy representation"
+      | Record_variable ->
+        Misc.fatal_error "convert_lprim: Pduprecord: variable representation"
     in
     [Unary (Duplicate_block { kind }, arg)]
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]
@@ -3336,7 +3332,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Pignore | Psequand | Psequor | Pbytes_of_string | Pbytes_to_string
       | Parray_of_iarray | Parray_to_iarray | Pwith_stack | Pwith_stack_bind
-      | Pperform | Presume | Preperform ),
+      | Pwith_stack_preemptible | Pwith_stack_bind_preemptible | Pperform
+      | Presume | Preperform ),
       _ ) ->
     Misc.fatal_errorf
       "[%a] should have been removed by [Lambda_to_flambda.transform_primitive]"

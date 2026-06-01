@@ -31,6 +31,7 @@ val simplify_non_lifted_set_of_closures :
   Downwards_acc.t ->
   Bound_pattern.t ->
   Set_of_closures.t ->
+  Alloc_mode.For_allocations.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   Simplify_named_result.t
 

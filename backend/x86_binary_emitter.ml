@@ -860,10 +860,6 @@ type simple_encoding = {
   r64_rm64 : int list;
   al_imm8 : int list;
   rax_imm32 : int list;
-  rm8_imm8 : int list;
-  rm16_imm16 : int list;
-  rm64_imm32 : int list;
-  rm64_imm8 : int list;
   reg : int;
 }
 
@@ -906,24 +902,24 @@ let emit_simple_encoding enc b dst src =
   | { r64_rm64 = opcodes }, Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       buf_int8 b 0x66;
       emit_mod_rm_reg b 0 opcodes rm (rd_of_reg64 reg)
-  | ( { rm64_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg64 _ | Mem { typ = NONE | QWORD | REAL8; arch = X64 }) as rm),
       Imm n )
     when is_imm8L n ->
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x83 ] rm reg;
       buf_int8L b n
-  | ( { rm8_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg8L _ | Reg8H _ | Mem { typ = BYTE; arch = X64 }) as rm),
       Imm n ) ->
       assert (is_imm8L n);
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x80 ] rm reg;
       buf_int8L b n
-  | ( { rm64_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg32 _ | Mem { typ = DWORD | REAL4 } | Mem { typ = NONE; arch = X86 })
       as rm),
       Imm n )
     when is_imm8L n ->
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x83 ] rm reg;
       buf_int8L b n
   | { rax_imm32 = opcodes }, Reg64 RAX, ((Imm _ | Sym _) as n) ->
       emit_rex b rexw;
@@ -932,23 +928,29 @@ let emit_simple_encoding enc b dst src =
   | { rax_imm32 = opcodes }, Reg32 RAX, ((Imm _ | Sym _) as n) ->
       buf_opcodes b opcodes;
       buf_int32_imm b n
-  | ( { rm16_imm16 = opcodes; reg },
-      ((Reg16 _ | Mem { typ = WORD })
-      as rm),
+  | ( { reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
+      Imm n )
+    when is_imm8L n ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 [ 0x83 ] rm reg;
+      buf_int8L b n
+  | ( { reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
       (Imm _ as n) ) ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x81 ] rm reg;
       buf_int16_imm b n
-  | ( { rm64_imm32 = opcodes; reg },
+  | ( { reg },
       ((Reg32 _ | Mem { typ = NONE; arch = X86 } | Mem { typ = DWORD | REAL4 })
       as rm),
       ((Imm _ | Sym _) as n) ) ->
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x81 ] rm reg;
       buf_int32_imm b n
-  | ( { rm64_imm32 = opcodes; reg },
+  | ( { reg },
       ((Reg64 _ | Mem _ | Mem64_RIP _) as rm),
       ((Imm _ | Sym _) as n) ) ->
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x81 ] rm reg;
       buf_int32_imm b n
   | _ ->
       Format.eprintf "src=%a dst=%a@." print_old_arg src print_old_arg dst;
@@ -963,10 +965,6 @@ let emit_simple_encoding base reg =
       r64_rm64 = [ base + 3 ];
       al_imm8 = [ base + 4 ];
       rax_imm32 = [ base + 5 ];
-      rm8_imm8 = [ 0x80 ];
-      rm16_imm16 = [ 0x81 ];
-      rm64_imm32 = [ 0x81 ];
-      rm64_imm8 = [ 0x83 ];
       reg;
     }
 

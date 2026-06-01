@@ -31,14 +31,14 @@ val n_way_join_simples :
 
 val n_way_join_env_extension :
   n_way_join_type:n_way_join_type ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   t ->
   Typing_env_extension.t join_arg list ->
   (Typing_env_extension.t * t) Or_bottom.t
 
 val cut_and_n_way_join :
   n_way_join_type:n_way_join_type ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   cut_after:Scope.t ->
   Meet_env.t ->
   Typing_env.t list ->
@@ -82,7 +82,7 @@ end
 
 val cut_and_n_way_join_with_analysis :
   n_way_join_type:n_way_join_type ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   cut_after:Scope.t ->
   Typing_env.t ->
   ('a * Typing_env.t) list ->

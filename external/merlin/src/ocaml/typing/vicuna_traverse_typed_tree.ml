@@ -87,16 +87,6 @@ let scrape_poly env ty =
   let ty = scrape_ty env ty in
   match get_desc ty with Tpoly (ty, _) -> get_desc ty | d -> d
 
-(* See [scrape_ty]; this returns the [type_desc] of a scraped [type_expr]. *)
-let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64 then External64 else External
-  in
-  Ctype.check_type_externality env ty ext
-
 type classification =
   | Int (* any immediate type *)
   | Float
@@ -110,7 +100,7 @@ let classify env ty : classification =
   (* NOTE: this call is redundant, but also does not hurt.
      It is inherited from the original definition. *)
   let ty = scrape_ty env ty in
-  if is_always_gc_ignorable env ty
+  if Ctype.is_always_gc_ignorable env ty
   then Int
   else
     match get_desc ty with
@@ -394,7 +384,7 @@ and value_kind_record env subst ~visited ~depth
       | Record_inlined (Ordinary { runtime_tag; _ }, _, _) ->
         Block (Some (runtime_tag, fields))
       | Record_float -> FloatArray
-      | Record_boxed _ -> Block (Some (0, fields))
+      | Record_boxed -> Block (Some (0, fields))
       | Record_inlined (Extension _, _, _) -> Block (Some (0, fields))
       | Record_inlined (Null, _, _) ->
         raise (Vicuna_unsupported With_null_variants)
@@ -404,6 +394,7 @@ and value_kind_record env subst ~visited ~depth
              (Other "Record_unboxed should have been handled above"))
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
+      | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
     in
     non_consts
 

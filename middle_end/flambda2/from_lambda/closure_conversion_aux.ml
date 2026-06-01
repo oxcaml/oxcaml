@@ -1100,7 +1100,7 @@ module Let_with_acc = struct
           |> Cost_metrics.from_size
         | Simple simple -> Code_size.simple simple |> Cost_metrics.from_size
         | Static_consts _consts -> Cost_metrics.zero
-        | Set_of_closures set_of_closures ->
+        | Set_of_closures (set_of_closures, _alloc_mode) ->
           let code_mapping = Acc.code_map acc in
           Cost_metrics.set_of_closures
             ~find_code_characteristics:(fun code_id ->

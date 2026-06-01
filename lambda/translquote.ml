@@ -2041,6 +2041,9 @@ and Exp_desc : sig
     Case.t ->
     t'
 
+  val let_open :
+    Debuginfo.Scoped_location.t -> Identifier.Module.t -> Exp.t -> t'
+
   val exclave : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val list_comprehension : Debuginfo.Scoped_location.t -> Comprehension.t -> t'
@@ -2197,6 +2200,9 @@ end = struct
       (mk_list ~loc (List.map extract a1))
       (mk_list ~loc (List.map extract a2))
       (extract a3)
+
+  let let_open loc a1 a2 =
+    apply2 "Exp_desc" "let_open" loc (extract a1) (extract a2)
 
   let exclave loc a1 = apply1 "Exp_desc" "exclave" loc (extract a1)
 
@@ -2633,11 +2639,11 @@ let rec with_new_idents_pat pat =
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
-  | Tpat_construct (_, _, args, _) ->
-    List.iter (fun pat -> with_new_idents_pat pat) args
+  | Tpat_construct (_, _, _, args, _) ->
+    List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> with_new_idents_pat pat)
-  | Tpat_record (lbl_pats, _) ->
+  | Tpat_record (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> with_new_idents_pat pat) pats
@@ -2646,7 +2652,7 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _) ->
+  | Tpat_record_unboxed_product (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
@@ -2665,11 +2671,11 @@ let rec without_idents_pat pat =
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
-  | Tpat_construct (_, _, args, _) ->
-    List.iter (fun pat -> without_idents_pat pat) args
+  | Tpat_construct (_, _, _, args, _) ->
+    List.iter (fun pat -> without_idents_pat pat) (List.map snd args)
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> without_idents_pat pat)
-  | Tpat_record (lbl_pats, _) ->
+  | Tpat_record (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> without_idents_pat pat) pats
@@ -2678,7 +2684,7 @@ let rec without_idents_pat pat =
     without_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _) ->
+  | Tpat_record_unboxed_product (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
@@ -2898,9 +2904,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
       Location.print_loc (to_location loc)
-  | Tpat_open _ ->
-    fatal_errorf "Translquote [at %a]: no support for open patterns."
-      Location.print_loc (to_location loc)
+  | Tpat_open _ -> pat_lam (* handled by path resolution  *)
   | Tpat_inspected_type (Label_disambiguation ambiguity) ->
     pat_lam
     |> maybe_constrain_pat_with_type loc
@@ -2942,13 +2946,15 @@ and quote_value_pattern ~scopes p =
           pats
       in
       Pat.tuple loc pats
-    | Tpat_construct (lid, constr, args, None) ->
+    | Tpat_construct (lid, constr, _, args, None) ->
       let constr = quote_constructor (of_location ~scopes lid.loc) env constr in
       let args =
         match args with
         | [] -> None
         | _ :: _ ->
-          let args = List.map (quote_value_pattern ~scopes) args in
+          let args =
+            List.map (fun (_sort, arg) -> quote_value_pattern ~scopes arg) args
+          in
           let with_labels =
             List.map
               (fun a -> Label.Nonoptional.no_label |> Label.Nonoptional.wrap, a)
@@ -2957,7 +2963,7 @@ and quote_value_pattern ~scopes p =
           Some (Pat.tuple loc with_labels |> Pat.wrap)
       in
       Pat.construct loc constr args
-    | Tpat_construct (_, _, _, Some _) ->
+    | Tpat_construct (_, _, _, _, Some _) ->
       fatal_errorf
         "Translquote [at %a]:@ Constructor patterns introducing locally \
          abstract types are not supported in quotes."
@@ -2965,7 +2971,7 @@ and quote_value_pattern ~scopes p =
     | Tpat_variant (variant, argo, _) ->
       let argo = Option.map (quote_value_pattern ~scopes) argo in
       Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
-    | Tpat_record (lbl_pats, closed) ->
+    | Tpat_record (lbl_pats, _, _, closed) ->
       let lbl_pats =
         List.map
           (fun (lid, lbl_desc, pat) ->
@@ -2996,7 +3002,7 @@ and quote_value_pattern ~scopes p =
           pats
       in
       Pat.unboxed_tuple loc pats
-    | Tpat_record_unboxed_product (lbl_pats, closed) ->
+    | Tpat_record_unboxed_product (lbl_pats, _, _, closed) ->
       let lbl_pats =
         List.map
           (fun (lid, lbl_desc, pat) ->
@@ -3646,7 +3652,7 @@ and update_env_without_extra ~loc extra =
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 
-and quote_expression_desc ~scopes ~transl stage e =
+and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
   let env = e.exp_env in
   let loc' = e.exp_loc in
   let loc = of_location ~scopes loc' in
@@ -3792,14 +3798,18 @@ and quote_expression_desc ~scopes ~transl stage e =
           exps
       in
       Exp_desc.tuple loc exps
-    | Texp_construct (lid, constr, args, _) ->
+    | Texp_construct (lid, constr, _, args, _) ->
       let constr = quote_constructor (of_location ~scopes lid.loc) env constr in
       let args =
         match args with
         | [] -> None
-        | [arg] -> Some (quote_expression ~scopes ~transl stage arg)
+        | [(_sort, arg)] -> Some (quote_expression ~scopes ~transl stage arg)
         | _ :: _ ->
-          let args = List.map (quote_expression ~scopes ~transl stage) args in
+          let args =
+            List.map
+              (fun (_, arg) -> quote_expression ~scopes ~transl stage arg)
+              args
+          in
           let with_labels =
             List.map
               (fun a -> Label.Nonoptional.wrap Label.Nonoptional.no_label, a)
@@ -3820,7 +3830,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_record { fields; extended_expression } ->
       let lbl_exps =
         Array.map
-          (fun (lbl, def) ->
+          (fun (lbl, _, def) ->
             let lbl = quote_record_field loc env lbl in
             let exp =
               match def with
@@ -3840,11 +3850,11 @@ and quote_expression_desc ~scopes ~transl stage e =
           extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base
-    | Texp_field (rcd, _, lid, lbl, _, _) ->
+    | Texp_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       Exp_desc.field loc rcd lbl
-    | Texp_setfield (rcd, _, lid, lbl, exp) ->
+    | Texp_setfield { record = rcd; lid; label = lbl; newval = exp; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       let exp = quote_expression ~scopes ~transl stage exp in
@@ -3879,8 +3889,15 @@ and quote_expression_desc ~scopes ~transl stage e =
       let obj = quote_expression ~scopes ~transl stage obj in
       let meth = quote_method loc meth in
       Exp_desc.send loc obj meth
+    | Texp_open
+        ( { open_expr = { mod_desc = Tmod_ident (path, _) };
+            open_attributes = []
+          },
+          exp ) ->
+      let exp = quote_expression ~scopes ~transl stage exp in
+      Exp_desc.let_open loc (module_for_path loc env path) exp
     | Texp_open _ ->
-      fatal_errorf "Translquote [at %a]: Texp_open not implemented"
+      fatal_errorf "Translquote [at %a]: non-trivial Texp_open not implemented"
         Location.print_loc (to_location loc)
     | Texp_letmodule (ident, _, _, mod_exp, body) -> (
       let mod_exp = quote_module_exp ~transl stage loc env mod_exp in
@@ -3939,7 +3956,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_record_unboxed_product { fields; extended_expression } ->
       let lbl_exps =
         Array.map
-          (fun (lbl, def) ->
+          (fun (lbl, _, def) ->
             let lbl = quote_record_field loc env lbl in
             let exp =
               match def with
@@ -3958,7 +3975,7 @@ and quote_expression_desc ~scopes ~transl stage e =
           extended_expression
       in
       Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base
-    | Texp_unboxed_field (rcd, _, lid, lbl, _) ->
+    | Texp_unboxed_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       Exp_desc.unboxed_field loc rcd lbl
@@ -4023,7 +4040,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     (quote_expression_extra ~env ~scopes stage)
     e.exp_extra (Exp_desc.wrap body)
 
-and quote_expression ~scopes ~transl stage e =
+and quote_expression ~scopes ~transl stage e : Exp.t =
   let desc = quote_expression_desc ~scopes ~transl stage e
   and attributes = quote_attributes e
   and loc = of_location ~scopes e.exp_loc in

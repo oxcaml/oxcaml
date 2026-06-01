@@ -176,6 +176,27 @@ CAMLextern wchar_t* caml_stat_wcsconcat(int n, ...);
 
 CAMLextern int caml_is_stack(value);
 
+
+/* At the end of a region (when caml_region_end is called), all stack
+   allocations performed by caml_local_alloc since the corresponding
+   caml_region_begin are freed.
+
+   When caml_region_end is called, there must be no remaining references to any
+   allocation in the region reachable from any GC root. NB: it is important that
+   there _be_ no such references, not merely that they aren't used again. Make
+   sure to clear e.g. any CAMLlocal roots that held stack allocated values by
+   resetting them to Val_unit or similar.
+
+   It is OK to fail to end a region. The next region that is ended will end all
+   regions that began after it. (This happens in OCaml code when exceptions are
+   raised, and in particular means you need not call caml_region_end before
+   caml_raise). */
+
+typedef intnat caml_region_t;
+CAMLextern caml_region_t caml_region_begin(void);
+CAMLextern void caml_region_end(caml_region_t);
+
+
 /* void caml_shrink_heap (char *);        Only used in compact.c */
 
 #ifdef CAML_INTERNALS
