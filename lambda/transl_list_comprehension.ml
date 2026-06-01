@@ -306,7 +306,7 @@ let rec translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
       Let_binding.let_all arg_lets bindings
     | Texp_comp_when cond ->
       Lifthenelse
-        ( transl_exp ~scopes Lambda.layout_any_value cond,
+        ( transl_exp ~scopes Lambda.layout_bool cond,
           body ~accumulator,
           accumulator,
           layout_any_value (* [list]s have the standard representation *) ))
