@@ -530,6 +530,11 @@ let report_error_doc ppf = function
 
 let report_error = Format_doc.compat report_error_doc
 
+let () =
+  Location.register_error_of_exn (function
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+    | _ -> None)
+
 type preproc_stack_check_result =
   { max_frame_size : int;
     contains_nontail_calls : bool
