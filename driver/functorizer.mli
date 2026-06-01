@@ -55,20 +55,6 @@ val impl_unit_info_with_cmi_data :
     inside the [implementation_aux] callback so the [Env] state persists into
     the bundle's type-check and save. *)
 
-val collect_all_modules :
-  find_unit_info_by_name:(string -> 'a) ->
-  get_intf:('a -> intf_unit_info) ->
-  'a list ->
-  'a list
-(** Collect all modules (inputs + transitive parameterized deps) in topological
-    order so that every module's dependencies appear before it. Parameterised
-    over the input type, with [get_intf] extracting the [intf_unit_info] needed
-    for topology. *)
-
-val collect_all_params : intf_unit_info list -> Global_module.t list
-(** Collect all unique parameter globals across all modules, preserving the
-    order in which they are first encountered. *)
-
 type bundle_sig = {
   signature : Types.signature;
   all_params : Global_module.t list;
@@ -76,22 +62,16 @@ type bundle_sig = {
       (** Topologically sorted: every module's deps appear before it. *)
 }
 
-val compute_bundle_sig :
-  find_unit_info_by_name:(string -> intf_unit_info) ->
-  intf_unit_info list ->
-  bundle_sig
+val compute_bundle_sig : intf_unit_info list -> bundle_sig
 (** Phase A of [-functorize]: build the bundle's signature purely from cmi data.
-    Walks transitive parameterised deps via [find_unit_info_by_name], collects
-    the union of declared parameters across all modules, and produces a
-    functor-wrapped signature. Reads only cmis (no cmo/cmx). The returned
-    [all_modules] is the topologically sorted list the code-gen phase should
-    iterate to instantiate each module in dependency order. *)
+    Walks each input's signature, compressing alias chains by loading the
+    referenced cmis on demand, and produces a functor-wrapped signature. Reads
+    only cmis (no cmo/cmx). The returned [all_modules] is the topologically
+    sorted list the code-gen phase should iterate to instantiate each module in
+    dependency order. *)
 
 val make_compilation_unit : Misc.filepath -> CU.t
 (** Derive the bundle's compilation unit from the output target's basename. *)
-
-val find_unit_info_by_name_cmi : string -> intf_unit_info
-(** Locate a module's .cmi by name on the load path and load it. *)
 
 val functorize_intf : Env.t -> Misc.filepath list -> Misc.filepath -> unit
 (** Backend-agnostic interface mode for [-functorize]. Inputs are .cmi files;
@@ -103,7 +83,6 @@ val functorize_impl_with :
   info:Compile_common.info ->
   input_files:Misc.filepath list ->
   read_unit_info_of_input:(Misc.filepath -> impl_unit_info) ->
-  find_intf_unit_info_by_name:(string -> intf_unit_info) ->
   find_impl_unit_info_by_name:(string -> impl_unit_info) ->
   compile_program:(Compile_common.info -> Lambda.program -> unit) ->
   unit

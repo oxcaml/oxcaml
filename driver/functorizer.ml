@@ -84,80 +84,6 @@ let impl_unit_info_with_cmi_data ~(ui_unit : CU.t)
   let intf = { intf with ui_unit } in
   { intf; ui_format }
 
-(* Names of parameterized modules that [ui] depends on.  Sourced from
-   [ui_deps] (the cmi-recorded globals) rather than [ui_format], because the
-   runtime layout drops deps that aren't actually referenced at runtime
-   (e.g., parameterized modules that only appear via [-no-alias-deps]
-   aliases). *)
-let parameterized_deps_of (ui : intf_unit_info) : string list =
-  List.map (fun gm -> gm.GM.head) ui.ui_deps
-
-(* Collect all modules (inputs + transitive parameterized deps) in topological
-   order so that every module's dependencies appear before it.  Parameterised
-   over the input type ['a] (typically [intf_unit_info] or [impl_unit_info])
-   via [get_intf], which extracts the intf-level info used for topology.
-   Single DFS pass: deps are loaded on demand and the post-order produces the
-   topological result. *)
-let collect_all_modules (type a) ~(find_unit_info_by_name : string -> a)
-    ~(get_intf : a -> intf_unit_info) (src_infos : a list) : a list =
-  let loaded : (string, a) Hashtbl.t = Hashtbl.create 16 in
-  List.iter
-    (fun ui ->
-      Hashtbl.replace loaded (CU.name_as_string (get_intf ui).ui_unit) ui)
-    src_infos;
-  let visited : (string, unit) Hashtbl.t = Hashtbl.create 16 in
-  let result : a list ref = ref [] in
-  let rec dfs ~required_by name =
-    if not (Hashtbl.mem visited name) then begin
-      Hashtbl.add visited name ();
-      let ui =
-        match Hashtbl.find_opt loaded name with
-        | Some ui -> ui
-        | None ->
-            let ui =
-              try find_unit_info_by_name name
-              with Not_found ->
-                Location.raise_errorf ~loc:Location.none
-                  "Cannot find '%s' for module '%s',@ required by '%s'."
-                  (String.uncapitalize_ascii name)
-                  name required_by
-            in
-            Hashtbl.add loaded name ui;
-            ui
-      in
-      List.iter (dfs ~required_by:name) (parameterized_deps_of (get_intf ui));
-      result := ui :: !result
-    end
-  in
-  List.iter
-    (fun ui ->
-      let name = CU.name_as_string (get_intf ui).ui_unit in
-      dfs ~required_by:name name)
-    src_infos;
-  List.rev !result
-
-(* Collect all unique declared parameters across all modules, preserving the
-   order in which they are first encountered.  Reads from [ui_params] (the
-   cmi-declared list) rather than the runtime layout, because the latter
-   collapses unused parameters to [Rp_unit] and would lose parameters that
-   aren't referenced at compile time. *)
-let collect_all_params (modules : intf_unit_info list) : GM.t list =
-  let seen = ref GM.Set.empty in
-  let result = ref [] in
-  List.iter
-    (fun (ui : intf_unit_info) ->
-      List.iter
-        (fun p ->
-          let head = GM.Parameter_name.to_string p in
-          let global = GM.create_exn head [] ~hidden_args:[] in
-          if not (GM.Set.mem global !seen) then begin
-            seen := GM.Set.add global !seen;
-            result := global :: !result
-          end)
-        ui.ui_params)
-    modules;
-  List.rev !result
-
 type bundle_sig = {
   signature : Types.signature;
   all_params : GM.t list;
@@ -175,8 +101,7 @@ type bundle_sig = {
    [-no-alias-deps]: alias-only intermediate modules (like dune's [d__]
    wrappers) don't appear in the bundle; only the modules at the *end* of
    each alias chain do. *)
-let compute_bundle_sig ~find_unit_info_by_name:_
-    (src_infos : intf_unit_info list) : bundle_sig =
+let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
   let make_md md_type : Types.module_declaration =
     {
       md_type;
@@ -513,12 +438,6 @@ let make_compilation_unit target =
   let output_basename = Filename.basename (Filename.remove_extension target) in
   CU.of_string (String.capitalize_ascii output_basename)
 
-let find_unit_info_by_name_cmi name : intf_unit_info =
-  let filename =
-    Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
-  in
-  read_intf_unit_info_of_cmi filename
-
 (* Interface mode: backend-agnostic.  Inputs are .cmi files; outputs are
    .cmi + .cmti + .cmsi.  Doesn't need [with_info] because the only Env work
    here is registering input cmis as imports (via [Env.import_cmi_for_link])
@@ -535,10 +454,7 @@ let functorize_intf initial_env files target =
   in
   Env.set_unit_name (Some unit_info);
   let src_infos = List.map read_intf_unit_info_of_cmi files in
-  let { signature = sg; _ } =
-    compute_bundle_sig ~find_unit_info_by_name:find_unit_info_by_name_cmi
-      src_infos
-  in
+  let { signature = sg; _ } = compute_bundle_sig src_infos in
   Misc.try_finally
     (fun () ->
       Typemod.functorize_interface initial_env ~sg unit_info compilation_unit)
@@ -552,7 +468,6 @@ let functorize_intf initial_env files target =
    that [Env.import_cmi_for_link] writes to the bundle's persistent env. *)
 let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
     ~(read_unit_info_of_input : Misc.filepath -> impl_unit_info)
-    ~(find_intf_unit_info_by_name : string -> intf_unit_info)
     ~(find_impl_unit_info_by_name : string -> impl_unit_info)
     ~(compile_program : Compile_common.info -> Lambda.program -> unit) : unit =
   let src_impls = List.map read_unit_info_of_input input_files in
@@ -560,8 +475,7 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
     List.map (fun (impl : impl_unit_info) -> impl.intf) src_impls
   in
   let { signature = sg; all_params; all_modules } =
-    compute_bundle_sig ~find_unit_info_by_name:find_intf_unit_info_by_name
-      src_intfs
+    compute_bundle_sig src_intfs
   in
   let modules_cu =
     List.map (fun (ui : intf_unit_info) -> ui.ui_unit) all_modules

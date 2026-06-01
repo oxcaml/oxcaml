@@ -72,7 +72,6 @@ let functorize_impl initial_env files target =
       in
       Functorizer.functorize_impl_with ~initial_env ~info ~input_files:files
         ~read_unit_info_of_input:read_unit_info_of_cmo
-        ~find_intf_unit_info_by_name:Functorizer.find_unit_info_by_name_cmi
         ~find_impl_unit_info_by_name:find_unit_info_by_name_cmo ~compile_program)
     ~exceptionally:(fun () ->
       Misc.remove_file target;

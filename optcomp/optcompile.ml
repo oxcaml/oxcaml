@@ -286,7 +286,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         Functorizer.functorize_impl_with ~initial_env ~info ~input_files:files
           ~read_unit_info_of_input:read_unit_info_of_cmx
-          ~find_intf_unit_info_by_name:Functorizer.find_unit_info_by_name_cmi
           ~find_impl_unit_info_by_name:find_unit_info_by_name_cmx
           ~compile_program)
       ~exceptionally:(fun () ->
