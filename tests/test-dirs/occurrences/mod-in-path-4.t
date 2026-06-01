@@ -49,6 +49,17 @@ F:
         "col": 18
       },
       "stale": false
+    },
+    {
+      "start": {
+        "line": 9,
+        "col": 19
+      },
+      "end": {
+        "line": 9,
+        "col": 20
+      },
+      "stale": false
     }
   ]
 
@@ -65,6 +76,28 @@ I:
       "end": {
         "line": 2,
         "col": 10
+      },
+      "stale": false
+    },
+    {
+      "start": {
+        "line": 8,
+        "col": 27
+      },
+      "end": {
+        "line": 8,
+        "col": 28
+      },
+      "stale": false
+    },
+    {
+      "start": {
+        "line": 9,
+        "col": 19
+      },
+      "end": {
+        "line": 9,
+        "col": 25
       },
       "stale": false
     },

@@ -21,6 +21,28 @@ We expect module appearing in paths to be highlighted
         "col": 10
       },
       "stale": false
+    },
+    {
+      "start": {
+        "line": 5,
+        "col": 8
+      },
+      "end": {
+        "line": 5,
+        "col": 11
+      },
+      "stale": false
+    },
+    {
+      "start": {
+        "line": 6,
+        "col": 4
+      },
+      "end": {
+        "line": 6,
+        "col": 7
+      },
+      "stale": false
     }
   ]
 
