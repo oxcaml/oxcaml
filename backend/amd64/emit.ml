@@ -2062,7 +2062,7 @@ let emit_instr ~first ~last ~fallthrough i =
         D.cfi_def_cfa_register ~reg:"r13";
         (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
            through this unless we were to tag this calling frame with
-           cfi_signal_frame in it's definition. *)
+           cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
       emit_call (Cmm.global_symbol func);
       if switch_stacks
