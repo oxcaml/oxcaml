@@ -441,21 +441,6 @@ module Layout = struct
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
     | Product p -> Product (List.map default_to_scannable_and_get p)
 
-  let rec default_to_fresh_layouts_and_get :
-      Sort.var list -> _ Layout.t -> Sort.var list * _ Layout.t =
-   fun vars layout ->
-    match layout with
-    | Any sa -> vars, Any sa
-    | Sort (s, sa) ->
-      let vars', s = Sort.default_to_fresh_layouts_and_get s in
-      vars' @ vars, Sort (s, sa)
-    | Product p ->
-      let vars', p = List.fold_left_map default_to_fresh_layouts_and_get [] p in
-      vars' @ vars, Product p
-
-  let default_to_fresh_layouts_and_get layout =
-    default_to_fresh_layouts_and_get [] layout
-
   let format ppf layout =
     let pp_string_list ppf lst =
       Fmt.pp_print_list
@@ -2527,13 +2512,6 @@ let default_to_scannable t =
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> ignore (Layout.default_to_scannable_and_get l)
-
-let default_to_fresh_layout t =
-  match t.jkind.base with
-  | Kconstr _ as b -> [], b
-  | Layout l ->
-    let vars, l = Layout.default_to_fresh_layouts_and_get l in
-    vars, Layout l
 
 let generalize ~current_level t =
   (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
