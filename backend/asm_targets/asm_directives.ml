@@ -841,7 +841,7 @@ let float64_from_bits f = float64_core (Int64.float_of_bits f) f
 
 let size ?size_of symbol =
   match TS.system () with
-  | GNU | Linux | FreeBSD | NetBSD | OpenBSD | Generic_BSD ->
+  | GNU | Linux | FreeBSD | NetBSD | OpenBSD ->
     let size_of =
       match size_of with None -> symbol | Some size_of -> size_of
     in

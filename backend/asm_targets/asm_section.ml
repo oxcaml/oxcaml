@@ -254,7 +254,7 @@ let details t first_occurrence =
     | Stapsdt_note, _, MacOS_like ->
       ["__DATA"; "__note_stapsdt"], None, ["regular"]
       (* NOTE: This is section is currently not tested. *)
-    | Stapsdt_note, _, (GNU | Solaris | Linux | Generic_BSD | BeOS) ->
+    | Stapsdt_note, _, (GNU | Solaris | Linux | BeOS) ->
       [".note.stapsdt"], Some "?", ["\"note\""]
     | Stapsdt_note, _, _ ->
       Misc.fatal_error "Target systems does not support stapsdt."

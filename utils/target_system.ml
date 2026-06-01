@@ -48,7 +48,6 @@ type derived_system =
   | FreeBSD
   | NetBSD
   | OpenBSD
-  | Generic_BSD
   | Solaris
   | Dragonfly
   | GNU
@@ -59,7 +58,6 @@ let derived_system () : derived_system =
   (* Derived from [configure.ac] *)
   match architecture (), Config.model, Config.system with
   | IA32, _, "linux_elf" -> Linux
-  | IA32, _, "bsd_elf" -> Generic_BSD
   | IA32, _, "beos" -> BeOS
   | IA32, _, "cygwin" -> Cygwin
   | IA32, _, "gnu" -> GNU
@@ -108,8 +106,8 @@ let derived_system () : derived_system =
 
 let is_windows () =
   match derived_system () with
-  | Linux | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris
-  | Dragonfly | GNU | BeOS | Unknown ->
+  | Linux | MacOS_like | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
+  | BeOS | Unknown ->
     false
   | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin -> true
 
@@ -123,7 +121,7 @@ let assembler () =
   | Win32 | Win64 -> MASM
   | MacOS_like -> MacOS
   | MinGW_32 | MinGW_64 | Cygwin | Linux | FreeBSD | NetBSD | OpenBSD
-  | Generic_BSD | Solaris | GNU | Dragonfly | BeOS | Unknown ->
+  | Solaris | GNU | Dragonfly | BeOS | Unknown ->
     GAS_like
 
 module Machine_width = struct
@@ -169,7 +167,6 @@ type system =
   | FreeBSD
   | NetBSD
   | OpenBSD
-  | Generic_BSD
   | Solaris
   | Dragonfly
   | GNU
@@ -186,7 +183,6 @@ let system () : system =
   | FreeBSD -> FreeBSD
   | NetBSD -> NetBSD
   | OpenBSD -> OpenBSD
-  | Generic_BSD -> Generic_BSD
   | Solaris -> Solaris
   | Dragonfly -> Dragonfly
   | GNU -> GNU
