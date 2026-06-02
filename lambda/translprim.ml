@@ -2602,6 +2602,23 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     lookup_primitive_and_mark_used
       (to_location loc) ~poly_mode ~poly_sort pos p env (Some path)
   in
+  let has_constant_constructor =
+    match arg_exps with
+    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+        cstr_constant
+    | [_; {exp_desc = Texp_variant(_, None)}]
+    | [{exp_desc = Texp_variant(_, None)}; _] -> true
+    | _ -> false
+  in
+  let prim =
+    if should_specialize_primitive p then
+      match specialize_primitive env loc ty ~has_constant_constructor prim with
+      | None -> prim
+      | Some prim -> prim
+    else
+      prim
+  in
   if stack then begin
     match prim with
     | Primitive (prim, _) ->
@@ -2625,23 +2642,6 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let has_constant_constructor =
-    match arg_exps with
-    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
-    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
-        cstr_constant
-    | [_; {exp_desc = Texp_variant(_, None)}]
-    | [{exp_desc = Texp_variant(_, None)}; _] -> true
-    | _ -> false
-  in
-  let prim =
-    if should_specialize_primitive p then
-      match specialize_primitive env loc ty ~has_constant_constructor prim with
-      | None -> prim
-      | Some prim -> prim
-    else
-      prim
-  in
   let lam = lambda_of_prim p.prim_name prim loc args (Some arg_exps) in
   let lam =
     if primitive_needs_event_after prim then begin
