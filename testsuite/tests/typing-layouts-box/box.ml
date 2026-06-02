@@ -41,9 +41,11 @@ val f : t -> float = <fun>
 
 type ('a : any) b = 'a box
 type t1' = float# b
+let check : float -> t1' = fun x -> x
 [%%expect{|
 type ('a : any) b = 'a box
 type t1' = float# b
+val check : float -> t1' = <fun>
 |}]
 
 let g' (x : float# b) : float# b = x;;
@@ -244,8 +246,10 @@ type ut = #(int * string)
 |}]
 
 type boxed_ut = ut box;;
+let check : int * string -> boxed_ut = fun x -> x;;
 [%%expect{|
 type boxed_ut = ut box
+val check : int * string -> boxed_ut = <fun>
 |}]
 
 let eq_ut (x : #(int * string) box) (y : ut box) = x = y;;
