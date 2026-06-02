@@ -119,6 +119,7 @@ let rec process ~(here : [%call_pos]) ?universe_for_parsing path =
       path
 
 let () =
+  Clflags.keyword_edition := Some "5.3";
   process "source.ml";
   process "source_jane_street.ml" ~universe_for_parsing:Language_extension.Universe.maximal;
   (* Check that parsing with no extensions enabled still succeeds.

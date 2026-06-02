@@ -51,19 +51,19 @@ jobs:
           # We use a custom install prefix for this workflow.
           # Consider renaming it to indicate as such when convenient.
           - name: runtime5 dev (x86_64-linux)
-            config: --enable-runtime5 --enable-dev
+            config: --enable-runtime5 --enable-dev --enable-keyword-edition=5.2
             os: warp-ubuntu-latest-x64-8x
             install_path: _custom_install
 
           - name: runtime5 debug stack-checks (x86_64-linux)
-            config: --enable-runtime5 --enable-stack-checks
+            config: --enable-runtime5 --enable-stack-checks --enable-keyword-edition=5.4
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: runtime5 debug (x86_64-linux)
-            config: --enable-runtime5
+            config: --enable-runtime5 --enable-keyword-edition=5.2+effect
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d

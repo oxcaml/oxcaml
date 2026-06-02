@@ -1,6 +1,7 @@
 (* TEST
    runtime5;
    stack-allocation;
+   flags += "-keywords 5.3";
    { native; }
 *)
 

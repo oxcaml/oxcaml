@@ -1,4 +1,6 @@
-(* TEST *)
+(* TEST
+  flags += "-keywords 5.3";
+*)
 
 open Effect
 open Effect.Deep

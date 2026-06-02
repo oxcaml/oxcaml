@@ -150,3 +150,5 @@ let objcopy_compress_debug_sections_flag = {@QS@|@objcopy_compress_debug_section
 let objcopy = {@QS@|@objcopy@|@QS@}
 
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
+
+let default_keyword_edition = @default_keyword_edition@
