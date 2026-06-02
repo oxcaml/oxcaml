@@ -1016,7 +1016,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | (path, decl) -> (path, decl.clty_hash_type)
         (* Raise a different error if it matches the name of an unboxed type *)
         | exception
-            (Env.Error (Lookup_error (_, _, Unbound_cltype _)) as exn)
+            (Env.Error.In_context
+               (Lookup_error (_, _, Unbound_cltype _)) as exn)
           ->
             let unboxed_lid : Longident.t =
               match lid.txt with
