@@ -506,6 +506,9 @@ val for_arrow : Types.jkind_l
 (** The jkind of an object type. *)
 val for_object : Types.jkind_l
 
+(** The jkind of an object type with no methods. *)
+val for_empty_object : Types.jkind_l
+
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
