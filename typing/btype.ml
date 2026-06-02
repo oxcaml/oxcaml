@@ -122,6 +122,7 @@ let newgenstub ~scope jkind =
 let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
+let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 
 (**** Check some types ****)
 

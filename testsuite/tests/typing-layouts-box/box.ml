@@ -53,9 +53,9 @@ val g' : float# b -> float# b = <fun>
 
 (* Test 3: [float# box] unifies with [float] *)
 
-let h (x : float# box) : float = x;;
+let h (x : 'a box) (y : 'a) : #(float * float#) = #(x, (y : float#))
 [%%expect{|
-val h : float -> float = <fun>
+val h : float -> float# -> #(float * float#) = <fun>
 |}]
 
 let i (x : float) : float# box = x;;
@@ -492,15 +492,17 @@ module MakeBoxed :
 (* Test 22: First-class modules *)
 
 module type T_FCM = sig
-  type t = float# box
+  type u : any
+  type t = u box
   val value : t
 end;;
 [%%expect{|
-module type T_FCM = sig type t = float val value : t end
+module type T_FCM = sig type u : any type t = u box val value : t end
 |}]
 
 let fcm : (module T_FCM) =
   (module struct
+    type u = float#
     type t = float# box
     let value = 3.14
   end);;
@@ -508,16 +510,24 @@ let fcm : (module T_FCM) =
 val fcm : (module T_FCM) = <module>
 |}]
 
-let extract_fcm () =
+let bad () =
   let module M = (val fcm) in
   M.value;;
 [%%expect{|
-val extract_fcm : unit -> float = <fun>
+Line 3, characters 2-9:
+3 |   M.value;;
+      ^^^^^^^
+Error: This expression has type "M.u box"
+       but an expression was expected of type "'a"
+       The type constructor "M.u" would escape its scope
 |}]
 
 let fcm_as_float : float = extract_fcm ();;
 [%%expect{|
-val fcm_as_float : float = 3.14
+Line 1, characters 27-38:
+1 | let fcm_as_float : float = extract_fcm ();;
+                               ^^^^^^^^^^^
+Error: Unbound value "extract_fcm"
 |}]
 
 (* Test 23: box on value types (int, string)
@@ -828,6 +838,15 @@ type u = t#
 [%%expect{|
 type t = string box
 type u = t#
+|}]
+
+type 'a t = 'a box
+type 'a u = 'a t# (* first *)
+type i = int t# (* second *)
+[%%expect{|
+type 'a t = 'a box
+type 'a u = 'a t#
+type i = int t#
 |}]
 
 (* Test 33: multiple layers of [box] *)

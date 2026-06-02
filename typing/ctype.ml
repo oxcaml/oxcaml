@@ -2303,8 +2303,7 @@ let rec try_expand_once_gen expand_abbrev env ty =
   | Tquote_eval t ->
       try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
   | Tbox t ->
-      let t' = try_expand_once_gen expand_abbrev env t in
-      newty (Tbox t')
+      try_expand_once_gen expand_abbrev env t |> new_box_ty
   | _ -> raise Cannot_expand
 
 let try_unbox_desc env = function

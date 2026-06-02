@@ -648,17 +648,6 @@ let build_initial_env add_type add_extension add_jkind empty_env =
           parameter. But I'm also fine not doing that for now (and wait until
           users complains). Internal ticket 5103. *)
        ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
-  |> add_type1 ident_box
-       ~variance:Variance.covariant
-       ~separability:Separability.Ind
-       ~manifest:type_box
-       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
-       ~param_jkind:(
-         Jkind.Builtin.any ~why:(Type_argument {
-           parent_path = Path.Pident ident_box;
-           position = 1;
-           arity = 1;
-         }))
   |> add_type1 ident_list
        ~variance:Variance.covariant
        ~separability:Separability.Ind
@@ -758,6 +747,17 @@ let build_initial_env add_type add_extension add_jkind empty_env =
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
+  |> add_type1 ident_box
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:type_box
+       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_box;
+           position = 1;
+           arity = 1;
+         }))
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
