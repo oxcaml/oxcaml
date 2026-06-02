@@ -17,14 +17,14 @@ type record = { x : string; y : string @@ many aliased; }
 
 let aliased_use (x @ aliased global) = x
 [%%expect{|
-(let (aliased_use/0 = (function {nlocal = 1} x/0? : stack x/0))
+(let (aliased_use/0 = (function {nlocal = 0} x/0? x/0))
   (apply (field_imm 1 (global Toploop!)) "aliased_use" aliased_use/0))
 val aliased_use : 'a -> 'a = <fun>
 |}]
 
 let unique_use (x @ unique global) = x
 [%%expect{|
-(let (unique_use/0 = (function {nlocal = 1} x/1? : stack x/1))
+(let (unique_use/0 = (function {nlocal = 0} x/1? x/1))
   (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/0))
 val unique_use : 'a @ unique -> 'a = <fun>
 |}]
@@ -38,7 +38,7 @@ let proj_aliased r =
 (let
   (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    proj_aliased/0 =
-     (function {nlocal = 1} r/0[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/0[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
@@ -59,7 +59,7 @@ let proj_unique r =
 (let
   (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    proj_unique/0 =
-     (function {nlocal = 1} r/2[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/2[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
@@ -83,7 +83,7 @@ let match_aliased r =
 (let
   (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_aliased/0 =
-     (function {nlocal = 1} r/4[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/4[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
@@ -105,7 +105,7 @@ let match_unique r =
 (let
   (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_unique/0 =
-     (function {nlocal = 1} r/6[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/6[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
@@ -130,7 +130,7 @@ let match_mini_anf_aliased r =
 (let
   (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_mini_anf_aliased/0 =
-     (function {nlocal = 1} r/8[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/8[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
@@ -156,7 +156,7 @@ let match_mini_anf_unique r =
 (let
   (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_mini_anf_unique/0 =
-     (function {nlocal = 1} r/10[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/10[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
@@ -183,7 +183,7 @@ let match_anf_aliased r =
 (let
   (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_anf_aliased/0 =
-     (function {nlocal = 1} r/12[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/12[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (catch
@@ -214,7 +214,7 @@ let match_anf_unique r =
 (let
   (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_anf_unique/0 =
-     (function {nlocal = 1} r/14[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/14[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (catch
@@ -256,7 +256,7 @@ let swap_inner (t : tree) =
 [%%expect{|
 (let
   (swap_inner/0 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        t/0[value<
             (consts (0))
              (non_consts ([0:
@@ -407,7 +407,7 @@ let match_guard r =
   (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_guard/0 =
-     (function {nlocal = 1} r/16[value<(consts ()) (non_consts ([0: *, *]))>]
+     (function {nlocal = 0} r/16[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let (y/9 =o? (field_mut 1 r/16))
