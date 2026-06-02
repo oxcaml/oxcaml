@@ -108,7 +108,7 @@ exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
 let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
-  let mode = Mode.Value.newvar () in
+  let mode = Mode.Value.newvar 0 in
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
   Value.submode_exn (min |> Alloc.of_const |> alloc_as_value) mode;
@@ -121,7 +121,7 @@ let register_allocation loc : Alloc.lr * Value.lr =
       ~hint_comonadic:Module_allocated_on_heap
       { Alloc.Const.max with areality = Global }
   in
-  let alloc_mode, _ = Alloc.newvar_below upper_bound in
+  let alloc_mode, _ = Alloc.newvar_below 0 upper_bound in
   let closed_over_mode =
     alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
   in
@@ -173,7 +173,7 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
       To achieve that, the mode of [foo] to be exposed as [M.foo] should be a
       flexible mode variable weaker than its actual mode.
     *)
-    let mode, _ = Mode.Value.newvar_above mode in
+    let mode, _ = Mode.Value.newvar_above (Ctype.get_current_level ()) mode in
     (* Upon construction, for comonadic (prescriptive) axes, module
     must be weaker than the values therein, for otherwise operations
     would be allowed to performed on the module (and extended to the
@@ -2818,19 +2818,31 @@ let check_nongen_signature_item env sig_item =
 let check_nongen_signature env sg =
   List.iter (check_nongen_signature_item env) sg
 
-let remove_functor_mode_variables = function
+let remove_functor_mode_variables ~zap_scope = function
   | Mty_functor (arg_opt, _, mres) ->
-      Mode.Alloc.zap_to_legacy mres |> ignore;
+      let zap_mode mode =
+        if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
+          Alloc.add_mode_to_zap_scope mode zap_scope
+         end else begin
+          Alloc.zap_to_legacy_force mode |> ignore
+         end
+      in
+      zap_mode mres;
       begin match arg_opt with
       | Unit -> ()
-      | Named (_, _, marg) -> Mode.Alloc.zap_to_legacy marg |> ignore
+      | Named (_, _, marg) -> zap_mode marg
       end
   | _ -> ()
 
 let remove_mode_and_jkind_variables env sg =
-  let rm_ty _env ty = Ctype.remove_mode_and_jkind_variables ty; None in
-  let rm_mty _env mty = remove_functor_mode_variables mty in
-  List.find_map (nongen_signature_item env rm_ty rm_mty) sg |> ignore
+  Mode.Alloc.with_zap_scope(fun ~zap_scope ->
+    let rm_ty _env ty =
+      Ctype.remove_mode_and_jkind_variables
+        ty ~zap_scope;
+      None
+    in
+    let rm_mty _env mty = remove_functor_mode_variables ~zap_scope mty in
+    List.find_map (nongen_signature_item env rm_ty rm_mty) sg |> ignore)
 
 (* Helpers for typing recursive modules *)
 
@@ -3230,7 +3242,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         type_module ~strengthen:true ~funct_body None newenv sbody
       in
       let body_mode = mode_without_locks_exn body.mod_mode in
-      let ret_mode = Alloc.newvar () in
+      let ret_mode = Alloc.newvar 0 in
       Value.submode_exn body_mode (ret_mode |> alloc_as_value);
       (* Apply currying constraints if the body is a functor,
          similar to constraints for functions. *)
@@ -3281,15 +3293,22 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       },
       final_shape
   | Pmod_unpack sexp ->
-      let mode = Value.newvar () in
+      let mode = Value.newvar 0 in
       let exp =
         Ctype.with_local_level_generalize_structure_if_principal
+          ~before_generalize:Typecore.generalize_structure_exp
           (fun () -> Typecore.type_exp env sexp
             ~mode:(Value.disallow_left mode))
       in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
           Tpackage pack ->
+            (* CR ageorges: should we remove modes here? *)
+            List.iter
+              (fun (_n, t) ->
+                 Mode.Alloc.with_zap_scope
+                   Ctype.remove_mode_and_jkind_variables t)
+              pack.pack_cstrs;
             check_package_closed ~loc:smod.pmod_loc ~env ~typ:exp.exp_type
               pack.pack_cstrs;
             if !Clflags.principal &&
@@ -4133,7 +4152,8 @@ let remove_mode_and_jkind_variables_for_toplevel str =
                          vb_expr = exp}])) }] ->
      (* These types are printed by the toplevel,
         even though they do not appear in sg *)
-     Ctype.remove_mode_and_jkind_variables exp.exp_type
+     Mode.Alloc.with_zap_scope
+       Ctype.remove_mode_and_jkind_variables exp.exp_type
   | _ -> ()
 
 let type_toplevel_phrase env sig_acc s =

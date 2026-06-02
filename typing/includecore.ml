@@ -275,6 +275,13 @@ let value_descriptions ~loc env name
         in
         (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
+        let mode_l1 =
+          Option.map
+            (fun m ->
+              if Language_extension.(is_at_least Mode_polymorphism Beta)
+              then fst (Mode.Locality.newvar_above 0 m)
+              else m) mode_l1
+        in
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
            pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
