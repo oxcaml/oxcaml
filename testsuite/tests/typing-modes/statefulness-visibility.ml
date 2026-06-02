@@ -744,31 +744,37 @@ Error: This value is "reading"
 let foo : int Atomic.t @ read_write -> (unit -> int) @ stateless =
     fun a () -> Atomic.exchange a 2
 [%%expect{|
-Line 2, characters 4-35:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.exchange a 2
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "stateful",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-35
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "read_write".
 |}]
 
 let foo : int Atomic.t @ write -> (unit -> unit) @ stateless =
     fun a () -> Atomic.set a 2
 [%%expect{|
-Line 2, characters 4-30:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.set a 2
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "writing",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-30
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "write" or "read_write".
 |}]
 
 let foo : int Atomic.t @ read -> (unit -> int) @ stateless =
     fun a () -> Atomic.get a
 [%%expect{|
-Line 2, characters 4-28:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.get a
-        ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "reading",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-28
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "read" or "read_write".
 |}]
 
 let foo @ stateless =
