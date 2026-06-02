@@ -267,12 +267,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 # Runtime selection
 
-#AC_ARG_ENABLE([runtime5],
-#  [AS_HELP_STRING([--enable-runtime5],
-#    [Use the OCaml 5 runtime])])
-AS_IF([test x"$enable_runtime5" = xyes],
-      [runtime_suffix=],
-      [runtime_suffix=4])
+runtime_suffix=
 
 AC_ARG_ENABLE([stack_checks],
   [AS_HELP_STRING([--enable-stack-checks],
@@ -480,18 +475,10 @@ AC_CONFIG_FILES([ocamltest/ocamltest_config.ml])
 AC_CONFIG_FILES([utils/config.common.ml])
 AC_CONFIG_FILES([utils/config.generated.ml])
 AC_CONFIG_FILES([tools/eventlog_metadata])
-AS_IF([test "x$enable_runtime5" = "xyes"],
-  [ AC_CONFIG_HEADERS([runtime/caml/m.h])
-    AC_CONFIG_HEADERS([runtime/caml/s.h])
-    AC_CONFIG_HEADERS([runtime/caml/exec.h])
-    AC_CONFIG_HEADERS([runtime/caml/version.h])
-  ],
-  [ AC_CONFIG_HEADERS([runtime4/caml/m.h])
-    AC_CONFIG_HEADERS([runtime4/caml/s.h])
-    AC_CONFIG_HEADERS([runtime4/caml/exec.h])
-    AC_CONFIG_HEADERS([runtime4/caml/version.h])
-  ]
-)
+AC_CONFIG_HEADERS([runtime/caml/m.h])
+AC_CONFIG_HEADERS([runtime/caml/s.h])
+AC_CONFIG_HEADERS([runtime/caml/exec.h])
+AC_CONFIG_HEADERS([runtime/caml/version.h])
 AC_CONFIG_FILES([compilerlibs/META])
 AC_CONFIG_FILES([otherlibs/stdlib_upstream_compatible/META])
 AC_CONFIG_FILES([otherlibs/stdlib_stable/META])
@@ -1008,14 +995,9 @@ AS_CASE([$host],
     [exeext=".exe"],
   [exeext=''])
 
-otherlibraries="dynlink"
+otherlibraries="dynlink runtime_events"
 lib_dynlink=true
-
-AS_IF(
-  [test x"$enable_runtime5" = x"yes"],
-  [otherlibraries="$otherlibraries runtime_events"
-   lib_runtime_events=true],
-  [])
+lib_runtime_events=true
 
 AS_IF([test x"$enable_unix_lib" != "xno"],
   [enable_unix_lib=yes
@@ -2587,10 +2569,6 @@ AC_CHECK_HEADER([spawn.h],
   [AC_CHECK_FUNC([posix_spawn],
     [AC_CHECK_FUNC([posix_spawnp], [AC_DEFINE([HAS_POSIX_SPAWN])])])])
 
-## ffs or _BitScanForward
-# CR mshinwell all-runtime5: remove ffs check, it's only needed for runtime4
-AC_CHECK_FUNC([ffs], [AC_DEFINE([HAS_FFS])])
-
 AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
 
 ## pthread_getaffinity_np, args differ from GNU and BSD
@@ -2808,10 +2786,7 @@ AC_CHECK_FUNCS(
 
 ## Activate the systhread library
 
-AS_IF(
-  [test x"$enable_runtime5" = x"yes"],
-  [runtime_suffix=],
-  [runtime_suffix=4])
+runtime_suffix=
 
 AS_CASE([$enable_systhreads,$enable_unix_lib],
   [yes,no],
@@ -3094,10 +3069,9 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
 # Multidomain is permitted without stack checks, you'll just get large
 # non-resizeable fiber stacks.
 AS_IF([test x"$enable_multidomain" = "xyes"],
-  [AS_IF([test x"$enable_runtime5" = "xyes" &&
-          test x"$enable_poll_insertion" = "xyes"],
+  [AS_IF([test x"$enable_poll_insertion" = "xyes"],
     [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=yes],
-    [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
+    [AC_MSG_ERROR([Creating multiple domains is only supported with \
 poll insertion enabled.])])], [])
 
 AC_SUBST([has_popcnt])
