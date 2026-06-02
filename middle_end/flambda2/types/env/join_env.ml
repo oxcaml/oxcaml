@@ -821,12 +821,12 @@ module Bindings_in_target_env : sig
   val alias_types_in_target_env :
     t -> Type_in_target_env.t Name_in_source_env.Map.t
 
-  (* Assuming that [since] derives from [t], returns the definitions of local
+  (* Assuming that [t] derives from [since], returns the definitions of local
      variables that have been added to [t] after [since]. *)
   val new_bindings :
     t -> since:t -> definition_in_joined_envs Name_in_target_env.Map.t
 
-  (* Assuming that [since] derives from [t], extract the created variables from
+  (* Assuming that [t] derives from [since], extract the created variables from
      [t], adding them to [since]. Any information about the created variables
      besides their kind (in particular, their [definition_in_joined_env]) is
      forgotten, and they won't appear in the [new_bindings]. *)
@@ -1979,6 +1979,13 @@ let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
         Joined_envs.equations_in_nth_joined_env joined_envs index
       in
       let diff_equations =
+        (* Note that we forget the potential newly created variables here, but
+           they could end up in the [Bindings_in_target_env] and cause issue if
+           they are ever used in the parent environment.
+
+           This is fine, however, because we drop any possible information about
+           these variables by calling [forget_definition_of_created_variables]
+           in [n_way_join_env_extension]. *)
         Type_in_one_joined_env.create_equations (TEL.equations diff_level)
       in
       (* The call below to [replay_definition_of_aliases_in_target_env] is only
@@ -2188,7 +2195,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
          extension), but not incorrect, only slighly inefficient. *)
       let bindings =
         Bindings_in_target_env.forget_definition_of_created_variables
-          bindings_after_extension ~since:bindings
+          bindings_after_extension ~since:t.bindings
       in
       Ok
         ( TEE.from_map
