@@ -20,7 +20,7 @@ let foo r x = r.i <- x
 [%%expect{|
 (let
   (foo/0 =
-     (function {nlocal = 1} r/0[L] x/0 : int
+     (function {nlocal = 0} r/0[L] x/0 : int
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
@@ -47,7 +47,7 @@ val foo :
 (* Can be [setfield_ptr] *)
 let foo (r @ global) x = r.i <- x
 [%%expect{|
-(let (foo/2 = (function {nlocal = 1} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
+(let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
   'a myref @ [< 'm @@ past & global corrupted forkable unyielding write] ->
@@ -63,7 +63,7 @@ let foo () =
 [%%expect{|
 (let
   (foo/3 =
-     (function {nlocal = 1} param/0[L][value<int>] : stack
+     (function {nlocal = 1} param/0[L][value<int>]
        (let
          (r/3 = (makemutable 0 (*) "bar")
           store/0 =
@@ -87,7 +87,7 @@ Line 2, characters 6-7:
 Warning 26 [unused-var]: unused variable "r".
 (let
   (foo/4 =
-     (function {nlocal = 1} param/2[L][value<int>] : stack
+     (function {nlocal = 1} param/2[L][value<int>]
        (region
          (let (r/5 =mut "bar")
            (function {nlocal = 1} r/6[L] : int
@@ -105,7 +105,7 @@ let foo () =
 [%%expect{|
 (let
   (foo/5 =
-     (function {nlocal = 1} param/3[L][value<int>] : stack
+     (function {nlocal = 1} param/3[L][value<int>]
        (let
          (r/7 = (makemutable 0 (*) "bar")
           store/1 =
@@ -134,9 +134,7 @@ val foo :
 let fst x = fun y -> x
 [%%expect{|
 (let
-  (fst/0 =
-     (function {nlocal = 1} x/3? : stack
-       (function {nlocal = 1} y/0[L]? : stack x/3)))
+  (fst/0 = (function {nlocal = 0} x/3? (function {nlocal = 1} y/0[L]? x/3)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/0))
 val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
   <fun>
@@ -144,7 +142,7 @@ val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
 
 let fst' x y = x
 [%%expect{|
-(let (fst'/0 = (function {nlocal = 1} x/4[L]? y/1[L]? : stack x/4))
+(let (fst'/0 = (function {nlocal = 1} x/4[L]? y/1[L]? x/4))
   (apply (field_imm 1 (global Toploop!)) "fst'" fst'/0))
 val fst' : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
   <fun>
@@ -157,7 +155,7 @@ let fst_local (x @ local) = exclave_ fun y -> x
 (let
   (fst_local/0 =
      (function {nlocal = 1} x/5[L]? : stack
-       (function[L] {nlocal = 1} y/2[L]? : stack x/5)))
+       (function[L] {nlocal = 1} y/2[L]? x/5)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/0))
 val fst_local :
   'a @ [< 'm > local unforkable yielding] ->
@@ -206,7 +204,7 @@ val use_yield : 'a @ [> yielding] -> unit @ 'm = <fun>
 (let (use_unyielding/0 = (function {nlocal = 1} param/7[L]? : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_unyielding" use_unyielding/0))
 val use_unyielding : 'a @ [< unyielding] -> unit @ 'm = <fun>
-(let (id/0 = (function {nlocal = 1} x/6[L]? : stack x/6))
+(let (id/0 = (function {nlocal = 1} x/6[L]? x/6))
   (apply (field_imm 1 (global Toploop!)) "id" id/0))
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
@@ -229,8 +227,7 @@ let apply_yielding (x @ yielding) = id x
 [%%expect{|
 (let
   (id/0 =? (apply (field_imm 0 (global Toploop!)) "id")
-   apply_yielding/0 =
-     (function {nlocal = 1} x/7? : stack (apply[yielding] id/0 x/7)))
+   apply_yielding/0 = (function {nlocal = 0} x/7? (apply[yielding] id/0 x/7)))
   (apply (field_imm 1 (global Toploop!)) "apply_yielding" apply_yielding/0))
 val apply_yielding :
   'a @ [< 'm & global > yielding] -> 'a @ [> 'm | yielding dynamic] = <fun>
@@ -241,8 +238,7 @@ val apply_yielding :
 let app f x = f x
 [%%expect{|
 (let
-  (app/0 =
-     (function {nlocal = 1} f/0[L] x/8[L]? : stack (apply[yielding] f/0 x/8)))
+  (app/0 = (function {nlocal = 1} f/0[L] x/8[L]? (apply[yielding] f/0 x/8)))
   (apply (field_imm 1 (global Toploop!)) "app" app/0))
 val app :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
@@ -255,8 +251,7 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
 (let
   (app/0 =? (apply (field_imm 0 (global Toploop!)) "app")
    app_yielding/0 =
-     (function {nlocal = 1} f/1 x/9[L]? : stack
-       (apply[yielding] app/0 f/1 x/9)))
+     (function {nlocal = 1} f/1 x/9[L]? (apply[yielding] app/0 f/1 x/9)))
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/0))
 val app_yielding :
   ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global > yielding] ->
@@ -302,7 +297,7 @@ let forward_yielding (y @ yielding) =
 (let
   (use_yield/0 =? (apply (field_imm 0 (global Toploop!)) "use_yield")
    forward_yielding/0 =
-     (function {nlocal = 1} y/3? : stack
+     (function {nlocal = 0} y/3?
        (let (letrec_function_context/1 =? (caml_alloc_dummy 1))
          (letrec
            (f/2

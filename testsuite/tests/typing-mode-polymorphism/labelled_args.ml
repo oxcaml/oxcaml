@@ -47,8 +47,6 @@ let () =
   let f = fst ~label2:() in
   use_uncontended (f ~label1:x)
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
 |}]
 
 let () =
@@ -74,8 +72,6 @@ let () =
   let y = fst ~label2:() ~label2:x in
   use_global y
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
 |}]
 
 let () =
@@ -83,8 +79,10 @@ let () =
   let y = fst ~label2:() ~label2:x in
   use_global y
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
+Line 4, characters 13-14:
+4 |   use_global y
+                 ^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let snd ~label1 ~label2 = label2
@@ -99,14 +97,11 @@ let () =
   let f = snd ~label2:x in
   use_uncontended (f ~label1:())
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
 |}]
 
 let foo = fst ~label2:()
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
+val foo : label1:'a @ [< 'm & global] -> 'a @ [> 'm] = <fun>
 |}]
 
 (* partially applying a labelled function yield
@@ -117,8 +112,10 @@ let () =
   let foo = fst ~label2 in
   use_global foo
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
+Line 4, characters 13-16:
+4 |   use_global foo
+                 ^^^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let () =
@@ -126,8 +123,6 @@ let () =
   let foo = fst ~label2 in
   use_global foo
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 138, characters 2-8: Assertion failed
-
 |}]
 
 let foo = fun x -> fst ~label1:x
