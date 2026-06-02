@@ -1871,6 +1871,12 @@ let assert_mixed_product_support =
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
 
+(* Records and variants with a field or constructor argument of kind [any] get a
+   variable representation, as oxcaml/oxcaml#5461. This is an experimental
+   feature that currently gets fewer optimizations, so we warn. *)
+let warn_variable_representation loc =
+  Location.prerr_warning loc Warnings.Experimental_variable_representations
+
 (* [Element_repr] is used to classify whether something is a "mixed product"
    (a mixed record or mixed variant constructor), meaning that some of the
    fields are unboxed in a way that isnt encoded in the usual short numeric tag.
@@ -2275,6 +2281,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
          [any]. This works because the representation doesn't include a sort,
          since it's not actually needed in order to produce code (the
          in-memory representation is always exactly the underlying value). *)
+      if Option.is_none sort then warn_variable_representation loc;
       Ok Record_unboxed
     in
     [ld_sort], rep, jkind
@@ -2421,11 +2428,15 @@ let update_record_representation env loc form lbls_and_types =
    [update_decls_jkind], so that mutually recursive type decls see each others'
    best kinds during normalization and subsumption
 *)
-let rec update_decl_jkind env dpath decl =
+let rec update_decl_jkind ?(warn_variable_rep = true) env dpath decl =
   let type_unboxed_version =
     Option.map
       (fun d ->
-        update_decl_jkind env (Path.unboxed_version dpath) d)
+        (* Don't warn separately for the implicit unboxed version of a boxed
+           record/variant: the user-written declaration is warned about
+           below. *)
+        update_decl_jkind ~warn_variable_rep:false env
+          (Path.unboxed_version dpath) d)
       decl.type_unboxed_version
   in
   let decl = { decl with type_unboxed_version } in
@@ -2479,6 +2490,8 @@ let rec update_decl_jkind env dpath decl =
             let ca_sort =
               Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
             in
+            if warn_variable_rep && Option.is_none sort then
+              warn_variable_representation loc;
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -2489,6 +2502,8 @@ let rec update_decl_jkind env dpath decl =
             let ld_sort =
               Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
             in
+            if warn_variable_rep && Option.is_none sort then
+              warn_variable_representation loc;
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -2514,7 +2529,9 @@ let rec update_decl_jkind env dpath decl =
                 cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
             | Ok _, None ->
                 Misc.fatal_error "Representation but no arg sorts?"
-            | _, _ -> cstr_layouts.(idx) <- Cstr_layout_variable
+            | _, _ ->
+                if warn_variable_rep then warn_variable_representation loc;
+                cstr_layouts.(idx) <- Cstr_layout_variable
           in
           let cstr = { cstr with Types.cd_args } in
           cstr
@@ -2571,7 +2588,10 @@ let rec update_decl_jkind env dpath decl =
       let rep =
         match rep with
         | Ok rep -> rep
-        | Error _ -> Record_variable
+        | Error _ ->
+          if warn_variable_rep then
+            warn_variable_representation decl.type_loc;
+          Record_variable
       in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
@@ -2602,7 +2622,10 @@ let rec update_decl_jkind env dpath decl =
         let rep =
           match rep with
           | Ok rep -> rep
-          | Error _ -> Record_unboxed_product_variable
+          | Error _ ->
+            if warn_variable_rep then
+              warn_variable_representation decl.type_loc;
+            Record_unboxed_product_variable
         in
         (* See Note [Quality of jkinds during inference] for more information
            about when we mark jkinds as best *)
