@@ -688,6 +688,8 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
         (fun () ->
            let cty =
              Ctype.with_local_level_generalize_structure_if_principal
+               ~before_generalize:(fun cty ->
+                 Ctype.generalize_structure cty.ctyp_type)
                (fun () -> Typetexp.transl_simple_type ~new_var_jkind:Any val_env
                             ~closed:false Alloc.Const.legacy styp)
            in
@@ -736,6 +738,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
            end;
            let definition =
              Ctype.with_local_level_generalize_structure_if_principal
+               ~before_generalize:Typecore.generalize_structure_exp
                (fun () -> Typecore.type_exp val_env sdefinition)
            in
            begin
@@ -1245,6 +1248,10 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let (pat, pv, val_env', met_env) =
         Ctype.with_local_level_generalize_structure_if_principal
+          ~before_generalize:begin fun (pat, _, _, _) ->
+            let gen {pat_type = ty} = Ctype.generalize_structure ty in
+            iter_pattern gen pat
+          end
           (fun () ->
             Typecore.type_class_arg_pattern cl_num val_env met_env l spat)
       in
@@ -1309,6 +1316,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       assert (sargs <> []);
       let cl =
         Ctype.with_local_level_generalize_structure_if_principal
+          ~before_generalize:(fun cl ->
+            Ctype.generalize_class_type_structure cl.cl_type)
           (fun () -> class_expr cl_num val_env met_env virt self_scope scl')
       in
       let rec nonopt_labels ls ty_fun =
@@ -1667,6 +1676,7 @@ let initial_env define_class approx
   (* Temporary type for the class constructor *)
   let constr_type =
     Ctype.with_local_level_generalize_structure_if_principal
+      ~before_generalize:Ctype.generalize_structure
       (fun () -> approx cl.pci_expr)
   in
   let dummy_cty = Cty_signature (Ctype.new_class_signature ()) in
@@ -1927,7 +1937,7 @@ let final_decl env define_class
                  , Non_generalizable_class { id; clty; nongen_vars }));
     );
   begin match
-    Ctype.closed_class clty.cty_params
+    Alloc.with_zap_scope Ctype.closed_class clty.cty_params
       (Btype.signature_of_class_type clty.cty_type)
   with
     None        -> ()

@@ -117,7 +117,7 @@ type return_mode
 
 val create_return_mode : Mode.Locality.l -> return_mode
 
-val return_mode_zap_to_floor : return_mode -> Mode.Locality.Const.t
+val return_mode_zap_to_floor_exn : return_mode -> Mode.Locality.Const.t
 
 val print_return_mode : Format.formatter -> return_mode -> unit
 
