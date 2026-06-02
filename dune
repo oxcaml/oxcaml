@@ -263,6 +263,8 @@
   typedecl
   typeopt
   value_rec_check
+  typing_recovery_state
+  typing_recovery
   typecore
   solver_intf
   solver
