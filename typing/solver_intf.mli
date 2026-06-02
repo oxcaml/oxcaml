@@ -393,6 +393,37 @@ module type Solver_mono = sig
   (** Returns true if the mode is a constant or a mode variable at level 0 *)
   val check_const_or_level_0 : ('a, 'l * 'r) mode -> bool
 
+  (** Returns true if the mode includes a mode variable at generic level *)
+  val check_generic : ('a, 'l * 'r) mode -> bool
+
+  type var_iterator =
+    { iter : 'a. 'a obj -> ('a, allowed * allowed) mode -> unit }
+  [@@unboxed]
+
+  val mode_iter : 'a obj -> ('a, 'l * 'r) mode -> var_iterator -> unit
+
+  (** Applies an iterator over every reachable covariant (left-) constraint
+      variable. The iterator is only applied to constraint variables at level 0,
+      and exposes the int identifier of the constraint variable. WARNING: the
+      iterator is only applied once per constraint, even when it appears as a
+      constraint multiple times via different morphisms *)
+  val iter_covariant :
+    'a obj ->
+    ('a, allowed * 'r) mode ->
+    (int -> ('a, allowed * disallowed) mode -> unit) ->
+    unit
+
+  (** Applies an iterator over every reachable contravariant (right-) constraint
+      variable. The iterator is only applied to constraint variables at level 0,
+      and exposes the int identifier of the constraint variable. WARNING: the
+      iterator is only applied once per constraint, even when it appears as a
+      constraint multiple times via different morphisms *)
+  val iter_contravariant :
+    'a obj ->
+    ('a, 'l * allowed) mode ->
+    (int -> ('a, disallowed * allowed) mode -> unit) ->
+    unit
+
   (** Apply a monotone morphism explained by an optional hint *)
   val apply :
     'b obj ->

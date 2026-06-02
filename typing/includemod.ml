@@ -792,7 +792,8 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
               | Specific ((m, _locks), _) ->
                 Yielding.disallow_right (Value.proj_comonadic Yielding m)
             in
-            Yielding.join (funct_yielding :: param_yielding)
+            Ctype.create_yielding_mode_l
+              (Yielding.join (funct_yielding :: param_yielding))
           in
           Ok
             (Tcoerce_functor(cc_arg, cc_res, application_yielding),
