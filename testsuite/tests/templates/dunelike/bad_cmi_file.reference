@@ -1,7 +1,7 @@
 File "_none_", line 1:
 Error: The implementation "(obtained by functorizing)"
        does not match the interface "bundle_bad/bundle_bad.cmi": 
-       In module "Func":
+       In module "Make":
        Modules do not match:
          functor (P : $S1) () -> ...
        is not included in

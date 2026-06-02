@@ -1,4 +1,4 @@
-module R = Bundle.Func(P_int)(Q_impl)()
+module R = Bundle.Make(P_int)(Q_impl)()
 
 let () =
   let f = R.Fancy.create 42

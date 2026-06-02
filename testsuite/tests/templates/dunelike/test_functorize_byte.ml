@@ -9,6 +9,7 @@
    derived.mli derived.ml \
    p_int.mli p_int.ml p_int__.ml \
    main_functorize.ml \
+   main_functorize_intf_sig.ml \
    main_functorize_double.ml \
    main_functorize_derived.ml \
    main_functorize_share.ml \
@@ -30,8 +31,7 @@
    bundle_phases.cmi.objinfo.reference \
    bundle_cms.cms.objinfo_byte.reference \
    bundle_bad.mli \
-   main_functorize_swap.ml \
-   test_functorize_swap.reference \
+   bad_swap.reference \
    bad_cmi_file.reference \
    main_crc_mismatch.ml \
    bad_crc_mismatch_byte.reference \
@@ -254,7 +254,37 @@
    reference = "test_functorize.reference";
    check-program-output;
 
-   (* Double application: applying Bundle.Func twice gives fresh abstract types *)
+   (* Module type sharing: [Bundle.Make(P_int)()] should match the module
+      type [Bundle.Intf(P_int).S].  Same expected output as test_functorize. *)
+
+   flags = "$flg -I bundle -I p -I p_int -I basic -I util";
+   module = "main_functorize_intf_sig.ml";
+   ocamlc.byte;
+
+   flags = "";
+   module = "";
+   program = "$test_build_directory/test_functorize_intf_sig.bc";
+   all_modules = "\
+     basic/basic__.cmo \
+     util/util__.cmo \
+     basic/basic.cmo \
+     util/util.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle/bundle.cmo \
+     main_functorize_intf_sig.cmo \
+   ";
+   ocamlc.byte;
+
+   stdout = "test_functorize_intf_sig.output";
+   stderr = "test_functorize_intf_sig.output";
+   output = "test_functorize_intf_sig.output";
+   run;
+
+   reference = "test_functorize.reference";
+   check-program-output;
+
+   (* Double application: applying Bundle.Make twice gives fresh abstract types *)
 
    flags = "$flg -I bundle -I p -I p_int -I basic -I util";
    module = "main_functorize_double.ml";
@@ -410,55 +440,17 @@
    reference = "bundle_cms.cms.objinfo_byte.reference";
    check-program-output;
 
-   (* Coercion: declared CMI has Util listed before Basic; bundle CMO has Basic
-      listed before Util.  The coercion must swap fields at runtime. *)
-
-   (* Phase 1: generate CMI with Util first *)
-   flags = "$flg -functorize -I p -I basic -I util";
-   module = "";
-   program = "bundle_swap/bundle_swap.cmi";
-   all_modules = "util/util.cmi basic/basic.cmi";
-   ocamlc.byte;
-
-   (* Phase 2: generate CMO with Basic first + -cmi-file for inclusion+coercion *)
-   flags = "$flg -functorize -I p -I basic -I util \
-     -cmi-file bundle_swap/bundle_swap.cmi";
-   module = "";
-   program = "bundle_swap/bundle_swap.cmo";
-   all_modules = "basic/basic.cmo util/util.cmo";
-   ocamlc.byte;
-
-   flags = "$flg -I bundle_swap -I p -I p_int -I basic -I util";
-   module = "main_functorize_swap.ml";
-   ocamlc.byte;
-
-   flags = "";
-   module = "";
-   program = "$test_build_directory/test_functorize_swap.bc";
-   all_modules = "\
-     basic/basic__.cmo \
-     util/util__.cmo \
-     basic/basic.cmo \
-     util/util.cmo \
-     p_int/p_int__.cmo \
-     p_int/p_int.cmo \
-     bundle_swap/bundle_swap.cmo \
-     main_functorize_swap.cmo \
-   ";
-   ocamlc.byte;
-
-   stdout = "test_functorize_swap.output";
-   stderr = "test_functorize_swap.output";
-   output = "test_functorize_swap.output";
-   run;
-
-   reference = "test_functorize_swap.reference";
-   check-program-output;
-
    (* Compile the incompatible declared interface for the bad-cmi-file test *)
 
    flags = "";
    module = "bundle_bad/bundle_bad.mli";
+   ocamlc.byte;
+
+   (* Phase 1 for swap test: generate CMI with Util first *)
+   flags = "$flg -functorize -I p -I basic -I util";
+   module = "";
+   program = "bundle_swap/bundle_swap.cmi";
+   all_modules = "util/util.cmi basic/basic.cmi";
    ocamlc.byte;
 
    (* CRC mismatch: phase 1 generates bundle_crc.cmi (Basic+Util), phase 2
@@ -502,7 +494,7 @@
      check-ocamlc.byte-output;
    }
 
-   (* Inclusion error: -cmi-file declares Func as a plain structure,
+   (* Inclusion error: -cmi-file declares Make as a plain structure,
       but the bundle infers a functor.  The inclusion check must fail. *)
    {
      flags = "$flg -functorize -I p -I basic -I util \
@@ -515,6 +507,25 @@
      ocamlc.byte;
 
      compiler_reference = "bad_cmi_file.reference";
+     check-ocamlc.byte-output;
+   }
+
+   (* Inclusion error: declared CMI has Util before Basic; bundle CMO has
+      Basic before Util.  With the [Intf]/[Make] cmi shape, [module type S
+      = sig ... end] inside [Intf] is type-level positional, so a runtime
+      permutation can't be coerced through it — the inclusion check must
+      fail. *)
+   {
+     flags = "$flg -functorize -I p -I basic -I util \
+       -cmi-file bundle_swap/bundle_swap.cmi";
+     module = "";
+     program = "bundle_swap/bundle_swap.cmo";
+     all_modules = "basic/basic.cmo util/util.cmo";
+     ocamlc_byte_exit_status = "2";
+     compiler_output = "bad_swap.output";
+     ocamlc.byte;
+
+     compiler_reference = "bad_swap.reference";
      check-ocamlc.byte-output;
    }
 

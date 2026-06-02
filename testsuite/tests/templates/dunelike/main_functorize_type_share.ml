@@ -1,4 +1,4 @@
-module R = Bundle_share.Func(P_int)()
+module R = Bundle_share.Make(P_int)()
 
 let () =
   (* Type sharing: Util_share.t = Basic_share.t (declared in util_share.mli).
@@ -7,8 +7,8 @@ let () =
   let b : R.Basic_share.t = u in
   print_endline (R.Basic_share.to_string b)
 
-module R1 = Bundle_share.Func(P_int)()
-module R2 = Bundle_share.Func(P_int)()
+module R1 = Bundle_share.Make(P_int)()
+module R2 = Bundle_share.Make(P_int)()
 
 let () =
   (* Each application gets a fresh counter, independent from the others.

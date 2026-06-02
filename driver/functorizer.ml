@@ -103,11 +103,7 @@ let impl_unit_info_with_cmi_data ~(ui_unit : CU.t)
    in which parameter idents in [bindings] (those whose names don't appear
    in the bundle as modules) become functor parameters. *)
 
-type bundle_module = {
-  bm_id : Ident.t;
-  bm_sign : Types.signature;
-}
-
+type bundle_module = { bm_id : Ident.t; bm_sign : Types.signature }
 type rev_bundle = bundle_module list
 
 module Bindings = Misc.Stdlib.String.Map
@@ -115,7 +111,6 @@ module Bindings = Misc.Stdlib.String.Map
 type bindings = Ident.t Bindings.t
 
 let empty_rev_bundle : rev_bundle = []
-
 let empty_bindings : bindings = Bindings.empty
 
 (* Load the cmi for compunit [name] via [Env.import_cmi_for_link]. *)
@@ -151,10 +146,9 @@ let classify_cmi (loaded : Persistent_env.loaded_cmi) =
 
    The collected substitution is applied to [swg]'s signature, then the new
    entry is consed onto [rev_bundle]. *)
-let rec insert_module ~name (swg : Signature_with_global_bindings.t)
-    ~rev_bundle ~bindings : Ident.t * rev_bundle * bindings =
-  if Bindings.mem name bindings
-  then
+let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~rev_bundle
+    ~bindings : Ident.t * rev_bundle * bindings =
+  if Bindings.mem name bindings then
     Misc.fatal_errorf "Functorizer.insert_module: %s already in bundle" name;
   let new_id = Ident.create_local name in
   let bindings = Bindings.add name new_id bindings in
@@ -170,25 +164,25 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t)
       ((gm, _prec) : GM.With_precision.t) =
     let head = gm.GM.head in
     match Bindings.find_opt head bindings with
-    | Some id -> add_subst_entry head id subst, rev_bundle, bindings
+    | Some id -> (add_subst_entry head id subst, rev_bundle, bindings)
     | None -> (
-      let loaded = load_cmi head in
-      match classify_cmi loaded with
-      | `Plain ->
-        (* Leave as global; no subst entry. *)
-        subst, rev_bundle, bindings
-      | `Parameter ->
-        Misc.fatal_errorf
-          "Functorizer.insert_module: parameter %s not pre-registered in \
-           bindings (the caller must add parameters before calling \
-           insert_module)"
-          head
-      | `Parameterised ->
-        let id, rev_bundle, bindings =
-          insert_module ~name:head loaded.sign_with_globals ~rev_bundle
-            ~bindings
-        in
-        add_subst_entry head id subst, rev_bundle, bindings)
+        let loaded = load_cmi head in
+        match classify_cmi loaded with
+        | `Plain ->
+            (* Leave as global; no subst entry. *)
+            (subst, rev_bundle, bindings)
+        | `Parameter ->
+            Misc.fatal_errorf
+              "Functorizer.insert_module: parameter %s not pre-registered in \
+               bindings (the caller must add parameters before calling \
+               insert_module)"
+              head
+        | `Parameterised ->
+            let id, rev_bundle, bindings =
+              insert_module ~name:head loaded.sign_with_globals ~rev_bundle
+                ~bindings
+            in
+            (add_subst_entry head id subst, rev_bundle, bindings))
   in
   let subst, rev_bundle, bindings =
     Array.fold_left process_bound
@@ -211,7 +205,7 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t)
   let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
   let sign = Subst.Lazy.force_signature sign_lazy in
   let rev_bundle = { bm_id = new_id; bm_sign = sign } :: rev_bundle in
-  new_id, rev_bundle, bindings
+  (new_id, rev_bundle, bindings)
 
 (* Insert an instantiation for compunit [name] into [instantiations] and
    return its Local Ident.  Idempotent: if [name] is already in [bindings],
@@ -222,56 +216,56 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t)
 
    The caller must pre-register every functor parameter ident in
    [bindings] under the parameter's name. *)
-let rec insert_instantiation ~name ~find_impl_unit_info_by_name
-    ~instantiations ~bindings =
+let rec insert_instantiation ~name ~find_impl_unit_info_by_name ~instantiations
+    ~bindings =
   match Bindings.find_opt name bindings with
-  | Some id -> id, instantiations, bindings
+  | Some id -> (id, instantiations, bindings)
   | None ->
-    let impl =
-      try find_impl_unit_info_by_name name
-      with Not_found ->
-        Location.raise_errorf ~loc:Location.none
-          "Cannot find impl for module '%s'." name
-    in
-    let new_id = Ident.create_local (name ^ "__block") in
-    let bindings = Bindings.add name new_id bindings in
-    let runtime_params =
-      match impl.ui_format with
-      | Mb_struct _ -> []
-      | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
-    in
-    let instantiations, bindings =
-      List.fold_left
-        (fun (instantiations, bindings) (rp : Lambda.runtime_param) ->
-          match rp with
-          | Rp_main_module_block global ->
-            let _, instantiations, bindings =
-              insert_instantiation ~name:global.GM.head
-                ~find_impl_unit_info_by_name ~instantiations ~bindings
-            in
-            instantiations, bindings
-          | Rp_argument_block _ | Rp_unit -> instantiations, bindings)
-        (instantiations, bindings) runtime_params
-    in
-    let resolve_lvar head =
-      match Bindings.find_opt head bindings with
-      | Some id -> id
-      | None ->
-        Misc.fatal_errorf "insert_instantiation: %s not in bindings" head
-    in
-    let args =
-      List.map
-        (fun (rp : Lambda.runtime_param) : Translmod.runtime_arg ->
-          match rp with
-          | Rp_argument_block global -> Lvar (resolve_lvar global.GM.head)
-          | Rp_main_module_block global -> Lvar (resolve_lvar global.GM.head)
-          | Rp_unit -> Unit)
-        runtime_params
-    in
-    let inst : Translmod.instantiation =
-      { ident = new_id; cu = impl.intf.ui_unit; args }
-    in
-    new_id, instantiations @ [inst], bindings
+      let impl =
+        try find_impl_unit_info_by_name name
+        with Not_found ->
+          Location.raise_errorf ~loc:Location.none
+            "Cannot find impl for module '%s'." name
+      in
+      let new_id = Ident.create_local (name ^ "__block") in
+      let bindings = Bindings.add name new_id bindings in
+      let runtime_params =
+        match impl.ui_format with
+        | Mb_struct _ -> []
+        | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
+      in
+      let instantiations, bindings =
+        List.fold_left
+          (fun (instantiations, bindings) (rp : Lambda.runtime_param) ->
+            match rp with
+            | Rp_main_module_block global ->
+                let _, instantiations, bindings =
+                  insert_instantiation ~name:global.GM.head
+                    ~find_impl_unit_info_by_name ~instantiations ~bindings
+                in
+                (instantiations, bindings)
+            | Rp_argument_block _ | Rp_unit -> (instantiations, bindings))
+          (instantiations, bindings) runtime_params
+      in
+      let resolve_lvar head =
+        match Bindings.find_opt head bindings with
+        | Some id -> id
+        | None ->
+            Misc.fatal_errorf "insert_instantiation: %s not in bindings" head
+      in
+      let args =
+        List.map
+          (fun (rp : Lambda.runtime_param) : Translmod.runtime_arg ->
+            match rp with
+            | Rp_argument_block global -> Lvar (resolve_lvar global.GM.head)
+            | Rp_main_module_block global -> Lvar (resolve_lvar global.GM.head)
+            | Rp_unit -> Unit)
+          runtime_params
+      in
+      let inst : Translmod.instantiation =
+        { ident = new_id; cu = impl.intf.ui_unit; args }
+      in
+      (new_id, instantiations @ [ inst ], bindings)
 
 let make_md md_type : Types.module_declaration =
   {
@@ -327,17 +321,18 @@ let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
         (match classify_cmi loaded with
         | `Parameterised -> ()
         | `Parameter ->
-          Compenv.fatal
-            (Printf.sprintf "functorize input '%s' is a parameter module" name)
+            Compenv.fatal
+              (Printf.sprintf "functorize input '%s' is a parameter module" name)
         | `Plain ->
-          Compenv.fatal
-            (Printf.sprintf "functorize input '%s' is not a parameterised module"
-               name));
+            Compenv.fatal
+              (Printf.sprintf
+                 "functorize input '%s' is not a parameterised module" name));
         let _id, rev_bundle, bindings =
           insert_module ~name loaded.sign_with_globals ~rev_bundle ~bindings
         in
-        rev_bundle, bindings)
-      (empty_rev_bundle, initial_bindings) src_infos
+        (rev_bundle, bindings))
+      (empty_rev_bundle, initial_bindings)
+      src_infos
   in
   let bundle = List.rev rev_bundle in
   let body =
@@ -364,58 +359,92 @@ let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
   in
   { body; param_ids; modules }
 
-type bundle_functor_type = {
-  functor_type : Types.module_type;
-      (** [Mty_functor(Named p, ... Mty_functor(Unit, body))] — one
-          [Mty_functor(Named ...)] layer per parameter, in declaration
-          order. *)
+(* Wrap [body] in [Mty_functor (Named p_i, sig_of_p_i)] layers, one per
+   parameter in [param_ids], in declaration order.  Each parameter's
+   signature is loaded from its cmi. *)
+let wrap_in_named_functor_layers (param_ids : Ident.t list)
+    (body : Types.module_type) : Types.module_type =
+  List.fold_right
+    (fun param_id body ->
+      let name = Ident.name param_id in
+      let loaded = load_cmi name in
+      let sign, _ = loaded.sign_with_globals.sign in
+      let param_type = Types.Mty_signature (Subst.Lazy.force_signature sign) in
+      Types.Mty_functor
+        ( Named (Some param_id, param_type, Mode.Alloc.legacy),
+          body,
+          Mode.Alloc.legacy ))
+    param_ids body
+
+type bundle_signature = {
+  signature : Types.signature;
+      (** Two-element signature:
+          [module Intf (P1)...(Pn) : sig module type S = sig <body> end end]
+          [module Make (P1)...(Pn) () : Intf(P1)...(Pn).S] *)
+  intf_id : Ident.t;  (** Local Ident for the [Intf] module. *)
+  make_id : Ident.t;  (** Local Ident for the [Make] module. *)
   all_params : GM.t list;
   all_modules : intf_unit_info list;
 }
 
-(* Wrap [compute_bundle_sig]'s output as a functor type:
-     [Mty_functor (Unit, body)] inside [Mty_functor (Named p, ...)] layers
-     for each parameter, in declaration order. *)
-let compute_bundle_functor_type (src_infos : intf_unit_info list) :
-    bundle_functor_type =
-  let { body; param_ids; modules } = compute_bundle_sig src_infos in
-  let signature_of_compunit name : Types.signature =
-    let loaded = load_cmi name in
-    let sign, _ = loaded.sign_with_globals.sign in
-    Subst.Lazy.force_signature sign
+(* Build the bundle's saved-cmi signature.  Wraps [compute_bundle_sig]'s body
+   into two siblings:
+     - [Intf]: applicative functor over the parameters, returning a struct
+       containing a single module type [S] equal to the body signature.  No
+       runtime computation (only types).
+     - [Make]: generative functor over the parameters + unit, with result
+       type [Intf(P1)...(Pn).S].  The actual runtime code lives here. *)
+let compute_bundle_signature (src_infos : intf_unit_info list) :
+    bundle_signature =
+  let { body; param_ids = intf_param_ids; modules } =
+    compute_bundle_sig src_infos
   in
-  let with_unit =
-    Types.Mty_functor (Unit, Mty_signature body, Mode.Alloc.legacy)
+  let intf_id = Ident.create_local "Intf" in
+  let make_id = Ident.create_local "Make" in
+  let s_id = Ident.create_local "S" in
+  (* Intf's body: [sig module type S = sig <body> end end] *)
+  let s_decl : Types.modtype_declaration =
+    {
+      mtd_type = Some (Mty_signature body);
+      mtd_attributes = [];
+      mtd_loc = Location.none;
+      mtd_uid = Types.Uid.internal_not_actually_unique;
+    }
   in
-  let functor_type =
-    List.fold_right
-      (fun param_id body ->
-        let name = Ident.name param_id in
-        let param_type = Types.Mty_signature (signature_of_compunit name) in
-        Types.Mty_functor
-          ( Named (Some param_id, param_type, Mode.Alloc.legacy),
-            body,
-            Mode.Alloc.legacy ))
-      param_ids with_unit
+  let intf_result = [ Types.Sig_modtype (s_id, s_decl, Exported) ] in
+  let intf_mty =
+    wrap_in_named_functor_layers intf_param_ids (Mty_signature intf_result)
+  in
+  (* Make's params are fresh idents (same names but different stamps), so
+     [Make]'s functor binders are distinct from [Intf]'s.  Make applies
+     [Intf] to its own parameters to compute its result type. *)
+  let make_param_ids =
+    List.map (fun id -> Ident.create_local (Ident.name id)) intf_param_ids
+  in
+  let intf_applied_path =
+    List.fold_left
+      (fun p arg_id -> Path.Papply (p, Path.Pident arg_id))
+      (Path.Pident intf_id) make_param_ids
+  in
+  let make_result = Types.Mty_ident (Path.Pdot (intf_applied_path, "S")) in
+  let make_with_unit =
+    Types.Mty_functor (Unit, make_result, Mode.Alloc.legacy)
+  in
+  let make_mty = wrap_in_named_functor_layers make_param_ids make_with_unit in
+  let signature =
+    [
+      Types.Sig_module
+        (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);
+      Types.Sig_module
+        (make_id, Mp_present, make_md make_mty, Trec_not, Exported);
+    ]
   in
   let all_params =
     List.map
       (fun id -> GM.create_exn (Ident.name id) [] ~hidden_args:[])
-      param_ids
+      intf_param_ids
   in
-  { functor_type; all_params; all_modules = modules }
-
-(* Wrap [functor_type] in a single-element signature [Sig_module Func] —
-   the conventional shape of a bundle's saved cmi. *)
-let wrap_as_func_module (functor_type : Types.module_type) : Types.signature =
-  [
-    Types.Sig_module
-      ( Ident.create_local "Func",
-        Mp_present,
-        make_md functor_type,
-        Trec_not,
-        Exported );
-  ]
+  { signature; intf_id; make_id; all_params; all_modules = modules }
 
 let make_compilation_unit target =
   let output_basename = Filename.basename (Filename.remove_extension target) in
@@ -437,8 +466,7 @@ let functorize_intf initial_env files target =
   in
   Env.set_unit_name (Some unit_info);
   let src_infos = List.map read_intf_unit_info_of_cmi files in
-  let { functor_type; _ } = compute_bundle_functor_type src_infos in
-  let sg = wrap_as_func_module functor_type in
+  let { signature = sg; _ } = compute_bundle_signature src_infos in
   Misc.try_finally
     (fun () ->
       Typemod.functorize_interface initial_env ~sg unit_info compilation_unit)
@@ -458,10 +486,9 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
   let src_intfs =
     List.map (fun (impl : impl_unit_info) -> impl.intf) src_impls
   in
-  let { functor_type; all_params; all_modules } =
-    compute_bundle_functor_type src_intfs
+  let { signature = sg; intf_id = _; make_id = _; all_params; all_modules } =
+    compute_bundle_signature src_intfs
   in
-  let sg = wrap_as_func_module functor_type in
   let modules_cu =
     List.map (fun (ui : intf_unit_info) -> ui.ui_unit) all_modules
   in
@@ -480,47 +507,46 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
       in
       match !Clflags.cmi_file with
       | Some cmi_file ->
-        let shape =
-          let uid = Types.Uid.of_compilation_unit_id modulename in
-          List.fold_left
-            (fun map cu ->
-              let name = CU.name_as_string cu in
-              let id = Ident.create_persistent name in
-              Shape.Map.add_module map id (Shape.for_persistent_unit name))
-            Shape.Map.empty modules_cu
-          |> Shape.str ~uid
-        in
-        let for_pack_prefix = CU.for_pack_prefix modulename in
-        let cmi_artifact =
-          Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
-        in
-        let name = CU.to_global_name_without_prefix modulename in
-        let dclsig, staticity = Env.read_signature name cmi_artifact in
-        let cc, _shape =
-          let modes =
-            Includecore.Specific
-              ( (Env.mode_unit ~staticity:Mode.Staticity.Dynamic, None),
-                Env.mode_unit ~staticity )
+          let shape =
+            let uid = Types.Uid.of_compilation_unit_id modulename in
+            List.fold_left
+              (fun map cu ->
+                let name = CU.name_as_string cu in
+                let id = Ident.create_persistent name in
+                Shape.Map.add_module map id (Shape.for_persistent_unit name))
+              Shape.Map.empty modules_cu
+            |> Shape.str ~uid
           in
-          Includemod.compunit initial_env ~mark:true
-            "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
-        in
-        save_cmt_cms None;
-        cc
+          let for_pack_prefix = CU.for_pack_prefix modulename in
+          let cmi_artifact =
+            Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
+          in
+          let name = CU.to_global_name_without_prefix modulename in
+          let dclsig, staticity = Env.read_signature name cmi_artifact in
+          let cc, _shape =
+            let modes =
+              Includecore.Specific
+                ( (Env.mode_unit ~staticity:Mode.Staticity.Dynamic, None),
+                  Env.mode_unit ~staticity )
+            in
+            Includemod.compunit initial_env ~mark:true
+              "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
+          in
+          save_cmt_cms None;
+          cc
       | None ->
-        let name = CU.name modulename in
-        let kind =
-          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
-        in
-        let cmi =
-          Env.save_signature_with_imports
-            ~alerts:Misc.Stdlib.String.Map.empty
-            (sg, Mode.Staticity.Dynamic)
-            name kind (Unit_info.cmi target)
-            (Array.of_list (Env.imports ()))
-        in
-        save_cmt_cms (Some cmi);
-        Typedtree.Tcoerce_none
+          let name = CU.name modulename in
+          let kind =
+            Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+          in
+          let cmi =
+            Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
+              (sg, Mode.Staticity.Dynamic)
+              name kind (Unit_info.cmi target)
+              (Array.of_list (Env.imports ()))
+          in
+          save_cmt_cms (Some cmi);
+          Typedtree.Tcoerce_none
   in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
     (* Functor parameter idents: one per [all_params], in declaration order. *)
@@ -557,7 +583,7 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
               ~find_impl_unit_info_by_name:find_impl_by_name ~instantiations
               ~bindings
           in
-          instantiations, bindings, id :: ids)
+          (instantiations, bindings, id :: ids))
         ([], initial_bindings, []) all_modules
     in
     let exposed_idents = List.rev exposed_idents_rev in

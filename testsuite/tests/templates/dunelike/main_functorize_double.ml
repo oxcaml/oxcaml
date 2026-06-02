@@ -1,5 +1,5 @@
-module R1 = Bundle.Func(P_int)()
-module R2 = Bundle.Func(P_int)()
+module R1 = Bundle.Make(P_int)()
+module R2 = Bundle.Make(P_int)()
 
 let () =
   let b1 = R1.Basic.create 42 in

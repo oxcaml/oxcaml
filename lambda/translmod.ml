@@ -1551,13 +1551,15 @@ let transl_functorize compilation_unit
       mode = alloc_heap
     }
   in
+  (* [Make] — generative functor over [params] + unit; carries the actual
+     bundle code. *)
   let unit_ident = Ident.create_local "*unit*" in
-  let func_params =
+  let make_func_params =
     List.map (mk_param layout_module) params
     @ [mk_param layout_unit unit_ident]
   in
-  let func =
-    lfunction ~params:func_params
+  let make_func =
+    lfunction ~params:make_func_params
       ~kind:(Curried { nlocal = 0 })
       ~return:layout_module
       ~attr:
@@ -1567,15 +1569,42 @@ let transl_functorize compilation_unit
         }
       ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
+  (* [Intf] — applicative functor over [params] only; its body contains
+     just a [module type S], which has no runtime presence, so the returned
+     struct is an empty block.  When [params] is empty, [Intf] is the empty
+     struct directly (no functor wrapping). *)
+  let intf_empty_body =
+    Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [], Loc_unknown)
+  in
+  let intf_func =
+    match params with
+    | [] -> intf_empty_body
+    | _ ->
+      let intf_params =
+        List.map
+          (fun id -> mk_param layout_module (Ident.rename id))
+          params
+      in
+      lfunction ~params:intf_params
+        ~kind:(Curried { nlocal = 0 })
+        ~return:layout_module
+        ~attr:
+          { default_function_attribute with
+            is_a_functor = true;
+            inline = Always_inline
+          }
+        ~loc:Loc_unknown ~body:intf_empty_body ~mode:alloc_heap
+        ~ret_mode:alloc_heap
+  in
   let code =
     apply_coercion Loc_unknown Strict coercion
       (Lprim
          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-           [func],
+           [intf_func; make_func],
            Loc_unknown ))
   in
   let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only { field_count = 1 } }
+    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
   in
   let required_globals =
     List.fold_left

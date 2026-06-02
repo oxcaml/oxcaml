@@ -1,4 +1,4 @@
-module R = Bundle_derived.Func(P_int)()
+module R = Bundle_derived.Make(P_int)()
 
 let () =
   let b = R.Basic.create 42 in

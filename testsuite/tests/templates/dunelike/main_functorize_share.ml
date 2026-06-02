@@ -1,4 +1,4 @@
-module R = Bundle2.Func(P_int)()
+module R = Bundle2.Make(P_int)()
 
 let () =
   (* Type sharing: Basic2 and Util2 have transparent type t = P.t.
@@ -8,8 +8,8 @@ let () =
   let b : R.Basic2.t = u in
   print_endline (R.Basic2.to_string b)
 
-module R1 = Bundle2.Func(P_int)()
-module R2 = Bundle2.Func(P_int)()
+module R1 = Bundle2.Make(P_int)()
+module R2 = Bundle2.Make(P_int)()
 
 let () =
   (* With transparent types, two bundle applications give the same type

@@ -5,7 +5,7 @@
    accessible here because we don't take [-parameter P]); with path
    compression, the alias points to the bundle-local [Message]. *)
 
-module Inst = Bundle_pure_alias.Func (P_int) ()
+module Inst = Bundle_pure_alias.Make (P_int) ()
 
 (* Access via the alias chain (the original failing case): *)
 let () = print_endline (Inst.Pure_alias.Message.hello (P_int.create ()))
