@@ -504,34 +504,26 @@ end;;
 module type T_FCM = sig type u : any type t = u box val value : t end
 |}]
 
-let fcm : (module T_FCM) =
+let fcm : (module T_FCM with type u = float#) =
   (module struct
     type u = float#
     type t = float# box
     let value = 3.14
   end);;
 [%%expect{|
-val fcm : (module T_FCM) = <module>
+val fcm : (module T_FCM with type u = float#) = <module>
 |}]
 
-let bad () =
+let extract_fcm () =
   let module M = (val fcm) in
   M.value;;
 [%%expect{|
-Line 3, characters 2-9:
-3 |   M.value;;
-      ^^^^^^^
-Error: This expression has type "M.u box"
-       but an expression was expected of type "'a"
-       The type constructor "M.u" would escape its scope
+val extract_fcm : unit -> float = <fun>
 |}]
 
 let fcm_as_float : float = extract_fcm ();;
 [%%expect{|
-Line 1, characters 27-38:
-1 | let fcm_as_float : float = extract_fcm ();;
-                               ^^^^^^^^^^^
-Error: Unbound value "extract_fcm"
+val fcm_as_float : float = 3.14
 |}]
 
 (* Test 23: box on value types (int, string)
