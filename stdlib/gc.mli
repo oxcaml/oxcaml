@@ -199,7 +199,7 @@ type control =
 
     stack_limit : int;
     (** The maximum size of the fiber stacks (in words).
-       Default: 128M. *)
+       Default: 1024k. *)
 
     allocation_policy : int;
     (** The policy used for allocating in the major heap.
@@ -366,9 +366,8 @@ external get : unit -> control = "caml_gc_get"
 ]
 (** Return the current values of the GC parameters in a [control] record.
 
-    The [major_heap_increment], [max_overhead], [allocation_policy], and
-    [window_size] fields are currently not available in OCaml 5: their returned
-    field values are therefore [0]. *)
+    The [allocation_policy] and [window_size] fields are currently not available
+    in OCaml 5: their returned field values are therefore [0]. *)
 
 external set : control -> unit = "caml_gc_set"
 [@@alert unsynchronized_access
@@ -377,9 +376,8 @@ external set : control -> unit = "caml_gc_set"
 (** [set r] changes the GC parameters according to the [control] record [r].
     The normal usage is: [Gc.set { (Gc.get()) with Gc.verbose = 0x00d }]
 
-    The [major_heap_increment], [max_overhead], [allocation_policy], and
-    [window_size] fields are currently not available in OCaml 5: setting them
-    therefore has no effect. *)
+    The [allocation_policy] and [window_size] fields are currently not available
+    in OCaml 5: setting them therefore has no effect. *)
 
 external minor : unit -> unit = "caml_gc_minor"
 (** Trigger a minor collection. *)
