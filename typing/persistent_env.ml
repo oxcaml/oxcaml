@@ -62,8 +62,13 @@ type error =
         value: Global_module.Name.t;
       }
 
-exception Error of error
-let error err = raise (Error err)
+include (struct
+  exception Error of error
+  let error e = Typing_recovery.log_and_raise (Error e)
+end : sig
+  type exn += private Error of error
+  val error : error -> 'a
+end)
 
 module Persistent_signature = struct
   type t =
@@ -254,8 +259,8 @@ let register_parameter ({param_imports; _} as penv) modname =
       ()
   | Some imp ->
       if not imp.imp_is_param then
-        raise (Error (Not_compiled_as_parameter
-                        (Global_module.Name.of_parameter_name modname)))
+        error (Not_compiled_as_parameter
+                 (Global_module.Name.of_parameter_name modname))
   end;
   param_imports := Param_set.add modname !param_imports
 
@@ -605,13 +610,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
         (fun (param, value) ->
             (* Argument with no parameter: fine only if allowed by flag *)
             if not allow_excess_args then
-              raise
-                (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
-                          valid_parameters = params;
-                          parameter = param;
-                          value = value |> Global_module.to_name;
-                        })))
+              error (Imported_module_has_no_such_parameter {
+                  imported = CU.Name.of_head_of_global_name modname;
+                  valid_parameters = params;
+                  parameter = param;
+                  value = value |> Global_module.to_name;
+                }))
       ~both:
         (fun expected_type (_arg_name, arg_value_global) ->
             let arg_value = arg_value_global |> Global_module.to_name in
@@ -629,12 +633,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
-              raise (Error (Argument_type_mismatch {
+              error (Argument_type_mismatch {
                   value = arg_value;
                   filename = pn.pn_import.imp_filename;
                   expected = expected_type;
                   actual = actual_type;
-                }))
+                })
             end)
   end;
   (* Form the name without any arguments at all, then substitute in all the
