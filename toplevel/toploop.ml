@@ -120,7 +120,7 @@ let run_script ppf name args =
                    (* Note: would use [Filename.abspath] here, if we had it. *)
   begin
     try toplevel_env := Compmisc.initial_env()
-    with Env.Error _ | Typetexp.Error _ as exn ->
+    with Env.Error.In_context _ | Typetexp.Error _ as exn ->
       Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
   Sys.interactive := false;
@@ -395,7 +395,7 @@ let loop ppf =
       Topeval.implementation_label;
   begin
     try initialize_toplevel_env ()
-    with Env.Error _ | Typetexp.Error _ as exn ->
+    with Env.Error.In_context _ | Typetexp.Error _ as exn ->
       Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
   let lb = Lexing.from_function refill_lexbuf in

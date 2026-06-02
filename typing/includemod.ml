@@ -668,7 +668,7 @@ and try_modtypes ~direction ~loc env subst ~modes
     match
       Env.normalize_module_path (Some Location.none) env p1
     with
-    | exception Env.Error (Env.Missing_module (_, _, path)) ->
+    | exception Env.Error.In_context (Env.Missing_module (_, _, path)) ->
         Error Error.(Mt_core(Unbound_module_path path))
     | p1 ->
         begin match Env.find_module_lazy p1 env with

@@ -108,6 +108,10 @@ val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
 
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
 
+val map_types :
+  (type_expr -> type_expr) ->
+  (expanded_type, 'variety) t -> (expanded_type, 'variety) t
+
 val incompatible_fields :
   name:string -> got:type_expr -> expected:type_expr -> (type_expr, _) elt
 
@@ -172,4 +176,6 @@ module Subtype : sig
     trace:error_trace -> unification_trace:unification_error_trace -> error
 
   val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val map_types : (type_expr -> type_expr) -> expanded_type t -> expanded_type t
 end
