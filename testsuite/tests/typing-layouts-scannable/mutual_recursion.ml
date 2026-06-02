@@ -10,24 +10,14 @@ type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
-(* CR layouts-scannable: The current approach does not play nicely with
-   mutually recursive declarations, as demonstrated by the following test: *)
-
 type a : value non_pointer & value non_pointer = #{ b : b }
 and b = #{ i : t_nonptr_val; j : t_nonptr_val }
 [%%expect{|
-Line 1, characters 0-59:
-1 | type a : value non_pointer & value non_pointer = #{ b : b }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is any & any
-         because it is an unboxed record.
-       But the layout of type "a" must be a sublayout of
-           value non_pointer & value non_pointer
-         because of the annotation on the declaration of the type a.
-       Note: The layout of immediate is value non_pointer.
+type a = #{ b : b; }
+and b = #{ i : t_nonptr_val; j : t_nonptr_val; }
 |}]
 
-(* BUT adding in the additional kind annotation on [b] makes this work! *)
+(* An extra kind annotation on [b] also works. *)
 type a : value non_pointer & value non_pointer = #{ b : b }
 and b : value non_pointer & value non_pointer = #{ i : t_nonptr_val; j : t_nonptr_val }
 [%%expect{|
@@ -35,21 +25,13 @@ type a = #{ b : b; }
 and b = #{ i : t_nonptr_val; j : t_nonptr_val; }
 |}]
 
+(* As does an annotation in field position. *)
 type a : value non_pointer & value non_pointer
-       (* BUT an annotation here does not change anything... *)
        = #{ b : (b as (_ : value non_pointer & value non_pointer)) }
 and b = #{ i : t_nonptr_val; j : t_nonptr_val }
 [%%expect{|
-Lines 1-3, characters 0-68:
-1 | type a : value non_pointer & value non_pointer
-2 |        (* BUT an annotation here does not change anything... *)
-3 |        = #{ b : (b as (_ : value non_pointer & value non_pointer)) }
-Error: The layout of type "a" is any & any
-         because it is an unboxed record.
-       But the layout of type "a" must be a sublayout of
-           value non_pointer & value non_pointer
-         because of the annotation on the declaration of the type a.
-       Note: The layout of immediate is value non_pointer.
+type a = #{ b : b; }
+and b = #{ i : t_nonptr_val; j : t_nonptr_val; }
 |}]
 
 (* Same example as above, split across two recursive modules *)
