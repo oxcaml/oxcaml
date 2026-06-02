@@ -1323,16 +1323,10 @@ let record_gets_unboxed_version lbls repr =
     not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 
-let manifest_is_box decl =
-  match decl.type_kind, decl.type_manifest with
-  | Type_abstract _, Some ty ->
-    (match get_desc ty with Tbox _ -> true | _ -> false)
-  | _ -> false
-
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
-  | Type_open | Type_record_unboxed_product _
+  | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
   | Type_record (_, Record_variable, _) ->
     (* As of this writing (2025-11-14), it's not possible to have
@@ -1341,41 +1335,12 @@ let gets_unboxed_version decl =
        (you'll want to consult [update_record_kind]). *)
     true
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
-  | Type_abstract _ -> manifest_is_box decl
 
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with
-  | Type_open | Type_record_unboxed_product _ | Type_variant _ -> None
-  | Type_abstract _ ->
-    (match decl.type_manifest with
-     | Some ty ->
-       (match get_desc ty with
-        | Tbox inner ->
-          (* The unboxed version of [type t = T box] has manifest [T].
-             Use [any] as a placeholder jkind; [check_abbrev] (called below)
-             updates the stored jkind from the manifest. *)
-          Some {
-            type_params = decl.type_params;
-            type_arity = decl.type_arity;
-            type_kind = Type_abstract Definition;
-            type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
-            type_ikind = Types.ikinds_todo "derive_unboxed_version Tbox";
-            type_private = decl.type_private;
-            type_manifest = Some inner;
-            type_variance = decl.type_variance;
-            type_separability =
-              Types.Separability.default_signature ~arity:decl.type_arity;
-            type_is_newtype = false;
-            type_expansion_scope = Btype.lowest_level;
-            type_loc = decl.type_loc;
-            type_attributes = decl.type_attributes;
-            type_unboxed_default = false;
-            type_uid = Uid.unboxed_version decl.type_uid;
-            type_unboxed_version = None;
-          }
-        | _ -> None)
-     | None -> None)
+  | Type_abstract _ | Type_open | Type_record_unboxed_product _
+  | Type_variant _ -> None
   | Type_record (lbls, repr, _)
     when not (record_gets_unboxed_version lbls repr) ->
     None

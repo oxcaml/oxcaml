@@ -1510,6 +1510,7 @@ let type_of_cstr path = function
 type unboxed_version_step =
   | Lacks_unboxed_version
   | Aliases of Path.t * type_expr list
+  | Manifest_is_box of type_expr
   | Has_unboxed_version of type_declaration
 let step_find_unboxed_version decl =
   match decl.type_unboxed_version with
@@ -1528,7 +1529,10 @@ let step_find_unboxed_version decl =
       | None -> Lacks_unboxed_version
       | Some ty ->
         match get_desc ty with
+        | Tconstr (path, [inner], _) when Path.same path Predef.path_box ->
+          Manifest_is_box inner
         | Tconstr (path, args, _) -> Aliases (path, args)
+        | Tbox inner -> Manifest_is_box inner
         | _ -> Lacks_unboxed_version
 
 let rec find_type_data path env seen =
@@ -1577,11 +1581,40 @@ and find_type_unboxed_version path env seen =
   match step_find_unboxed_version decl with
   | Has_unboxed_version ud -> ud
   | Lacks_unboxed_version -> raise Not_found
+  | Manifest_is_box inner ->
+    {
+      type_params = decl.type_params;
+      type_arity = decl.type_arity;
+      type_kind = decl.type_kind;
+      type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf
+             "env unboxed Tbox manifest path=%a" Path.print path);
+      type_private = decl.type_private;
+      type_manifest = Some inner;
+      type_variance = decl.type_variance;
+      type_separability =
+        Types.Separability.default_signature ~arity:decl.type_arity;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = decl.type_loc;
+      type_attributes = decl.type_attributes;
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version decl.type_uid;
+      type_unboxed_version = None;
+    }
   | Aliases (path, args) ->
     let ud = find_type_unboxed_version path env seen in
     let man =
-      Btype.newgenty
-        (Tconstr (Path.unboxed_version path, args, ref Mnil)) in
+      if Path.is_unboxed_version path && args = [] then
+        (* Avoid wrapping into a twice-unboxed path; [ud]'s manifest already
+           represents the once-unboxed type. *)
+        Option.get ud.type_manifest
+      else
+        Btype.newgenty
+          (Tconstr (Path.unboxed_version path, args, ref Mnil))
+    in
     let jkind = ud.type_jkind in
     (* CR layouts v7.2: compute the exact separability *)
     (* As this unboxed version aliases [ud], its params' separabilities can
