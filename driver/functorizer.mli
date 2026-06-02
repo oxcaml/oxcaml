@@ -60,9 +60,11 @@ type bundle_module = {
   bm_sign : Types.signature;
 }
 
-type bundle = bundle_module list
-(** Under-construction list of instantiated modules in topological order
-    (deps appear before users).  Each module's signature has had its
+type rev_bundle = bundle_module list
+(** Under-construction list of instantiated modules, in *reverse* topo
+    order: newest item at the head, deepest dep at the tail.  This makes
+    [insert_module] insertions O(1).  Consumers should reverse this once
+    to obtain topo order.  Each module's signature has had its
     [bound_globals] substituted to reference earlier modules / parameters. *)
 
 module Bindings : Map.S with type key = string
@@ -74,20 +76,22 @@ type bindings = Ident.t Bindings.t
     and so never appear here; they remain global references at link time.
     Parameter declaration order is the caller's responsibility. *)
 
-val empty_bundle : bundle
+val empty_rev_bundle : rev_bundle
 
 val empty_bindings : bindings
 
 val insert_module :
   name:string ->
   Signature_with_global_bindings.t ->
-  bundle:bundle ->
+  rev_bundle:rev_bundle ->
   bindings:bindings ->
-  bundle * bindings
-(** [insert_module ~name swg ~bundle ~bindings] appends a module declaration
-    for [swg] (named [name]) to [bundle].  The caller must pre-register
-    every parameter the bundle exposes in [bindings] before calling; the
-    helper rejects unknown [Parameter] compunits in [bound_globals].
+  Ident.t * rev_bundle * bindings
+(** [insert_module ~name swg ~rev_bundle ~bindings] returns the fresh Local
+    Ident for [name], the extended [rev_bundle] (newest item consed at the
+    head — caller must [List.rev] to obtain topo order), and the extended
+    [bindings].  The caller must pre-register every parameter the bundle
+    exposes in [bindings] before calling; the helper rejects unknown
+    [Parameter] compunits in [bound_globals].
 
     Each entry in [swg.bound_globals] is resolved by:
       - reusing the existing entry in [bindings] (a previously-inserted

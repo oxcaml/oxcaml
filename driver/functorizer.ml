@@ -86,10 +86,11 @@ let impl_unit_info_with_cmi_data ~(ui_unit : CU.t)
 
 (* ----- Bundle insertion helper -----
 
-   A [bundle] is the under-construction list of instantiated modules, in
-   topological order (deps appear before users).  Each module's signature
-   has already had its [bound_globals] substituted to reference earlier
-   modules / parameters.
+   A [rev_bundle] is the under-construction list of instantiated modules
+   in *reverse* topo order (newest item at the head, deps at the tail) so
+   that each insertion is O(1) via [::].  The caller reverses once at the
+   end to obtain topo order.  Each module's signature has already had its
+   [bound_globals] substituted to reference earlier modules / parameters.
 
    The companion [bindings] map records, for every globally-named compunit
    already accounted for, the Local Ident it is bound to — either as a
@@ -107,13 +108,13 @@ type bundle_module = {
   bm_sign : Types.signature;
 }
 
-type bundle = bundle_module list
+type rev_bundle = bundle_module list
 
 module Bindings = Misc.Stdlib.String.Map
 
 type bindings = Ident.t Bindings.t
 
-let empty_bundle : bundle = []
+let empty_rev_bundle : rev_bundle = []
 
 let empty_bindings : bindings = Bindings.empty
 
@@ -129,7 +130,7 @@ let classify_cmi (loaded : Persistent_env.loaded_cmi) =
   | None -> `Parameter
   | Some _ -> if loaded.params = [] then `Plain else `Parameterised
 
-(* Insert [swg] into [bundle] as a module declaration named [name].
+(* Insert [swg] into [rev_bundle] as a module declaration named [name].
 
    The caller is responsible for pre-registering every parameter the bundle
    should expose; this helper rejects unknown [Parameter] compunits in
@@ -149,25 +150,33 @@ let classify_cmi (loaded : Persistent_env.loaded_cmi) =
          * [Plain]: no substitution — the reference stays as a global.
 
    The collected substitution is applied to [swg]'s signature, then the new
-   entry is appended to [bundle]. *)
-let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~bundle
-    ~bindings : bundle * bindings =
+   entry is consed onto [rev_bundle]. *)
+let rec insert_module ~name (swg : Signature_with_global_bindings.t)
+    ~rev_bundle ~bindings : Ident.t * rev_bundle * bindings =
   if Bindings.mem name bindings
   then
     Misc.fatal_errorf "Functorizer.insert_module: %s already in bundle" name;
   let new_id = Ident.create_local name in
   let bindings = Bindings.add name new_id bindings in
   let loaded = load_cmi name in
-  (* First pass: walk [bound_globals] for its side-effect — insert any
-     missing parameterised dep modules into the bundle and grow [bindings]
-     accordingly. *)
-  let process_bound (bundle, bindings) ((gm, _prec) : GM.With_precision.t) =
+  (* Walk [bound_globals], collecting each head's Local Ident into [subst].
+     For not-yet-known heads, recursively insert (parameterised) or skip
+     (plain).  Parameter compunits must be pre-registered by the caller. *)
+  let add_subst_entry head id subst =
+    let name_id = Ident.create_global (GM.Name.create_no_args head) in
+    Subst.add_module name_id (Path.Pident id) subst
+  in
+  let process_bound (subst, rev_bundle, bindings)
+      ((gm, _prec) : GM.With_precision.t) =
     let head = gm.GM.head in
-    if Bindings.mem head bindings then bundle, bindings
-    else
+    match Bindings.find_opt head bindings with
+    | Some id -> add_subst_entry head id subst, rev_bundle, bindings
+    | None -> (
       let loaded = load_cmi head in
       match classify_cmi loaded with
-      | `Plain -> bundle, bindings
+      | `Plain ->
+        (* Leave as global; no subst entry. *)
+        subst, rev_bundle, bindings
       | `Parameter ->
         Misc.fatal_errorf
           "Functorizer.insert_module: parameter %s not pre-registered in \
@@ -175,43 +184,34 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~bundle
            insert_module)"
           head
       | `Parameterised ->
-        insert_module ~name:head loaded.sign_with_globals ~bundle ~bindings
+        let id, rev_bundle, bindings =
+          insert_module ~name:head loaded.sign_with_globals ~rev_bundle
+            ~bindings
+        in
+        add_subst_entry head id subst, rev_bundle, bindings)
   in
-  let bundle, bindings =
-    Array.fold_left process_bound (bundle, bindings) swg.bound_globals
+  let subst, rev_bundle, bindings =
+    Array.fold_left process_bound
+      (Subst.identity, rev_bundle, bindings)
+      swg.bound_globals
   in
-  (* The signature can reference exactly two flavours of global compunit:
-       - heads of [bound_globals] entries — other parameterised modules
-         this one depends on;
-       - the compunit's own declared parameters ([cmi_params]) — these
-         may appear only nested inside [bound_globals] entries (e.g.,
-         [P] as the [{P}] in [Basic{P}]) and so wouldn't be picked up by
-         iterating [bound_globals] alone.
-     Build subst entries for both.  Plain compunits aren't in [bindings];
-     skipping them leaves their references as globals (correct). *)
-  let add_subst_for head s =
-    match Bindings.find_opt head bindings with
-    | None -> s
-    | Some id ->
-      let name_id = Ident.create_global (GM.Name.create_no_args head) in
-      Subst.add_module name_id (Path.Pident id) s
-  in
+  (* Declared parameters ([cmi_params]) may appear in the signature only
+     nested inside [bound_globals] entries (e.g., [P] as the [{P}] in
+     [Basic{P}]), so they need their own subst entries. *)
   let subst =
-    let s = Subst.identity in
-    let s =
-      Array.fold_left
-        (fun s ((gm, _) : GM.With_precision.t) -> add_subst_for gm.GM.head s)
-        s swg.bound_globals
-    in
     List.fold_left
-      (fun s p -> add_subst_for (GM.Parameter_name.to_string p) s)
-      s loaded.params
+      (fun subst p ->
+        let p_name = GM.Parameter_name.to_string p in
+        match Bindings.find_opt p_name bindings with
+        | None -> subst
+        | Some id -> add_subst_entry p_name id subst)
+      subst loaded.params
   in
   let sign_lazy, _staticity = swg.sign in
   let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
   let sign = Subst.Lazy.force_signature sign_lazy in
-  let bundle = bundle @ [{ bm_id = new_id; bm_sign = sign }] in
-  bundle, bindings
+  let rev_bundle = { bm_id = new_id; bm_sign = sign } :: rev_bundle in
+  new_id, rev_bundle, bindings
 
 (* Insert an instantiation for compunit [name] into [instantiations] and
    return its Local Ident.  Idempotent: if [name] is already in [bindings],
@@ -319,9 +319,9 @@ let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
       (fun bindings id -> Bindings.add (Ident.name id) id bindings)
       empty_bindings param_ids
   in
-  let bundle, _bindings =
+  let rev_bundle, _bindings =
     List.fold_left
-      (fun (bundle, bindings) (ui : intf_unit_info) ->
+      (fun (rev_bundle, bindings) (ui : intf_unit_info) ->
         let name = CU.name_as_string ui.ui_unit in
         let loaded = load_cmi name in
         (match classify_cmi loaded with
@@ -333,9 +333,13 @@ let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
           Compenv.fatal
             (Printf.sprintf "functorize input '%s' is not a parameterised module"
                name));
-        insert_module ~name loaded.sign_with_globals ~bundle ~bindings)
-      (empty_bundle, initial_bindings) src_infos
+        let _id, rev_bundle, bindings =
+          insert_module ~name loaded.sign_with_globals ~rev_bundle ~bindings
+        in
+        rev_bundle, bindings)
+      (empty_rev_bundle, initial_bindings) src_infos
   in
+  let bundle = List.rev rev_bundle in
   let body =
     List.map
       (fun bm ->
