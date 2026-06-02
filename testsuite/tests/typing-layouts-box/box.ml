@@ -835,18 +835,75 @@ val widen : obj_more box -> obj box = <fun>
 
 type t = string box
 type u = t#
+let check : u -> string = fun x -> x
 [%%expect{|
 type t = string box
 type u = t#
+val check : u -> string = <fun>
 |}]
 
 type 'a t = 'a box
-type 'a u = 'a t# (* first *)
-type i = int t# (* second *)
+type 'a u = 'a t#
+let check : 'a -> 'a u = fun x -> x
 [%%expect{|
 type 'a t = 'a box
 type 'a u = 'a t#
+val check : 'a -> 'a u = <fun>
+|}]
+
 type i = int t#
+let check : i -> int = fun x -> x
+[%%expect{|
+type i = int t#
+val check : i -> int = <fun>
+|}]
+
+module M : sig
+  type ('a : any) b = 'a box
+  type ('a : any) t = 'a
+  type ('a : any) t2 = 'a
+  type s = string
+  type tup = int * int
+end = struct
+  type ('a : any) b = 'a box
+  type ('a : any) t = 'a b#
+  type ('a : any) t2 = 'a box#
+  type s = string b#
+  type tup = #(int * int) b
+end
+[%%expect{|
+module M :
+  sig
+    type ('a : any) b = 'a box
+    type ('a : any) t = 'a
+    type ('a : any) t2 = 'a
+    type s = string
+    type tup = int * int
+  end
+|}]
+
+module M : sig
+  type ('a : any) b = 'a box
+  type ('a : any) t = 'a b#
+  type ('a : any) t2 = 'a box#
+  type s = string b#
+  type tup = #(int * int) b
+end = struct
+  type ('a : any) b = 'a box
+  type ('a : any) t = 'a
+  type ('a : any) t2 = 'a
+  type s = string
+  type tup = int * int
+end
+[%%expect{|
+module M :
+  sig
+    type ('a : any) b = 'a box
+    type ('a : any) t = 'a b#
+    type ('a : any) t2 = 'a box#
+    type s = string b#
+    type tup = #(int * int) b
+  end
 |}]
 
 (* Test 33: multiple layers of [box] *)
