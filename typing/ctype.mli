@@ -347,14 +347,14 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
-                  filtered_arrow
+val filter_arrow: Env.t -> type_expr -> arg_label ->
+                  has_poly:Btype.explicit_poly -> filtered_arrow
         (* A special case of unification (with l:'a -> 'b). If
-           [force_poly] is false then the usual invariant that the
+           [has_poly] is [Mono] then the usual invariant that the
            argument type be a [Tpoly] node is not enforced. Raises
            [Filter_arrow_failed] instead of [Unify].  *)
 val filter_mono: type_expr -> type_expr
-        (* A special case of unification (with Tpoly('a, [])). Can
+        (* A special case of unification (with Tpoly('a, [], None)). Can
            only be called on [Tpoly] nodes. Raises [Filter_mono_failed]
            instead of [Unify] *)
 val filter_arrow_mono: Env.t -> type_expr -> arg_label -> filtered_arrow

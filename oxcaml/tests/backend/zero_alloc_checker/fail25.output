@@ -33,11 +33,3 @@ Error: Annotation check for zero_alloc failed on function Fail25.f2 (camlFail25.
 
 File "fail25.ml", line 52, characters 24-34:
 Error: called function may allocate (direct tailcall camlFail25.f1_HIDE_STAMP)
-
-File "fail25.ml", line 56, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Fail25.outer (camlFail25.outer_HIDE_STAMP).
-
-File "fail25.ml", line 60, characters 2-15:
-Error: called function may allocate (direct tailcall camlFail25.inner_HIDE_STAMP)
-Hint: Recompile without -disable-precise-zero-alloc-checker for more precise results.
-

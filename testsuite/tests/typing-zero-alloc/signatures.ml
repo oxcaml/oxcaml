@@ -612,6 +612,11 @@ Error: Signature mismatch:
        Here the former is 1 and the latter is 2.
 |}]
 
+module type S_with_newtype = sig
+  type 'a t
+  val[@zero_alloc] f : 'a. 'a t -> int -> 'a
+end
+
 module type S_alias_explicit_arity_1 = sig
   val[@zero_alloc arity 1] f : t_two_args
 end
@@ -620,12 +625,14 @@ module M_bad_explicit_arity_1 : S_alias_explicit_arity_1 = struct
   let[@zero_alloc] f x y = x + y
 end
 [%%expect{|
+module type S_with_newtype =
+  sig type 'a t val f : 'a t -> int -> 'a [@@zero_alloc] end
 module type S_alias_explicit_arity_1 =
   sig val f : t_two_args [@@zero_alloc arity 1] end
-Lines 5-7, characters 59-3:
-5 | ...........................................................struct
-6 |   let[@zero_alloc] f x y = x + y
-7 | end
+Lines 10-12, characters 59-3:
+10 | ...........................................................struct
+11 |   let[@zero_alloc] f x y = x + y
+12 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : int -> int -> int [@@zero_alloc] end
@@ -639,6 +646,14 @@ Error: Signature mismatch:
        When using "zero_alloc" in a signature, the syntactic arity of
        the implementation must match the function type in the interface.
        Here the former is 2 and the latter is 1.
+|}]
+
+module M : S_with_newtype = struct
+  type 'a t = 'a list
+  let[@zero_alloc] f (type a) l n : a = List.nth l n
+end
+[%%expect {|
+module M : S_with_newtype
 |}]
 
 module M_good_explicit_arity_1 : S_alias_explicit_arity_1 = struct
@@ -795,7 +810,7 @@ Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f x y = x + y
            ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_1 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -809,7 +824,7 @@ Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f = fun x y -> x + y
            ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_2 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -823,7 +838,7 @@ Line 2, characters 15-25:
 2 |   let f = fun[@zero_alloc arity 2]  x y -> x + y
                    ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_fun_1 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -841,7 +856,7 @@ Line 4, characters 11-21:
 4 |       fun[@zero_alloc arity 1] y -> y
                ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_fun_2 : sig val f : int -> int -> int end
 |}]
@@ -1809,4 +1824,40 @@ module T3 :
     module M' : S1
     module M'' : S2
   end
+|}]
+
+(*****************************************)
+(* Test 19: Interaction of value aliases *)
+
+module T1 : sig
+  val[@zero_alloc] f : 'a -> 'a
+  val[@zero_alloc] g : 'a -> 'a
+end = struct
+  let (f as g) = fun x -> x
+end
+[%%expect{|
+module T1 :
+  sig val f : 'a -> 'a [@@zero_alloc] val g : 'a -> 'a [@@zero_alloc] end
+|}]
+
+module T1' : sig
+  val[@zero_alloc] f : 'a -> 'a
+  val[@zero_alloc] g : int -> int
+end = struct
+  let (f as g) = fun x -> x
+end
+[%%expect{|
+module T1' :
+  sig val f : 'a -> 'a [@@zero_alloc] val g : int -> int [@@zero_alloc] end
+|}]
+
+module T2 : sig
+  val[@zero_alloc] f : 'a -> 'a
+  val[@zero_alloc] g : int -> int
+end = struct
+  let[@zero_alloc] (f as g) = fun x -> x
+end
+[%%expect{|
+module T2 :
+  sig val f : 'a -> 'a [@@zero_alloc] val g : int -> int [@@zero_alloc] end
 |}]

@@ -83,27 +83,90 @@ let get (t : t) =
     | Some { strict; opt; custom_error_msg; } ->
       Check { loc; arity; strict; opt; custom_error_msg }
 
+let is_default_const = function
+  | Const Default_zero_alloc -> true
+  | Const (Ignore_assert_all | Check _ | Assume _) | Var _ -> false
+
+type check_context =
+  | Signature
+  | Fun_param
+  | Type_constraint
+  | Default
+
+type incompatible_check =
+  | Strict
+  | Opt
+
+type less_general =
+  | Missing_entirely of check_context
+  | Parameter_requirement of incompatible_check
+  | Other
+
 type error =
-  | Less_general of { missing_entirely : bool }
-  | Arity_mismatch of int * int
+  | Less_general of less_general
+  | Arity_mismatch of int * int * check_context
+  | Incompatible of incompatible_check
+  | One_missing
+
+let error_is_arity_mismatch = function
+  | Less_general _ | Incompatible _ | One_missing -> false
+  | Arity_mismatch _ -> true
 
 exception Error of error
+
+let one_missing = One_missing
 
 let print_error ppf error =
   let pr fmt = Format_doc.fprintf ppf fmt in
   match error with
-  | Less_general { missing_entirely } ->
+  | Less_general Other ->
+    pr "The former provides a weaker \"zero_alloc\" guarantee than the latter."
+  | Less_general (Missing_entirely context) ->
     pr "The former provides a weaker \"zero_alloc\" guarantee than the latter.";
-    if missing_entirely then
-      pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
-  | Arity_mismatch (n1, n2) ->
+    (match context with
+     | Signature ->
+       pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
+     | Fun_param ->
+       pr "@ Hint: Add a \"zero_alloc\" attribute to the argument's definition."
+     | Type_constraint | Default -> ())
+  | Less_general (Parameter_requirement Strict) ->
+    pr "The argument's \"zero_alloc\" property is required to be \"strict\",@ \
+        but this function is not."
+  | Less_general (Parameter_requirement Opt) ->
+    pr "The argument's \"zero_alloc\" check is \"opt\", but the parameter@ \
+        requires a non-\"opt\" check."
+  | Incompatible check_type ->
+    pr "There is a mismatch between the two \"zero_alloc\" assumptions:@ \
+        the \"%s\" payloads need to match exactly."
+      (match check_type with
+       | Strict -> "strict"
+       | Opt -> "opt")
+  | Arity_mismatch (n1, n2, Signature) ->
     pr "zero_alloc arity mismatch:@ \
         When using \"zero_alloc\" in a signature, the syntactic arity of@ \
         the implementation must match the function type in the interface.@ \
         Here the former is %d and the latter is %d."
       n1 n2
+  | Arity_mismatch (n1, n2, Type_constraint) ->
+    pr "When using \"zero_alloc\" on function parameters, the arities in the@ \
+        type of the function and the parameter term must match exactly.@ \
+        Here the arity in the actual parameter term is %d and the arity in@ \
+        the type of the function is %d."
+      n1 n2
+  | Arity_mismatch (n1, n2, Fun_param) ->
+    pr "Inconsistent \"zero_alloc\" arity payload for a function parameter:@ \
+        the implementation specifies %d, but it is constrained to be %d."
+      n1 n2
+  | Arity_mismatch (n1, n2, Default) ->
+    pr "Inconsistent \"zero_alloc\" arity properties: seen both %d and %d.@ \
+        This error should never be reported in this context.@ \
+        Contact the OxCaml development team and report a bug."
+      n1 n2
+  | One_missing ->
+    pr "The two types must agree on \"zero_alloc\":@ \
+        either both carry the annotation or neither does."
 
-let sub_const_const_exn za1 za2 =
+let sub_const_const_exn ~context za1 za2 =
   (* The core of the check here is that we translate both attributes into the
      abstract domain and use the existing inclusion check from there, ensuring
      what we do in the typechecker matches the backend.
@@ -116,9 +179,9 @@ let sub_const_const_exn za1 za2 =
        be fully separate.
      - [arity] is also not captured by the abstract domain - it exists only for
        use here, in typechecking.  If the arities do not match, we issue an
-       error. It's essential for the soundness of the way we (will, in the next
-       PR) use zero_alloc in signatures that the apparent arity of the type in
-       the signature matches the syntactic arity of the function.
+       error. It's essential for the soundness of how zero_alloc is used in
+       signatures that the apparent arity of the type in the signature matches
+       the syntactic arity of the function.
      - [ignore] is erased from structure items when computing their signature.
        On signatures, [ignore] is interpreted as "top" for the inclusion check.
        This interpretation is the same as erasing [ignore]. *)
@@ -142,13 +205,21 @@ let sub_const_const_exn za1 za2 =
         | Default_zero_alloc -> true
         | Ignore_assert_all | Check _ | Assume _ -> false
       in
-      raise (Error (Less_general {missing_entirely}))
+      if missing_entirely then
+        raise (Error (Less_general (Missing_entirely context)))
+      else if context = Fun_param then
+        raise (Error (Less_general (Parameter_requirement Strict)))
+      else
+        raise (Error (Less_general Other))
     end;
   (* opt check *)
   begin match za1, za2 with
   | Check { opt = opt1; _ }, Check { opt = opt2; _ } ->
     if opt1 && not opt2 then
-      raise (Error (Less_general {missing_entirely = false}))
+      if context = Fun_param then
+        raise (Error (Less_general (Parameter_requirement Opt)))
+      else
+        raise (Error (Less_general Other))
   | (Check _ | Default_zero_alloc | Assume _ | Ignore_assert_all), _ -> ()
   end;
   (* arity check *)
@@ -160,7 +231,7 @@ let sub_const_const_exn za1 za2 =
   | Some arity1, Some arity2 ->
     (* Check *)
     if not (arity1 = arity2) then
-      raise (Error (Arity_mismatch (arity1, arity2)))
+      raise (Error (Arity_mismatch (arity1, arity2, context)))
   | Some _, None -> ()
     (* Forgetting zero_alloc info is fine *)
   | None, Some _ ->
@@ -168,14 +239,14 @@ let sub_const_const_exn za1 za2 =
     Misc.fatal_error "Zero_alloc: sub_const_exn"
   | None, None -> ()
 
-let sub_var_const_exn v c =
+let sub_var_const_exn ~context v c =
   (* This can only fail due to an arity mismatch. We have a linear order and can
      always constrain the var lower to make the sub succeed. *)
   match v, c with
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
   | { arity = arity1; _ }, Check { arity = arity2; _ }
     when arity1 <> arity2 ->
-    raise (Error (Arity_mismatch (arity1, arity2)))
+    raise (Error (Arity_mismatch (arity1, arity2, context)))
   | { desc = None; _ }, Check { strict; opt; custom_error_msg;  } ->
     !log_change (None, v);
     v.desc <- Some { strict; opt; custom_error_msg }
@@ -200,7 +271,7 @@ let sub_var_const_exn v c =
       v.desc <- Some { strict; opt; custom_error_msg; }
     end
 
-let sub_exn za1 za2 =
+let sub_exn ~context za1 za2 =
   match za1, za2 with
   | _, Var _ ->
     (* A fully inferred signature will never have a variable in it, so we almost
@@ -216,16 +287,45 @@ let sub_exn za1 za2 =
        event).
     *)
     if not (za1 == za2) then
-      Misc.fatal_error "zero_alloc: variable constraint"
+      Misc.fatal_error "zero_alloc sub: variable constraint"
   | _, Const (Assume _) ->
-    Misc.fatal_error "zero_alloc: invalid constraint"
+    Misc.fatal_error "zero_alloc sub: invalid constraint"
   | _, (Const (Default_zero_alloc | Ignore_assert_all)) -> ()
-  | Var v, Const c -> sub_var_const_exn v c
-  | Const c1, Const c2 -> sub_const_const_exn c1 c2
+  | Var v, Const c -> sub_var_const_exn ~context v c
+  | Const c1, Const c2 -> sub_const_const_exn ~context c1 c2
 
-let sub za1 za2 =
+let sub ~context za1 za2 =
   try
-    sub_exn za1 za2;
+    sub_exn ~context za1 za2;
     Ok ()
   with
   | Error e -> Result.Error e
+
+let check_payload_to_string ?(apparent_arity = -1)
+    ({strict; opt; arity; _} : check) =
+  String.concat ""
+    [ if strict then " strict" else "";
+      if opt then " opt" else "";
+      if arity = apparent_arity then "" else Printf.sprintf " arity %d" arity;
+    ]
+
+let check_equal
+      ~context
+      {arity = arity1; opt = opt1; strict = strict1; _}
+      {arity = arity2; opt = opt2; strict = strict2; _} =
+  try
+    if arity1 <> arity2 then
+      raise (Error (Arity_mismatch (arity1, arity2, context)));
+    if strict1 <> strict2 then
+      raise (Error (Incompatible Strict));
+    if opt1 <> opt2 then
+      raise (Error (Incompatible Opt));
+    Ok ()
+  with
+  | Error e -> Result.Error e
+
+let check_option_equal ~context za1 za2 =
+  match za1, za2 with
+  | None, None -> Ok ()
+  | Some _, None | None, Some _ -> Result.Error One_missing
+  | Some c1, Some c2 -> check_equal ~context c1 c2
