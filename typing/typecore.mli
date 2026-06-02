@@ -246,7 +246,7 @@ type error =
   | Not_an_object of type_expr * type_forcing_context option
   | Non_value_object of Jkind.Violation.t * type_forcing_context option
   | Non_value_let_rec of Jkind.Violation.t * type_expr
-  | Undefined_method of type_expr * string * string list option
+  | Undefined_method of Typedtree.expression * string * string list option
   | Undefined_self_method of string * string list
   | Virtual_class of Longident.t
   | Private_type of type_expr
@@ -361,8 +361,14 @@ type error =
 and invalid_layout_poly_inst_context =
   | Binding_op
 
-exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+
+module Error : sig
+  type exn += private In_context of Location.t * Env.t * error
+
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
 
 val report_error: loc:Location.t -> Env.t -> error -> Location.error
  (** @deprecated.  Use {!Location.error_of_exn}, {!Location.print_report}. *)
