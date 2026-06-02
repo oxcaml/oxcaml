@@ -2137,7 +2137,7 @@ let rec transl_address loc = function
   | Env.Aunit (cu, mode) ->
     let staticity = Mode.Value.proj_monadic Staticity mode in
     let staticity =
-      match Mode.Staticity.zap_to_floor staticity with
+      match Mode.Staticity.zap_to_floor_exn staticity with
       | Static -> Static
       | Dynamic -> Dynamic
     in
