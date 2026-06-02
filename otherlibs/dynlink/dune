@@ -148,6 +148,7 @@
   datarepr
   cmi_format
   persistent_env
+  typing_recovery
   env
   jkind
   ikind
@@ -391,6 +392,8 @@
 
 (copy_files ../../typing/persistent_env.ml)
 
+(copy_files ../../typing/typing_recovery.ml)
+
 (copy_files ../../typing/env.ml)
 
 (copy_files ../../lambda/debuginfo.ml)
@@ -592,6 +595,8 @@
 (copy_files ../../file_formats/cmi_format.mli)
 
 (copy_files ../../typing/persistent_env.mli)
+
+(copy_files ../../typing/typing_recovery.mli)
 
 (copy_files ../../typing/env.mli)
 
