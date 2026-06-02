@@ -299,6 +299,8 @@ let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
     =
   L.create_int section (Label.to_int l)
 
+let fp = Config.with_frame_pointers
+
 (* Mark a symbol as global, with protected visibility on ELF if enabled.
    Protected visibility prevents symbol interposition, which allows direct
    addressing to be used safely. This matches amd64 behavior. *)
@@ -898,6 +900,23 @@ and emit_subimm rd rs n =
     A.ins4 SUB_immediate rd rs (O.imm nh) O.optional_none;
     if nl <> 0 then A.ins4 SUB_immediate rd rd (O.imm nl) O.optional_none)
 
+(* Set x29 (frame pointer) to sp + n. Handles large immediates that don't fit in
+   a single ADD instruction's 12-bit field. *)
+let emit_fp_from_sp n =
+  assert (n >= 0);
+  if n <= 0xFFF
+  then A.ins4 ADD_immediate O.fp O.sp (O.imm n) O.optional_none
+  else if n <= 0xFFF_FFF
+  then (
+    let nl = n land 0xFFF and nh = n land 0xFFF_000 in
+    A.ins4 ADD_immediate O.fp O.sp (O.imm nh) O.optional_none;
+    if nl <> 0 then A.ins4 ADD_immediate O.fp O.fp (O.imm nl) O.optional_none)
+  else
+    Misc.fatal_errorf
+      "emit_fp_from_sp: frame size %d exceeds the %d-byte limit reachable by \
+       two ADD immediates"
+      n 0xFFF_FFF
+
 let emit_cmpimm rs n =
   if n >= 0
   then A.ins_cmp rs (O.imm n) O.optional_none
@@ -1353,15 +1372,32 @@ let emit_instr env i =
   | Lprologue ->
     assert (Env.prologue_required env);
     let n = Env.frame_size env in
-    if n > 0 then emit_stack_adjustment (-n);
-    if Env.contains_calls env
+    if fp
     then (
+      A.ins3 (STP X) O.fp O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
+      D.cfi_adjust_cfa_offset ~bytes:16;
+      D.cfi_offset ~reg:(R.gp_encoding R.fp) ~offset:(-16);
       D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
-      emit_str_sp_offset O.lr (n - 8))
+      let n = n - 16 in
+      if n > 0 then emit_stack_adjustment (-n);
+      emit_fp_from_sp n)
+    else (
+      if n > 0 then emit_stack_adjustment (-n);
+      if Env.contains_calls env
+      then (
+        D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
+        emit_str_sp_offset O.lr (n - 8)))
   | Lepilogue_open ->
     let n = Env.frame_size env in
-    if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
-    if n > 0 then emit_stack_adjustment n
+    if fp
+    then (
+      let n = n - 16 in
+      if n > 0 then emit_stack_adjustment n;
+      A.ins3 (LDP X) O.fp O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+      D.cfi_adjust_cfa_offset ~bytes:(-16))
+    else (
+      if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
+      if n > 0 then emit_stack_adjustment n)
   | Lepilogue_close ->
     let n = Env.frame_size env in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
@@ -1450,18 +1486,25 @@ let emit_instr env i =
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
       record_frame env i.live (Dbg_other i.dbg))
     else (
-      (* Store OCaml stack pointer in the frame pointer register. No need to
-         store previous x29 because OCaml doesn't maintain frame pointers. *)
+      (* Save/restore OCaml stack pointer in callee-saved register x19 or frame
+         pointer register x29. *)
       if Config.runtime5
       then (
-        A.ins_mov_from_sp ~dst:O.fp;
+        if fp
+        then A.ins_mov_from_sp ~dst:(O.reg_x 19)
+        else A.ins_mov_from_sp ~dst:O.fp;
         D.cfi_remember_state ();
-        D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
+        D.cfi_def_cfa_register
+          ~reg:(if fp then "19" else Int.to_string (R.gp_encoding R.fp));
         A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
         A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
-      if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
+      if Config.runtime5
+      then
+        if fp
+        then A.ins_mov_to_sp ~src:(O.reg_x 19)
+        else A.ins_mov_to_sp ~src:O.fp;
       D.cfi_restore_state ())
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
@@ -1871,7 +1914,7 @@ let emit_instr env i =
             emit_printf "	.4byte	%a - %a\n" femit_label jumptbl.(j)
               femit_label lbltbl
         done *)
-  | Lentertrap -> ()
+  | Lentertrap -> if fp then emit_fp_from_sp (Env.frame_size env - 16)
   | Ladjust_stack_offset { delta_bytes } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
     Env.set_stack_offset env (Env.stack_offset env + delta_bytes)

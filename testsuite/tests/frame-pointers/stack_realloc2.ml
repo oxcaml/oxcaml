@@ -3,7 +3,18 @@
    frame_pointers;
    readonly_files = "fp_backtrace.c stack_realloc_.c";
    all_modules = "${readonly_files} stack_realloc2.ml";
-   native;
+   (* TODO ocaml#14545 and ocaml#13762 tidy up the ocamltest language
+           in this case. not-macos really implies Linux with gcc and
+           macos implies clang on arm64. *)
+   {
+     not-macos;
+     reference = "${test_source_directory}/stack_realloc2.reference";
+     native;
+   } {
+     macos;
+     reference = "${test_source_directory}/stack_realloc2.${arch}.reference";
+     native;
+   }
 *)
 
 open Effect
