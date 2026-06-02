@@ -298,6 +298,7 @@ let read_one_param ppf position name v =
   | "no-app-funct" -> clear "no-app-funct" [ applicative_functors ] v
   | "nodynlink" -> clear "nodynlink" [ dlcode ] v
   | "short-paths" -> clear "short-paths" [ real_paths ] v
+  | "typing-recovery" -> set "typing-recovery" [ typing_recovery ] v
   | "trans-mod" -> set "trans-mod" [ transparent_modules ] v
   | "opaque" -> set "opaque" [ opaque ] v
 
