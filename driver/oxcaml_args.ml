@@ -225,6 +225,12 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_experimental_optimizations f =
+  ( "-experimental-optimizations",
+    Arg.Unit f,
+    " Enable a bundle of experimental codegen optimizations that are not yet \
+     on by default (subject to change)" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -1280,6 +1286,7 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1462,6 +1469,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1796,6 +1804,16 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
+
+  (* Bundle of experimental codegen optimizations enabled by
+     [-experimental-optimizations]. *)
+  let experimental_optimizations () =
+    cfg_prologue_shrink_wrap ();
+    x86_peephole_optimize ();
+    regalloc_param "SPLIT_AROUND_LOOPS:on";
+    regalloc_param "AFFINITY:on";
+    regalloc Clflags.Register_allocator.Irc;
+    cfg_merge_blocks ()
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2349,6 +2367,10 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "experimental-optimizations" ->
+        if Compenv.check_bool ppf name v then
+          Oxcaml_options_impl.experimental_optimizations ();
+        true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges
