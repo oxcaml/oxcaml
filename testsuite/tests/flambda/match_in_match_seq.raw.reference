@@ -4,8 +4,8 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let f = %project_value_slot.[`aux`].[`f`] (my_closure) in
-   let next = %project_value_slot.[`aux`].[`next`] (my_closure) in
+   let f = %project_value_slot.[aux].[f] (my_closure) in
+   let next = %project_value_slot.[aux].[next] (my_closure) in
    apply inlined(hint) next (s) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
@@ -43,12 +43,12 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
-   let next =
-     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[`next_1`]
+   let f =
+     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[f_1]
        (my_closure)
    in
-   let f =
-     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[`f_1`]
+   let next =
+     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[next_1]
        (my_closure)
    in
    apply inlined(hint) next (s) -> k3 * k2
@@ -95,8 +95,8 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
-   let next = %project_value_slot.[`aux_1`].[`next_2`] (my_closure) in
-   let f = %project_value_slot.[`aux_1`].[`f_2`] (my_closure) in
+   let f = %project_value_slot.[aux_1].[f_2] (my_closure) in
+   let next = %project_value_slot.[aux_1].[next_2] (my_closure) in
    apply inlined(hint) next (s) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
@@ -170,7 +170,7 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
    let hi =
-     %project_value_slot.[`fn[match_in_match_seq.ml:55,11--63]`].[`hi`]
+     %project_value_slot.[`fn[match_in_match_seq.ml:55,11--63]`].[hi]
        (my_closure)
    in
    (let prim = %int_comp.gt (i, hi) in
@@ -192,7 +192,7 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 of [ 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
-   let unfold = %project_value_slot.[`ints`].[`unfold`] (my_closure) in
+   let unfold = %project_value_slot.[ints].[unfold] (my_closure) in
    let `fn[match_in_match_seq.ml:55,11--63]` =
      closure `fn[match_in_match_seq.ml:55,11--63]_9`
        @`fn[match_in_match_seq.ml:55,11--63]`
@@ -203,7 +203,7 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
        (`fn[match_in_match_seq.ml:55,11--63]`, lo)
        -> k1 * k2
  in
- let code size(3)
+ let code size(3) stub
        `fn[match_in_match_seq.ml:57,33--36]_11`
          (prim : imm tagged, prim_1 : imm tagged)
          my_closure _region _ghost_region my_depth
@@ -219,7 +219,7 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let fold_left = %project_value_slot.[`sum`].[`fold_left`] (my_closure) in
+   let fold_left = %project_value_slot.[sum].[fold_left] (my_closure) in
    let `fn[match_in_match_seq.ml:57,33--36]` =
      closure `fn[match_in_match_seq.ml:57,33--36]_11`
        @`fn[match_in_match_seq.ml:57,33--36]`
@@ -245,11 +245,11 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let map = %project_value_slot.[`foo`].[`map`] (my_closure) in
-   let square = %project_value_slot.[`foo`].[`square`] (my_closure) in
-   let ints = %project_value_slot.[`foo`].[`ints`] (my_closure) in
-   let sum = %project_value_slot.[`foo`].[`sum`] (my_closure) in
-   let filter = %project_value_slot.[`foo`].[`filter`] (my_closure) in
+   let map = %project_value_slot.[foo].[map] (my_closure) in
+   let filter = %project_value_slot.[foo].[filter] (my_closure) in
+   let square = %project_value_slot.[foo].[square] (my_closure) in
+   let ints = %project_value_slot.[foo].[ints] (my_closure) in
+   let sum = %project_value_slot.[foo].[sum] (my_closure) in
    apply direct(ints_8)
      (ints : _ -> [ 0 of [ 0 of val * val ] ]) (0, 11) -> k5 * k2
      where k5 (apply_result : [ 0 of [ 0 of val * val ] ]) =
