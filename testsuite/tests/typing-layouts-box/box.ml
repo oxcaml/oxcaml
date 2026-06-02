@@ -1019,3 +1019,59 @@ let f (eq : (Abs_value.t box, int * int) Type.eq) : unit =
 [%%expect{|
 val f : (Abs_value.t box, int * int) Type.eq -> unit = <fun>
 |}]
+
+(* Test 36: preliminary testing of boxing primitives *)
+
+(* Incorrect versions of boxing primitives, to test typechecking. *)
+
+(* float *)
+open (struct
+  external box : float# -> float = "%box_float"
+  external unbox : float -> float# = "%unbox_float"
+  let box = Obj.magic box
+  let unbox = Obj.magic unbox
+end : sig
+  val box : ('a : any). 'a -> 'a box
+  val unbox : ('a : any). 'a box -> 'a
+end)
+[%%expect{|
+val box : ('a : any). 'a -> 'a box = <fun>
+val unbox : ('a : any). 'a box -> 'a = <fun>
+|}]
+
+let box_float : float# -> float = box
+let unbox_float : float -> float# = unbox
+let float_0_via_box = box #0.
+let float_0_unbox = unbox 0.
+[%%expect{|
+val box_float : float# -> float = <fun>
+val unbox_float : float -> float# = <fun>
+val float_0_via_box : float = 0.
+val float_0_unbox : float# = <abstr>
+|}]
+
+(* ref *)
+open (struct
+  let box contents = { contents }
+  let unbox { contents } = contents
+  let box = Obj.magic box
+  let unbox = Obj.magic unbox
+end : sig
+  val box : ('a : any). 'a -> 'a box
+  val unbox : ('a : any). 'a box -> 'a
+end)
+[%%expect{|
+val box : ('a : any). 'a -> 'a box = <fun>
+val unbox : ('a : any). 'a box -> 'a = <fun>
+|}]
+
+let box_ref : 'a ref# -> 'a ref = box
+let unbox_ref : 'a ref -> 'a ref# = unbox
+let ref_0_via_box = box #{ contents = 0 }
+let ref_0_unbox = unbox { contents = 0 }
+[%%expect{|
+val box_ref : 'a ref# -> 'a ref = <fun>
+val unbox_ref : 'a ref -> 'a ref# = <fun>
+val ref_0_via_box : int ref = {contents = 0}
+val ref_0_unbox : int ref# = #{contents = 0}
+|}]
