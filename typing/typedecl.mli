@@ -249,6 +249,11 @@ type error =
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
 
-exception Error of Location.t * error
+module Error : sig
+    type exn += private In_context of Location.t * error
+
+  val log_or_raise : Location.t -> error -> unit
+  val log_and_raise : Location.t -> error -> 'a
+end
 
 val report_error: loc:Location.t -> error -> Location.report
