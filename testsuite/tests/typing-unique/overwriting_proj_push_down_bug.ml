@@ -17,14 +17,14 @@ type record = { x : string; y : string @@ many aliased; }
 
 let aliased_use (x @ aliased global) = x
 [%%expect{|
-(let (aliased_use/290 = (function {nlocal = 1} x/292? : stack x/292))
+(let (aliased_use/290 = (function {nlocal = 0} x/292? x/292))
   (apply (field_imm 1 (global Toploop!)) "aliased_use" aliased_use/290))
 val aliased_use : 'a -> 'a = <fun>
 |}]
 
 let unique_use (x @ unique global) = x
 [%%expect{|
-(let (unique_use/293 = (function {nlocal = 1} x/295? : stack x/295))
+(let (unique_use/293 = (function {nlocal = 0} x/295? x/295))
   (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/293))
 val unique_use : 'a @ unique -> 'a = <fun>
 |}]
@@ -38,7 +38,7 @@ let proj_aliased r =
 (let
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    proj_aliased/296 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/298[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -60,7 +60,7 @@ let proj_unique r =
 (let
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    proj_unique/301 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/303[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -85,7 +85,7 @@ let match_aliased r =
 (let
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_aliased/306 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/308[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -108,7 +108,7 @@ let match_unique r =
 (let
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_unique/312 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/314[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -134,7 +134,7 @@ let match_mini_anf_aliased r =
 (let
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_mini_anf_aliased/318 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/320[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -161,7 +161,7 @@ let match_mini_anf_unique r =
 (let
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_mini_anf_unique/328 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/330[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -189,7 +189,7 @@ let match_anf_aliased r =
 (let
   (aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_anf_aliased/338 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/340[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -222,7 +222,7 @@ let match_anf_unique r =
 (let
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_anf_unique/350 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/352[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
@@ -266,7 +266,7 @@ let swap_inner (t : tree) =
 [%%expect{|
 (let
   (swap_inner/368 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        t/370[value<
               (consts (0))
                (non_consts ([0:
@@ -419,7 +419,7 @@ let match_guard r =
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_guard/386 =
-     (function {nlocal = 1}
+     (function {nlocal = 0}
        r/388[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
