@@ -67,7 +67,7 @@ arr_sum:
   jle   .L0
   ret
 .L1:
-  movq  camlTOP2__block101@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -77,9 +77,8 @@ arr_sum:
   ret
 |}]
 
-(* CR ttebbi: The generated control flow branches three (!) times on
-   should_continue. In block 123, we can even statically know that the bit is 1.
-   Additionally, we materialise the should_continue bit. *)
+(* CR ttebbi: We check [target < x] twice, even though the second branch is
+   redundant. *)
 let search ~target (start : int list) =
   let node = ref start in
   while
@@ -95,33 +94,25 @@ let search ~target (start : int list) =
 [%%expect_asm X86_64{|
 search:
   movq  %rax, %rdi
-  testb $1, %bl
+  movq  %rbx, %rax
+  testb $1, %al
   je    .L1
+  jmp   .L3
 .L0:
-  xorl  %esi, %esi
-  movq  %rbx, %rax
-  jmp   .L4
-.L1:
-  movq  (%rbx), %rax
-  xorl  %esi, %esi
-  cmpq  %rax, %rdi
-  setl  %sil
-  testq %rsi, %rsi
-  je    .L2
-  movq  8(%rbx), %rax
-  testq %rsi, %rsi
+  testb $1, %al
   jne   .L3
-  jmp   .L4
-.L2:
-  movq  %rbx, %rax
-  testq %rsi, %rsi
-  je    .L4
-.L3:
-  movq  %rax, %rbx
-  testb $1, %bl
-  je    .L1
+.L1:
+  movq  (%rax), %rbx
+  cmpq  %rbx, %rdi
+  jge   .L2
+  movq  8(%rax), %rax
+  cmpq  %rbx, %rdi
+  jge   .L3
   jmp   .L0
-.L4:
+.L2:
+  cmpq  %rbx, %rdi
+  jl    .L0
+.L3:
   ret
 |}]
 
@@ -154,4 +145,36 @@ learn_from_branch:
 .L0:
   leaq  -1(%rax,%rax), %rax
   ret
+|}]
+
+
+(* CR ttebbi: We repeat the same branch twice. *)
+let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
+ match x = 2, y = 2 with
+ | true, true -> c1 ()
+ | _, false -> c2 ()
+ | false, _ -> c3 ()
+[%%expect_asm X86_64{|
+complex_branching_on_two_comparisons:
+  movq  %rbx, %rcx
+  movq  %rsi, %rbx
+  cmpq  $5, %rax
+  jne   .L0
+  cmpq  $5, %rcx
+  jne   .L0
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
+.L0:
+  cmpq  $5, %rcx
+  jne   .L1
+  movl  $1, %eax
+  movq  (%rdx), %rdi
+  movq  %rdx, %rbx
+  jmp   *%rdi
+.L1:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
 |}]

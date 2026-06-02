@@ -225,6 +225,16 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_cfg_jump_threading f =
+  ( "-cfg-jump-threading",
+    Arg.Unit f,
+    " Fold conditional branches using reaching definitions" )
+
+let mk_no_cfg_jump_threading f =
+  ( "-no-cfg-jump-threading",
+    Arg.Unit f,
+    " Do not fold conditional branches using reaching definitions" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -1280,6 +1290,8 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val cfg_jump_threading : unit -> unit
+  val no_cfg_jump_threading : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1462,6 +1474,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_cfg_jump_threading F.cfg_jump_threading;
+      mk_no_cfg_jump_threading F.no_cfg_jump_threading;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1796,6 +1810,9 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
+
+  let cfg_jump_threading = set' Oxcaml_flags.cfg_jump_threading
+  let no_cfg_jump_threading = clear' Oxcaml_flags.cfg_jump_threading
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2349,6 +2366,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "cfg-jump-threading" -> set' Oxcaml_flags.cfg_jump_threading
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges

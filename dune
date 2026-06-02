@@ -654,6 +654,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_jump_threading
   cfg_prologue
   cfg_merge_blocks
   extra_debug

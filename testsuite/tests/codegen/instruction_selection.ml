@@ -92,9 +92,6 @@ logand_branch:
 |}]
 
 
-(* CR ttebbi: We materialize comparison result bits despite
-   only using them for a single branch. Also, the `_ -> 0`
-   case is duplicated for no good reason. *)
 let combine_comparisons r f =
   match !r > 5, !r < 20 with
   | true, true -> !r
@@ -102,15 +99,11 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $41, %rbx
-  setl  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
-  movq  %rbx, %rax
+  cmpq  $41, %rax
+  jge   .L0
   ret
 .L0:
   movl  $1, %eax
@@ -125,14 +118,11 @@ let repeat_comparisons r _f =
   if a && b then 1 else 2
 [%%expect_asm X86_64{|
 repeat_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $11, %rbx
-  setg  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
+  cmpq  $11, %rax
+  jle   .L0
   movl  $3, %eax
   ret
 .L0:
@@ -140,6 +130,49 @@ repeat_comparisons:
   ret
 |}]
 
+let bad_max a b =
+  let i = ref 0 in
+  while !i < a || !i < b do incr i done;
+  !i
+[%%expect_asm X86_64{|
+bad_max:
+  movq  %rax, %rdi
+  movl  $1, %eax
+  cmpq  %rdi, %rax
+  jl    .L1
+.L0:
+  cmpq  %rbx, %rax
+  jge   .L2
+.L1:
+  addq  $2, %rax
+  cmpq  %rdi, %rax
+  jl    .L1
+  jmp   .L0
+.L2:
+  ret
+|}]
+
+let int_compare x y =
+  let[@inline never] opaque _ = 0 in
+  match Stdlib.Int.compare x y with
+  | 0 -> opaque x
+  | r -> r
+[%%expect_asm X86_64{|
+int_compare:
+  movq  %rax, %rdi
+  cmpq  %rbx, %rdi
+  je    .L0
+  movq  $-1, %rsi
+  xorl  %eax, %eax
+  cmpq  %rbx, %rdi
+  setg  %al
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
+  ret
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize the boolean needlessly. *)
 let branch_and_return o =
@@ -329,7 +362,7 @@ let is_int_constant () : bool =
    Obj.repr (Some 3) |> Obj.is_int
 [%%expect_asm X86_64{|
 is_int_constant:
-  movq  camlTOP25__const_block785@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   andl  $1, %eax
   leaq  1(%rax,%rax), %rax
   ret
@@ -376,13 +409,13 @@ let branch_or_tailcall x =
 branch_or_tailcall:
   cmpq  $5, %rax
   jbe   .L0
-  movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
 .L0:
-  movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
+  movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]

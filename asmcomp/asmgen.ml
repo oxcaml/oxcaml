@@ -422,6 +422,8 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "cfg_cse" CSE.cfg_with_layout
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
   ++ Cfg_with_infos.make
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_jump_threading"
+       Cfg_jump_threading.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
   ++ save_cfg_before_regalloc
   ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
