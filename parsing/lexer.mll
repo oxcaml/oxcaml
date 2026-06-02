@@ -42,7 +42,6 @@ exception Error of error * Location.t
 
 (* The table of keywords *)
 
-<<<<<<< HEAD
 let all_keywords =
   let v5_3 = Some (5,3) in
   let v1_0 = Some (1,0) in
@@ -93,106 +92,10 @@ let all_keywords =
     "nonrec", NONREC, v4_2;
     "object", OBJECT, v1_0;
     "of", OF, always;
-    "once_", ONCE, oxcaml;
     "open", OPEN, always;
     "or", OR, always;
     "overwrite_", OVERWRITE, oxcaml;
-||||||| eb63e0e418
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_", KIND;
-    "kind_of_", KIND_OF;
-    "layout_", LAYOUT;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "once_", ONCE;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
-=======
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_", KIND;
-    "kind_of_", KIND_OF;
-    "layout_", LAYOUT;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 (*  "parser", PARSER; *)
-<<<<<<< HEAD
     "poly_", POLY, oxcaml;
     "private", PRIVATE, v1_0;
     "rec", REC, always;
@@ -205,52 +108,11 @@ let keyword_table =
     "true", TRUE, always;
     "try", TRY, always;
     "type", TYPE, always;
-    "unique_", UNIQUE, oxcaml;
     "val", VAL, always;
     "virtual", VIRTUAL, v1_0;
     "when", WHEN, always;
     "while", WHILE, always;
     "with", WITH, always;
-||||||| eb63e0e418
-    "poly_", POLY;
-    "private", PRIVATE;
-    "rec", REC;
-    "repr_", REPR;
-    "sig", SIG;
-    "stack_", STACK;
-    "borrow_", BORROW;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "unique_", UNIQUE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
-=======
-    "poly_", POLY;
-    "private", PRIVATE;
-    "rec", REC;
-    "repr_", REPR;
-    "sig", SIG;
-    "stack_", STACK;
-    "borrow_", BORROW;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
     "lor", INFIXOP3("lor"), always; (* Should be INFIXOP2 *)
     "lxor", INFIXOP3("lxor"), always; (* Should be INFIXOP2 *)

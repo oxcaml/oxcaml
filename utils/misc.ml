@@ -659,7 +659,6 @@ end
 
 module Int = Stdlib.Int
 
-<<<<<<< HEAD
 let repeated_label l =
   let module Set = Stdlib.String.Set in
   let rec go s = function
@@ -900,19 +899,6 @@ module Utf8_lexeme = struct
     is_lowercase_at (String.length s) s 0
 end
 
-||||||| eb63e0e418
-=======
-let repeated_label l =
-  let module Set = Stdlib.String.Set in
-  let rec go s = function
-    | [] -> None
-    | (None, _) :: l -> go s l
-    | (Some lbl, _) :: l ->
-      if Set.mem lbl s then Some lbl else go (Set.add lbl s) l
-  in
-  go Set.empty l
-
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 (* File functions *)
 
 let find_in_path path name =

@@ -141,7 +141,6 @@ run {| let foo : 'a -> 'a = fun x -> x in foo |}
 let (foo : 'a -> 'a) = (fun x -> x : 'a -> 'a) in foo
 - : unit = ()
 |}];;
-<<<<<<< HEAD
 
 let run s =
   let pe = Parse.implementation (Lexing.from_string s) in
@@ -162,9 +161,7 @@ type t =
   | (::)
 let f (x : t) = match x with | (::) -> 4
 - : unit = ()
-|}]
-||||||| eb63e0e418
-=======
+|}];;
 
 (***********************************)
 (* Untypeast/pprintast correctly handle declaration modalities. *)
@@ -191,4 +188,3 @@ run_structure {|
 module type S  = sig val x : int -> int @@ portable end
 - : unit = ()
 |}]
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb

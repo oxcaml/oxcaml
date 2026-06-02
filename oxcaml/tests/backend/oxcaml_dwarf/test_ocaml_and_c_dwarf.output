@@ -84,16 +84,6 @@
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
-<<<<<<< HEAD
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_res
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_res(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_res
-||||||| eb63e0e418
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(closure=<unavailable>, arg=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_exn
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_do_pending_actions_exn
-=======
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(closure=<unavailable>, arg=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_exn
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_do_pending_actions_flags_exn(flags=0)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb

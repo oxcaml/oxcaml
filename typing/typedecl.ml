@@ -1974,37 +1974,6 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Constructor_mixed shape
 
-<<<<<<< HEAD
-||||||| eb63e0e418
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
-
-=======
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
-
 let compute_record_repr
     loc reprs lbls
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
@@ -2219,7 +2188,6 @@ let compute_record_kind env loc lbls rep =
     Misc.fatal_error
       "Typedecl.compute_record_kind: unexpected record representation"
 
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
@@ -4667,7 +4635,8 @@ let transl_package_constraint ~loc ty =
 
 let abstract_type_decl ~injective ~jkind ~params =
   let arity = List.length params in
-  Ctype.with_local_level_generalize ~before_generalize:generalize_decl begin fun () ->
+  Ctype.with_local_level_generalize ~before_generalize:generalize_decl
+    begin fun () ->
     let params = List.map Ctype.newvar params in
     { type_params = params;
       type_arity = arity;
@@ -5272,20 +5241,10 @@ let report_error ~loc = function
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
   | Cannot_unbox_or_untag_type Unboxed ->
-<<<<<<< HEAD
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \
-         Only %a, %a, %a, %a, vector primitives, and@ \
+         Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
          the corresponding unboxed types can be marked unboxed."
-||||||| eb63e0e418
-      fprintf ppf "@[Don't know how to unbox this type.@ \
-                   Only %a, %a, %a, %a, vector primitives, and@ \
-                   the corresponding unboxed types can be marked unboxed.@]"
-=======
-      fprintf ppf "@[Don't know how to unbox this type.@ \
-                   Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
-                   the corresponding unboxed types can be marked unboxed.@]"
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
         Style.inline_code "float"
         Style.inline_code "int8"
         Style.inline_code "int16"
@@ -5293,21 +5252,11 @@ let report_error ~loc = function
         Style.inline_code "int64"
         Style.inline_code "nativeint"
   | Cannot_unbox_or_untag_type Untagged ->
-<<<<<<< HEAD
       Location.errorf ~loc
         "Don't know how to untag this type. Only %a, %a, %a, \
          and@ other immediate types can be untagged."
         Style.inline_code "int8"
         Style.inline_code "int16"
-||||||| eb63e0e418
-      fprintf ppf "@[Don't know how to untag this type. Only %a, %a, %a, \
-                   and@ other immediate types can be untagged.@]"
-        Style.inline_code "int8"
-        Style.inline_code "int16"
-=======
-      fprintf ppf "@[Don't know how to untag this type. Only %a \
-                   and@ other immediate types can be untagged.@]"
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
         Style.inline_code "int"
   | Cannot_unbox_or_untag_type Unpacked ->
       Location.errorf ~loc
@@ -5551,38 +5500,30 @@ let report_error ~loc = function
     Location.errorf ~loc
       "Atomic record fields must have layout value."
   | Layout_poly_unsupported ->
-<<<<<<< HEAD
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-||||||| eb63e0e418
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
-=======
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
   | Missing_flatten_floats ->
-    fprintf ppf
-      "@[This record type mixes boxed and unboxed float fields,@ \
+    Location.errorf ~loc
+      "This record type mixes boxed and unboxed float fields,@ \
        which causes the flat float record optimization.@ \
-       You must annotate it with %a.@]"
+       You must annotate it with %a."
       Style.inline_code "[@@flatten_floats]"
   | Misplaced_flatten_floats ->
-    fprintf ppf
-      "@[The %a attribute is only allowed on record types@ \
-       that mix boxed %a and unboxed %a fields.@]"
+    Location.errorf ~loc
+      "The %a attribute is only allowed on record types@ \
+       that mix boxed %a and unboxed %a fields."
       Style.inline_code "[@@flatten_floats]"
       Style.inline_code "float"
       Style.inline_code "float#"
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Recursive_jkind_definition (path, env, reaching_path) ->
     Printtyp.wrap_printing_env ~error:true env @@ fun () ->
     Location.errorf ~loc "The kind %a is cyclic%a"
       (Style.as_inline_code Printtyp.path) path
       Reaching_path.pp_kind_colon reaching_path
   | Bad_represent_as_float_array_attribute ->
-    fprintf ppf
-      "@[%a can only be used on records whose fields \
-       are all float64.@]"
+    Location.errorf ~loc
+      "%a can only be used on records whose fields \
+       are all float64."
       Style.inline_code "[@@represent_as_float_array]"
 
 let () =

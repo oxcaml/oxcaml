@@ -541,20 +541,12 @@ let execute_phrase print_outcome ppf phr =
                     if rewritten then
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
-<<<<<<< HEAD
-                          let outv = outval_of_id newenv id vd.val_type in
-                          let ty = Out_type.tree_of_type_scheme vd.val_type in
-||||||| eb63e0e418
-                          let outv = outval_of_id newenv id vd.val_type in
-                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
-=======
                           let outv =
                             outval_of_id newenv id vd.val_lpoly vd.val_type
                           in
                           (* CR-someday zqian: should pass val_lpoly to
                              printer *)
-                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+                          let ty = Out_type.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
                     else

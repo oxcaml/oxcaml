@@ -4440,29 +4440,11 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             (combine_constant value_kind ploc arg cst arg_partial)
       | Construct cstr ->
           compile_test
-<<<<<<< HEAD
             (divide_constructor ~scopes)
             (combine_constructor value_kind ploc arg ph.pat_env
                ph.pat_unique_barrier cstr arg_partial)
-      | Array (_, elt_sort, _) ->
-          let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-          let kind = Typeopt.array_pattern_kind pomega elt_sort in
-||||||| eb63e0e418
-            (compile_match ~scopes value_kind repr partial)
-            partial (divide_constructor ~scopes)
-            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
-            ctx pm
-      | Array (_, elt_sort, _) ->
-          let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-          let kind = Typeopt.array_pattern_kind pomega elt_sort in
-=======
-            (compile_match ~scopes value_kind repr partial)
-            partial (divide_constructor ~scopes)
-            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
-            ctx pm
       | Array (_, _, _) ->
           let kind = Typeopt.array_pattern_kind pomega in
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
           compile_test
             (divide_array ~scopes kind)
             (combine_array value_kind ploc arg kind arg_partial)

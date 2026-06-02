@@ -9,16 +9,8 @@ external ( .:() ) : 'a iarray -> int -> 'a = "%array_safe_get";;
 
 (** Create some immutable and mutable arrays *)
 
-<<<<<<< HEAD
 let iarray  : int   iarray = [|1;2;3;4;5|];;
 let iarray_local () = exclave_ Iarray.init_local 5 ~f:(fun x -> x + 1);;
-||||||| eb63e0e418
-let iarray  : int   iarray = [:1;2;3;4;5:];;
-let iarray_local () = exclave_ Iarray.init_local 5 (fun x -> x + 1);;
-=======
-let iarray  : int   iarray = [:1;2;3;4;5:];;
-let iarray_local () = exclave_ Iarray.init_local 5 ~f:(fun x -> x + 1);;
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 let ifarray : float iarray = [:1.5;2.5;3.5;4.5;5.5:];;
 let ifarray_local () =
   exclave_ Iarray.init_local 5 ~f:(fun x -> Int.to_float x +. 1.5);;

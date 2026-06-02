@@ -23,13 +23,7 @@ L101:
   %14 = load i64, ptr %4
   store i64 %14, ptr %5
   %15 = load i64, ptr %ds
-<<<<<<< HEAD
   %16 = add i64 %15, 408
-||||||| eb63e0e418
-  %16 = add i64 %15, 376
-=======
-  %16 = add i64 %15, 384
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   %17 = inttoptr i64 %16 to ptr
   %18 = load i64, ptr %17
   %19 = inttoptr i64 %18 to ptr addrspace(1)

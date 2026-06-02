@@ -1121,7 +1121,7 @@ let rec address_head = function
 (* The name of the compilation unit currently compiled. *)
 module Current_unit : sig
   val get : unit -> Unit_info.t option
-<<<<<<< HEAD
+  val get_cu : unit -> Compilation_unit.t option
   val set : Unit_info.t -> unit
   val unset : unit -> unit
 
@@ -1131,23 +1131,13 @@ module Current_unit : sig
     val is_ident : Ident.t -> bool
     val is_path : Path.t -> bool
   end
-||||||| eb63e0e418
-  val set : Unit_info.t option -> unit
-  val is : string -> bool
-  val is_ident : Ident.t -> bool
-  val is_path : Path.t -> bool
-=======
-  val get_cu : unit -> Compilation_unit.t option
-  val set : Unit_info.t option -> unit
-  val is : string -> bool
-  val is_ident : Ident.t -> bool
-  val is_path : Path.t -> bool
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 end = struct
   let current_unit : Unit_info.t option ref =
     ref None
   let get () =
     !current_unit
+  let get_cu () =
+    Option.map Unit_info.modname (get ())
   let set cu =
     current_unit := Some cu
   let unset () =
@@ -1175,7 +1165,7 @@ let get_current_unit = Current_unit.get
 let get_current_unit_name = Current_unit.Name.get
 
 let in_current_unit_and_stage ~name ~stage =
-  Current_unit_name.is name && stage = 0
+  Current_unit.Name.is name && stage = 0
 
 let find_same_module id tbl =
   match IdTbl.find_same_without_locks id tbl with
@@ -1187,13 +1177,7 @@ let find_same_module id tbl =
 let find_name_module ~mark ~stage name tbl =
   match IdTbl.find_name_and_locks wrap_module ~mark name tbl with
   | Ok x -> x
-<<<<<<< HEAD
-  | Error locks when not (Current_unit.Name.is name) ->
-||||||| eb63e0e418
-  | Error locks when not (Current_unit_name.is name) ->
-=======
   | Error locks when not (in_current_unit_and_stage ~name ~stage) ->
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
       let path = Pident(Ident.create_persistent name) in
       path, locks, Mod_persistent
   | _ ->
@@ -1892,11 +1876,11 @@ let add_required_global_for_quote path env =
   | None -> ()
   | Some global ->
     let name = Compilation_unit.Name.of_head_of_global_name global in
-    if Current_unit_name.is (Compilation_unit.Name.to_string name)
+    if Current_unit.Name.is (Compilation_unit.Name.to_string name)
     then begin
       (* The current compilation unit appears in quotes.
          [find_module_address] would [raise Not_found] in this case. *)
-      match Current_unit_name.get_cu () with
+      match Current_unit.get_cu () with
       | Some cu ->
         Persistent_env.require_impl_for_quote !persistent_env cu
       | None ->
@@ -4368,16 +4352,8 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
   let locks = IdTbl.get_all_locks env.modules in
-<<<<<<< HEAD
-  let path, loc_def =
-    if !Clflags.no_alias_deps && not load then
-||||||| eb63e0e418
-  let path, loc_def =
-    if !Clflags.transparent_modules && not load then
-=======
   let path, loc_def, mode =
-    if !Clflags.transparent_modules && not load then
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+    if !Clflags.no_alias_deps && not load then
       let path, () =
         lookup_global_name_module_no_locks Don't_load ~errors ~use ~loc name env
       in
@@ -4727,13 +4703,7 @@ let bound_module name env =
   match IdTbl.find_name_and_locks wrap_module ~mark:false name env.modules with
   | Ok _ -> true
   | Error _ ->
-<<<<<<< HEAD
-      if Current_unit.Name.is name then false
-||||||| eb63e0e418
-      if Current_unit_name.is name then false
-=======
       if in_current_unit_and_stage ~name ~stage:env.stage then false
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
@@ -5414,23 +5384,7 @@ let report_error_doc = function
   | Illegal_value_name(loc, name) ->
       Location.errorf ~loc "%a is not a valid value identifier."
        Style.inline_code name
-<<<<<<< HEAD
   | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t err
-  | Implicit_jkind_already_defined { name; defined_at; loc } ->
-      Location.errorf ~loc
-        "@[<hov>The implicit kind for %a is already defined at %a.@]"
-        Style.inline_code name
-        (Location.Doc.loc ~capitalize_first:false) defined_at
-||||||| eb63e0e418
-  | Implicit_jkind_already_defined { name; defined_at; loc = _ } ->
-      fprintf ppf
-        "@[<hov>The implicit kind for %a is already defined at %a.@]"
-        Style.inline_code name
-        (Location.Doc.loc ~capitalize_first:false) defined_at
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t ppf err
-=======
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t ppf err
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Incomplete_instantiation { unset_param } ->
       Location.errorf ~loc:Location.none
         "@[<hov>Not enough instance arguments: \
@@ -5453,46 +5407,7 @@ let () =
   Location.register_error_of_exn
     (function
       | Error err ->
-<<<<<<< HEAD
           Some (report_error_doc err)
-||||||| eb63e0e418
-          let loc =
-            match err with
-            | Missing_module (loc, _, _)
-            | Illegal_value_name (loc, _)
-            | Implicit_jkind_already_defined { loc; _ }
-            | Toplevel_splice loc
-            | Unsupported_inside_quotation (loc, _)
-            | Lookup_error(loc, _, _) -> loc
-            | Incomplete_instantiation _ -> Location.none
-          in
-          let error_of_printer =
-            if loc = Location.none
-            then Location.error_of_printer_file
-            else Location.error_of_printer ~loc ?sub:None
-          in
-          Some
-            (error_of_printer
-               report_error_doc err)
-=======
-          let loc =
-            match err with
-            | Missing_module (loc, _, _)
-            | Illegal_value_name (loc, _)
-            | Toplevel_splice loc
-            | Unsupported_inside_quotation (loc, _)
-            | Lookup_error(loc, _, _) -> loc
-            | Incomplete_instantiation _ -> Location.none
-          in
-          let error_of_printer =
-            if loc = Location.none
-            then Location.error_of_printer_file
-            else Location.error_of_printer ~loc ?sub:None
-          in
-          Some
-            (error_of_printer
-               report_error_doc err)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
       | _ ->
           None
     )

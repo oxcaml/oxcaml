@@ -13,16 +13,8 @@ let immutable_load l = (List.hd l) + (List.hd l)
 [%%expect_asm X86_64{|
 immutable_load:
   testb $1, %al
-<<<<<<< HEAD
   je    .L105
   movq  camlStdlib__List__Pmakeblock2453@GOTPCREL(%rip), %rax
-||||||| eb63e0e418
-  je    .L105
-  movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
-=======
-  je    .L0
-  movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

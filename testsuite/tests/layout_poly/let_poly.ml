@@ -264,7 +264,7 @@ let poly_ f = `A
 Line 1, characters 10-11:
 1 | let poly_ f = `A
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -332,7 +332,7 @@ type r = { a : int; b : int -> int; }
 Line 2, characters 10-11:
 2 | let poly_ f = { a = 42; b = fun x -> x }
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -356,7 +356,7 @@ type ur = #{ a : int; b : int; }
 Line 2, characters 10-11:
 2 | let poly_ f = #{ a = 42; b = 0 }
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -617,7 +617,7 @@ let _bar (x @ local) =
 Line 2, characters 12-13:
 2 |   let poly_ f = x in
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 3, characters 2-3:
 3 |   f
@@ -639,17 +639,17 @@ let f (x @ local) =
 Line 3, characters 12-13:
 3 |   and poly_ g = () in
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 2, characters 12-13:
 2 |   let poly_ f = x
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 2, characters 12-13:
 2 |   let poly_ f = x
                 ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 

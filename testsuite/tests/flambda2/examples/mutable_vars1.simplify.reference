@@ -27,13 +27,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                where k5 =
                  let prim_6 = %num_conv.[tagged_imm].[int8] (c) in
                  let prim_7 =
-<<<<<<< HEAD
-                   %num_conv.[`tagged_imm`].[`nativeint`] (n_293_unboxed0)
-||||||| eb63e0e418
-                   %num_conv.[`tagged_imm`].[`nativeint`] (n_289_unboxed0)
-=======
-                   %num_conv.[tagged_imm].[`nativeint`] (n_289_unboxed0)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+                   %num_conv.[tagged_imm].[`nativeint`] (n_293_unboxed0)
                  in
                  let Pbytessetu =
                    %bytes_or_bigstring_set.bytes.[`8`] (s', prim_7, prim_6)

@@ -2537,13 +2537,7 @@ let type_path env ty =
   let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
 
-<<<<<<< HEAD
-let quote_record_field env loc (lbl_desc : _ Data_types.gen_label_description) =
-||||||| eb63e0e418
-let quote_record_field env loc lbl_desc =
-=======
-let quote_record_field loc env lbl_desc =
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
   match type_path env lbl_desc.lbl_res with
   | None ->
     fatal_errorf "Translquote [at %a]: no global path for record field"
@@ -2558,13 +2552,7 @@ let quote_record_field loc env lbl_desc =
     fatal_errorf "Translquote [at %a]: unsupported constructor type detected."
       Location.print_loc (to_location loc)
 
-<<<<<<< HEAD
-let quote_constructor env loc (constr : Data_types.constructor_description) =
-||||||| eb63e0e418
-let quote_constructor env loc constr =
-=======
-let quote_constructor loc env constr =
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+let quote_constructor loc env (constr : Data_types.constructor_description) =
   let exception Non_builtin of string in
   (try
      Identifier.Constructor.wrap
@@ -3174,16 +3162,8 @@ and quote_core_type ~scopes ty =
     without_idents_poly names;
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
   | Ttyp_package package ->
-<<<<<<< HEAD
     let { tpt_path; tpt_cstrs; tpt_type = _; tpt_txt = _ } = package in
-    let mod_type = module_type_for_path loc tpt_path
-||||||| eb63e0e418
-    let { pack_path; pack_fields; pack_type = _; pack_txt = _ } = package in
-    let mod_type = module_type_for_path loc pack_path
-=======
-    let { pack_path; pack_fields; pack_type = _; pack_txt = _ } = package in
-    let mod_type = module_type_for_path loc env pack_path
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+    let mod_type = module_type_for_path loc env tpt_path
     and with_types =
       List.map
         (fun (lid, ty) ->

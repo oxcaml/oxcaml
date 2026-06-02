@@ -926,17 +926,9 @@ let core env id x =
       Fmt.dprintf
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a"
         (Ident.name id)
-<<<<<<< HEAD
-        (Includecore.report_mode_sub_error "first is" "second is") e
-||||||| eb63e0e418
-        (Includecore.report_mode_sub_error "first is" "second is") e
-        Printtyp.Conflicts.print_explanations
-=======
         (Includecore.report_mode_sub_error
            ~pp:(Location.none, Structure_item (Class, id))
            "first is" "second is") e
-        Printtyp.Conflicts.print_explanations
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Err.Jkind_declarations diff ->
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
         "Kind declarations do not match"

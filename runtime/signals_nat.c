@@ -47,7 +47,7 @@ Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
 {
   frame_descr* d;
   caml_domain_state * dom_st = Caml_state;
-  caml_frame_descrs fds = caml_get_frame_descrs();
+  caml_frame_descrs* fds = caml_get_frame_descrs();
   struct stack_info* stack = dom_st->current_stack;
 
   char * sp = (char*)stack->sp;
@@ -92,40 +92,11 @@ Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
 void caml_garbage_collection(void)
 {
   caml_domain_state * dom_st = Caml_state;
-<<<<<<< HEAD
-  caml_frame_descrs * fds = caml_get_frame_descrs();
-  struct stack_info* stack = dom_st->current_stack;
-
-  char * sp = (char*)stack->sp;
-  sp = First_frame(sp);
-  uintnat retaddr = Saved_return_address(sp);
-||||||| eb63e0e418
-  caml_frame_descrs fds = caml_get_frame_descrs();
-  struct stack_info* stack = dom_st->current_stack;
-
-  char * sp = (char*)stack->sp;
-  sp = First_frame(sp);
-  uintnat retaddr = Saved_return_address(sp);
-=======
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
   /* Synchronise for the case when [young_limit] was used to interrupt
      us. */
   atomic_thread_fence(memory_order_acquire);
 
-<<<<<<< HEAD
-  { /* Find the frame descriptor for the current allocation */
-    d = caml_find_frame_descr(fds, retaddr);
-    /* Must be an allocation frame */
-    CAMLassert(d);
-    CAMLassert(!frame_return_to_C(d));
-    CAMLassert(frame_has_allocs(d));
-||||||| eb63e0e418
-  { /* Find the frame descriptor for the current allocation */
-    d = caml_find_frame_descr(fds, retaddr);
-    /* Must be an allocation frame */
-    CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
-=======
   unsigned char* alloc_len = NULL;
   int nallocs = 0;
   intnat allocsz = current_frame_alloc_wosize(&alloc_len, &nallocs);
@@ -134,63 +105,16 @@ void caml_garbage_collection(void)
     /* This is a poll */
     caml_process_pending_actions_flags(CAML_FROM_CAML);
     return;
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   }
 
-<<<<<<< HEAD
-  { /* Compute the total allocation size at this point,
-       including allocations combined by Comballoc */
-    unsigned char* alloc_len = frame_end_of_live_ofs(d);
-    int  nallocs = *alloc_len++;
-    intnat allocsz = 0;
-||||||| eb63e0e418
-  { /* Compute the total allocation size at this point,
-       including allocations combined by Comballoc */
-    unsigned char* alloc_len = frame_end_of_live_ofs(d);
-    int i, nallocs = *alloc_len++;
-    intnat allocsz = 0;
-=======
   caml_alloc_small_dispatch(dom_st, allocsz, CAML_DO_TRACK | CAML_FROM_CAML,
                             nallocs, alloc_len);
 }
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
-<<<<<<< HEAD
-    if (nallocs == 0) {
-      /* This is a poll */
-      caml_process_pending_actions();
-      return;
-    }
-    else
-    {
-      for (int i = 0; i < nallocs; i++) {
-        allocsz += Whsize_wosize(Wosize_encoded_alloc_len(alloc_len[i]));
-      }
-      /* We have computed whsize (including header)
-         but need wosize (without) */
-      allocsz -= 1;
-    }
-||||||| eb63e0e418
-    if (nallocs == 0) {
-      /* This is a poll */
-      caml_process_pending_actions();
-      return;
-    }
-    else
-    {
-      for (i = 0; i < nallocs; i++) {
-        allocsz += Whsize_wosize(Wosize_encoded_alloc_len(alloc_len[i]));
-      }
-      /* We have computed whsize (including header)
-         but need wosize (without) */
-      allocsz -= 1;
-    }
-=======
 /* Redo the allocation that was interrupted by preemption. */
 void caml_redo_preempted_allocation(void)
 {
   caml_domain_state * dom_st = Caml_state;
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
   intnat allocsz = current_frame_alloc_wosize(NULL, NULL);
 

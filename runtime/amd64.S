@@ -720,19 +720,9 @@ Make_call_realloc_stack(_avx512, ZMM)
 LBL(caml_call_gc ## suffix):                         \
         SAVE_ALL_REGS(simd);                         \
         LEAVE_FUNCTION;                              \
-<<<<<<< HEAD
-        ret;                                         \
-    CFI_ENDPROC                 ;                    \
-    END_FUNCTION(caml_call_gc ## suffix)
-||||||| eb63e0e418
-        ret;                                         \
-    CFI_ENDPROC                 ;                    \
-    ENDFUNCTION(G(caml_call_gc ## suffix))
-=======
         jmp G(caml_do_call_gc);                      \
     CFI_ENDPROC;                                     \
-    ENDFUNCTION(G(caml_call_gc ## suffix))
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+    END_FUNCTION(caml_call_gc ## suffix)
 
 Make_call_gc(, NO)
 Make_call_gc(_sse, XMM)
@@ -780,7 +770,7 @@ LBL(restore_regs_and_ret):
 4:      LEAVE_FUNCTION
         ret
 CFI_ENDPROC
-ENDFUNCTION(G(caml_do_call_gc))
+END_FUNCTION(caml_do_call_gc)
 
 FUNCTION(G(caml_raise_stack_overflow_nat))
 CFI_STARTPROC
@@ -1464,11 +1454,6 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_reperform)
 
-<<<<<<< HEAD
-FUNCTION(caml_resume)
-||||||| eb63e0e418
-FUNCTION(G(caml_resume))
-=======
 /* Perform a preemption.
    This function can only be called from caml_do_call_gc, after
    caml_garbage_collection but before restoring registers
@@ -1476,7 +1461,7 @@ FUNCTION(G(caml_resume))
    Caml_state->preemption must contain a freshly allocated *3-word* preemption
    continuation
 */
-FUNCTION(G(caml_preempt))
+FUNCTION(caml_preempt)
 CFI_STARTPROC
         /* Restore the young_ptr that was saved at the beginning of
            SAVE_ALL_REGS, in caml_call_gc */
@@ -1512,10 +1497,9 @@ CFI_STARTPROC
         /* Perform the preemption effect */
         jmp     LBL(do_perform)
 CFI_ENDPROC
-ENDFUNCTION(G(caml_preempt))
+END_FUNCTION(caml_preempt)
 
-FUNCTION(G(caml_resume))
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+FUNCTION(caml_resume)
 CFI_STARTPROC
     /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
         movq   %rdi, %r12                    /* %r12 := arg */

@@ -1142,17 +1142,8 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (flags & CAML_FROM_CAML)
       /* In the case of allocations performed from OCaml, execute
          asynchronous callbacks. */
-<<<<<<< HEAD
-      (void) caml_get_value_or_raise_async(caml_do_pending_actions_res(),
-                                           "minor GC");
-||||||| eb63e0e418
-      (void) caml_raise_async_if_exception(caml_do_pending_actions_exn(),
-        "minor GC");
-=======
-      (void) caml_raise_async_if_exception(
-         caml_do_pending_actions_flags_exn(flags),
-        "minor GC");
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+      (void) caml_get_value_or_raise_async(
+               caml_do_pending_actions_flags_res(flags), "minor GC");
     else {
       /* In the case of allocations performed from C, only perform
          non-delayable actions. */

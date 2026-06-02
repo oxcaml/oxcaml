@@ -154,20 +154,6 @@ type mode_mismatch_kind = Parameter | Return
 
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
-<<<<<<< HEAD
-||||||| eb63e0e418
-  | Constructor_labeled_arg
-  | Partial_tuple_pattern_bad_type
-  | Extra_tuple_label of string option * type_expr
-  | Missing_tuple_label of string option * type_expr
-=======
-  | Constructor_labeled_arg
-  | Partial_tuple_pattern_bad_type
-  | Extra_tuple_label of string option * type_expr
-  | Missing_tuple_label of string option * type_expr
-  | Repeated_tuple_exp_label of string
-  | Repeated_tuple_pat_label of string
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Label_mismatch of
       record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
@@ -281,12 +267,8 @@ type error =
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
-<<<<<<< HEAD
   | Bind_existential of existential_binding * Ident.t * type_expr
-||||||| eb63e0e418
-=======
   | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Expr_not_a_record_type of record_form_packed * type_expr
@@ -2028,13 +2010,7 @@ let solve_constructor_annotation
         let (id, new_env) =
           Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
-<<<<<<< HEAD
-        {name with txt = id}, (decl, tv), jkind_annot_opt)
-||||||| eb63e0e418
-        {name with txt = id}, jkind_annot_opt)
-=======
-        {name with txt = id}, jkind_annot_opt, jkind)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+        {name with txt = id}, (decl, tv), jkind_annot_opt, jkind)
       name_list
   in
   (* Translate the type annotation using these type names. *)
@@ -2060,22 +2036,14 @@ let solve_constructor_annotation
           Ttuple tyl -> List.map snd tyl
         | _ -> assert false
   in
-<<<<<<< HEAD
-  if existentials <> [] then begin
-    let ids_decls = List.map (fun (x,dm,_) -> (x.txt,dm)) existentials in
-    let ids = List.map fst ids_decls in
-||||||| eb63e0e418
-  if existentials <> [] then ignore begin
-    let ids = List.map (fun (x, _) -> x.txt) existentials in
-=======
   (* Check that the kind from the declaration is a subkind of the kind from
      the pattern annotation. *)
   let check_existential id declared_jkind =
     match
-      List.find_opt (fun (n, _, _) -> Ident.same n.txt id) existentials
+      List.find_opt (fun (n, _, _, _) -> Ident.same n.txt id) existentials
     with
     | None -> assert false
-    | Some (name, jkind_annot_opt, annotated_jkind) ->
+    | Some (name, _, jkind_annot_opt, annotated_jkind) ->
         let type_equal = Ctype.type_equal !!penv in
         let context = Ctype.mk_jkind_context_always_principal !!penv in
         (match
@@ -2095,16 +2063,16 @@ let solve_constructor_annotation
      [name_list] (which has the same length) is empty, [solve_Ppat_construct]
      uses treatment [Make_existentials_abstract] *)
   if existentials <> [] then begin
-    let ids = List.map (fun (x, _, _) -> x.txt) existentials in
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+    let ids_decls = List.map (fun (x,dm,_,_) -> (x.txt,dm)) existentials in
+    let ids = List.map fst ids_decls in
     let rem =
       (* First process the existentials introduced by this constructor.
          Just need to make their definitions abstract. *)
       List.fold_left
         (fun rem (tv, declared_jkind) ->
           match get_desc tv with
-<<<<<<< HEAD
             Tconstr(Path.Pident id, [], _) when List.mem_assoc id rem ->
+              check_existential id declared_jkind;
               let decl, tv' = List.assoc id ids_decls in
               let env =
                 Env.add_type ~check:false id
@@ -2116,14 +2084,6 @@ let solve_constructor_annotation
               (* Since id is now abstract, this does not create a cycle *)
               unify_pat_types cty.ctyp_loc env tv tv';
               List.remove_assoc id rem
-||||||| eb63e0e418
-            Tconstr(Path.Pident id, [], _) when List.mem id rem ->
-              list_remove id rem
-=======
-            Tconstr(Path.Pident id, [], _) when List.mem id rem ->
-              check_existential id declared_jkind;
-              list_remove id rem
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
           | _ ->
               raise (Error (cty.ctyp_loc, !!penv,
                             Unbound_existential (ids, ty))))
@@ -2158,17 +2118,11 @@ let solve_constructor_annotation
       rem;
     if rem <> [] then Btype.cleanup_abbrev ();
   end;
-<<<<<<< HEAD
-  ty_args, Some (List.map (fun (ty, _, jkind) -> ty, jkind) existentials, cty)
-||||||| eb63e0e418
-  ty_args, Some (existentials, cty)
-=======
   let existentials =
-    List.map (fun (name, jkind_annot_opt, _) -> name, jkind_annot_opt)
+    List.map (fun (name, _, jkind_annot_opt, _) -> name, jkind_annot_opt)
       existentials
   in
   ty_args, Some (existentials, cty)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
 let solve_Ppat_construct tps (penv : Pattern_env.t) loc constr no_existentials
         existential_styp expected_ty =
@@ -3205,17 +3159,10 @@ and type_pat_aux
   let type_tuple_pat spl closed =
     (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
        when we allow non-values in boxed tuples. *)
-<<<<<<< HEAD
     assert (closed = Open || List.length spl >= 2);
     Option.iter
       (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
       (Misc.repeated_label spl);
-||||||| eb63e0e418
-=======
-    Option.iter
-      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
-      (Misc.repeated_label spl);
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
@@ -3231,16 +3178,7 @@ and type_pat_aux
       solve_Ppat_tuple ~alloc_mode loc penv args expected_ty
     in
     let pl =
-<<<<<<< HEAD
       List.map2 (fun (lbl, t, alloc_mode) (_, p) ->
-||||||| eb63e0e418
-      List.map (fun (lbl, p, t, alloc_mode) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
-=======
-      List.map (fun (lbl, p, t, alloc_mode) ->
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
         lbl,
         type_pat tps Value ~alloc_mode p t
           Jkind.Sort.(of_const Const.for_tuple_element))
@@ -3257,17 +3195,10 @@ and type_pat_aux
   let type_unboxed_tuple_pat spl closed =
     Language_extension.assert_enabled ~loc Layouts
       Language_extension.Stable;
-<<<<<<< HEAD
     assert (closed = Open || List.length spl >= 2);
     Option.iter
       (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
       (Misc.repeated_label spl);
-||||||| eb63e0e418
-=======
-    Option.iter
-      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
-      (Misc.repeated_label spl);
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
@@ -3283,16 +3214,7 @@ and type_pat_aux
       solve_Ppat_unboxed_tuple ~alloc_mode loc penv args expected_ty
     in
     let pl =
-<<<<<<< HEAD
       List.map2 (fun (lbl, t, alloc_mode, sort) (_, p) ->
-||||||| eb63e0e418
-      List.map (fun (lbl, p, t, alloc_mode, sort) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
-=======
-      List.map (fun (lbl, p, t, alloc_mode, sort) ->
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
         lbl, type_pat tps Value ~alloc_mode p t sort, sort)
         expected_tys args
     in
@@ -3883,17 +3805,9 @@ let type_pattern_list
   let tps = create_type_pat_state allow_modules in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
-<<<<<<< HEAD
-      ~is_lpoly ~equations_scope ~in_counterexample:false in
-  let type_pat (attrs, pat_mode, exp_mode, pat) ty sort =
-||||||| eb63e0e418
-      ~is_lpoly ~equations_scope ~allow_recursive_equations:false in
-  let type_pat (attrs, pat_mode, exp_mode, pat) ty sort =
-=======
-      ~equations_scope ~allow_recursive_equations:false in
+      ~equations_scope ~in_counterexample:false in
   let type_pat (attrs, pat_mode, env_alloc_mode, exp_mode, pat) ty sort =
     Pattern_env.set_env_alloc_mode new_penv env_alloc_mode;
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
     Builtin_attributes.warning_scope ~ppwarning:false attrs
       (fun () ->
          exp_mode,
@@ -4285,7 +4199,8 @@ let rec check_counter_example_pat
         tpl expected_tys;
       let tpl_ann = List.combine tpl expected_tys in
       map_fold_cont
-        (fun ((l,p,_),(_,t,_,sort)) k -> check_rec p t (fun p -> k (l, p, sort)))
+        (fun ((l,p,_),(_,t,_,sort)) k ->
+          check_rec p t (fun p -> k (l, p, sort)))
         tpl_ann
         (fun pl ->
            let pat_type =
@@ -6214,48 +6129,6 @@ and type_function_ret_info =
     ret_sort: Jkind.sort;
   }
 
-<<<<<<< HEAD
-||||||| eb63e0e418
-(* Generalize expressions *)
-let generalize_structure_exp exp = generalize_structure exp.exp_type
-let may_lower_contravariant_then_generalize env exp =
-  if maybe_expansive exp then lower_contravariant env exp.exp_type;
-  generalize exp.exp_type
-
-let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; flat_float = _ } =
-  generalize_structure base_ty;
-  generalize_structure el_ty;
-  match ba with
-  | Baccess_field _ -> ()
-  | Baccess_block (_, idx) ->
-    generalize_structure_exp idx
-
-let generalize_structure_type_unboxed_access_result
-      (el_ty, Uaccess_unboxed_field _) =
-  generalize_structure el_ty
-
-=======
-(* Generalize expressions *)
-let generalize_structure_exp exp = generalize_structure exp.exp_type
-let may_lower_contravariant_then_generalize env exp =
-  if maybe_expansive exp then lower_contravariant env exp.exp_type;
-  generalize exp.exp_type
-
-let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; modality = _ } =
-  generalize_structure base_ty;
-  generalize_structure el_ty;
-  match ba with
-  | Baccess_field _ -> ()
-  | Baccess_block (_, idx) ->
-    generalize_structure_exp idx
-
-let generalize_structure_type_unboxed_access_result
-      (el_ty, Uaccess_unboxed_field _) =
-  generalize_structure el_ty
-
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 (* value binding elaboration *)
 
 let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
@@ -7509,18 +7382,8 @@ and type_expect_
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
-<<<<<<< HEAD
-    let { ba; base_ty; el_ty; flat_float; modality } =
-      with_local_level_generalize_structure_if_principal
-||||||| eb63e0e418
-    let { ba; base_ty; el_ty; flat_float; modality } =
-      with_local_level_if_principal
-        ~post:generalize_structure_type_block_access_result
-=======
     let { ba; base_ty; el_ty; modality } =
-      with_local_level_if_principal
-        ~post:generalize_structure_type_block_access_result
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+      with_local_level_generalize_structure_if_principal
         (fun () ->
            let res = type_block_access env expected_base_ty principal ba in
            (* This unification is to get a better [base_ty], and is not
@@ -9997,7 +9860,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           let arg, ty_arg, vars =
             with_local_level_generalize begin fun () ->
               let vars, ty_arg' =
-                with_local_level_generalize_structure_if separate begin fun () ->
+                with_local_level_generalize_structure_if separate
+                  begin fun () ->
                   instance_poly_fixed vars ty_arg'
                 end
               in
@@ -10968,19 +10832,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           let (pat_list, _new_env, _force, pvs, _mvs as res) =
             with_local_level_generalize_if is_recursive (fun () ->
               type_pattern_list Value existential_context env mutable_flag spatl
-<<<<<<< HEAD
-                nvs sorts allow_modules ~is_lpoly
+                nvs sorts allow_modules
             ) ~before_generalize:(fun (_, _, _, pvs, _) ->
                                     iter_pattern_variables_type generalize pvs)
-||||||| eb63e0e418
-                nvs sorts allow_modules ~is_lpoly
-            ) ~post:(fun (_, _, _, pvs, _) ->
-                       iter_pattern_variables_type generalize pvs)
-=======
-                nvs sorts allow_modules
-            ) ~post:(fun (_, _, _, pvs, _) ->
-                       iter_pattern_variables_type generalize pvs)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
           in
           (* If recursive, first unify with an approximation of the
              expression *)
@@ -12806,7 +12660,6 @@ let report_error ~loc env =
         "@[<2>%s:@ %a@]"
         "This type does not bind all existentials in the constructor"
         (Style.as_inline_code pp_type) (ids, ty)
-<<<<<<< HEAD
   | Bind_existential (reason, id, ty) ->
       let reason1, reason2 = match reason with
       | Bind_already_bound -> "the name", "that is already bound"
@@ -12821,12 +12674,9 @@ let report_error ~loc env =
         "introduced by this GADT constructor"
         "The type annotation tries to bind it to"
         reason1 (Style.as_inline_code Printtyp.type_expr) ty reason2
-||||||| eb63e0e418
-=======
   | Existential_jkind_mismatch (id, err) ->
       Location.error_of_printer ~loc
         (Jkind.Violation.report_with_name ~name:(Ident.name id) env) err
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Missing_type_constraint ->
       Location.errorf ~loc
         "@[%s@ %s@]"

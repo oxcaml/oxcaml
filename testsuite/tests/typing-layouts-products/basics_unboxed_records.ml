@@ -622,30 +622,11 @@ Error: This expression has type "t",
        which is a boxed record rather than an unboxed one.
 |}]
 
-<<<<<<< HEAD
 let _ = #{ b = #5.0 }
 [%%expect{|
-Line 1, characters 11-12:
-1 | let _ = #{ b = #5.0 }
-               ^
-Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-Note that float- and [@@unboxed]- records don't get unboxed versions.
+- : t# = #{b = <abstr>}
 |}]
 
-||||||| eb63e0e418
-let _ = #{ b = #5.0 }
-[%%expect{|
-Line 1, characters 11-12:
-1 | let _ = #{ b = #5.0 }
-               ^
-Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
-|}]
-
-=======
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 let _ = { u = #5.0 }
 [%%expect{|
 Line 1, characters 10-11:
@@ -665,30 +646,11 @@ Hint: There is an unboxed record field with this name.
 To project an unboxed record field, use ".#u" instead of ".u".
 |}]
 
-<<<<<<< HEAD
 let bad_get t = t.#b
 [%%expect{|
-Line 1, characters 19-20:
-1 | let bad_get t = t.#b
-                       ^
-Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-Note that float- and [@@unboxed]- records don't get unboxed versions.
+val bad_get : t# -> float# = <fun>
 |}]
 
-||||||| eb63e0e418
-let bad_get t = t.#b
-[%%expect{|
-Line 1, characters 19-20:
-1 | let bad_get t = t.#b
-                       ^
-Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
-|}]
-
-=======
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 (*****************************************************************************)
 (* Initial expressions for functionally updated records are always evaluated *)
 

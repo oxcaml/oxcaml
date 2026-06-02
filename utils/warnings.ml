@@ -605,7 +605,6 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
-<<<<<<< HEAD
   { number = 74;
     names = ["degraded-to-partial-match"];
     description = "A pattern-matching is compiled as partial \
@@ -616,14 +615,11 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
-||||||| eb63e0e418
-=======
   { number = 182;
     names = ["untagged-external-small-int-return"];
     description = "An external declaration returns an (int8[@untagged]) or \
                    an (int16[@untagged])";
     since = since 5 2 };
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   { number = 183;
     names = ["redundant-kind-modifier"];
     (* CR layouts-scannable: As more axes are added, this description (and
@@ -1026,13 +1022,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-<<<<<<< HEAD
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..185"
-||||||| eb63e0e418
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..185"
-=======
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..184"
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..184"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1404,11 +1394,19 @@ let message = function
         Style.inline_code "[@tail_mod_cons]"
         Style.inline_code "[@tailcall false]"
   | Generative_application_expects_unit ->
-<<<<<<< HEAD
       msg "A generative functor@ \
            should be applied@ to@ %a;@ using@ %a@ is deprecated."
         Style.inline_code "()"
         Style.inline_code "(struct end)"
+  | Untagged_external_small_int_return ->
+      msg "Using %a or %a on C stub returns is not@ \
+           recommended since %a does not perform a sign-extension.@ Use@ \
+           %a or %a instead."
+        Style.inline_code "(int8[@untagged])"
+        Style.inline_code "(int16[@untagged])"
+        Style.inline_code "[@untagged]"
+        Style.inline_code "(int8[@unboxed])"
+        Style.inline_code "(int16[@unboxed])"
   | Degraded_to_partial_match ->
       let[@manual.ref "ss:warn74"] ref_manual = [ 13; 5; 5 ] in
       msg
@@ -1417,87 +1415,13 @@ let message = function
          typically@ occurs@ due@ to@ complex@ matches@ on@ mutable@ fields.@ %a"
         Style.inline_code "Match_failure"
         Misc.print_see_manual ref_manual
-||||||| eb63e0e418
-      "A generative functor\n\
-       should be applied to '()'; using '(struct end)' is deprecated."
-=======
-      "A generative functor\n\
-       should be applied to '()'; using '(struct end)' is deprecated."
-  | Untagged_external_small_int_return ->
-      "Using (int8[@untagged]) or (int16[@untagged]) on C stub returns is not\n\
-       recommended since [@untagged] does not perform a sign-extension. Use\n\
-       (int8[@unboxed]) or (int16[@unboxed]) instead."
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Redundant_kind_modifier abbrev ->
-<<<<<<< HEAD
-      msg "This kind modifier is already implied by the kind %a."
+      msg "This kind modifier, or a stronger one,@ \
+           is already implied by the kind %a."
         Style.inline_code abbrev
-||||||| eb63e0e418
-      "This kind modifier is already implied by the kind \"" ^ abbrev ^ "\"."
-=======
-      "This kind modifier, or a stronger one, is\n\
-       already implied by the kind \"" ^ abbrev ^ "\"."
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Ignored_kind_modifier (abbrev, modifiers) ->
-<<<<<<< HEAD
       msg "The kind modifier(s) %a have no effect on the kind %a."
         Style.inline_code (String.concat " " modifiers) Style.inline_code abbrev
-  | Overridden_kind_modifier overridden_by ->
-      msg "This kind modifier is overridden by %a later."
-        Style.inline_code overridden_by
-||||||| eb63e0e418
-      Printf.sprintf
-      "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
-      (String.concat " " modifiers) abbrev
-  | Overridden_kind_modifier overridden_by ->
-      "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
-  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Non_value_sort layout) ->
-      Printf.sprintf
-      "External declaration here is not upstream compatible. \n\
-       The only types with non-value layouts allowed are float#, \n\
-       int32#, int64#, and nativeint#. Unknown type with layout \n\
-       %s encountered."
-      layout
-  | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      Printf.sprintf
-      "[@unboxed] attribute must be added to external declaration \n\
-       argument type with layout %s for upstream compatibility."
-      layout
-  | Incompatible_with_upstream Immediate_void_variant ->
-      "This variant is immediate \n\
-       because all its constructors have all-void arguments, but after \n\
-       erasure for upstream compatibility, void is no longer zero-width, \n\
-       so it won't be immediate."
-  | Incompatible_with_upstream Separability_check ->
-      "This type relies on OxCaml's extended separability checking \n\
-       and would not be accepted by upstream OCaml."
-=======
-      Printf.sprintf
-      "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
-      (String.concat " " modifiers) abbrev
-  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Non_value_sort layout) ->
-      Printf.sprintf
-      "External declaration here is not upstream compatible. \n\
-       The only types with non-value layouts allowed are float#, \n\
-       int32#, int64#, and nativeint#. Unknown type with layout \n\
-       %s encountered."
-      layout
-  | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      Printf.sprintf
-      "[@unboxed] attribute must be added to external declaration \n\
-       argument type with layout %s for upstream compatibility."
-      layout
-  | Incompatible_with_upstream Immediate_void_variant ->
-      "This variant is immediate \n\
-       because all its constructors have all-void arguments, but after \n\
-       erasure for upstream compatibility, void is no longer zero-width, \n\
-       so it won't be immediate."
-  | Incompatible_with_upstream Separability_check ->
-      "This type relies on OxCaml's extended separability checking \n\
-       and would not be accepted by upstream OCaml."
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Incompatible_with_upstream Unpacked_attribute ->
       msg "[@@unpacked] is not supported by upstream OCaml."
   | Unnecessarily_partial_tuple_pattern ->
@@ -1537,7 +1461,8 @@ let message = function
            but the %a attribute for@ this signature does not apply to it@ \
            because its type is not syntactically a function type.@ \
            @[If it should be checked, use an explicit zero_alloc attribute@ \
-           with an arity.@ If not, use an explicit zero_alloc ignore attribute.@]"
+           with an arity.@ If not, use an explicit zero_alloc ignore \
+           attribute.@]"
         Style.inline_code (Printf.sprintf "[@@@zero_alloc %s]" s)
   | Unchecked_zero_alloc_attribute ->
       msg "the zero_alloc attribute cannot be checked.@ \

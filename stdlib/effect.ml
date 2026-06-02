@@ -12,16 +12,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< HEAD
-type 'a t = 'a eff = ..
-||||||| eb63e0e418
-type 'a t = ..
-=======
 external register_named_value : string -> 'a -> unit
   = "caml_register_named_value"
 
-type 'a t = ..
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+type 'a t = 'a eff = ..
 external perform : 'a t -> 'a = "%perform"
 exception Out_of_fibers = Out_of_fibers
 type exn += Unhandled: 'a t -> exn
@@ -161,22 +155,11 @@ module Shallow = struct
     let error _ = failwith "impossible" in
     let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) _last_fiber =
       match eff with
-<<<<<<< HEAD
       | M.Initial_setup__ -> raise_notrace (E (Cont k))
-||||||| eb63e0e418
-      | M.Initial_setup__ ->
-          cont_set_last_fiber k last_fiber;
-          raise_notrace (E (Cont k))
-=======
-      | M.Initial_setup__ ->
-          cont_set_last_fiber k last_fiber;
-          raise_notrace (E (Cont k))
       (* We need to handle [Preemption] here since it's triggered automatically
          on a timer, and might arrive while we're setting up the fiber *)
       | Preemption ->
-          cont_set_last_fiber k last_fiber;
           resume k (fun x -> x) ()
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
       | _ -> error ()
     in
     match with_stack error error effc f' () with

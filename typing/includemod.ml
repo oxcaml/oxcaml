@@ -1343,27 +1343,13 @@ let () =
    interface. *)
 
 let compunit0
-<<<<<<< HEAD
-    ~comparison env ~mark impl_name impl_sig intf_name intf_sig unit_shape =
-  let loc = Location.in_file impl_name in
-||||||| eb63e0e418
-    ~comparison env ~mark impl_name impl_sig intf_name intf_sig unit_shape =
-=======
     ~comparison env ~mark impl_name ~modes impl_sig intf_name intf_sig
     unit_shape =
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+  let loc = Location.in_file impl_name in
   let direction = Directionality.strictly_positive ~mark ~both:false in
   match
-<<<<<<< HEAD
     signatures ~core:core_inclusion ~direction ~loc env Subst.identity
-      ~modes:modes_unit impl_sig intf_sig unit_shape
-||||||| eb63e0e418
-    signatures ~direction ~loc:(Location.in_file impl_name) env
-      Subst.identity ~modes:modes_unit impl_sig intf_sig unit_shape
-=======
-    signatures ~direction ~loc:(Location.in_file impl_name) env
-      Subst.identity ~modes impl_sig intf_sig unit_shape
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+      ~modes impl_sig intf_sig unit_shape
   with Result.Error reasons ->
     let diff = Error.diff impl_name intf_name reasons in
     let cdiff =

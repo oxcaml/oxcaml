@@ -362,22 +362,10 @@ module Pattern_env : sig
   type t = private
     { mutable env : Env.t;
       equations_scope : int;
-<<<<<<< HEAD
       in_counterexample : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
-    -> in_counterexample:bool -> t
-||||||| eb63e0e418
-      allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
-    -> allow_recursive_equations:bool -> t
-=======
-      allow_recursive_equations : bool;
       mutable env_alloc_mode : Mode.Alloc.r option; }
   val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
-    -> allow_recursive_equations:bool -> t
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+    -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
   val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
@@ -385,31 +373,13 @@ end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
-<<<<<<< HEAD
       in_counterexample : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~in_counterexample =
-||||||| eb63e0e418
-      allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~allow_recursive_equations =
-=======
-      allow_recursive_equations : bool;
       mutable env_alloc_mode : Mode.Alloc.r option; }
-  let make ?env_alloc_mode env ~equations_scope ~allow_recursive_equations =
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+  let make ?env_alloc_mode env ~equations_scope ~in_counterexample =
     { env;
       equations_scope;
-<<<<<<< HEAD
       in_counterexample;
-      is_lpoly; }
-||||||| eb63e0e418
-      allow_recursive_equations;
-      is_lpoly; }
-=======
-      allow_recursive_equations;
       env_alloc_mode; }
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in

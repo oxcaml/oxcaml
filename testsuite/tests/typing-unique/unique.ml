@@ -41,9 +41,6 @@ Line 1, characters 40-41:
 1 | let dup (x @ unique) = ((x : @ unique), x, x)
                                             ^
 Error: This value is used here, but it is also being used as unique at:
-Line 1, characters 24-38:
-1 | let dup (x @ unique) = ((x : @ unique), x, x)
-                            ^^^^^^^^^^^^^^
 
 |}]
 
@@ -66,9 +63,6 @@ Line 1, characters 40-41:
 1 | let dup (x @ unique) = ((x : @ unique), x)
                                             ^
 Error: This value is used here, but it is also being used as unique at:
-Line 1, characters 24-38:
-1 | let dup (x @ unique) = ((x : @ unique), x)
-                            ^^^^^^^^^^^^^^
 
 |}]
 
@@ -315,22 +309,10 @@ val higher_order5 : 'a @ unique -> 'a = <fun>
 
 let higher_order6 (x @ unique) = let f (x @ unique) = (x : @ unique) in higher_order2 f x
 [%%expect{|
-<<<<<<< HEAD
-Line 1, characters 79-80:
-1 | let higher_order6 (unique_ x) = let f (unique_ x) = unique_ x in higher_order2 f x
-                                                                                   ^
-Error: The value "f" has type "'a @ unique -> 'a"
-||||||| eb63e0e418
-Line 1, characters 79-80:
-1 | let higher_order6 (unique_ x) = let f (unique_ x) = unique_ x in higher_order2 f x
-                                                                                   ^
-Error: This expression has type "'a @ unique -> 'a"
-=======
 Line 1, characters 86-87:
 1 | let higher_order6 (x @ unique) = let f (x @ unique) = (x : @ unique) in higher_order2 f x
                                                                                           ^
-Error: This expression has type "'a @ unique -> 'a"
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+Error: The value "f" has type "'a @ unique -> 'a"
        but an expression was expected of type "'b -> 'c @ unique"
 |}]
 

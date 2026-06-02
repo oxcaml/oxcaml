@@ -1280,7 +1280,9 @@ val equal_record_representation_up_to_scannable_axes :
   record_representation -> record_representation -> bool
 
 val equal_record_unboxed_product_representation_up_to_scannable_axes :
-  record_unboxed_product_representation -> record_unboxed_product_representation -> bool
+  record_unboxed_product_representation
+  -> record_unboxed_product_representation
+  -> bool
 
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool

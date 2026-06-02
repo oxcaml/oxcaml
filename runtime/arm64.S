@@ -1196,7 +1196,6 @@ END_FUNCTION(caml_callback3_asm)
         LEAVE_FUNCTION
 .endm
 
-<<<<<<< HEAD
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
  * point to its parent at Handler_parent(Stack_handler(f)). In the following,
@@ -1204,18 +1203,6 @@ END_FUNCTION(caml_callback3_asm)
  * parent pointer.
  */
 
-||||||| eb63e0e418
-
-/*
- * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
- */
-
-=======
-
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 FUNCTION(caml_perform)
         CFI_STARTPROC
     /*  x0: effect to perform

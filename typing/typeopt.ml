@@ -100,7 +100,6 @@ let is_base_type env ty base_ty_path =
   | _ -> false
 
 let maybe_pointer_type env ty =
-<<<<<<< HEAD
   match scrape_ty env ty with
   | Some ty ->
     let immediate_or_pointer =
@@ -115,34 +114,6 @@ let maybe_pointer_type env ty =
     in
     immediate_or_pointer, nullable
   | None -> Pointer, Nullable
-||||||| eb63e0e418
-  let ty = scrape_ty env ty in
-  let immediate_or_pointer =
-    match Ctype.is_always_gc_ignorable env ty with
-    | true -> Immediate
-    | false -> Pointer
-  in
-  let nullable =
-    match Ctype.check_type_nullability env ty Non_null with
-    | true -> Non_nullable
-    | false -> Nullable
-  in
-  immediate_or_pointer, nullable
-=======
-  let ty = scrape_ty env ty in
-  (* CR layouts: calling [check_type_jkind] three times (indirectly) is sad *)
-  let immediate_or_pointer =
-    match Ctype.is_always_gc_ignorable env ty with
-    | true -> Immediate
-    | false -> Pointer
-  in
-  let nullable =
-    match Ctype.check_type_nullability env ty Non_null with
-    | true -> Non_nullable
-    | false -> Nullable
-  in
-  immediate_or_pointer, nullable
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
@@ -223,27 +194,15 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-<<<<<<< HEAD
-let classify ~classify_product env ty sort : _ classification =
-  match (sort : Jkind.Sort.Const.t) with
-  | Base Scannable -> begin
-  match scrape_ty env ty with
-  | None -> Any
-  | Some ty ->
-||||||| eb63e0e418
-let classify ~classify_product env ty sort : _ classification =
-  let ty = scrape_ty env ty in
-  match (sort : Jkind.Sort.Const.t) with
-  | Base Scannable -> begin
-=======
 let classify ~classify_product env ty layout : _ classification =
-  let ty = scrape_ty env ty in
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _sa) -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+  match scrape_ty env ty with
+  | None -> Any
+  | Some ty ->
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
@@ -396,7 +355,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_elt env loc ty =
-  let ty = scrape_ty env ty in
+  let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
   let elt_layout = type_representable_layout ~why:Array_element env loc ty in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
@@ -433,22 +392,10 @@ let array_kind_of_elt env loc ty =
 
 let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
-<<<<<<< HEAD
   | Some (Tconstr(p, [elt_ty], _))
     when Path.same p Predef.path_array || Path.same p Predef.path_iarray ->
-      array_kind_of_elt ~elt_sort env loc elt_ty
-  | Some (Tconstr(p, [], _)) when Path.same p Predef.path_floatarray ->
-||||||| eb63e0e418
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
-                              || Path.same p Predef.path_iarray ->
-      array_kind_of_elt ~elt_sort env loc elt_ty
-  | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
-=======
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
-                              || Path.same p Predef.path_iarray ->
       array_kind_of_elt env loc elt_ty
-  | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+  | Some (Tconstr(p, [], _)) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
     begin match elt_ty with
@@ -1442,16 +1389,8 @@ let report_error ppf = function
          layout %s.@ \
          @[Hint: if the array contents should not be scanned, annotating@ \
          contained abstract types as [mod external] may resolve this error.@]"
-<<<<<<< HEAD
         Printtyp.Doc.type_expr elt_ty
-        Jkind.Sort.Const.format const
-||||||| eb63e0e418
-        Printtyp.type_expr elt_ty
-        Jkind.Sort.Const.format const
-=======
-        Printtyp.type_expr elt_ty
         (Jkind.Layout.Const.to_string const)
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
       begin match elt_kinding_failure with
       | Some (env, ty, err) ->

@@ -1135,14 +1135,8 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
-<<<<<<< HEAD
   val _i_variance : unit -> unit
-  val _ikinds : unit -> unit
-||||||| eb63e0e418
-  val _ikinds : unit -> unit
-=======
   val _no_ikinds : unit -> unit
->>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _Ix : string -> unit
