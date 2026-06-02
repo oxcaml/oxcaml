@@ -34,7 +34,6 @@ CLEAN_FILES = \
   $(CLEAN_DUNE_WORKSPACES) \
   duneconf/dirs-to-ignore.inc \
   duneconf/ox-extra.inc \
-  dune.runtime_selection \
   otherlibs/dune \
   natdynlinkops \
   otherlibs/dynlink/natdynlinkops \

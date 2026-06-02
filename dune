@@ -39,7 +39,7 @@
     -warn-error
     +A))))
 
-(include dune.runtime_selection)
+(dirs (:standard \ runtime4 debugger4))
 
 (copy_files# utils/*.ml{,i})
 

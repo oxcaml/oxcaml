@@ -410,5 +410,4 @@ ocaml/primitives.new
 
 /natdynlinkops
 
-dune.runtime_selection
 /otherlibs/dune
