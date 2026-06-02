@@ -980,6 +980,12 @@ let error_of_printer ?(loc = none) ?(sub = []) pp x =
 let error_of_printer_file print x =
   error_of_printer ~loc:(in_file !input_name) print x
 
+let multiple_errors ?loc = function
+  | [error] -> error
+  | errors ->
+      let sub = List.concat_map (fun err -> err.main :: err.sub) errors in
+      errorf ?loc ~sub "Multiple errors were encountered@,"
+
 (******************************************************************************)
 (* Reporting warnings: generating a report from a warning number using the
    information in [Warnings] + convenience functions. *)
