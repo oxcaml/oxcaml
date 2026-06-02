@@ -73,9 +73,8 @@ arr_sum:
   ret
 |}]
 
-(* CR ttebbi: The generated control flow branches three (!) times on
-   should_continue. In block 123, we can even statically know that the bit is 1.
-   Additionally, we materialise the should_continue bit. *)
+(* CR ttebbi: The generated control flow branches two times on
+   should_continue. Additionally, we materialise the should_continue bit. *)
 let search ~target (start : int list) =
   let node = ref start in
   while
@@ -110,8 +109,7 @@ search:
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  testq %rsi, %rsi
-  je    .L4
+  jmp   .L4
 .L3:
   movq  %rax, %rbx
   testb $1, %bl

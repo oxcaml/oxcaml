@@ -1809,11 +1809,15 @@ module Oxcaml_options_impl = struct
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
     cfg_prologue_shrink_wrap ();
+    cfg_prologue_validate ();
     x86_peephole_optimize ();
     regalloc_param "SPLIT_AROUND_LOOPS:on";
     regalloc_param "AFFINITY:on";
-    regalloc Clflags.Register_allocator.Irc;
-    cfg_merge_blocks ()
+    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
+    regalloc_param "IRC_INTERF_THRESHOLD:4096";
+    cfg_merge_blocks ();
+    cfg_eliminate_dead_trap_handlers ();
+    cfg_value_propagation_flow ()
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
