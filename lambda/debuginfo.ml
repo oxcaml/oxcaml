@@ -46,8 +46,7 @@ module Scoped_location = struct
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-
-      mangling_item: Compilation_unit.t Structured_mangling.path_item option}
+               mangling_item: Compilation_unit.t Structured_mangling.path_item option}
 
   let str = function
     | Empty -> ""

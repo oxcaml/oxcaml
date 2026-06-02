@@ -224,8 +224,28 @@ let mangle_path_item buf path_item =
 
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
-module Parsed = struct
+let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
+  (* Compare the current compilation unit with the one recorded in the [path] to
+     avoid repetition in the mangled name when they are identical, and to add an
+     explicit inline tag to separate the two compilation units (the one
+     currently created and the source of the code) when they differ. *)
+  let path =
+    Compilation_unit cu
+    ::
+    (match path with
+    | Compilation_unit cu' :: path' when Compilation_unit.equal cu cu' -> path'
+    | Compilation_unit _ :: _ -> Inline_marker :: path
+    | _ -> path)
+  in
+  let b = Buffer.create 10 in
+  Buffer.add_string b ocaml_prefix;
+  mangle_path b path;
+  Buffer.contents b
+
+module Parse = struct
   let is_digit = function '0' .. '9' -> true | _ -> false
+  (* CR shym Replace with Char.Ascii.is_digit when the transition to 5.4 is
+     complete *)
 
   let incr_n r n = r := !r + n
 
@@ -236,11 +256,13 @@ module Parsed = struct
       | 'A' .. 'Z' ->
         aux ((n * 26) + (Char.code str.[p] - Char.code 'A')) (p + 1)
       | _ -> n, p - pos
+      | exception Invalid_argument _ -> invalid_arg "no base26 number to decode"
     in
     match str.[pos] with
     | '_' -> None
     | 'A' .. 'Z' -> Some (aux 0 pos)
-    | _ -> invalid_arg "No base26 number to decode"
+    | _ | (exception Invalid_argument _) ->
+      invalid_arg "no base26 number to decode"
 
   (** Inverse of {!hex}. *)
   let unhex h1 h2 =
@@ -255,11 +277,14 @@ module Parsed = struct
 
   let unhexes buf str pos =
     let rec loop i =
-      match str.[i] with
-      | '0' .. '9' | 'a' .. 'f' ->
-        Buffer.add_char buf (unhex str.[i] str.[i + 1]);
-        loop (i + 2)
-      | _ -> i - pos
+      try
+        match str.[i] with
+        | '0' .. '9' | 'a' .. 'f' ->
+          Buffer.add_char buf (unhex str.[i] str.[i + 1]);
+          loop (i + 2)
+        | _ -> i - pos
+      with Invalid_argument _ ->
+        invalid_arg "non-terminated hexadecimal integer"
     in
     loop pos
 
@@ -276,8 +301,8 @@ module Parsed = struct
       Option.map (fun n -> n, len) (int_of_string_opt (String.sub str pos len))
 
   (** Inverse of {!encode_split_parts}: given the payload of an escaped
-      identifier (the part after the [u<len>] prefix), reconstruct the
-      original string by interleaving the raw and escaped parts. *)
+      identifier (the part after the [u<len>] prefix), reconstruct the original
+      string by interleaving the raw and escaped parts. *)
   let decode_split_parts sym =
     let initial_raw_pos =
       try String.index sym '_' + 1
@@ -305,15 +330,15 @@ module Parsed = struct
     loop ();
     Buffer.contents res
 
-  (** Inverse of {!encode}: decode a single length-prefixed identifier at
-      [pos] in [str], returning the decoded string and the number of bytes
-      consumed. *)
+  (** Inverse of {!encode}: decode a single length-prefixed identifier at [pos]
+      in [str], returning the decoded string and the number of bytes consumed.
+  *)
   let decode str pos =
     let is_escaped = pos < String.length str && str.[pos] = 'u' in
     let flag_len = if is_escaped then 1 else 0 in
     match undecimal str (pos + flag_len) with
     | None -> None
-    | Some (payload_len, length_len) ->
+    | Some (payload_len, length_len) -> (
       let full_len = flag_len + length_len + payload_len in
       if payload_len <= 0 || pos + full_len > String.length str
       then None
@@ -321,38 +346,29 @@ module Parsed = struct
         let payload =
           String.sub str (pos + flag_len + length_len) payload_len
         in
-        Some
-          ( (if is_escaped then decode_split_parts payload else payload),
-            full_len )
+        try
+          Some
+            ( (if is_escaped then decode_split_parts payload else payload),
+              full_len )
+          (* decode_split_parts raises Invalid_argument exceptions when the
+             symbol is not correctly formatted *)
+        with Invalid_argument _ -> None)
 
   (** Inverse of {!tag_prefixed_loc}: split a decoded [file_line_col] payload
-      back into its components. Returns [None] if the payload does not have
-      the expected shape. *)
+      back into its components. Returns [None] if the payload does not have the
+      expected shape. *)
   let parse_location loc =
-    let len = String.length loc in
-    let rec find_underscores i count first second =
-      if i < 0
-      then first, second, count
-      else if loc.[i] = '_'
-      then
-        match count with
-        | 0 -> find_underscores (i - 1) 1 i second
-        | 1 -> find_underscores (i - 1) 2 i first
-        | _ -> first, second, count
-      else find_underscores (i - 1) count first second
+    Option.bind (String.rindex_opt loc '_') @@ fun second ->
+    Option.bind (String.rindex_from_opt loc (second - 1) '_') @@ fun first ->
+    let line_str = String.sub loc (first + 1) (second - first - 1) in
+    Option.bind (int_of_string_opt line_str) @@ fun line ->
+    let col_str =
+      String.sub loc (second + 1) (String.length loc - second - 1)
     in
-    let first, second, count = find_underscores (len - 1) 0 (-1) (-1) in
-    if count < 2
-    then None
-    else
-      let file = String.sub loc 0 first in
-      let line_str = String.sub loc (first + 1) (second - first - 1) in
-      let col_str = String.sub loc (second + 1) (len - second - 1) in
-      match int_of_string_opt line_str, int_of_string_opt col_str with
-      | Some line, Some col ->
-        let file_opt = if file = "" then None else Some file in
-        Some (line, col, file_opt)
-      | _ -> None
+    Option.bind (int_of_string_opt col_str) @@ fun col ->
+    let file = String.sub loc 0 first in
+    let file_opt = if file = "" then None else Some file in
+    Some (line, col, file_opt)
 
   (* Linux prefix *)
   let linux_prefix = ocaml_prefix
@@ -360,8 +376,8 @@ module Parsed = struct
   (* macOS prefix with two underscores *)
   let alternate_prefix = "_" ^ ocaml_prefix
 
-  (* Returns the length of the matched prefix, or [None] if [sym] does not
-     start with either. Single source of truth for prefix detection so that
+  (* Returns the length of the matched prefix, or [None] if [sym] does not start
+     with either. Single source of truth for prefix detection so that
      [starts_with_prefix] and [parse] cannot drift. *)
   let matched_prefix_len sym =
     if String.starts_with ~prefix:linux_prefix sym
@@ -373,68 +389,44 @@ module Parsed = struct
   let starts_with_prefix sym = Option.is_some (matched_prefix_len sym)
 
   let parse sym =
-    match matched_prefix_len sym with
-    | None -> None
-    | Some start_pos ->
-      let pos = ref start_pos in
-      let items = ref [] in
-      let parse_loc tag_constructor =
-        match decode sym !pos with
-        | None -> raise Exit
-        | Some (decoded, l) -> (
-          match parse_location decoded with
-          | None -> raise Exit
-          | Some (line, col, file_opt) ->
-            incr_n pos l;
-            items := tag_constructor (line, col, file_opt) :: !items)
+    let parse_loc pos tag_constructor =
+      Option.bind (decode sym pos) @@ fun (decoded, l) ->
+      Option.bind (parse_location decoded) @@ fun (line, col, file_opt) ->
+      Some (tag_constructor line col file_opt, l)
+    in
+    let parse_named pos tag_constructor =
+      Option.bind (decode sym pos) @@ fun (decoded, l) ->
+      Some (tag_constructor decoded, l)
+    in
+    let len = String.length sym in
+    Option.bind (matched_prefix_len sym) @@ fun start_pos ->
+    let rec loop path pos =
+      let aux parse_fun tag_constructor =
+        Option.bind (parse_fun (pos + 1) tag_constructor) @@ fun (it, l) ->
+        loop (it :: path) (pos + 1 + l)
+      and build_result () =
+        if pos = start_pos
+        then None
+        else
+          let suffix =
+            if pos < len then String.sub sym pos (len - pos) else ""
+          in
+          Some (List.rev path, suffix)
       in
-      let parse_named tag_constructor =
-        match decode sym !pos with
-        | None -> raise Exit
-        | Some (decoded, l) ->
-          incr_n pos l;
-          items := tag_constructor decoded :: !items
-      in
-      let len = String.length sym in
-      (try
-         while !pos < len && sym.[!pos] <> '_' do
-           let tag = sym.[!pos] in
-           incr pos;
-           match tag with
-           | 'U' -> parse_named (fun s -> Compilation_unit s)
-           | 'M' -> parse_named (fun s -> Module s)
-           | 'O' -> parse_named (fun s -> Class s)
-           | 'F' -> parse_named (fun s -> Function s)
-           | 'L' -> parse_loc (fun (l, c, f) -> Anonymous_function (l, c, f))
-           | 'S' -> parse_loc (fun (l, c, f) -> Anonymous_module (l, c, f))
-           | 'P' -> parse_loc (fun (l, c, f) -> Partial_function (l, c, f))
-           | 'I' -> items := Inline_marker :: !items
-           | _ -> raise Exit
-         done;
-         if !pos = start_pos
-         then None
-         else
-           let suffix =
-             if !pos < len then String.sub sym !pos (len - !pos) else ""
-           in
-           Some (List.rev !items, suffix)
-       with Exit | Invalid_argument _ -> None)
+      if pos < len
+      then
+        match sym.[pos] with
+        | 'U' -> aux parse_named (fun s -> Compilation_unit s)
+        | 'M' -> aux parse_named (fun s -> Module s)
+        | 'O' -> aux parse_named (fun s -> Class s)
+        | 'F' -> aux parse_named (fun s -> Function s)
+        | 'L' -> aux parse_loc (fun l c f -> Anonymous_function (l, c, f))
+        | 'S' -> aux parse_loc (fun l c f -> Anonymous_module (l, c, f))
+        | 'P' -> aux parse_loc (fun l c f -> Partial_function (l, c, f))
+        | 'I' -> loop (Inline_marker :: path) (pos + 1)
+        | '_' -> build_result ()
+        | _ -> None
+      else build_result ()
+    in
+    loop [] start_pos
 end
-
-let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
-  (* Compare the current compilation unit with the one recorded in the [path] to
-     avoid repetition in the mangled name when they are identical, and to add an
-     explicit inline tag to separate the two compilation units (the one
-     currently created and the source of the code) when they differ. *)
-  let path =
-    Compilation_unit cu
-    ::
-    (match path with
-    | Compilation_unit cu' :: path' when Compilation_unit.equal cu cu' -> path'
-    | Compilation_unit _ :: _ -> Inline_marker :: path
-    | _ -> path)
-  in
-  let b = Buffer.create 10 in
-  Buffer.add_string b ocaml_prefix;
-  mangle_path b path;
-  Buffer.contents b

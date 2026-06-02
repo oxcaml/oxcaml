@@ -81,7 +81,7 @@ type 'cu path = 'cu path_item list
 val mangle_ident : Compilation_unit.t -> Compilation_unit.t path -> string
 
 (** Inverse direction: parse a mangled symbol back into a structured path. *)
-module Parsed : sig
+module Parse : sig
   (** [starts_with_prefix sym] is [true] iff [sym] starts with one of the
       prefixes the structured mangler emits ([_Caml] or its macOS-flavoured
       [__Caml] variant). *)

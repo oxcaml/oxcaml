@@ -6,7 +6,9 @@ rejected: caml_foo
 rejected: _CamlU3FooXXX
 rejected: _CamlU99Foo
 rejected: _CamlUFoo
-rejected: _CamlU3FooFu5G2gg_funcsub
+rejected: _CamlU3FooFu6G1234_funcsub
+rejected: _CamlU3FooFu11G2g_funcsub
+rejected: _CamlU3FooFu11G2A_funcsub
 rejected: camlFoo__$3
 rejected: camlFoo__$
 rejected: camlFoo__$3

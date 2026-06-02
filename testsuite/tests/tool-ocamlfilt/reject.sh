@@ -29,9 +29,17 @@ check_reject structured "_CamlU3FooXXX"
 check_reject structured "_CamlU99Foo"
 # Structured: missing decimal length after a path-item tag.
 check_reject structured "_CamlUFoo"
+# Structured: bad index in the [u<len>...] escaped identifier
+# (The last item is [Fu6G1234_] where [G] expect a raw part of at least 6
+# characters; [funcsub] is the suffix, the escaped characters shouldn't be
+# inserted in it).
+check_reject structured "_CamlU3FooFu6G1234_funcsub"
 # Structured: bad hex in the [u<len>...] escaped identifier
-# ([G] and [g] are not lowercase hex digits).
-check_reject structured "_CamlU3FooFu5G2gg_funcsub"
+# ([g] is not a correct hexadecimal digit)
+check_reject structured "_CamlU3FooFu11G2g_funcsub"
+# Structured: bad hex in the [u<len>...] escaped identifier
+# ([A] is not a lowercase hexadecimal digit)
+check_reject structured "_CamlU3FooFu11G2A_funcsub"
 
 # Flat1: truncated [$xx] escape (only one byte follows the '$').
 check_reject flat1 'camlFoo__$3'

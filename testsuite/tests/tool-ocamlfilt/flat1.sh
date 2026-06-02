@@ -4,6 +4,7 @@ OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
 
 ${OCAMLFILT} --format flat1 \
   "camlFoo" \
+  "camlFoo_" \
   "camlFoo__bar_0" \
   "camlA__B__C__D__func_0" \
   "camlFoo__bar_baz_42" \

@@ -30,17 +30,20 @@
 
 (** OCaml symbol demangler - supports multiple mangling schemes *)
 
+(* CR shym Replace helper functions in this module with the equivalent versions
+   in [Char.Ascii] when the transition to 5.4 is complete *)
+
 (* Helper functions *)
 let is_digit = function '0' .. '9' -> true | _ -> false
 
 (** Structured name demangler
 
-    Parsing the mangled symbol into a {!Structured_mangling.Parsed.path} is
-    delegated to {!Structured_mangling.Parsed.parse}, so that the encoder and
-    decoder live next to each other and can be tested as inverses. This module
-    only chooses how to render the parsed path as human-readable text. *)
+    Parsing the mangled symbol into a {!Structured_mangling.path} is delegated
+    to {!Structured_mangling.Parse.parse}, so that the encoder and decoder live
+    next to each other and can be tested as inverses. This module only chooses
+    how to render the parsed path as human-readable text. *)
 module Structured = struct
-  let starts_with_prefix = Structured_mangling.Parsed.starts_with_prefix
+  let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
   let format_anonymous_location prefix line col file_opt =
     let file = Option.value ~default:"" file_opt in
@@ -60,39 +63,38 @@ module Structured = struct
   let pp_path (path, suffix) =
     String.concat "." (List.map render_path_item path) ^ suffix
 
-  let unmangle sym = Option.map pp_path (Structured_mangling.Parsed.parse sym)
+  let unmangle sym = Option.map pp_path (Structured_mangling.Parse.parse sym)
 end
 
 module FlatCommon = struct
-  (* On Linux-like targets the linker name is [caml<unit>...]. On macOS
-     the assembler prepends a single underscore for its calling
-     convention, so the actual linker name is [_caml<unit>...]; nm,
-     objdump and assembly listings show that as-is. We accept both
-     forms here. (Unlike the structured scheme, which uses [_Caml] as
-     the bare prefix and so sees [__Caml] on macOS, the flat scheme's
-     bare prefix is the underscore-free [caml].) *)
+  (* On Linux-like targets the linker name is [caml<unit>...]. On macOS the
+     assembler prepends a single underscore for its calling convention, so the
+     actual linker name is [_caml<unit>...]; nm, objdump and assembly listings
+     show that as-is. We accept both forms here. (Unlike the structured scheme,
+     which uses [_Caml] as the bare prefix and so sees [__Caml] on macOS, the
+     flat scheme's bare prefix is the underscore-free [caml].) *)
   let caml_prefix = "caml"
 
   let alternate_caml_prefix = "_caml"
 
   let is_upper = function 'A' .. 'Z' -> true | _ -> false
 
-  (* If [str] starts with one of the recognised flat prefixes followed
-     by an uppercase letter (i.e. a syntactically valid OCaml module
-     name), return the length of the matched prefix. Otherwise return
-     [None]. *)
+  (* If [str] starts with one of the recognised flat prefixes followed by an
+     uppercase letter (i.e. a syntactically valid OCaml module name), return the
+     length of the matched prefix. Otherwise return [None]. *)
   let matched_prefix_len str =
     let try_prefix prefix =
       let plen = String.length prefix in
-      if String.starts_with ~prefix str
-         && String.length str > plen
-         && is_upper str.[plen]
+      if
+        String.starts_with ~prefix str
+        && String.length str > plen
+        && is_upper str.[plen]
       then Some plen
       else None
     in
-    match try_prefix alternate_caml_prefix with
+    match try_prefix caml_prefix with
     | Some _ as r -> r
-    | None -> try_prefix caml_prefix
+    | None -> try_prefix alternate_caml_prefix
 
   let starts_with_prefix str = matched_prefix_len str <> None
 
@@ -111,12 +113,12 @@ module FlatCommon = struct
     | _ -> invalid_arg (Printf.sprintf "Cannot decode hexadecimal digit: %c" c)
 end
 
-(* OCaml 5.3+ flat demangling. Trunk emits one of two styles per
-   binary, distinguished here by a prescan:
-   - Linux-like: separator ['.'] (or ["__"] in the pre-5.3 encoding),
-     escape ["$xx"].
-   - macOS-like: separator ['$'], escape ["$$xx"], separator+escape
-     ["$$$xx"]. *)
+(** OCaml 5.3+ flat demangling. Trunk emits one of two styles per binary,
+    distinguished here by a prescan:
+    - Linux-like: separator ['.'] (or ["__"] in the pre-5.3 encoding), escape
+      ["$xx"].
+    - macOS-like: separator ['$'], escape ["$$xx"], separator+escape ["$$$xx"].
+*)
 module Flat1 = struct
   open FlatCommon
 
@@ -124,154 +126,117 @@ module Flat1 = struct
     | Linux_like
     | Macosx
 
-  (* A bare ['.'] or ["__"] is a positive Linux-like marker (macOS
-     escapes source ['.'] as ["$$2e"] and never uses ["__"]). A ["$$"]
-     or a ['$'] not followed by two hex digits is a positive macOS
-     marker. A ['$'] followed by two hex digits is ambiguous in
-     isolation; if no Linux marker appears anywhere else in the symbol
-     the only coherent reading is macOS. *)
+  (* A bare ['.'] or ["__"] can only appear in a Linux-like symbol (macOS
+     escapes source ['.'] as ["$$2e"] and never uses ["__"]). A ["$$"] or a
+     ['$'] not followed by two hex digits can only appear in a macOS symbol. A
+     ['$'] followed by two hex digits is ambiguous in isolation; if no ['.'] and
+     no ["__"] appear anywhere else in the symbol the only coherent reading is
+     macOS. *)
   let detect_style ~prefix_len str =
     let len = String.length str in
     let rec scan i saw_dollar_hex_pair =
       if i >= len
       then if saw_dollar_hex_pair then Macosx else Linux_like
-      else if Char.equal str.[i] '.'
-      then Linux_like
-      else if
-        Char.equal str.[i] '_'
-        && i + 1 < len
-        && Char.equal str.[i + 1] '_'
-      then Linux_like
-      else if Char.equal str.[i] '$'
-      then
-        if i + 1 < len && Char.equal str.[i + 1] '$'
-        then Macosx
-        else if
-          i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
-        then scan (i + 3) true
-        else Macosx
-      else scan (i + 1) saw_dollar_hex_pair
+      else
+        match str.[i] with
+        | '.' -> Linux_like
+        | '_' when i + 1 < len && Char.equal str.[i + 1] '_' -> Linux_like
+        | '$' when i + 1 < len && Char.equal str.[i + 1] '$' -> Macosx
+        | '$' when i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
+          ->
+          scan (i + 3) true
+        | '$' -> Macosx
+        | _ -> scan (i + 1) saw_dollar_hex_pair
     in
     scan prefix_len false
 
   let unmangle str =
     match matched_prefix_len str with
     | None -> None
-    | Some prefix_len ->
+    | Some prefix_len -> (
       let style = detect_style ~prefix_len str in
-      let j = ref 0 in
-      let i = ref prefix_len in
       let len = String.length str in
       let result = Bytes.create len in
+      (* [loop] should raise [Invalid_argument] {e only} when the input [str] is
+         not a well-formed symbol. So accesses such as [str.[k]] are used only
+         when [k] {e must} be a valid index in a well-formed mangled [str]. Note
+         the invariant [j <= i < len] when [prefix_len >= 0] so all [Bytes.set]
+         are within bounds. *)
+      let rec loop i j =
+        if i >= len
+        then j
+        else
+          match style, str.[i] with
+          | Macosx, '$'
+            when Char.equal str.[i + 1] '$'
+                 && is_xdigit str.[i + 2]
+                 && is_xdigit str.[i + 3] ->
+            (* "$$xx" -> hex-encoded character *)
+            let a = (hex str.[i + 2] lsl 4) lor hex str.[i + 3] in
+            Bytes.set result j (Char.chr a);
+            loop (i + 4) (j + 1)
+          | Macosx, '$' ->
+            (* bare "$" -> separator *)
+            Bytes.set result j '.';
+            loop (i + 1) (j + 1)
+          | Linux_like, '$' when is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
+            ->
+            (* "$xx" -> hex-encoded character *)
+            let a = (hex str.[i + 1] lsl 4) lor hex str.[i + 2] in
+            Bytes.set result j (Char.chr a);
+            loop (i + 3) (j + 1)
+          | Linux_like, '_' when i + 1 < len && Char.equal str.[i + 1] '_' ->
+            (* "__" -> separator (pre-5.3 / runtime4 encoding) *)
+            Bytes.set result j '.';
+            loop (i + 2) (j + 1)
+          | _, c ->
+            Bytes.set result j c;
+            loop (i + 1) (j + 1)
+      in
       try
-        while !i < len do
-          match style with
-          | Macosx ->
-            if
-              Char.equal str.[!i] '$'
-              && Char.equal str.[!i + 1] '$'
-              && Char.equal str.[!i + 2] '$'
-              && is_xdigit str.[!i + 3]
-              && is_xdigit str.[!i + 4]
-            then (
-              (* "$$$xx" -> separator + hex-encoded character *)
-              let a = (hex str.[!i + 3] lsl 4) lor hex str.[!i + 4] in
-              Bytes.set result !j '.';
-              j := !j + 1;
-              Bytes.set result !j (Char.chr a);
-              j := !j + 1;
-              i := !i + 5)
-            else if
-              Char.equal str.[!i] '$'
-              && Char.equal str.[!i + 1] '$'
-              && is_xdigit str.[!i + 2]
-              && is_xdigit str.[!i + 3]
-            then (
-              (* "$$xx" -> hex-encoded character *)
-              let a = (hex str.[!i + 2] lsl 4) lor hex str.[!i + 3] in
-              Bytes.set result !j (Char.chr a);
-              j := !j + 1;
-              i := !i + 4)
-            else if Char.equal str.[!i] '$'
-            then (
-              (* bare "$" -> separator *)
-              Bytes.set result !j '.';
-              j := !j + 1;
-              i := !i + 1)
-            else (
-              Bytes.set result !j str.[!i];
-              j := !j + 1;
-              i := !i + 1)
-          | Linux_like ->
-            if
-              Char.equal str.[!i] '$'
-              && is_xdigit str.[!i + 1]
-              && is_xdigit str.[!i + 2]
-            then (
-              (* "$xx" -> hex-encoded character *)
-              let a = (hex str.[!i + 1] lsl 4) lor hex str.[!i + 2] in
-              Bytes.set result !j (Char.chr a);
-              j := !j + 1;
-              i := !i + 3)
-            else if
-              Char.equal str.[!i] '_' && Char.equal str.[!i + 1] '_'
-            then (
-              (* "__" -> separator (pre-5.3 / runtime4 encoding) *)
-              Bytes.set result !j '.';
-              j := !j + 1;
-              i := !i + 2)
-            else (
-              Bytes.set result !j str.[!i];
-              j := !j + 1;
-              i := !i + 1)
-        done;
-        Some (Bytes.extend result 0 (!j - len) |> Bytes.to_string)
-      (* Out-of-bounds index accesses on a truncated symbol raise
-         [Invalid_argument]; everything else should propagate. *)
-      with Invalid_argument _ -> None
+        Some (Bytes.sub_string result 0 (loop prefix_len 0))
+        (* Out-of-bounds index accesses on a truncated symbol raise
+           [Invalid_argument]; everything else should propagate. *)
+      with Invalid_argument _ -> None)
 end
 
-(* OCaml flat0 style demangling 5.2 and earlier. *)
+(** OCaml flat0 style demangling 5.2 and earlier. *)
 module Flat0 = struct
   open FlatCommon
 
   let unmangle str =
     match matched_prefix_len str with
     | None -> None
-    | Some prefix_len ->
-      let j = ref 0 in
-      let i = ref prefix_len in
+    | Some prefix_len -> (
       let len = String.length str in
       let result = Bytes.create len in
-      try
-        while !i < len do
-          if str.[!i] == '_' && str.[!i + 1] == '_'
-          then (
+      (* See the comment above for [loop] in [Flat1.unmangle] about
+         [Invalid_argument] *)
+      let rec loop i j =
+        if i >= len
+        then j
+        else
+          match str.[i] with
+          | '_' when i + 1 < len && Char.equal str.[i + 1] '_' ->
             (* "__" -> "." *)
-            Bytes.set result !j '.';
-            j := !j + 1;
-            i := !i + 2)
-          else if
-            Char.equal str.[!i] '$'
-            && is_xdigit str.[!i + 1]
-            && is_xdigit str.[!i + 2]
-          then (
+            Bytes.set result j '.';
+            loop (i + 2) (j + 1)
+          | '$' when is_xdigit str.[i + 1] && is_xdigit str.[i + 2] ->
             (* "$xx" is a hex-encoded character *)
-            let a = Char.chr ((hex str.[!i + 1] lsl 4) lor hex str.[!i + 2]) in
-            Bytes.set result !j a;
-            j := !j + 1;
-            i := !i + 3)
-          else (
+            let a = Char.chr ((hex str.[i + 1] lsl 4) lor hex str.[i + 2]) in
+            Bytes.set result j a;
+            loop (i + 3) (j + 1)
+          | c ->
             (* regular characters *)
-            Bytes.set result !j str.[!i];
-            j := !j + 1;
-            i := !i + 1)
-        done;
-        Some (Bytes.extend result 0 (!j - len) |> Bytes.to_string)
-      (* Same rationale as [Flat1.unmangle]: catch the
-         [Invalid_argument] from out-of-bounds index accesses on a
-         truncated symbol, propagate everything else. *)
-      with Invalid_argument _ -> None
+            Bytes.set result j c;
+            loop (i + 1) (j + 1)
+      in
+      try
+        Some (Bytes.sub_string result 0 (loop prefix_len 0))
+        (* Same rationale as [Flat1.unmangle]: catch the [Invalid_argument] from
+           out-of-bounds index accesses on a truncated symbol, propagate
+           everything else. *)
+      with Invalid_argument _ -> None)
 end
 
 (* Auto-detect and demangle *)
@@ -301,9 +266,9 @@ let demangle_with_format format str =
   | Flat1 -> Flat1.unmangle str
   | Structured -> Structured.unmangle str
 
-(* Mirroring c++filt / rustfilt: print the demangled form when we recognise
-   the symbol, otherwise pass the input through unchanged. The exit code is
-   always 0 so the tool is safe to drop into a shell pipeline. *)
+(* Mirroring c++filt / rustfilt: print the demangled form when we recognise the
+   symbol, otherwise pass the input through unchanged. The exit code is always 0
+   so the tool is safe to drop into a shell pipeline. *)
 let process_line format line =
   match demangle_with_format format line with
   | Some demangled -> print_endline demangled
@@ -322,7 +287,6 @@ let process_stdin format () =
 let process_symbols format symbols = List.iter (process_line format) symbols
 
 let main format symbols =
-  let format = Option.value ~default:Auto format in
   match symbols with
   | [] -> process_stdin format ()
   | symbols -> process_symbols format symbols
@@ -333,7 +297,7 @@ let usage_msg =
    Usage: ocamlfilt [OPTIONS] [SYMBOLS...]\n\n\
    If no symbols are provided, reads from standard input.\n"
 
-let format_ref = ref None
+let format_ref = ref Auto
 
 let symbols_ref = ref []
 
@@ -342,14 +306,12 @@ let specs =
       Arg.String
         (fun s ->
           format_ref
-            := Some
-                 (match s with
-                 | "auto" -> Auto
-                 | "flat0" -> Flat0
-                 | "flat1" -> Flat1
-                 | "structured" -> Structured
-                 | _ ->
-                   raise (Arg.Bad (Printf.sprintf "unknown format: '%s'" s)))),
+            := match s with
+               | "auto" -> Auto
+               | "flat0" -> Flat0
+               | "flat1" -> Flat1
+               | "structured" -> Structured
+               | _ -> raise (Arg.Bad (Printf.sprintf "unknown format: '%s'" s))),
       "<format>  Set mangling format: auto, flat0 (<= 5.2.1), flat1 (>= 5.3), \
        structured  (default: auto)" ) ]
 
