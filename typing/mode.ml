@@ -5454,7 +5454,8 @@ module Comonadic_gen (Obj : Obj) = struct
   let generalize ~current_level a =
     if Language_extension.(is_at_least_mode_poly Alpha)
     then S.generalize ~log:None ~current_level obj a
-    else S.generalize_structure ~log:None ~current_level obj a
+    else if Language_extension.(is_at_least_mode_poly Beta)
+    then S.generalize_structure ~log:None ~current_level obj a
 
   let generalize_structure ~current_level a =
     if Language_extension.(is_at_least_mode_poly Beta)
@@ -5644,7 +5645,8 @@ module Monadic_gen (Obj : Obj) = struct
   let generalize ~current_level a =
     if Language_extension.(is_at_least_mode_poly Alpha)
     then S.generalize ~log:None ~current_level obj a
-    else S.generalize_structure ~log:None ~current_level obj a
+    else if Language_extension.(is_at_least_mode_poly Beta)
+    then S.generalize_structure ~log:None ~current_level obj a
 
   let generalize_structure ~current_level a =
     if Language_extension.(is_at_least_mode_poly Beta)
