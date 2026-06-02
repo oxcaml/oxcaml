@@ -829,11 +829,18 @@ let report_jkind_mismatch first second ppf err =
   | Manifest_mismatch ->
       pr "Their definitions are not equal."
 
-let compare_unsafe_mode_crossing ~env umc1 umc2 =
+let compare_unsafe_mode_crossing ~env decl1 decl2 umc1 umc2 =
+  let check_decl_jkind sub super mismatch =
+    match Ctype.check_decl_jkind env sub super.type_jkind with
+    | Ok () -> None
+    | Error _ -> Some (Unsafe_mode_crossing mismatch)
+  in
   match umc1, umc2 with
   | None, None -> None
-  | Some _, None -> Some (Unsafe_mode_crossing (Mode_crossing_only_on First))
-  | None, Some _ -> Some (Unsafe_mode_crossing (Mode_crossing_only_on Second))
+  | Some _, None ->
+    check_decl_jkind decl1 decl2 (Mode_crossing_only_on First)
+  | None, Some _ ->
+    check_decl_jkind decl1 decl2 (Mode_crossing_only_on Second)
   | Some umc1, Some umc2 ->
     if equal_unsafe_mode_crossing
          ~type_equal:(Ctype.type_equal env)
@@ -1654,18 +1661,21 @@ let type_declarations ?(equality = false) ~loc env ~mark name
               cstrs2
               rep1
               rep2)
-          (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
+          (fun () ->
+             compare_unsafe_mode_crossing ~env decl1 decl2 umc1 umc2)
       end
     | (Type_record(labels1,rep1,umc1), Type_record(labels2,rep2,umc2)) -> begin
         Misc.Stdlib.Option.first_some
           (mark_and_compare_records Legacy labels1 rep1 labels2 rep2)
-          (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
+          (fun () ->
+             compare_unsafe_mode_crossing ~env decl1 decl2 umc1 umc2)
       end
     | (Type_record_unboxed_product(labels1,rep1,umc1),
        Type_record_unboxed_product(labels2,rep2,umc2)) -> begin
         Misc.Stdlib.Option.first_some
           (mark_and_compare_records Unboxed_product labels1 rep1 labels2 rep2)
-          (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
+          (fun () ->
+             compare_unsafe_mode_crossing ~env decl1 decl2 umc1 umc2)
       end
     | (Type_open, Type_open) -> None
     | (_, _) -> Some (Kind (of_kind decl1.type_kind, of_kind decl2.type_kind))
