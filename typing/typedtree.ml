@@ -83,7 +83,7 @@ module Unique_barrier = struct
 
   let enable barrier = match !barrier with
     | Not_computed ->
-      barrier := Enabled (Uniqueness.newvar ())
+      barrier := Enabled (Uniqueness.newvar 0)
     | _ -> Misc.fatal_error "Unique barrier was enabled twice"
 
   (* Due to or-patterns a barrier may have several upper bounds. *)
@@ -95,7 +95,7 @@ module Unique_barrier = struct
   let resolve barrier =
     match !barrier with
     | Enabled uniq ->
-      let zapped = Uniqueness.zap_to_ceil uniq in
+      let zapped = Uniqueness.zap_to_ceil_exn uniq in
       barrier := Resolved zapped;
       zapped
     | Resolved barrier -> barrier
@@ -139,7 +139,7 @@ type return_mode = Mode.Locality.l
 
 let create_return_mode m = m
 
-let return_mode_zap_to_floor m = Mode.Locality.zap_to_floor m
+let return_mode_zap_to_floor_exn m = Mode.Locality.zap_to_floor_exn m
 
 let print_return_mode ppf m =
   Format_doc.compat (Mode.Locality.print ()) ppf m

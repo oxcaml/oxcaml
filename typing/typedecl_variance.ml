@@ -157,13 +157,13 @@ let compute_variance_type env ~check (required, loc) decl tyl =
             | Tconstr _ ->
                 let old = !visited in
                 begin try
-                  Ctype.iter_type_expr_with_stages check env ty
+                  Ctype.iter_type_expr_with_stages check env (Fun.const ()) ty
                 with Exit ->
                   visited := old;
                   let ty' = Ctype.expand_head_opt env ty in
                   if eq_type ty ty' then raise Exit else check env ty'
                 end
-            | _ -> Ctype.iter_type_expr_with_stages check env ty
+            | _ -> Ctype.iter_type_expr_with_stages check env (Fun.const ()) ty
           end
         in
         try check env ty; compute_variance env tvl injective ty
@@ -236,7 +236,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
                      , Bad_variance ( variance_error
                                     , (c1,n1,false)
                                     , (c2,n2,false))))
-        | None -> Ctype.iter_type_expr_with_stages check env ty
+        | None -> Ctype.iter_type_expr_with_stages check env (Fun.const ()) ty
       end
     in
     List.iter (fun (_,ty) -> check env ty) tyl;
