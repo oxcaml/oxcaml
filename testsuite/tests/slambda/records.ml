@@ -80,7 +80,8 @@ type s = { e : t; f : t; }
            one =? (apply (field_imm 0 (global Toploop!)) "one"))
           (region
             (mixedfield 0  (value<int>,untagged_immediate)
-              (makelocalblock 0 (?,untagged_immediate) one two_u)))) ⟫ }
+              (makelocalblock 0 (value_or_null<int>,untagged_immediate) one
+                two_u)))) ⟫ }
 - : int = 1
 |}];;
 

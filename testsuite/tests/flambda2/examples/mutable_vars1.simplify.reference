@@ -17,7 +17,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                      (for_counter_naked : int64, n_293_unboxed0 : imm tagged) =
            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
            let i = %tag_imm (prim_2) in
-           let prim_3 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+           let prim_3 = %num_conv.[tagged_imm].[`nativeint`] (i) in
            let prim_4 = %string_load.[`8`] (s, prim_3) in
            let c = %tag_imm (prim_4) in
            ((let prim_5 = %int_comp.ne (c, 0) in
@@ -25,9 +25,15 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                | 0 -> k4
                | 1 -> k5
                where k5 =
-                 let prim_6 = %num_conv.[`tagged_imm`].[`int8`] (c) in
+                 let prim_6 = %num_conv.[tagged_imm].[int8] (c) in
                  let prim_7 =
+<<<<<<< HEAD
                    %num_conv.[`tagged_imm`].[`nativeint`] (n_293_unboxed0)
+||||||| eb63e0e418
+                   %num_conv.[`tagged_imm`].[`nativeint`] (n_289_unboxed0)
+=======
+                   %num_conv.[tagged_imm].[`nativeint`] (n_289_unboxed0)
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
                  in
                  let Pbytessetu =
                    %bytes_or_bigstring_set.bytes.[`8`] (s', prim_7, prim_6)

@@ -444,7 +444,7 @@ external f10_9 : (nativeint#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 18-28:
 1 | external f10_9 : (nativeint#[@untagged]) -> bool -> string  = "foo" "bar";;
                       ^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
 
@@ -453,7 +453,7 @@ external f10_10 : string -> (nativeint#[@untagged])  = "foo" "bar";;
 Line 1, characters 29-39:
 1 | external f10_10 : string -> (nativeint#[@untagged])  = "foo" "bar";;
                                  ^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
 

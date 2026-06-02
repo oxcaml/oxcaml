@@ -1421,8 +1421,19 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
     (Misc.repeated_label stl);
   let ctys =
     List.map
+<<<<<<< HEAD
       (fun (l, t) ->
          l, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+||||||| eb63e0e418
+      (fun (label, t) ->
+         Option.iter (fun _ ->
+             Language_extension.assert_enabled ~loc Labeled_tuples ())
+           label;
+         label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+=======
+      (fun (label, t) ->
+         label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
       stl
   in
   List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
@@ -1915,7 +1926,16 @@ let report_error_doc loc env = function
         "The %s extension is disabled@ \
          To enable it, pass the '-extension %s' flag@]" ext ext
   | Polymorphic_optional_param ->
+<<<<<<< HEAD
       Location.errorf ~loc "@[Optional parameters cannot be polymorphic@]"
+||||||| eb63e0e418
+      fprintf ppf "@[Optional parameters cannot be polymorphic@]"
+=======
+      fprintf ppf "@[Optional parameters cannot be polymorphic@]"
+  | Repeated_tuple_label l ->
+      fprintf ppf "@[This tuple type has two labels named %a@]"
+        Style.inline_code l
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with

@@ -23,16 +23,40 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(
   %18 = alloca i64
   %19 = alloca i64
   %20 = load i64, ptr %ds
+<<<<<<< HEAD
   %21 = add i64 %20, 616
+||||||| eb63e0e418
+  %21 = add i64 %20, 584
+=======
+  %21 = add i64 %20, 592
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   %22 = inttoptr i64 %21 to ptr
   %23 = load i64, ptr %ds
+<<<<<<< HEAD
   %24 = add i64 %23, 624
+||||||| eb63e0e418
+  %24 = add i64 %23, 592
+=======
+  %24 = add i64 %23, 600
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   %25 = inttoptr i64 %24 to ptr
   %26 = load i64, ptr %ds
+<<<<<<< HEAD
   %27 = add i64 %26, 632
+||||||| eb63e0e418
+  %27 = add i64 %26, 600
+=======
+  %27 = add i64 %26, 608
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   %28 = inttoptr i64 %27 to ptr
   %29 = load i64, ptr %ds
+<<<<<<< HEAD
   %30 = add i64 %29, 640
+||||||| eb63e0e418
+  %30 = add i64 %29, 608
+=======
+  %30 = add i64 %29, 616
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   %31 = inttoptr i64 %30 to ptr
   %32 = alloca i64
   %33 = alloca i64

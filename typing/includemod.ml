@@ -247,11 +247,8 @@ module Directionality = struct
 
 end
 
-let modes_unit =
-  Specific ((Env.mode_unit, None), Env.mode_unit)
-
 let modes_toplevel =
-  Specific ((Env.mode_unit, None), Env.mode_unit)
+  Specific ((toplevel_mode, None), toplevel_mode)
 
 module Core_inclusion = struct
   (* All functions "blah env x1 x2" check that x1 is included in x2,
@@ -1346,12 +1343,27 @@ let () =
    interface. *)
 
 let compunit0
+<<<<<<< HEAD
     ~comparison env ~mark impl_name impl_sig intf_name intf_sig unit_shape =
   let loc = Location.in_file impl_name in
+||||||| eb63e0e418
+    ~comparison env ~mark impl_name impl_sig intf_name intf_sig unit_shape =
+=======
+    ~comparison env ~mark impl_name ~modes impl_sig intf_name intf_sig
+    unit_shape =
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   let direction = Directionality.strictly_positive ~mark ~both:false in
   match
+<<<<<<< HEAD
     signatures ~core:core_inclusion ~direction ~loc env Subst.identity
       ~modes:modes_unit impl_sig intf_sig unit_shape
+||||||| eb63e0e418
+    signatures ~direction ~loc:(Location.in_file impl_name) env
+      Subst.identity ~modes:modes_unit impl_sig intf_sig unit_shape
+=======
+    signatures ~direction ~loc:(Location.in_file impl_name) env
+      Subst.identity ~modes impl_sig intf_sig unit_shape
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   with Result.Error reasons ->
     let diff = Error.diff impl_name intf_name reasons in
     let cdiff =
@@ -1364,9 +1376,9 @@ let compunit = compunit0 ~comparison:Implementation_vs_interface
 (* Check that the interface of a compilation unit meets the interface of the
    parameter it's declared to be an argument for using [-as-argument-for] *)
 
-let compunit_as_argument env arg_name arg_sig param_name param_sig =
+let compunit_as_argument env arg_name ~modes arg_sig param_name param_sig =
   let cc, _shape =
-    compunit0 env arg_name arg_sig param_name param_sig Shape.dummy_mod
+    compunit0 env arg_name ~modes arg_sig param_name param_sig Shape.dummy_mod
       ~comparison:Argument_vs_parameter ~mark:true
   in
   cc

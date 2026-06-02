@@ -280,12 +280,15 @@ module Flambda2 : sig
       poly_compare_cost : float;
       small_function_size : int;
       large_function_size : int;
+      small_functor_size : int;
+      large_functor_size : int;
       threshold : float;
     }
 
     module Default : sig
       val default_arguments : inlining_arguments
       val speculative_inlining_only_if_arguments_useful : bool
+      val speculative_inlining_track_lifted_constants : bool
     end
 
     val oclassic_arguments : inlining_arguments
@@ -305,9 +308,14 @@ module Flambda2 : sig
     val small_function_size : Clflags.Int_arg_helper.parsed ref
     val large_function_size : Clflags.Int_arg_helper.parsed ref
 
+    val small_functor_size : Clflags.Int_arg_helper.parsed ref
+    val large_functor_size : Clflags.Int_arg_helper.parsed ref
+
     val threshold : Clflags.Float_arg_helper.parsed ref
 
     val speculative_inlining_only_if_arguments_useful : bool ref
+
+    val speculative_inlining_track_lifted_constants : bool ref
 
     val report_bin : bool ref
   end

@@ -707,11 +707,15 @@ let f () =
 
 ### Mutability
 
-Mutable fields are always `global_`, including array elements. That is, while
-you may create local `ref`s or arrays, their contents must always be global.
-Should you need to put a local value into one of these
-places, you may want to check out
+Mutable fields and array elements require their contents to be `global`. That
+is, while you may create local `ref`s or arrays, the values stored in them must
+always be global. Should you need to put a local value into one of these places,
+you may want to check out
 [`ppx_globalize`](https://github.com/janestreet/ppx_globalize).
+
+This is one part of a broader rule for mutable fields; see the
+[modes syntax](../../modes/syntax#record-fields) section for the full
+mutable-field rule.
 
 This restriction may be lifted somewhat in future: the tricky part is that
 naively permitting mutability might allow an older local mutable value to be

@@ -1372,7 +1372,6 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
-  | Lop Dummy_use -> ()
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -1632,7 +1631,7 @@ let emit_instr env i =
       A.ins2 CNT_vector reg_v8b_7 reg_v8b_7;
       A.ins2 ADDV reg_b7 reg_v8b_7;
       A.ins2 FMOV_fp_to_gp_64 (H.reg_x i.res.(0)) reg_d7)
-  | Lop (Intop (Ictz _)) ->
+  | Lop (Intop Ictz) ->
     (* [ctz Rd, Rn] is optionally supported from Armv8.7, but rbit and clz are
        supported in all ARMv8 CPUs. *)
     if !Arch.feat_cssc
@@ -1640,7 +1639,7 @@ let emit_instr env i =
     else (
       A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
       A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
-  | Lop (Intop (Iclz _)) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
+  | Lop (Intop Iclz) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     A.ins4 AND_shifted_register rd rn rm O.optional_none
@@ -1681,8 +1680,7 @@ let emit_instr env i =
     A.ins_lsr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
-  | Lop
-      (Intop_imm ((Imul | Idiv | Iclz _ | Ictz _ | Ipopcnt | Imod | Imulh _), _))
+  | Lop (Intop_imm ((Imul | Idiv | Iclz | Ictz | Ipopcnt | Imod | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i

@@ -33,12 +33,14 @@ CAMLextern void caml_enter_blocking_section (void);
 CAMLextern void caml_enter_blocking_section_no_pending (void);
 CAMLextern void caml_leave_blocking_section (void);
 
+CAMLextern void caml_process_pending_actions_flags (int flags);
 CAMLextern void caml_process_pending_actions (void);
 /* Checks for pending actions and executes them. This includes pending
    minor and major collections, thread switching, signal handlers,
    finalisers, and Memprof callbacks. Assumes that the runtime lock is
    held. Can raise exceptions asynchronously into OCaml code. */
 
+<<<<<<< HEAD
 /* Same as [caml_process_pending_actions], but returns the reified
    result instead of raising exceptions directly (if any). */
 CAMLextern caml_result caml_process_pending_actions_res (void);
@@ -46,6 +48,10 @@ CAMLextern caml_result caml_process_pending_actions_res (void);
 /* Returns [Val_unit] or an encoded exception.
    Superseded by the safer [_res] variant above,
    kept around for compatibility. */
+||||||| eb63e0e418
+=======
+CAMLextern value caml_process_pending_actions_flags_exn (int flags);
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 CAMLextern value caml_process_pending_actions_exn (void);
 
 CAMLextern int caml_check_pending_actions (void);
@@ -104,7 +110,18 @@ caml_result caml_execute_signal_res(int signal_number);
 CAMLextern void caml_record_signal(int signal_number);
 CAMLextern caml_result caml_process_pending_signals_res(void);
 CAMLextern void caml_set_action_pending(caml_domain_state *);
+<<<<<<< HEAD
 caml_result caml_do_pending_actions_res(void);
+||||||| eb63e0e418
+value caml_do_pending_actions_exn(void);
+value caml_process_pending_actions_with_root (value extra_root); // raises
+value caml_process_pending_actions_with_root_exn (value extra_root);
+=======
+value caml_do_pending_actions_exn(void);
+value caml_do_pending_actions_flags_exn(int flags);
+value caml_process_pending_actions_with_root (value extra_root); // raises
+value caml_process_pending_actions_with_root_exn (value extra_root);
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
 void caml_init_signal_handling(void);
 void caml_init_signals(void);

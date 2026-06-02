@@ -71,6 +71,8 @@ module Expanded_type : sig
 
   val to_type : t -> Type_grammar.t
 
+  val kind : t -> K.t
+
   type descr = private
     | Value of Type_grammar.head_of_kind_value
     | Naked_immediate of Type_grammar.head_of_kind_naked_immediate
@@ -137,6 +139,8 @@ end = struct
     { kind : K.t;
       descr : descr Or_unknown_or_bottom.t
     }
+
+  let kind t = t.kind
 
   let descr t = t.descr
 

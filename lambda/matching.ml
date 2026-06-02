@@ -259,7 +259,7 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
-      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
+      | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
       | `Alias (p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view p, patl),
@@ -376,7 +376,7 @@ end = struct
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
-      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
+      | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -634,7 +634,7 @@ end = struct
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
-          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
+          | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -777,7 +777,7 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
-          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
+          | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -2565,7 +2565,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let sem = add_barrier_to_read ubr sem in
       let access, sort, layout =
         match lbl.lbl_repres with
-        | Record_boxed _
+        | Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout
@@ -2600,6 +2600,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_dummy _ ->
+          fatal_error "get_expr_args_record: unexpected dummy representation"
       in
       let binding_kind =
         if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
@@ -4438,12 +4440,29 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             (combine_constant value_kind ploc arg cst arg_partial)
       | Construct cstr ->
           compile_test
+<<<<<<< HEAD
             (divide_constructor ~scopes)
             (combine_constructor value_kind ploc arg ph.pat_env
                ph.pat_unique_barrier cstr arg_partial)
       | Array (_, elt_sort, _) ->
           let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
           let kind = Typeopt.array_pattern_kind pomega elt_sort in
+||||||| eb63e0e418
+            (compile_match ~scopes value_kind repr partial)
+            partial (divide_constructor ~scopes)
+            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
+            ctx pm
+      | Array (_, elt_sort, _) ->
+          let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
+          let kind = Typeopt.array_pattern_kind pomega elt_sort in
+=======
+            (compile_match ~scopes value_kind repr partial)
+            partial (divide_constructor ~scopes)
+            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
+            ctx pm
+      | Array (_, _, _) ->
+          let kind = Typeopt.array_pattern_kind pomega in
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
           compile_test
             (divide_array ~scopes kind)
             (combine_array value_kind ploc arg kind arg_partial)

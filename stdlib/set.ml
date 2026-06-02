@@ -1177,4 +1177,4 @@ module MakePortable(Ord: sig @@ portable include OrderedType end) =
             end
       in
       seq_of_enum_ (aux low s End)
-  end
+ end [@@inline available]

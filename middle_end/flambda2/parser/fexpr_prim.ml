@@ -12,49 +12,35 @@ let or_unknown cons =
       ~to_:(fun _ ouk ->
         match (ouk : _ Or_unknown.t) with Unknown -> None | Known v -> Some v))
 
-let target_ocaml_int : Target_ocaml_int.t value_lens =
-  { encode = (fun _ t -> Target_ocaml_int.to_int t |> string_of_int |> wrap_loc);
-    decode =
-      (fun _ s ->
-        (* CR mshinwell: Should get machine_width from fexpr context when
-           available *)
-        let mw = Target_system.Machine_width.Sixty_four in
-        Target_ocaml_int.of_int mw @@ int_of_string (unwrap_loc s))
-  }
+let target_ocaml_int : Target_ocaml_int.t param_cons =
+  D.value
+    { encode =
+        (fun _ t -> Target_ocaml_int.to_int t |> string_of_int |> wrap_loc);
+      decode =
+        (fun _ s ->
+          (* CR mshinwell: Should get machine_width from fexpr context when
+             available *)
+          let mw = Target_system.Machine_width.Sixty_four in
+          Target_ocaml_int.of_int mw @@ int_of_string (unwrap_loc s))
+    }
 
-let scannable_tag : Tag.Scannable.t value_lens =
-  { encode = (fun _ t -> Tag.Scannable.to_int t |> string_of_int |> wrap_loc);
-    decode =
-      (fun _ s -> Tag.Scannable.create_exn @@ int_of_string (unwrap_loc s))
-  }
+let scannable_tag : Tag.Scannable.t param_cons =
+  D.value
+    { encode = (fun _ t -> Tag.Scannable.to_int t |> string_of_int |> wrap_loc);
+      decode =
+        (fun _ s -> Tag.Scannable.create_exn @@ int_of_string (unwrap_loc s))
+    }
 
 let mutability =
-  D.(
-    default ~def:Mutability.Immutable
-    @@ constructor_flag Mutability.["imm_uniq", Immutable_unique; "mut", Mutable])
+  D.constructor_flag
+    Mutability.
+      ["immut", Immutable; "immut_uniq", Immutable_unique; "mut", Mutable]
+
+let opt_mutability = D.default ~def:Mutability.Immutable mutability
 
 let mutable_flag =
   D.(
     default ~def:Asttypes.Immutable @@ constructor_flag Asttypes.["mut", Mutable])
-
-let mutability_as_value =
-  { decode =
-      (fun _ m : Mutability.t ->
-        match unwrap_loc m with
-        | "immut" -> Immutable
-        | "immut_uniq" -> Immutable_unique
-        | "mut" -> Mutable
-        | _ -> Misc.fatal_error "invalid mutability");
-    encode =
-      (fun _ m ->
-        let s =
-          match (m : Mutability.t) with
-          | Immutable -> "immut"
-          | Immutable_unique -> "immut_uniq"
-          | Mutable -> "mut"
-        in
-        wrap_loc s)
-  }
 
 let standard_int =
   D.(
@@ -69,7 +55,7 @@ let standard_int =
              "nativeint", Naked_nativeint ])
 
 let standard_int_or_float =
-  D.constructor_value
+  D.constructor_flag
     Flambda_kind.Standard_int_or_float.
       [ "tagged_imm", Tagged_immediate;
         "imm", Naked_immediate;
@@ -122,96 +108,126 @@ let block_access_field_kind =
     default ~def:P.Block_access_field_kind.Any_value
     @@ constructor_flag ["imm", P.Block_access_field_kind.Immediate])
 
+let flat_suffix_element =
+  D.constructor_flag
+    K.
+      [ "float", Naked_float;
+        "float32", Naked_float32;
+        "int8", Naked_int8;
+        "int16", Naked_int16;
+        "int32", Naked_int32;
+        "int64", Naked_int64;
+        "nativeint", Naked_nativeint;
+        "imm", Naked_immediate;
+        "vec128", Naked_vec128;
+        "vec256", Naked_vec256;
+        "vec512", Naked_vec512 ]
+
+let mixed_block_shape =
+  let open D in
+  maps
+    ~from:(fun _ (size, suffix) ->
+      K.Mixed_block_shape.from_prefix_size_and_suffix_elements size suffix)
+    ~to_:(fun _ shape ->
+      K.Mixed_block_shape.(
+        value_prefix_size shape, Array.to_list (flat_suffix shape)))
+    (param2 int (list flat_suffix_element))
+
 let block_access_kind =
-  let value =
-    D.(
-      param3 block_access_field_kind
-        (or_unknown @@ labeled "tag" scannable_tag)
-        (or_unknown @@ labeled "size" target_ocaml_int))
+  let open D in
+  let tag = or_unknown @@ labeled "tag" scannable_tag in
+  let size = or_unknown @@ labeled "size" target_ocaml_int in
+  let|= mixed_field_kind =
+    let open P.Mixed_block_access_field_kind in
+    let| value_k = block_access_field_kind, fun _ bak -> Value_prefix bak in
+    let| suffix_k = flat_suffix_element, fun _ fse -> Flat_suffix fse in
+    return_either (fun env mfk ->
+        match mfk with
+        | Value_prefix bak -> value_k env bak
+        | Flat_suffix fse -> suffix_k env fse)
   in
-  let naked_float =
-    D.(param2 (flag "float") (or_unknown @@ labeled "size" target_ocaml_int))
+  let|= bak =
+    let| naked_float =
+      ( param2 (flag "float") size,
+        fun _ ((), size) -> P.Block_access_kind.Naked_floats { size } )
+    in
+    let| mixed =
+      param5_case
+        ~decode:(fun _ () tag size field_kind shape ->
+          P.Block_access_kind.Mixed { tag; size; field_kind; shape })
+        (flag "mixed") tag size mixed_field_kind mixed_block_shape
+    in
+    let| value_k =
+      param3_case block_access_field_kind tag size
+        ~decode:(fun _ field_kind tag size ->
+          P.Block_access_kind.Values { field_kind; tag; size })
+    in
+    P.Block_access_kind.(
+      return_either (fun env bak ->
+          match bak with
+          | Values { field_kind; tag; size } ->
+            value_k env (field_kind, tag, size)
+          | Naked_floats { size } -> naked_float env ((), size)
+          | Mixed m -> mixed env ((), m.tag, m.size, m.field_kind, m.shape)))
   in
-  D.(
-    either
-      ~no_match_handler:
-        P.Block_access_kind.(
-          function
-          | Mixed _ as bak -> Misc.fatal_errorf "Unsupported %a" print bak
-          | Values _ | Naked_floats _ -> assert false)
-      [ case
-          ~box:(fun _ ((), size) -> P.Block_access_kind.Naked_floats { size })
-          ~unbox:(fun _ bak ->
-            match (bak : P.Block_access_kind.t) with
-            | Naked_floats { size } -> Some ((), size)
-            | Values _ | Mixed _ -> None)
-          naked_float;
-        case
-          ~box:(fun _ (field_kind, tag, size) ->
-            P.Block_access_kind.Values { field_kind; tag; size })
-          ~unbox:(fun _ bak ->
-            match (bak : P.Block_access_kind.t) with
-            | Values { field_kind; tag; size } -> Some (field_kind, tag, size)
-            | Naked_floats _ | Mixed _ -> None)
-          value ])
+  bak
 
 type block_kind =
   | FNaked_floats
   | FValues of Tag.Scannable.t
 
 let block_kind : block_kind param_cons =
-  D.(
-    either
-      [ case
-          ~box:(fun _ () -> FNaked_floats)
-          ~unbox:(fun _ bk ->
-            match bk with FNaked_floats -> Some () | FValues _ -> None)
-          (flag "floats");
-        case
-          ~box:(fun _ tag -> FValues tag)
-          ~unbox:(fun _ bk ->
-            match bk with FValues tag -> Some tag | FNaked_floats -> None)
-          (positional scannable_tag) ])
+  let open D in
+  let|= bk =
+    let| floats = flag "floats", fun _ () -> FNaked_floats in
+    let| values = positional scannable_tag, fun _ tag -> FValues tag in
+    return_either (fun env bk ->
+        match bk with
+        | FNaked_floats -> floats env ()
+        | FValues tag -> values env tag)
+  in
+  bk
 
 let string_accessor_width =
-  { decode =
-      (fun _ i : P.string_accessor_width ->
-        let i = unwrap_loc i in
-        match i with
-        | "f32" -> Single
-        | "8" -> Eight
-        | "8s" -> Eight_signed
-        | "16" -> Sixteen
-        | "16s" -> Sixteen_signed
-        | "32" -> Thirty_two
-        | "64" -> Sixty_four
-        | "128a" -> One_twenty_eight { aligned = true }
-        | "128u" -> One_twenty_eight { aligned = false }
-        | "256a" -> Two_fifty_six { aligned = true }
-        | "256u" -> Two_fifty_six { aligned = false }
-        | "512a" -> Five_twelve { aligned = true }
-        | "512u" -> Five_twelve { aligned = false }
-        | _ -> Misc.fatal_errorf "invalid string accessor width '%s'" i);
-    encode =
-      (fun _ saw ->
-        let s =
-          match (saw : P.string_accessor_width) with
-          | Eight -> "8"
-          | Eight_signed -> "8s"
-          | Sixteen -> "16"
-          | Sixteen_signed -> "16s"
-          | Thirty_two -> "32"
-          | Single -> "f32"
-          | Sixty_four -> "64"
-          | One_twenty_eight { aligned = false } -> "128u"
-          | One_twenty_eight { aligned = true } -> "128a"
-          | Two_fifty_six { aligned = false } -> "256u"
-          | Two_fifty_six { aligned = true } -> "256a"
-          | Five_twelve { aligned = false } -> "512u"
-          | Five_twelve { aligned = true } -> "512a"
-        in
-        wrap_loc s)
-  }
+  D.value
+    { decode =
+        (fun _ i : P.string_accessor_width ->
+          let i = unwrap_loc i in
+          match i with
+          | "f32" -> Single
+          | "8" -> Eight
+          | "8s" -> Eight_signed
+          | "16" -> Sixteen
+          | "16s" -> Sixteen_signed
+          | "32" -> Thirty_two
+          | "64" -> Sixty_four
+          | "128a" -> One_twenty_eight { aligned = true }
+          | "128u" -> One_twenty_eight { aligned = false }
+          | "256a" -> Two_fifty_six { aligned = true }
+          | "256u" -> Two_fifty_six { aligned = false }
+          | "512a" -> Five_twelve { aligned = true }
+          | "512u" -> Five_twelve { aligned = false }
+          | _ -> Misc.fatal_errorf "invalid string accessor width '%s'" i);
+      encode =
+        (fun _ saw ->
+          let s =
+            match (saw : P.string_accessor_width) with
+            | Eight -> "8"
+            | Eight_signed -> "8s"
+            | Sixteen -> "16"
+            | Sixteen_signed -> "16s"
+            | Thirty_two -> "32"
+            | Single -> "f32"
+            | Sixty_four -> "64"
+            | One_twenty_eight { aligned = false } -> "128u"
+            | One_twenty_eight { aligned = true } -> "128a"
+            | Two_fifty_six { aligned = false } -> "256u"
+            | Two_fifty_six { aligned = true } -> "256a"
+            | Five_twelve { aligned = false } -> "512u"
+            | Five_twelve { aligned = true } -> "512a"
+          in
+          wrap_loc s)
+    }
 
 let init_or_assign =
   D.(
@@ -222,38 +238,43 @@ let init_or_assign =
              "lassign", Assignment (Alloc_mode.For_assignments.local ()) ])
 
 let alloc_mode_for_allocation =
-  D.(
-    default ~def:Alloc_mode.For_allocations.heap
-    @@ either
-         [ case (labeled "local" string)
-             ~box:(fun env r ->
-               let region =
-                 if String.equal (unwrap_loc r) "toplevel"
-                 then env.toplevel_region
-                 else Fexpr_to_flambda_commons.find_var env r
-               in
-               Alloc_mode.For_allocations.local ~region)
-             ~unbox:(fun env -> function
-               | Alloc_mode.For_allocations.Local { region } ->
-                 let r =
-                   match
-                     Flambda_to_fexpr_commons.Env.find_region_exn env region
-                   with
-                   | Fexpr.Toplevel -> wrap_loc "toplevel"
-                   | Named s -> s
-                 in
-                 Some r
-               | Alloc_mode.For_allocations.Heap -> None) ])
+  let open D in
+  let|= am =
+    let| local =
+      ( labeled "local" string,
+        fun env r ->
+          let region =
+            if String.equal (unwrap_loc r) "toplevel"
+            then env.toplevel_region
+            else Fexpr_to_flambda_commons.find_var env r
+          in
+          Alloc_mode.For_allocations.local ~region )
+    in
+    let| heap = param0, fun _ () -> Alloc_mode.For_allocations.heap in
+    return_either (fun env -> function
+      | Alloc_mode.For_allocations.Local { region } ->
+        let r =
+          match Flambda_to_fexpr_commons.Env.find_region_exn env region with
+          | Fexpr.Toplevel -> wrap_loc "toplevel"
+          | Named s -> s
+        in
+        local env r
+      | Alloc_mode.For_allocations.Heap -> heap env ())
+  in
+  am
 
 let alloc_mode_for_assignments =
-  D.(
-    default ~def:Alloc_mode.For_assignments.heap
-    @@ either
-         [ case (flag "local")
-             ~box:(fun _env () -> Alloc_mode.For_assignments.local ())
-             ~unbox:(fun _env -> function
-               | Alloc_mode.For_assignments.Local -> Some ()
-               | Alloc_mode.For_assignments.Heap -> None) ])
+  let open D in
+  let|= am =
+    let| local =
+      flag "local", fun _env () -> Alloc_mode.For_assignments.local ()
+    in
+    let| heap = param0, fun _ () -> Alloc_mode.For_assignments.heap in
+    return_either (fun env -> function
+      | Alloc_mode.For_assignments.Local -> local env ()
+      | Alloc_mode.For_assignments.Heap -> heap env ())
+  in
+  am
 
 let boxable_number =
   D.constructor_flag
@@ -287,14 +308,16 @@ let array_kind =
              "gc_ign", Gc_ignorable_values ])
 
 let array_kind_for_length =
-  D.(
-    either
-      P.Array_kind_for_length.
-        [ id_case @@ constructor_flag ["generic", Float_array_opt_dynamic];
-          case array_kind
-            ~box:(fun _ k -> Array_kind k)
-            ~unbox:(fun _ -> function
-              | Float_array_opt_dynamic -> None | Array_kind k -> Some k) ])
+  let open D in
+  let open P.Array_kind_for_length in
+  let|= ak =
+    let| generic = flag "generic", fun _ () -> Float_array_opt_dynamic in
+    let| arrayk = array_kind, fun _ k -> Array_kind k in
+    return_either (fun env -> function
+      | Float_array_opt_dynamic -> generic env ()
+      | Array_kind k -> arrayk env k)
+  in
+  ak
 
 let lazy_tag =
   D.(
@@ -379,129 +402,131 @@ let kind =
            "rec_info", K.rec_info ])
 
 let kind_with_subkind =
-  { decode =
-      (fun _ m : Flambda_kind.With_subkind.t ->
-        match unwrap_loc m with
-        | "region" -> Flambda_kind.With_subkind.region
-        | "rec_info" -> Flambda_kind.With_subkind.rec_info
-        | "imm" -> Flambda_kind.With_subkind.naked_immediate
-        | "float32" -> Flambda_kind.With_subkind.naked_float32
-        | "float" -> Flambda_kind.With_subkind.naked_float
-        | "int8" -> Flambda_kind.With_subkind.naked_int8
-        | "int16" -> Flambda_kind.With_subkind.naked_int16
-        | "int32" -> Flambda_kind.With_subkind.naked_int32
-        | "int64" -> Flambda_kind.With_subkind.naked_int64
-        | "nativeint" -> Flambda_kind.With_subkind.naked_nativeint
-        | "vec128" -> Flambda_kind.With_subkind.naked_vec128
-        | "vec256" -> Flambda_kind.With_subkind.naked_vec256
-        | "vec512" -> Flambda_kind.With_subkind.naked_vec512
-        | value ->
-          let nullable, non_null_value_subkind =
-            if String.ends_with ~suffix:"_or_null" value
-            then
-              ( K.With_subkind.Nullable.Nullable,
-                String.sub value 0
-                  (String.length value - String.length "_or_null") )
-            else K.With_subkind.Nullable.Non_nullable, value
-          in
-          let non_null_value_subkind : K.With_subkind.Non_null_value_subkind.t =
-            match non_null_value_subkind with
-            | "value" -> Anything
-            | "boxed_float32" -> Boxed_float32
-            | "boxed_float" -> Boxed_float
-            | "boxed_int32" -> Boxed_int32
-            | "boxed_int64" -> Boxed_int64
-            | "boxed_nativeint" -> Boxed_nativeint
-            | "boxed_vec128" -> Boxed_vec128
-            | "boxed_vec256" -> Boxed_vec256
-            | "boxed_vec512" -> Boxed_vec512
-            | "tagged_imm" -> Tagged_immediate
-            | "variant" ->
-              Format.eprintf "Unsupported value subkind: variant@.";
-              Anything
-            | "float_block" ->
-              Format.eprintf "Unsupported value subkind: float_block@.";
-              Anything
-            | "floatarray" -> Float_array
-            | "imm_array" -> Immediate_array
-            | "array" -> Value_array
-            | "genarray" -> Generic_array
-            | "float32_array" -> Unboxed_float32_array
-            | "int_array" -> Untagged_int_array
-            | "int8_array" -> Untagged_int8_array
-            | "int16_array" -> Untagged_int16_array
-            | "int32_array" -> Unboxed_int32_array
-            | "int64_array" -> Unboxed_int64_array
-            | "nativeint_array" -> Unboxed_nativeint_array
-            | "vec128_array" -> Unboxed_vec128_array
-            | "vec256_array" -> Unboxed_vec256_array
-            | "vec512_array" -> Unboxed_vec512_array
-            | "array#" -> Unboxed_product_array
-            | _ ->
-              Misc.fatal_errorf "Unsupported value subkind: %s"
-                non_null_value_subkind
-          in
-          K.With_subkind.create K.value non_null_value_subkind nullable);
-    encode =
-      (fun _ (m : Flambda_kind.With_subkind.t) ->
-        let s =
-          match Flambda_kind.With_subkind.kind m with
-          | Region -> "region"
-          | Rec_info -> "rec_info"
-          | Naked_number naked_number_kind -> (
-            match naked_number_kind with
-            | Naked_immediate -> "imm"
-            | Naked_float32 -> "float32"
-            | Naked_float -> "float"
-            | Naked_int8 -> "int8"
-            | Naked_int16 -> "int16"
-            | Naked_int32 -> "int32"
-            | Naked_int64 -> "int64"
-            | Naked_nativeint -> "nativeint"
-            | Naked_vec128 -> "vec128"
-            | Naked_vec256 -> "vec256"
-            | Naked_vec512 -> "vec512")
-          | Value -> (
-            let s =
-              match Flambda_kind.With_subkind.non_null_value_subkind m with
-              | Anything -> "value"
-              | Boxed_float32 -> "boxed_float32"
-              | Boxed_float -> "boxed_float"
-              | Boxed_int32 -> "boxed_int32"
-              | Boxed_int64 -> "boxed_int64"
-              | Boxed_nativeint -> "boxed_nativeint"
-              | Boxed_vec128 -> "boxed_vec128"
-              | Boxed_vec256 -> "boxed_vec256"
-              | Boxed_vec512 -> "boxed_vec512"
-              | Tagged_immediate -> "tagged_imm"
-              | Variant { consts = _; non_consts = _ } ->
-                (* CR bclement: need a better support for structural values *)
-                "variant"
-              | Float_block { num_fields = _ } ->
-                (* CR bclement: need a better support for structural values *)
-                "float_block"
-              | Float_array -> "floatarray"
-              | Immediate_array -> "imm_array"
-              | Value_array -> "array"
-              | Generic_array -> "genarray"
-              | Unboxed_float32_array -> "float32_array"
-              | Untagged_int_array -> "int_array"
-              | Untagged_int8_array -> "int8_array"
-              | Untagged_int16_array -> "int16_array"
-              | Unboxed_int32_array -> "int32_array"
-              | Unboxed_int64_array -> "int64_array"
-              | Unboxed_nativeint_array -> "nativeint_array"
-              | Unboxed_vec128_array -> "vec128_array"
-              | Unboxed_vec256_array -> "vec256_array"
-              | Unboxed_vec512_array -> "vec512_array"
-              | Unboxed_product_array -> "array#"
+  D.value
+    { decode =
+        (fun _ m : Flambda_kind.With_subkind.t ->
+          match unwrap_loc m with
+          | "region" -> Flambda_kind.With_subkind.region
+          | "rec_info" -> Flambda_kind.With_subkind.rec_info
+          | "imm" -> Flambda_kind.With_subkind.naked_immediate
+          | "float32" -> Flambda_kind.With_subkind.naked_float32
+          | "float" -> Flambda_kind.With_subkind.naked_float
+          | "int8" -> Flambda_kind.With_subkind.naked_int8
+          | "int16" -> Flambda_kind.With_subkind.naked_int16
+          | "int32" -> Flambda_kind.With_subkind.naked_int32
+          | "int64" -> Flambda_kind.With_subkind.naked_int64
+          | "nativeint" -> Flambda_kind.With_subkind.naked_nativeint
+          | "vec128" -> Flambda_kind.With_subkind.naked_vec128
+          | "vec256" -> Flambda_kind.With_subkind.naked_vec256
+          | "vec512" -> Flambda_kind.With_subkind.naked_vec512
+          | value ->
+            let nullable, non_null_value_subkind =
+              if String.ends_with ~suffix:"_or_null" value
+              then
+                ( K.With_subkind.Nullable.Nullable,
+                  String.sub value 0
+                    (String.length value - String.length "_or_null") )
+              else K.With_subkind.Nullable.Non_nullable, value
             in
-            match Flambda_kind.With_subkind.nullable m with
-            | Nullable -> s ^ "_or_null"
-            | Non_nullable -> s)
-        in
-        wrap_loc s)
-  }
+            let non_null_value_subkind : K.With_subkind.Non_null_value_subkind.t
+                =
+              match non_null_value_subkind with
+              | "value" -> Anything
+              | "boxed_float32" -> Boxed_float32
+              | "boxed_float" -> Boxed_float
+              | "boxed_int32" -> Boxed_int32
+              | "boxed_int64" -> Boxed_int64
+              | "boxed_nativeint" -> Boxed_nativeint
+              | "boxed_vec128" -> Boxed_vec128
+              | "boxed_vec256" -> Boxed_vec256
+              | "boxed_vec512" -> Boxed_vec512
+              | "tagged_imm" -> Tagged_immediate
+              | "variant" ->
+                Format.eprintf "Unsupported value subkind: variant@.";
+                Anything
+              | "float_block" ->
+                Format.eprintf "Unsupported value subkind: float_block@.";
+                Anything
+              | "floatarray" -> Float_array
+              | "imm_array" -> Immediate_array
+              | "array" -> Value_array
+              | "genarray" -> Generic_array
+              | "float32_array" -> Unboxed_float32_array
+              | "int_array" -> Untagged_int_array
+              | "int8_array" -> Untagged_int8_array
+              | "int16_array" -> Untagged_int16_array
+              | "int32_array" -> Unboxed_int32_array
+              | "int64_array" -> Unboxed_int64_array
+              | "nativeint_array" -> Unboxed_nativeint_array
+              | "vec128_array" -> Unboxed_vec128_array
+              | "vec256_array" -> Unboxed_vec256_array
+              | "vec512_array" -> Unboxed_vec512_array
+              | "array#" -> Unboxed_product_array
+              | _ ->
+                Misc.fatal_errorf "Unsupported value subkind: %s"
+                  non_null_value_subkind
+            in
+            K.With_subkind.create K.value non_null_value_subkind nullable);
+      encode =
+        (fun _ (m : Flambda_kind.With_subkind.t) ->
+          let s =
+            match Flambda_kind.With_subkind.kind m with
+            | Region -> "region"
+            | Rec_info -> "rec_info"
+            | Naked_number naked_number_kind -> (
+              match naked_number_kind with
+              | Naked_immediate -> "imm"
+              | Naked_float32 -> "float32"
+              | Naked_float -> "float"
+              | Naked_int8 -> "int8"
+              | Naked_int16 -> "int16"
+              | Naked_int32 -> "int32"
+              | Naked_int64 -> "int64"
+              | Naked_nativeint -> "nativeint"
+              | Naked_vec128 -> "vec128"
+              | Naked_vec256 -> "vec256"
+              | Naked_vec512 -> "vec512")
+            | Value -> (
+              let s =
+                match Flambda_kind.With_subkind.non_null_value_subkind m with
+                | Anything -> "value"
+                | Boxed_float32 -> "boxed_float32"
+                | Boxed_float -> "boxed_float"
+                | Boxed_int32 -> "boxed_int32"
+                | Boxed_int64 -> "boxed_int64"
+                | Boxed_nativeint -> "boxed_nativeint"
+                | Boxed_vec128 -> "boxed_vec128"
+                | Boxed_vec256 -> "boxed_vec256"
+                | Boxed_vec512 -> "boxed_vec512"
+                | Tagged_immediate -> "tagged_imm"
+                | Variant { consts = _; non_consts = _ } ->
+                  (* CR bclement: need a better support for structural values *)
+                  "variant"
+                | Float_block { num_fields = _ } ->
+                  (* CR bclement: need a better support for structural values *)
+                  "float_block"
+                | Float_array -> "floatarray"
+                | Immediate_array -> "imm_array"
+                | Value_array -> "array"
+                | Generic_array -> "genarray"
+                | Unboxed_float32_array -> "float32_array"
+                | Untagged_int_array -> "int_array"
+                | Untagged_int8_array -> "int8_array"
+                | Untagged_int16_array -> "int16_array"
+                | Unboxed_int32_array -> "int32_array"
+                | Unboxed_int64_array -> "int64_array"
+                | Unboxed_nativeint_array -> "nativeint_array"
+                | Unboxed_vec128_array -> "vec128_array"
+                | Unboxed_vec256_array -> "vec256_array"
+                | Unboxed_vec512_array -> "vec512_array"
+                | Unboxed_product_array -> "array#"
+              in
+              match Flambda_kind.With_subkind.nullable m with
+              | Nullable -> s ^ "_or_null"
+              | Non_nullable -> s)
+          in
+          wrap_loc s)
+    }
 
 (* Nullaries *)
 let invalid =
@@ -544,12 +569,12 @@ let block_load =
   D.(
     unary "%block_load"
       ~params:
-        (param3 block_access_kind mutability (positional target_ocaml_int))
+        (param3 block_access_kind opt_mutability (positional target_ocaml_int))
       (fun _env (kind, mut, field) -> P.Block_load { kind; mut; field }))
 
 let bigarray_length =
   D.(
-    unary "%bigarray_lenght" ~params:(positional int) (fun _ dimension ->
+    unary "%bigarray_length" ~params:(positional int) (fun _ dimension ->
         P.Bigarray_length { dimension }))
 
 let array_length =
@@ -606,9 +631,8 @@ let duplicate_array =
   D.(
     unary "%duplicate_array"
       ~params:
-        (param3 duplicate_array_kind
-           (positional mutability_as_value)
-           (positional mutability_as_value))
+        (param3 duplicate_array_kind (positional mutability)
+           (positional mutability))
       (fun _ (kind, source_mutability, destination_mutability) ->
         P.Duplicate_array { kind; source_mutability; destination_mutability }))
 
@@ -735,7 +759,7 @@ let array_load =
     binary "%array_load"
       ~params:
         (maps
-           (param2 array_kind mutability)
+           (param2 array_kind opt_mutability)
            ~from:(fun _ (k, m) ->
              let lk : P.Array_load_kind.t =
                match (k : P.Array_kind.t) with
@@ -780,45 +804,33 @@ let int_comp =
   let open D in
   let open Flambda_primitive in
   let sign = default ~def:Signed @@ constructor_flag ["unsigned", Unsigned] in
-  let[@warning "-fragile-match"] comp =
-    either
-      [ case
-          (param2 sign (flag "lt"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Lt s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Lt s) -> Some (s, ())
-            | Yielding_bool (Le _ | Gt _ | Ge _ | Eq | Neq)
-            | Yielding_int_like_compare_functions _ ->
-              None);
-        case
-          (param2 sign (flag "le"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Le s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Le s) -> Some (s, ()) | _ -> None);
-        case
-          (param2 sign (flag "gt"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Gt s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Gt s) -> Some (s, ()) | _ -> None);
-        case
-          (param2 sign (flag "ge"))
-          ~box:(fun _ (s, ()) -> Yielding_bool (Ge s))
-          ~unbox:(fun _ -> function
-            | Yielding_bool (Ge s) -> Some (s, ()) | _ -> None);
-        case
-          (param2 sign (flag "qmark"))
-          ~box:(fun _ (s, ()) -> Yielding_int_like_compare_functions s)
-          ~unbox:(fun _ -> function
-            | Yielding_int_like_compare_functions s -> Some (s, ()) | _ -> None);
-        case (flag "eq")
-          ~box:(fun _ () -> Yielding_bool Eq)
-          ~unbox:(fun _ -> function Yielding_bool Eq -> Some () | _ -> None);
-        case (flag "ne")
-          ~box:(fun _ () -> Yielding_bool Neq)
-          ~unbox:(fun _ -> function Yielding_bool Neq -> Some () | _ -> None)
-        (* id_case *)
-        (*   (constructor_flag ["eq", Yielding_bool Eq; "ne", Yielding_bool Neq]); *)
-      ]
+  let|= comp =
+    let| lt =
+      param2_case sign (flag "lt") ~decode:(fun _ s () -> Yielding_bool (Lt s))
+    in
+    let| le =
+      param2_case sign (flag "le") ~decode:(fun _ s () -> Yielding_bool (Le s))
+    in
+    let| gt =
+      param2_case sign (flag "gt") ~decode:(fun _ s () -> Yielding_bool (Gt s))
+    in
+    let| ge =
+      param2_case sign (flag "ge") ~decode:(fun _ s () -> Yielding_bool (Ge s))
+    in
+    let| qmark =
+      param2_case sign (flag "qmark") ~decode:(fun _ s () ->
+          Yielding_int_like_compare_functions s)
+    in
+    let| eq = flag "eq", fun _ () -> Yielding_bool Eq in
+    let| neq = flag "ne", fun _ () -> Yielding_bool Neq in
+    return_either (fun env -> function
+      | Yielding_bool (Lt s) -> lt env (s, ())
+      | Yielding_bool (Le s) -> le env (s, ())
+      | Yielding_bool (Gt s) -> gt env (s, ())
+      | Yielding_bool (Ge s) -> ge env (s, ())
+      | Yielding_bool Eq -> eq env ()
+      | Yielding_bool Neq -> neq env ()
+      | Yielding_int_like_compare_functions s -> qmark env (s, ()))
   in
   binary "%int_comp" ~params:(param2 standard_int comp) (fun _ (i, c) ->
       P.Int_comp (i, c))
@@ -1004,7 +1016,7 @@ let begin_try_ghost_region =
 let make_block =
   D.(
     variadic "%block"
-      ~params:(param3 mutability block_kind alloc_mode_for_allocation)
+      ~params:(param3 opt_mutability block_kind alloc_mode_for_allocation)
       (fun _ (m, k, a) n ->
         let kind =
           match k with
@@ -1018,7 +1030,7 @@ let make_block =
 let make_array =
   D.(
     variadic "%array"
-      ~params:(param3 array_kind mutability alloc_mode_for_allocation)
+      ~params:(param3 array_kind opt_mutability alloc_mode_for_allocation)
       (fun _ (k, m, a) _ -> P.Make_array (k, m, a)))
 
 module OfFlambda = struct

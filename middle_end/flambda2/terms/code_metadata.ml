@@ -249,6 +249,8 @@ let with_is_tupled is_tupled t = { t with is_tupled }
 
 let with_result_types result_types t = { t with result_types }
 
+let with_inlining_decision inlining_decision t = { t with inlining_decision }
+
 module Option = struct
   include Option
 
@@ -627,8 +629,10 @@ let approx_equal
   && Loopify_attribute.equal loopify1 loopify2
 
 let map_result_types ({ result_types; _ } as t) ~f =
-  { t with
-    result_types =
-      Or_unknown_or_bottom.map result_types
-        ~f:(Result_types.map_result_types ~f)
-  }
+  let result_types' =
+    Or_unknown_or_bottom.map_sharing result_types
+      ~f:(Result_types.map_result_types ~f)
+  in
+  if result_types == result_types'
+  then t
+  else { t with result_types = result_types' }

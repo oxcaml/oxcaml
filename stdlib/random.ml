@@ -29,7 +29,7 @@ module State = struct
 
   type t = (int64, int64_elt, c_layout) Array1.t
 
-  external next: t -> (int64[@unboxed]) @@ portable
+  external next: t @ local -> (int64[@unboxed]) @@ portable
       = "caml_lxm_next" "caml_lxm_next_unboxed" [@@noalloc]
 
   let create () : t =
@@ -344,7 +344,7 @@ let mk_default () =
 
 (* CR-soon mslater: this is safe since the state is only updated by a C call
    that cannot be preempted, we do not yield, and we do not borrow the state.
-   However, it will not be deterministic in the presence of threads, so it 
+   However, it will not be deterministic in the presence of threads, so it
    should be converted to TLS. *)
 let random_key =
   DLS.new_key
@@ -355,7 +355,7 @@ let random_key =
 
 let[@inline] apply0 f () = f (Obj.magic_uncontended (DLS.get random_key))
 let[@inline] apply1 f v =  f (Obj.magic_uncontended (DLS.get random_key)) v
-let[@inline] apply_in_range f ~min ~max = 
+let[@inline] apply_in_range f ~min ~max =
   f (Obj.magic_uncontended (DLS.get random_key)) ~min ~max
 
 let bits = apply0 State.bits

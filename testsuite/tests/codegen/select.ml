@@ -50,9 +50,9 @@ let select_cmp_twice (x : int) (y: int) =
 [%%expect_asm X86_64{|
 select_cmp_twice:
   movq  %rax, %rdi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
   setl  %al
-  movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   movl  $41, %esi
   movl  $21, %edx

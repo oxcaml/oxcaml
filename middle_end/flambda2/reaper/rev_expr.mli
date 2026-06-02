@@ -43,7 +43,7 @@ and rev_named =
   | Static_consts of rev_static_const_or_code list
 
 and rev_static_const_or_code =
-  | Code of rev_code
+  | Code (* Code is in the accumulator, to be found by its code_id. *)
   | Deleted_code
   | Static_const of rev_static_const
 

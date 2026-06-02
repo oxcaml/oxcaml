@@ -1290,7 +1290,12 @@ and glb_scannable_kind kind1 kind2 =
    probably trigger it. For other layouts, we raise an error.
 *)
 let glb_array_type loc t1 t2 =
-
+  let unexpected ?(what="unexpected array kind") () =
+    Misc.fatal_errorf "%a: %s in glb: %s, %s"
+      Location.print_loc loc
+      what
+      (Printlambda.array_kind t1) (Printlambda.array_kind t2)
+  in
   match t1, t2 with
   (* Handle unboxed array kinds which should only match with themselves.
 
@@ -1308,7 +1313,7 @@ let glb_array_type loc t1 t2 =
   | (Pgenarray | Punboxedfloatarray Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
   | (Pgenarray | Punboxedoruntaggedintarray Untagged_int),
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray Untagged_int
@@ -1328,7 +1333,7 @@ let glb_array_type loc t1 t2 =
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray Unboxed_nativeint
   | Punboxedoruntaggedintarray _, _ | _, Punboxedoruntaggedintarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
   | (Pgenarray | Punboxedvectorarray Unboxed_vec128),
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray Unboxed_vec128
@@ -1339,7 +1344,7 @@ let glb_array_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
 
   (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
   | Pgenarray,
@@ -1347,16 +1352,16 @@ let glb_array_type loc t1 t2 =
   | (Pgcignorableproductarray kinds1) as k, Pgcignorableproductarray kinds2 ->
     if List.equal equal_ignorable_product_element_kind kinds1 kinds2
     then k
-    else Misc.fatal_error "mismatched ignorableproductarray kinds in glb"
+    else unexpected () ~what:"mismatched ignorableproductarray kinds"
   | Pgcscannableproductarray kinds1, Pgcscannableproductarray kinds2 ->
     begin match glb_scannable_kinds kinds1 kinds2 with
     | Some kinds -> Pgcscannableproductarray kinds
-    | None -> Misc.fatal_error "mismatched scannableproductarray kinds in glb"
+    | None -> unexpected () ~what:"mismatched scannableproductarray kinds"
     end
   | Pgcignorableproductarray _, _ | _, Pgcignorableproductarray _ ->
-    Misc.fatal_error "unexpected Pgcignorableproductarray kind in glb"
+    unexpected () ~what:"unexpected Pgcignorableproductarray kind"
   | Pgcscannableproductarray _, _ | _, Pgcscannableproductarray _ ->
-    Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
+    unexpected () ~what:"unexpected Pgcscannableproductarray kind"
 
   (* No GLB; only used in the [Obj.magic] case *)
   | Pfloatarray, (Paddrarray | Pgcignorableaddrarray | Pintarray)
@@ -1379,6 +1384,12 @@ let glb_array_type loc t1 t2 =
   | Pfloatarray, Pfloatarray -> Pfloatarray
 
 let glb_array_ref_type loc t1 t2 =
+  let unexpected ?(what="unexpected array kind") () =
+    Misc.fatal_errorf "%a: %s in glb: %a, %s"
+      Location.print_loc loc
+      what
+      Printlambda.array_ref_kind t1 (Printlambda.array_kind t2)
+  in
   match t1, t2 with
   (* Handle unboxed array kinds which should only match with themselves.
 
@@ -1397,7 +1408,7 @@ let glb_array_ref_type loc t1 t2 =
     Punboxedfloatarray_ref Unboxed_float32
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
   | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int),
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray_ref Untagged_int
@@ -1417,7 +1428,7 @@ let glb_array_ref_type loc t1 t2 =
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_ref Unboxed_nativeint
   | Punboxedoruntaggedintarray_ref _, _ | _, Punboxedoruntaggedintarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
   | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec128),
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_ref Unboxed_vec128
@@ -1428,7 +1439,7 @@ let glb_array_ref_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
 
   (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
   | Pgenarray_ref _, Pgcignorableproductarray kinds ->
@@ -1437,17 +1448,17 @@ let glb_array_ref_type loc t1 t2 =
     Pgcscannableproductarray_ref kinds
   | (Pgcignorableproductarray_ref kinds1) as k,
     Pgcignorableproductarray kinds2 ->
-    if kinds1 = kinds2 then k else
-      Misc.fatal_error "mismatched ignorableproductarray kinds in glb"
+    if kinds1 = kinds2 then k
+    else unexpected () ~what:"mismatched ignorableproductarray kinds"
   | Pgcscannableproductarray_ref kinds1, Pgcscannableproductarray kinds2 ->
     begin match glb_scannable_kinds kinds1 kinds2 with
     | Some kinds -> Pgcscannableproductarray_ref kinds
-    | None -> Misc.fatal_error "mismatched scannableproductarray kinds in glb"
+    | None -> unexpected () ~what:"mismatched scannableproductarray kinds"
     end
   | Pgcignorableproductarray_ref _, _ | _, Pgcignorableproductarray _ ->
-    Misc.fatal_error "unexpected Pgcignorableproductarray kind in glb"
+    unexpected () ~what:"unexpected Pgcignorableproductarray kind"
   | Pgcscannableproductarray_ref _, _ | _, Pgcscannableproductarray _ ->
-    Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
+    unexpected () ~what:"unexpected Pgcscannableproductarray kind"
 
   (* No GLB; only used in the [Obj.magic] case *)
   | Pfloatarray_ref _, (Paddrarray | Pgcignorableaddrarray | Pintarray)
@@ -1483,6 +1494,12 @@ let glb_array_ref_type loc t1 t2 =
   | (Pfloatarray_ref _ as x), Pfloatarray -> x
 
 let glb_array_set_type loc t1 t2 =
+  let unexpected ?(what="unexpected array kind") () =
+    Misc.fatal_errorf "%a: %s in glb: %a, %s"
+      Location.print_loc loc
+      what
+      Printlambda.array_set_kind t1 (Printlambda.array_kind t2)
+  in
   match t1, t2 with
   (* Handle unboxed array kinds which can only match with themselves.
 
@@ -1501,7 +1518,7 @@ let glb_array_set_type loc t1 t2 =
     Punboxedfloatarray_set Unboxed_float32
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
   | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int),
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray_set Untagged_int
@@ -1521,7 +1538,7 @@ let glb_array_set_type loc t1 t2 =
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_set Unboxed_nativeint
   | Punboxedoruntaggedintarray_set _, _ | _, Punboxedoruntaggedintarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
   | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec128),
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_set Unboxed_vec128
@@ -1532,7 +1549,7 @@ let glb_array_set_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
-    Misc.fatal_error "unexpected array kind in glb"
+    unexpected ()
 
   (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
   | Pgenarray_set _, Pgcignorableproductarray kinds ->
@@ -1541,18 +1558,18 @@ let glb_array_set_type loc t1 t2 =
     Pgcscannableproductarray_set (m, kinds)
   | (Pgcignorableproductarray_set kinds1) as k,
     Pgcignorableproductarray kinds2 ->
-    if kinds1 = kinds2 then k else
-      Misc.fatal_error "mismatched ignorableproductarray kinds in glb"
+    if kinds1 = kinds2 then k
+    else unexpected () ~what:"mismatched ignorableproductarray kinds"
   | Pgcscannableproductarray_set (mode, kinds1),
     Pgcscannableproductarray kinds2 ->
     begin match glb_scannable_kinds kinds1 kinds2 with
     | Some kinds -> Pgcscannableproductarray_set (mode, kinds)
-    | None -> Misc.fatal_error "mismatched scannableproductarray kinds in glb"
+    | None -> unexpected () ~what:"mismatched scannableproductarray kinds"
     end
   | Pgcignorableproductarray_set _, _ | _, Pgcignorableproductarray _ ->
-    Misc.fatal_error "unexpected Pgcignorableproductarray_set kind in glb"
+    unexpected () ~what:"unexpected Pgcignorableproductarray_set kind"
   | Pgcscannableproductarray_set _, _ | _, Pgcscannableproductarray _ ->
-    Misc.fatal_error "unexpected Pgcscannableproductarray_set kind in glb"
+    unexpected () ~what:"unexpected Pgcscannableproductarray_set kind"
 
   (* No GLB; only used in the [Obj.magic] case *)
   | Pfloatarray_set, (Paddrarray | Pgcignorableaddrarray | Pintarray)
@@ -1671,12 +1688,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       Some (Primitive (Pfield (n, is_int, mut), arity))
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
-      (* CR layouts: [~elt_sort:None] here is not ideal and should be
-         fixed. To do that, we will need more checking of primitives
-         in the front end. *)
       let array_type =
-        glb_array_type loc t
-          (array_type_kind ~elt_sort:None ~elt_ty:None env loc p)
+        glb_array_type loc t (array_type_kind ~elt_ty:None env loc p)
       in
       if t = array_type then None
       else Some (Primitive (Parraylength array_type, arity))
@@ -1685,7 +1698,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1694,8 +1707,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Parraysetu (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
       let loc = to_location loc in
       let array_set_type =
-        glb_array_set_type loc st
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some p3) env loc p1)
+        glb_array_set_type loc st (array_type_kind ~elt_ty:(Some p3) env loc p1)
       in
       if st = array_set_type then None
       else Some (Primitive (Parraysetu (array_set_type, index_kind), arity))
@@ -1704,7 +1716,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1713,8 +1725,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Parraysets (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
       let loc = to_location loc in
       let array_set_type =
-        glb_array_set_type loc st
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some p3) env loc p1)
+        glb_array_set_type loc st (array_type_kind ~elt_ty:(Some p3) env loc p1)
       in
       if st = array_set_type then None
       else Some (Primitive (Parraysets (array_set_type, index_kind), arity))
@@ -1723,7 +1734,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     _ :: p2 :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_kind_of_elt ~elt_sort:None env loc p2
+        array_kind_of_elt env loc p2
         |> glb_array_type loc array_kind
       in
       if array_kind = new_array_kind then None
@@ -1735,7 +1746,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     _ :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_type_kind ~elt_sort:None ~elt_ty:None env loc rest_ty
+        array_type_kind ~elt_ty:None env loc rest_ty
         |> glb_array_type loc array_kind
       in
       unboxed_product_uninitialized_array_check loc new_array_kind;
@@ -1756,7 +1767,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
        kind.  If you haven't, then taking the glb of both would be just as
        likely to compound your error (e.g., by treating a Pgenarray as a
        Pfloatarray) as to help you. *)
-    let array_kind = array_type_kind ~elt_sort:None ~elt_ty:None env loc p2 in
+    let array_kind = array_type_kind ~elt_ty:None env loc p2 in
     let new_dst_array_set_kind =
       glb_array_set_type loc dst_array_set_kind array_kind
     in
@@ -1765,7 +1776,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       src_mutability; dst_array_set_kind = new_dst_array_set_kind }, arity))
   | Primitive (Parray_element_size_in_bytes _, arity), p1 :: _ -> (
       let array_kind =
-        array_type_kind ~elt_sort:None ~elt_ty:None env (to_location loc) p1
+        array_type_kind ~elt_ty:None env (to_location loc) p1
       in
       Some (Primitive (Parray_element_size_in_bytes array_kind, arity))
     )
@@ -1896,8 +1907,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
          || Path.same p Predef.path_iarray -> ()
      | _ -> err ());
     let ak =
-      Typeopt.array_type_kind ~elt_sort:None ~elt_ty:None
-        env loc array_ty
+      Typeopt.array_type_kind ~elt_ty:None env loc array_ty
     in
     let jkind = Ctype.type_jkind env elt_ty in
     let mbe = Typedecl.mixed_block_element env elt_ty jkind in

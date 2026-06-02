@@ -46,11 +46,11 @@ module Hidden_int64_u :
 module Immediate : sig
   val id : ('a : immediate). 'a -> 'a
   val ignore : ('a : immediate). 'a -> unit
-  val unique : ('a : immediate). unique_ 'a -> 'a
+  val unique : ('a : immediate). 'a @ unique -> 'a
 end = struct
   let id x = x
   let ignore _ = ()
-  let unique (unique_ x) = x
+  let unique (x @ unique) = x
 end
 
 [%%expect{|
@@ -65,11 +65,11 @@ module Immediate :
 module Float_u : sig
   val id : ('a : float64). 'a -> 'a
   val ignore : ('a : float64). 'a -> unit
-  val unique : ('a : float64). unique_ 'a -> 'a
+  val unique : ('a : float64). 'a @ unique -> 'a
 end = struct
   let id x = x
   let ignore _ = ()
-  let unique (unique_ x) = x
+  let unique (x @ unique) = x
 end
 
 [%%expect{|
@@ -84,11 +84,11 @@ module Float_u :
 module Int64_u : sig
   val id : ('a : bits64). 'a -> 'a
   val ignore : ('a : bits64). 'a -> unit
-  val unique : ('a : bits64). unique_ 'a -> 'a
+  val unique : ('a : bits64). 'a @ unique -> 'a
 end = struct
   let id x = x
   let ignore _ = ()
-  let unique (unique_ x) = x
+  let unique (x @ unique) = x
 end
 
 [%%expect{|
@@ -266,49 +266,49 @@ Line 2, characters 71-72:
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let string_duplicate = let once_ x : string = "hello" in Fun.id x
+let string_duplicate = let (x @ once) : string = "hello" in Fun.id x
 
 [%%expect{|
 val string_duplicate : string = "hello"
 |}]
 
-let int_duplicate = let once_ x : int = 5 in Fun.id x
+let int_duplicate = let (x @ once) : int = 5 in Fun.id x
 
 [%%expect{|
 val int_duplicate : int = 5
 |}]
 
-let string_list_duplicate = let once_ x : string list = ["hi";"bye"] in Fun.id x
+let string_list_duplicate = let (x @ once) : string list = ["hi";"bye"] in Fun.id x
 
 [%%expect{|
 val string_list_duplicate : string list = ["hi"; "bye"]
 |}]
 
-let int_list_duplicate = let once_ x : int list = [4;5] in Fun.id x
+let int_list_duplicate = let (x @ once) : int list = [4;5] in Fun.id x
 
 [%%expect{|
 val int_list_duplicate : int list = [4; 5]
 |}]
 
 let hidden_string_duplicate =
-  let once_ x : Hidden_string.t = Hidden_string.hide "hello" in Fun.id x
+  let (x @ once) : Hidden_string.t = Hidden_string.hide "hello" in Fun.id x
 
 [%%expect{|
-Line 2, characters 71-72:
-2 |   let once_ x : Hidden_string.t = Hidden_string.hide "hello" in Fun.id x
-                                                                           ^
+Line 2, characters 74-75:
+2 |   let (x @ once) : Hidden_string.t = Hidden_string.hide "hello" in Fun.id x
+                                                                              ^
 Error: This value is "once" but is expected to be "many".
 |}]
 
 let hidden_int_duplicate =
-  let once_ x : Hidden_int.t = Hidden_int.hide 42 in Fun.id x
+  let (x @ once) : Hidden_int.t = Hidden_int.hide 42 in Fun.id x
 
 [%%expect{|
 val hidden_int_duplicate : Hidden_int.t = <abstr>
 |}]
 
 let hidden_string_list_duplicate =
-  let once_ x : Hidden_string.t list =
+  let (x @ once) : Hidden_string.t list =
     [Hidden_string.hide "hi"; Hidden_string.hide "bye"]
   in Fun.id x
 
@@ -320,7 +320,7 @@ Error: This value is "once" but is expected to be "many".
 |}]
 
 let hidden_int_list_duplicate =
-  let once_ x : Hidden_int.t list =
+  let (x @ once) : Hidden_int.t list =
     [Hidden_int.hide 2; Hidden_int.hide 3]
   in Fun.id x
 
@@ -328,72 +328,72 @@ let hidden_int_list_duplicate =
 val hidden_int_list_duplicate : Hidden_int.t list = [<abstr>; <abstr>]
 |}]
 
-let float_duplicate = let once_ x : float = 3.14 in Fun.id x
+let float_duplicate = let (x @ once) : float = 3.14 in Fun.id x
 
 [%%expect{|
 val float_duplicate : float = 3.14
 |}]
 
-let float_u_duplicate () = let once_ x : float# = #3.14 in Float_u.id x
+let float_u_duplicate () = let (x @ once) : float# = #3.14 in Float_u.id x
 
 [%%expect{|
 val float_u_duplicate : unit -> float# = <fun>
 |}]
 
-let int64_u_duplicate () = let once_ x : int64# = #314L in Int64_u.id x
+let int64_u_duplicate () = let (x @ once) : int64# = #314L in Int64_u.id x
 
 [%%expect{|
 val int64_u_duplicate : unit -> int64# = <fun>
 |}]
 
 let hidden_float_u_duplicate () =
-  let once_ x : Hidden_float_u.t = Hidden_float_u.hide #3.14 in Float_u.id x
+  let (x @ once) : Hidden_float_u.t = Hidden_float_u.hide #3.14 in Float_u.id x
 
 [%%expect{|
 val hidden_float_u_duplicate : unit -> Hidden_float_u.t = <fun>
 |}]
 
 let hidden_int64_u_duplicate () =
-  let once_ x : Hidden_int64_u.t = Hidden_int64_u.hide #314L in Int64_u.id x
+  let (x @ once) : Hidden_int64_u.t = Hidden_int64_u.hide #314L in Int64_u.id x
 
 [%%expect{|
 val hidden_int64_u_duplicate : unit -> Hidden_int64_u.t = <fun>
 |}]
 
 let float_u_record_duplicate =
-  let once_ x : float_u_record = { x = #3.14; y = #2.718 } in Fun.id x
+  let (x @ once) : float_u_record = { x = #3.14; y = #2.718 } in Fun.id x
 
 [%%expect{|
 val float_u_record_duplicate : float_u_record = {x = <abstr>; y = <abstr>}
 |}]
 
 let float_u_record_list_duplicate =
-  let once_ x : float_u_record list = [] in Fun.id x
+  let (x @ once) : float_u_record list = [] in Fun.id x
 
 [%%expect{|
 val float_u_record_list_duplicate : float_u_record list = []
 |}]
 
-let function_duplicate = let once_ x : int -> int = fun y -> y in Fun.id x
+let function_duplicate = let (x @ once) : int -> int = fun y -> y in Fun.id x
 
 [%%expect{|
-Line 1, characters 73-74:
-1 | let function_duplicate = let once_ x : int -> int = fun y -> y in Fun.id x
-                                                                             ^
+Line 1, characters 76-77:
+1 | let function_duplicate = let (x @ once) : int -> int = fun y -> y in Fun.id x
+                                                                                ^
 Error: This value is "once" but is expected to be "many".
 |}]
 
 let function_list_duplicate =
-  let once_ x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in Fun.id x
+  let (x @ once) : (int -> int) list = [(fun y -> y); fun z -> z + 1] in Fun.id x
 
 [%%expect{|
-Line 2, characters 77-78:
-2 |   let once_ x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in Fun.id x
-                                                                                 ^
+Line 2, characters 80-81:
+2 |   let (x @ once) : (int -> int) list = [(fun y -> y); fun z -> z + 1] in Fun.id x
+                                                                                    ^
 Error: This value is "once" but is expected to be "many".
 |}]
 
-let unique (unique_ x) = x
+let unique (x @ unique) = x
 
 [%%expect{|
 val unique : 'a @ unique -> 'a = <fun>

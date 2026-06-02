@@ -179,13 +179,14 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         else assign_first (succ idx)
       in
       (* assigns the available register with the highest affinity *)
-      let rec assign_affinity = function
-        | [] -> assign_first 0
-        | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+      let rec assign_affinity aff =
+        match Regalloc_affinity.next aff with
+        | None -> assign_first 0
+        | Some { Regalloc_affinity.priority = _; phys_reg } ->
           let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < num_available_registers && available.(idx)
           then do_assign ~phys_reg
-          else assign_affinity tl
+          else assign_affinity aff
       in
       assign_affinity (Regalloc_affinity.get (State.affinity state) reg))
   | Reg _ | Stack _ -> Not_spilling
@@ -283,7 +284,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots, affinity =
+  let (_ : cfg_infos), stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () ->
@@ -302,7 +303,6 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
         save_cfg "ls" cfg_with_layout)
       cfg_with_infos
   in
-  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   let state = State.make ~stack_slots ~affinity in
   main ~round:1 state cfg_with_infos;
   Regalloc_rewrite.postlude

@@ -112,7 +112,7 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
      in the future; care is needed as some may clobber registers beyond
      [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
      writing only to the destination). *)
-  | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
+  | Imul | Imulh _ | Idiv | Imod | Iclz | Ictz | Ipopcnt | Icomp _ -> None
 
 let eval_float_op op (left : float) (right : float option) : float option =
   match (op : Operation.float_operation) with
@@ -286,9 +286,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
           remove_destroyed instr
         end
       | Op
-          ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
-          | Int128op _ | Intop_atomic _
+          ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Int128op _
+          | Intop_atomic _
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _

@@ -61,8 +61,8 @@ type integer_operation =
   | Ilsl
   | Ilsr
   | Iasr
-  | Iclz of { arg_is_non_zero : bool }
-  | Ictz of { arg_is_non_zero : bool }
+  | Iclz
+  | Ictz
   | Ipopcnt
   | Icomp of integer_comparison
 
@@ -84,8 +84,8 @@ let string_of_integer_operation = function
   | Ilsl -> " << "
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
-  | Iclz { arg_is_non_zero } -> Printf.sprintf "clz %B " arg_is_non_zero
-  | Ictz { arg_is_non_zero } -> Printf.sprintf "ctz %B " arg_is_non_zero
+  | Iclz -> "clz "
+  | Ictz -> "ctz "
   | Ipopcnt -> "popcnt "
   | Icomp cmp -> string_of_integer_comparison cmp
 
@@ -95,7 +95,7 @@ let string_of_int128_operation = function
   | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let is_unary_integer_operation = function
-  | Iclz _ | Ictz _ | Ipopcnt -> true
+  | Iclz | Ictz | Ipopcnt -> true
   | Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
   | Iasr | Icomp _ ->
     false
@@ -114,62 +114,58 @@ let equal_integer_operation left right =
   | Ilsl, Ilsl -> true
   | Ilsr, Ilsr -> true
   | Iasr, Iasr -> true
-  | ( Iclz { arg_is_non_zero = left_arg_is_non_zero },
-      Iclz { arg_is_non_zero = right_arg_is_non_zero } ) ->
-    Bool.equal left_arg_is_non_zero right_arg_is_non_zero
-  | ( Ictz { arg_is_non_zero = left_arg_is_non_zero },
-      Ictz { arg_is_non_zero = right_arg_is_non_zero } ) ->
-    Bool.equal left_arg_is_non_zero right_arg_is_non_zero
+  | Iclz, Iclz -> true
+  | Ictz, Ictz -> true
   | Ipopcnt, Ipopcnt -> true
   | Icomp left, Icomp right -> equal_integer_comparison left right
   | ( Iadd,
       ( Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Isub,
       ( Iadd | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imul,
       ( Iadd | Isub | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imulh _,
       ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Idiv,
       ( Iadd | Isub | Imul | Imulh _ | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imod,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Iand,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ior,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ixor,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ilsl,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ilsr,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Iasr,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Iclz _,
+      | Ilsr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Iclz,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Ictz _,
+      | Ilsr | Iasr | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Ictz,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ipopcnt | Icomp _ ) )
+      | Ilsr | Iasr | Iclz | Ipopcnt | Icomp _ ) )
   | ( Ipopcnt,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Icomp _ ) )
+      | Ilsr | Iasr | Iclz | Ictz | Icomp _ ) )
   | ( Icomp _,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ) ) ->
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt ) ) ->
     false
 
 let equal_int128_operation left right =
@@ -282,7 +278,6 @@ type t =
   | Move
   | Spill
   | Reload
-  | Dummy_use
   | Const_int of nativeint (* CR-someday xclerc: change to `Targetint.t` *)
   | Const_float32 of int32
   | Const_float of int64
@@ -339,7 +334,6 @@ let is_pure = function
   | Move -> true
   | Spill -> true
   | Reload -> true
-  | Dummy_use -> true
   | Const_int _ -> true
   | Const_float32 _ -> true
   | Const_float _ -> true
@@ -403,8 +397,8 @@ let intop (op : integer_operation) =
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
   | Ipopcnt -> " pop "
-  | Iclz _ -> " clz "
-  | Ictz _ -> " ctz "
+  | Iclz -> " clz "
+  | Ictz -> " ctz "
   | Icomp cmp -> intcomp cmp
 
 let int128op = function
@@ -427,7 +421,6 @@ let dump ppf op =
   | Move -> Format.fprintf ppf "mov"
   | Spill -> Format.fprintf ppf "spill"
   | Reload -> Format.fprintf ppf "reload"
-  | Dummy_use -> Format.fprintf ppf "dummy_use"
   | Const_int n -> Format.fprintf ppf "const_int %nd" n
   | Const_float32 f ->
     Format.fprintf ppf "const_float32 %Fs" (Int32.float_of_bits f)
@@ -445,9 +438,9 @@ let dump ppf op =
   | Stackoffset n -> Format.fprintf ppf "stackoffset %d" n
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
-  | Intop op -> Format.fprintf ppf "intop %s" (intop op)
-  | Int128op op -> Format.fprintf ppf "int128op %s" (int128op op)
-  | Intop_imm (op, n) -> Format.fprintf ppf "intop %s %d" (intop op) n
+  | Intop op -> Format.fprintf ppf "intop%s" (intop op)
+  | Int128op op -> Format.fprintf ppf "int128op%s" (int128op op)
+  | Intop_imm (op, n) -> Format.fprintf ppf "intop%s%d" (intop op) n
   | Intop_atomic { op; size = _; addr = _ } ->
     Format.fprintf ppf "intop atomic %s" (Printcmm.atomic_op op)
   | Floatop (Float64, op) -> Format.fprintf ppf "floatop %a" floatop op
@@ -610,7 +603,7 @@ let equal left right =
     && Option.equal Int.equal left_wp right_wp
     && Option.equal Backend_var.Provenance.equal left_prov right_prov
   | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
-  | Dummy_use, Dummy_use | Domain_index, Domain_index -> true
+  | Domain_index, Domain_index -> true
   | Int128op left_op, Int128op right_op ->
     equal_int128_operation left_op right_op
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
@@ -618,12 +611,12 @@ let equal left right =
     Int.equal left_bytes right_bytes
     && Cmm.equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
-  | ( ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
-      | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
-      | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
-      | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-      | Poll | Pause | Alloc _ ),
+  | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
+      | Alloc _ ),
       _ ) ->
     false

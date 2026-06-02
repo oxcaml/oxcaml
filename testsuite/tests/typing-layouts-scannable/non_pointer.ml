@@ -20,9 +20,9 @@ type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
 type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
-type t : value non_pointer & value maybe_separable & float64
+type t : value non_pointer & value_maybe_separable & float64
 [%%expect{|
-type t : value non_pointer & value maybe_separable & float64
+type t : value non_pointer & value_maybe_separable & float64
 |}]
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
@@ -38,10 +38,10 @@ type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
 
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
@@ -52,10 +52,10 @@ type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
 
-type ('a : value maybe_separable) accepts_maybeptr_val
+type ('a : value_maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 [%%expect{|
-type ('a : value maybe_separable) accepts_maybeptr_val
+type ('a : value_maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 |}]
 
@@ -94,7 +94,7 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer)"
-       The layout of t_maybeptr_val is value maybe_separable
+       The layout of t_maybeptr_val is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer
@@ -164,7 +164,7 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer64)"
-       The layout of t_maybeptr_val is value maybe_separable
+       The layout of t_maybeptr_val is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer64
@@ -241,7 +241,7 @@ Line 3, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : any separable)"
-       The layout of t_maybeptr_val is value maybe_separable
+       The layout of t_maybeptr_val is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -249,10 +249,10 @@ Error: This type "t_maybeptr_val" should be an instance of type
 
 (* unboxed records *)
 
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
@@ -261,7 +261,7 @@ type fails : value non_pointer = #{ a : t_maybeptr_val }
 Line 1, characters 0-56:
 1 | type fails : value non_pointer = #{ a : t_maybeptr_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "fails" is value maybe_separable
+Error: The layout of type "fails" is value_maybe_separable
          because it is an unboxed record.
        But the layout of type "fails" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type fails.
@@ -293,7 +293,7 @@ let f x =
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
-let f (type a : value maybe_separable) (x : a) =
+let f (type a : value_maybe_separable) (x : a) =
   let require_np (y : (_ : value non_pointer)) = () in
   require_np y
 [%%expect{|
@@ -311,7 +311,7 @@ val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
 let f (type a : value non_pointer) (x : a) =
-  (* here, y is value maybe_separable *)
+  (* here, y is value_maybe_separable *)
   let g y = () in
   g x
 [%%expect{|
@@ -319,7 +319,7 @@ val f : ('a : value non_pointer). 'a -> unit = <fun>
 |}]
 
 let f (t : (_ : value non_pointer & value)) =
-  (* here, x is value maybe_separable *)
+  (* here, x is value_maybe_separable *)
   let g (type a : value non_pointer) (x : a) = () in
   let #(np, v) = t in
   g np
@@ -412,6 +412,15 @@ Error: The value "nf" has type "a or_null" but an expression was expected of typ
 |}]
 
 module M : sig
+  type t : immediate_or_null
+end = struct
+  type t = int or_null
+end
+[%%expect{|
+module M : sig type t : immediate_or_null end
+|}]
+
+module M : sig
   type t : immediate_or_null & float64
 end = struct
   type t = #(int or_null * float#)
@@ -448,7 +457,7 @@ Error: Signature mismatch:
 module M1 : sig
   type ('a : value non_pointer) t : value
 end = struct
-  type ('a : value maybe_separable) t = t_nonptr_val
+  type ('a : value_maybe_separable) t = t_nonptr_val
 end
 [%%expect{|
 module M1 : sig type ('a : value non_pointer) t end
@@ -500,7 +509,7 @@ Error: Signature mismatch:
          type 'a t = t_maybeptr_val
        is not included in
          type ('a : value non_pointer) t : value non_pointer
-       The layout of the first is value maybe_separable
+       The layout of the first is value_maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.
@@ -603,4 +612,95 @@ type check = non_pointer require_non_pointer
 [%%expect{|
 type non_pointer : value non_pointer
 type check = non_pointer require_non_pointer
+|}]
+
+(* Mixed records and mutual recursion edge cases *)
+
+module Equal_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Equal_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Less_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s : value non_pointer
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Less_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Not_le_layout : sig
+  type r = { r : #(t * s) }
+  and t : value non_pointer
+  and s
+end = struct
+  type r = { r : #(t * s) }
+  and t
+  and s
+end
+[%%expect{|
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type r = { r : #(t * s) }
+7 |   and t
+8 |   and s
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type r = { r : #(t * s); } and t and s end
+       is not included in
+         sig type r = { r : #(t * s); } and t : value non_pointer and s end
+       Type declarations do not match:
+         type t
+       is not included in
+         type t : value non_pointer
+       The layout of the first is value
+         because of the definition of t at line 7, characters 2-7.
+       But the layout of the first must be a sublayout of value non_pointer
+         because of the definition of t at line 3, characters 2-27.
+       Note: The layout of immediate is value non_pointer.
+|}]
+
+(* We only compare record representations up to scannable axes for the inclusion
+   check, to support type substitution edge cases.
+   See also Note [Ignoring scannable axes in type declaration representations]
+   in typing/types.mli
+*)
+
+module M : sig
+  type t
+  (* Because [t := int] only via the substitution below, the compiler doesn't
+     realize that [t] is [non_pointer] when computing the type declaration *)
+  type r = { t : t; i : int64# }
+end with type t := int = struct
+  type r = { t : int ; i : int64# }
+end
+
+(* Then, for this check, the new record declaration technically has a more
+   precise representation, but we accept it as we only compare representations
+   up to scannable axes.
+
+   This can lead to a unnecessary [caml_modify] in some uncommon cases: see the
+   test with a "CR layouts-scannable" in
+   testsuite/tests/typing-layouts-caml-modify/non_pointer.ml
+*)
+type r = M.r = { t : int ; i : int64# }
+[%%expect{|
+module M : sig type r = { t : int; i : int64#; } end
+type r = M.r = { t : int; i : int64#; }
 |}]

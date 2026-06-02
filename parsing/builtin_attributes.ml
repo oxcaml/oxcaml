@@ -130,6 +130,8 @@ let builtin_attrs =
   ; "regalloc"
   ; "regalloc_param"
   ; "implicit_kind"
+  ; "flatten_floats"
+  ; "represent_as_float_array"
   ]
 
 let builtin_attrs =
@@ -523,6 +525,11 @@ let has_unboxed attrs = has_attribute "unboxed" attrs
 let has_boxed attrs = has_attribute "boxed" attrs
 let has_atomic attrs = has_attribute "atomic" attrs
 
+let has_flatten_floats attrs = has_attribute "flatten_floats" attrs
+
+let has_represent_as_float_array attrs =
+  has_attribute "represent_as_float_array" attrs
+
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
 
@@ -698,6 +705,9 @@ let has_or_null attrs =
 
 let has_or_null_reexport attrs =
   has_attribute "or_null_reexport" attrs
+
+let has_magic_staged_modes attrs =
+  has_attribute "magic_staged_modes" attrs
 
 let curry_attr loc =
   Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])

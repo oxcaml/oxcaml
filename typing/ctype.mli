@@ -201,24 +201,49 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       in_counterexample : bool;
       (* true iff checking counter examples *)
-      is_lpoly : bool;
-      (* true iff the pattern is under let poly_ *)
+      mutable env_alloc_mode : Mode.Alloc.r option;
+      (** [Some m] if the pattern is under [let poly_], where [m] is the
+         allocation mode of the captured environment *)
     }
+<<<<<<< HEAD
   val make: ?is_lpoly:bool -> Env.t -> equations_scope:int -> in_counterexample:bool -> t
+||||||| eb63e0e418
+  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+    -> allow_recursive_equations:bool -> t
+=======
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
+    -> allow_recursive_equations:bool -> t
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end
 
 type existential_treatment =
   | Keep_existentials_flexible
   | Make_existentials_abstract of Pattern_env.t
 
+<<<<<<< HEAD
 val instance_constructor:
   existential_treatment ->
   Data_types.constructor_description ->
   Types.constructor_argument list * type_expr * type_expr list
 (* Same, for a constructor. Also returns existentials. *)
 
+||||||| eb63e0e418
+val instance_constructor: existential_treatment ->
+        constructor_description ->
+        Types.constructor_argument list * type_expr * type_expr list
+        (* Same, for a constructor. Also returns existentials. *)
+=======
+val instance_constructor: existential_treatment ->
+        constructor_description ->
+        Types.constructor_argument list * type_expr
+          * (type_expr * Types.jkind_lr) list
+        (* Same, for a constructor. The third component pairs each existential
+           with its declared jkind (read from the original, not the copy, so it
+           is unaffected by later unification). *)
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 val instance_parameterized_type:
         ?keep_names:bool ->
         type_expr list -> type_expr -> type_expr list * type_expr

@@ -7,8 +7,8 @@ let code loopify(never) size(16) newer_version_of(f_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let r = %project_value_slot.[`f`].[`r`] (my_closure) in
-  let a = %project_value_slot.[`f`].[`a`] (my_closure) in
+  let r = %project_value_slot.[f].[r] (my_closure) in
+  let a = %project_value_slot.[f].[a] (my_closure) in
   (let untagged = %untag_imm (a) in
    switch untagged
      | 0 -> k (0)
@@ -22,8 +22,8 @@ let code loopify(never) size(20) newer_version_of(g_3)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let s = %project_value_slot.[`g`].[`s`] (my_closure) in
-  let b = %project_value_slot.[`g`].[`b`] (my_closure) in
+  let s = %project_value_slot.[g].[s] (my_closure) in
+  let b = %project_value_slot.[g].[b] (my_closure) in
   (let untagged = %untag_imm (b) in
    switch untagged
      | 0 -> k (0)
@@ -38,10 +38,10 @@ let code rec loopify(never) size(39) newer_version_of(h_4)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let b = %project_value_slot.[`h`].[`b`] (my_closure) in
-  let a = %project_value_slot.[`h`].[`a`] (my_closure) in
-  let g = %project_function_slot.[`h`].[`g`] (my_closure) in
-  let f = %project_function_slot.[`h`].[`f`] (my_closure) in
+  let b = %project_value_slot.[h].[b] (my_closure) in
+  let a = %project_value_slot.[h].[a] (my_closure) in
+  let g = %project_function_slot.[h].[g] (my_closure) in
+  let f = %project_function_slot.[h].[f] (my_closure) in
   (let untagged = %untag_imm (b) in
    switch untagged
      | 0 -> k2 (0)
@@ -134,7 +134,7 @@ apply direct(partial_apply1_44) inlined(never) inlining_state(depth(11))
                  my_closure _region _ghost_region my_depth
                  -> k * k1
                  : imm tagged =
-           let r_1 = %project_value_slot.[`f`].[`r`] ($camlOffset__f_7) in
+           let r_1 = %project_value_slot.[f].[r] ($camlOffset__f_7) in
            let int_add = %int_barith.add (r_1, x) in
            cont k (int_add)
            with { a = 1; b = 0; r = r; s = s }

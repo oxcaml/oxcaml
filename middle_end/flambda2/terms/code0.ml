@@ -127,6 +127,9 @@ let ids_for_export ~ids_for_export_function_params_and_body
       free_names_of_params_and_body_ids ]
 
 let map_result_types ({ code_metadata; _ } as t) ~f =
-  { t with code_metadata = Code_metadata.map_result_types code_metadata ~f }
+  let code_metadata' = Code_metadata.map_result_types code_metadata ~f in
+  if code_metadata == code_metadata'
+  then t
+  else { t with code_metadata = code_metadata' }
 
 let free_names_of_params_and_body t = t.free_names_of_params_and_body

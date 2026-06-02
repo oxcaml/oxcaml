@@ -41,13 +41,24 @@ external get :
 (** [get a n] returns the element number [n] of immutable array [a].
    The first element has number 0.
    The last element has number [length a - 1].
-   You can also write [a.:(n)] instead of [get a n].
 
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
+<<<<<<< HEAD
 val init : ('a : value_or_null mod separable).
   int -> local_ (int -> 'a) -> 'a iarray
+||||||| eb63e0e418
+external ( .:() ) :
+  ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  = "%array_safe_get"
+[@@layout_poly]
+(** A synonym for [get]. *)
+
+val init : int -> local_ (int -> 'a) -> 'a iarray
+=======
+val init : int -> local_ (int -> 'a) -> 'a iarray
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 (** [init n f] returns a fresh immutable array of length [n],
    with element number [i] initialized to the result of [f i].
    In other terms, [init n f] tabulates the results of [f]
@@ -70,8 +81,16 @@ val concat : ('a : value_or_null mod separable). 'a iarray list -> 'a iarray
 
 val sub
   : ('a : value_or_null mod separable).
+<<<<<<< HEAD
   'a iarray -> pos:int -> len:int -> 'a iarray
 (** [sub a ~pos ~len] returns a fresh immutable array of length [len],
+||||||| eb63e0e418
+  'a iarray -> int -> int -> 'a iarray
+(** [sub a pos len] returns a fresh immutable array of length [len],
+=======
+  'a iarray -> pos:int -> len:int -> 'a iarray
+(** [sub a pos len] returns a fresh immutable array of length [len],
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
    containing the elements number [pos] to [pos + len - 1]
    of immutable array [a].  This creates a copy of the selected
    portion of the immutable array.
@@ -107,8 +126,21 @@ val iter
   local_ ('a -> unit) -> 'a iarray -> unit
 (** [iter f a] applies function [f] in turn to all
    the elements of [a].  It is equivalent to
+<<<<<<< HEAD
    [f a.:(0); f a.:(1); ...; f a.:(length a - 1); ()]. *)
 
+||||||| eb63e0e418
+   [f a.:(0); f a.:(1); ...; f a.:(length a - 1); ()]. *)
+
+val iter_local
+  : ('a : value_or_null mod separable).
+  local_ (local_ 'a -> unit) -> local_ 'a iarray -> unit
+(** The locally-scoped version of [iter]. *)
+
+=======
+   [f (get a 0); f (get a 1); ...; f (get a (length a - 1)); ()]. *)
+
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 val iteri
   : ('a : value_or_null mod separable).
   local_ (int -> 'a -> unit) -> 'a iarray -> unit
@@ -121,8 +153,31 @@ val map
   local_ ('a -> 'b) -> 'a iarray -> 'b iarray
 (** [map f a] applies function [f] to all the elements of [a],
    and builds an immutable array with the results returned by [f]:
+<<<<<<< HEAD
    [[| f a.:(0); f a.:(1); ...; f a.:(length a - 1) |]]. *)
 
+||||||| eb63e0e418
+   [[| f a.:(0); f a.:(1); ...; f a.:(length a - 1) |]]. *)
+
+val map_local
+  : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
+  local_ (local_ 'a -> local_ 'b) -> local_ 'a iarray -> local_ 'b iarray
+(** The locally-scoped and locally-allocating version of [map]. *)
+
+val map_local_input
+  : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
+  local_ (local_ 'a -> 'b) -> local_ 'a iarray -> 'b iarray
+(** The locally-constrained but globally-allocating version of [map]. *)
+
+val map_local_output
+  : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
+  local_ ('a -> local_ 'b) -> 'a iarray -> local_ 'b iarray
+(** The locally-allocating but global-input version of [map]. *)
+
+=======
+   [[| f (get a 0); f (get a 1); ...; f (get a (length a - 1)) |]]. *)
+
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 val mapi
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
   local_ (int -> 'a -> 'b) -> 'a iarray -> 'b iarray
@@ -134,7 +189,7 @@ val fold_left
   : ('a : value_or_null) ('b : value_or_null mod separable).
   local_ ('a -> 'b -> 'a) -> 'a -> 'b iarray -> 'a
 (** [fold_left f init a] computes
-   [f (... (f (f init a.:(0)) a.:(1)) ...) a.:(n-1)],
+   [f (... (f (f init (get a 0)) (get a 1)) ...) (get a n-1)],
    where [n] is the length of the immutable array [a]. *)
 
 val fold_left_map
@@ -169,7 +224,9 @@ val map2
   local_ ('a -> 'b -> 'c) -> 'a iarray -> 'b iarray -> 'c iarray
 (** [map2 f a b] applies function [f] to all the elements of [a]
    and [b], and builds an immutable array with the results returned by [f]:
-   [[| f a.:(0) b.:(0); ...; f a.:(length a - 1) b.:(length b - 1)|]].
+   [[| f (get a 0) (get b 0);
+       ...;
+       f (get a (length a - 1)) (get b (length b - 1))|]].
    @raise Invalid_argument if the immutable arrays are not the same size. *)
 
 
@@ -272,9 +329,25 @@ val sort
    The result of [sort], which we'll call [a'], contains the same elements as
    [a], reordered in such a way that for all i and j valid indices of [a] (or
    equivalently, of [a']):
+<<<<<<< HEAD
 -   [cmp a'.:(i) a'.:(j)] >= 0 if and only if i >= j
 *)
 
+||||||| eb63e0e418
+-   [cmp a'.:(i) a'.:(j)] >= 0 if and only if i >= j
+*)
+
+(* MISSING: Requires rewriting the sorting algorithms
+val sort_local :
+  (local_ 'a -> local_ 'a -> int) -> local_ 'a iarray -> local_ 'a iarray
+(** The locally-constrained and locally-allocating version of [sort]. *)
+*)
+
+=======
+-   [cmp (get a' i) (get a' j)] >= 0 if and only if i >= j
+*)
+
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 val stable_sort
   : ('a : value_or_null mod separable).
   ('a -> 'a -> int) -> 'a iarray -> 'a iarray

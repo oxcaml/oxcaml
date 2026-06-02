@@ -178,6 +178,10 @@ let dump_reaper () = !Oxcaml_flags.Flambda2.Dump.reaper
 
 let freshen_when_printing () = !Oxcaml_flags.Flambda2.Dump.freshen
 
+let erase_in_types_depth_variables =
+  Oxcaml_args.Extra_options.bool __LOC__
+    "flambda2-erase-in-types-depth-variables"
+
 module Inlining = struct
   module I = Oxcaml_flags.Flambda2.Inlining
   module IH = Clflags.Int_arg_helper
@@ -251,6 +255,16 @@ module Inlining = struct
     | Round round -> IH.get ~key:round !I.large_function_size
     | Default opt_level -> (default_for_opt_level opt_level).large_function_size
 
+  let small_functor_size round_or_default =
+    match round_or_default with
+    | Round round -> IH.get ~key:round !I.small_functor_size
+    | Default opt_level -> (default_for_opt_level opt_level).small_functor_size
+
+  let large_functor_size round_or_default =
+    match round_or_default with
+    | Round round -> IH.get ~key:round !I.large_functor_size
+    | Default opt_level -> (default_for_opt_level opt_level).large_functor_size
+
   let threshold round_or_default =
     match round_or_default with
     | Round round -> FH.get ~key:round !I.threshold
@@ -259,6 +273,9 @@ module Inlining = struct
   let speculative_inlining_only_if_arguments_useful () =
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_only_if_arguments_useful
+
+  let speculative_inlining_track_lifted_constants () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_track_lifted_constants
 end
 
 module Debug = struct

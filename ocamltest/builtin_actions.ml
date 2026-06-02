@@ -378,6 +378,14 @@ let has_symlink = make
     "symlinks available"
     "symlinks not available")
 
+let poll_insertion = make
+  ~name:"poll_insertion"
+  ~description:"Pass if poll-insertion is enabled"
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.poll_insertion)
+    "poll insertion enabled"
+    "poll insertion not enabled")
+
 let setup_build_env = make
   ~name:"setup-build-env"
   ~description:"Create a dedicated directory for the test and populates it"
@@ -507,6 +515,7 @@ let init () =
     arch32;
     arch64;
     has_symlink;
+    poll_insertion;
     setup_build_env;
     setup_simple_build_env;
     run;

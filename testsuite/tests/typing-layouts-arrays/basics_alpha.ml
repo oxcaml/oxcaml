@@ -133,7 +133,7 @@ let d (x : 'a array) = get x 0
 [%%expect{|
 external get : ('a : any separable). 'a array -> int -> float
   = "%floatarray_safe_get"
-val d : ('a : value maybe_null). 'a array -> float = <fun>
+val d : ('a : value_maybe_null). 'a array -> float = <fun>
 |}];;
 
 external get : int32# array -> int -> float = "%floatarray_safe_get"
@@ -284,8 +284,16 @@ let _ =
 Line 2, characters 39-44:
 2 |   let[@warning "-10"] rec x = [| x |]; #42.0 in
                                            ^^^^^
+<<<<<<< HEAD
 Error: This constant has type "float#" but an expression was expected of type
          "('a : value maybe_null)"
+||||||| eb63e0e418
+Error: This expression has type "float#" but an expression was expected of type
+         "('a : value maybe_null)"
+=======
+Error: This expression has type "float#" but an expression was expected of type
+         "('a : value_maybe_null)"
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
        But the layout of float# must be a value layout
@@ -300,8 +308,16 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42l in
                                            ^^^^
+<<<<<<< HEAD
 Error: This constant has type "int32#" but an expression was expected of type
          "('a : value maybe_null)"
+||||||| eb63e0e418
+Error: This expression has type "int32#" but an expression was expected of type
+         "('a : value maybe_null)"
+=======
+Error: This expression has type "int32#" but an expression was expected of type
+         "('a : value_maybe_null)"
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
        But the layout of int32# must be a value layout
@@ -316,8 +332,16 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42L in
                                            ^^^^
+<<<<<<< HEAD
 Error: This constant has type "int64#" but an expression was expected of type
          "('a : value maybe_null)"
+||||||| eb63e0e418
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : value maybe_null)"
+=======
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : value_maybe_null)"
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a value layout
@@ -332,8 +356,16 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42n in
                                            ^^^^
+<<<<<<< HEAD
 Error: This constant has type "nativeint#"
        but an expression was expected of type "('a : value maybe_null)"
+||||||| eb63e0e418
+Error: This expression has type "nativeint#"
+       but an expression was expected of type "('a : value maybe_null)"
+=======
+Error: This expression has type "nativeint#"
+       but an expression was expected of type "('a : value_maybe_null)"
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of nativeint# must be a value layout
@@ -348,8 +380,16 @@ let _ =
 Line 2, characters 39-45:
 2 |   let[@warning "-10"] rec x = [| x |]; #42.0s in
                                            ^^^^^^
+<<<<<<< HEAD
 Error: This constant has type "float32#" but an expression was expected of type
          "('a : value maybe_null)"
+||||||| eb63e0e418
+Error: This expression has type "float32#"
+       but an expression was expected of type "('a : value maybe_null)"
+=======
+Error: This expression has type "float32#"
+       but an expression was expected of type "('a : value_maybe_null)"
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
        But the layout of float32# must be a value layout

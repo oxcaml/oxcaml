@@ -216,10 +216,9 @@ let pseudoregs_for_operation op arg res =
     arg, res
   (* Other instructions are regular *)
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
-  | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _ | Iadd)
+  | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
   | Intop_imm
-      ( ( Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _
-        | Ictz _ ),
+      ( (Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz | Ictz),
         _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
@@ -227,9 +226,9 @@ let pseudoregs_for_operation op arg res =
       | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
-  | Move | Spill | Reload | Dummy_use | Reinterpret_cast _ | Static_cast _
-  | Const_int _ | Const_float32 _ | Const_float _ | Const_vec128 _
-  | Const_vec256 _ | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
+  | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
+  | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
+  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->

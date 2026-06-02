@@ -15,6 +15,8 @@ let to_string_padded t = Printf.sprintf "#%04d" t
 
 let format fmt t = Format.fprintf fmt "%d" t
 
+let format_padded fmt t = Format.fprintf fmt "%8d" t
+
 type sequence = { mutable next : t }
 
 let make_sequence ?(last_used = -1) () = { next = succ last_used }

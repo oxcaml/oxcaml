@@ -121,7 +121,7 @@ The abbreviations defined in the language are as follows:
 
 * `any_non_null = any non_null separable`
 
-* `value = scannable non_null separable`
+* `value = value_or_null non_null separable`
 
     This is the kind of typical OCaml values, as they have been before OxCaml
     was invented. When a kind is unknown (but `any` would not be an appropriate
@@ -137,12 +137,12 @@ The abbreviations defined in the language are as follows:
     This is the kind of `int` and types like it (including enumerations and
     `bool`). It is the OxCaml equivalent of OCaml's `[@@immediate]` attribute.
 
-* `immediate_or_null = value non_pointer maybe_null mod everything`
+* `immediate_or_null = value_or_null non_pointer mod everything`
 
     This is the kind of `int or_null` and similar types.
 
 * `immediate64 = value non_pointer64 mod global aliased many contended portable
-                 forkable unyielding immutable stateless external64 non_float`
+                 forkable unyielding immutable stateless external64`
 
     This is just like `immediate`, but applies only on 64-bit machines. On a
     32-bit machine, value whose types are `immediate64` may be
@@ -172,6 +172,12 @@ The abbreviations defined in the language are as follows:
     call to `caml_modify` (on 64-bit machines). See also the documentation on
     [externality][].
 
+* `immediate64_or_null = value_or_null non_pointer64 mod global aliased many
+                         contended portable forkable unyielding immutable
+                         stateless external64`
+
+    This is the kind of `(_ : immediate64) or_null` and similar types.
+
 * `immutable_data = value non_float mod many contended portable forkable
                     unyielding immutable stateless`
 
@@ -179,17 +185,38 @@ The abbreviations defined in the language are as follows:
     old data", we mean that values of types of this kind contain no pointers to
     functions. The type `string` has this kind.
 
+
+* `immutable_data_or_null = value_or_null non_float mod many contended portable
+                            forkable unyielding immutable stateless`
+
+    This is the kind of `(_ : immutable_data) or_null` and similar types.
+
 * `sync_data = value non_float mod many contended portable forkable unyielding
                stateless`
 
    This is a suitable kind of plain old data that the type system guarantees can be mutated only
    safely in parallel, similar to the `Sync` trait in Rust.
 
+* `sync_data_or_null = value_or_null non_float mod many contended portable
+                       forkable unyielding stateless`
+
+    This is the kind of `(_ : sync_data) or_null` and similar types.
+
 * `mutable_data = value non_float mod many portable forkable unyielding
                   stateless`
 
     This is a suitable kind for plain old data that may be mutable. The
     type `int ref` has this kind.
+
+
+* `mutable_data_or_null = value_or_null non_float mod many portable forkable unyielding
+                          stateless`
+
+    This is the kind of `(_ : mutable_data) or_null` and similar types.
+
+* `value_maybe_separable = value_or_null non_null`
+
+* `value_maybe_null = value_or_null separable`
 
 ## Implications
 
@@ -454,10 +481,9 @@ lists containing one or more repetitions. Any nonterminal not defined here is
 defined in the OCaml [manual][].
 
 **Note on syntax for scannable axes:** Previously, scannable axes used to be
-non-modal axes, and were written like `value mod non_null`, which upper-bounds
-the nullability to `non_null`. Now, we can also write them as `value non_null`,
-which overrides the nullability to `non_null`. We will soon remove the ability
-to upper-bound scannable axes via the `mod` syntax.
+non-modal axes, and were written like `value mod non_pointer`, which
+upper-bounds the separability to `non_pointer`. Now, we can also write them as
+`value non_pointer`.
 
 First we define the syntax for kinds:
 

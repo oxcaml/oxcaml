@@ -16,6 +16,9 @@ title: Intro
     padding: 15px;
     text-align: center;
 }
+.table td { padding: 0 5px; }
+.table td:first-child, { padding-left: 0; }
+.table td:last-child, { padding-right: 0; }
 </style>
 
 # Introduction to the Mode System
@@ -110,13 +113,13 @@ allocation](../../stack-allocation/intro).
 
 ## Past modes: Contention
 
-|----------------------|
-| contended            |
-| `|`                  |
-| corrupted `|` shared |
-| `|`                  |
-| **uncontended**      |
-{: .table }
+|--------------------|
+| contended          |
+|       `/` | `\`    |
+| corrupted | shared |
+|       `\` | `/`    |
+| **uncontended**    |
+{: .table .merge-table-cells}
 
 Contention is a past axis that tracks whether a value has been shared between
 threads. A value is *contended* if another thread can both read and write to it,
@@ -138,13 +141,13 @@ when they are contended.
 
 ## Future modes: Portability
 
-|---------------------------|
-| **nonportable**           |
-| `|`                       |
-| shareable `|` corruptible |
-| `|`                       |
-| portable                  |
-{: .table }
+|-------------------------|
+| **nonportable**         |
+|       `/` | `\`         |
+| shareable | corruptible |
+|       `\` | `/`         |
+| portable                |
+{: .table .merge-table-cells}
 
 Portability is a future axis that tracks whether a value is allowed to move across
 thread boundaries. Functions that capture uncontended state are *nonportable*,
@@ -276,11 +279,11 @@ when they are yielding.
 
 |----------------|
 | immutable      |
-| `|`            |
+|  `/` | `\`     |
 | read | write   |
-| `|`            |
+|  `\` | `/`     |
 | **read_write** |
-{: .table}
+{: .table .merge-table-cells}
 
 Visibility is a past axis that controls access to mutable portions of values.
 It's similar to contention: the typechecker forbids accessing mutable fields of values
@@ -296,11 +299,11 @@ when they are immutable.
 
 |-------------------|
 | **stateful**      |
-| `|`               |
+|     `/` | `\`     |
 | writing | reading |
-| `|`               |
+|     `\` | `/`     |
 | stateless         |
-{: .table}
+{: .table .merge-table-cells}
 
 Statefulness is a future axis that tracks whether a function reads or writes to some
 mutable state that it closes over (in other words, state that is not explicitly passed to it in an argument).

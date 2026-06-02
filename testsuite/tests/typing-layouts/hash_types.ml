@@ -199,6 +199,13 @@ type r = { f : float#; si : #(string * int64); }
 type u = r#
 |}]
 
+type ('a : float64) t = { i : 'a ; j : 'a }
+type floatu_t : float64 & float64 = float# t#
+[%%expect{|
+type ('a : float64) t = { i : 'a; j : 'a; }
+type floatu_t = float# t#
+|}]
+
 (* But not float, mixed float/float#, or [@@unboxed] records *)
 type r = { f : float ; f2 : float }
 type bad = r#
@@ -210,7 +217,7 @@ Line 2, characters 11-13:
 Error: The type "r" has no unboxed version.
 Hint: Float records don't get unboxed versions.
 |}]
-type r = { f : float ; f2 : float# }
+type r = { f : float ; f2 : float# } [@@flatten_floats]
 type bad = r#
 [%%expect{|
 type r = { f : float; f2 : float#; }
@@ -231,11 +238,12 @@ Error: The type "r" has no unboxed version.
 Hint: [@@unboxed] records don't get unboxed versions.
 |}]
 type ('a : float64) t = { i : 'a ; j : 'a }
+[@@represent_as_float_array]
 type floatu_t : float64 & float64 = float t#
 [%%expect{|
 type ('a : float64) t = { i : 'a; j : 'a; }
-Line 2, characters 42-44:
-2 | type floatu_t : float64 & float64 = float t#
+Line 3, characters 42-44:
+3 | type floatu_t : float64 & float64 = float t#
                                               ^^
 Error: The type "t" has no unboxed version.
 Hint: Float records don't get unboxed versions.
@@ -488,7 +496,7 @@ Line 2, characters 0-23:
 Error: The layout of type "r#" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
+           value_or_null & float64
          because it is an unboxed record.
        Note: The layout of immediate is value non_pointer.
 |}]
@@ -504,7 +512,7 @@ Line 2, characters 0-23:
 Error: The layout of type "r#" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
+           value_or_null & float64
          because it is an unboxed record.
        Note: The layout of immediate is value non_pointer.
 |}]

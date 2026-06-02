@@ -116,9 +116,9 @@ let load_lambda ppf tlam =
 let pr_item =
   Out_type.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg _; val_type}, _) ->
+      | Sig_value(id, {val_kind = Val_reg _; val_type; val_lpoly}, _) ->
           Some (outval_of_value env (getvalue (Translmod.toplevel_name id))
-                  val_type)
+                  val_lpoly val_type)
       | _ -> None
     )
 
@@ -146,11 +146,20 @@ let execute_phrase print_outcome ppf phr =
                   | _ ->
                       match find_eval_phrase str with
                       | Some (exp, _, _, _) ->
+<<<<<<< HEAD
                         let outv = outval_of_value newenv v exp.exp_type in
                         let ty =
                           Out_type.prepare_for_printing [exp.exp_type];
                           Out_type.tree_of_typexp Type_scheme exp.exp_type
                         in
+||||||| eb63e0e418
+                        let outv = outval_of_value newenv v exp.exp_type in
+                        let ty = Printtyp.tree_of_type_scheme exp.exp_type in
+=======
+                        let outv = outval_of_value newenv v
+                                     (Types.Lpoly.determined []) exp.exp_type in
+                        let ty = Printtyp.tree_of_type_scheme exp.exp_type in
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
                         Ophr_eval (outv, ty)
                       | None -> Ophr_signature (pr_item oldenv sg'))
               else Ophr_signature []
@@ -159,7 +168,8 @@ let execute_phrase print_outcome ppf phr =
               toplevel_sig := oldsig;
               if exn = Out_of_memory then Gc.full_major();
               let outv =
-                outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
+                outval_of_value !toplevel_env (Obj.repr exn)
+                  (Types.Lpoly.determined []) Predef.type_exn
               in
               Ophr_exception (exn, outv)
         in

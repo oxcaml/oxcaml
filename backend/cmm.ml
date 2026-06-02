@@ -558,8 +558,8 @@ type operation =
   | Casr
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype
-  | Cclz of { arg_is_non_zero : bool }
-  | Cctz of { arg_is_non_zero : bool }
+  | Cclz
+  | Cctz
   | Cpopcnt
   | Cprefetch of
       { is_write : bool;
@@ -767,9 +767,9 @@ let iter_shallow_tail f = function
         | Ctls_get | Cdomain_index | Cpoll | Cpause | Capply _ | Cextcall _
         | Cload _
         | Cstore (_, _)
-        | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-        | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
-        | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+        | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
+        | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+        | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
         | Ctuple_field (_, _) ),
@@ -801,7 +801,7 @@ let map_shallow_tail f = function
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
           | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
-          | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
+          | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
           | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
           | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)

@@ -1,9 +1,9 @@
 (* TEST
-   flags = "-ikinds";
    expect;
 *)
 
-(* Basic tests for abstract kinds. No with-kind substutitions yet. *)
+(* Basic tests for abstract kinds. [with kind_] substitutions are tested in
+   [with_constraints_ikinds.ml]. *)
 
 (****************************************************)
 (* Test: Abstract kinds allowed in sigs and structs *)
@@ -1385,7 +1385,7 @@ type t2 : k2
 type ('a : k1) require_k1
 |}]
 
-(* In the [-ikinds] variant this is accepted: [t1]'s kind is [k1], so the
+(* In the ikinds-enabled variant this is accepted: [t1]'s kind is [k1], so the
    with bound does not change the required kind. *)
 type a : k1 with t1
 type b = a require_k1

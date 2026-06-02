@@ -875,6 +875,7 @@ let core env id x =
         (Out_type.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
+           ~pp:(diff.got.val_loc, Structure_item (Value, id))
            "the first" "the second" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
   | Err.Modalities e ->
@@ -925,7 +926,17 @@ let core env id x =
       Fmt.dprintf
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a"
         (Ident.name id)
+<<<<<<< HEAD
         (Includecore.report_mode_sub_error "first is" "second is") e
+||||||| eb63e0e418
+        (Includecore.report_mode_sub_error "first is" "second is") e
+        Printtyp.Conflicts.print_explanations
+=======
+        (Includecore.report_mode_sub_error
+           ~pp:(Location.none, Structure_item (Class, id))
+           "first is" "second is") e
+        Printtyp.Conflicts.print_explanations
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Err.Jkind_declarations diff ->
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
         "Kind declarations do not match"
@@ -1082,7 +1093,8 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       dwith_context ctx printer :: before
   | Mode e ->
       let printer ppf =
-        Includecore.report_mode_sub_error "Got" "expected" ppf e
+        Includecore.report_mode_sub_error
+          ~pp:(Location.none, Unknown) "Got" "expected" ppf e
       in
       dwith_context ctx printer :: before
 

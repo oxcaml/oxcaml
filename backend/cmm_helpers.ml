@@ -1058,16 +1058,30 @@ let mk_not dbg cmm =
 let mk_compare_ints_untagged dbg a1 a2 =
   bind "int_cmp" a2 (fun a2 ->
       bind "int_cmp" a1 (fun a1 ->
-          let op1 = Cop (Ccmpi Cgt, [a1; a2], dbg) in
-          let op2 = Cop (Ccmpi Clt, [a1; a2], dbg) in
-          sub_int op1 op2 dbg))
+          (* Three-way compare via csel(a1>=a2, a1>a2, -1):
+
+             a1 < a2 => csel(0, _, -1) = -1
+
+             a1 = a2 => csel(1, 0, _) = 0
+
+             a1 > a2 => csel(1, 1, _) = 1
+
+             Compared to (a1 > a2) - (a1 < a2), this encoding uses one fewer
+             instruction and has good latency without resorting to tricks. *)
+          let cond = Cop (Ccmpi Cge, [a1; a2], dbg) in
+          let ifso = Cop (Ccmpi Cgt, [a1; a2], dbg) in
+          let ifnot = Cconst_int (-1, dbg) in
+          Cop (Ccsel typ_int, [cond; ifso; ifnot], dbg)))
 
 let mk_unsigned_compare_ints_untagged dbg a1 a2 =
   bind "uint_cmp" a2 (fun a2 ->
       bind "uint_cmp" a1 (fun a1 ->
-          let op1 = Cop (Ccmpi Cugt, [a1; a2], dbg) in
-          let op2 = Cop (Ccmpi Cult, [a1; a2], dbg) in
-          sub_int op1 op2 dbg))
+          (* Same encoding as [mk_compare_ints_untagged] but with unsigned
+             comparisons. *)
+          let cond = Cop (Ccmpi Cuge, [a1; a2], dbg) in
+          let ifso = Cop (Ccmpi Cugt, [a1; a2], dbg) in
+          let ifnot = Cconst_int (-1, dbg) in
+          Cop (Ccsel typ_int, [cond; ifso; ifnot], dbg)))
 
 let mk_compare_ints dbg a1 a2 =
   match a1, a2 with

@@ -26,6 +26,7 @@
 #endif
 #include "caml/alloc.h"
 #include "caml/callback.h"
+#include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
@@ -374,7 +375,13 @@ CAMLexport int caml_check_pending_actions(void)
   return check_pending_actions(Caml_state);
 }
 
+<<<<<<< HEAD
 caml_result caml_do_pending_actions_res(void)
+||||||| eb63e0e418
+value caml_do_pending_actions_exn(void)
+=======
+value caml_do_pending_actions_flags_exn(int flags)
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 {
   /* 1. Non-delayable actions that do not run OCaml code. */
 
@@ -404,12 +411,34 @@ caml_result caml_do_pending_actions_res(void)
   caml_check_async(res, "finaliser");
   if (caml_result_is_exception(res)) goto exception;
 
-  /* Process ticks (fiber preemptions and preemptive systhread switching). By
-     doing this last, we do not need to set the action pending flag in case a
-     context switch happens: all actions have been processed at this point. */
+  /* Process external interrupts (e.g. preemptive systhread switching). By doing
+     this after all other possibly exception-returning actions, we do not need
+     to set the action pending flag in case a context switch happens: all
+     actions have been processed at this point. */
   caml_process_tick();
 
+<<<<<<< HEAD
   return Result_unit;
+||||||| eb63e0e418
+  return Val_unit;
+=======
+  /* Check for a pending preemption
+
+     This sets up an *uninitialized* 3-word preemption continuation, so we can
+     only do it if pending actions were checked from ocaml (in
+     caml_garbage_collection)
+
+     It's important that after this function is called, we don't enter the gc
+     again before returning to OCaml. The continuation this allocates is
+     uninitialized, and should not be promoted before being initialized.
+   */
+  if (flags & CAML_FROM_CAML) {
+    caml_domain_setup_preemption();
+  }
+
+
+  return Val_unit;
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 
 exception:
   /* If an exception is raised during an asynchronous callback, then
@@ -420,24 +449,70 @@ exception:
   return res;
 }
 
+<<<<<<< HEAD
 caml_result caml_process_pending_actions_with_root_res(value root)
+||||||| eb63e0e418
+value caml_process_pending_actions_with_root_exn(value root)
+=======
+value caml_do_pending_actions_exn(void)
+{
+  return caml_do_pending_actions_flags_exn(CAML_FROM_C);
+}
+
+value caml_process_pending_actions_with_root_flags_exn(value root, int flags)
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 {
   if (caml_check_pending_actions()) {
     CAMLparam1(root);
+<<<<<<< HEAD
     caml_result result = caml_do_pending_actions_res();
     if (caml_result_is_exception(result)) CAMLreturnT(caml_result, result);
+||||||| eb63e0e418
+    value exn = caml_do_pending_actions_exn();
+    if (Is_exception_result(exn)) CAMLreturn(exn);
+=======
+    value exn = caml_do_pending_actions_flags_exn(flags);
+    if (Is_exception_result(exn)) CAMLreturn(exn);
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
     CAMLdrop;
   }
   return Result_value(root);
 }
 
-CAMLprim value caml_process_pending_actions_with_root(value root)
+value caml_process_pending_actions_with_root_exn(value root)
 {
-  return caml_get_value_or_raise_async(
-    caml_process_pending_actions_with_root_res(root), "");
+  return caml_process_pending_actions_with_root_flags_exn(root, CAML_FROM_C);
 }
 
+value caml_process_pending_actions_with_root_flags(value root, int flags)
+{
+<<<<<<< HEAD
+  return caml_get_value_or_raise_async(
+    caml_process_pending_actions_with_root_res(root), "");
+||||||| eb63e0e418
+  return caml_raise_async_if_exception(
+    caml_process_pending_actions_with_root_exn(root),
+    "");
+=======
+  return caml_raise_async_if_exception(
+    caml_process_pending_actions_with_root_flags_exn(root, flags),
+    "");
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
+}
+
+<<<<<<< HEAD
 CAMLexport caml_result caml_process_pending_actions_res(void)
+||||||| eb63e0e418
+CAMLexport value caml_process_pending_actions_exn(void)
+=======
+CAMLprim value caml_process_pending_actions_with_root(value root)
+{
+  return caml_process_pending_actions_with_root_flags(root, CAML_FROM_C);
+}
+
+
+CAMLexport value caml_process_pending_actions_exn(void)
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 {
   if (caml_check_pending_actions()) {
     return caml_do_pending_actions_res();
@@ -446,8 +521,14 @@ CAMLexport caml_result caml_process_pending_actions_res(void)
   }
 }
 
+CAMLexport void caml_process_pending_actions_flags(int flags)
+{
+  caml_process_pending_actions_with_root_flags(Val_unit, flags);
+}
+
 CAMLexport void caml_process_pending_actions(void)
 {
+<<<<<<< HEAD
   caml_get_value_or_raise(
     caml_process_pending_actions_res());
 }
@@ -457,6 +538,11 @@ CAMLexport value caml_process_pending_actions_exn(void)
 {
   caml_result res = caml_process_pending_actions_res();
   return caml_result_get_encoded_exception(res);
+||||||| eb63e0e418
+  caml_process_pending_actions_with_root(Val_unit);
+=======
+  caml_process_pending_actions_flags(CAML_FROM_C);
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 }
 
 /* OS-independent numbering of signals */

@@ -216,8 +216,24 @@ type mode_mismatch_kind = Parameter | Return
 
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
+<<<<<<< HEAD
   | Label_mismatch of
       Data_types.record_form_packed * Longident.t * Errortrace.unification_error
+||||||| eb63e0e418
+  | Constructor_labeled_arg
+  | Partial_tuple_pattern_bad_type
+  | Extra_tuple_label of string option * type_expr
+  | Missing_tuple_label of string option * type_expr
+  | Label_mismatch of record_form_packed * Longident.t * Errortrace.unification_error
+=======
+  | Constructor_labeled_arg
+  | Partial_tuple_pattern_bad_type
+  | Extra_tuple_label of string option * type_expr
+  | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
+  | Label_mismatch of record_form_packed * Longident.t * Errortrace.unification_error
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Pattern_type_clash :
       Errortrace.unification_error * Parsetree.pattern_desc option
       -> error
@@ -318,7 +334,12 @@ type error =
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
+<<<<<<< HEAD
   | Bind_existential of existential_binding * Ident.t * type_expr
+||||||| eb63e0e418
+=======
+  | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Expr_not_a_record_type of Data_types.record_form_packed * type_expr
@@ -334,9 +355,7 @@ type error =
       Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_record_unboxed
-  | Block_access_private_record
-  | Block_index_flattened_record of type_expr
+  | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Block_index_atomic_unsupported
@@ -365,6 +384,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
+  | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =

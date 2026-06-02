@@ -878,32 +878,52 @@ and apply_renaming_row_like :
     ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t) option =
  fun ~apply_renaming_lattice ~apply_renaming_maps_to ~known ~other ~map_known
      renaming ->
-  let rename_index { domain; shape } =
-    let domain =
+  let rename_index ({ domain; shape } as index) =
+    let domain' =
       match domain with
-      | Known index -> Known (apply_renaming_lattice index renaming)
-      | At_least index -> At_least (apply_renaming_lattice index renaming)
+      | Known i ->
+        let i' = apply_renaming_lattice i renaming in
+        if i == i' then domain else Known i'
+      | At_least i ->
+        let i' = apply_renaming_lattice i renaming in
+        if i == i' then domain else At_least i'
     in
-    { domain; shape }
+    if domain == domain' then index else { domain = domain'; shape }
   in
   let known' =
     map_known
-      (fun { index; maps_to; env_extension } ->
-        { index = rename_index index;
-          env_extension = apply_renaming_env_extension env_extension renaming;
-          maps_to = apply_renaming_maps_to maps_to renaming
-        })
+      (fun ({ index; maps_to; env_extension } as case) ->
+        let index' = rename_index index in
+        let env_extension' =
+          apply_renaming_env_extension env_extension renaming
+        in
+        let maps_to' = apply_renaming_maps_to maps_to renaming in
+        if
+          index == index'
+          && env_extension == env_extension'
+          && maps_to == maps_to'
+        then case
+        else
+          { index = index'; env_extension = env_extension'; maps_to = maps_to' })
       known
   in
   let other' : _ Or_bottom.t =
     match other with
-    | Bottom -> Bottom
+    | Bottom -> other
     | Ok { index; maps_to; env_extension } ->
-      Ok
-        { index = rename_index index;
-          env_extension = apply_renaming_env_extension env_extension renaming;
-          maps_to = apply_renaming_maps_to maps_to renaming
-        }
+      let index' = rename_index index in
+      let env_extension' =
+        apply_renaming_env_extension env_extension renaming
+      in
+      let maps_to' = apply_renaming_maps_to maps_to renaming in
+      if
+        index == index'
+        && env_extension == env_extension'
+        && maps_to == maps_to'
+      then other
+      else
+        Ok
+          { index = index'; env_extension = env_extension'; maps_to = maps_to' }
   in
   if known == known' && other == other' then None else Some (known', other')
 
@@ -934,47 +954,62 @@ and apply_renaming_row_like_for_closures
   | Some (known_closures, other_closures) -> { known_closures; other_closures }
 
 and apply_renaming_closures_entry
-    { function_types; closure_types; value_slot_types } renaming =
-  { function_types =
-      Function_slot.Map.map_sharing
-        (fun function_type ->
-          Or_unknown.map function_type ~f:(fun function_type ->
-              apply_renaming_function_type function_type renaming))
-        function_types;
-    closure_types =
-      apply_renaming_function_slot_indexed_product closure_types renaming;
-    value_slot_types =
-      apply_renaming_value_slot_indexed_product value_slot_types renaming
-  }
+    ({ function_types; closure_types; value_slot_types } as closures_entry)
+    renaming =
+  let function_types' =
+    Function_slot.Map.map_sharing
+      (fun function_type ->
+        Or_unknown.map_sharing function_type ~f:(fun function_type ->
+            apply_renaming_function_type function_type renaming))
+      function_types
+  in
+  let closure_types' =
+    apply_renaming_function_slot_indexed_product closure_types renaming
+  in
+  let value_slot_types' =
+    apply_renaming_value_slot_indexed_product value_slot_types renaming
+  in
+  if
+    function_types == function_types'
+    && closure_types == closure_types'
+    && value_slot_types == value_slot_types'
+  then closures_entry
+  else
+    { function_types = function_types';
+      closure_types = closure_types';
+      value_slot_types = value_slot_types'
+    }
 
 and apply_renaming_function_slot_indexed_product
-    { function_slot_components_by_index } renaming =
-  let function_slot_components_by_index =
+    ({ function_slot_components_by_index } as product) renaming =
+  let function_slot_components_by_index' =
     Function_slot.Map.map_sharing
       (fun ty -> apply_renaming ty renaming)
       function_slot_components_by_index
   in
-  { function_slot_components_by_index }
+  if function_slot_components_by_index == function_slot_components_by_index'
+  then product
+  else
+    { function_slot_components_by_index = function_slot_components_by_index' }
 
-and apply_renaming_value_slot_indexed_product { value_slot_components_by_index }
-    renaming =
-  let value_slot_components_by_index =
-    (* CR-someday mshinwell: some loss of sharing here, potentially *)
-    Value_slot.Map.filter_map
+and apply_renaming_value_slot_indexed_product
+    ({ value_slot_components_by_index } as product) renaming =
+  let value_slot_components_by_index' =
+    Value_slot.Map.filter_map_sharing
       (fun value_slot ty ->
         if not (Renaming.value_slot_is_used renaming value_slot)
         then None
         else Some (apply_renaming ty renaming))
       value_slot_components_by_index
   in
-  { value_slot_components_by_index }
+  if value_slot_components_by_index == value_slot_components_by_index'
+  then product
+  else { value_slot_components_by_index = value_slot_components_by_index' }
 
 and apply_renaming_int_indexed_product fields renaming =
-  let fields = Array.copy fields in
-  for i = 0 to Array.length fields - 1 do
-    fields.(i) <- apply_renaming fields.(i) renaming
-  done;
-  fields
+  Misc.Stdlib.Array.map_sharing
+    (fun field -> apply_renaming field renaming)
+    fields
 
 and apply_renaming_function_type ({ code_id; rec_info } as function_type)
     renaming =

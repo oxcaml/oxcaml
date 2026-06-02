@@ -109,7 +109,7 @@ Line 1, characters 13-18:
 1 | type fails = t_von accepts_sep
                  ^^^^^
 Error: This type "t_von" should be an instance of type "('a : any separable)"
-       The layout of t_von is value maybe_separable maybe_null
+       The layout of t_von is value_or_null
          because of the definition of t_von at line 1, characters 0-26.
        But the layout of t_von must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -122,7 +122,7 @@ Line 1, characters 13-18:
 1 | type fails = t_von accepts_nonfloat
                  ^^^^^
 Error: This type "t_von" should be an instance of type "('a : any non_float)"
-       The layout of t_von is value maybe_separable maybe_null
+       The layout of t_von is value_or_null
          because of the definition of t_von at line 1, characters 0-26.
        But the layout of t_von must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
@@ -504,7 +504,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "t_val or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_val or_null is value maybe_separable maybe_null
+       The layout of t_val or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of t_val or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -517,7 +517,7 @@ Line 1, characters 13-18:
 1 | type fails = t_b64 or_null accepts_maybesep
                  ^^^^^
 Error: This type "t_b64" should be an instance of type
-         "('a : value maybe_separable)"
+         "('a : value_maybe_separable)"
        The layout of t_b64 is bits64
          because of the definition of t_b64 at line 1, characters 0-19.
        But the layout of t_b64 must be a value layout
@@ -528,7 +528,7 @@ type t_maybesep_val : value_or_null mod non_null
 type succeeds = t_maybesep_val or_null
 
 [%%expect{|
-type t_maybesep_val : value maybe_separable
+type t_maybesep_val : value_maybe_separable
 type succeeds = t_maybesep_val or_null
 |}]
 
@@ -559,7 +559,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable maybe_null
+       The layout of float or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -577,7 +577,7 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybesep_val" should be an instance of type
          "('a : any separable)"
-       The layout of t_maybesep_val is value maybe_separable
+       The layout of t_maybesep_val is value_maybe_separable
          because of the definition of t_maybesep_val at line 1, characters 0-48.
        But the layout of t_maybesep_val must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -613,7 +613,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable maybe_null
+       The layout of float or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -691,7 +691,7 @@ type unbx = { unbx : t_maybesep_val; } [@@unboxed]
 type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 
 [%%expect{|
-type ('a : value maybe_separable) unbx' = Unbx of 'a [@@unboxed]
+type ('a : value_maybe_separable) unbx' = Unbx of 'a [@@unboxed]
 |}]
 
 (* Separability and unboxed records. *)
@@ -704,7 +704,7 @@ type a : value = #{ a : t_maybesep_val }
 Line 1, characters 0-40:
 1 | type a : value = #{ a : t_maybesep_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is value maybe_separable
+Error: The layout of type "a" is value_maybe_separable
          because it is an unboxed record.
        But the layout of type "a" must be a sublayout of value
          because of the annotation on the declaration of the type a.
@@ -730,7 +730,7 @@ Line 3, characters 83-89:
                                                                                        ^^^^^^
 Error: The type constraints are not consistent.
        Type "('b : value & value & float64)" is not compatible with type "b"
-       The layout of b is value non_pointer & value maybe_separable & float64
+       The layout of b is value non_pointer & value_maybe_separable & float64
          because of the definition of b at line 1, characters 0-51.
        But the layout of b must be a sublayout of value & value & float64
          because of the annotation on 'b in the declaration of the type fails.
@@ -749,7 +749,7 @@ Line 3, characters 83-89:
 Error: The type constraints are not consistent.
        Type "('c : value & value & float64)" is not compatible with type
          "c" = "#(float * float or_null * float#)"
-       The layout of c is value & value maybe_separable maybe_null & float64
+       The layout of c is value & value_or_null & float64
          because it is an unboxed tuple.
        But the layout of c must be a sublayout of value & value & float64
          because of the annotation on 'c in the declaration of the type fails.
@@ -809,8 +809,7 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any non_float)"
-       The layout of float Or_null_reexport.t is
-           value maybe_separable maybe_null
+       The layout of float Or_null_reexport.t is value_or_null
          because it is the primitive type or_null.
        But the layout of float Or_null_reexport.t must be a sublayout of
            any non_float
@@ -825,8 +824,7 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any separable)"
-       The layout of float Or_null_reexport.t is
-           value maybe_separable maybe_null
+       The layout of float Or_null_reexport.t is value_or_null
          because it is the primitive type or_null.
        But the layout of float Or_null_reexport.t must be a sublayout of
            any separable
@@ -857,7 +855,7 @@ Line 1, characters 13-31:
                  ^^^^^^^^^^^^^^^^^^
 Error: This type "float unbx or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float unbx or_null is value maybe_separable maybe_null
+       The layout of float unbx or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of float unbx or_null must be a sublayout of
            any separable
@@ -939,10 +937,10 @@ Error: Signature mismatch:
          type 'a t = float or_null
        is not included in
          type ('a : value non_float) t : value_or_null non_float
-       The layout of the first is value maybe_separable maybe_null
+       The layout of the first is value_or_null
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of
-           value non_float maybe_null
+           value_or_null non_float
          because of the definition of t at line 2, characters 2-65.
 |}]
 
@@ -959,7 +957,7 @@ module type S0 = sig
 end
 
 [%%expect{|
-module type S0 = sig type t : value maybe_null end
+module type S0 = sig type t : value_maybe_null end
 |}]
 
 module M5 : S0 = struct
@@ -995,10 +993,10 @@ Error: Signature mismatch:
        Type declarations do not match:
          type t = float or_null
        is not included in
-         type t : value maybe_null
-       The layout of the first is value maybe_separable maybe_null
+         type t : value_maybe_null
+       The layout of the first is value_or_null
          because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of value maybe_null
+       But the layout of the first must be a sublayout of value_maybe_null
          because of the definition of t at line 2, characters 2-38.
 |}]
 

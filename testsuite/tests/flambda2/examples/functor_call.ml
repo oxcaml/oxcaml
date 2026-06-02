@@ -2,6 +2,7 @@
  compile_only = "true";
  modules = "functor_with_rec.ml";
  flambda2;
+ ocamlopt_flags = "-O3";
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte with dump-simplify;
  check-fexpr-dump;

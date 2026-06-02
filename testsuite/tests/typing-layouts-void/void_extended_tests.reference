@@ -6,13 +6,13 @@ Test 1: equality, comparison, hashing, and marshalling
   Compare vh1 vh2: 0
   Hash vh1: 129913994
   Hash vh2: 129913994
-  Equality pv1 = pv2: failed (compare: mixed block value)
-  Compare pv1 pv2: failed (compare: mixed block value)
-  Equality r1 = r2: failed (compare: mixed block value)
-  Compare r1 r2: failed (compare: mixed block value)
+  Equality pv1 = pv2: true
+  Compare pv1 pv2: 0
+  Equality r1 = r2: true
+  Compare r1 r2: 0
   Marshalling void_holder succeeded, equality: true
-  Marshalling variant_with_void failed: Invalid_argument("output_value: mixed block")
-  Marshalling record_with_void failed: Invalid_argument("output_value: mixed block")
+  Marshalling variant_with_void succeeded, equality: true
+  Marshalling record_with_void succeeded, equality: true
   Unboxed products with void: cannot test equality/comparison/hashing
   (These operations are not supported on unboxed types containing void)
 Test 2: higher-order functions with void arguments/returns

@@ -105,12 +105,26 @@ let foo b = if b then
 else
    ~a1: "5", 10, ~c: "hi"
 [%%expect{|
+<<<<<<< HEAD
 Line 4, characters 3-25:
 4 |    ~a1: "5", 10, ~c: "hi"
        ^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "a1:string * int * c:'a"
        but an expression was expected of type "a1:string * int * a2:string"
        Labels "c" and "a2" do not match
+||||||| eb63e0e418
+Line 4, characters 3-24:
+4 |    ~a: "5", 10, ~c: "hi"
+       ^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "a:string * int * c:'a"
+       but an expression was expected of type "a:string * int * a:string"
+=======
+Line 4, characters 3-25:
+4 |    ~a1: "5", 10, ~c: "hi"
+       ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "a1:string * int * c:'a"
+       but an expression was expected of type "a1:string * int * a2:string"
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
 |}]
 
 (* Types in function argument/return *)

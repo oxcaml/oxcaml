@@ -24,8 +24,6 @@ module TE = Flambda2_types.Typing_env
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
 
-type get_imported_names = unit -> Name.Set.t
-
 type get_imported_code = unit -> Exported_code.t
 
 module Disable_inlining_reason = struct
@@ -217,11 +215,10 @@ let define_extra_variable t var kind =
   (define_variable0 [@inlined hint]) ~extra:true t var kind
 
 let create ~round ~machine_width ~(resolver : resolver)
-    ~(get_imported_names : get_imported_names)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
     ~toplevel_my_region ~toplevel_my_ghost_region =
-  let typing_env = TE.create ~machine_width ~resolver ~get_imported_names in
+  let typing_env = TE.create ~machine_width ~resolver in
   let t =
     { round;
       machine_width;
@@ -748,6 +745,12 @@ let set_has_seen_a_non_liftable_continuation t =
 let must_inline t = Replay_history.must_inline t.replay_history
 
 let replay_history t = t.replay_history
+
+let record_inlining_decision ~apply decision t =
+  { t with
+    replay_history =
+      Replay_history.record_inlining_decision ~apply decision t.replay_history
+  }
 
 let map_specialization_cost ~f t =
   let specialization_cost = f t.specialization_cost in

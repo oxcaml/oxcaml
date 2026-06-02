@@ -1,10 +1,10 @@
 let code f_1 deleted in
-let code loopify(never) size(7)
+let code loopify(never) size(7) stub
       partial_f_2 (param1)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let f = %project_value_slot.[`partial_f`].[`f`] (my_closure) in
+  let f = %project_value_slot.[partial_f].[f] (my_closure) in
   apply (f : val * val -> imm tagged) (0, param1) -> k * k1
 in
 let code test_0 deleted in

@@ -86,7 +86,7 @@ Line 1, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value maybe_separable maybe_null
+       The layout of 'a Or_null.t is value_or_null
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-79.
@@ -107,7 +107,7 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value maybe_separable maybe_null
+       The layout of 'a Or_null.t is value_or_null
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-45.
@@ -121,7 +121,7 @@ type 'a t : value = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-51:
 1 | type 'a t : value = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value maybe_separable maybe_null
+Error: The layout of type "'a or_null" is value_or_null
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of value
          because of the definition of t at line 1, characters 0-51.
@@ -133,7 +133,7 @@ type 'a t : float64 = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-53:
 1 | type 'a t : float64 = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value maybe_separable maybe_null
+Error: The layout of type "'a or_null" is value_or_null
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of float64
          because of the definition of t at line 1, characters 0-53.
@@ -146,7 +146,7 @@ Line 1, characters 24-26:
 1 | type ('a : float64) t = 'a or_null [@@or_null_reexport]
                             ^^
 Error: This type "('a : float64)" should be an instance of type
-         "('b : value maybe_separable)"
+         "('b : value_maybe_separable)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
        But the layout of 'a must be a value layout
@@ -164,17 +164,27 @@ let fail = Or_null.This (Or_null.This 5)
 [%%expect{|
 module Or_null :
   sig
-    type ('a : value maybe_separable) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+    type ('a : value_maybe_separable) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
   end
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value maybe_separable)"
        The layout of 'a Or_null.t is value maybe_separable maybe_null
+||||||| eb63e0e418
+Error: This expression has type "'a Or_null.t" = "'a or_null"
+       but an expression was expected of type "('b : value maybe_separable)"
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
+=======
+Error: This expression has type "'a Or_null.t" = "'a or_null"
+       but an expression was expected of type "('b : value_maybe_separable)"
+       The layout of 'a Or_null.t is value_or_null
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of
-           value maybe_separable
+           value_maybe_separable
          because of the definition of t at line 2, characters 2-63.
 |}]
 

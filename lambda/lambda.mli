@@ -1281,6 +1281,11 @@ val transl_class_path: scoped_location -> Env.t -> Path.t -> lambda
 
 val transl_address : scoped_location -> Persistent_env.address -> lambda
 
+val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
+
+val pointerness_of_separability
+  : Jkind_axis.Separability.t -> immediate_or_pointer
+
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val block_shape_of_value_kinds : value_kind list option -> block_shape
@@ -1289,9 +1294,9 @@ val block_shape_of_value_kinds : value_kind list option -> block_shape
    Errors if there's a splice variable *)
 val is_uniform_block_shape : block_shape -> bool
 
-(* Returns [None] if contains all values,
-   returns the [mixed_block_shape] if it has at least one non-value.
-   Errors if there's a splice variable *)
+(* Returns [None] if contains all values (including products of values
+   and void), returns the [mixed_block_shape] if it has at least one
+   non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
 val transl_mixed_product_shape_for_read :
@@ -1301,9 +1306,6 @@ val transl_mixed_product_shape_for_read :
 
 val transl_module_representation :
   Types.module_representation -> module_representation
-
-val block_of_module_representation :
-  loc:Warnings.loc -> module_representation -> primitive
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
@@ -1424,10 +1426,10 @@ val mixed_block_element_of_layout : layout -> 'a mixed_block_element
 val project_from_mixed_block_shape
   : 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
 
-(** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
-    externality, and [Pgenval] otherwise. *)
-val value_kind_of_value_with_externality
-  : Jkind_axis.Externality.t -> value_kind_non_null
+(** [Immediate] if a type of [scannable] jkind is GC-ignorable based on its
+    provided externality, and [Pointer] otherwise. *)
+val pointerness_of_scannable_with_externality
+  : Jkind_axis.Externality.t -> immediate_or_pointer
 
 (* Translates [Float_boxed] as [Punboxed_float Unboxed_float64], for
    compatibility with block indices. *)

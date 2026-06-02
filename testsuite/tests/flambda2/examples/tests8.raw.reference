@@ -22,7 +22,7 @@ let $camlTests8__first_const = Block 0 () in
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
    let map_foo =
-     %project_value_slot.[`fn[tests8.ml:20,12--80]`].[`my_closure`]
+     %project_value_slot.[`fn[tests8.ml:20,12--80]`].[my_closure]
        (my_closure)
    in
    let `fn[tests8.ml:20,62--77]` =

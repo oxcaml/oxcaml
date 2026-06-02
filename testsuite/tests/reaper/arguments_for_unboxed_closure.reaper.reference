@@ -8,7 +8,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(id_2)
   cont k (z)
 in
 let $camlArguments_for_unboxed_closure__id_6 = closure id_2_1 @`id` in
-let code inline(never) loopify(never) size(10) newer_version_of(u_4)
+let code inline(never) loopify(never) size(7) newer_version_of(u_4)
       u_4_1
         (u_into_my_closure_field_g_field_x, u_into_my_closure_field_g_field_y)
         my_closure _region _ghost_region my_depth
@@ -33,7 +33,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(unused_3)
 in
 let $camlArguments_for_unboxed_closure__unused_7 = closure unused_3_1 @unused
 in
-let code loopify(never) size(11) newer_version_of(g_1)
+let code loopify(never) size(9) newer_version_of(g_1)
       g_1_1 (g_into_my_closure_field_x, h : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -44,7 +44,7 @@ let code loopify(never) size(11) newer_version_of(g_1)
       let int_add = %int_barith.add (x, apply_result) in
       cont k (int_add)
 in
-let code loopify(never) size(52) newer_version_of(f_0)
+let code loopify(never) size(13) newer_version_of(f_0)
       f_0_1 (x : imm tagged, y : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1

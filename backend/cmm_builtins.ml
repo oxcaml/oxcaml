@@ -105,30 +105,23 @@ let clear_sign_bit arg dbg =
   let mask = Nativeint.lognot (Nativeint.shift_left 1n ((size_int * 8) - 1)) in
   Cop (Cand, [arg; Cconst_natint (mask, dbg)], dbg)
 
-let clz ~arg_is_non_zero bi arg dbg =
-  let op = Cclz { arg_is_non_zero } in
-  if_operation_supported_bi bi op ~f:(fun () ->
-      let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
+let clz bi arg dbg =
+  if_operation_supported_bi bi Cclz ~f:(fun () ->
+      let res = Cop (Cclz, [make_unsigned_int bi arg dbg], dbg) in
       let extra_bits = (size_int * 8) - bit_count bi in
       if extra_bits <> 0
       then Cop (Caddi, [res; Cconst_int (-extra_bits, dbg)], dbg)
       else res)
 
-let ctz ~arg_is_non_zero bi arg dbg =
-  let bit_count = bit_count bi in
-  if bit_count = size_int * 8 || arg_is_non_zero
-  then
-    let op = Cctz { arg_is_non_zero } in
-    if_operation_supported_bi bi op ~f:(fun () -> Cop (op, [arg], dbg))
-  else
-    (* regardless of the value of the argument [arg_is_non_zero], always set the
-       corresponding field to [true], because we make it non-zero below by
-       setting bit 32/16/8. *)
-    let op = Cctz { arg_is_non_zero = true } in
-    if_operation_supported_bi bi op ~f:(fun () ->
+let ctz bi arg dbg =
+  if_operation_supported_bi bi Cctz ~f:(fun () ->
+      let bit_count = bit_count bi in
+      if bit_count = size_int * 8
+      then Cop (Cctz, [arg], dbg)
+      else
         (* Set bit 32/16/8 *)
         let mask = Nativeint.shift_left 1n bit_count in
-        Cop (op, [Cop (Cor, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
+        Cop (Cctz, [Cop (Cor, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
 
 let popcnt bi arg dbg =
   if_operation_supported_bi bi Cpopcnt ~f:(fun () ->
@@ -868,36 +861,21 @@ let transl_builtin name args dbg typ_res =
   | "caml_float32_of_int64" ->
     Some (Cop (Cstatic_cast (Float_of_int Float32), args, dbg))
   | "caml_int_clz_tagged_to_untagged" ->
-    (* The tag does not change the number of leading zeros. The advantage of
-       keeping the tag is it guarantees that, on x86-64, the input to the BSR
-       instruction is nonzero. *)
-    let op = Cclz { arg_is_non_zero = true } in
-    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+    if_operation_supported Cclz ~f:(fun () -> Cop (Cclz, args, dbg))
   | "caml_int_clz_untagged_to_untagged" ->
-    let op = Cclz { arg_is_non_zero = false } in
-    if_operation_supported op ~f:(fun () ->
+    if_operation_supported Cclz ~f:(fun () ->
         let arg = clear_sign_bit (one_arg name args) dbg in
-        Cop (Caddi, [Cop (op, [arg], dbg); Cconst_int (-1, dbg)], dbg))
+        Cop (Caddi, [Cop (Cclz, [arg], dbg); Cconst_int (-1, dbg)], dbg))
   | "caml_int64_clz_unboxed_to_untagged" ->
-    clz ~arg_is_non_zero:false Unboxed_int64 (one_arg name args) dbg
+    clz Unboxed_int64 (one_arg name args) dbg
   | "caml_int32_clz_unboxed_to_untagged" ->
-    clz ~arg_is_non_zero:false Unboxed_int32 (one_arg name args) dbg
+    clz Unboxed_int32 (one_arg name args) dbg
   | "caml_int16_clz_untagged_to_untagged" ->
-    clz ~arg_is_non_zero:false Untagged_int16 (one_arg name args) dbg
+    clz Untagged_int16 (one_arg name args) dbg
   | "caml_int8_clz_untagged_to_untagged" ->
-    clz ~arg_is_non_zero:false Untagged_int8 (one_arg name args) dbg
+    clz Untagged_int8 (one_arg name args) dbg
   | "caml_nativeint_clz_unboxed_to_untagged" ->
-    clz ~arg_is_non_zero:false Unboxed_nativeint (one_arg name args) dbg
-  | "caml_int64_clz_nonzero_unboxed_to_untagged" ->
-    clz ~arg_is_non_zero:true Unboxed_int64 (one_arg name args) dbg
-  | "caml_int32_clz_nonzero_unboxed_to_untagged" ->
-    clz ~arg_is_non_zero:true Unboxed_int32 (one_arg name args) dbg
-  | "caml_int16_clz_nonzero_untagged_to_untagged" ->
-    clz ~arg_is_non_zero:true Untagged_int16 (one_arg name args) dbg
-  | "caml_int8_clz_nonzero_untagged_to_untagged" ->
-    clz ~arg_is_non_zero:true Untagged_int8 (one_arg name args) dbg
-  | "caml_nativeint_clz_nonzero_unboxed_to_untagged" ->
-    clz ~arg_is_non_zero:true Unboxed_nativeint (one_arg name args) dbg
+    clz Unboxed_nativeint (one_arg name args) dbg
   | "caml_int_popcnt_tagged_to_untagged" ->
     if_operation_supported Cpopcnt ~f:(fun () ->
         (* Having the argument tagged saves a shift, but there is one extra
@@ -938,35 +916,24 @@ let transl_builtin name args dbg typ_res =
        whose corresponding instruction is 1 byte shorter. This will not require
        an extra register, unless both the argument and result of the BSF
        instruction are in the same register. *)
-    let op = Cctz { arg_is_non_zero = true } in
-    if_operation_supported op ~f:(fun () ->
+    if_operation_supported Cctz ~f:(fun () ->
         let c =
           Cop
             ( Clsl,
               [Cconst_int (1, dbg); Cconst_int ((size_int * 8) - 1, dbg)],
               dbg )
         in
-        Cop (op, [Cop (Cor, [one_arg name args; c], dbg)], dbg))
+        Cop (Cctz, [Cop (Cor, [one_arg name args; c], dbg)], dbg))
   | "caml_int8_ctz_untagged_to_untagged" ->
-    ctz ~arg_is_non_zero:false Untagged_int8 (one_arg name args) dbg
+    ctz Untagged_int8 (one_arg name args) dbg
   | "caml_int16_ctz_untagged_to_untagged" ->
-    ctz ~arg_is_non_zero:false Untagged_int16 (one_arg name args) dbg
+    ctz Untagged_int16 (one_arg name args) dbg
   | "caml_int32_ctz_unboxed_to_untagged" ->
-    ctz ~arg_is_non_zero:false Unboxed_int32 (one_arg name args) dbg
+    ctz Unboxed_int32 (one_arg name args) dbg
   | "caml_int64_ctz_unboxed_to_untagged" ->
-    ctz ~arg_is_non_zero:false Unboxed_int64 (one_arg name args) dbg
+    ctz Unboxed_int64 (one_arg name args) dbg
   | "caml_nativeint_ctz_unboxed_to_untagged" ->
-    ctz ~arg_is_non_zero:false Unboxed_nativeint (one_arg name args) dbg
-  | "caml_int8_ctz_nonzero_untagged_to_untagged" ->
-    ctz ~arg_is_non_zero:true Untagged_int8 (one_arg name args) dbg
-  | "caml_int16_ctz_nonzero_untagged_to_untagged" ->
-    ctz ~arg_is_non_zero:true Untagged_int16 (one_arg name args) dbg
-  | "caml_int32_ctz_nonzero_unboxed_to_untagged" ->
-    ctz ~arg_is_non_zero:true Unboxed_int32 (one_arg name args) dbg
-  | "caml_int64_ctz_nonzero_unboxed_to_untagged" ->
-    ctz ~arg_is_non_zero:true Unboxed_int64 (one_arg name args) dbg
-  | "caml_nativeint_ctz_nonzero_unboxed_to_untagged" ->
-    ctz ~arg_is_non_zero:true Unboxed_nativeint (one_arg name args) dbg
+    ctz Unboxed_nativeint (one_arg name args) dbg
   | "caml_signed_int64_mulh_unboxed" ->
     mulhi ~signed:true Unboxed_int64 args dbg
   | "caml_unsigned_int64_mulh_unboxed" ->

@@ -46,6 +46,23 @@ let () = run "t_uniform2.0" (Float.Array.create 0 : t_uniform2)
 let () = run "t_uniform2.1" (Float.Array.create 1 : t_uniform2)
 let () = run "t_uniform3" ((fun x -> x) : t_uniform3)
 
+(* These types are "mixed" in the type system (they use unboxed types or
+   products) but all their runtime fields are values or void, so they should
+   compile to uniform blocks. *)
+type t_uniform_vv = { ss : #( string * string ) }
+type t_uniform_vu = { s : string; u : unit# }
+type t_uniform_vu_variant = A of string * unit#
+
+let () = run "t_uniform_vv" ({ ss = #("a", "b") } : t_uniform_vv)
+let () =
+  let rec x : t_uniform_vv = { ss = #("a", "b") } in
+  run "t_uniform_vv rec" x
+let () = run "t_uniform_vu" ({ s = "hello"; u = #() } : t_uniform_vu)
+let () = run "t_uniform_vu_variant" (A ("x", #()) : t_uniform_vu_variant)
+let () =
+  let rec x : t_uniform_vu_variant = A ("x", #()) in
+  run "t_uniform_vu_variant rec" x
+
 let () = run "t_mixed0" ({ x = #4L } : t_mixed0)
 let () = run "t_mixed1" ({ x = ""; y = #5L } : t_mixed1)
 let () = run "t_mixed2" ({ x = ""; y = ""; z = #5L }: t_mixed2)

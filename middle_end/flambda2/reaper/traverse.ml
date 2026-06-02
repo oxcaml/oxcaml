@@ -95,7 +95,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Acc.add_any_source acc param)
       params);
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
-  Acc.add_code acc code_id code_dep
+  Acc.add_code_dep acc code_id code_dep
 
 let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     acc : unit =
@@ -105,18 +105,27 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   let funs =
     Function_declarations.funs (Set_of_closures.function_decls set_of_closures)
   in
-  Function_slot.Lmap.iter
-    (fun function_slot name ->
-      Acc.kind acc name K.value;
-      let code_id =
-        (Function_slot.Map.find function_slot funs
-          : Function_declarations.code_id_in_function_declaration)
-      in
-      match code_id with
-      | Deleted _ -> ()
-      | Code_id { code_id; only_full_applications } ->
-        Acc.add_set_of_closures_dep acc name code_id ~only_full_applications)
-    names_and_function_slots;
+  let names_and_code_ids =
+    Function_slot.Lmap.mapi
+      (fun function_slot name ->
+        Acc.kind acc name K.value;
+        let code_id =
+          (Function_slot.Map.find function_slot funs
+            : Function_declarations.code_id_in_function_declaration)
+        in
+        let code_id =
+          match code_id with
+          | Deleted _ -> Or_unknown.Unknown
+          | Code_id { code_id; only_full_applications } ->
+            Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
+              ~only_full_applications
+              ~defined_in_code_id:(Env.current_code_id denv);
+            Or_unknown.Known code_id
+        in
+        name, code_id)
+      names_and_function_slots
+  in
+  Acc.add_set_of_closures acc names_and_code_ids;
   Function_slot.Lmap.iter
     (fun _function_slot function_slot_name ->
       Value_slot.Map.iter
@@ -556,7 +565,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
                 ~le_monde_exterieur:(Env.le_monde_exterieur denv)
                 ~all_constants:(Env.all_constants denv)
             in
-            Code code :: rev_group)
+            Acc.add_code acc code_id code;
+            Code :: rev_group)
           ~deleted_code:(fun rev_group _ -> Deleted_code :: rev_group)
           ~set_of_closures:(fun rev_group ~closure_symbols:_ set_of_closures ->
             Static_const
@@ -727,7 +737,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Check _ -> true
   in
   let code_dep =
-    match Acc.find_code acc code_id with
+    match Acc.find_code_dep acc code_id with
     | Some code_dep -> code_dep
     | None -> Misc.fatal_errorf "No code dep found for %a" Code_id.print code_id
   in
@@ -821,12 +831,16 @@ and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   | Invalid { message } -> traverse_invalid denv acc ~message
 
 type result =
-  { holed : Rev_expr.t;
+  { toplevel_expr : Rev_expr.t;
+    code : Rev_expr.rev_code Code_id.Map.t;
+    ordered_code_ids : Code_id.t array;
     deps : Global_flow_graph.graph;
     kinds : K.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t
+    code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    all_sets_of_closures :
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -881,10 +895,13 @@ let run (unit : Flambda_unit.t) =
   let continuation_info = Acc.get_continuation_info acc in
   let code_deps = Acc.code_deps acc in
   if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
-  { holed;
+  { toplevel_expr = holed;
+    code = Acc.get_all_code acc;
+    ordered_code_ids = Acc.sort_code_ids acc;
     deps;
     kinds;
     fixed_arity_continuations;
     continuation_info;
-    code_deps
+    code_deps;
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc
   }

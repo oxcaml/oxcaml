@@ -14,10 +14,29 @@
  (ocamlopt_flags
   (:standard
    (:include %{project_root}/ocamlopt_flags.sexp)
+   (:include ocamlopt_flags.sexp)
    -O3
    -open
    Int_replace_polymorphic_compare))
  (libraries ocamlcommon))
+
+; Regular OCaml Rule (first phase of bootstrapping)
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy ocamlopt_upstream_flags.sexp %{targets})))
+
+; OxCaml Rule
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (copy ocamlopt_oxcaml_flags.sexp %{targets})))
 
 (install
  (files

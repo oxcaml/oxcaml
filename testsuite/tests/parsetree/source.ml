@@ -7527,6 +7527,15 @@ type t = String.( t )
 
 let x: [`A] :> [> `A | `B ] = `A
 let x :> [> `A | `B ] = `A
+<<<<<<< HEAD
 
 (* Utf8 identifier *)
 let là = function ça -> ça
+||||||| eb63e0e418
+=======
+
+(* Return annotations on anonymous functions that require parens. *)
+let f = [fun x : (int -> int) -> x]
+
+let g = [fun x : (_ as 'a) -> x]
+>>>>>>> dd4e8507373d22fb295422eb6dd3d997c76c47cb

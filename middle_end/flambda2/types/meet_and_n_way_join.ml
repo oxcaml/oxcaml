@@ -39,7 +39,7 @@ let map_return_value f (x : _ meet_return_value) =
   | Both_inputs -> Both_inputs
   | New_result x -> New_result (f x)
 
-type 'a meet_result =
+type 'a meet_result = 'a ME.meet_result =
   | Bottom of unit meet_return_value
   | Ok of 'a meet_return_value * ME.t
 
@@ -48,30 +48,6 @@ type 'a n_way_join_result = 'a Or_unknown.t * Join_env.t
 let map_join_result ~f (v, env) = Or_unknown.map ~f v, env
 
 let ( let>>+ ) x f = map_join_result ~f x
-
-let add_equation (simple : Simple.t) ty_of_simple env ~meet_type :
-    unit meet_result =
-  let name name ~coercion:coercion_from_name_to_simple =
-    let coercion_from_simple_to_name =
-      Coercion.inverse coercion_from_name_to_simple
-    in
-    let ty_of_name =
-      TG.apply_coercion ty_of_simple coercion_from_simple_to_name
-    in
-    match ME.add_equation_strict env name ty_of_name ~meet_type with
-    | Ok env -> Ok (New_result (), env)
-    | Bottom -> Bottom (New_result ())
-  in
-  Simple.pattern_match simple ~name ~const:(fun const ->
-      (* A constant is its own most precise type, but we still need to check
-         that is matches the assigned type. *)
-      if Flambda_features.check_light_invariants ()
-      then assert (TG.get_alias_opt ty_of_simple == None);
-      (* Make sure to not use an alias type, or we will loop! *)
-      let concrete_ty_of_const = ET.to_type (ET.create_const const) in
-      match meet_type env concrete_ty_of_const ty_of_simple with
-      | Or_bottom.Ok (_, env) -> Ok (New_result (), env)
-      | Or_bottom.Bottom -> Bottom (New_result ()))
 
 let map_result ~f = function
   | Bottom r -> Bottom r
@@ -292,8 +268,9 @@ let add_defined_vars env level =
         kind)
     level env
 
-let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
-    initial_env val_a1 val_b1 extensions1 val_a2 val_b2 extensions2 =
+let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
+    ~n_way_join initial_env val_a1 val_b1 extensions1 val_a2 val_b2 extensions2
+    =
   let join_scope = ME.current_scope initial_env in
   let env = ME.increment_scope initial_env in
   let direct_return r =
@@ -302,7 +279,7 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
         let level = ME.cut scoped_env ~cut_after:join_scope in
         let initial_env = add_defined_vars initial_env level in
         let ext = TEE.from_map (TEL.equations level) in
-        ME.add_env_extension_strict initial_env ext ~meet_type)
+        ME.add_env_extension_strict initial_env ext ~meet_expanded_head)
   in
   let env_a, env_b = Or_bottom.Ok env, Or_bottom.Ok env in
   let env_a, env_b =
@@ -310,18 +287,18 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     | No_extensions -> env_a, env_b
     | Ext { when_a; when_b } ->
       ( Or_bottom.bind env_a ~f:(fun env ->
-            ME.add_env_extension_strict env when_a ~meet_type),
+            ME.add_env_extension_strict env when_a ~meet_expanded_head),
         Or_bottom.bind env_b ~f:(fun env ->
-            ME.add_env_extension_strict env when_b ~meet_type) )
+            ME.add_env_extension_strict env when_b ~meet_expanded_head) )
   in
   let env_a, env_b =
     match extensions2 with
     | No_extensions -> env_a, env_b
     | Ext { when_a; when_b } ->
       ( Or_bottom.bind env_a ~f:(fun env ->
-            ME.add_env_extension_strict env when_a ~meet_type),
+            ME.add_env_extension_strict env when_a ~meet_expanded_head),
         Or_bottom.bind env_b ~f:(fun env ->
-            ME.add_env_extension_strict env when_b ~meet_type) )
+            ME.add_env_extension_strict env when_b ~meet_expanded_head) )
   in
   let a_result : _ meet_result =
     match env_a with
@@ -356,8 +333,8 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     let result_env =
       (* Not strict, as we don't expect to be able to get bottom equations from
          joining non-bottom ones *)
-      Join_env.cut_and_n_way_join ~meet_type ~n_way_join_type:n_way_join
-        ~cut_after:join_scope initial_env
+      Join_env.cut_and_n_way_join ~meet_expanded_head
+        ~n_way_join_type:n_way_join ~cut_after:join_scope initial_env
         [ME.typing_env env_a; ME.typing_env env_b]
     in
     let when_a_level = ME.cut env_a ~cut_after:join_scope in
@@ -409,9 +386,8 @@ let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
   then Ok (Both_inputs, env)
   else
     match
-      Code_age_relation.meet
-        (TE.code_age_relation (ME.typing_env env))
-        ~resolver:(TE.code_age_relation_resolver (ME.typing_env env))
+      Code_age_relation.meet (ME.code_age_relation env)
+        ~resolver:(ME.code_age_relation_resolver env)
         code_id1 code_id2
     with
     | Bottom -> Bottom (New_result ())
@@ -638,105 +614,7 @@ let join_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
     then Ok element_kind1
     else Unknown
 
-let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
-  (* Kind mismatches should have been caught (either turned into Invalid or a
-     fatal error) before we get here. *)
-  if not (K.equal (TG.kind t1) (TG.kind t2))
-  then
-    Misc.fatal_errorf "Kind mismatch upon meet:@ %a@ versus@ %a" TG.print t1
-      TG.print t2;
-  let kind = TG.kind t1 in
-  let simple1 =
-    match
-      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t1
-        ~min_name_mode:Name_mode.in_types
-    with
-    | exception Not_found -> None
-    | canonical_simple -> Some canonical_simple
-  in
-  let simple2 =
-    match
-      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t2
-        ~min_name_mode:Name_mode.in_types
-    with
-    | exception Not_found -> None
-    | canonical_simple -> Some canonical_simple
-  in
-  match simple1 with
-  | None -> (
-    let expanded1 =
-      Expand_head.expand_head0 (ME.typing_env env) t1
-        ~known_canonical_simple_at_in_types_mode:simple1
-    in
-    match simple2 with
-    | None ->
-      let expanded2 =
-        Expand_head.expand_head0 (ME.typing_env env) t2
-          ~known_canonical_simple_at_in_types_mode:simple2
-      in
-      map_result ~f:ET.to_type (meet_expanded_head env expanded1 expanded2)
-    | Some simple2 -> (
-      (* Here we are meeting a non-alias type on the left with an alias on the
-         right. In all cases, the return type is the alias, so we will always
-         return [Right_input]; the interesting part will be the environment.
-
-         [add_equation] will meet [expanded1] with the existing type of
-         [simple2]. *)
-      let env : unit meet_result =
-        add_equation simple2 (ET.to_type expanded1) env ~meet_type
-      in
-      match env with
-      | Ok (_, env) -> Ok (Right_input, env)
-      | Bottom r -> Bottom r))
-  | Some simple1 -> (
-    match simple2 with
-    | None -> (
-      let expanded2 =
-        Expand_head.expand_head0 (ME.typing_env env) t2
-          ~known_canonical_simple_at_in_types_mode:simple2
-      in
-      (* We always return [Left_input] (see comment above) *)
-      let env : unit meet_result =
-        add_equation simple1 (ET.to_type expanded2) env ~meet_type
-      in
-      match env with
-      | Ok (_, env) -> Ok (Left_input, env)
-      | Bottom r -> Bottom r)
-    | Some simple2 -> (
-      if
-        (* We are doing a meet between two alias types. Whatever happens, the
-           resulting environment will contain an alias equation between the two
-           inputs, so both the left-hand alias and the right-hand alias are
-           correct results for the meet, allowing us to return [Both_inputs] in
-           all cases. *)
-        Simple.equal simple1 simple2
-      then
-        (* The alias is already present; no need to add any equation here *)
-        Ok (Both_inputs, env)
-      else
-        let env =
-          Simple.pattern_match simple2
-            ~name:(fun _ ~coercion:_ ->
-              add_equation simple2
-                (TG.alias_type_of kind simple1)
-                env ~meet_type)
-            ~const:(fun const2 ->
-              Simple.pattern_match simple1
-                ~name:(fun _ ~coercion:_ ->
-                  add_equation simple1
-                    (TG.alias_type_of kind simple2)
-                    env ~meet_type)
-                ~const:(fun const1 : unit meet_result ->
-                  if Reg_width_const.equal const1 const2
-                  then Ok (New_result (), env)
-                  else Bottom (New_result ())))
-        in
-        (* [add_equation] will have called [meet] on the underlying types, so
-           [env] now contains all extra equations arising from meeting the
-           expanded heads. *)
-        match env with
-        | Ok (_, env) -> Ok (Both_inputs, env)
-        | Bottom r -> Bottom r))
+let rec meet env t1 t2 = ME.meet_type env t1 t2 ~meet_expanded_head
 
 and meet_or_unknown_or_bottom : type a b.
     (ME.t -> a -> a -> b meet_result) ->
@@ -837,8 +715,9 @@ and meet_head_of_kind_value env
   map_result
     ~f:(fun (non_null, is_null, _extensions) : TG.head_of_kind_value ->
       { non_null; is_null })
-    (meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
-       env non_null1 is_null1 No_extensions non_null2 is_null2 No_extensions)
+    (meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
+       ~n_way_join env non_null1 is_null1 No_extensions non_null2 is_null2
+       No_extensions)
 
 and meet_head_of_kind_value_non_null env
     (head1 : TG.head_of_kind_value_non_null)
@@ -1075,40 +954,12 @@ and meet_relation env var1 var2 =
   | None, None -> Ok (Both_inputs, env)
   | Some _, None -> Ok (Left_input, env)
   | None, Some _ -> Ok (Right_input, env)
-  | Some var1, Some var2 ->
-    let simple1 =
-      TE.get_canonical_simple_ignoring_name_mode (ME.typing_env env)
-        (Simple.var var1)
-    in
-    let simple2 =
-      TE.get_canonical_simple_ignoring_name_mode (ME.typing_env env)
-        (Simple.var var2)
-    in
-    if Simple.equal simple1 simple2
-    then Ok (Both_inputs, env)
-    else
-      Simple.pattern_match simple1
-        ~const:(fun _ ->
-          Simple.pattern_match simple2
-            ~const:(fun _ : _ meet_result ->
-              (* Distinct constants: this is a bottom result *)
-              Bottom (New_result ()))
-            ~name:(fun _ ~coercion:_ : _ meet_result -> Ok (Right_input, env)))
-        ~name:(fun _ ~coercion:_ ->
-          Simple.pattern_match simple2
-            ~const:(fun _ : _ meet_result -> Ok (Left_input, env))
-            ~name:(fun _ ~coercion:_ ->
-              (* Note: This equality can (rarely?) cause loops due to reductions
-                 that could be stored on the relation variables (if the relation
-                 variable has a [Is_int] / [Get_tag] / [Is_null] type). This is
-                 caught by the safeguard in [Meet_env]. *)
-              match
-                add_equation simple1
-                  (TG.alias_type_of K.naked_immediate simple2)
-                  env ~meet_type
-              with
-              | Ok (_, env) -> Ok (Both_inputs, env)
-              | Bottom r -> Bottom r))
+  | Some var1, Some var2 -> (
+    match
+      ME.add_alias env (Simple.var var1) (Simple.var var2) ~meet_expanded_head
+    with
+    | Ok env -> Ok (Both_inputs, env)
+    | Bottom -> Bottom (New_result ()))
 
 and meet_variant env ~(is_int1 : Variable.t option)
     ~(get_tag1 : Variable.t option)
@@ -1179,9 +1030,9 @@ and meet_variant env ~(is_int1 : Variable.t option)
       map_result
         ~f:(fun (imms, (get_tag, blocks), extensions) ->
           get_tag, blocks, imms, extensions)
-        (meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type
-           ~n_way_join env imms1 (get_tag1, blocks1) extensions1 imms2
-           (get_tag2, blocks2) extensions2))
+        (meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b
+           ~meet_expanded_head ~n_way_join env imms1 (get_tag1, blocks1)
+           extensions1 imms2 (get_tag2, blocks2) extensions2))
     ~left_a:is_int1 ~right_a:is_int2
     ~left_b:(get_tag1, blocks1, imms1, extensions1)
     ~right_b:(get_tag2, blocks2, imms2, extensions2)
@@ -1207,7 +1058,7 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     then bottom_other_side is_int_side
     else
       let rebuild = TG.Head_of_kind_naked_immediate.create_is_int in
-      let machine_width = TE.machine_width (ME.typing_env env) in
+      let machine_width = ME.machine_width env in
       match
         ( I.Set.mem (I.zero machine_width) immediates,
           I.Set.mem (I.one machine_width) immediates )
@@ -1224,7 +1075,7 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     then bottom_other_side is_null_side
     else
       let rebuild = TG.Head_of_kind_naked_immediate.create_is_null in
-      let machine_width = TE.machine_width (ME.typing_env env) in
+      let machine_width = ME.machine_width env in
       match
         ( I.Set.mem (I.zero machine_width) immediates,
           I.Set.mem (I.one machine_width) immediates )
@@ -1242,7 +1093,7 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
       let tags =
         I.Set.fold
           (fun tag tags ->
-            let machine_width = TE.machine_width (ME.typing_env env) in
+            let machine_width = ME.machine_width env in
             match Tag.create_from_targetint machine_width tag with
             | Some tag -> Tag.Set.add tag tags
             | None -> tags (* No blocks exist with this tag *))
@@ -1251,7 +1102,7 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
       if Tag.Set.is_empty tags
       then Bottom (New_result ())
       else
-        let machine_width = TE.machine_width (ME.typing_env env) in
+        let machine_width = ME.machine_width env in
         match
           MTC.blocks_with_these_tags ~machine_width tags
             (Alloc_mode.For_types.unknown ())
@@ -1442,8 +1293,8 @@ and meet_row_like :
        that variables defined in the central env are defined in all the joined
        envs. *)
     let result_env =
-      Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join ~meet_type
-        ~cut_after:common_scope initial_env scoped_envs
+      Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join
+        ~meet_expanded_head ~cut_after:common_scope initial_env scoped_envs
     in
     Variable.Map.fold
       (fun var kind env ->
@@ -1563,11 +1414,13 @@ and meet_row_like :
       | Ok (maps_to_result, env) -> (
         let env : _ Or_bottom.t =
           match
-            ME.add_env_extension_strict env case1.env_extension ~meet_type
+            ME.add_env_extension_strict env case1.env_extension
+              ~meet_expanded_head
           with
           | Bottom -> Bottom
           | Ok env ->
-            ME.add_env_extension_strict env case2.env_extension ~meet_type
+            ME.add_env_extension_strict env case2.env_extension
+              ~meet_expanded_head
         in
         match env with
         | Bottom -> bottom_case (New_result ())
@@ -1619,7 +1472,7 @@ and meet_row_like :
         | Unknown -> (
           match
             ME.add_env_extension_strict base_env other_case.env_extension
-              ~meet_type
+              ~meet_expanded_head
           with
           | Bottom -> None
           | Ok env ->
@@ -1638,7 +1491,7 @@ and meet_row_like :
         | Unknown -> (
           match
             ME.add_env_extension_strict base_env other_case.env_extension
-              ~meet_type
+              ~meet_expanded_head
           with
           | Bottom -> None
           | Ok env ->
@@ -1654,7 +1507,8 @@ and meet_row_like :
         Some Unknown
       | Known case, Unknown -> (
         match
-          ME.add_env_extension_strict base_env case.env_extension ~meet_type
+          ME.add_env_extension_strict base_env case.env_extension
+            ~meet_expanded_head
         with
         | Bottom -> None
         | Ok env ->
@@ -1663,7 +1517,8 @@ and meet_row_like :
           Some (Known case))
       | Unknown, Known case -> (
         match
-          ME.add_env_extension_strict base_env case.env_extension ~meet_type
+          ME.add_env_extension_strict base_env case.env_extension
+            ~meet_expanded_head
         with
         | Bottom -> None
         | Ok env ->
@@ -1859,14 +1714,6 @@ and meet_function_type (env : ME.t)
     in
     combine_results2 env ~rebuild ~meet_a:meet_code_id ~left_a:code_id1
       ~right_a:code_id2 ~meet_b:meet ~left_b:rec_info1 ~right_b:rec_info2
-
-and meet_type env t1 t2 : _ Or_bottom.t =
-  if TE.is_bottom (ME.typing_env env)
-  then Bottom
-  else
-    match meet env t1 t2 with
-    | Ok (res, env) -> Ok (res, env)
-    | Bottom _ -> Bottom
 
 and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
   let kind =
@@ -3087,8 +2934,8 @@ and n_way_join_function_type (env : Join_env.t)
 
 and n_way_join_env_extension env exts =
   match
-    Join_env.n_way_join_env_extension ~n_way_join_type:n_way_join ~meet_type env
-      exts
+    Join_env.n_way_join_env_extension ~n_way_join_type:n_way_join
+      ~meet_expanded_head env exts
   with
   | Bottom -> TEE.empty, env
   | Ok (ext, env) -> ext, env

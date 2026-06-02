@@ -202,11 +202,15 @@ let force_runtime_shape_exn cs =
   match runtime_shape cs with Some s -> s | None -> raise Layout_missing
 
 (* CR mshinwell: it seems like this should move to the frontend *)
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Scannable -> Scannable
+    (* CR layouts-scannable: since [Layout.t] does not (currently) store
+       scannable axis information, we are forced to default to max. If
+       [Layout.t] changes to store scannable axis info, change this too. *)
+    | Scannable -> Scannable Jkind_types.Scannable_axes.max
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed

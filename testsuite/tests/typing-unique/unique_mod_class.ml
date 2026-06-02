@@ -4,20 +4,20 @@
 
 (* This file tests the interaction between a module/class and its surrounding environment *)
 
-let unique_id (unique_ x) = ignore x
+let unique_id (x @ unique) = ignore x
 
 
 (* you cannot use env vars as unique in classes/objects  *)
 let texp_object () =
   let x = "foo" in
   object (self)
-  val bar = unique_ x
+  val bar = (x : @ unique)
   end;
 [%%expect{|
 val unique_id : 'a @ unique -> unit = <fun>
-Line 8, characters 20-21:
-8 |   val bar = unique_ x
-                        ^
+Line 8, characters 13-14:
+8 |   val bar = (x : @ unique)
+                 ^
 Error: This value is "aliased"
          because it is used in an object (at lines 7-9, characters 2-5).
        However, the highlighted expression is expected to be "unique".
@@ -45,14 +45,14 @@ Line 3, characters 12-13:
 let texp_letmodule () =
   let x = "foo" in
   let module Bar = struct
-    let y = unique_ x
+    let y = (x : @ unique)
   end
   in
   ()
 [%%expect{|
-Line 4, characters 12-21:
-4 |     let y = unique_ x
-                ^^^^^^^^^
+Line 4, characters 12-26:
+4 |     let y = (x : @ unique)
+                ^^^^^^^^^^^^^^
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]
@@ -79,12 +79,12 @@ Line 3, characters 12-13:
 
 let texp_open () =
   let x = "foo" in
-  let open (struct let y = unique_ x end) in
+  let open (struct let y = (x : @ unique) end) in
   ()
 [%%expect{|
-Line 3, characters 27-36:
-3 |   let open (struct let y = unique_ x end) in
-                               ^^^^^^^^^
+Line 3, characters 27-41:
+3 |   let open (struct let y = (x : @ unique) end) in
+                               ^^^^^^^^^^^^^^
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]
@@ -109,13 +109,13 @@ module type bar = sig val y : string end
 
 let texp_pack () =
   let x = "foo" in
-  let z = (module struct let y = unique_ x end : bar) in
+  let z = (module struct let y = (x : @ unique) end : bar) in
   ()
 [%%expect{|
 module type bar = sig val y : string end
-Line 5, characters 33-42:
-5 |   let z = (module struct let y = unique_ x end : bar) in
-                                     ^^^^^^^^^
+Line 5, characters 33-47:
+5 |   let z = (module struct let y = (x : @ unique) end : bar) in
+                                     ^^^^^^^^^^^^^^
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]

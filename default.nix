@@ -148,6 +148,7 @@ let
         ncurses
         zlib
         libedit
+        xz # lzma for -DLLDB_ENABLE_LZMA=ON, lldb emits a warning otherwise
         swig
       ];
 
@@ -158,6 +159,7 @@ let
         "-DLLDB_ENABLE_PYTHON=ON"
         "-DLLDB_ENABLE_LIBEDIT=ON"
         "-DLLDB_ENABLE_CURSES=ON"
+        "-DLLDB_ENABLE_LZMA=ON"
         # Disable tests to avoid needing libc++
         "-DLLDB_INCLUDE_TESTS=OFF"
         "-DLLVM_INCLUDE_TESTS=OFF"
@@ -166,13 +168,19 @@ let
 
       sourceRoot = "source/llvm";
       enableParallelBuilding = true;
+
+      # Fix permission issue: version-header-fix.py overwrites lldb-defines.h
+      # during the build and needs the right permissions to do so.
+      postUnpack = ''
+        chmod u+w source/lldb/include/lldb/lldb-defines.h
+      '';
     }
 
   ;
 
-  lldb = makeLlvm {
+  lldb = makeLlvm rec {
     pname = "oxcaml-lldb";
-    version = "16.0.6-minus0";
+    version = "21.1.0+oxcaml0";
     projects = [
       "clang"
       "lldb"
@@ -180,8 +188,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "ocaml-flambda";
       repo = "llvm-project";
-      tag = "oxcaml-lldb-16.0.6-minus0";
-      sha256 = "sha256-ZIbcC1wj2U9QYt3s1kOYPs+gtaCX+EXfMC3WiiF821E=";
+      tag = "oxcaml-lldb-${version}";
+      hash = "sha256-DrXQY/1MJCgSqHd4vHpUbdTVWbLZEXkDbUVRYOp3e6Y=";
     };
   };
 
@@ -291,7 +299,7 @@ stdenv.mkDerivation {
     { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
 
   passthru = {
-    inherit ocaml_4_14_2 ocaml_5_4_0 ocamlformat;
+    inherit ocaml_4_14_2 ocaml_5_4_0 ocamlformat lldb;
   };
 
 }

@@ -162,6 +162,12 @@ type t16 : value non_pointer
 type t17 : value & value non_pointer
 |}]
 
+type ('a : value mod external_ stateless many unyielding non_float) t18 =
+  ('a : value mod immutable global aliased)
+[%%expect{|
+type ('a : value mod everything non_float) t18 = 'a
+|}]
+
 type t = #(int * float#)
 
 let f xs = match xs with
@@ -486,9 +492,9 @@ type t =
 type fn = local_ int @ portable contended -> local_ int @ portable contended ;;
 type nested_fn = (local_ int @ portable once -> local_ int @ portable once) @ portable once -> local_ int @ portable once;;
 type ('a, 'b) labeled_fn =
-  a:local_ unique_ 'a @ portable contended -> ?b:local_ once_ 'b @ portable contended ->  local_ 'a @ contended portable-> (int -> local_ 'b @ unique once) @ portable;;
+  a:local_ 'a @ unique portable contended -> ?b:local_ 'b @ once portable contended ->  local_ 'a @ contended portable-> (int -> local_ 'b @ unique once) @ portable;;
 type typvar_fn =
-  a:local_ unique_ ('a 'b. 'a) @ portable contended -> unit
+  a:local_ ('a 'b. 'a) @ unique portable contended -> unit
 
 [%%expect{|
 type fn = int @ local portable contended -> int @ local portable contended
@@ -922,7 +928,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value maybe_null). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)

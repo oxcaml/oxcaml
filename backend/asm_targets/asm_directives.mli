@@ -499,6 +499,10 @@ module Directive : sig
 
   (** Emit a little-endian integer value of the given width to a buffer. *)
   val emit_int_le : Buffer.t -> width_bytes:int -> int64 -> unit
+
+  (** Replace the [Asm_label.t] inside a [New_label (Label _, _)] directive
+      using the given function. Other directives are returned unchanged. *)
+  val map_new_label : (Asm_label.t -> Asm_label.t) -> t -> t
 end
 
 (** To be called by the emitter at the very start of code generation.

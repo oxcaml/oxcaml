@@ -18,22 +18,22 @@ one_or_two_element_list:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L110
-.L112:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rdi
   movq  $2048, -8(%rdi)
   movq  %rbx, (%rdi)
   movq  $1, 8(%rdi)
   cmpq  $1, %rax
-  jne   .L106
+  jne   .L1
   movq  %rdi, %rax
   addq  $8, %rsp
   ret
-.L106:
+.L1:
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L113
-.L115:
+  jb    <hidden GC jump pad>
+.L2:
   leaq  8(%r15), %rax
   movq  $2048, -8(%rax)
   movq  %rbx, (%rax)
@@ -57,25 +57,26 @@ spill_slot_lifetime:
   subq  $24, %rsp
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L112:
+.L0:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L113:
+.L1:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L114:
+.L2:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L115:
+.L3:
   subq  $40, %r15
   cmpq  (%r14), %r15
-  jb    .L116
-.L118:
+  jb    <hidden GC jump pad>
+.L4:
   leaq  8(%r15), %rax
-  movq  $4350, -8(%rax)
+  movabsq $72057594037932032, %rbx
+  movq  %rbx, -8(%rax)
   vmovsd (%rsp), %xmm1
   vmovsd %xmm1, (%rax)
   vmovsd 8(%rsp), %xmm1

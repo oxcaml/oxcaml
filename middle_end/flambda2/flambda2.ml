@@ -240,6 +240,8 @@ let flambda_to_flambda0 : type m.
 
 let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
     (unit : Flambda_unit.t) =
+  (* CR bclement: this does not seem like the right place to set this up. *)
+  Misc.Style.setup (Flambda_features.colour ());
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let mode, close_prog_metadata =
     match Flambda_features.mode () with

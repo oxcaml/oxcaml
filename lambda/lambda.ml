@@ -698,22 +698,25 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   | None -> All_value
   | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
+(* CR rtjoa: This function is redundant with [Mixed_product_bytes], but it's
+   duplicated for now. We should fix the module dependency structure *)
+let rec is_value_or_void_element : _ mixed_block_element -> bool = function
+  | Value _ -> true
+  | Product elts -> Array.for_all is_value_or_void_element elts
+  | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+    false
+(* CR layout poly: This function probably shouldn't exist at all and we should
+   merge mixed_block_shape and block_shape. *)
 let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
     =
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform =
-      Array.for_all
-        (function
-          | Value _ -> true
-          (* CR layout poly: This function probably shouldn't exist at all
-             and we should merge mixed_block_shape and block_shape. *)
-          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
-          | _ -> false)
-        shape
-    in
-    if is_uniform then None else Some shape
+    if Array.for_all is_value_or_void_element shape
+    then None
+    else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
@@ -1761,9 +1764,21 @@ let rec patch_guarded patch = function
       Levent (patch_guarded patch lam, ev)
   | _ -> fatal_error "Lambda.patch_guarded"
 
+let value_kind_of_pointerness = function
+  | Immediate -> Pintval
+  | Pointer -> Pgenval
+
+let pointerness_of_separability sep =
+  if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
+
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Scannable -> Value generic_value
+  | Scannable { separability; _ } ->
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_separability separability)
+    in
+    Value { generic_value with raw_kind }
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1789,7 +1804,11 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Scannable -> Value (get_value_kind i)
+    | Scannable { separability; _ } ->
+      let raw_kind =
+        value_kind_of_pointerness (pointerness_of_separability separability)
+      in
+      Value { (get_value_kind i) with raw_kind }
     | Float_boxed -> Float_boxed (get_mode i)
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1819,6 +1838,9 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
+  (* The shape here is potentially an underapproximation, since the scannable
+     axes in [shape] will all be [max]. This should not matter, though, since it
+     is not possible to reassign / directly mutate a [val] in a module. *)
   let shape =
     Array.map
       (fun sort ->
@@ -1829,7 +1851,7 @@ let transl_module_representation repr =
   in
   let is_value (elt : Types.mixed_block_element) =
     match elt with
-    | Scannable -> true
+    | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
     | Product _ | Void -> false
@@ -1891,28 +1913,6 @@ let transl_prim modname field =
             primitive with no corresponding user source location. *)
       | path, _ -> transl_value_path Loc_unknown env path
     )
-
-let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
-  | Module_mixed (shape, _) ->
-    let rec count_values shape =
-      Array.fold_left
-        (fun acc elt ->
-          match elt with
-          | Value _ -> acc + 1
-          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-          | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
-          | Product product_shape -> acc + count_values product_shape
-          (* CR layout poly: We need to support this for relatively simple
-             layout poly usecases, however it should be easy to move this assert
-             to after slambdaeval (or maybe during?). *)
-          | Splice_variable _ ->
-            error ~loc (Slambda_unsupported "mixed modules"))
-        0 shape
-    in
-    Typedecl.assert_mixed_product_support loc Module
-      ~value_prefix_len:(count_values shape);
-    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
@@ -2933,9 +2933,9 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
 
-let value_kind_of_value_with_externality ext =
-  let open Jkind_axis.Externality in
-  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+let pointerness_of_scannable_with_externality ext =
+  if Jkind_axis.Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
 
 let rec layout_of_mixed_block_element_for_idx_set
   ext (mbe : _ mixed_block_element)
@@ -2947,7 +2947,9 @@ let rec layout_of_mixed_block_element_for_idx_set
       (Array.to_list
         (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
-    let raw_kind = value_kind_of_value_with_externality ext in
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_scannable_with_externality ext)
+    in
     Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
   | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64

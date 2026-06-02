@@ -1192,8 +1192,8 @@ access `mood` even if a `Thing.t` is `contended`, and in fact we can mark `t` as
 [`Atomic` module], as it has many useful operations,
 from `compare_exchange` to atomic logical bitwise XOR. Also, note that we're
 using Core's `Atomic` here rather than the `Atomic` from OxCaml's standard
-library, which hews closer to the upstream OCaml standard library and doesn't
-support mode crossing.
+library, which hews closer to the OCaml standard library and doesn't support
+mode crossing.
 
 [crosses contention]: #mode-crossing
 [`Atomic` module]: https://github.com/janestreet/portable/blob/master/kernel/src/atomic.mli

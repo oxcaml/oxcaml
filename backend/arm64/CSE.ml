@@ -50,11 +50,8 @@ let class_of_operation (op : Operation.t)
           intr
     in
     Class op_class
-  | Move | Spill | Reload | Dummy_use
-  | Floatop _
-  | Csel _
-  | Reinterpret_cast _ | Static_cast _
-  | Const_int _ | Const_float32 _ | Const_float _
+  | Move | Spill | Reload | Floatop _ | Csel _ | Reinterpret_cast _
+  | Static_cast _ | Const_int _ | Const_float32 _ | Const_float _
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
@@ -68,9 +65,7 @@ let is_cheap_operation (op : Operation.t)
   | Const_int n ->
     Cheap (Nativeint.compare n 65535n <= 0 && Nativeint.compare n 0n >= 0)
   | Specific _
-  | Move | Spill | Reload | Dummy_use
-  | Floatop _
-  | Csel _
+  | Move | Spill | Reload | Floatop _ | Csel _
   | Reinterpret_cast _ | Static_cast _
   | Const_float32 _ | Const_float _
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
