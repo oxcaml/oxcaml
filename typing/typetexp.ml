@@ -999,7 +999,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               ctyp Ttyp_call_pos (newconstr Predef.path_lexing_position [])
             else transl_type env ~policy ~row_context arg_mode.mode_modes arg
           in
-          let acc_mode = curry_mode acc_mode arg_mode.mode_modes in
+          let acc_mode = curry_mode_const acc_mode arg_mode.mode_modes in
           let ret_mode =
             match rest with
             | [] -> ret_mode
@@ -1475,7 +1475,9 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
         cty, jkind_annot
       with Not_found ->
         let t, ty, jkind_annot =
-          with_local_level_generalize_structure_if_principal begin fun () ->
+          with_local_level_generalize_structure_if_principal
+            ~before_generalize:(fun (t, _, _) -> generalize_structure t)
+            begin fun () ->
             let jkind, rigid =
               jkind_for_fresh_var env alias alias_loc attrs jkind_annot_opt
             in
@@ -1685,7 +1687,7 @@ let rec make_fixed_univars mark ty =
                   ~fixed:(Some (Univar more))));
         Btype.iter_row (make_fixed_univars mark) row
     | _ ->
-        Btype.iter_type_expr (make_fixed_univars mark) ty
+        Btype.iter_type_expr (make_fixed_univars mark) (Fun.const ()) ty
     end
 
 let make_fixed_univars ty =
@@ -1752,7 +1754,7 @@ let transl_type_scheme_mono env styp =
      declarations from having undefaulted jkind variables. Without
      this line, we might accidentally export a jkind-flexible definition
      from a compilation unit, which would lead to miscompilation. *)
-  remove_mode_and_jkind_variables typ.ctyp_type;
+  Alloc.with_zap_scope (remove_mode_and_jkind_variables typ.ctyp_type);
   typ
 
 let transl_type_scheme_poly env attrs loc vars inner_type =
@@ -1776,7 +1778,7 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
     ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
-  remove_mode_and_jkind_variables typ.ctyp_type;
+  Alloc.with_zap_scope (remove_mode_and_jkind_variables typ.ctyp_type);
   { ctyp_desc = Ttyp_poly (typed_vars, typ);
     ctyp_type = typ.ctyp_type;
     ctyp_env = env;
@@ -1845,7 +1847,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
               Types.set_var_jkind t jkind
             | None -> ())
           | _ -> ())
-        | _ -> Btype.iter_type_expr replace t)
+        | _ -> Btype.iter_type_expr replace (Fun.const ()) t)
       end
     in
     let ety = Subst.type_expr Subst.identity ty in
