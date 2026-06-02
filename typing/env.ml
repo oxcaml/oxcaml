@@ -1534,8 +1534,6 @@ let step_find_unboxed_version decl =
       | None -> Lacks_unboxed_version
       | Some ty ->
         match get_desc ty with
-        | Tconstr (path, [inner], _) when Path.same path Predef.path_box ->
-          Manifest_is_box inner
         | Tconstr (path, args, _) -> Aliases (path, args)
         | Tbox inner -> Manifest_is_box inner
         | _ -> Lacks_unboxed_version
@@ -1590,7 +1588,7 @@ and find_type_unboxed_version path env seen =
     {
       type_params = decl.type_params;
       type_arity = decl.type_arity;
-      type_kind = decl.type_kind;
+      type_kind = Type_abstract Definition;
       type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
       type_ikind =
         Types.ikinds_todo
@@ -1612,11 +1610,9 @@ and find_type_unboxed_version path env seen =
   | Aliases (path, args) ->
     let ud = find_type_unboxed_version path env seen in
     let man =
-      if Path.is_unboxed_version path && args = [] then
-        (* Avoid wrapping into a twice-unboxed path; [ud]'s manifest already
-           represents the once-unboxed type. *)
-        Option.get ud.type_manifest
-      else
+      match ud.type_manifest with
+      | Some man -> !apply env ud.type_params man args
+      | None ->
         Btype.newgenty
           (Tconstr (Path.unboxed_version path, args, ref Mnil))
     in
