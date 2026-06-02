@@ -184,8 +184,8 @@ let tag_anonymous_function = "L" (* lambda *)
 
 let tag_partial_function = "P"
 
-type path_item =
-  | Compilation_unit of Compilation_unit.t
+type 'cu path_item =
+  | Compilation_unit of 'cu
   | Inline_marker
   | Module of string
   | Anonymous_module of int * int * string option
@@ -194,7 +194,7 @@ type path_item =
   | Anonymous_function of int * int * string option
   | Partial_function of int * int * string option
 
-type path = path_item list
+type 'cu path = 'cu path_item list
 
 let mangle_path_item buf path_item =
   let tag_prefixed ~tag sym = Printf.bprintf buf "%s%a" tag encode sym in
@@ -225,18 +225,6 @@ let mangle_path_item buf path_item =
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
 module Parsed = struct
-  type path_item =
-    | Compilation_unit of string
-    | Inline_marker
-    | Module of string
-    | Anonymous_module of int * int * string option
-    | Class of string
-    | Function of string
-    | Anonymous_function of int * int * string option
-    | Partial_function of int * int * string option
-
-  type path = path_item list
-
   let is_digit = function '0' .. '9' -> true | _ -> false
 
   let incr_n r n = r := !r + n
@@ -433,7 +421,7 @@ module Parsed = struct
        with Exit | Invalid_argument _ -> None)
 end
 
-let mangle_ident (cu : Compilation_unit.t) (path : path) =
+let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
   (* Compare the current compilation unit with the one recorded in the [path] to
      avoid repetition in the mangled name when they are identical, and to add an
      explicit inline tag to separate the two compilation units (the one

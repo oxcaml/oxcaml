@@ -46,7 +46,7 @@ module Structured = struct
     let file = Option.value ~default:"" file_opt in
     Printf.sprintf "%s(%s:%d:%d)" prefix file line col
 
-  let render_path_item (item : Structured_mangling.Parsed.path_item) =
+  let render_path_item (item : string Structured_mangling.path_item) =
     match item with
     | Compilation_unit s | Module s | Class s | Function s -> s
     | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
