@@ -590,3 +590,30 @@ end
 [%%expect{|
 module M : sig type t : immutable_data end
 |}]
+
+module Plain_unsafe_public_redeclaration : sig
+  type t : immutable_data = Leaf [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t : immutable_data = Leaf
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : immutable_data = Leaf
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = Leaf end
+       is not included in
+         sig
+           type t : immutable_data non_pointer = Leaf
+           [@@unsafe_allow_any_mode_crossing]
+         end
+       Type declarations do not match:
+         type t = Leaf
+       is not included in
+         type t : immutable_data non_pointer = Leaf
+       [@@unsafe_allow_any_mode_crossing]
+       They have different unsafe mode crossing behavior:
+       the second has [@@unsafe_allow_any_mode_crossing], but the first does not
+|}]
