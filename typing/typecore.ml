@@ -476,6 +476,12 @@ type expected_mode =
 
         Each location points to the corresponding sub-pattern of [Ppat_tuple].
     *)
+
+    return_from_exclave : bool ref option;
+    (** Indicates whether the expected mode is for an exclave expression in tail
+        position. The field is a bool ref so that it is preserved across all
+        copies.
+    *)
   }
 
 type position_and_mode = {
@@ -484,11 +490,13 @@ type position_and_mode = {
   region_mode : Regionality.r option;
   (** INVARIANT: [Some m] iff [apply_position] is [Tail], where [m] is the mode
      of the surrounding region *)
+  return_from_exclave : bool ref option;
 }
 
 let position_and_mode_default = {
   apply_position = Default;
   region_mode = None;
+  return_from_exclave = None;
 }
 
 (** Decides the runtime tail call behaviour based on lexical structures and user
@@ -507,14 +515,24 @@ let position_and_mode env (expected_mode : expected_mode) sexp
   | RTail (m ,FTail) -> begin
       match requested with
       | Some `Tail | Some `Tail_if_possible | None ->
-          {apply_position = Tail; region_mode = Some m}
-      | Some `Nontail -> {apply_position = Nontail; region_mode = None}
+          { apply_position = Tail;
+            region_mode = Some m;
+            return_from_exclave = expected_mode.return_from_exclave }
+      | Some `Nontail ->
+          { apply_position = Nontail;
+            region_mode = None;
+            return_from_exclave = None }
     end
   | RNontail | RTail(_, FNontail) -> begin
       match requested with
       | None | Some `Tail_if_possible ->
-          {apply_position = Default; region_mode = None}
-      | Some `Nontail -> {apply_position = Nontail; region_mode = None}
+          { apply_position = Default;
+            region_mode = None;
+            return_from_exclave = None }
+      | Some `Nontail ->
+          { apply_position = Nontail;
+            region_mode = None;
+            return_from_exclave = None }
       | Some `Tail -> fail `Not_a_tailcall
   end
 
@@ -549,7 +567,8 @@ let mode_default mode =
   { position = RNontail;
     mode = Value.disallow_left mode;
     strictly_local = false;
-    tuple_modes = None }
+    tuple_modes = None;
+    return_from_exclave = None }
 
 let mode_legacy = mode_default Value.legacy
 
@@ -650,7 +669,7 @@ let mode_max_with_position position =
 
 (** Take the expected mode of [exclave_ exp], return the expected mode of [exp].
     [expected_mode] must be higher than [regional]. *)
-let mode_exclave expected_mode =
+let mode_exclave (expected_mode : expected_mode) =
   let mode =
      as_single_mode expected_mode
      (* if we expect an exclave to be [regional], then inside the exclave the
@@ -658,14 +677,23 @@ let mode_exclave expected_mode =
      |> value_to_alloc_r2l
      |> alloc_as_value
   in
+  Option.iter (fun excl -> excl := true) expected_mode.return_from_exclave;
   { (mode_default mode)
-    with strictly_local = true
+    with strictly_local = true;
+         return_from_exclave = expected_mode.return_from_exclave
   }
 
 let mode_strictly_local expected_mode =
   { expected_mode
     with strictly_local = true
   }
+
+let mode_return_from_exclave (expected_mode : expected_mode) =
+  match expected_mode.return_from_exclave with
+  | Some r -> r, expected_mode
+  | None ->
+    let r = ref false in
+    r, { expected_mode with return_from_exclave = Some r }
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -747,7 +775,9 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
                 kind = Id_prim _; _ }, 1, Tail ->
      (* RHS of (&&) and (||) is at the tail of function region if the
         application is. The argument mode is not constrained otherwise. *)
-     mode_with_position vmode (RTail (Option.get position_and_mode.region_mode, FTail)),
+     { (mode_with_position vmode
+          (RTail (Option.get position_and_mode.region_mode, FTail)))
+       with return_from_exclave = position_and_mode.return_from_exclave },
      vmode
   | Texp_ident { kind = Id_prim _; _ }, _, _ ->
      (* Other primitives cannot be tail-called *)
@@ -831,13 +861,24 @@ let newvar_below_if_modepoly level m =
   else m
 
 let newvar_above_if_modepoly level m =
-  if Language_extension.(is_at_least Mode_polymorphism Beta)
+  if Language_extension.(is_at_least_mode_poly Beta)
   then fst (Locality.newvar_above level m)
   else m
 
 let create_allocation_mode_l mode =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   newvar_above_if_modepoly 0 locality_mode |> Locality.disallow_right
+
+let create_function_return_mode
+    ~return_from_exclave ret_mode : return_mode =
+  let ret_mode =
+    if Language_extension.(is_at_least_mode_poly Beta) then
+      if return_from_exclave
+      then Locality.disallow_right Locality.local
+      else Locality.disallow_right Locality.global
+    else create_allocation_mode_l ret_mode
+  in
+  Typedtree.create_return_mode ret_mode
 
 let create_allocation_mode_r mode =
   let locality_mode = Alloc.proj_comonadic Areality mode in
@@ -5210,7 +5251,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                 (mode_partial_fun:: mode_closed_args))
              in
              let mode_closure =
-               Alloc.proj_comonadic Areality (Alloc.disallow_left mode_cls)
+               create_allocation_mode_r mode_cls
              in
              let mode_arg =
                create_allocation_mode_l mode_arg
@@ -7404,12 +7445,8 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      let ap_mode_alloc =
-        create_allocation_mode_l mode_ret
-        |> Typedtree.create_return_mode
-      in
       let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
+      let ap_mode = create_allocation_mode_l mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
@@ -7428,8 +7465,8 @@ and type_expect_
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
-        exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode_alloc,
-                              zero_alloc);
+        exp_desc = Texp_apply(funct, args, pm.apply_position,
+                    Typedtree.create_return_mode ap_mode, zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
@@ -9492,6 +9529,9 @@ and type_function
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
       in
+      let excl, expected_inner_mode =
+        mode_return_from_exclave expected_inner_mode
+      in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
         map_half_typed_cases Value env expected_pat_mode
@@ -9650,14 +9690,14 @@ and type_function
             };
         }
       in
+      let return_from_exclave = !excl in
+      let ret_mode =
+        create_function_return_mode ~return_from_exclave ret_mode
+      in
       let ret_info =
         match ret_info with
         | Some _ as x -> x
         | None ->
-          let ret_mode =
-            create_allocation_mode_l ret_mode
-            |> create_return_mode
-          in
           let ret_mode =
             {ret_mode_annots with mode_modes = ret_mode }
           in
@@ -11366,6 +11406,9 @@ and type_function_cases_expect
         ~ret_mode_annots:Mode.Alloc.Const.Option.none
         ~is_first_val_param:first ~is_final_val_param:true
     in
+    let excl, expected_inner_mode =
+      mode_return_from_exclave expected_inner_mode
+    in
     let cases, partial =
       type_cases Value env
         expected_pat_mode expected_inner_mode ty_arg_mono arg_sort
@@ -11399,11 +11442,12 @@ and type_function_cases_expect
       { fun_closure_mode = closure_mode;
         alloc_mode }
     in
+    let return_from_exclave = !excl in
     cases, ty_fun, fun_alloc_mode,
       { ret_sort;
         ret_mode =
           { mode_modes =
-              create_allocation_mode_l ret_mode |> create_return_mode;
+              create_function_return_mode ~return_from_exclave ret_mode;
             mode_desc = [] } }
   end
 
