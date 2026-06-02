@@ -591,14 +591,17 @@ module Value_kind_cache = struct
     cache := Some (Path.Tbl.create 20);
     Fun.protect f ~finally:(fun () -> cache := old)
 
-  let add path decl res =
-    match !cache with
-    | None -> ()
-    | Some tbl -> Path.Tbl.replace tbl path (decl, res)
+  let add ~env path decl res =
+    if not (Env.has_local_constraints env) then begin
+      match !cache with
+      | None -> ()
+      | Some tbl -> Path.Tbl.replace tbl path (decl, res)
+    end
 
   let find_opt ~env path =
     match !cache with
     | None -> None
+    | Some _ when Env.has_local_constraints env -> None
     | Some tbl ->
        match Path.Tbl.find tbl path with
        | exception Not_found -> None
@@ -798,7 +801,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
              (value_kind_of_scannable_jkind env decl.type_jkind)
          else
            let visited', k = value_kind_decl decl in
-           Value_kind_cache.add p decl (visited' - num_nodes_visited, k);
+           Value_kind_cache.add ~env p decl (visited' - num_nodes_visited, k);
            visited', k
     end
   | Ttuple labeled_fields ->
