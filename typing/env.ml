@@ -935,11 +935,6 @@ let same_constr = ref (fun _ _ _ -> assert false)
 
 let constrain_type_jkind = ref (fun _ _ _ -> assert false)
 
-let apply =
-  (* to be filled with Ctype.apply *)
-  ref ((fun _env _params _ty _args -> assert false) :
-        t -> type_expr list -> type_expr -> type_expr list -> type_expr)
-
 let check_well_formed_module = ref (fun _ -> assert false)
 
 (* Helper to decide whether to report an identifier shadowing

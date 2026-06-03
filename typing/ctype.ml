@@ -3436,8 +3436,7 @@ let constrain_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:false env ty jkind
 
 let () =
-  Env.constrain_type_jkind := constrain_type_jkind;
-  Env.apply := apply ?use_current_level:None
+  Env.constrain_type_jkind := constrain_type_jkind
 
 let check_type_externality env ty ext =
   let upper_bound =
