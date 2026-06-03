@@ -220,11 +220,11 @@ let foo () =
 
 ## Interactions with stack allocation
 
-A borrowed value cannot escape its borrow region, just as a stack-allocated
-value cannot escape its allocation region. Both restrictions are enforced
-through the same locality mode axis, and the compiler does not currently
-distinguish the two. This conflation can reject programs that would
-otherwise be sound:
+A borrow region only allows `global` values to escape; anything `local` to
+it is trapped inside. A value can also be `local` because it was
+stack-allocated, and the compiler does not distinguish these two reasons
+for being `local`. As a result, a stack-allocated value cannot escape a
+borrow region, even when no borrowed value is involved:
 
 ```ocaml
 let bar (x @ local) =
