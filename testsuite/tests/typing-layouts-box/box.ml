@@ -1128,3 +1128,65 @@ val unbox_ref : 'a ref -> 'a ref# = <fun>
 val ref_0_via_box : int ref = {contents = 0}
 val ref_0_unbox : int ref# = #{contents = 0}
 |}]
+
+(* Test 37: Private type abbreviations *)
+
+type t = private int box
+(* The implied unboxed definition is [type t# = private int] *)
+[%%expect{|
+type t = private int box
+|}]
+
+(* hence [t# =/= int] *)
+let id (x : t#) = (x : int)
+[%%expect{|
+Line 1, characters 19-20:
+1 | let id (x : t#) = (x : int)
+                       ^
+Error: This expression has type "t#" but an expression was expected of type "int"
+|}]
+
+(* but [t#] is coercible to [int] *)
+let id (x : t#) = (x :> int)
+[%%expect{|
+val id : t# -> int = <fun>
+|}]
+
+(* Test 38: Unboxing through multiple definitions *)
+
+type 'c s = 'c box
+type ('a, 'b) t = ('a * 'b) s
+type ('a, 'b) t' = ('a, 'b) t#
+
+let id (x : (int, string) t') : int * string = x
+[%%expect{|
+type 'c s = 'c box
+type ('a, 'b) t = ('a * 'b) s
+type ('a, 'b) t' = ('a, 'b) t#
+val id : (int, string) t' -> int * string = <fun>
+|}]
+
+type ('a, 'b) t'' = ('a, 'b) t'#
+[%%expect{|
+Line 1, characters 29-32:
+1 | type ('a, 'b) t'' = ('a, 'b) t'#
+                                 ^^^
+Error: The type "t'" has no unboxed version.
+|}]
+
+(* Test 38: Unboxing through tuple type abbreviation *)
+
+(* CR box jbachurski: I think this should work for consistency with type checking:
+   Since [t = #('a * 'b) box], we should have [t# = #('a * 'b)]. *)
+
+type ('a, 'b) t = 'a * 'b
+type 'a t' = ('a, 'a) t#
+
+let id (x : int t') : #(int * int) = x
+[%%expect{|
+type ('a, 'b) t = 'a * 'b
+Line 2, characters 22-24:
+2 | type 'a t' = ('a, 'a) t#
+                          ^^
+Error: The type "t" has no unboxed version.
+|}]
