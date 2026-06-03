@@ -47,7 +47,7 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
+  Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
 
 (* If the [.mli] file has any file-level staticity modality (whether
@@ -176,8 +176,8 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
 
-exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+exception Errors of Location.t * Typing_recovery.Error_set.t
 
 val report_error: Env.t -> loc:Location.t -> error -> Location.error
 
