@@ -97,7 +97,7 @@ type address =
   | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
-  Subst.Lazy.signature
+  Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t
@@ -105,10 +105,18 @@ type 'a sig_reader =
   -> flags:Cmi_format.pers_flags list
   -> 'a
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val read : 'a t
   -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.signature
 
+||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
+  -> Subst.Lazy.signature
+=======
+val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
+  -> Subst.Lazy.persistent_signature
+>>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
@@ -159,7 +167,7 @@ val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 val make_cmi : 'a t
   -> Compilation_unit.Name.t
   -> Cmi_format.kind
-  -> Subst.Lazy.signature
+  -> Subst.Lazy.persistent_signature
   -> alerts
   -> Cmi_format.cmi_infos_lazy
 
@@ -178,12 +186,25 @@ val import_crcs : 'a t -> source:filepath ->
 (* Return the set of compilation units imported, with their CRC *)
 val imports : 'a t -> Import_info.Intf.t list
 
-(* Require that the specified compilation unit will be available at quotation
+(* Require that the provided interface will be available at quotation
    compile time. *)
-val require_global_for_quote : 'a t -> Compilation_unit.Name.t -> unit
+val require_intf_for_quote: 'a t -> Compilation_unit.Name.t -> unit
 
-(* Return the set of compilation units referenced by quotes *)
-val quoted_globals : 'a t -> Compilation_unit.Name.t list
+(* Return the set of interfaces referenced by quotes *)
+val quoted_intfs: 'a t -> Compilation_unit.Name.Set.t
+
+(* Compute the transitive closure of the dependencies of these interfaces that
+   have been loaded by typing. Always includes the input interfaces. *)
+val loaded_transitive_dependencies : 'a t
+  -> Compilation_unit.Name.Set.t
+  -> Compilation_unit.Name.Set.t
+
+(* Require that the provided implementation will be available at quotation
+   compile time. *)
+val require_impl_for_quote: 'a t -> Compilation_unit.t -> unit
+
+(* Return the set of implementations referenced by quotes *)
+val quoted_impls: 'a t -> Compilation_unit.Set.t
 
 (* Return the set of imports represented as runtime parameters. If this module is indeed
    parameterised (that is, [parameters] returns a non-empty list), it will be compiled as

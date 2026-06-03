@@ -219,11 +219,21 @@ let structure_item sub item =
   in
   Str.mk ~loc desc
 
+let modalities_of_val_modal_info = function
+  | Valmi_sig_value modalities -> Typemode.untransl_modalities modalities
+  | Valmi_str_primitive modes ->
+      let modality_of_mode { txt = Mode mode; loc } =
+        { txt = Modality mode; loc }
+      in
+      List.map modality_of_mode (Typemode.untransl_mode modes)
+
 let value_description sub v =
   let loc = sub.location sub v.val_loc in
   let attrs = sub.attributes sub v.val_attributes in
+  let modalities = modalities_of_val_modal_info v.val_modal_info in
   Val.mk ~loc ~attrs
     ~prim:v.val_prim
+    ~modalities
     (map_loc sub v.val_name)
     (sub.typ sub v.val_desc)
 

@@ -89,7 +89,24 @@ let rec catch m f = match m with
 let keyword_table : keywords =
   create_hashtable 149 [
     "and", AND;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     "as", AS;
+||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+    "nonrec", NONREC, v4_2;
+    "object", OBJECT, v1_0;
+    "of", OF, always;
+    "once_", ONCE, oxcaml;
+    "open", OPEN, always;
+    "or", OR, always;
+    "overwrite_", OVERWRITE, oxcaml;
+=======
+    "nonrec", NONREC, v4_2;
+    "object", OBJECT, v1_0;
+    "of", OF, always;
+    "open", OPEN, always;
+    "or", OR, always;
+    "overwrite_", OVERWRITE, oxcaml;
+>>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
     "assert", ASSERT;
     "begin", BEGIN;
     "class", CLASS;
@@ -106,7 +123,24 @@ let keyword_table : keywords =
     "false", FALSE;
     "for", FOR;
     "fun", FUN;
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
     "function", FUNCTION;
+||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+    "true", TRUE, always;
+    "try", TRY, always;
+    "type", TYPE, always;
+    "unique_", UNIQUE, oxcaml;
+    "val", VAL, always;
+    "virtual", VIRTUAL, v1_0;
+    "when", WHEN, always;
+=======
+    "true", TRUE, always;
+    "try", TRY, always;
+    "type", TYPE, always;
+    "val", VAL, always;
+    "virtual", VIRTUAL, v1_0;
+    "when", WHEN, always;
+>>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
     "functor", FUNCTOR;
     "global_", GLOBAL;
     "if", IF;
@@ -1206,6 +1240,18 @@ and skip_sharp_bang state = parse
         lexbuf.lex_curr_p <- end_pos;
         return token
 
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
+||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+  let init ?(keyword_edition=None,[]) () =
+    populate_keywords keyword_edition;
+    is_in_string := false;
+    comment_start_loc := [];
+=======
+  let init ?(keyword_edition=Config.default_keyword_edition) () =
+    populate_keywords keyword_edition;
+    is_in_string := false;
+    comment_start_loc := [];
+>>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
   let rec token_without_comments state lexbuf =
     token state lexbuf >>= function
     | COMMENT _ ->

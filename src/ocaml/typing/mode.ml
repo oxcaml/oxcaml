@@ -276,6 +276,11 @@ module type Heyting = sig
 
   include Lattice
 
+  (** A total structural order used for map keys. This is not lattice order:
+      [compare_total a b = 0] must agree with semantic equality of [a] and [b].
+  *)
+  val compare_total : t -> t -> int
+
   (** [imply c] is the right adjoint of [meet c]; That is, for any [a] and [b],
       [meet c a <= b] iff [a <= imply c b] *)
   val imply : t -> t -> t
@@ -285,6 +290,11 @@ module type CoHeyting = sig
   (** Extend the [Lattice] interface with operations of co-Heyting algebras *)
 
   include Lattice
+
+  (** A total structural order used for map keys. This is not lattice order:
+      [compare_total a b = 0] must agree with semantic equality of [a] and [b].
+  *)
+  val compare_total : t -> t -> int
 
   (** [subtract _ c] is the left adjoint of [join c]. That is, for any [a] and
       [b], [subtract a c <= b] iff [a <= join c b] *)
@@ -302,6 +312,8 @@ module Lattices = struct
     let le a b = L.ord a <= L.ord b
 
     let equal a b = L.ord a = L.ord b
+
+    let compare_total a b = Int.compare (L.ord a) (L.ord b)
 
     let join a b = if L.ord a > L.ord b then a else b
 
@@ -381,6 +393,8 @@ module Lattices = struct
     let max = L.max
 
     let equal a b = a = b
+
+    let compare_total a b = Int.compare (l_to_int a) (l_to_int b)
 
     let join a b = l_of_int (l_to_int a lor l_to_int b)
 
@@ -763,6 +777,20 @@ module Lattices = struct
       && Visibility.equal visibility1 visibility2
       && Staticity.equal staticity1 staticity2
 
+    let compare_total m1 m2 =
+      let c = Uniqueness.compare_total m1.uniqueness m2.uniqueness in
+      if c <> 0
+      then c
+      else
+        let c = Contention.compare_total m1.contention m2.contention in
+        if c <> 0
+        then c
+        else
+          let c = Visibility.compare_total m1.visibility m2.visibility in
+          if c <> 0
+          then c
+          else Staticity.compare_total m1.staticity m2.staticity
+
     let join m1 m2 =
       let uniqueness = Uniqueness.join m1.uniqueness m2.uniqueness in
       let contention = Contention.join m1.contention m2.contention in
@@ -881,6 +909,28 @@ module Lattices = struct
       && Yielding.equal yielding1 yielding2
       && Statefulness.equal statefulness1 statefulness2
 
+    let compare_total m1 m2 =
+      let c = Areality.compare_total m1.areality m2.areality in
+      if c <> 0
+      then c
+      else
+        let c = Linearity.compare_total m1.linearity m2.linearity in
+        if c <> 0
+        then c
+        else
+          let c = Portability.compare_total m1.portability m2.portability in
+          if c <> 0
+          then c
+          else
+            let c = Forkable.compare_total m1.forkable m2.forkable in
+            if c <> 0
+            then c
+            else
+              let c = Yielding.compare_total m1.yielding m2.yielding in
+              if c <> 0
+              then c
+              else Statefulness.compare_total m1.statefulness m2.statefulness
+
     let join m1 m2 =
       let areality = Areality.join m1.areality m2.areality in
       let linearity = Linearity.join m1.linearity m2.linearity in
@@ -926,6 +976,8 @@ module Lattices = struct
     let[@inline] le a b = L.le b a
 
     let equal = L.equal
+
+    let compare_total = L.compare_total
 
     let join = L.meet
 
@@ -1061,13 +1113,23 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
 
-  let compare : type a. a obj -> a -> a -> (a, a) Misc.comparison =
-   fun obj c1 c2 ->
-    if le obj c1 c2
-    then
-      begin if le obj c2 c1 then Equal else Less_than
-      end
-    else Greater_than
+  let compare_total : type a. a obj -> a -> a -> int =
+   fun obj a b ->
+    match obj with
+    | Locality -> Locality.compare_total a b
+    | Regionality -> Regionality.compare_total a b
+    | Uniqueness_op -> Uniqueness_op.compare_total a b
+    | Contention_op -> Contention_op.compare_total a b
+    | Visibility_op -> Visibility_op.compare_total a b
+    | Linearity -> Linearity.compare_total a b
+    | Portability -> Portability.compare_total a b
+    | Forkable -> Forkable.compare_total a b
+    | Yielding -> Yielding.compare_total a b
+    | Statefulness -> Statefulness.compare_total a b
+    | Staticity_op -> Staticity_op.compare_total a b
+    | Monadic_op -> Monadic_op.compare_total a b
+    | Comonadic_with_locality -> Comonadic_with_locality.compare_total a b
+    | Comonadic_with_regionality -> Comonadic_with_regionality.compare_total a b
 
   let equal : type a. a obj -> a -> a -> bool =
    fun obj a b ->
@@ -1158,49 +1220,73 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.print
     | Comonadic_with_regionality -> Comonadic_with_regionality.print
 
-  let compare_obj : type a b. a obj -> b obj -> (a, b) Misc.comparison =
+  let compare_obj : type a b. a obj -> b obj -> int =
    fun a b ->
     match a, b with
-    | Locality, Locality -> Equal
-    | Locality, _ -> Less_than
-    | _, Locality -> Greater_than
-    | Regionality, Regionality -> Equal
-    | Regionality, _ -> Less_than
-    | _, Regionality -> Greater_than
-    | Uniqueness_op, Uniqueness_op -> Equal
-    | Uniqueness_op, _ -> Less_than
-    | _, Uniqueness_op -> Greater_than
-    | Linearity, Linearity -> Equal
-    | Linearity, _ -> Less_than
-    | _, Linearity -> Greater_than
-    | Portability, Portability -> Equal
-    | Portability, _ -> Less_than
-    | _, Portability -> Greater_than
-    | Forkable, Forkable -> Equal
-    | Forkable, _ -> Less_than
-    | _, Forkable -> Greater_than
-    | Yielding, Yielding -> Equal
-    | Yielding, _ -> Less_than
-    | _, Yielding -> Greater_than
-    | Statefulness, Statefulness -> Equal
-    | Statefulness, _ -> Less_than
-    | _, Statefulness -> Greater_than
-    | Contention_op, Contention_op -> Equal
-    | Contention_op, _ -> Less_than
-    | _, Contention_op -> Greater_than
-    | Visibility_op, Visibility_op -> Equal
-    | Visibility_op, _ -> Less_than
-    | _, Visibility_op -> Greater_than
-    | Staticity_op, Staticity_op -> Equal
-    | Staticity_op, _ -> Less_than
-    | _, Staticity_op -> Greater_than
-    | Monadic_op, Monadic_op -> Equal
-    | Monadic_op, _ -> Less_than
-    | _, Monadic_op -> Greater_than
-    | Comonadic_with_regionality, Comonadic_with_regionality -> Equal
-    | Comonadic_with_regionality, _ -> Less_than
-    | _, Comonadic_with_regionality -> Greater_than
-    | Comonadic_with_locality, Comonadic_with_locality -> Equal
+    | Locality, Locality -> 0
+    | Locality, _ -> -1
+    | _, Locality -> 1
+    | Regionality, Regionality -> 0
+    | Regionality, _ -> -1
+    | _, Regionality -> 1
+    | Uniqueness_op, Uniqueness_op -> 0
+    | Uniqueness_op, _ -> -1
+    | _, Uniqueness_op -> 1
+    | Linearity, Linearity -> 0
+    | Linearity, _ -> -1
+    | _, Linearity -> 1
+    | Portability, Portability -> 0
+    | Portability, _ -> -1
+    | _, Portability -> 1
+    | Forkable, Forkable -> 0
+    | Forkable, _ -> -1
+    | _, Forkable -> 1
+    | Yielding, Yielding -> 0
+    | Yielding, _ -> -1
+    | _, Yielding -> 1
+    | Statefulness, Statefulness -> 0
+    | Statefulness, _ -> -1
+    | _, Statefulness -> 1
+    | Contention_op, Contention_op -> 0
+    | Contention_op, _ -> -1
+    | _, Contention_op -> 1
+    | Visibility_op, Visibility_op -> 0
+    | Visibility_op, _ -> -1
+    | _, Visibility_op -> 1
+    | Staticity_op, Staticity_op -> 0
+    | Staticity_op, _ -> -1
+    | _, Staticity_op -> 1
+    | Monadic_op, Monadic_op -> 0
+    | Monadic_op, _ -> -1
+    | _, Monadic_op -> 1
+    | Comonadic_with_regionality, Comonadic_with_regionality -> 0
+    | Comonadic_with_regionality, _ -> -1
+    | _, Comonadic_with_regionality -> 1
+    | Comonadic_with_locality, Comonadic_with_locality -> 0
+
+  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.is_eq =
+   fun a b ->
+    match a, b with
+    | Locality, Locality -> Misc.Is_eq
+    | Regionality, Regionality -> Misc.Is_eq
+    | Uniqueness_op, Uniqueness_op -> Misc.Is_eq
+    | Linearity, Linearity -> Misc.Is_eq
+    | Portability, Portability -> Misc.Is_eq
+    | Forkable, Forkable -> Misc.Is_eq
+    | Yielding, Yielding -> Misc.Is_eq
+    | Statefulness, Statefulness -> Misc.Is_eq
+    | Contention_op, Contention_op -> Misc.Is_eq
+    | Visibility_op, Visibility_op -> Misc.Is_eq
+    | Staticity_op, Staticity_op -> Misc.Is_eq
+    | Monadic_op, Monadic_op -> Misc.Is_eq
+    | Comonadic_with_regionality, Comonadic_with_regionality -> Misc.Is_eq
+    | Comonadic_with_locality, Comonadic_with_locality -> Misc.Is_eq
+    | ( ( Locality | Regionality | Uniqueness_op | Linearity | Portability
+        | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
+        | Staticity_op | Monadic_op | Comonadic_with_regionality
+        | Comonadic_with_locality ),
+        _ ) ->
+      Misc.Is_not_eq
 end
 
 module Lattices_mono = struct
@@ -1232,59 +1318,38 @@ module Lattices_mono = struct
       | Visibility -> Fmt.fprintf ppf "visibility"
       | Staticity -> Fmt.fprintf ppf "staticity"
 
-    let equal : type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) Misc.eq option
-        =
+    let equal : type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) Misc.is_eq =
      fun ax1 ax2 ->
       match ax1, ax2 with
-      | Areality, Areality -> Some Refl
-      | Linearity, Linearity -> Some Refl
-      | Portability, Portability -> Some Refl
-      | Uniqueness, Uniqueness -> Some Refl
-      | Contention, Contention -> Some Refl
-      | Forkable, Forkable -> Some Refl
-      | Yielding, Yielding -> Some Refl
-      | Statefulness, Statefulness -> Some Refl
-      | Visibility, Visibility -> Some Refl
-      | Staticity, Staticity -> Some Refl
+      | Areality, Areality -> Is_eq
+      | Linearity, Linearity -> Is_eq
+      | Portability, Portability -> Is_eq
+      | Uniqueness, Uniqueness -> Is_eq
+      | Contention, Contention -> Is_eq
+      | Forkable, Forkable -> Is_eq
+      | Yielding, Yielding -> Is_eq
+      | Statefulness, Statefulness -> Is_eq
+      | Visibility, Visibility -> Is_eq
+      | Staticity, Staticity -> Is_eq
       | ( ( Areality | Linearity | Uniqueness | Portability | Contention
           | Forkable | Yielding | Statefulness | Visibility | Staticity ),
           _ ) ->
-        None
+        Is_not_eq
 
-    let compare : type p r1 r2.
-        (p, r1) t -> (p, r2) t -> (r1, r2) Misc.comparison =
-     fun ax1 ax2 ->
-      match ax1, ax2 with
-      | Areality, Areality -> Equal
-      | Areality, _ -> Less_than
-      | _, Areality -> Greater_than
-      | Forkable, Forkable -> Equal
-      | Forkable, _ -> Less_than
-      | _, Forkable -> Greater_than
-      | Yielding, Yielding -> Equal
-      | Yielding, _ -> Less_than
-      | _, Yielding -> Greater_than
-      | Linearity, Linearity -> Equal
-      | Linearity, _ -> Less_than
-      | _, Linearity -> Greater_than
-      | Statefulness, Statefulness -> Equal
-      | Statefulness, _ -> Less_than
-      | _, Statefulness -> Greater_than
-      | Portability, Portability -> Equal
-      | Portability, _ -> .
-      | _, Portability -> .
-      | Uniqueness, Uniqueness -> Equal
-      | Uniqueness, _ -> Less_than
-      | _, Uniqueness -> Greater_than
-      | Visibility, Visibility -> Equal
-      | Visibility, _ -> Less_than
-      | _, Visibility -> Greater_than
-      | Contention, Contention -> Equal
-      | Contention, _ -> Less_than
-      | _, Contention -> Greater_than
-      | Staticity, Staticity -> Equal
-      | Staticity, _ -> .
-      | _, Staticity -> .
+    let ord : type p r. (p, r) t -> int = function
+      | Areality -> 0
+      | Forkable -> 1
+      | Yielding -> 2
+      | Linearity -> 3
+      | Statefulness -> 4
+      | Portability -> 5
+      | Uniqueness -> 6
+      | Visibility -> 7
+      | Contention -> 8
+      | Staticity -> 9
+
+    let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
+     fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
 
     let proj : type p r. (p, r) t -> p -> r =
      fun ax t ->
@@ -1523,97 +1588,129 @@ module Lattices_mono = struct
       comonadic_with_obj src0
 
   let rec compare_morph : type a1 l1 r1 a2 b l2 r2.
+      b obj -> (a1, b, l1 * r1) morph -> (a2, b, l2 * r2) morph -> int =
+   fun dst f1 f2 ->
+    match f1, f2 with
+    | Id, Id -> 0
+    | Id, _ -> -1
+    | _, Id -> 1
+    | Proj (src1, ax1), Proj (src2, ax2) -> (
+      let c = compare_obj src1 src2 in
+      if c <> 0
+      then c
+      else
+        match equal_obj src1 src2 with
+        | Misc.Is_eq -> Axis.compare ax1 ax2
+        | Misc.Is_not_eq ->
+          Misc.fatal_error
+            "Mode.Lattices_mono.compare_morph: inconsistent object equality")
+    | Proj _, _ -> -1
+    | _, Proj _ -> 1
+    | Max_with ax1, Max_with ax2 -> Axis.compare ax1 ax2
+    | Max_with _, _ -> -1
+    | _, Max_with _ -> 1
+    | Min_with ax1, Min_with ax2 -> Axis.compare ax1 ax2
+    | Min_with _, _ -> -1
+    | _, Min_with _ -> 1
+    | Meet_const c1, Meet_const c2 -> compare_total dst c1 c2
+    | Meet_const _, _ -> -1
+    | _, Meet_const _ -> 1
+    | Imply_const c1, Imply_const c2 -> compare_total dst c1 c2
+    | Imply_const _, _ -> -1
+    | _, Imply_const _ -> 1
+    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> 0
+    | Monadic_to_comonadic_min, _ -> -1
+    | _, Monadic_to_comonadic_min -> 1
+    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 ->
+      compare_obj a1 a2
+    | Comonadic_to_monadic_min _, _ -> -1
+    | _, Comonadic_to_monadic_min _ -> 1
+    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> 0
+    | Monadic_to_comonadic_max, _ -> -1
+    | _, Monadic_to_comonadic_max -> 1
+    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 ->
+      compare_obj a1 a2
+    | Comonadic_to_monadic_max _, _ -> -1
+    | _, Comonadic_to_monadic_max _ -> 1
+    | Local_to_regional, Local_to_regional -> 0
+    | Local_to_regional, _ -> -1
+    | _, Local_to_regional -> 1
+    | Locality_as_regionality, Locality_as_regionality -> 0
+    | Locality_as_regionality, _ -> -1
+    | _, Locality_as_regionality -> 1
+    | Global_to_regional, Global_to_regional -> 0
+    | Global_to_regional, _ -> -1
+    | _, Global_to_regional -> 1
+    | Regional_to_local, Regional_to_local -> 0
+    | Regional_to_local, _ -> -1
+    | _, Regional_to_local -> 1
+    | Regional_to_global, Regional_to_global -> 0
+    | Regional_to_global, _ -> -1
+    | _, Regional_to_global -> 1
+    | Compose (f1, g1), Compose (f2, g2) -> (
+      let c = compare_morph dst f1 f2 in
+      if c <> 0
+      then c
+      else
+        match equal_morph dst f1 f2 with
+        | Misc.Is_eq -> compare_morph (src dst f1) g1 g2
+        | Misc.Is_not_eq ->
+          Misc.fatal_error
+            "Mode.Lattices_mono.compare_morph: inconsistent equality")
+    | Compose _, _ -> -1
+    | _, Compose _ -> 1
+    | Map_comonadic f, Map_comonadic g ->
+      compare_morph (proj_obj Areality dst) f g
+
+  and equal_morph : type a1 l1 r1 a2 b l2 r2.
       b obj ->
       (a1, b, l1 * r1) morph ->
       (a2, b, l2 * r2) morph ->
-      (a1, a2) Misc.comparison =
+      (a1, a2) Misc.is_eq =
    fun dst f1 f2 ->
     match f1, f2 with
-    | Id, Id -> Equal
-    | Id, _ -> Less_than
-    | _, Id -> Greater_than
+    | Id, Id -> Misc.Is_eq
     | Proj (src1, ax1), Proj (src2, ax2) -> (
-      match compare_obj src1 src2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> (
-        match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Greater_than -> Greater_than
-        | Equal -> Equal))
-    | Proj _, _ -> Less_than
-    | _, Proj _ -> Greater_than
-    | Max_with ax1, Max_with ax2 -> (
-      match Axis.compare ax1 ax2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Max_with _, _ -> Less_than
-    | _, Max_with _ -> Greater_than
-    | Min_with ax1, Min_with ax2 -> (
-      match Axis.compare ax1 ax2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Min_with _, _ -> Less_than
-    | _, Min_with _ -> Greater_than
-    | Meet_const c1, Meet_const c2 -> compare dst c1 c2
-    | Meet_const _, _ -> Less_than
-    | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 -> compare dst c1 c2
-    | Imply_const _, _ -> Less_than
-    | _, Imply_const _ -> Greater_than
-    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
-    | Monadic_to_comonadic_min, _ -> Less_than
-    | _, Monadic_to_comonadic_min -> Greater_than
-    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> (
-      match compare_obj a1 a2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Comonadic_to_monadic_min _, _ -> Less_than
-    | _, Comonadic_to_monadic_min _ -> Greater_than
-    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
-    | Monadic_to_comonadic_max, _ -> Less_than
-    | _, Monadic_to_comonadic_max -> Greater_than
-    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> (
-      match compare_obj a1 a2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Comonadic_to_monadic_max _, _ -> Less_than
-    | _, Comonadic_to_monadic_max _ -> Greater_than
-    | Local_to_regional, Local_to_regional -> Equal
-    | Local_to_regional, _ -> Less_than
-    | _, Local_to_regional -> Greater_than
-    | Locality_as_regionality, Locality_as_regionality -> Equal
-    | Locality_as_regionality, _ -> Less_than
-    | _, Locality_as_regionality -> Greater_than
-    | Global_to_regional, Global_to_regional -> Equal
-    | Global_to_regional, _ -> Less_than
-    | _, Global_to_regional -> Greater_than
-    | Regional_to_local, Regional_to_local -> Equal
-    | Regional_to_local, _ -> Less_than
-    | _, Regional_to_local -> Greater_than
-    | Regional_to_global, Regional_to_global -> Equal
-    | Regional_to_global, _ -> Less_than
-    | _, Regional_to_global -> Greater_than
+      match equal_obj src1 src2 with
+      | Misc.Is_not_eq -> Misc.Is_not_eq
+      | Misc.Is_eq -> (
+        match Axis.equal ax1 ax2 with
+        | Misc.Is_eq -> Misc.Is_eq
+        | Misc.Is_not_eq -> Misc.Is_not_eq))
+    | Max_with ax1, Max_with ax2 -> Axis.equal ax1 ax2
+    | Min_with ax1, Min_with ax2 -> Axis.equal ax1 ax2
+    | Meet_const c1, Meet_const c2 ->
+      if equal dst c1 c2 then Misc.Is_eq else Misc.Is_not_eq
+    | Imply_const c1, Imply_const c2 ->
+      if equal dst c1 c2 then Misc.Is_eq else Misc.Is_not_eq
+    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Misc.Is_eq
+    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 ->
+      equal_obj a1 a2
+    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Misc.Is_eq
+    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 ->
+      equal_obj a1 a2
+    | Local_to_regional, Local_to_regional -> Misc.Is_eq
+    | Locality_as_regionality, Locality_as_regionality -> Misc.Is_eq
+    | Global_to_regional, Global_to_regional -> Misc.Is_eq
+    | Regional_to_local, Regional_to_local -> Misc.Is_eq
+    | Regional_to_global, Regional_to_global -> Misc.Is_eq
     | Compose (f1, g1), Compose (f2, g2) -> (
-      match compare_morph dst f1 f2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> (
-        match compare_morph (src dst f1) g1 g2 with
-        | Less_than -> Less_than
-        | Greater_than -> Greater_than
-        | Equal -> Equal))
-    | Compose _, _ -> Less_than
-    | _, Compose _ -> Greater_than
-    | Map_comonadic f, Map_comonadic g -> (
-      match compare_morph (proj_obj Areality dst) f g with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
+      match equal_morph dst f1 f2 with
+      | Misc.Is_not_eq -> Misc.Is_not_eq
+      | Misc.Is_eq -> equal_morph (src dst f1) g1 g2)
+    | Map_comonadic f, Map_comonadic g ->
+      begin match equal_morph (proj_obj Areality dst) f g with
+      | Misc.Is_not_eq -> Misc.Is_not_eq
+      | Misc.Is_eq -> Misc.Is_eq
+      end
+    | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _ | Imply_const _
+        | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
+        | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
+        | Local_to_regional | Locality_as_regionality | Global_to_regional
+        | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
+          ),
+        _ ) ->
+      Misc.Is_not_eq
 
   let rec print_morph : type a b l r.
       b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =
@@ -1867,8 +1964,8 @@ module Lattices_mono = struct
         | Portability -> Axis Portability)
       | Max_with m_ax, ax | Min_with m_ax, ax -> (
         match Axis.equal m_ax ax with
-        | None -> NoneResponsible
-        | Some Refl -> SourceIsSingle)
+        | Is_not_eq -> NoneResponsible
+        | Is_eq -> SourceIsSingle)
       | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
       | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
       | Comonadic_to_monadic_min _, ax -> handle_comonadic_to_monadic ax
@@ -1918,9 +2015,9 @@ module Lattices_mono = struct
     | Proj (mid, ax), Meet_const c ->
       Some (compose dst (Meet_const (Axis.proj ax c)) (Proj (mid, ax)))
     | Proj (_, ax1), Max_with ax2 -> (
-      match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Id)
+      match Axis.equal ax1 ax2 with Is_not_eq -> None | Is_eq -> Some Id)
     | Proj (_, ax1), Min_with ax2 -> (
-      match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Id)
+      match Axis.equal ax1 ax2 with Is_not_eq -> None | Is_eq -> Some Id)
     | Proj (mid, ax), Map_comonadic f -> (
       let src' = src mid m2 in
       match ax with
@@ -2110,8 +2207,8 @@ module Report = struct
 
   (** Human-readible mode error report. *)
   type 'a t =
-    { left : ('a, left_only) ahint;
-      right : ('a, right_only) ahint
+    { left : loosening * ('a, left_only) ahint;
+      right : loosening * ('a, right_only) ahint
     }
 
   (** Convert Solver error to report. *)
@@ -2119,96 +2216,179 @@ module Report = struct
     (** Given a branch of two constant bounds on a single axis, choose the the
         one that's responsible for the branch. *)
     let choose_branch_axis : type a l r.
-        (l * r) Solver_intf.branch -> a C.obj -> a -> a -> [`First | `Second] =
-     fun b a_obj x y ->
-      (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
-         [x] and [y], which are unordered anyway. In the future we might want to keep an
-         order for better error messages. For example, order them by occurrence in the
-         source code such that the more recent hint is returned.
-
-         nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
-      if
-        begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
+        (l * r) Solver_intf.branch ->
+        a C.obj ->
+        a ->
+        a ->
+        other:a ->
+        [`First | `Second] =
+     fun b a_obj x y ~other ->
+      (* CR-someday zqian: in the case where each of [x] and [y] can be
+         responsible independently, for not satisfying [~other], we currently
+         arbitrarily prioritize `Second. In the future we might want to
+         prioritize for better error messages. For example, prioritize the first
+         element in a [join]. This requires inspecting the [solver.ml] to ensure
+         the ordering in the [join] list is preserved. *)
+      match b with
+      | Meet ->
+        if C.le a_obj other x
+        then begin
+          assert (not (C.le a_obj other y));
+          `Second
         end
-      then `First
-      else `Second
+        else `First
+      | Join ->
+        if C.le a_obj x other
+        then begin
+          assert (not (C.le a_obj y other));
+          `Second
+        end
+        else `First
+
+    type 'd side =
+      | Left : left_only side
+      | Right : right_only side
+      constraint 'd = 'l * 'r
+    [@@ocaml.warning "-62"]
+
+    let adjoint : type a b l r.
+        a C.obj ->
+        (l * r) side ->
+        (b, a, l * r) C.morph ->
+        (a, b, r * l) C.morph =
+     fun obj side morph ->
+      match side with
+      | Left -> C.right_adjoint obj morph
+      | Right -> C.left_adjoint obj morph
 
     (** Given a solver hint on a product lattice, and an axis in that product
         that we are interested in, returns a human-readible hint.*)
     let rec hint_apply : type a b l r.
         a C.obj ->
+        (l * r) side ->
+        a ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
+        other:a ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
-        (l * r) hint =
-     fun obj morph_hint morph ahint res ->
-      let obj = C.src obj morph in
+        (a, l * r) ahint =
+     fun obj side a morph_hint morph ~other ahint res ->
+      let src = C.src obj morph in
       match res with
-      | NoneResponsible -> Irrelevant
+      | NoneResponsible -> a, Irrelevant
       | SourceIsSingle ->
-        let ahint = ahint_axis obj ahint in
-        Apply (morph_hint, obj, ahint)
+        let morph' = adjoint obj side morph in
+        let other = C.apply src morph' other in
+        let ahint = hint_axis src side ~other ahint in
+        let ma = C.apply obj morph (fst ahint) in
+        ma, Apply (morph_hint, src, ahint)
       | Axis ax ->
-        let ahint = ahint_prod obj ax ahint in
-        let obj = C.proj_obj ax obj in
-        Apply (morph_hint, obj, ahint)
+        let b, hint = ahint in
+        let morph' = adjoint obj side morph in
+        let other = C.apply src morph' other in
+        let x, hint = hint_prod src side ax ~other (b, hint) in
+        let b = C.Axis.set ax x b in
+        let a = C.apply obj morph b in
+        let src = C.proj_obj ax src in
+        a, Apply (morph_hint, src, (x, hint))
 
     and hint_prod : type t a l r.
-        t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
-     fun obj ax -> function
+        t C.obj ->
+        (l * r) side ->
+        (t, a) Axis.t ->
+        other:t ->
+        (t, l * r) S.ahint ->
+        (a, l * r) ahint =
+     fun obj side ax ~other (a, hint) ->
+      match hint with
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj morph_hint morph ahint
-          (C.For_hint.find_responsible_axis_prod morph ax)
-      | Const c -> Const c
+        let t, hint =
+          hint_apply obj side a morph_hint morph ~other ahint
+            (C.For_hint.find_responsible_axis_prod morph ax)
+        in
+        Axis.proj ax t, hint
+      | Const c -> Axis.proj ax a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_hint =
+        let chosen_ahint =
+          let other = Axis.proj ax other in
           let proj1 = Axis.proj ax a1 in
           let proj2 = Axis.proj ax a2 in
           let obj = C.proj_obj ax obj in
-          match choose_branch_axis b obj proj1 proj2 with
-          | `First -> hint1
-          | `Second -> hint2
+          match choose_branch_axis b obj proj1 proj2 ~other with
+          | `First -> a1, hint1
+          | `Second -> a2, hint2
         in
-        hint_prod obj ax chosen_hint
-
-    and ahint_prod : type t a l r.
-        t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj ax (t, hint) ->
-      let a = Axis.proj ax t in
-      let hint = hint_prod obj ax hint in
-      a, hint
+        hint_prod obj side ax ~other chosen_ahint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
-    and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
-     fun obj -> function
+    and hint_axis : type a l r.
+        a C.obj ->
+        (l * r) side ->
+        other:a ->
+        (a, l * r) S.ahint ->
+        (a, l * r) ahint =
+     fun obj side ~other (a, hint) ->
+      match hint with
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj morph_hint morph ahint
+        hint_apply obj side a morph_hint morph ~other ahint
           (C.For_hint.find_responsible_axis_single morph)
-      | Const c -> Const c
+      | Const c -> a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_hint =
-          match choose_branch_axis b obj a1 a2 with
-          | `First -> hint1
-          | `Second -> hint2
+        let chosen_ahint =
+          match choose_branch_axis b obj a1 a2 ~other with
+          | `First -> a1, hint1
+          | `Second -> a2, hint2
         in
-        hint_axis obj chosen_hint
+        hint_axis obj side ~other chosen_ahint
 
-    and ahint_axis : type a l r.
-        a Lattices_mono.obj -> (a, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj (a, hint) -> a, hint_axis obj hint
+    let hint_prod_loosening : type t a l r.
+        t C.obj ->
+        (l * r) side ->
+        (t, a) Axis.t ->
+        other:t ->
+        (t, l * r) S.ahint ->
+        loosening * (a, l * r) ahint =
+     fun obj side ax ~other ((t, _) as ahint) ->
+      let axis_obj = C.proj_obj ax obj in
+      let a, hint = hint_prod obj side ax ~other ahint in
+      let loosening =
+        if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
+        then Not_loosened
+        else Loosened
+      in
+      loosening, (a, hint)
+
+    let hint_axis_loosening : type a l r.
+        a C.obj ->
+        (l * r) side ->
+        other:a ->
+        (a, l * r) S.ahint ->
+        loosening * (a, l * r) ahint =
+     fun obj side ~other ((original, _) as ahint) ->
+      let a, hint = hint_axis obj side ~other ahint in
+      let loosening =
+        if Misc.Le_result.equal ~le:(C.le obj) a original
+        then Not_loosened
+        else Loosened
+      in
+      loosening, (a, hint)
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left; right } ->
-      let left = ahint_prod obj axis left in
-      let right = ahint_prod obj axis right in
+      let left = hint_prod_loosening obj Left axis ~other:(fst right) left in
+      let right =
+        hint_prod_loosening obj Right axis
+          ~other:(Axis.set axis (fst (snd left)) (fst right))
+          right
+      in
       { left; right }
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
      fun obj { left; right } ->
-      let left = ahint_axis obj left in
-      let right = ahint_axis obj right in
+      let left = hint_axis_loosening obj Left ~other:(fst right) left in
+      let right = hint_axis_loosening obj Right ~other:(fst (snd left)) right in
       { left; right }
   end
 
@@ -2256,6 +2436,10 @@ module Report = struct
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
     | Quote -> Some (print_article_noun Consonant "quoted expression")
     | Expression -> Some (print_article_noun Vowel "expression")
+    | Effect_match ->
+      Some (print_article_noun Consonant "pattern match with effect cases")
+    | Effect_try ->
+      Some (print_article_noun Consonant "try-with with effect cases")
     | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
     | Object -> Some (print_article_noun Vowel "object")
@@ -2413,6 +2597,10 @@ module Report = struct
         "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
+    | Lpoly_captured_environment ->
+      Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
 
   let print_allocation_r : allocation -> Fmt.formatter -> unit =
    fun { txt; _ } ->
@@ -2427,6 +2615,9 @@ module Report = struct
          allocation)"
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
+    | Lpoly_captured_environment ->
+      (* currently not testable *)
+      Fmt.dprintf "is a layout-polymorphic expression"
 
   let modality_if_relevant ~fixpoint pp =
     if
@@ -2614,9 +2805,9 @@ module Report = struct
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
-    match C.compare_obj a_obj b_obj with
-    | Equal -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Less_than | Greater_than -> false
+    match C.equal_obj a_obj b_obj with
+    | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+    | Misc.Is_not_eq -> false
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -2658,9 +2849,27 @@ module Report = struct
       Some Mode_with_hint
   [@@ocaml.warning "-4"]
 
+  let print_ahint_loosening : type a l r.
+      [`Left | `Right] ->
+      pinpoint ->
+      a C.obj ->
+      Fmt.formatter ->
+      loosening ->
+      (a, l * r) ahint ->
+      print_error_result option =
+   fun side pp obj ppf loosening ahint ->
+    (match loosening with
+    | Loosened ->
+      begin match adjust_side obj side with
+      | `Actual -> Fmt.fprintf ppf "weaker than "
+      | `Expected -> Fmt.fprintf ppf "stronger than "
+      end
+    | Not_loosened -> ());
+    print_ahint side pp obj ppf ahint
+
   type 'a ahint_sided =
-    | Left of ('a, left_only) ahint
-    | Right of ('a, right_only) ahint
+    | Left of (loosening * ('a, left_only) ahint)
+    | Right of (loosening * ('a, right_only) ahint)
 
   let print_ahint_sided : type a.
       pinpoint ->
@@ -2670,8 +2879,10 @@ module Report = struct
       print_error_result option =
    fun pp obj ppf ahint_sided ->
     match ahint_sided with
-    | Left ahint -> print_ahint `Left pp obj ppf ahint
-    | Right ahint -> print_ahint `Right pp obj ppf ahint
+    | Left (loosening, ahint) ->
+      print_ahint_loosening `Left pp obj ppf loosening ahint
+    | Right (loosening, ahint) ->
+      print_ahint_loosening `Right pp obj ppf loosening ahint
 
   let print : type a. pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj { left; right } ->
@@ -3328,8 +3539,7 @@ module Comonadic_with (Areality : Areality) = struct
         P Forkable;
         P Yielding;
         P Statefulness ]
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3373,6 +3583,11 @@ module Comonadic_with (Areality : Areality) = struct
         let obj1 = proj_obj ax1 in
         let obj2 = proj_obj ax2 in
         C.compare_obj obj1 obj2
+
+      let equal_obj ax1 ax2 =
+        let obj1 = proj_obj ax1 in
+        let obj2 = proj_obj ax2 in
+        C.equal_obj obj1 obj2
 
       let print_obj ppf ax =
         let obj = proj_obj ax in
@@ -3467,8 +3682,7 @@ module Monadic = struct
 
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3514,6 +3728,11 @@ module Monadic = struct
         let obj1 = proj_obj ax1 in
         let obj2 = proj_obj ax2 in
         C.compare_obj obj1 obj2
+
+      let equal_obj ax1 ax2 =
+        let obj1 = proj_obj ax1 in
+        let obj2 = proj_obj ax2 in
+        C.equal_obj obj1 obj2
 
       let print_obj ppf ax =
         let obj = proj_obj ax in
@@ -3603,12 +3822,12 @@ module Value_with (Areality : Areality) = struct
       | Comonadic : 'a Comonadic.Axis.t -> 'a t
       | Monadic : 'a Monadic.Axis.t -> 'a t
 
-    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
+    let compare : type a b. a t -> b t -> int =
      fun t1 t2 ->
       match t1, t2 with
       | Comonadic t1, Comonadic t2 -> Axis.compare t1 t2
-      | Comonadic _, _ -> Less_than
-      | _, Comonadic _ -> Greater_than
+      | Comonadic _, _ -> -1
+      | _, Comonadic _ -> 1
       | Monadic t1, Monadic t2 -> Axis.compare t1 t2
 
     type packed = P : 'a t -> packed
@@ -3623,8 +3842,7 @@ module Value_with (Areality : Areality) = struct
       @ List.map
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
-      |> List.sort (fun (P ax1) (P ax2) ->
-          Misc.comparison_result (compare ax1 ax2))
+      |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function
@@ -5098,23 +5316,22 @@ module Crossing = struct
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
 
-    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
+    let compare : type a b. a t -> b t -> int =
      fun ax1 ax2 ->
       match ax1, ax2 with
-      | Monadic ax1, Monadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Equal -> Equal
-        | Greater_than -> Greater_than
-        end
-      | Monadic _, _ -> Less_than
-      | _, Monadic _ -> Greater_than
-      | Comonadic ax1, Comonadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Equal -> Equal
-        | Greater_than -> Greater_than
-        end
+      | Monadic ax1, Monadic ax2 -> Axis.compare ax1 ax2
+      | Monadic _, _ -> -1
+      | _, Monadic _ -> 1
+      | Comonadic ax1, Comonadic ax2 -> Axis.compare ax1 ax2
+
+    let equal : type a b. a t -> b t -> (a, b) Misc.is_eq =
+     fun ax1 ax2 ->
+      match ax1, ax2 with
+      | Monadic ax1, Monadic ax2 -> (
+        match Axis.equal ax1 ax2 with Is_eq -> Is_eq | Is_not_eq -> Is_not_eq)
+      | Comonadic ax1, Comonadic ax2 -> (
+        match Axis.equal ax1 ax2 with Is_eq -> Is_eq | Is_not_eq -> Is_not_eq)
+      | (Monadic _ | Comonadic _), _ -> Is_not_eq
 
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
@@ -5164,6 +5381,8 @@ module Crossing = struct
     let print_obj = Axis.print
 
     let compare_obj = Axis.compare
+
+    let equal_obj = Axis.equal
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic

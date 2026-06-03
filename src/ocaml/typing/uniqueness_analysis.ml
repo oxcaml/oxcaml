@@ -2419,7 +2419,8 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_match (arg, _, cases, eff_cases, _) ->
     let value, uf_arg = check_uniqueness_exp_for_match ienv arg in
     let uf_cases = check_uniqueness_comp_cases ienv value cases in
-    let uf_eff_cases = check_uniqueness_cases ienv value eff_cases in
+    let effect_value = Match_single Paths.untracked in
+    let uf_eff_cases = check_uniqueness_cases ienv effect_value eff_cases in
     (* CR rtjoa for zqian: uncertain whether this is sound *)
     (* Effects can be run multiple times - for uniqueness, this is equivalent to
        twice - and can also be run when the non-effect case is run. *)
@@ -2429,7 +2430,8 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     let uf_body = check_uniqueness_exp ~overwrite:None ienv body in
     let value = Match_single (Paths.fresh ()) in
     let uf_cases = check_uniqueness_cases ienv value cases in
-    let uf_eff_cases = check_uniqueness_cases ienv value eff_cases in
+    let effect_value = Match_single Paths.untracked in
+    let uf_eff_cases = check_uniqueness_cases ienv effect_value eff_cases in
     (* CR rtjoa for zqian: uncertain whether this is sound *)
     (* Effects can be run multiple times - for uniqueness, this is equivalent to
        twice - and can also be run when the non-effect case is run. *)
