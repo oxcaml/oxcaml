@@ -24,14 +24,17 @@ val maybe_pointer_type : Env.t -> Types.type_expr
 val maybe_pointer : Typedtree.expression
   -> Lambda.immediate_or_pointer * Lambda.nullable
 
-(* Supplying [None] for [elt_sort] should be avoided when possible. It
-   will result in a call to [Ctype.type_sort] which can be expensive. *)
+(* CR layouts-scannable: These functions will call [Ctype.type_sort] and extract
+   the layout in order to compute the array_kind. If (representable) layout info
+   is stored (e.g. in the typedtree) instead of sorts, those layouts can be
+   threaded through these functions to avoid the possibly expensive calls. *)
 val array_type_kind :
-  elt_sort:(Jkind.Sort.Const.t option) -> elt_ty:(Types.type_expr option)
+  elt_ty:(Types.type_expr option)
   -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 (*
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
 val array_kind_of_elt :
+<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
   elt_sort:(Jkind.Sort.Const.t option)
   -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 *)
@@ -40,6 +43,18 @@ val array_kind :
 (*
 val array_pattern_kind :
   Typedtree.pattern -> Jkind.Sort.Const.t -> Lambda.array_kind
+||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
+  elt_sort:(Jkind.Sort.Const.t option)
+  -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
+val array_kind :
+  Typedtree.expression -> Jkind.Sort.Const.t -> Lambda.array_kind
+val array_pattern_kind :
+  Typedtree.pattern -> Jkind.Sort.Const.t -> Lambda.array_kind
+=======
+  Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
+val array_kind : Typedtree.expression -> Lambda.array_kind
+val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
+>>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 
 (* If [kind] or [layout] is unknown, attempt to specialize it by examining the
    type parameters of the bigarray. If [kind] or [length] is not unknown, returns

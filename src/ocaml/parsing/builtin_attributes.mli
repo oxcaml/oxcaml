@@ -198,6 +198,8 @@ val explicit_arity: Parsetree.attributes -> bool
 
 val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
+val has_flatten_floats: Parsetree.attributes -> bool
+val has_represent_as_float_array: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 
@@ -217,6 +219,7 @@ val has_layout_poly: Parsetree.attributes -> bool
 val has_curry: Parsetree.attributes -> bool
 val has_or_null : Parsetree.attributes -> bool
 val has_or_null_reexport : Parsetree.attributes -> bool
+val has_magic_staged_modes : Parsetree.attributes -> bool
 
 val tailcall : Parsetree.attributes ->
     ([`Tail|`Nontail|`Tail_if_possible] option, [`Conflict]) result

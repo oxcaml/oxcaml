@@ -155,7 +155,6 @@ let fmt_presence f x =
   | Types.Mp_present -> fprintf f "(Present)"
   | Types.Mp_absent -> fprintf f "(Absent)"
 
-
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
   fprintf f s (*...*)
@@ -251,8 +250,8 @@ let mixed_block_element i ppf mixed_block_element =
 let record_representation i ppf = let open Types in function
   | Record_unboxed ->
     line i ppf "Record_unboxed\n"
-  | Record_boxed sorts ->
-    line i ppf "Record_boxed %a\n" (sort_array i) sorts
+  | Record_boxed ->
+    line i ppf "Record_boxed\n"
   | Record_inlined (t, _c, v) ->
     line i ppf "Record_inlined (%a, %a)\n" tag t (variant_representation i) v
   | Record_float -> line i ppf "Record_float\n"
@@ -260,6 +259,10 @@ let record_representation i ppf = let open Types in function
   | Record_mixed shape ->
     line i ppf "Record_mixed\n";
     array (i+1) mixed_block_element ppf shape
+  | Record_dummy { represent_as_float_array = true } ->
+    line i ppf "Record_dummy [@@represent_as_float_array]\n"
+  | Record_dummy { represent_as_float_array = false } ->
+    line i ppf "Record_dummy\n"
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->

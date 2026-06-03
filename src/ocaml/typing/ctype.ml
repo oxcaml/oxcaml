@@ -215,6 +215,12 @@ let create_scope () =
 
 let wrap_end_def f = Misc.try_finally f ~always:end_def
 
+let mark_toplevel_in_quotations env =
+  let scope = !current_level in
+  (* Create a new scope to make sure we only capture what came before *)
+  let _ = create_scope () in
+  Env.mark_toplevel_in_quotations ~scope env
+
 (* [with_local_level_gen] handles both the scoping structure of levels
    and automatic generalization through pools (cf. btype.ml) *)
 let with_local_level_gen ~begin_def ~structure ?before_generalize f =
@@ -284,12 +290,6 @@ let with_local_level_generalize_structure_if_principal f =
 let with_local_level_generalize_for_class ~before_generalize f =
   with_local_level_gen
     ~begin_def:begin_class_def ~structure:false ~before_generalize f
-
-let mark_toplevel_in_quotations env =
-  let scope = !current_level in
-  (* Create a new scope to make sure we only capture what came before *)
-  let _ = create_scope () in
-  Env.mark_toplevel_in_quotations ~scope env
 
 let with_local_level ?post f =
   begin_def ();
@@ -382,27 +382,29 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~in_counterexample =
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  let make ?env_alloc_mode env ~equations_scope ~in_counterexample =
     { env;
       equations_scope;
       in_counterexample;
-      is_lpoly; }
+      env_alloc_mode; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
+  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
 end
 
 (**** unification mode ****)
@@ -416,7 +418,8 @@ type unification_environment =
       { penv : Pattern_env.t;
         equated_types : TypePairs.t;
         assume_injective : bool;
-        unify_eq_set : TypePairs.t }
+        unify_eq_set : TypePairs.t;
+        pattern_stage : Env.stage; }
     (* GADT constraint unification mode:
        only used for type indices of GADT constructors
        during pattern matching.
@@ -460,6 +463,11 @@ let unify_eq uenv t1 t2 =
 let in_subst_mode = function
   | Expression {in_subst} -> in_subst
   | Pattern _ -> false
+
+let can_generate_equations = function
+  | Expression _ -> false
+  | Pattern { penv; pattern_stage } ->
+    Env.stage penv.env >= pattern_stage
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
@@ -573,6 +581,7 @@ let unify_with_decr_stage uenv f =
     with exn ->
       Pattern_env.set_env p.penv (incr_stage p.penv.env);
       raise exn
+
 (* Unification generally must check that the jkinds of the two types being
    unified agree.  However, sometimes we need to delay these jkind
    checks, and this is tracked by the [jkind_unification_mode] in [lmode].
@@ -1646,20 +1655,23 @@ type existential_treatment =
 let instance_constructor existential_treatment cstr =
   For_copy.with_scope (fun copy_scope ->
     let name_counter = ref 0 in
+    let declared_jkind_of existential =
+      match get_desc existential with
+      | Tvar { jkind } -> jkind
+      | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
+          (* Existential row variable *)
+      | _ -> Misc.fatal_error "Ctype.instance_constructor"
+    in
     let copy_existential =
       match existential_treatment with
-      | Keep_existentials_flexible -> copy copy_scope
+      | Keep_existentials_flexible ->
+          fun existential ->
+            (copy copy_scope existential, declared_jkind_of existential)
       | Make_existentials_abstract penv ->
           fun existential ->
             (* CR layouts v1.5: Add test case that hits this once we have syntax
                for it *)
-            let jkind =
-              match get_desc existential with
-              | Tvar { jkind } -> jkind
-              | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
-                  (* Existential row variable *)
-              | _ -> assert false
-            in
+            let jkind = declared_jkind_of existential in
             let decl = new_local_type (Existential cstr.cstr_name) jkind in
             let name = existential_name name_counter existential in
             let env = penv.env in
@@ -1672,7 +1684,7 @@ let instance_constructor existential_treatment cstr =
             let tv = copy copy_scope existential in
             assert (is_Tvar tv);
             link_type tv to_unify;
-            tv
+            (tv, jkind)
     in
     let ty_ex = List.map copy_existential cstr.cstr_existentials in
     let ty_res = copy copy_scope cstr.cstr_res in
@@ -3337,10 +3349,6 @@ let check_type_externality env ty ext =
   | Ok () -> true
   | Error _ -> false
 
-let is_always_gc_ignorable env ty =
-  check_type_externality
-    env ty (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-
 let check_type_nullability env ty null =
   let upper_bound =
     Jkind.set_root_nullability (Jkind.Builtin.any ~why:Dummy_jkind) null
@@ -3349,13 +3357,28 @@ let check_type_nullability env ty null =
   | Ok () -> true
   | Error _ -> false
 
-let check_type_separability env ty sep =
-  let upper_bound =
-    Jkind.set_root_separability (Jkind.Builtin.any ~why:Dummy_jkind) sep
-  in
+let check_type_separability jkind env ty sep =
+  let upper_bound = Jkind.set_root_separability jkind sep in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
   | Error _ -> false
+
+let is_always_gc_ignorable env ty =
+  (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
+  check_type_externality env ty
+    (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
+  ||
+  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
+     whenever [ty]'s layout is not scannable, the check will be [false]. *)
+  (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
+     a type of kind [value non_pointer & value non_pointer] will fail to be
+     recognized as being always_gc_ignorable, even though it is. To avoid this,
+     [non_pointer(64)] should imply [external(64)]. *)
+  check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty
+      (Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ())
+
+let check_type_separability env ty sep =
+  check_type_separability (Jkind.Builtin.any ~why:Dummy_jkind) env ty sep
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with
@@ -4323,18 +4346,20 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     else
       match decl.type_kind, decl'.type_kind with
       | Type_record (lst,r,umc), Type_record (lst',r',umc')
-        when equal_record_representation r r' ->
+        when equal_record_representation_up_to_scannable_axes r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_record_unboxed_product (lst,r,umc),
         Type_record_unboxed_product (lst',r',umc')
-        when equal_record_unboxed_product_representation r r' ->
+        when
+          equal_record_unboxed_product_representation_up_to_scannable_axes r r'
+        ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_variant (v1,r,umc), Type_variant (v2,r',umc')
-        when equal_variant_representation r r' ->
+        when equal_variant_representation_up_to_scannable_axes r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_variant_description type_pairs env v1 v2;
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
@@ -4580,7 +4605,7 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 pack2 =
 let rec is_instantiable_ty uenv ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
-      in_pattern_mode uenv &&
+      can_generate_equations uenv &&
       is_instantiable (get_env uenv) ~for_jkind_eqn:false path
   | Tquote ty' ->
     unify_with_incr_stage uenv (fun uenv ->
@@ -4672,22 +4697,24 @@ let unify3_var uenv jkind1 t1' t2 t2' =
       backtrack snap;
       reify uenv t1';
       reify uenv t2';
-      begin match get_desc t2' with
-      | Tconstr(path,[],_)
-        when is_instantiable (get_env uenv) ~for_jkind_eqn:false path ->
-          add_gadt_equation uenv path t1'
-            (* This is necessary because a failed kind-check above
-               might meaningfully refine a type constructor *)
-      | _ ->
-        occur_univar ~inj_only:true (get_env uenv) t2';
-        mcomp_for Unify (get_env uenv) t1' t2'
-          (* the call to [mcomp] can be skipped in the other case in this
-             [match] because [add_gadt_equation] checks for jkind
-             intersection, which is the only interesting check in [mcomp]
-             when one side is a variable. We could pull that check out
-             here specially, but it seems simpler not to. *)
-      end;
-      record_equation uenv t1' t2'
+      if can_generate_equations uenv then begin
+        begin match get_desc t2' with
+        | Tconstr(path,[],_)
+          when is_instantiable (get_env uenv) ~for_jkind_eqn:false path ->
+            add_gadt_equation uenv path t1'
+              (* This is necessary because a failed kind-check above
+                 might meaningfully refine a type constructor *)
+        | _ ->
+          occur_univar ~inj_only:true (get_env uenv) t2';
+          mcomp_for Unify (get_env uenv) t1' t2'
+            (* the call to [mcomp] can be skipped in the other case in this
+               [match] because [add_gadt_equation] checks for jkind
+               intersection, which is the only interesting check in [mcomp]
+               when one side is a variable. We could pull that check out
+               here specially, but it seems simpler not to. *)
+        end;
+        record_equation uenv t1' t2'
+      end
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -4871,7 +4898,7 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
       | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) when Path.same p1 p2 ->
-          if not (in_pattern_mode uenv) then
+          if not (can_generate_equations uenv) then
             unify_list uenv tl1 tl2
           else if can_assume_injective uenv then
             without_assume_injective uenv (fun uenv -> unify_list uenv tl1 tl2)
@@ -4894,7 +4921,7 @@ and unify3 uenv t1 t1' t2 t2' =
               inj (List.combine tl1 tl2)
       | (Tconstr (path,[],_),
          Tconstr (path',[],_))
-        when in_pattern_mode uenv &&
+        when can_generate_equations uenv &&
         let env = get_env uenv in
         is_instantiable env ~for_jkind_eqn:false path
         && is_instantiable env ~for_jkind_eqn:false path' ->
@@ -4906,13 +4933,13 @@ and unify3 uenv t1 t1' t2 t2' =
           record_equation uenv t1' t2';
           add_gadt_equation uenv source destination
       | (Tconstr (path,[],_), _)
-        when in_pattern_mode uenv
+        when can_generate_equations uenv
           && is_instantiable (get_env uenv) ~for_jkind_eqn:false path ->
           reify uenv t2';
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t2'
       | (_, Tconstr (path,[],_))
-        when in_pattern_mode uenv
+        when can_generate_equations uenv
           && is_instantiable (get_env uenv) ~for_jkind_eqn:false path ->
           reify uenv t1';
           record_equation uenv t1' t2';
@@ -4952,8 +4979,10 @@ and unify3 uenv t1 t1' t2 t2' =
           && (is_equatable_ty t1 || is_equatable_ty t2) ->
           reify uenv t1';
           reify uenv t2';
-          mcomp_for Unify (get_env uenv) t1' t2';
-          record_equation uenv t1' t2'
+          if can_generate_equations uenv then (
+            mcomp_for Unify (get_env uenv) t1' t2';
+            record_equation uenv t1' t2'
+          )
       | (Tobject (fi1, nm1), Tobject (fi2, _)) ->
           unify_fields uenv fi1 fi2;
           (* Type [t2'] may have been instantiated by [unify_fields] *)
@@ -4975,8 +5004,10 @@ and unify3 uenv t1 t1' t2 t2' =
               backtrack snap;
               reify uenv t1';
               reify uenv t2';
-              mcomp_for Unify (get_env uenv) t1' t2';
-              record_equation uenv t1' t2'
+              if can_generate_equations uenv then (
+                mcomp_for Unify (get_env uenv) t1' t2';
+                record_equation uenv t1' t2'
+              )
           end
       | (Tfield(f,kind,_,rem), Tnil) | (Tnil, Tfield(f,kind,_,rem)) ->
           begin match field_kind_repr kind with
@@ -5354,7 +5385,8 @@ let unify_gadt (penv : Pattern_env.t) ~pat:ty1 ~expected:ty2 =
         { penv;
           equated_types;
           assume_injective = true;
-          unify_eq_set = TypePairs.create 11; }
+          unify_eq_set = TypePairs.create 11;
+          pattern_stage = Env.stage penv.env; }
     in
     unify uenv ty1 ty2;
     equated_types
@@ -6399,66 +6431,65 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
   (* Moregen splits the generic level into two finer levels:
      [generic_level] and [subject_level = generic_level - 1].
      In order to properly detect and print weak variables when
-     printing errors, we need to merge those levels back together,
-     by regeneralizing the levels of the types on the error path.
+     printing errors, we need to merge those levels back together.
+     We do that by starting at level [subject_level - 1], using
+     [with_local_level_generalize] to first set the current level
+     to [subject_level], and then generalize nodes at [subject_level]
+     on exit.
+     Strictly speaking, we could avoid generalizing when there is no error,
+     as nodes at level [subject_level] are never unified with nodes of
+     the original types, but that would be rather ad hoc.
  *)
   with_level ~level:(subject_level - 1) begin fun () ->
-    (*
-      Generic variables are first duplicated with [instance].  So,
-      their levels are lowered to [subject_level].  The subject is
-      then copied with [duplicate_type].  That way, its levels won't be
-      changed.
-     *)
-    let (subj_sorts, subj_inst, subj) =
-      with_level ~level:subject_level begin fun () ->
-        let (subj_sorts, subj_inst) =
-          Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
-            (fun () -> instance subj_sch)
-        in
-        let subj = duplicate_type subj_inst in
-        (subj_sorts, subj_inst, subj)
-      end
-    in
-    (* Duplicate generic variables *)
-    let (pat_sorts, patt) =
-      Jkind_types.Sort.instance_with ~level:generic_level pat_sort_vars
-        (fun () -> generic_instance pat_sch)
-    in
-    try
-      with_univar_pairs [] begin fun () ->
-        let type_pairs = fresh_moregen_pairs () in
-        moregen inst_nongen Covariant type_pairs env patt subj;
-        (* After [moregen], [pat_sorts] have been set to [subj_sorts].
-           [subj_sorts] are ephemeral rigid vars created by
-           [instance_with] to stand for [subj_sort_vars] during moregen.
-           Replace them back with the originals so that the returned
-           [pat_sort_refs] refer to [subj_sort_vars], not to the
-           short-lived rigid instances. *)
-        let subj_sort_vars =
-          List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
-        in
-        let subst_map = List.combine subj_sorts subj_sort_vars in
-        List.map
-          (fun v ->
-            v
-            |> Jkind_types.Sort.get_representable_var
-            |> Option.map (Jkind_types.Sort.subst subst_map))
-          pat_sorts
-      end
-    with Moregen_trace trace ->
-      (* Moregen splits the generic level into two finer levels:
-         [generic_level] and [subject_level = generic_level - 1].
-         In order to properly detect and print weak variables when
-         printing this error, we need to merge them back together,
-         by regeneralizing the levels of the types after they were
-         instantiated at [subject_level] above.  Because [moregen]
-         does some unification that we need to preserve for more
-         legible error messages, we have to manually perform the
-         regeneralization rather than backtracking. *)
-      let (), _sub_sorts =
-        Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)
+    match with_local_level_generalize begin fun () ->
+      assert (!current_level = subject_level);
+      (*
+        Generic variables are first duplicated with [instance].  So,
+        their levels are lowered to [subject_level].  The subject is
+        then copied with [duplicate_type].  That way, its levels won't be
+        changed.
+       *)
+      let (subj_sorts, subj_inst) =
+        Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
+          (fun () -> instance subj_sch)
       in
-      raise (Moregen (expand_to_moregen_error env trace))
+      let subj = duplicate_type subj_inst in
+      (* Duplicate generic variables *)
+      let (pat_sorts, patt) =
+        Jkind_types.Sort.instance_with ~level:generic_level pat_sort_vars
+          (fun () -> generic_instance pat_sch)
+      in
+      try
+        with_univar_pairs [] begin fun () ->
+          let type_pairs = fresh_moregen_pairs () in
+          moregen inst_nongen Covariant type_pairs env patt subj;
+          (* After [moregen], [pat_sorts] have been set to [subj_sorts].
+             [subj_sorts] are ephemeral rigid vars created by [instance_with] to
+             stand for [subj_sort_vars] during moregen.  Replace them back with
+             the originals so that the returned [pat_sort_refs] refer to
+             [subj_sort_vars], not to the short-lived rigid instances. *)
+          let subj_sort_vars =
+            List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
+          in
+          let subst_map = List.combine subj_sorts subj_sort_vars in
+          let sorts =
+            List.map
+              (fun v ->
+                 v
+                 |> Jkind_types.Sort.get_representable_var
+                 |> Option.map (Jkind_types.Sort.subst subst_map))
+              pat_sorts
+          in
+          subj_inst, Ok sorts
+        end
+      with Moregen_trace trace -> subj_inst, Error trace
+    end
+      ~before_generalize:(fun (subj_inst, _) ->
+        ignore
+          (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
+    with
+    | _, Ok sorts -> sorts
+    | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =

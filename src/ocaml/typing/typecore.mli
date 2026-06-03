@@ -321,6 +321,7 @@ type error =
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
   | Bind_existential of existential_binding * Ident.t * type_expr
+  | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Expr_not_a_record_type of Data_types.record_form_packed * type_expr
@@ -336,9 +337,7 @@ type error =
       Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_record_unboxed
-  | Block_access_private_record
-  | Block_index_flattened_record of type_expr
+  | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Block_index_atomic_unsupported
@@ -367,6 +366,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
+  | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =

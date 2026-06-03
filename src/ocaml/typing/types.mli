@@ -834,7 +834,7 @@ type type_declaration =
 
     type_ikind: constructor_ikind_entry;
     (* Cached constructor ikind polynomial (opaque) populated when jkinds are
-       normalized under [-ikinds]; carries a reason when absent. *)
+       normalized with ikinds enabled; carries a reason when absent. *)
 
     type_private: private_flag;
     type_manifest: type_expr option;
@@ -846,7 +846,9 @@ type type_declaration =
     type_loc: Location.t;
     type_attributes: Parsetree.attributes;
     type_unboxed_default: bool;
-    (* true if the unboxed-ness of this type was chosen by a compiler flag *)
+    (* true if the user did not specify an explicit representation attribute
+       ([@@unboxed] or [@@represent_as_float_array]), so the representation may
+       have been chosen by a compiler flag. *)
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
     (* stores the unboxed version of that this type introduces: this is [Some]
@@ -899,7 +901,7 @@ and tag = Ordinary of {src_index: int;  (* Unique name (per type) *)
    to appear in any order in a record, and later stages of the compiler
    re-arrange the block. *)
 and mixed_block_element =
-  | Scannable
+  | Scannable of Jkind_types.Scannable_axes.t
   | Float_boxed
   (* A [Float_boxed] is a float that's stored flat but boxed upon projection. *)
   | Float64
@@ -932,7 +934,7 @@ and record_representation =
   (* For an inlined record, we record the representation of the variant that
      contains it and the tag/representation of the relevant constructor of that
      variant. *)
-  | Record_boxed of Jkind_types.Sort.Const.t array
+  | Record_boxed
   | Record_float (* All fields are floats *)
   | Record_ufloat
   (* All fields are [float#]s.  Same runtime representation as [Record_float],
@@ -942,6 +944,19 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
+  | Record_dummy of { represent_as_float_array : bool }
+  (* Note [Record_dummy]:
+     We typecheck type declarations before updating their kinds, yet some record
+     representations are kind-dependent. In particular, we don't choose between
+     [Record_boxed], [Record_float], [Record_ufloat], and [Record_mixed] until
+     type declaration jkinds are updated in [update_decls_jkind].
+
+     Until then, we use [Record_dummy], which also tracks whether the
+     declaration has the attribute [@@represent_as_float_array], as we can't
+     check whether the attribute is valid until we know the kinds of the fields
+     (which must all be [float64]).
+
+     After [update_decls_jkind], no record should have this representation. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1124,6 +1139,10 @@ module Lpoly : sig
   (** Assert that layout poly is determined and return the generalized vars. *)
   val get_exn : t -> Jkind_types.Sort.var list
 
+  (** Returns [true] for [determined []], [false] otherwise.
+      Raise exception if [pending]. *)
+  val is_empty_exn : t -> bool
+
   (** Dispatch on the state of [t]:
       - If pending ([pending loc]), call [on_to_generalize loc],
         transition to finalized with the returned vars.
@@ -1174,6 +1193,8 @@ module type Wrapped = sig
   | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
+
+  and persistent_signature = signature * Mode.Staticity.Const.t
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -1245,13 +1266,26 @@ val compare_tag :  tag -> tag -> int
 
 (* Equality *)
 
-val equal_record_representation :
+(* Note [Ignoring scannable axes in type declaration representations]:
+
+   For record and variant representations to be compatible, they only need to be
+   equal *up to scannable axes.*
+
+   This is safe because the only way that only the scannable axes can differ
+   between type definitions whose kinds match is through type substitution (or
+   perhaps other module typing tricks), which results in one representation
+   being *overapproximate* wrt scannable axes - this result in worse codegen but
+   is still sound. See references to this note. *)
+
+val equal_record_representation_up_to_scannable_axes :
   record_representation -> record_representation -> bool
 
-val equal_record_unboxed_product_representation :
-  record_unboxed_product_representation -> record_unboxed_product_representation -> bool
+val equal_record_unboxed_product_representation_up_to_scannable_axes :
+  record_unboxed_product_representation
+  -> record_unboxed_product_representation
+  -> bool
 
-val equal_variant_representation :
+val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
 val mixed_block_element_of_const_sort :
@@ -1269,12 +1303,16 @@ val bound_value_identifiers_and_sorts :
 
 val signature_item_id : signature_item -> Ident.t
 
-val equal_mixed_block_element :
+val equal_mixed_block_element_up_to_scannable_axes :
   mixed_block_element -> mixed_block_element -> bool
+(* CR layouts: this appears to be dead code *)
 val compare_mixed_block_element :
   mixed_block_element -> mixed_block_element -> int
 val mixed_block_element_to_string : mixed_block_element -> string
 val mixed_block_element_to_lowercase_string : mixed_block_element -> string
+
+val equal_mixed_product_shape_up_to_scannable_axes :
+  mixed_product_shape -> mixed_product_shape -> bool
 
 val equal_unsafe_mode_crossing :
   type_equal:(type_expr -> type_expr -> bool) ->

@@ -29,6 +29,11 @@
 [@@@warning "+4"]
 
 module Uid = Shape.Uid
+
+(* CR layouts-scannable: As noted on the CR on [Sort] in [jkind_intf.ml], a
+   sort no longer contains sufficient information to compile: it's missing the
+   scannable axes! Once a better data definition for tracking this is added,
+   the meaning of [Layout] below perhaps should change as well. *)
 module Layout = Jkind_types.Sort.Const
 
 type base_layout = Jkind_types.Sort.base
@@ -319,8 +324,8 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Trepr (_, _)
-                | Tpackage _
-                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ ->
+                | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+                  ->
                   assert false
               in
               Misc.fatal_errorf
@@ -379,7 +384,10 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Scannable -> Layout.Base Scannable
+    (* CR layouts-scannable: We forget about the stored scannable axes when
+       converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
+       a place to put them. See the CR on [Layout] at the top of this file. *)
+    | Types.Scannable _ -> Layout.Base Scannable
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
@@ -555,7 +563,7 @@ module Type_decl_shape = struct
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
-          | Record_boxed _ ->
+          | Record_boxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
           | Record_mixed fields ->
             record_of_labels ~shape_for_constr ~type_subst
@@ -588,7 +596,9 @@ module Type_decl_shape = struct
                  inside of a match. For example, if [Foo] is the constructor \
                  [Foo { a : int; b : int }], then [r] is an inline record in \
                  [match e with Foo r -> ...]."
-            else unknown_shape ())
+            else unknown_shape ()
+          | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+          )
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->

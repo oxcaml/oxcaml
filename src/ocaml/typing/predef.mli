@@ -37,6 +37,7 @@ type abstract_type_constr = [
   | `Atomic_loc
   | `Lexing_position
   | `Code
+  | `Eval
   | `Float32
   | `Int8
   | `Int16
