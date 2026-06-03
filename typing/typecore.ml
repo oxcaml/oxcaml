@@ -10958,6 +10958,10 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
 (* Typing of statements (expressions whose values are discarded) *)
 
 and type_statement ?explanation ?(position=RNontail) env sexp =
+  let recovery_errors = Typing_recovery.monitor_errors () in
+  let has_recovery_errors () =
+    !Clflags.typing_recovery && !recovery_errors
+  in
   (* OCaml 5.2.0 changed the type of 'while' to give 'while true do e done'
      a polymorphic type.  The change has the potential to trigger a
      nonreturning-statement warning in existing code that follows
@@ -10992,7 +10996,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
-    if is_Tvar ty
+    if is_Tvar ty && (not (has_recovery_errors ()))
     && get_level ty > get_current_level ()
     && not (allow_polymorphic subexp) then
       Location.prerr_warning
@@ -11043,6 +11047,10 @@ and map_half_typed_cases
   = fun ?additional_checks_for_split_cases ?conts
     category env pat_mode
     ty_arg sort_arg ty_res loc caselist ~type_body ~check_if_total ->
+  let recovery_errors = Typing_recovery.monitor_errors () in
+  let has_recovery_errors () =
+    !Clflags.typing_recovery && !recovery_errors
+  in
   (* ty_arg is _fully_ generalized *)
   let patterns = List.map (fun ((x : untyped_case), _) -> x.pattern) caselist in
   let contains_polyvars = List.exists contains_polymorphic_variant patterns in
@@ -11263,18 +11271,19 @@ and map_half_typed_cases
       check_unused ~lev env Predef.type_exn exn_cases ;
     end;
   in
-  if contains_polyvars then
-    add_delayed_check (fun () -> unused_check true)
-  else
-    (* Check for unused cases, do not delay because of gadts *)
-    unused_check false;
-  begin
-    match additional_checks_for_split_cases with
-    | None -> ()
-    | Some check ->
-        check val_cases_with_result;
-        check exn_cases_with_result;
-  end;
+  if not (has_recovery_errors ()) then (
+    if contains_polyvars then
+      add_delayed_check (fun () -> unused_check true)
+    else
+      (* Check for unused cases, do not delay because of gadts *)
+      unused_check false;
+    begin
+      match additional_checks_for_split_cases with
+      | None -> ()
+      | Some check ->
+          check val_cases_with_result;
+          check exn_cases_with_result;
+    end);
   (result, partial), [ty_res']
   end
   (* Ensure that existential types do not escape *)
