@@ -17,13 +17,16 @@ let recording =
 
 let reading_record = Option.is_some threshold || Option.is_some fail_thresh
 
-let file_id = ref (Sys.getcwd ())
-
 let local_step = ref 0
+
+let args_reverse = ref []
 
 let add_arg arg =
   assert (!local_step = 0);
-  file_id := !file_id ^ ":" ^ arg
+  args_reverse := arg :: !args_reverse
+
+let file_id () =
+  Sys.getcwd () ^ ":" ^ String.concat ":" (List.rev !args_reverse)
 
 (* --- Recording --- *)
 
@@ -32,7 +35,7 @@ let flush_record () =
   then (
     let path = Option.get record_path in
     let oc = open_out_gen [Open_append; Open_creat; Open_text] 0o644 path in
-    Printf.fprintf oc "%s %d\n" !file_id !local_step;
+    Printf.fprintf oc "%s %d\n" (file_id ()) !local_step;
     close_out oc;
     local_step := 0)
 
@@ -74,7 +77,7 @@ let compute_step_range file_id =
   | _ -> 0, 0
 
 let step_range =
-  lazy (if reading_record then compute_step_range !file_id else 0, 0)
+  lazy (if reading_record then compute_step_range (file_id ()) else 0, 0)
 
 let format_message = function Some f -> " (" ^ f () ^ ")" | None -> ""
 
@@ -95,14 +98,14 @@ let should_do_opt_step ?message () : bool =
       Misc.fatal_errorf
         "OPT_FUEL: step %d exceeds recorded max %d in %s%s; record file %s may \
          be stale or optimization non-deterministic."
-        step global_to !file_id (format_message message)
+        step global_to (file_id ()) (format_message message)
         (Option.get record_path);
     match threshold, fail_thresh with
     | Some thresh, None -> step < thresh
     | None, Some fail_thresh ->
       if step = fail_thresh - 1
       then
-        Misc.fatal_errorf "OPT_FUEL: critical step %d in %s%s" step !file_id
+        Misc.fatal_errorf "OPT_FUEL: critical step %d in %s%s" step (file_id ())
           (format_message message);
       true
     | _, _ ->
