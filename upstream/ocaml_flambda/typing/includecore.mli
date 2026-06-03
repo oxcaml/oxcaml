@@ -90,6 +90,7 @@ type record_mismatch =
   | Ufloat_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
+  | Representation_shape_mismatch
 
 type constructor_mismatch =
   | Type of Errortrace.equality_error
@@ -228,6 +229,7 @@ val class_types:
 *)
 
 val report_value_mismatch :
+  pp:Mode.Hint.pinpoint ->
   string -> string ->
   Env.t ->
   value_mismatch Format_doc.printer
@@ -241,6 +243,7 @@ val report_modality_sub_error :
   string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
 
 val report_mode_sub_error :
+  pp:Mode.Hint.pinpoint ->
   string -> string -> Format_doc.formatter -> Mode.Value.error -> unit
 
 val report_extension_constructor_mismatch :

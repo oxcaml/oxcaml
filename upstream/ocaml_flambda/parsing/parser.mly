@@ -1097,7 +1097,6 @@ let maybe_pmod_constraint mode expr =
 %token NONREC                 "nonrec"
 %token OBJECT                 "object"
 %token OF                     "of"
-%token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
 %token OR                     "or"
@@ -1142,7 +1141,6 @@ let maybe_pmod_constraint mode expr =
 %token TYPE                   "type"
 %token <string> UIDENT        "UIdent" (* just an example *)
 %token UNDERSCORE             "_"
-%token UNIQUE                 "unique_"
 %token VAL                    "val"
 %token VIRTUAL                "virtual"
 %token WHEN                   "when"
@@ -3886,7 +3884,8 @@ simple_delimited_pattern:
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+        Some label,
+        mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
 ;
 labeled_tuple_pat_element_list(self):
   | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
@@ -4193,7 +4192,8 @@ jkind_decl:
   pjkind_manifest=jkind_manifest
   attrs2=post_item_attributes
     {
-      let pjkind_attributes = attrs1 @ attrs2 in
+      let docs = symbol_docs $sloc in
+      let pjkind_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let pjkind_loc = make_loc $sloc in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }
@@ -4669,11 +4669,13 @@ strict_function_or_labeled_tuple_type:
   (* The next three cases are for labled tuples - see comment on [tuple_type]
      below.
 
-     The first two cases are present just to resolve a shift/reduce conflict in a
-     module type [S with t := x:t1 * t2 -> ...] which might be the beginning of
+     The first two cases are present just to resolve a shift/reduce conflict
+     in a module type [S with t := x:t1 * t2 -> ...] which might be the
+     beginning of
        [S with t := x:t1 * t2 -> S']    or    [S with t := x:t1 * t2 -> t3]
-     They are the same as the previous two cases, but with [arg_label] specialized
-     to [LIDENT COLON] and the domain type specialized to [proper_tuple_type].
+     They are the same as the previous two cases, but with [arg_label]
+     specialized to [LIDENT COLON] and the domain type specialized to
+     [proper_tuple_type].
      Apparently, this is sufficient for menhir to be able to delay a decision
      about which of the above module type cases we are in.  *)
   | mktyp(
@@ -4733,10 +4735,6 @@ strict_function_or_labeled_tuple_type:
 %inline mode_legacy:
    | LOCAL
        { mkloc (Mode "local") (make_loc $sloc) }
-   | UNIQUE
-       { mkloc (Mode "unique") (make_loc $sloc) }
-   | ONCE
-       { mkloc (Mode "once") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
