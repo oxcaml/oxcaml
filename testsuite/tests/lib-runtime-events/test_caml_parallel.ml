@@ -1,8 +1,5 @@
 (* TEST
  {
-   runtime4;
-   skip;
- }{
    include runtime_events;
    runtime5;
    multidomain;
