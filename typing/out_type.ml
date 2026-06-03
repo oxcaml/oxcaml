@@ -44,12 +44,13 @@ module Style = Misc.Style
    cases:
 
    (C1.1) The type declaration is abstract, has no manifest (i.e.,
-   it's written without any [=]-signs), and the annotation is not equivalent to value.
+   it's written without any [=]-signs), and the annotation is not
+   equivalent to value.
 
    In this case, there is no way to know the jkind without the annotation.
 
-   (C1.2) The type has unsafe mode crossings. In this case, the jkind is overridden by the
-   user rather than being inferred from the definition.
+   (C1.2) The type has unsafe mode crossings. In this case, the jkind is
+   overridden by the user rather than being inferred from the definition.
 
    Case (C2). The jkind on a type parameter to a type, like
    [type ('a : <<this one>>) t = ...].
@@ -373,7 +374,8 @@ let pervasives_name namespace name =
           Out_name.create (pervasives name)
       | exception Not_found ->
           let r = Out_name.create name in
-          set namespace @@ M.add name (Associated_to_pervasives r) (get namespace);
+          set namespace
+          @@ M.add name (Associated_to_pervasives r) (get namespace);
           r
 
 (** Lookup for preexisting named item within the current {!printing_env} *)
@@ -404,7 +406,9 @@ let ident_name_simple namespace id =
           let hid', m = find_hid id' Ident.Map.empty in
           let hid, m = find_hid id m in
           Out_name.set r (human_unique hid' id');
-          List.iter (fun (id,hid) -> Ident_conflicts.collect_explanation namespace hid id)
+          List.iter
+            (fun (id,hid) ->
+              Ident_conflicts.collect_explanation namespace hid id)
             [id, hid; id', hid' ];
           set namespace @@ M.add name (Need_unique_name m) (get namespace);
           Out_name.create (human_unique hid id)
@@ -725,7 +729,8 @@ let set_printing_env env =
                applied.
             *)
             let rewritten_p1 = rewrite_double_underscore_paths env p1 in
-            printing_map := Path.Map.add p1 (ref (Paths [ p; rewritten_p1 ])) !printing_map)
+            printing_map :=
+              Path.Map.add p1 (ref (Paths [ p; rewritten_p1 ])) !printing_map)
         env in
     printing_cont := [cont];
   end
@@ -1629,7 +1634,8 @@ and tree_of_qsvs qtvs =
       match v.desc with
       | Tvar _ when v.level = generic_level ->
         Some (Variable_names.name_of_type Variable_names.new_name v)
-      | Tunivar _ -> Some (Variable_names.name_of_type Variable_names.new_name v)
+      | Tunivar _ ->
+        Some (Variable_names.name_of_type Variable_names.new_name v)
       | _ -> None)
     qtvs
 
@@ -1667,7 +1673,9 @@ and tree_of_typlist mode tyl =
   List.map (tree_of_typexp mode Alloc.Const.legacy) tyl
 
 and tree_of_labeled_typlist mode tyl =
-  List.map (fun (label, ty) -> label, tree_of_typexp mode Alloc.Const.legacy ty) tyl
+  List.map
+    (fun (label, ty) -> label, tree_of_typexp mode Alloc.Const.legacy ty)
+    tyl
 
 and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
   (tree_of_typexp Type Alloc.Const.legacy ty,
@@ -2031,7 +2039,8 @@ let tree_of_type_decl id decl =
           then Some "or_null_reexport"
           else None
         in
-        tree_of_manifest (Otyp_sum (List.map tree_of_constructor_in_decl cstrs)),
+        tree_of_manifest
+          (Otyp_sum (List.map tree_of_constructor_in_decl cstrs)),
         decl.type_private,
         unboxed,
         or_null_attribute,
@@ -2347,7 +2356,8 @@ let rec tree_of_class_type mode params =
       let csil =
         List.fold_left
           (fun csil (l, m, v, t) ->
-            Ocsg_value (l, m = Asttypes.Mutable, v = Virtual, tree_of_typexp mode t)
+            Ocsg_value
+              (l, m = Asttypes.Mutable, v = Virtual, tree_of_typexp mode t)
             :: csil)
           csil all_vars
       in
@@ -2385,7 +2395,8 @@ let tree_of_class_param param variance =
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in
   match tree_of_typexp Type_scheme param with
-    Otyp_var (ot_non_gen, ot_name) -> {ot_non_gen; ot_name; ot_variance; ot_jkind}
+    Otyp_var (ot_non_gen, ot_name) ->
+      {ot_non_gen; ot_name; ot_variance; ot_jkind}
   | _ -> {ot_non_gen=false; ot_name="?"; ot_variance; ot_jkind}
 
 let class_variance =
@@ -2548,8 +2559,9 @@ let expand_module_type =
 
 (** How to abbreviate signatures *)
 module Abbrev = struct
-  (* The code is substantially simpler if [width] is mutable. Strictly speaking, [depth]
-     doesn't have to be mutable here but mixed mutability would be quite confusing. *)
+  (* The code is substantially simpler if [width] is mutable. Strictly
+     speaking, [depth] doesn't have to be mutable here but mixed mutability
+     would be quite confusing. *)
   type t =
     { (* To what depth to unfold the module tree *)
       mutable depth : int
@@ -2585,8 +2597,9 @@ module Abbrev = struct
         x
     | None -> f ()
 
-  (** Reduce the remaining width by the number of items in [sg] and return the number of
-      items to print in [sg] and a flag that inidicates whether [sg] is being trimmed. *)
+  (** Reduce the remaining width by the number of items in [sg] and return
+      the number of items to print in [sg] and a flag that inidicates whether
+      [sg] is being trimmed. *)
   let items t sg =
     match t with
     | Some t ->
@@ -2621,7 +2634,9 @@ let rec tree_of_modtype ?abbrev = function
             && not (Env.is_functor_arg p !printing_env)
           in
           Omty_strengthen
-            (tree_of_modtype ?abbrev mty, tree_of_path (Some Module) p, unaliasable)
+            (tree_of_modtype ?abbrev mty,
+             tree_of_path (Some Module) p,
+             unaliasable)
       | mty -> tree_of_modtype ?abbrev mty
       end
 
@@ -2645,15 +2660,20 @@ and tree_of_signature ?abbrev = function
   | sg ->
     Abbrev.deeper abbrev (fun () ->
       wrap_env (fun env -> env)(fun sg ->
-        (* Only expand signatures to 'abbrev.depth' depth and print at most 'abbrev.width'
-           items overall. We just keep decreasing 'abbrev.width' during the traversal but
-           make sure that we expand the current signature up to 'abbrev.width' before
-           expanding it's components. Below, 'max_items' is the number of items we should
-           print in the current signature and 'abbrev.width' is then be the remaining
-           number of items. This is simpler to implement than proper breadth-first. *)
+        (* Only expand signatures to 'abbrev.depth' depth and print at most
+           'abbrev.width' items overall. We just keep decreasing 'abbrev.width'
+           during the traversal but make sure that we expand the current
+           signature up to 'abbrev.width' before expanding it's components.
+           Below, 'max_items' is the number of items we should print in the
+           current signature and 'abbrev.width' is then be the remaining number
+           of items. This is simpler to implement than proper breadth-first. *)
         let max_items, trimmed = Abbrev.items abbrev sg in
-        let tree_groups = tree_of_signature_rec ?abbrev ?max_items !printing_env sg in
-        let items = List.concat_map (fun (_env,l) -> List.map snd l) tree_groups in
+        let tree_groups =
+          tree_of_signature_rec ?abbrev ?max_items !printing_env sg
+        in
+        let items =
+          List.concat_map (fun (_env,l) -> List.map snd l) tree_groups
+        in
         if trimmed then items @ [Osig_ellipsis] else items
         ) sg
     )
@@ -2689,7 +2709,9 @@ and tree_of_signature_rec ?abbrev ?max_items env' sg =
 
 and trees_of_recursive_sigitem_group ?abbrev env
     (syntactic_group: Signature_group.rec_group) =
-  let display (x:Signature_group.sig_item) = x.src, tree_of_sigitem ?abbrev x.src in
+  let display (x:Signature_group.sig_item) =
+    x.src, tree_of_sigitem ?abbrev x.src
+  in
   let env = Env.add_signature syntactic_group.pre_ghosts env in
   match syntactic_group.group with
   | Not_rec x -> add_sigitem env x, [display x]
@@ -2708,7 +2730,8 @@ and tree_of_sigitem ?abbrev = function
   | Sig_module(id, _, md, rs, _) ->
       let abbrev =
         if List.exists (function
-            | Parsetree.{attr_name = {txt="..."}; attr_payload = PStr []} -> true
+            | Parsetree.{attr_name = {txt="..."}; attr_payload = PStr []} ->
+              true
             | _ -> false)
             md.md_attributes
           then Some (Abbrev.ellipsis ())
@@ -2842,7 +2865,8 @@ let abbreviate ~abbrev f =
 
 (* let tree_of_path = tree_of_path None *)
 let tree_of_module ident ?(ellipsis = false) =
-  tree_of_module ident ?abbrev:(if ellipsis then Some (Abbrev.ellipsis ()) else None)
+  tree_of_module ident
+    ?abbrev:(if ellipsis then Some (Abbrev.ellipsis ()) else None)
 let tree_of_signature sg = tree_of_signature sg
 let tree_of_modtype ?(abbrev = false) ty =
   abbreviate ~abbrev tree_of_modtype ty

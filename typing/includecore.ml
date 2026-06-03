@@ -66,7 +66,9 @@ let child_close_over_coercion_opt id c =
   match c with
   | None -> None
   | Some (locks, lid, loc) ->
-      Some (locks, Longident.Ldot (Location.mkloc lid loc, Location.mknoloc id), loc)
+      Some (locks,
+            Longident.Ldot (Location.mkloc lid loc, Location.mknoloc id),
+            loc)
 
 let child_modes id = function
   | All -> All

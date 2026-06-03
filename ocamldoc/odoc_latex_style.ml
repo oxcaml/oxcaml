@@ -65,11 +65,13 @@ let content =
   }
 
 \newenvironment{ocamldocdescription}
-{\list{}{\rightmargin0pt \topsep0pt}\raggedright\item\noindent\relax\ignorespaces}
+{\list{}{\rightmargin0pt \topsep0pt}\raggedright
+\item\noindent\relax\ignorespaces}
 {\endlist\medskip}
 
 \newenvironment{ocamldoccomment}
-{\list{}{\leftmargin 2\leftmargini \rightmargin0pt \topsep0pt}\raggedright\item\noindent\relax}
+{\list{}{\leftmargin 2\leftmargini \rightmargin0pt \topsep0pt}\raggedright
+\item\noindent\relax}
 {\endlist}
 
 \let \ocamldocparagraph \paragraph

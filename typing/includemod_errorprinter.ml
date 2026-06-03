@@ -971,8 +971,10 @@ let module_type_declarations id {Err.got=d1 ; expected=d2} =
   Fmt.dprintf
     "@[<hv 2>Module type declarations do not match:@ \
      %a@;<1 -2>does not match@ %a@]"
-    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration ~abbrev:true id d1)
-    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration ~abbrev:true id d2)
+    !Oprint.out_sig_item
+      (Out_type.tree_of_modtype_declaration ~abbrev:true id d1)
+    !Oprint.out_sig_item
+      (Out_type.tree_of_modtype_declaration ~abbrev:true id d2)
 
 let interface_mismatch ppf (diff: _ Err.diff) =
   Fmt.fprintf ppf

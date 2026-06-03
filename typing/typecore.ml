@@ -3854,7 +3854,8 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (fun {pv_id; pv_uid; pv_type; pv_loc; pv_kind; pv_attributes; pv_sort}
         (pv, val_env, met_env) ->
          let check s =
-           if pv_kind = As_var then Warnings.Unused_var { name = s; mutated = false }
+           if pv_kind = As_var
+           then Warnings.Unused_var { name = s; mutated = false }
            else Warnings.Unused_var_strict { name = s; mutated = false } in
          let id' = Ident.rename pv_id in
          let val_env =

@@ -1593,7 +1593,9 @@ and with_constraint ctxt f = function
         (with_loc type_longident) li
         (module_type ctxt) mty;
   | Pwith_jkind (li, jd) ->
-      pp f "kind_ %a =@ %a" (with_loc type_longident) li (jkind_declaration ctxt) jd;
+      pp f "kind_ %a =@ %a"
+        (with_loc type_longident) li
+        (jkind_declaration ctxt) jd;
   | Pwith_typesubst (li, ({ptype_params=ls;_} as td)) ->
       pp f "type@ %a %a :=@ %a"
         type_params ls
