@@ -105,18 +105,8 @@ type 'a sig_reader =
   -> flags:Cmi_format.pers_flags list
   -> 'a
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-val read : 'a t
-  -> Global_module.Name.t -> Unit_info.Artifact.t
-  -> Subst.Lazy.signature
-
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
-  -> Subst.Lazy.signature
-=======
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.persistent_signature
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a

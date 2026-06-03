@@ -626,20 +626,12 @@ let (>>) : bind_judg -> term_judg -> term_judg =
   fun binder term mode -> binder mode (term mode)
 
 (* Compute the appropriate [mode] for an array expression *)
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
-  | Pfloatarray ->
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
-  | Lambda.Pfloatarray ->
-=======
 let array_mode exp =
   match Typeopt.array_kind exp with
   | Lambda.Pfloatarray ->
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
     (* (flat) float arrays unbox their elements *)
     Dereference
-  | Pgenarray ->
+  | Lambda.Pgenarray ->
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
