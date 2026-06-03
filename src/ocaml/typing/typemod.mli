@@ -49,11 +49,8 @@ val type_implementation:
 val type_interface:
   sourcefile:string -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 val transl_signature:
   Env.t -> Parsetree.signature -> Typedtree.signature
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-=======
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
@@ -62,7 +59,6 @@ val transl_signature:
    CR-soon zqian: all persistent modules should always be [Static]. *)
 val staticity_of_modalities:
   Typedtree.modalities -> Mode.Staticity.Const.t
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*

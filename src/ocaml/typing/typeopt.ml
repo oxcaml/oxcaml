@@ -294,75 +294,8 @@ let classify ~classify_product env ty layout : _ classification =
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-(*
-let rec scannable_product_array_kind elt_ty_for_error loc sorts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-let rec scannable_product_array_kind elt_ty_for_error loc sorts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
-=======
-let rec scannable_product_array_kind elt_ty_for_error loc layouts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-
-and sort_to_scannable_product_element_kind elt_ty_for_error loc
-      (layout : Jkind.Layout.Const.t) =
-  match layout with
-  | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
-                               with non-representable layout"
-  | Base (Scannable, { separability; _ }) ->
-      let open Jkind_axis.Separability in
-      if le separability (upper_bound_if_is_always_gc_ignorable ())
-        then Pint_scannable else Paddr_scannable
-  | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
-          Untagged_immediate | Vec128 | Vec256 | Vec512), _) as c ->
-    raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
-  | Base (Void, _) ->
-    raise (Error (loc, Unsupported_void_in_array))
-  | Product sorts ->
-    Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
-  | Univar _ ->
-    Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
-  | Genvar _ ->
-    Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
-
-let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
-  match sorts with
-  | [Base (Vec128, _); Base (Vec128, _)] ->
-    [ Punboxedvector_ignorable Unboxed_vec128;
-      Punboxedvector_ignorable Unboxed_vec128 ]
-  | [Base (Vec128, _); Base (Vec128, _); Base (Vec128, _); Base (Vec128, _)] ->
-    [ Punboxedvector_ignorable Unboxed_vec128;
-      Punboxedvector_ignorable Unboxed_vec128;
-      Punboxedvector_ignorable Unboxed_vec128;
-      Punboxedvector_ignorable Unboxed_vec128 ]
-  | _ -> List.map (sort_to_ignorable_product_element_kind loc) sorts
-
-and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
-  match layout with
-  | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
-                               with non-representable layout"
-  (* Scannable axes are irrelevant, since we already know we can ignore *)
-  | Base (Scannable, _sa) -> Pint_ignorable
-  | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
-  | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
-  | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
-  | Base (Bits16, _) -> Punboxedoruntaggedint_ignorable Untagged_int16
-  | Base (Bits32, _) -> Punboxedoruntaggedint_ignorable Unboxed_int32
-  | Base (Bits64, _) -> Punboxedoruntaggedint_ignorable Unboxed_int64
-  | Base (Word, _) -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
-  | Base (Untagged_immediate, _) -> Punboxedoruntaggedint_ignorable Untagged_int
-  | Base ((Vec128 | Vec256 | Vec512), _) ->
-    raise (Error (loc, Unsupported_vector_in_product_array))
-  | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
-  | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
-  | Univar _ ->
-    Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
-  | Genvar _ ->
-    Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
-*)
 let scannable_product_array_kind _ _ _ = ()
+
 let ignorable_product_array_kind _ _ = ()
 
 let array_kind_of_elt env loc ty =
@@ -452,22 +385,10 @@ let array_type_mut env ty =
 let array_kind exp =
   array_type_kind ~elt_ty:None exp.exp_env exp.exp_loc exp.exp_type
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-(*
-let array_pattern_kind pat elt_sort =
-  array_type_kind
-    ~elt_sort:(Some elt_sort) ~elt_ty:None
-    pat.pat_env pat.pat_loc pat.pat_type
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-let array_pattern_kind pat elt_sort =
-  array_type_kind
-    ~elt_sort:(Some elt_sort) ~elt_ty:None
-    pat.pat_env pat.pat_loc pat.pat_type
-=======
 let array_pattern_kind pat =
   array_type_kind ~elt_ty:None pat.pat_env pat.pat_loc pat.pat_type
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 
+(*
 let bigarray_decode_type env ty tbl dfl =
   match scrape env ty with
   | Some (Tconstr(Pdot(Pident mod_id, type_name), [], _))
@@ -475,44 +396,6 @@ let bigarray_decode_type env ty tbl dfl =
       begin try List.assoc type_name tbl with Not_found -> dfl end
   | _ ->
       dfl
-
-let kind_table =
-  ["float16_elt", Pbigarray_float16;
-   "float32_elt", Pbigarray_float32;
-   "float64_elt", Pbigarray_float64;
-   "int8_signed_elt", Pbigarray_sint8;
-   "int8_unsigned_elt", Pbigarray_uint8;
-   "int16_signed_elt", Pbigarray_sint16;
-   "int16_unsigned_elt", Pbigarray_uint16;
-   "int32_elt", Pbigarray_int32;
-   "int64_elt", Pbigarray_int64;
-   "int_elt", Pbigarray_caml_int;
-   "nativeint_elt", Pbigarray_native_int;
-   "complex32_elt", Pbigarray_complex32;
-   "complex64_elt", Pbigarray_complex64]
-
-let layout_table =
-  ["c_layout", Pbigarray_c_layout;
-   "fortran_layout", Pbigarray_fortran_layout]
-
-let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
-  match scrape env typ with
-  | Some (Tconstr(_p, [_caml_type; elt_type; layout_type], _abbrev)) ->
-      let kind =
-        match kind with
-        | Pbigarray_unknown ->
-          bigarray_decode_type env elt_type kind_table Pbigarray_unknown
-        | _ -> kind
-      in
-      let layout =
-        match layout with
-        | Pbigarray_unknown_layout ->
-          bigarray_decode_type env layout_type layout_table Pbigarray_unknown_layout
-        | _ -> layout
-      in
-      (kind, layout)
-  | _ ->
-      (kind, layout)
 
 let value_kind_of_scannable_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_scannable env jkind in

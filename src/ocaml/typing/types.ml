@@ -835,20 +835,6 @@ end
 
 include Make_wrapped(struct type 'a t = 'a end)
 
-let array_equal eq_elt l1 l2 =
-  (* Basically inlines [Array.for_all2] to avoid the [raise] *)
-  let n = Array.length l1 in
-  Int.equal n (Array.length l2) &&
-  let rec loop i =
-    if Int.equal i n then
-      true
-    else if eq_elt (Array.unsafe_get l1 i) (Array.unsafe_get l2 i) then
-      loop (succ i)
-    else
-      false
-  in
-  loop 0
-
 let equal_tag t1 t2 =
   match (t1, t2) with
   | Ordinary {src_index=i1}, Ordinary {src_index=i2} ->
@@ -931,16 +917,8 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, _ -> -1
   | _, Void -> 1
 
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  array_equal equal_mixed_block_element r1 r2
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
-=======
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 
 let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
@@ -954,19 +932,9 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      array_equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
-          && array_equal Jkind_types.Sort.Const.equal
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-      Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
-          && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
-=======
       Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
           equal_constructor_representation_up_to_scannable_axes cstr1 cstr2
           && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
                sorts1 sorts2)
         cstrs_and_sorts1
         cstrs_and_sorts2
@@ -984,20 +952,10 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
          constructor representation. *)
       ignore (cr1 : constructor_representation);
       ignore (cr2 : constructor_representation);
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
-  | Record_boxed sorts1, Record_boxed sorts2 ->
-      array_equal Jkind_types.Sort.Const.equal sorts1 sorts2
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
-  | Record_boxed sorts1, Record_boxed sorts2 ->
-      Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
-=======
       equal_tag tag1 tag2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->

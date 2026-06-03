@@ -1094,24 +1094,7 @@ let merloc startpos ?endpos x =
 %token AND [@symbol "and"]
 %token AS [@symbol "as"]
 %token ASSERT [@symbol "assert"]
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 %token BACKQUOTE [@symbol "`"]
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-%token NONREC                 "nonrec"
-%token OBJECT                 "object"
-%token OF                     "of"
-%token ONCE                   "once_"
-%token OPEN                   "open"
-%token <string> OPTLABEL      "?label:" (* just an example *)
-%token OR                     "or"
-=======
-%token NONREC                 "nonrec"
-%token OBJECT                 "object"
-%token OF                     "of"
-%token OPEN                   "open"
-%token <string> OPTLABEL      "?label:" (* just an example *)
-%token OR                     "or"
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 %token BANG [@symbol "!"]
 %token BAR [@symbol "|"]
 %token BARBAR [@symbol "||"]
@@ -1156,24 +1139,7 @@ let merloc startpos ?endpos x =
 %token GREATERRBRACKET [@symbol ">]"]
 %token HASHLPAREN [@symbol "#("]
 %token HASHLBRACE [@symbol "#{"]
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
 %token HASHFALSE [@symbol "#false"]
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-%token TYPE                   "type"
-%token <string> UIDENT        "UIdent" (* just an example *)
-%token UNDERSCORE             "_"
-%token UNIQUE                 "unique_"
-%token VAL                    "val"
-%token VIRTUAL                "virtual"
-%token WHEN                   "when"
-=======
-%token TYPE                   "type"
-%token <string> UIDENT        "UIdent" (* just an example *)
-%token UNDERSCORE             "_"
-%token VAL                    "val"
-%token VIRTUAL                "virtual"
-%token WHEN                   "when"
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
 %token HASHTRUE [@symbol "#true"]
 %token IF [@symbol "if"]
 %token IN [@symbol "in"]

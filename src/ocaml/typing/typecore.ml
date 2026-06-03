@@ -6802,7 +6802,7 @@ and type_expect_
       set_levels saved_levels;
       re {
         exp_desc = Texp_record {
-            fields = [||]; representation = Record_boxed [||];
+            fields = [||]; representation = Record_boxed;
             extended_expression = None;
             alloc_mode = None
           };
@@ -7238,11 +7238,6 @@ and type_expect_
         split_cases [] [] [] caselist
       in
       if val_caselist = [] && eff_caselist <> [] then
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-        raise (error (loc, env, No_value_clauses));
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-        raise (Error (loc, env, No_value_clauses));
-=======
         raise (Error (loc, env, No_value_clauses));
       let env, arg_pat_mode, arg_expected_mode, expected_mode =
         match eff_caselist with
@@ -7273,7 +7268,6 @@ and type_expect_
           may_lower_contravariant env arg;
           generalize arg.exp_type)
       in
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
       let val_cases, partial =
         type_cases Computation env arg_pat_mode expected_mode arg.exp_type
           sort ty_expected_explained ~check_if_total:true loc val_caselist
@@ -7677,46 +7671,6 @@ and type_expect_
       | Error err ->
         raise (error(loc, env, Block_index_modality_mismatch { mut; err }))
     end;
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-    let el_ty =
-      if flat_float then
-        let has_unboxed_version p =
-          not (Path.is_unboxed_version p) &&
-          try
-            ignore (Env.find_type (Path.unboxed_version p) env);
-            true
-          with Not_found ->
-            false
-        in
-        match get_desc (expand_head env el_ty) with
-        | Tconstr(p, args, _) when has_unboxed_version p ->
-          newconstr (Path.unboxed_version p) args
-        | _ ->
-          raise (error(loc, env, Block_index_flattened_record el_ty))
-      else
-        el_ty
-    in
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-    let el_ty =
-      if flat_float then
-        let has_unboxed_version p =
-          not (Path.is_unboxed_version p) &&
-          try
-            ignore (Env.find_type (Path.unboxed_version p) env);
-            true
-          with Not_found ->
-            false
-        in
-        match get_desc (expand_head env el_ty) with
-        | Tconstr(p, args, _) when has_unboxed_version p ->
-          newconstr (Path.unboxed_version p) args
-        | _ ->
-          raise (Error(loc, env, Block_index_flattened_record el_ty))
-      else
-        el_ty
-    in
-=======
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
     let ty =
       if mut then
         Predef.type_idx_mut base_ty el_ty
@@ -8742,64 +8696,8 @@ and type_block_access env expected_base_ty principal
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     if mut then Env.mark_label_used Mutation label.lbl_uid;
     let ba = Baccess_field (lid, label) in
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-    let flat_float  =
-      (* whether we change the final el ty to [float#]. we don't set [el_ty]
-          to [float#] here because it could be a singleton unboxed record
-          containing a float, and thus be followed by an unboxed access *)
-      match label.lbl_repres with
-      | Record_boxed _ -> false
-      | Record_mixed mixed ->
-        begin match mixed.(label.lbl_pos) with
-        | Float_boxed -> true
-        | Float64 | Float32 | Scannable | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word | Product _ | Void
-        | Untagged_immediate ->
-          false
-        end
-      | Record_float -> true
-      | Record_ufloat -> false
-      | Record_unboxed ->
-        raise (error (lid.loc, env, Block_access_record_unboxed))
-      | Record_inlined _ ->
-        Misc.fatal_error "Typecore.type_block_access: inlined record"
-    in
-    let () =
-      match label.lbl_private with
-      | Public -> ()
-      | Private ->
-        raise (error (lid.loc, env, Block_access_private_record))
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-    let flat_float  =
-      (* whether we change the final el ty to [float#]. we don't set [el_ty]
-          to [float#] here because it could be a singleton unboxed record
-          containing a float, and thus be followed by an unboxed access *)
-      match label.lbl_repres with
-      | Record_boxed _ -> false
-      | Record_mixed mixed ->
-        begin match mixed.(label.lbl_pos) with
-        | Float_boxed -> true
-        | Float64 | Float32 | Scannable | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word | Product _ | Void
-        | Untagged_immediate ->
-          false
-        end
-      | Record_float -> true
-      | Record_ufloat -> false
-      | Record_unboxed ->
-        raise (Error (lid.loc, env, Block_access_record_unboxed))
-      | Record_inlined _ ->
-        Misc.fatal_error "Typecore.type_block_access: inlined record"
-    in
-    let () =
-      match label.lbl_private with
-      | Public -> ()
-      | Private ->
-        raise (Error (lid.loc, env, Block_access_private_record))
-=======
     let bad_record_error reason =
       raise (Error (lid.loc, env, Block_access_bad_record reason))
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
     in
     (match label.lbl_repres with
      | Record_boxed -> ()
@@ -9737,7 +9635,7 @@ and type_label_access
         lbl_all = [||];
         lbl_repres =
           (match record_form with
-          | Legacy -> Record_boxed [||]
+          | Legacy -> Record_boxed
           | Unboxed_product -> Record_unboxed_product);
         lbl_private = Public;
         lbl_loc = lid.loc;
@@ -11365,21 +11263,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         Some m
     | Nonrecursive -> None
   in
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-  let spatl =  List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
-  let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-  let spatl = List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
-  let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
-=======
   let spatl = List.map vb_pat_constraint spat_sexp_list in
   let spatl =
     List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl
   in
   let attrs_list = List.map (fun (attrs, _, _, _, _) -> attrs) spatl in
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
   let is_recursive = (rec_flag = Recursive) in
 
   let (pat_list, exp_list, new_env, mvs, sorts, pvs) =

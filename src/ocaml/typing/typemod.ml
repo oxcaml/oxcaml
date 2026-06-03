@@ -4638,21 +4638,12 @@ let type_implementation target modulename initial_env ast =
                      { new_arg_type = arg_type; old_source_file = source_intf;
                        old_arg_type = arg_type_from_cmi });
           let coercion, shape =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-              Includemod.compunit initial_env ~mark:true
-                sourcefile sg compiled_intf_file_name dclsig shape
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-            Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true
-                sourcefile sg compiled_intf_file_name dclsig shape)
-=======
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
                   ((mode, None), Env.mode_unit ~staticity))
                 sg compiled_intf_file_name dclsig shape)
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
           in
           (* Check the _mli_ against the argument type, since the mli determines
              the visible type of the module and that's what needs to conform to
@@ -4687,14 +4678,6 @@ let type_implementation target modulename initial_env ast =
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
           let coercion, shape =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-              Includemod.compunit initial_env ~mark:true
-                sourcefile sg "(inferred signature)" simple_sg shape
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-            Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true
-                sourcefile sg "(inferred signature)" simple_sg shape)
-=======
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)
             let modes =
@@ -4704,7 +4687,6 @@ let type_implementation target modulename initial_env ast =
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit initial_env ~mark:true sourcefile ~modes
                 sg "(inferred signature)" simple_sg shape)
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
           in
           check_nongen_signature finalenv simple_sg;
           let zap_modality =
@@ -4737,27 +4719,13 @@ let type_implementation target modulename initial_env ast =
               Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = arg_type }
             in
             let cmi =
-<<<<<<< janestreet/merlin-jst:merge-5.4-minus37
-||||||| /usr/local/home/dkalinichenko/flambda-backend/main-3:cf93f7beb6e730de4b7217c27b960e6e7ba1ada9
-              Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature ~alerts simple_sg name kind
-                  (Unit_info.cmi target))
-            in
-            Profile.record_call "save_cmt" (fun () ->
-              let annots = Cmt_format.Implementation str in
-=======
               Profile.record_call "save_cmi" (fun () ->
                 Env.save_signature ~alerts (simple_sg, Staticity.Dynamic)
                   name kind (Unit_info.cmi target))
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
->>>>>>> /usr/local/home/dkalinichenko/flambda-backend/main-3:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-              Env.save_signature ~alerts simple_sg name kind
-                (Unit_info.cmi target)
-            in
-            let annots = Cmt_format.Implementation str in
-            save_cmt_and_cms target annots initial_env (Some cmi) (Some shape)
+              save_cmt_and_cms target annots initial_env (Some cmi) (Some shape));
           end;
           { structure = str;
             coercion;
