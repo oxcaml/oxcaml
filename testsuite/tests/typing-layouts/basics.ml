@@ -621,6 +621,11 @@ type ('a : void) void4 = Void4 of 'a
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
+Line 1, characters 0-33:
+1 | type ('a : any) any4 = Any4 of 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type ('a : any) any4 = Any4 of 'a
 |}];;
 

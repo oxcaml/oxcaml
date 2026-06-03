@@ -51,6 +51,11 @@ type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any separable non_null
 type t2
+Line 3, characters 0-60:
+3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
@@ -60,6 +65,11 @@ type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any separable non_null
 type t2
+Line 3, characters 0-68:
+3 | type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
@@ -69,6 +79,11 @@ type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 
 [%%expect{|
 type t1 : any separable non_null
 type t2
+Line 3, characters 0-95:
+3 | type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 : t1 ; t2 : t2};;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
@@ -78,6 +93,11 @@ type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any separable non_null
+Line 3, characters 0-69:
+3 | type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
@@ -87,6 +107,11 @@ type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any separable non_null
+Line 3, characters 0-61:
+3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
@@ -96,6 +121,11 @@ type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any separable non_null
+Line 3, characters 0-67:
+3 | type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
@@ -105,6 +135,11 @@ type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : 
 [%%expect{|
 type t1 : any
 type t2 : any separable non_null
+Line 3, characters 0-94:
+3 | type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 Line 3, characters 0-94:
 3 | type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
