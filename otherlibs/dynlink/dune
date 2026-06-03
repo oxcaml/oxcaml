@@ -148,6 +148,7 @@
   cmi_format
   persistent_env
   typing_recovery
+  typing_recovery_state
   env
   jkind
   ikind
@@ -156,6 +157,8 @@
   signature_group
   printtyp
   includecore
+  tast_mapper
+  tast_iterator
   typedecl_properties
   typedecl_separability
   typedecl_variance
@@ -182,6 +185,7 @@
   outcometree
   cmo_format
   cmxs_format
+  cmt_format
   debug_event
   compilation_unit
   import_info
@@ -383,8 +387,6 @@
 
 (copy_files ../../typing/persistent_env.ml)
 
-(copy_files ../../typing/typing_recovery.ml)
-
 (copy_files ../../typing/env.ml)
 
 (copy_files ../../lambda/debuginfo.ml)
@@ -581,8 +583,6 @@
 
 (copy_files ../../typing/persistent_env.mli)
 
-(copy_files ../../typing/typing_recovery.mli)
-
 (copy_files ../../typing/env.mli)
 
 (copy_files ../../lambda/debuginfo.mli)
@@ -610,6 +610,28 @@
 (copy_files ../../bytecomp/symtable.mli)
 
 (copy_files ../../bytecomp/debug_event.mli)
+
+; Typing recovery
+
+(copy_files ../../typing/tast_mapper.ml)
+
+(copy_files ../../typing/tast_iterator.ml)
+
+(copy_files ../../file_formats/cmt_format.ml)
+
+(copy_files ../../typing/typing_recovery_state.ml)
+
+(copy_files ../../typing/typing_recovery.ml)
+
+(copy_files ../../typing/tast_mapper.mli)
+
+(copy_files ../../typing/tast_iterator.mli)
+
+(copy_files ../../file_formats/cmt_format.mli)
+
+(copy_files ../../typing/typing_recovery_state.mli)
+
+(copy_files ../../typing/typing_recovery.mli)
 
 ; .mli-only:
 
