@@ -5,7 +5,7 @@
    runtime5;
    poll_insertion;
    multicore;
-   flags += "-alert -unsafe_multidomain -alert -do_not_spawn_domains -w -21";
+   flags += "-w -21";
    { native; }
 *)
 
