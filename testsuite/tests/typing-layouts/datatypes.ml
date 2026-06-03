@@ -1,10 +1,6 @@
 (* TEST
- {
-   expect;
- }{
-   flags = "-extension layouts_beta";
-   expect;
- }
+ flags = "-extension layouts_alpha";
+ expect;
 *)
 
 (* Tests for jkinds in algebraic datatypes *)
