@@ -1481,22 +1481,6 @@ let no_stack_checks = Actions.make
     "Stack checks disabled"
     "Stack checks enabled")
 
-let runtime4 = Actions.make
-  ~name:"runtime4"
-  ~description:"Passes if the OCaml 4.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate (not Config.runtime5)
-    "4.x runtime being used"
-    "5.x runtime being used")
-
-let runtime5 = Actions.make
-  ~name:"runtime5"
-  ~description:"Passes if the OCaml 5.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate Config.runtime5
-    "5.x runtime being used"
-    "4.x runtime being used")
-
 (* CR ttebbi: We should also protect against non-default register allocation
     options. *)
 let only_default_codegen = Actions.make
@@ -1735,7 +1719,5 @@ let init () =
     multidomain;
     stack_checks;
     no_stack_checks;
-    runtime4;
-    runtime5;
     only_default_codegen
   ]
