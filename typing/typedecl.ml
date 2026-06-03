@@ -2671,31 +2671,28 @@ let update_decls_jkind_reason decls =
    unboxed-contains, rather than the dummy [any] jkinds assigned in
    [transl_declaration]. See Note [Default jkinds in transl_declaration]. *)
 let update_decls_jkind env order decls =
-  let process env id decl =
-    Builtin_attributes.warning_scope decl.type_attributes (fun () ->
-      let allow_any_crossing =
-        Builtin_attributes.has_unsafe_allow_any_mode_crossing
-          decl.type_attributes
-      in
-
-      (* Check that the attribute is valid, if set (unconditionally, for
-         consistency). *)
-      if allow_any_crossing then begin
-        match decl.type_kind with
-        | Type_abstract _ | Type_open ->
-          raise(Error(
-            decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-        | _ -> ()
-      end;
-
-      update_decl_jkind env (Pident id) decl, allow_any_crossing)
-  in
   let decls_by_id = Ident.Map.of_list decls in
   let _env, results =
     List.fold_left
       (fun (env, results) id ->
          let decl = Ident.Map.find id decls_by_id in
-         let new_decl, allow_any_crossing = process env id decl in
+         let new_decl, allow_any_crossing =
+           Builtin_attributes.warning_scope decl.type_attributes (fun () ->
+             let allow_any_crossing =
+               Builtin_attributes.has_unsafe_allow_any_mode_crossing
+                 decl.type_attributes
+             in
+             (* Check that the attribute is valid, if set (unconditionally, for
+               consistency). *)
+             if allow_any_crossing then begin
+               match decl.type_kind with
+               | Type_abstract _ | Type_open ->
+                 raise(Error(
+                   decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+               | _ -> ()
+             end;
+             update_decl_jkind env (Pident id) decl, allow_any_crossing)
+         in
          let env = add_type ~check:false id new_decl env in
          env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
       (env, Ident.Map.empty) order
