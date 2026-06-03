@@ -52,7 +52,7 @@
   (target opnames.ml)
   (deps
      (:make_opcodes make_opcodes.exe)
-     (:input ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/instruct.h))
+     (:input ../runtime/caml/instruct.h))
   (action
     (with-stdin-from %{input}
       (with-stdout-to %{target}
