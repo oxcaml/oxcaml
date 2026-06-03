@@ -161,7 +161,8 @@ module TyVarEnv : sig
 
   val is_in_scope : string -> bool
 
-  val add : ?unused:bool ref -> string -> type_expr -> jkind_lr -> Env.stage -> unit
+  val add :
+    ?unused:bool ref -> string -> type_expr -> jkind_lr -> Env.stage -> unit
   (* add a global type variable to the environment, with the given jkind.
      Precondition: the [type_expr] must be a [Tvar] with the given jkind. *)
 
@@ -301,7 +302,8 @@ end = struct
 
   let add ?(unused = ref false) name v jkind stage =
     assert (not_generic v);
-    type_variables := TyVarMap.add name (v, unused, jkind, stage) !type_variables
+    type_variables :=
+      TyVarMap.add name (v, unused, jkind, stage) !type_variables
 
   let narrow () =
     (increase_global_level (), !type_variables)

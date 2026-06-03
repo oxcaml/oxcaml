@@ -144,6 +144,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_SET_OF_CLOSURES [@symbol "set_of_closures"]
 %token KWD_SIZE   [@symbol "size"]
 %token KWD_SUCC   [@symbol "succ"]
+%token KWD_STUB   [@symbol "stub"]
 %token KWD_SWITCH [@symbol "switch"]
 %token KWD_TAGGED [@symbol "tagged"]
 %token KWD_TAILREC [@symbol "tailrec"]
@@ -257,7 +258,8 @@ code:
     result_mode = boption(KWD_LOCAL);
     EQUAL; body = expr;
     { let
-        recursive, inline, loopify, id, newer_version_of, code_size, is_tupled
+        recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,
+        stub
         =
         header
       in
@@ -265,7 +267,7 @@ code:
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_var; ghost_region_var; depth_var;
                             ret_cont; exn_cont; body };
-        code_size; is_tupled; loopify; result_mode; } }
+        code_size; is_tupled; stub; loopify; result_mode; } }
 ;
 
 code_header:
@@ -276,8 +278,10 @@ code_header:
     KWD_SIZE LPAREN; code_size = code_size; RPAREN;
     newer_version_of = option(newer_version_of);
     is_tupled = boption(KWD_TUPLED);
+    stub = boption(KWD_STUB);
     id = code_id;
-    { recursive, inline, loopify, id, newer_version_of, code_size, is_tupled }
+    { recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,
+      stub }
 ;
 
 newer_version_of:
@@ -321,14 +325,17 @@ prim_param_val:
   | i = INT { make_located (fst i) ($startpos, $endpos)}
 
 prim_param:
-  | DOT; flag = IDENT { Flag flag }
-  | DOT LBRACK; p = prim_param_val; RBRACK
-    { Positional p }
-  | DOT; label = IDENT; LBRACK; value = prim_param_val; RBRACK
-    { Labeled { label; value } }
+  | flag = prim_param_val { Labeled (flag, []) }
+  | label = prim_param_val; LBRACK;
+      subvals = separated_nonempty_list(COMMA, prim_param);
+    RBRACK
+    { Labeled (label, subvals) }
+  | LBRACK; ps = separated_nonempty_list(COMMA, prim_param); RBRACK
+    { Anonymous ps }
 
 prim_op:
-  | prim = PRIM; params = prim_param* { { prim; params} }
+  | prim = PRIM; ps = pair(DOT, prim_param)*
+    { { prim; params = List.map snd ps } }
 
 named:
   | s = simple { Simple s }
@@ -342,8 +349,10 @@ named:
   | KWD_REC_INFO; ri = rec_info_atom { Rec_info ri }
 ;
 
+
 switch_case:
-  | i = tag; MINUSGREATER; ac = apply_cont_expr { i,ac }
+  | i = tag; MINUSGREATER; ac = apply_cont_expr { i, Named_cont ac }
+  | i = tag; MINUSGREATER; b = atomic_body { i, Inlined_goto b }
 ;
 
 switch:
@@ -439,7 +448,7 @@ let_expr(body):
 
 inner_expr:
   | w = where_expr { w }
-  | a = atomic_expr { a }
+  | s = inlined_expr { s }
 ;
 
 where_expr:
@@ -450,7 +459,17 @@ where_expr:
 
 continuation_body:
   | l = let_expr(continuation_body) { l }
+  | s = inlined_expr { s }
+;
+
+atomic_body:
+  | l = let_expr(atomic_body) { l }
   | a = atomic_expr { a }
+
+inlined_expr:
+  | a = atomic_expr { a }
+  | KWD_SWITCH; scrutinee = simple; cases = switch
+    { Switch {scrutinee; cases} }
 ;
 
 atomic_expr:
@@ -458,7 +477,6 @@ atomic_expr:
   | KWD_UNREACHABLE { Invalid { message =  "treat-as-unreachable" } }
   | KWD_INVALID; message = STRING { Invalid { message } }
   | KWD_CONT; ac = apply_cont_expr { Apply_cont ac }
-  | KWD_SWITCH; scrutinee = simple; cases = switch { Switch {scrutinee; cases} }
   | KWD_APPLY e = apply_expr { Apply e }
   | LPAREN; e = expr; RPAREN { e }
 ;

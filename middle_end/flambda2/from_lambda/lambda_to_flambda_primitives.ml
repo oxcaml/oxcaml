@@ -122,42 +122,43 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
   | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
   | Shape shape ->
-    let shape_length = Array.length shape in
-    if num_fields <> shape_length
+    (* This function is only called for uniform block shapes. We flatten
+       products of values into individual value fields. *)
+    let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
+      match elem with
+      | L.Value vk ->
+        K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+      | Product elts -> Array.fold_left collect_value_fields acc elts
+      | Float_boxed ()
+      | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+        Misc.fatal_error "convert_block_shape: non-uniform shape"
+    in
+    let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
+    let fields_length = List.length fields in
+    if num_fields <> fields_length
     then
       Misc.fatal_errorf
         "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
          fields"
-        num_fields shape_length;
-    (* This function is only called for uniform block shapes *)
-    Array.to_list
-      (Array.map
-         (fun (elem : unit L.mixed_block_element) ->
-           match elem with
-           | L.Value vk ->
-             K.With_subkind.from_lambda_value_kind ~machine_width vk
-           | Float_boxed ()
-           | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-           | Vec256 | Vec512 | Word | Untagged_immediate | Product _
-           | Splice_variable _ ->
-             Misc.fatal_error "convert_block_shape: non-uniform shape")
-         shape)
+        num_fields fields_length;
+    fields
 
-let check_float_array_optimisation_enabled name =
+let check_float_array_optimisation_enabled dbg name =
   if not (Flambda_features.flat_float_array ())
   then
     Misc.fatal_errorf
-      "[%s] is not expected when the float array optimisation is disabled" name
-      ()
+      "%a: [%s] is not expected when the float array optimisation is disabled"
+      Debuginfo.print_compact dbg name ()
 
 type converted_array_kind =
   | Array_kind of P.Array_kind.t
   | Float_array_opt_dynamic
 
-let convert_array_kind (kind : L.array_kind) : converted_array_kind =
+let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
   match kind with
   | Pgenarray ->
-    check_float_array_optimisation_enabled "Pgenarray";
+    check_float_array_optimisation_enabled dbg "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Array_kind Values
   | Pgcignorableaddrarray -> Array_kind Gc_ignorable_values
@@ -204,8 +205,8 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
     in
     Array_kind (Unboxed_product (List.map convert_kind kinds))
 
-let convert_array_kind_for_length kind : P.Array_kind_for_length.t =
-  match convert_array_kind kind with
+let convert_array_kind_for_length dbg kind : P.Array_kind_for_length.t =
+  match convert_array_kind dbg kind with
   | Array_kind array_kind -> Array_kind array_kind
   | Float_array_opt_dynamic -> Float_array_opt_dynamic
 
@@ -238,8 +239,8 @@ type converted_array_ref_kind =
   | Array_ref_kind of Array_ref_kind.t
   | Float_array_opt_dynamic_ref of L.locality_mode
 
-let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
-    =
+let convert_array_ref_kind _dbg (kind : L.array_ref_kind) :
+    converted_array_ref_kind =
   match kind with
   | Pgenarray_ref mode ->
     (* CR mshinwell: We can't check this because of the translations of
@@ -353,9 +354,9 @@ let convert_array_ref_kind_to_array_kind (array_ref_kind : Array_ref_kind.t) :
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds))
 
-let convert_array_ref_kind_for_length array_ref_kind : P.Array_kind_for_length.t
-    =
-  match convert_array_ref_kind array_ref_kind with
+let convert_array_ref_kind_for_length dbg array_ref_kind :
+    P.Array_kind_for_length.t =
+  match convert_array_ref_kind dbg array_ref_kind with
   | Float_array_opt_dynamic_ref _ -> Float_array_opt_dynamic
   | Array_ref_kind array_ref_kind -> (
     match array_ref_kind with
@@ -408,8 +409,8 @@ type converted_array_set_kind =
   | Array_set_kind of Array_set_kind.t
   | Float_array_opt_dynamic_set of Alloc_mode.For_assignments.t
 
-let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
-    =
+let convert_array_set_kind _dbg (kind : L.array_set_kind) :
+    converted_array_set_kind =
   match kind with
   | Pgenarray_set mode ->
     (* CR mshinwell: see CR in [convert_array_ref_kind] above
@@ -523,9 +524,9 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds))
 
-let convert_array_set_kind_for_length array_set_kind : P.Array_kind_for_length.t
-    =
-  match convert_array_set_kind array_set_kind with
+let convert_array_set_kind_for_length dbg array_set_kind :
+    P.Array_kind_for_length.t =
+  match convert_array_set_kind dbg array_set_kind with
   | Float_array_opt_dynamic_set _ -> Float_array_opt_dynamic
   | Array_set_kind Naked_floats_to_be_unboxed -> Array_kind Naked_floats
   | Array_set_kind (No_float_array_opt nfo) -> (
@@ -553,11 +554,11 @@ type converted_duplicate_array_kind =
   | Duplicate_array_kind of P.Duplicate_array_kind.t
   | Float_array_opt_dynamic
 
-let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
+let convert_array_kind_to_duplicate_array_kind dbg (kind : L.array_kind) :
     converted_duplicate_array_kind =
   match kind with
   | Pgenarray ->
-    check_float_array_optimisation_enabled "Pgenarray";
+    check_float_array_optimisation_enabled dbg "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Duplicate_array_kind Values
   | Pgcignorableaddrarray -> Duplicate_array_kind Values
@@ -1489,9 +1490,9 @@ let array_set_unsafe ~machine_width dbg ~array ~index array_kind array_set_kind
     ~new_values
   |> H.maybe_create_unboxed_product
 
-let[@inline always] match_on_array_ref_kind ~array array_ref_kind f :
+let[@inline always] match_on_array_ref_kind dbg ~array array_ref_kind f :
     H.expr_primitive =
-  match convert_array_ref_kind array_ref_kind with
+  match convert_array_ref_kind dbg array_ref_kind with
   | Array_ref_kind array_ref_kind ->
     let array_kind = convert_array_ref_kind_to_array_kind array_ref_kind in
     f array_kind array_ref_kind
@@ -1508,9 +1509,9 @@ let[@inline always] match_on_array_ref_kind ~array array_ref_kind f :
            a singleton. *)
         [K.With_subkind.any_value] )
 
-let[@inline always] match_on_array_set_kind ~array array_set_kind f :
+let[@inline always] match_on_array_set_kind dbg ~array array_set_kind f :
     H.expr_primitive =
-  match convert_array_set_kind array_set_kind with
+  match convert_array_set_kind dbg array_set_kind with
   | Array_set_kind array_set_kind ->
     let array_kind = convert_array_set_kind_to_array_kind array_set_kind in
     f array_kind array_set_kind
@@ -1840,7 +1841,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             | Float_boxed _ -> unbox_float arg)
           args
       in
-      let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+      let kind_shape =
+        match K.Scannable_block_shape.from_mixed_block_shape shape with
+        | Mixed_record kind_shape -> kind_shape
+        | Value_only ->
+          Misc.fatal_error
+            "Pmakeblock: mixed_block_of_block_shape returned Some but \
+             from_mixed_block_shape returned Value_only"
+      in
       [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
@@ -2034,7 +2042,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pmakearray (lambda_array_kind, mutability, mode), _ -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
-    let array_kind = convert_array_kind lambda_array_kind in
+    let array_kind = convert_array_kind dbg lambda_array_kind in
     let mutability = Mutability.from_lambda mutability in
     match array_kind with
     | Array_kind array_kind ->
@@ -2084,7 +2092,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pduprecord (repr, num_fields), [[arg]] ->
     let kind : P.Duplicate_block_kind.t =
       match repr with
-      | Record_boxed _ ->
+      | Record_boxed ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
@@ -2092,6 +2100,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_float | Record_ufloat ->
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
+      | Record_inlined
+          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
+        Values
+          { tag = Tag.Scannable.create_exn runtime_tag;
+            length = Target_ocaml_int.of_int machine_width num_fields
+          }
+      | Record_mixed shape
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
+        Values
+          { tag = Tag.Scannable.zero;
+            length = Target_ocaml_int.of_int machine_width num_fields
+          }
       | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
       | Record_inlined
           ( Ordinary { runtime_tag; _ },
@@ -2121,6 +2142,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_unboxed
       | Record_inlined (Null, _, _) ->
         Misc.fatal_errorf "Cannot handle record kind for Pduprecord: %a"
+          Printlambda.primitive prim
+      | Record_dummy _ ->
+        Misc.fatal_errorf "convert_lprim: Pduprecord: dummy representation: %a"
           Printlambda.primitive prim
     in
     [Unary (Duplicate_block { kind }, arg)]
@@ -2352,7 +2376,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     in
     [Ternary (Array_set (array_kind, array_set_kind), Prim obj, field, value)]
   | Parraylength kind, [[arg]] -> (
-    let array_kind = convert_array_kind_for_length kind in
+    let array_kind = convert_array_kind_for_length dbg kind in
     let prim : H.expr_primitive = Unary (Array_length array_kind, arg) in
     match array_kind with
     | Array_kind
@@ -2373,7 +2397,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [Binary (Int_arith (Tagged_immediate, Div), Prim prim, Simple divisor)])
   | Pduparray (kind, mutability), [[arg]] -> (
     let duplicate_array_kind =
-      convert_array_kind_to_duplicate_array_kind kind
+      convert_array_kind_to_duplicate_array_kind dbg kind
     in
     let source_mutability = Mutability.Immutable in
     let destination_mutability = Mutability.from_lambda mutability in
@@ -2578,7 +2602,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
     in
@@ -2587,25 +2611,22 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         let imm = Target_ocaml_int.of_int machine_width new_index in
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
-        let block_access : P.Block_access_kind.t =
-          let field_kind =
-            H.mixed_block_access_field_kind
-              flattened_reordered_shape.(new_index)
-          in
-          Mixed
-            { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
+        let field_elt = flattened_reordered_shape.(new_index) in
+        let block_access =
+          H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
+            ~size:Unknown field_elt
         in
-        let block_access : H.expr_primitive =
+        let prim : H.expr_primitive =
           Unary
             ( Block_load { kind = block_access; mut = mutability; field = imm },
               arg )
         in
-        match flattened_reordered_shape.(new_index) with
+        match field_elt with
         | Float_boxed (mode : Lambda.locality_mode) ->
-          box_float mode block_access ~current_region
+          box_float mode prim ~current_region
         | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
-          block_access)
+          prim)
       new_indexes
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
       [[block]; [value]] ) ->
@@ -2653,7 +2674,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
     in
@@ -2668,21 +2689,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (fun new_index value : H.expr_primitive ->
           let imm = Target_ocaml_int.of_int machine_width new_index in
           check_non_negative_imm imm "Psetmixedfield";
-          let block_access : P.Block_access_kind.t =
-            Mixed
-              { field_kind =
-                  H.mixed_block_access_field_kind
-                    flattened_reordered_shape.(new_index);
-                shape = kind_shape;
-                tag = Unknown;
-                size = Unknown
-              }
+          let field_elt = flattened_reordered_shape.(new_index) in
+          let block_access =
+            H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
+              ~size:Unknown field_elt
           in
           let init_or_assign =
             convert_init_or_assign initialization_or_assignment
           in
           let value : H.simple_or_prim =
-            match flattened_reordered_shape.(new_index) with
+            match field_elt with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
               value
@@ -2702,28 +2718,32 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* For this and the following cases we will end up relying on the backend to
        CSE the two accesses to the array's header word in the [Pgenarray]
        case. *)
-    [ match_on_array_ref_kind ~array array_ref_kind
+    [ match_on_array_ref_kind dbg ~array array_ref_kind
         (array_load_unsafe ~machine_width ~array ~mut
            ~index:(convert_index_to_tagged_int ~index ~index_kind)
            ~current_region) ]
   | Parrayrefs (array_ref_kind, index_kind, mut), [[array]; [index]] ->
-    let array_length_kind = convert_array_ref_kind_for_length array_ref_kind in
+    let array_length_kind =
+      convert_array_ref_kind_for_length dbg array_ref_kind
+    in
     [ check_array_access ~dbg ~array array_length_kind ~index ~index_kind
         ~machine_width
-        (match_on_array_ref_kind ~array array_ref_kind
+        (match_on_array_ref_kind dbg ~array array_ref_kind
            (array_load_unsafe ~machine_width ~array ~mut
               ~index:(convert_index_to_tagged_int ~index ~index_kind)
               ~current_region)) ]
   | Parraysetu (array_set_kind, index_kind), [[array]; [index]; new_values] ->
-    [ match_on_array_set_kind ~array array_set_kind
+    [ match_on_array_set_kind dbg ~array array_set_kind
         (array_set_unsafe ~machine_width dbg ~array
            ~index:(convert_index_to_tagged_int ~index ~index_kind)
            ~new_values) ]
   | Parraysets (array_set_kind, index_kind), [[array]; [index]; new_values] ->
-    let array_length_kind = convert_array_set_kind_for_length array_set_kind in
+    let array_length_kind =
+      convert_array_set_kind_for_length dbg array_set_kind
+    in
     [ check_array_access ~dbg ~array array_length_kind ~index ~index_kind
         ~machine_width
-        (match_on_array_set_kind ~array array_set_kind
+        (match_on_array_set_kind dbg ~array array_set_kind
            (array_set_unsafe ~machine_width dbg ~array
               ~index:(convert_index_to_tagged_int ~index ~index_kind)
               ~new_values)) ]
@@ -2974,7 +2994,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
   | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    check_float_array_optimisation_enabled "Pfloat_array_load_vec";
+    check_float_array_optimisation_enabled dbg "Pfloat_array_load_vec";
     [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
         ~boxed ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
   | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
@@ -3024,7 +3044,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~boxed ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index ]
   | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    check_float_array_optimisation_enabled "Pfloat_array_set_vec";
+    check_float_array_optimisation_enabled dbg "Pfloat_array_set_vec";
     [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
         ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_value
     ]

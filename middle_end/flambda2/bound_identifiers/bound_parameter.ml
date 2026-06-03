@@ -55,7 +55,18 @@ include Container_types.Make (struct
       Flambda_kind.With_subkind.print kind
 end)
 
-let create param kind uid = { param; kind; uid }
+let create param kind uid =
+  if
+    not
+      (Flambda_kind.equal
+         (Flambda_kind.With_subkind.kind kind)
+         (Variable.kind param))
+  then
+    Misc.fatal_errorf
+      "Cannot create parameter %a with kind %a: it must have a subkind of %a"
+      Variable.print param Flambda_kind.With_subkind.print kind
+      Flambda_kind.print (Variable.kind param);
+  { param; kind; uid }
 
 let var t = t.param
 

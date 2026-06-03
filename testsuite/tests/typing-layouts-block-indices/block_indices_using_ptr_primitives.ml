@@ -67,17 +67,6 @@ let () =
   Printf.printf "%f\n" r.f;
   print_newline ()
 
-type float_record = { f' : float; mutable f : float }
-
-let () =
-  print_endline "Float record";
-  let r = { f' = -100.0; f = 1.0 } in
-  let x = unsafe_get_ptr #(r, (.f)) in
-  Printf.printf "%f\n" (Float_u.to_float x);
-  unsafe_set_ptr #(r, (.f)) #2.0;
-  Printf.printf "%f\n" r.f;
-  print_newline ()
-
 type mixed_record = { i : int; mutable u : float#; s : string }
 
 let () =
@@ -109,26 +98,6 @@ let () =
   Printf.printf "%f\n" x;
   unsafe_set_ptr #(r, (.r.#f)) 2.0;
   Printf.printf "%f\n" r.r.#f;
-  print_newline ()
-
-type mixed_float_record = { mutable f : float; mutable u : float# }
-
-let () =
-  print_endline "Mixed float record (float field)";
-  let r = { f = 1.0; u = -#100.0 } in
-  let x = unsafe_get_ptr #(r, (.f)) in
-  Printf.printf "%f\n" (Float_u.to_float x);
-  unsafe_set_ptr #(r, (.f)) #2.0;
-  Printf.printf "%f\n" r.f;
-  print_newline ()
-
-let () =
-  print_endline "Mixed float record (float# field)";
-  let r = { f = -100.0; u = #1.0 } in
-  let x = unsafe_get_ptr #(r, (.u)) in
-  Printf.printf "%f\n" (Float_u.to_float x);
-  unsafe_set_ptr #(r, (.u)) #2.0;
-  Printf.printf "%f\n" (Float_u.to_float r.u);
   print_newline ()
 
 type floatu_floatu = #{ f1: float#; f2 : float# }

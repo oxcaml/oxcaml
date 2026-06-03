@@ -64,13 +64,16 @@ val unwrap_loc : 'a Fexpr.located -> 'a
     The complexity comes from the description of the parameters of the primitive
     variant itself, which can be arbitrary caml values.
 
-    As {!type:param} shows, there is three kinds of primitive parameter:
-    - Positional, written [.(value)]
-    - Flag, written [.flag]
-    - Labeled, written [.label(value)]
+    As {!type:param} shows, there is two kinds of primitive parameter:
+    - Tuples, written [.[val1, ..., valN]]
+    - Labeled, written [.label[val1, ..., valN]]. They can be without arguments
+      [.label] to denote flags.
 
-    Flags and labeled can appear in any order, at any positions. Positional and
-    labeled are provided with {!type:value_lens} to convert their payload.
+    Flags and labeled can appear in any order, at any positions. Both of them
+    can be nested, the dot separator is only for toplevel parameters.
+
+    The type {!type:value_lens} is used to describe conversions of custom types.
+    Label, flags and inner values are all treated the same.
 
     The constructors provide composable {!type:param_cons} values. They allow
     the construction of more complex types, such as tuples, list, options or
@@ -112,11 +115,14 @@ module Describe : sig
       cases. *)
   val todop : string -> 'p param_cons
 
+  (** Constructor from simple lens *)
+  val value : 'a value_lens -> 'a param_cons
+
   (** Syntactic positional parameter *)
-  val positional : 'a value_lens -> 'a param_cons
+  val positional : 'a param_cons -> 'a param_cons
 
   (** Syntactic labeled parameter *)
-  val labeled : string -> 'a value_lens -> 'a param_cons
+  val labeled : string -> 'a param_cons -> 'a param_cons
 
   (** Syntactic flag parameter. Flags have no values and the only information
       they carry is their presence. {!val:flag} has little reason to appear by
@@ -147,6 +153,23 @@ module Describe : sig
   val param3 :
     'a param_cons -> 'b param_cons -> 'c param_cons -> ('a * 'b * 'c) param_cons
 
+  (** Quadruple of constructions. *)
+  val param4 :
+    'a param_cons ->
+    'b param_cons ->
+    'c param_cons ->
+    'd param_cons ->
+    ('a * 'b * 'c * 'd) param_cons
+
+  (** Quintuple of constructions. *)
+  val param5 :
+    'a param_cons ->
+    'b param_cons ->
+    'c param_cons ->
+    'd param_cons ->
+    'e param_cons ->
+    ('a * 'b * 'c * 'd * 'e) param_cons
+
   (** Specify a default value for the underlying constructor, which will be used
       if there is no match. In conversion to fexpr, if the provided parameter
       equals the default, no parameter will be produced. [~eq] allows the
@@ -158,6 +181,10 @@ module Describe : sig
   (** Makes a construction optional. Always matches. *)
   val option : 'p param_cons -> 'p option param_cons
 
+  (** Makes a list of a construction. Atomized to make the list explicit,
+      expects its own level of bracket syntactically *)
+  val list : 'p param_cons -> 'p list param_cons
+
   (** Custom transformation of parameter value.
 
       Labels inverted to be related to the argument. [maps x ~to_ ~from] read
@@ -168,51 +195,90 @@ module Describe : sig
     'a param_cons ->
     'b param_cons
 
-  (** Simple pattern-matching of parameters. Takes a list of case construction
-      (see {!val:case}) and represents the first that matches in appearance
-      order.
+  (** Pattern maching *)
 
-      Caution: exhaustivity is no enforced. And patterns may be fragile, take
-      care to order them properly to avoid mismatch, especially with optional
-      parameters. *)
-  val either :
-    ?no_match_handler:('p -> unit) -> 'p case_cons list -> 'p param_cons
+  (** Using monadic notation, we define patterns using [let|] binding a
+      [param_cons] and a boxing function, ending with a call to [return_either]
+      with a full pattern matching on the outer type. This is then bound to the
+      resulting [param_cons] with [let|=]. The order of declaration of pattern
+      is the order in which they will be tried against. Example:
 
-  (** Describes a constructor pattern. Takes the construction we want to match.
-      - [~box] allows mapping of the matched value, usually to wrap it in the
-        type of the enclosing {!val:either}.
-      - [~unbox] is the reverse but expect an optional return value, to tell if
-        the value corresponds to the described case. This is the only place
-        where exhaustivity can be enforced. *)
-  val case :
-    box:(decode_env -> 'c -> 'p) ->
-    unbox:(encode_env -> 'p -> 'c option) ->
-    'c param_cons ->
-    'p case_cons
+      {[
+      let|= example =
+          let| b = bool, (fun _ b -> if b then 1 else 0) in
+          let| i = int, (fun _ -> Fun.id) in
+          return_either
+            (fun env p ->
+               match p with
+               | 0 -> b env false
+               | 1 -> b env true
+               | x -> i env x)
+      ]}
 
-  (** Same as {!val:case}, but [~box] and [~unbox] are identity. *)
-  val id_case : 'p param_cons -> 'p case_cons
+      This is a [int param_cons] encoded to either a bool ["true" | "false"] or
+      an int. *)
+
+  type 'p encode_case = encode_env -> 'p -> param list
+
+  type 'p build_either
+
+  val return_either : (encode_env -> 'p -> param list) -> 'p build_either
+
+  val ( let| ) :
+    'case param_cons * (decode_env -> 'case -> 'p) ->
+    ('case encode_case -> 'p build_either) ->
+    'p build_either
+
+  val ( let|= ) : 'p build_either -> ('p param_cons -> 'a) -> 'a
+
+  val param2_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    ('c1 * 'c2) param_cons * (decode_env -> 'c1 * 'c2 -> 'p)
+
+  val param3_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'c3 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    'c3 param_cons ->
+    ('c1 * 'c2 * 'c3) param_cons * (decode_env -> 'c1 * 'c2 * 'c3 -> 'p)
+
+  val param4_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'c3 -> 'c4 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    'c3 param_cons ->
+    'c4 param_cons ->
+    ('c1 * 'c2 * 'c3 * 'c4) param_cons
+    * (decode_env -> 'c1 * 'c2 * 'c3 * 'c4 -> 'p)
+
+  val param5_case :
+    decode:(decode_env -> 'c1 -> 'c2 -> 'c3 -> 'c4 -> 'c5 -> 'p) ->
+    'c1 param_cons ->
+    'c2 param_cons ->
+    'c3 param_cons ->
+    'c4 param_cons ->
+    'c5 param_cons ->
+    ('c1 * 'c2 * 'c3 * 'c4 * 'c5) param_cons
+    * (decode_env -> 'c1 * 'c2 * 'c3 * 'c4 * 'c5 -> 'p)
 
   (** {2 Parameter payload descriptors}
 
       Can be extended here. Or defined elsewhere for specific values. *)
 
   (** Raw value *)
-  val string : string Fexpr.located value_lens
+  val string : string Fexpr.located param_cons
 
   (** Parsed as integer. Fails if the string is not one. *)
-  val int : int value_lens
+  val int : int param_cons
 
   (** Parsed as boolean. Fails if the string is not one. *)
-  val bool : bool value_lens
+  val bool : bool param_cons
 
   (** Same as {!val:string}. With some tweaks to the parser, we could call
       actual parsing start-points in it. *)
-  val diy : string Fexpr.located value_lens
-
-  (** Similar to {!val:constructor_flag} but for payload. Exhaustivity not
-      enforced. *)
-  val constructor_value : (string * 'p) list -> 'p value_lens
+  val diy : string Fexpr.located param_cons
 end
 
 (** Fetch primitive conversion function from registered descriptions *)

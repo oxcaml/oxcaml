@@ -30,17 +30,19 @@ type t =
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
-        threshold : float
+        threshold : float;
+        is_a_functor : bool
       }
   | Attribute_always
-  | Replay_history_says_must_inline
+  | Replay_history_says_must_inline of t
   | Begin_unrolling of int
   | Continue_unrolling
   | Definition_says_inline of { was_inline_always : bool }
   | Speculatively_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
-        threshold : float
+        threshold : float;
+        is_a_functor : bool
       }
   | Jsir_inlining_disabled
 

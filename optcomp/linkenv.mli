@@ -71,9 +71,13 @@ val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
 
 val remove_required : t -> CU.t -> unit
 
-val add_quoted_globals : t -> CU.Name.t list -> unit
+val add_quoted_cmi : t -> CU.Name.t list -> unit
 
-val get_quoted_globals : t -> CU.Name.Set.t
+val add_quoted_cmx : t -> CU.t list -> unit
+
+val get_quoted_cmi : t -> CU.Name.Set.t
+
+val get_quoted_cmx : t -> CU.Set.t
 
 val extract_missing_globals : t -> (CU.t * filepath list) list
 

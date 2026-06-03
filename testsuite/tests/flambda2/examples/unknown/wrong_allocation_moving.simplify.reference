@@ -6,7 +6,7 @@ let code loopify(never) size(2) newer_version_of(`fn[wrong_allocation_moving.ml:
         -> k * k1
         : float boxed =
   let y =
-    %project_value_slot.[`fn[wrong_allocation_moving.ml:21,15--28]`].[`y`]
+    %project_value_slot.[`fn[wrong_allocation_moving.ml:21,15--28]`].[y]
       (my_closure)
   in
   cont k (y)

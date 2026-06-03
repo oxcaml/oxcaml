@@ -40,7 +40,7 @@ Line 1, characters 19-38:
                        ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate_or_null" should be an instance of type
          "('a : immediate)"
-       The layout of t_immediate_or_null is value non_pointer maybe_null
+       The layout of t_immediate_or_null is value_or_null non_pointer
          because of the definition of t_immediate_or_null at line 1, characters 0-44.
        But the layout of t_immediate_or_null must be a sublayout of
            value non_pointer
@@ -60,7 +60,7 @@ Line 1, characters 19-38:
                        ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate_or_null" should be an instance of type
          "('a : value)"
-       The layout of t_immediate_or_null is value non_pointer maybe_null
+       The layout of t_immediate_or_null is value_or_null non_pointer
          because of the definition of t_immediate_or_null at line 1, characters 0-44.
        But the layout of t_immediate_or_null must be a sublayout of value
          because of the definition of accept_value at line 1, characters 0-30.
@@ -177,7 +177,7 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : immediate64)"
-       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
+       The layout of t_immediate64_or_null is value_or_null non_pointer64
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of
            value non_pointer64
@@ -192,7 +192,7 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : immediate)"
-       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
+       The layout of t_immediate64_or_null is value_or_null non_pointer64
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of
            value non_pointer
@@ -207,7 +207,7 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : value)"
-       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
+       The layout of t_immediate64_or_null is value_or_null non_pointer64
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of value
          because of the definition of accept_value at line 1, characters 0-30.
@@ -236,10 +236,10 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: This type "exn or_null" should be an instance of type
          "('a : immediate64_or_null)"
-       The layout of exn or_null is value maybe_separable maybe_null
+       The layout of exn or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of exn or_null must be a sublayout of
-           value non_pointer64 maybe_null
+           value_or_null non_pointer64
          because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
 |}]
 
@@ -273,9 +273,9 @@ Error: Signature mismatch:
          type t = string or_null
        is not included in
          type t : immediate64_or_null
-       The layout of the first is value non_float maybe_null
+       The layout of the first is value_or_null non_float
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of
-           value non_pointer64 maybe_null
+           value_or_null non_pointer64
          because of the definition of t at line 2, characters 2-30.
 |}]

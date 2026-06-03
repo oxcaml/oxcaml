@@ -170,16 +170,17 @@ let int = Array.init 8 (fun _ -> Reg.create Int)
 let check name f ~validate ~save ~exp_std ~exp_err =
   let cfg = f () in
   let with_wrap_ppf ppf f =
-    Format.pp_print_flush ppf ();
-    let buf = Buffer.create 0 in
-    let ppf_buf = Format.formatter_of_buffer buf in
-    let old_out_func = Format.pp_get_formatter_out_functions ppf () in
-    Format.pp_set_formatter_out_functions ppf
-      (Format.pp_get_formatter_out_functions ppf_buf ());
-    let res = f () in
-    Format.pp_print_flush ppf ();
-    Format.pp_set_formatter_out_functions ppf old_out_func;
-    res, buf |> Buffer.to_bytes |> Bytes.to_string |> String.trim
+    Cfg_colours.without_colours ~f:(fun () ->
+        Format.pp_print_flush ppf ();
+        let buf = Buffer.create 0 in
+        let ppf_buf = Format.formatter_of_buffer buf in
+        let old_out_func = Format.pp_get_formatter_out_functions ppf () in
+        Format.pp_set_formatter_out_functions ppf
+          (Format.pp_get_formatter_out_functions ppf_buf ());
+        let res = f () in
+        Format.pp_print_flush ppf ();
+        Format.pp_set_formatter_out_functions ppf old_out_func;
+        res, buf |> Buffer.to_bytes |> Bytes.to_string |> String.trim)
   in
   let ((), err_out), std_out =
     with_wrap_ppf Format.std_formatter (fun () ->

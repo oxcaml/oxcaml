@@ -2259,8 +2259,10 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is "stateful"
-         because it is allocated at line 5, characters 8-41 containing data.
+       The first is weaker than "writing"
+         because it contains a usage (of the value "r" at line 5, characters 25-26)
+         which is expected to be "write" or "read_write"
+         because its mutable field "contents" is being written.
        However, the second is "stateless".
 |}]
 
@@ -2296,7 +2298,11 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is "stateful"
-         because it is allocated at line 7, characters 8-27 containing data.
+       The first is weaker than "writing"
+         because it closes over the value "set" at line 7, characters 21-24
+         which is "writing"
+         because it contains a usage (of the value "r" at line 6, characters 15-16)
+         which is expected to be "write" or "read_write"
+         because its mutable field "contents" is being written.
        However, the second is "stateless".
 |}]

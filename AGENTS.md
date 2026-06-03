@@ -61,8 +61,7 @@ Configuration is needed after changing `.in` files or the autoconf script.
 - Use pattern-matching and functional programming idioms
 - Avoid `assert false` and other unreachable code
 - Rebuild the project often while using the LSP using `make -s boot-compiler`. When
-  you don't rebuild, the LSP may give you stale information from a previous
-  build.
+  you don't rebuild, the LSP may give you stale information from a previous build
 
 ## Important Notes
 

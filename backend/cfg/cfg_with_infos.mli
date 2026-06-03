@@ -32,6 +32,8 @@ val get_block_exn : t -> Label.t -> Cfg.basic_block
 
 val liveness : t -> liveness
 
+val liveness_if_available : t -> liveness option
+
 val liveness_find : t -> InstructionId.t -> Cfg_liveness.Liveness.domain
 
 val liveness_find_opt :

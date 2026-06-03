@@ -49,7 +49,7 @@ let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
 let field_offset_for_label lbl =
   match lbl.lbl_repres with
-  | Record_boxed _
+  | Record_boxed
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
   | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
       lbl.lbl_pos
@@ -69,6 +69,8 @@ let field_offset_for_label lbl =
   | Record_inlined (_, Constructor_mixed _, Variant_with_null)
   | Record_mixed _ ->
       lbl.lbl_pos
+  | Record_dummy _ ->
+      fatal_error "field_offset_for_label: dummy record representation"
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -584,6 +586,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | exception Not_constant -> None
             | constants -> (
               match cstr.cstr_shape with
+              | Constructor_mixed shape
+                when Mixed_product_bytes.types_shape_is_all_value shape ->
+                  (* Note [Constant all-value mixed records]:
+                     Currently unreachable: mixed constructors with all-value
+                     shapes require void or product fields, which don't have
+                     constant representations, so [extract_constant] raises
+                     [Not_constant] first. *)
+                  (* Some (Const_block(runtime_tag, constants)) *)
+                  None
               | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
@@ -714,7 +725,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
       let prim_and_args =
         match lbl.lbl_repres with
-          Record_boxed _
+          Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer e in
           if Types.is_atomic lbl.lbl_mut
@@ -761,10 +772,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 if i <> lbl.lbl_pos then Lambda.generic_value
                 else
                   let pointerness, nullable = maybe_pointer e in
-                  let raw_kind = match pointerness with
-                    | Pointer -> Pgenval
-                    | Immediate -> Pintval
-                  in
+                  let raw_kind = value_kind_of_pointerness pointerness in
                   Lambda.{ raw_kind; nullable })
               ~get_mode:(fun i ->
                 if i <> lbl.lbl_pos then Lambda.alloc_heap
@@ -779,6 +787,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           in
           Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_dummy _ ->
+          fatal_error "transl_exp0: dummy record representation"
       in
       begin match prim_and_args with
       | None -> targ
@@ -817,7 +827,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let newval_lambda = transl_exp ~scopes lbl.lbl_sort newval in
       let prim, args =
         match lbl.lbl_repres with
-          Record_boxed _
+          Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
@@ -861,12 +871,14 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Psetmixedfield([lbl.lbl_pos], shape, mode),
           [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_dummy _ ->
+            fatal_error "transl_exp0: unexpected dummy representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
-      let kind = array_kind e element_sort in
+      let kind = array_kind e in
       let ll =
         transl_list ~scopes
           (List.map (fun e -> (e, element_sort)) expr_list)
@@ -938,13 +950,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let loc = of_location ~scopes e.exp_loc in
       Transl_list_comprehension.comprehension
         ~transl_exp ~scopes ~loc comp
-  | Texp_array_comprehension (_amut, elt_sort, comp) ->
+  | Texp_array_comprehension (_amut, _, comp) ->
       (* We can ignore mutability here since we've already checked in in the
          type checker; both mutable and immutable arrays are created the same
          way *)
       let loc = of_location ~scopes e.exp_loc in
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      let array_kind = Typeopt.array_kind e elt_sort in
+      let array_kind = Typeopt.array_kind e in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
@@ -2123,7 +2134,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       | Overridden (_lid, expr) ->
           let upd =
             match repres with
-              Record_boxed _
+              Record_boxed
             | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                 let ptr, _ = maybe_pointer expr in
                 Psetfield(lbl.lbl_pos, ptr, Assignment modify_heap)
@@ -2156,6 +2167,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 Psetmixedfield
                   ([lbl.lbl_pos], shape, Assignment modify_heap)
             | Record_inlined (_, _, Variant_with_null) -> assert false
+            | Record_dummy _ ->
+              fatal_error "transl_record: unexpected dummy representation"
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
                                 transl_exp ~scopes lbl.lbl_sort expr],
@@ -2193,7 +2206,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                let sem = add_barrier_to_read unique_barrier sem in
                let access =
                  match repres with
-                   Record_boxed _
+                   Record_boxed
                  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                    let ptr, _ = maybe_pointer_type env typ in
                    Pfield (i, ptr, sem)
@@ -2224,9 +2237,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                            let pointerness, nullable =
                              maybe_pointer_type env typ
                            in
-                           let raw_kind = match pointerness with
-                             | Pointer -> Pgenval
-                             | Immediate -> Pintval
+                           let raw_kind =
+                             value_kind_of_pointerness pointerness
                            in
                            Lambda.{ raw_kind; nullable })
                        ~get_mode:(fun _i ->
@@ -2237,6 +2249,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    in
                    Pmixedfield ([i], shape, sem)
                  | Record_inlined (_, _, Variant_with_null) -> assert false
+                 | Record_dummy _ ->
+                   fatal_error "transl_record: unexpected dummy representation"
                in
                Lprim(access, [Lvar init_id],
                      of_location ~scopes loc),
@@ -2256,7 +2270,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         if mut = Mutable then raise Not_constant;
         let cl = List.map extract_constant ll in
         match repres with
-        | Record_boxed _ -> Lconst(Const_block(0, cl))
+        | Record_boxed -> Lconst(Const_block(0, cl))
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
             Lconst(Const_block(runtime_tag, cl))
@@ -2264,6 +2278,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lconst(match cl with [v] -> v | _ -> assert false)
         | Record_float ->
             Lconst(Const_float_block(List.map extract_float cl))
+        | Record_mixed shape
+          when Mixed_product_bytes.types_shape_is_all_value shape ->
+            (* Currently unreachable; see Note [Constant all-value
+               mixed records]. *)
+            (* Lconst(Const_block(0, cl)) *)
+            raise Not_constant
         | Record_mixed shape ->
             if !Clflags.native_code then
               let shape = Lambda.transl_mixed_product_shape shape in
@@ -2273,6 +2293,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  be supported in bytecode. See symtable.ml for the difficulty.
               *)
               raise Not_constant
+        | Record_inlined
+            (Ordinary { runtime_tag = _; _ }, Constructor_mixed shape,
+             Variant_boxed _)
+          when Mixed_product_bytes.types_shape_is_all_value shape ->
+            (* Currently unreachable; see Note [Constant all-value
+               mixed records]. *)
+            (* Lconst(Const_block(runtime_tag, cl)) *)
+            raise Not_constant
         | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
         | Record_ufloat ->
             (* CR layouts v5.1: We should support structured constants for
@@ -2282,10 +2310,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (_, _, (Variant_extensible | Variant_with_null))
         | Record_inlined ((Extension _ | Null), _, _) ->
             raise Not_constant
+        | Record_dummy _ ->
+          fatal_error "transl_record: unexpected dummy representation"
       with Not_constant ->
         let loc = of_location ~scopes loc in
         match repres with
-          Record_boxed _ ->
+          Record_boxed ->
             let shape = List.map must_be_value shape in
             Lprim(Pmakeblock(0, mut,
                              Lambda.block_shape_of_value_kinds (Some shape),
@@ -2333,6 +2363,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_inlined (Null, _, _) -> assert false
+        | Record_dummy _ ->
+          fatal_error "transl_record: unexpected dummy representation"
     in
     begin match opt_init_expr with
       None -> lam
@@ -2374,7 +2406,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       | [l] -> l (* erase singleton unboxed records before lambda *)
       | _ -> Lprim(Pmake_unboxed_product shape, ll, of_location ~scopes loc)
     in
-    match opt_init_expr with
+    begin match opt_init_expr with
     | None -> lam
     | Some (init_expr, init_expr_sort) ->
       let init_expr_sort =
@@ -2383,6 +2415,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       let layout = layout_exp init_expr_sort init_expr in
       let exp = transl_exp ~scopes init_expr_sort init_expr in
       Llet(Strict, layout, init_id, init_id_duid, exp, lam)
+    end
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
 and transl_idx ~scopes loc env ba uas =
@@ -2414,7 +2447,7 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_field (_id, lbl) ->
     begin match lbl.lbl_repres with
-    | Record_boxed _
+    | Record_boxed
     | Record_float | Record_ufloat ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
@@ -2439,18 +2472,22 @@ and transl_idx ~scopes loc env ba uas =
         raise (Error (loc, Block_index_gap_overflow_possible));
       Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
+    | Record_dummy _ ->
+      fatal_error "transl_idx: unexpected dummy representation"
     end
   end
 
 and transl_atomic_loc ~scopes arg arg_sort lbl =
   let arg = transl_exp ~scopes arg_sort arg in
   begin match lbl.lbl_repres with
+  | Record_dummy _ ->
+    Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat
     ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
-  | Record_boxed _
+  | Record_boxed
   | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
                           | Variant_with_null))

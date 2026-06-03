@@ -26,6 +26,7 @@
 #endif
 #include "caml/alloc.h"
 #include "caml/callback.h"
+#include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
@@ -374,7 +375,7 @@ CAMLexport int caml_check_pending_actions(void)
   return check_pending_actions(Caml_state);
 }
 
-caml_result caml_do_pending_actions_res(void)
+caml_result caml_do_pending_actions_flags_res(int flags)
 {
   /* 1. Non-delayable actions that do not run OCaml code. */
 
@@ -404,10 +405,25 @@ caml_result caml_do_pending_actions_res(void)
   caml_check_async(res, "finaliser");
   if (caml_result_is_exception(res)) goto exception;
 
-  /* Process ticks (fiber preemptions and preemptive systhread switching). By
-     doing this last, we do not need to set the action pending flag in case a
-     context switch happens: all actions have been processed at this point. */
+  /* Process external interrupts (e.g. preemptive systhread switching). By doing
+     this after all other possibly exception-returning actions, we do not need
+     to set the action pending flag in case a context switch happens: all
+     actions have been processed at this point. */
   caml_process_tick();
+
+  /* Check for a pending preemption
+
+     This sets up an *uninitialized* 3-word preemption continuation, so we can
+     only do it if pending actions were checked from ocaml (in
+     caml_garbage_collection)
+
+     It's important that after this function is called, we don't enter the gc
+     again before returning to OCaml. The continuation this allocates is
+     uninitialized, and should not be promoted before being initialized.
+   */
+  if (flags & CAML_FROM_CAML) {
+    caml_domain_setup_preemption();
+  }
 
   return Result_unit;
 
@@ -420,21 +436,59 @@ exception:
   return res;
 }
 
-caml_result caml_process_pending_actions_with_root_res(value root)
+caml_result caml_do_pending_actions_res(void)
+{
+  return caml_do_pending_actions_flags_res(CAML_FROM_C);
+}
+
+value caml_do_pending_actions_flags_exn(int flags)
+{
+  return caml_result_get_encoded_exception(
+    caml_do_pending_actions_flags_res(flags));
+}
+
+value caml_do_pending_actions_exn(void)
+{
+  return caml_do_pending_actions_flags_exn(CAML_FROM_C);
+}
+
+caml_result caml_process_pending_actions_with_root_flags_res(value root,
+                                                             int flags)
 {
   if (caml_check_pending_actions()) {
     CAMLparam1(root);
-    caml_result result = caml_do_pending_actions_res();
+    caml_result result = caml_do_pending_actions_flags_res(flags);
     if (caml_result_is_exception(result)) CAMLreturnT(caml_result, result);
     CAMLdrop;
   }
   return Result_value(root);
 }
 
-CAMLprim value caml_process_pending_actions_with_root(value root)
+caml_result caml_process_pending_actions_with_root_res(value root)
+{
+  return caml_process_pending_actions_with_root_flags_res(root, CAML_FROM_C);
+}
+
+value caml_process_pending_actions_with_root_flags_exn(value root, int flags)
+{
+  return caml_result_get_encoded_exception(
+    caml_process_pending_actions_with_root_flags_res(root, flags));
+}
+
+value caml_process_pending_actions_with_root_exn(value root)
+{
+  return caml_process_pending_actions_with_root_flags_exn(root, CAML_FROM_C);
+}
+
+value caml_process_pending_actions_with_root_flags(value root, int flags)
 {
   return caml_get_value_or_raise_async(
-    caml_process_pending_actions_with_root_res(root), "");
+    caml_process_pending_actions_with_root_flags_res(root, flags), "");
+}
+
+CAMLprim value caml_process_pending_actions_with_root(value root)
+{
+  return caml_process_pending_actions_with_root_flags(root, CAML_FROM_C);
 }
 
 CAMLexport caml_result caml_process_pending_actions_res(void)
@@ -446,17 +500,27 @@ CAMLexport caml_result caml_process_pending_actions_res(void)
   }
 }
 
+CAMLexport void caml_process_pending_actions_flags(int flags)
+{
+  caml_process_pending_actions_with_root_flags(Val_unit, flags);
+}
+
 CAMLexport void caml_process_pending_actions(void)
 {
-  caml_get_value_or_raise(
-    caml_process_pending_actions_res());
+  caml_process_pending_actions_flags(CAML_FROM_C);
 }
 
 /* deprecated, but kept around for backward-compatibility */
 CAMLexport value caml_process_pending_actions_exn(void)
 {
-  caml_result res = caml_process_pending_actions_res();
-  return caml_result_get_encoded_exception(res);
+  return caml_result_get_encoded_exception(
+    caml_process_pending_actions_res());
+}
+
+CAMLexport value caml_process_pending_actions_flags_exn(int flags)
+{
+  return caml_result_get_encoded_exception(
+    caml_process_pending_actions_with_root_flags_res(Val_unit, flags));
 }
 
 /* OS-independent numbering of signals */

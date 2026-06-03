@@ -13,7 +13,7 @@ The mode system in the compiler tracks various properties of values, so that cer
 performance-enhancing operations can be performed safely. For example:
 - Locality tracks escaping. See [the local allocations
   reference](../../stack-allocation/reference)
-- Uniqueness and linearity tracks aliasing. See [the uniqueness reference](../../uniqueness/reference)
+- Uniqueness and linearity track aliasing. See [the uniqueness reference](../../uniqueness/reference)
 - Portability and contention tracks inter-thread sharing.
     <!-- CR zqian: reference for portability and contention -->
 
@@ -21,7 +21,7 @@ performance-enhancing operations can be performed safely. For example:
 `lazy e` contains a thunk that evaluates `e`, as well as a mutable cell to store the
 result of `e`. Upon construction, the mode of `lazy e` cannot be stronger than `e`. For
 example, if `e` is `nonportable`, then `lazy e` cannot be `portable`. Upon destruction
-(forcing a lazy value), the result cannot be stronger than the mode of lazy value. For
+(forcing a lazy value), the result cannot be stronger than the mode of the lazy value. For
 example, forcing a `nonportable` lazy value cannot give a `portable` result. Additionally,
 forcing a lazy value involves accessing the mutable cell and thus requires the lazy value
 to be `uncontended`.
@@ -29,9 +29,10 @@ to be `uncontended`.
 Currently, the above rules don't apply to the locality axis, because both the result and
 the lazy value are heap-allocated, so they are always `global`.
 
-Additionally, upon construction, the comonadic fragment of `lazy e` cannot be stronger
-than the thunk. The thunk is checked as `fun () -> e`, potentially closing over variables,
-which weakens its comonadic fragment. This rule doesn't apply to several axes:
+Additionally, upon construction, the relevant mode axes of `lazy e` cannot be
+stronger than the thunk. The thunk is checked as `fun () -> e`, potentially
+closing over variables, which can weaken the thunk on those axes. This rule
+doesn't apply to several axes:
 - The thunk is always heap-allocated so always `global`.
 - Since the thunk is only evaluated if the lazy value is `uncontended`, one can construct
 a lazy value at `portable` even if the thunk is `nonportable` (e.g., closing over
@@ -127,7 +128,7 @@ let () = bar foo (* prints "foo" *)
 Exceptions also cross statefulness and visibility with identical restrictions.
 
 # Modalities
-Modalities, as described in the [syntax](./syntax) section, can be though of as functions
+Modalities, as described in the [syntax](../syntax) section, can be thought of as functions
 from mode to mode. For example, let's imagine one defines a record type with some modality
 `m`:
 
@@ -183,7 +184,7 @@ Similarly, the least common supermode of `corrupted` and `shared` is `contended`
 the greatest common submode of `shareable` and `corruptible` is `portable`.
 
 # Mode crossing
-In the [intro](./intro) to modes, we saw the idea of "mode crossing", in which values of
+In the [intro](../intro) to modes, we saw the idea of "mode crossing", in which values of
 types with particular properties can cross from some supermode to some submode for free.
 For example, immutable data crosses most modes: a `string @ immutable` can always be
 treated as a `string @ read_write` (because there are no mutable fields to read or write),

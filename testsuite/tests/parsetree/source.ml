@@ -7530,3 +7530,8 @@ let x :> [> `A | `B ] = `A
 
 (* Utf8 identifier *)
 let là = function ça -> ça
+
+(* Return annotations on anonymous functions that require parens. *)
+let f = [fun x : (int -> int) -> x]
+
+let g = [fun x : (_ as 'a) -> x]

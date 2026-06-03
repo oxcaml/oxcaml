@@ -48,7 +48,9 @@ let cmm_invariants ppf fd_cmm =
 let cfg_invariants ppf cfg =
   let print_fundecl ppf c =
     if !Oxcaml_flags.dump_cfg
-    then Cfg_with_layout.dump ppf c ~msg:"*** Cfg invariant check failed"
+    then
+      Format.fprintf ppf "*** Cfg invariant check failed\n%a"
+        Printcfg.cfg_with_layout c
     else Format.fprintf ppf "%s" (Cfg_with_layout.cfg c).fun_name
   in
   if !Oxcaml_flags.cfg_invariants && Cfg_invariants.run ppf cfg
@@ -62,8 +64,7 @@ let pass_dump_linear_if ppf flag message phrase =
   phrase
 
 let pass_dump_cfg_if ppf flag message c =
-  if !flag
-  then fprintf ppf "*** %s@.%a@." message (Cfg_with_layout.dump ~msg:"") c;
+  if !flag then fprintf ppf "*** %s@.%a@." message Printcfg.cfg_with_layout c;
   c
 
 let should_vectorize () =

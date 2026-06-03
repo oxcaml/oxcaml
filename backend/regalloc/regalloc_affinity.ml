@@ -50,13 +50,47 @@ let temp_and_phys_reg_of_instr :
     | _ -> None)
   | _ -> None
 
-type t = affinity list Reg.Tbl.t
+module Classes : sig
+  type t
 
-let compute : Cfg_with_infos.t -> t =
- fun cfg_with_infos ->
-  let res = Reg.Tbl.create 17 in
+  val make : unit -> t
+
+  val find : t -> Reg.t -> Reg.t
+
+  val unite : t -> Reg.t -> Reg.t -> unit
+end = struct
+  (* pointer to "parent", missing key means identity *)
+  type t = Reg.t Reg.Tbl.t
+
+  let make () = Reg.Tbl.create 32
+
+  let rec find : t -> Reg.t -> Reg.t =
+   fun t reg ->
+    match Reg.Tbl.find_opt t reg with
+    | None -> reg
+    | Some parent -> if Reg.same reg parent then reg else find t parent
+
+  let unite : t -> Reg.t -> Reg.t -> unit =
+   fun t left right ->
+    let left = find t left in
+    let right = find t right in
+    Reg.Tbl.replace t left right
+end
+
+type t =
+  { classes : Classes.t;
+    affinity : affinity array Reg.Tbl.t
+  }
+
+let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
+ fun cfg_with_infos phi_moves ->
+  let classes = Classes.make () in
+  List.iter
+    (fun { Regalloc_split.src; dst } -> Classes.unite classes src dst)
+    phi_moves;
+  let affinity = Reg.Tbl.create 17 in
   match Lazy.force Regalloc_utils.affinity with
-  | false -> res
+  | false -> { classes; affinity }
   | true ->
     let priorities : int Phys_reg.Tbl.t Reg.Tbl.t = Reg.Tbl.create 17 in
     Cfg.iter_blocks (Cfg_with_infos.cfg cfg_with_infos) ~f:(fun label block ->
@@ -76,19 +110,45 @@ let compute : Cfg_with_infos.t -> t =
             match temp_and_phys_reg_of_instr instr with
             | None -> ()
             | Some (temp, phys_reg) ->
+              let temp = Classes.find classes temp in
               incr_move priorities ~temp ~phys_reg ~delta));
-    (* CR xclerc for xclerc: consider switching from list to (dynamic array). *)
+    (* CR-someday xclerc for xclerc: consider switching to a heap, since we are
+       only interested in extracting according to priority. *)
     Reg.Tbl.iter
       (fun temp phys_reg_tbl ->
-        let affinity_list =
-          Phys_reg.Tbl.fold
-            (fun phys_reg priority acc ->
-              if priority <= 0 then acc else { priority; phys_reg } :: acc)
-            phys_reg_tbl []
-        in
-        Reg.Tbl.replace res temp (List.sort compare_desc_proprity affinity_list))
+        let affinities = Dynarray.create () in
+        Phys_reg.Tbl.iter
+          (fun phys_reg priority ->
+            if priority > 0
+            then Dynarray.add_last affinities { priority; phys_reg })
+          phys_reg_tbl;
+        let affinities = Dynarray.to_array affinities in
+        Array.sort compare_desc_proprity affinities;
+        Reg.Tbl.replace affinity temp affinities)
       priorities;
-    res
+    { classes; affinity }
 
-let get : t -> Reg.t -> affinity list =
- fun t reg -> match Reg.Tbl.find_opt t reg with None -> [] | Some list -> list
+type affinities =
+  { mutable next_index : int;
+    affinities : affinity array
+  }
+
+let get : t -> Reg.t -> affinities =
+ fun t reg ->
+  let reg = Classes.find t.classes reg in
+  let affinities =
+    match Reg.Tbl.find_opt t.affinity reg with
+    | None -> [||]
+    | Some array -> array
+  in
+  { next_index = 0; affinities }
+
+let next : affinities -> affinity option =
+ fun aff ->
+  let idx = aff.next_index in
+  if idx >= Array.length aff.affinities
+  then None
+  else
+    let res = aff.affinities.(idx) in
+    aff.next_index <- succ idx;
+    Some res

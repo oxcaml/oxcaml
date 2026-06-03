@@ -186,3 +186,10 @@ CAMLprim value caml_effective_tick_interval_usec_bytecode(void)
 {
   caml_failwith("Domains not supported on runtime4");
 }
+
+/* Preemption */
+
+CAMLprim value caml_domain_preempt_self(value eff)
+{
+  caml_failwith("Effects not supported on runtime4");
+}

@@ -61,10 +61,13 @@ let merge_cmxa0 ~archives =
     | _ :: _ -> failwith "Archives do not agree on the .cmxa magic number"
     | [] -> assert false
   in
-  let ncmxs = ref 0 and ncmis = ref 0 and nquoted_globals = ref 0 in
+  let ncmxs = ref 0 and ncmis = ref 0
+  and nquoted_cmi = ref 0 and nquoted_cmx = ref 0
+  in
   let cmi_table = Hashtbl.create 42 in
   let cmx_table = Hashtbl.create 42 in
-  let quoted_globals_table = Hashtbl.create 42 in
+  let quoted_cmi_table = Hashtbl.create 42 in
+  let quoted_cmx_table = Hashtbl.create 42 in
   cmxa_list
   |> List.iter (fun (lib : Cmx_format.library_infos) ->
          lib.lib_imports_cmi
@@ -83,24 +86,34 @@ let merge_cmxa0 ~archives =
                   Hashtbl.add cmx_table cu (import, !ncmxs);
                   incr ncmxs
                 end);
-         lib.lib_quoted_globals
-         |> Array.iter (fun quoted_global ->
-                if not (Hashtbl.mem quoted_globals_table quoted_global)
+         lib.lib_quoted_cmi
+         |> Array.iter (fun quoted_cmi ->
+                if not (Hashtbl.mem quoted_cmi_table quoted_cmi)
                 then begin
-                  Hashtbl.add quoted_globals_table quoted_global
-                    (quoted_global, !nquoted_globals);
-                  incr nquoted_globals
+                  Hashtbl.add quoted_cmi_table quoted_cmi
+                    (quoted_cmi, !nquoted_cmi);
+                  incr nquoted_cmi
+                end);
+         lib.lib_quoted_cmx
+         |> Array.iter (fun quoted_cmx ->
+                if not (Hashtbl.mem quoted_cmx_table quoted_cmx)
+                then begin
+                  Hashtbl.add quoted_cmx_table quoted_cmx
+                    (quoted_cmx, !nquoted_cmx);
+                  incr nquoted_cmx
                 end));
   let cmis = Array.make !ncmis Import_info.dummy in
   Hashtbl.iter (fun _name (import, i) -> cmis.(i) <- import) cmi_table;
   let cmxs = Array.make !ncmxs Import_info.dummy in
   Hashtbl.iter (fun _name (import, i) -> cmxs.(i) <- import) cmx_table;
-  let quoted_globals =
-    Array.make !nquoted_globals Compilation_unit.Name.dummy
-  in
+  let quoted_cmis = Array.make !nquoted_cmi Compilation_unit.Name.dummy in
   Hashtbl.iter
-    (fun quoted_global (_, i) -> quoted_globals.(i) <- quoted_global)
-    quoted_globals_table;
+    (fun quoted_cmi (_, i) -> quoted_cmis.(i) <- quoted_cmi)
+    quoted_cmi_table;
+  let quoted_cmxs = Array.make !nquoted_cmx Compilation_unit.dummy in
+  Hashtbl.iter
+    (fun quoted_cmx (_, i) -> quoted_cmxs.(i) <- quoted_cmx)
+    quoted_cmx_table;
   let genfns = Generic_fns.Tbl.make () in
   let _, lib_units, lib_ccobjs, lib_ccopts =
     List.fold_left
@@ -139,10 +152,14 @@ let merge_cmxa0 ~archives =
                 li_imports_cmx =
                   remap cmxa.lib_imports_cmx cmxs cmx_table li.li_imports_cmx
                     ~get_key:Import_info.cu;
-                li_quoted_globals =
-                  remap cmxa.lib_quoted_globals quoted_globals
-                    quoted_globals_table li.li_quoted_globals
-                    ~get_key:(fun x -> x)
+                li_quoted_cmi =
+                  remap cmxa.lib_quoted_cmi quoted_cmis
+                    quoted_cmi_table li.li_quoted_cmi
+                    ~get_key:Fun.id;
+                li_quoted_cmx =
+                  remap cmxa.lib_quoted_cmx quoted_cmxs
+                    quoted_cmx_table li.li_quoted_cmx
+                    ~get_key:Fun.id;
               })
             cmxa.lib_units
         in
@@ -160,7 +177,8 @@ let merge_cmxa0 ~archives =
       lib_ccopts;
       lib_imports_cmi = cmis;
       lib_imports_cmx = cmxs;
-      lib_quoted_globals = quoted_globals;
+      lib_quoted_cmi = quoted_cmis;
+      lib_quoted_cmx = quoted_cmxs;
       lib_generic_fns = Generic_fns.Tbl.entries genfns;
       lib_requires_metaprogramming =
         List.exists

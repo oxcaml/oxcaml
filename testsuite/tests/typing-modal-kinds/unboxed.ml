@@ -238,13 +238,11 @@ Lines 1-2, characters 0-43:
 1 | type 'a t : value & value mod portable =
 2 |   #{ x : 'a contended; y : 'a @@ portable }
 Error: The kind of type "t" is
-           immediate
-             separable
+           value mod everything
              mod dynamic
              with 'a @@ portable
              with 'a contended
-           & immediate
-               separable
+           & value mod everything
                mod dynamic
                with 'a @@ portable
                with 'a contended
@@ -265,9 +263,11 @@ Lines 1-2, characters 0-40:
 1 | type 'a t : value & value mod portable =
 2 |   #{ x : 'a contended; y : 'a portable }
 Error: The kind of type "t" is
-           immediate separable mod dynamic with 'a contended with 'a portable
-           & immediate
-               separable
+           value mod everything
+             mod dynamic
+             with 'a contended
+             with 'a portable
+           & value mod everything
                mod dynamic
                with 'a contended
                with 'a portable

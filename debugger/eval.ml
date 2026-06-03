@@ -35,6 +35,7 @@ type error =
   | Wrong_label of type_expr * string
   | Not_a_record of type_expr
   | No_result
+  | Layout_polymorphic_value
 
 exception Error of error
 
@@ -108,6 +109,8 @@ let rec expression event env = function
             | _ ->
                 value_path event env p
           in
+          if not @@ Lpoly.is_empty_exn valdesc.val_lpoly then
+            raise (Error Layout_polymorphic_value);
           v, valdesc.val_type
       | exception Not_found ->
           raise(Error(Unbound_long_identifier lid))
@@ -247,3 +250,5 @@ let report_error ppf = function
         (as_inline_code Printtyp.type_expr) ty
   | No_result ->
       fprintf ppf "@[No result available at current program event@]@."
+  | Layout_polymorphic_value ->
+      fprintf ppf "@[Cannot print a layout-polymorphic value@]@."

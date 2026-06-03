@@ -95,13 +95,13 @@ parameter.
 
 Labels may also be repeated in a tuple, and unlabeled elements can be thought of
 as all sharing the same unique label.  When matching on such a tuple, the first
-occurence of a label in the pattern is bound to the first corresponding label in
+occurrence of a label in the pattern is bound to the first corresponding label in
 the value, and so on.  As a result, it's also now possible to partially match on
 an unlabeled tuple to retrieve the first few elements.
 
 ## Limitations
 
-Parentheses are necessary to disambiguate functions types with labeled arguments
+Parentheses are necessary to disambiguate function types with labeled arguments
 from function types with labeled tuple arguments when the first element of the
 tuple has a label.  `ocamlformat` will handle this for you.
 
@@ -132,4 +132,4 @@ File "foo.ml", line 3, characters 6-12:
 Error: Could not determine the type of this partial tuple pattern.
 ```
 
-*This extension will appear in OCaml 5.4. See [ocaml/ocaml#13498](https://github.com/ocaml/ocaml/pull/13498).*
+*This extension is available in OCaml 5.4. See [ocaml/ocaml#13498](https://github.com/ocaml/ocaml/pull/13498).*

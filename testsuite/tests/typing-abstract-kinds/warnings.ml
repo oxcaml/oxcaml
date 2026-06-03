@@ -1,5 +1,5 @@
 (* TEST
-   flags = "-w +191";
+   flags = "-w +191 -no-ikinds";
 *)
 
 (* The unused kind decl warning exists *)

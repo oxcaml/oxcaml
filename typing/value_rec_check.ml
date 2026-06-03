@@ -624,7 +624,8 @@ let (>>) : bind_judg -> term_judg -> term_judg =
   fun binder term mode -> binder mode (term mode)
 
 (* Compute the appropriate [mode] for an array expression *)
-let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
+let array_mode exp =
+  match Typeopt.array_kind exp with
   | Lambda.Pfloatarray ->
     (* (flat) float arrays unbox their elements *)
     Dereference
@@ -758,9 +759,8 @@ let rec expression : Typedtree.expression -> term_judg =
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
     | Texp_atomic_loc (expr, _, _, _, _) ->
       expression expr << Guard
-    | Texp_array (_, elt_sort, exprs, _) ->
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      list expression exprs << array_mode exp elt_sort
+    | Texp_array (_, _, exprs, _) ->
+      list expression exprs << array_mode exp
     | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
@@ -774,9 +774,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_list_comprehension { comp_body; comp_clauses } ->
       join ((expression comp_body << Guard) ::
             comprehension_clauses comp_clauses)
-    | Texp_array_comprehension (_, elt_sort, { comp_body; comp_clauses }) ->
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      join ((expression comp_body << array_mode exp elt_sort) ::
+    | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
+      join ((expression comp_body << array_mode exp) ::
             comprehension_clauses comp_clauses)
     | Texp_construct (_, desc, exprs, _) ->
       let access_constructor =
@@ -793,7 +792,7 @@ let rec expression : Typedtree.expression -> term_judg =
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
-                 | Scannable | Float_boxed -> Guard
+                 | Scannable _ | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
                  | Void | Product _ ->
@@ -816,16 +815,18 @@ let rec expression : Typedtree.expression -> term_judg =
         let field_mode i = match rep with
           | Record_float | Record_ufloat -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
-          | Record_boxed _ | Record_inlined (_, Constructor_uniform_value, _) ->
+          | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
               Guard
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
             (match mixed_shape.(i) with
-             | Scannable | Float_boxed -> Guard
+             | Scannable _ | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
              | Void | Product _ ->
                Dereference)
+          | Record_dummy _ ->
+            Misc.fatal_error "value_rec_check: unexpected dummy representation"
         in
         let field ((label : Data_types.label_description), field_def) =
           let env =

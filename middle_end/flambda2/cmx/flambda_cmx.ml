@@ -21,7 +21,6 @@ module Imported_unit_map = Global_module.Name.Map
 
 type loader =
   { get_module_info : Compilation_unit.t -> Flambda_cmx_format.t option;
-    mutable imported_names : Name.Set.t;
     mutable imported_code : Exported_code.t;
     mutable imported_units : TE.Serializable.t option Imported_unit_map.t
   }
@@ -49,9 +48,6 @@ let load_cmx_file_contents loader comp_unit =
           let typing_env, all_code =
             Flambda_cmx_format.import_typing_env_and_code cmx
           in
-          let newly_imported_names = TE.Serializable.name_domain typing_env in
-          loader.imported_names
-            <- Name.Set.union newly_imported_names loader.imported_names;
           loader.imported_code <- EC.merge all_code loader.imported_code;
           let offsets = Flambda_cmx_format.exported_offsets cmx in
           Exported_offsets.import_offsets offsets;
@@ -98,7 +94,6 @@ let predefined_exception_typing_env () =
 let create_loader ~get_module_info =
   let loader =
     { get_module_info;
-      imported_names = Name.Set.empty;
       imported_code = Exported_code.empty;
       imported_units = Imported_unit_map.empty
     }
@@ -108,11 +103,7 @@ let create_loader ~get_module_info =
     <- Imported_unit_map.singleton
          (Compilation_unit.Name.to_global_name Compilation_unit.Name.predef_exn)
          (Some predefined_exception_typing_env);
-  loader.imported_names
-    <- TE.Serializable.name_domain predefined_exception_typing_env;
   loader
-
-let get_imported_names loader () = loader.imported_names
 
 let get_imported_code loader () = loader.imported_code
 
@@ -199,10 +190,8 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let all_code =
     (* CR mshinwell: do we need to remove unused function slot bindings from the
        result types too? *)
-    all_code
-    |> EC.remove_unused_value_slots_from_result_types_and_shortcut_aliases
-         ~used_value_slots ~canonicalise
-    |> EC.remove_unreachable ~reachable_names
+    EC.prepare_for_export all_code ~reachable_names ~used_value_slots
+      ~canonicalise
   in
   let final_typing_env = create_typing_env reachable_names in
   (* We need to re-export offsets for everything reachable from the cmx file;
@@ -213,10 +202,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
      function_slots/vars reachable from the code of the current compilation
      unit, but since we also re-export code metadata (including return types)
      from other compilation units, we need to take those into account. *)
-  (* CR gbury: it might be more efficient to not compute the free names for all
-     exported code, but fold over the exported code to avoid allocating some
-     free_names *)
-  let free_names_of_all_code = EC.free_names all_code in
+  let free_slots_of_all_code =
+    EC.free_function_slots_and_value_slots all_code
+  in
   let slots_used_in_typing_env =
     TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
@@ -224,9 +212,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
     exported_offsets
     |> Exported_offsets.reexport_function_slots
          (Name_occurrences.all_function_slots_at_normal_mode
-            free_names_of_all_code)
+            free_slots_of_all_code)
     |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots_at_normal_mode free_names_of_all_code)
+         (Name_occurrences.all_value_slots_at_normal_mode free_slots_of_all_code)
     |> Exported_offsets.reexport_function_slots
          (Name_occurrences.all_function_slots_at_normal_mode
             slots_used_in_typing_env)
@@ -255,8 +243,7 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
       TE.Serializable.create typing_env ~reachable_names
     in
     let free_names_of_name name =
-      Option.map T.free_names
-        (TE.Pre_serializable.find_or_missing typing_env name)
+      Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
       ~used_value_slots ~canonicalise ~exported_offsets all_code

@@ -214,6 +214,7 @@ let make_log_body_and_terminator :
   then Cfg.dump_terminator ~sep:", " Format.err_formatter term.Cfg.desc;
   if enabled then log_instruction_suffix term liveness
 
+(* CR-soon xclerc for xclerc: factor out with `Printcfg`. *)
 let make_log_cfg_with_infos :
     log_function ->
     instr_prefix:(Cfg.basic Cfg.instruction -> string) ->

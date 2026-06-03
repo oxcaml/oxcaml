@@ -258,6 +258,16 @@ let compute_static_size lam =
               join_sizes action size (compute_expression_size env action))
             size cases)
         Unreachable all_cases
+  (* In native code, void fields are erased, so the runtime block size is the
+     number of value fields only. In bytecode, void fields are kept, so the
+     block size includes all fields. *)
+  and all_value_mixed_block_size shape =
+    if !Clflags.native_code then
+      Mixed_product_bytes.value_prefix_len
+        (Mixed_product_bytes.count (Product shape))
+    else Array.length shape
+  and all_value_mixed_block_size_types shape =
+    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and size_of_primitive env p args =
     match p with
     | Pignore
@@ -295,7 +305,7 @@ let compute_static_size lam =
 
     | Pduprecord (repres, size) ->
         begin match repres with
-        | Record_boxed _
+        | Record_boxed
         | Record_inlined (_, Constructor_uniform_value,
                           (Variant_boxed _ | Variant_extensible)) ->
             Block (Regular_block size)
@@ -304,10 +314,18 @@ let compute_static_size lam =
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
         | Record_mixed shape ->
-            Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+            if Mixed_product_bytes.types_shape_is_all_value shape
+            then
+              Block (Regular_block
+                (all_value_mixed_block_size_types shape))
+            else
+              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
+        | Record_dummy _ ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected dummy representation"
         end
     | Pmakeblock (_, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
@@ -318,7 +336,12 @@ let compute_static_size lam =
            should merge Regular_block and Mixed_record (and fix the error
            produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
-         | None -> Block (Regular_block (List.length args))
+         | None ->
+           let size = match shape with
+             | All_value -> List.length args
+             | Shape shape -> all_value_mixed_block_size shape
+           in
+           Block (Regular_block size)
          | Some arr -> Block (Mixed_record arr))
     | Pmakelazyblock _ ->
         Block Lazy_block

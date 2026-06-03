@@ -140,24 +140,50 @@ module Code_id_importer = Make_importer (Code_id)
 module Continuation_importer = Make_importer (Continuation)
 
 let import_typing_env_and_code0 ~sections t =
-  let symbols = Symbol_importer.import t.table_data.symbols in
-  let variables = Variable_importer.import t.table_data.variables in
-  let simples = Simple_importer.import t.table_data.simples in
-  let consts = Const_importer.import t.table_data.consts in
-  let code_ids = Code_id_importer.import t.table_data.code_ids in
-  let continuations = Continuation_importer.import t.table_data.continuations in
+  let symbols =
+    Profile.record_call ~accumulate:true "import_symbols" (fun () ->
+        Symbol_importer.import t.table_data.symbols)
+  in
+  let variables =
+    Profile.record_call ~accumulate:true "import_variables" (fun () ->
+        Variable_importer.import t.table_data.variables)
+  in
+  let simples =
+    Profile.record_call ~accumulate:true "import_simples" (fun () ->
+        Simple_importer.import t.table_data.simples)
+  in
+  let consts =
+    Profile.record_call ~accumulate:true "import_consts" (fun () ->
+        Const_importer.import t.table_data.consts)
+  in
+  let code_ids =
+    Profile.record_call ~accumulate:true "import_code_ids" (fun () ->
+        Code_id_importer.import t.table_data.code_ids)
+  in
+  let continuations =
+    Profile.record_call ~accumulate:true "import_continuations" (fun () ->
+        Continuation_importer.import t.table_data.continuations)
+  in
   let used_value_slots = t.used_value_slots in
   let original_compilation_unit = t.original_compilation_unit in
   let renaming =
-    Renaming.create_import_map ~symbols ~variables ~simples ~consts ~code_ids
-      ~continuations ~used_value_slots ~original_compilation_unit
+    Profile.record_call ~accumulate:true "create_import_map" (fun () ->
+        Renaming.create_import_map ~symbols ~variables ~simples ~consts
+          ~code_ids ~continuations ~used_value_slots ~original_compilation_unit)
   in
   let typing_env =
-    Flambda2_types.Typing_env.Serializable.apply_renaming t.final_typing_env
-      renaming
+    Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->
+        Flambda2_types.Typing_env.Serializable.apply_renaming t.final_typing_env
+          renaming)
   in
-  let all_code = Exported_code.from_raw ~sections t.all_code in
-  let all_code = Exported_code.apply_renaming code_ids renaming all_code in
+  let all_code =
+    Profile.record_call ~accumulate:true "exported_code_from_raw" (fun () ->
+        Exported_code.from_raw ~sections t.all_code)
+  in
+  let all_code =
+    Profile.record_call ~accumulate:true "exported_code_apply_renaming"
+      (fun () -> Exported_code.apply_renaming code_ids renaming all_code)
+  in
   typing_env, all_code
 
 let import_typing_env_and_code (t, sections) =
@@ -169,9 +195,14 @@ let import_typing_env_and_code (t, sections) =
       (fun (typing_env, code) t0 ->
         let typing_env0, code0 = import_typing_env_and_code0 ~sections t0 in
         let typing_env =
-          Flambda2_types.Typing_env.Serializable.merge typing_env typing_env0
+          Profile.record_call ~accumulate:true "typing_env_merge" (fun () ->
+              Flambda2_types.Typing_env.Serializable.merge typing_env
+                typing_env0)
         in
-        let code = Exported_code.merge code code0 in
+        let code =
+          Profile.record_call ~accumulate:true "exported_code_merge" (fun () ->
+              Exported_code.merge code code0)
+        in
         typing_env, code)
       (import_typing_env_and_code0 ~sections t0)
       rem

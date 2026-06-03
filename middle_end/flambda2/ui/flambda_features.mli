@@ -123,6 +123,8 @@ val dump_reaper : unit -> bool
 
 val freshen_when_printing : unit -> bool
 
+val erase_in_types_depth_variables : unit -> bool
+
 module Inlining : sig
   type round_or_default =
     | Round of int
@@ -152,9 +154,15 @@ module Inlining : sig
 
   val large_function_size : round_or_default -> int
 
+  val small_functor_size : round_or_default -> int
+
+  val large_functor_size : round_or_default -> int
+
   val threshold : round_or_default -> float
 
   val speculative_inlining_only_if_arguments_useful : unit -> bool
+
+  val speculative_inlining_track_lifted_constants : unit -> bool
 end
 
 module Debug : sig

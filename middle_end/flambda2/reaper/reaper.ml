@@ -23,12 +23,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
       | None -> Exported_code.find_exn (load_code ()) code_id)
   in
   let Traverse.
-        { holed;
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
           deps;
           kinds;
           fixed_arity_continuations;
           continuation_info;
-          code_deps
+          code_deps;
+          all_sets_of_closures
         } =
     Traverse.run unit
   in
@@ -42,11 +45,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
       Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
       Dot_printer.print_solved_dep solved_dep deps)
   in
+  let types_rewrite_context =
+    Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
+  in
   let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
       =
-    Rebuild.rebuild ~machine_width ~code_deps ~fixed_arity_continuations
-      ~continuation_info ~final_typing_env kinds solved_dep get_code_metadata
-      holed
+    Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
+      ~fixed_arity_continuations ~continuation_info ~final_typing_env
+      ~types_rewrite_context kinds solved_dep get_code_metadata toplevel_expr
+      code
   in
   let all_code =
     Exported_code.add_code
@@ -57,7 +64,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let final_typing_env =
     Option.map
-      (Types_rewriter.rewrite_typing_env solved_dep
+      (Types_rewriter.rewrite_typing_env types_rewrite_context
          ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in

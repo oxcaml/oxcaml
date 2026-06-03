@@ -73,7 +73,7 @@ let iplt_symbol_name ~prefix ~symbol =
    NOP instructions (90 90) for padding to reach 8 bytes. *)
 let plt_entry_template =
   let section =
-    { X86_binary_emitter.sec_name = ".text.iplt";
+    { X86_binary_emitter.sec_name = X86_proc.Section_name.of_string ".text.iplt";
       sec_instrs =
         [| X86_ast.Ins
              (X86_ast.JMP (X86_ast.Mem64_RIP (X86_ast.QWORD, "dummy", 0)));

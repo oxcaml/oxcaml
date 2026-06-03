@@ -315,11 +315,12 @@ let print_bigarray name unsafe kind ppf layout =
 
 let record_rep ppf r = match r with
   | Record_unboxed -> fprintf ppf "unboxed"
-  | Record_boxed _ -> fprintf ppf "boxed"
+  | Record_boxed -> fprintf ppf "boxed"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
+  | Record_dummy _ -> fprintf ppf "dummy"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =

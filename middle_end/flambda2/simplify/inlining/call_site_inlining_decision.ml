@@ -123,7 +123,22 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
-  UA.cost_metrics uacc
+  let cost_metrics_of_lifted_constants =
+    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+    then
+      let lifted_constants = UA.lifted_constants uacc in
+      Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
+        ~f:(fun cost_metrics lifted_constant ->
+          List.fold_left
+            (fun cost_metrics definition ->
+              Cost_metrics.( + ) cost_metrics
+                (Rebuilt_static_const.cost_metrics
+                   (Lifted_constant.Definition.defining_expr definition)))
+            cost_metrics
+            (Lifted_constant.definitions lifted_constant))
+    else Cost_metrics.zero
+  in
+  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
 let argument_types_useful dacc apply =
   if
@@ -156,10 +171,9 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
   let denv = DA.denv dacc in
   let disable_inlining = DE.disable_inlining denv in
-  let decision =
-    Code_or_metadata.code_metadata code_or_metadata
-    |> Code_metadata.inlining_decision
-  in
+  let code_metadata = Code_or_metadata.code_metadata code_or_metadata in
+  let decision = Code_metadata.inlining_decision code_metadata in
+  let is_a_functor = Code_metadata.is_a_functor code_metadata in
   let in_a_stub, doing_speculative_inlining =
     match disable_inlining with
     | Disable_inlining Stub -> true, false
@@ -198,7 +212,7 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
         | Doing_speculative_inlining | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
         | Never_inlined_attribute | Attribute_always
-        | Replay_history_says_must_inline | Begin_unrolling _
+        | Replay_history_says_must_inline _ | Begin_unrolling _
         | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
           ->
           (* These can't be returned by the speculative inlining cases below. *)
@@ -227,9 +241,12 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
             Float.compare evaluated_to threshold <= 0
           in
           if is_under_inline_threshold
-          then Speculatively_inline { cost_metrics; evaluated_to; threshold }
+          then
+            Speculatively_inline
+              { cost_metrics; evaluated_to; threshold; is_a_functor }
           else
-            Speculatively_not_inline { cost_metrics; evaluated_to; threshold })
+            Speculatively_not_inline
+              { cost_metrics; evaluated_to; threshold; is_a_functor })
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in
@@ -246,7 +263,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     then
       Misc.fatal_errorf
         "Deciding not to inline an [Apply], but the replay_history says we \
-         should inline"
+         should inline.@ Replay_history: %a"
+        Replay_history.print
+        (DE.replay_history (DA.denv dacc))
   in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in
@@ -255,14 +274,15 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     fail_if_must_inline ();
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
-    let code_or_metadata =
-      DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
-    in
-    if not (Code_or_metadata.code_present code_or_metadata)
-    then (
+    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    | exception Not_found ->
       fail_if_must_inline ();
-      Missing_code)
-    else
+      Missing_code
+    | code_or_metadata when not (Code_or_metadata.code_present code_or_metadata)
+      ->
+      fail_if_must_inline ();
+      Missing_code
+    | code_or_metadata -> (
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
          1. We see an [@unrolled n] annotation (with n > 0) on an apply
@@ -337,7 +357,17 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               fail_if_must_inline ();
               Recursion_depth_exceeded)
             else if must_inline
-            then Replay_history_says_must_inline
+            then
+              match
+                Replay_history.replay_inlining_decision
+                  (DE.replay_history (DA.denv dacc))
+              with
+              | Still_recording ->
+                Misc.fatal_errorf
+                  "Internal assumption broken: DE.says must_inline\n\
+                  \                  (presumably because of the replay \
+                   history), but the replay history is still recoding."
+              | Replayed decision -> Replay_history_says_must_inline decision
             else
               might_inline dacc ~apply ~code_or_metadata ~function_type
                 ~simplify_expr ~return_arity
@@ -351,7 +381,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else (
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
-          | `Always -> Attribute_always))
+          | `Always -> Attribute_always)))
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =

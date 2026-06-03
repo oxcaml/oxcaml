@@ -1163,8 +1163,8 @@ Line 4, characters 25-45:
                              ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
@@ -1173,7 +1173,7 @@ Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
                                           ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1193,8 +1193,8 @@ Line 1, characters 27-43:
                                ^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
@@ -1204,8 +1204,8 @@ Line 1, characters 29-47:
                                  ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
@@ -1214,7 +1214,7 @@ Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
                                             ^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1239,6 +1239,7 @@ Line 1, characters 29-58:
                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
@@ -1248,6 +1249,7 @@ Line 1, characters 35-64:
                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_tuple_return_with_attr_u :
@@ -1257,7 +1259,7 @@ Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@unboxed]) = "foo"
               ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1284,6 +1286,7 @@ Line 1, characters 32-50:
                                     ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
@@ -1292,7 +1295,7 @@ Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
                                                       ^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1333,8 +1336,8 @@ Line 2, characters 26-54:
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 type ext_record_arg_record_3 = #{ i : int; b : bool; s : string }
@@ -1346,8 +1349,8 @@ Line 2, characters 28-58:
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 type ext_record_arg_attr_record = #{ i : int; b : bool }
@@ -1359,7 +1362,7 @@ Line 3, characters 3-29:
 3 |   (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1389,6 +1392,7 @@ Line 2, characters 31-41:
                                    ^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 type ext_record_nested = #{ x : int; y : ext_record_arg_record }
@@ -1400,6 +1404,21 @@ Line 2, characters 30-54:
                                   ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
+|}]
+
+external error_with_multiple_hints
+  : #(int * int) -> #(int * int) -> #(int * int * int)
+  = "foo" "bar"
+[%%expect{|
+Line 2, characters 4-54:
+2 |   : #(int * int) -> #(int * int) -> #(int * int * int)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 type t = #{ i : int; b : bool }
@@ -1410,7 +1429,7 @@ Line 2, characters 49-50:
 2 | external ext_record_return_with_attr_u : int -> (t [@unboxed]) = "foo"
                                                      ^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1487,8 +1506,8 @@ Line 2, characters 2-22:
       ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 (* @unpacked allows product types as arguments to C stubs *)
@@ -1538,6 +1557,7 @@ Line 2, characters 2-36:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: The "[@unpacked]" attribute is not allowed on C stub returns.
 |}]
 
 (* @unpacked combined with @unboxed should error *)
@@ -1716,7 +1736,7 @@ Line 1, characters 31-37:
 1 | let _ = Array.init 3 (fun _ -> #(1,2))
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value maybe_null)"
+       but an expression was expected of type "('c : value_maybe_null)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
@@ -1731,8 +1751,8 @@ Line 1, characters 16-60:
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [caml_array_make] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
-       Hint: Types with product layouts in C stub arguments
-       require the "[@unpacked]" attribute.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
@@ -1802,7 +1822,7 @@ Line 2, characters 31-50:
 2 | let _ = Array.init 3 (fun _ -> #{ i1 = 1; i2 = 2 })
                                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "array_init_record"
-       but an expression was expected of type "('a : value maybe_null)"
+       but an expression was expected of type "('a : value_maybe_null)"
        The layout of array_init_record is
            value non_pointer & value non_pointer
          because of the definition of array_init_record at line 1, characters 0-48.
@@ -2054,7 +2074,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immutable_data separable & immutable_data separable
+           value mod forkable unyielding many stateless immutable
+           & value mod forkable unyielding many stateless immutable
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2065,8 +2086,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate separable mod dynamic with string u
-           & immediate separable mod dynamic with string u
+           value mod everything mod dynamic with string u
+           & value mod everything mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2100,7 +2121,7 @@ Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
            immediate mod dynamic with int with string
-           & immediate non_float mod dynamic with int with string
+           & value mod everything non_float mod dynamic with int with string
            & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
@@ -2129,7 +2150,8 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immutable_data separable & immutable_data separable
+           value mod forkable unyielding many stateless immutable
+           & value mod forkable unyielding many stateless immutable
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2139,8 +2161,8 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate separable mod dynamic with string u
-           & immediate separable mod dynamic with string u
+           value mod everything mod dynamic with string u
+           & value mod everything mod dynamic with string u
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2181,7 +2203,7 @@ let g (x : 'a) = f () x
 
 [%%expect{|
 val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
-val g : ('a : value maybe_null & value). 'a -> 'a = <fun>
+val g : ('a : value_maybe_null & value). 'a -> 'a = <fun>
 |}]
 
 (* test subjkinding *)
@@ -2349,11 +2371,8 @@ Error: The kind of type "record" is value non_float mod immutable with 'a
          because of the annotation on the declaration of the type record.
 |}]
 
-(*******************************************************************************)
-(* Test 22: You can't defeat the value prefix size limit with nested products. *)
-
-(* And note that blocks with products are always mixed blocks, so we don't
-   need to add any unboxed types to hit the limit. *)
+(****************************************************************************)
+(* Test 22: Product components counted correctly for the value prefix limit *)
 
 type eight_values :
   value & value & value & value & value & value & value & value
@@ -2375,7 +2394,58 @@ type r_254 =
     f253 : string;
     f254 : string;
   }
-
+type r_254_f64 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f64 : float#;
+  }
+type r_255 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : string;
+  }
+type r_255_void =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : #(string * unit#);
+    v : unit#;
+  }
 [%%expect{|
 type eight_values
   : value & value & value & value & value & value & value & value
@@ -2401,9 +2471,61 @@ type r_254 = {
   f253 : string;
   f254 : string;
 }
+type r_254_f64 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f64 : float#;
+}
+type r_255 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : string;
+}
+type r_255_void = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : #(string * unit#);
+  v : unit#;
+}
 |}]
 
-type r_255 =
+type r_255_f64 =
   { a : thirty_two_values#;
     b : thirty_two_values#;
     c : thirty_two_values#;
@@ -2418,21 +2540,21 @@ type r_255 =
     f252 : string;
     f253 : string;
     f254 : string;
-    f255 : string;
+    f255 : #(string * unit#);
+    f64 : float#;
   }
-
 [%%expect{|
-Lines 1-17, characters 0-3:
- 1 | type r_255 =
+Lines 1-18, characters 0-3:
+ 1 | type r_255_f64 =
  2 |   { a : thirty_two_values#;
  3 |     b : thirty_two_values#;
  4 |     c : thirty_two_values#;
  5 |     d : thirty_two_values#;
 ...
-14 |     f253 : string;
 15 |     f254 : string;
-16 |     f255 : string;
-17 |   }
+16 |     f255 : #(string * unit#);
+17 |     f64 : float#;
+18 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
 
@@ -2456,8 +2578,7 @@ Line 3, characters 0-66:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
@@ -2492,8 +2613,7 @@ Lines 3-4, characters 0-34:
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
@@ -2512,8 +2632,7 @@ Lines 3-4, characters 0-34:
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have

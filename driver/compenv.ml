@@ -572,7 +572,7 @@ let read_one_param ppf position name v =
     |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
 
   | "extension" -> Language_extension.enable_of_string_exn v
-  | "ikinds" -> set "ikinds" [ Clflags.ikinds ] v
+  | "no-ikinds" -> clear "no-ikinds" [ Clflags.ikinds ] v
   | "ikinds-debug" -> set "ikinds-debug" [ Clflags.ikinds_debug ] v
   | "disable-all-extensions" ->
     if check_bool ppf name v then

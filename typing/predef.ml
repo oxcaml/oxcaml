@@ -893,11 +893,7 @@ let decl_of_type_constr tconstr =
            ("pos_bol", type_int);
            ("pos_cnum", type_int) ]
          in
-         Type_record (
-           labels,
-           (Record_boxed (List.map (fun label -> label.ld_sort) labels |> Array.of_list)),
-           None
-         )
+         Type_record (labels, Record_boxed, None)
        )
        (* Fields are [int] and [string], so [immutable_data] already captures
           their direct contribution. Encoding this directly avoids predef-time

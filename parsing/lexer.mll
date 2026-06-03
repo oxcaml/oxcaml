@@ -92,7 +92,6 @@ let all_keywords =
     "nonrec", NONREC, v4_2;
     "object", OBJECT, v1_0;
     "of", OF, always;
-    "once_", ONCE, oxcaml;
     "open", OPEN, always;
     "or", OR, always;
     "overwrite_", OVERWRITE, oxcaml;
@@ -109,7 +108,6 @@ let all_keywords =
     "true", TRUE, always;
     "try", TRY, always;
     "type", TYPE, always;
-    "unique_", UNIQUE, oxcaml;
     "val", VAL, always;
     "virtual", VIRTUAL, v1_0;
     "when", WHEN, always;

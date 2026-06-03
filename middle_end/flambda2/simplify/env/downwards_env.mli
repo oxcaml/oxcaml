@@ -19,8 +19,6 @@ open! Flambda.Import
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
 
-type get_imported_names = unit -> Name.Set.t
-
 type get_imported_code = unit -> Exported_code.t
 
 type t
@@ -34,7 +32,6 @@ val create :
   round:int ->
   machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
-  get_imported_names:get_imported_names ->
   get_imported_code:get_imported_code ->
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
@@ -241,6 +238,9 @@ val must_inline : t -> bool
 val replay_history : t -> Replay_history.t
 
 val with_replay_history : (Replay_history.t * bool) option -> t -> t
+
+val record_inlining_decision :
+  apply:Apply_expr.t -> Call_site_inlining_decision_type.t -> t -> t
 
 val with_join_analysis :
   Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t

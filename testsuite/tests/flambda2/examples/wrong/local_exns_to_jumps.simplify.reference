@@ -35,9 +35,10 @@ apply ccall noalloc
                          let naked_immediate = unboxed_field in
                          switch naked_immediate
                            | 0 -> k4
-                           | 1 -> k2
-                                    pop(regular k2)
-                                    ($camlLocal_exns_to_jumps__Exit209)
+                           | 1 ->
+                             k2
+                               pop(regular k2)
+                               ($camlLocal_exns_to_jumps__Exit209)
                        where k4 =
                          let int_add = %int_barith.add (r_294_unboxed0, 1) in
                          cont k3 (int_add))))

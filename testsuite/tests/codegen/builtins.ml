@@ -38,15 +38,6 @@ clz64:
   ret
 |}]
 
-let clz64_nonzero x =
-  Builtins.int64_clz_nonzero (Int64_u.to_int64 x)
-[%%expect_asm X86_64{|
-clz64_nonzero:
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count leading zeros - int32 *)
 
 (* CR ttebbi: Could use lzcntl directly instead of zero-extend + lzcntq
@@ -61,32 +52,12 @@ clz32:
   ret
 |}]
 
-let clz32_nonzero x =
-  Builtins.int32_clz_nonzero (Int32_u.to_int32 x)
-[%%expect_asm X86_64{|
-clz32_nonzero:
-  movl  %eax, %eax
-  lzcnt %rax, %rax
-  addq  $-32, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count leading zeros - nativeint *)
 
 let clz_native x =
   Builtins.nativeint_clz (Nativeint_u.to_nativeint x)
 [%%expect_asm X86_64{|
 clz_native:
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
-let clz_native_nonzero x =
-  Builtins.nativeint_clz_nonzero (Nativeint_u.to_nativeint x)
-[%%expect_asm X86_64{|
-clz_native_nonzero:
   lzcnt %rax, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -117,15 +88,6 @@ ctz64:
   ret
 |}]
 
-let ctz64_nonzero x =
-  Builtins.int64_ctz_nonzero (Int64_u.to_int64 x)
-[%%expect_asm X86_64{|
-ctz64_nonzero:
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count trailing zeros - int32 *)
 
 (* CR ttebbi: We should use the 32bit tzcnt instruction. *)
@@ -139,30 +101,12 @@ ctz32:
   ret
 |}]
 
-let ctz32_nonzero x =
-  Builtins.int32_ctz_nonzero (Int32_u.to_int32 x)
-[%%expect_asm X86_64{|
-ctz32_nonzero:
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
 (* Count trailing zeros - nativeint *)
 
 let ctz_native x =
   Builtins.nativeint_ctz (Nativeint_u.to_nativeint x)
 [%%expect_asm X86_64{|
 ctz_native:
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
-let ctz_native_nonzero x =
-  Builtins.nativeint_ctz_nonzero (Nativeint_u.to_nativeint x)
-[%%expect_asm X86_64{|
-ctz_native_nonzero:
   tzcnt %rax, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -210,6 +154,123 @@ let popcnt_native x =
 popcnt_native:
   popcnt %rax, %rax
   leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+(* Shift left - int64 *)
+
+let int64_shl x y =
+  Builtins.int64_shl (Int64_u.to_int64 x) (Int64_u.to_int64 y)
+  |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+int64_shl:
+  movq  %rbx, %rcx
+  salq  %cl, %rax
+  ret
+|}]
+
+(* Shift left - int32 *)
+
+let int32_shl x y =
+  Builtins.int32_shl (Int32_u.to_int32 x) (Int32_u.to_int32 y)
+  |> Int32_u.of_int32
+[%%expect_asm X86_64{|
+int32_shl:
+  movq  %rbx, %rcx
+  andl  $31, %ecx
+  salq  %cl, %rax
+  movslq %eax, %rax
+  ret
+|}]
+
+(* Shift left - nativeint *)
+
+let nativeint_shl x y =
+  Builtins.nativeint_shl
+    (Nativeint_u.to_nativeint x) (Nativeint_u.to_nativeint y)
+  |> Nativeint_u.of_nativeint
+[%%expect_asm X86_64{|
+nativeint_shl:
+  movq  %rbx, %rcx
+  salq  %cl, %rax
+  ret
+|}]
+
+(* Shift right arithmetic - int64 *)
+
+let int64_sar x y =
+  Builtins.int64_sar (Int64_u.to_int64 x) (Int64_u.to_int64 y)
+  |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+int64_sar:
+  movq  %rbx, %rcx
+  sarq  %cl, %rax
+  ret
+|}]
+
+(* Shift right arithmetic - int32 *)
+
+let int32_sar x y =
+  Builtins.int32_sar (Int32_u.to_int32 x) (Int32_u.to_int32 y)
+  |> Int32_u.of_int32
+[%%expect_asm X86_64{|
+int32_sar:
+  movq  %rbx, %rcx
+  andl  $31, %ecx
+  sarq  %cl, %rax
+  ret
+|}]
+
+(* Shift right arithmetic - nativeint *)
+
+let nativeint_sar x y =
+  Builtins.nativeint_sar
+    (Nativeint_u.to_nativeint x) (Nativeint_u.to_nativeint y)
+  |> Nativeint_u.of_nativeint
+[%%expect_asm X86_64{|
+nativeint_sar:
+  movq  %rbx, %rcx
+  sarq  %cl, %rax
+  ret
+|}]
+
+(* Shift right logical - int64 *)
+
+let int64_shr x y =
+  Builtins.int64_shr (Int64_u.to_int64 x) (Int64_u.to_int64 y)
+  |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+int64_shr:
+  movq  %rbx, %rcx
+  shrq  %cl, %rax
+  ret
+|}]
+
+(* Shift right logical - int32 *)
+
+let int32_shr x y =
+  Builtins.int32_shr (Int32_u.to_int32 x) (Int32_u.to_int32 y)
+  |> Int32_u.of_int32
+[%%expect_asm X86_64{|
+int32_shr:
+  movq  %rbx, %rcx
+  andl  $31, %ecx
+  movl  %eax, %eax
+  shrq  %cl, %rax
+  movslq %eax, %rax
+  ret
+|}]
+
+(* Shift right logical - nativeint *)
+
+let nativeint_shr x y =
+  Builtins.nativeint_shr
+    (Nativeint_u.to_nativeint x) (Nativeint_u.to_nativeint y)
+  |> Nativeint_u.of_nativeint
+[%%expect_asm X86_64{|
+nativeint_shr:
+  movq  %rbx, %rcx
+  shrq  %cl, %rax
   ret
 |}]
 

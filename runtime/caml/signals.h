@@ -33,6 +33,7 @@ CAMLextern void caml_enter_blocking_section (void);
 CAMLextern void caml_enter_blocking_section_no_pending (void);
 CAMLextern void caml_leave_blocking_section (void);
 
+CAMLextern void caml_process_pending_actions_flags (int flags);
 CAMLextern void caml_process_pending_actions (void);
 /* Checks for pending actions and executes them. This includes pending
    minor and major collections, thread switching, signal handlers,
@@ -42,6 +43,8 @@ CAMLextern void caml_process_pending_actions (void);
 /* Same as [caml_process_pending_actions], but returns the reified
    result instead of raising exceptions directly (if any). */
 CAMLextern caml_result caml_process_pending_actions_res (void);
+
+CAMLextern value caml_process_pending_actions_flags_exn (int flags);
 
 /* Returns [Val_unit] or an encoded exception.
    Superseded by the safer [_res] variant above,
@@ -104,7 +107,16 @@ caml_result caml_execute_signal_res(int signal_number);
 CAMLextern void caml_record_signal(int signal_number);
 CAMLextern caml_result caml_process_pending_signals_res(void);
 CAMLextern void caml_set_action_pending(caml_domain_state *);
+caml_result caml_do_pending_actions_flags_res(int flags);
 caml_result caml_do_pending_actions_res(void);
+value caml_do_pending_actions_flags_exn(int flags);
+value caml_do_pending_actions_exn(void);
+caml_result caml_process_pending_actions_with_root_flags_res
+  (value extra_root, int flags);
+value caml_process_pending_actions_with_root_flags (value extra_root, int flags);
+value caml_process_pending_actions_with_root_flags_exn
+  (value extra_root, int flags);
+value caml_process_pending_actions_with_root_exn (value extra_root);
 
 void caml_init_signal_handling(void);
 void caml_init_signals(void);

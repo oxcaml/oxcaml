@@ -21,7 +21,7 @@ f_unboxed_unit:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L107:
+.L0:
   addq  $8, %rsp
   ret
 |}]
@@ -38,8 +38,8 @@ mutual_recursion:
   subq  $8, %rsp
   subq  $56, %r15
   cmpq  (%r14), %r15
-  jb    .L106
-.L108:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rdi
   movq  $6391, -8(%rdi)
   movq  camlTOP3__g_6_9_code@GOTPCREL(%rip), %rsi
@@ -59,9 +59,9 @@ mutual_recursion:
 mutual_recursion.f:
   movq  %rbx, %rdi
   cmpq  $1, %rax
-  jge   .L114
+  jge   .L0
   ret
-.L114:
+.L0:
   leaq  -24(%rdi), %rbx
   movq  16(%rdi), %rdi
   subq  %rdi, %rax
@@ -70,9 +70,9 @@ mutual_recursion.f:
 
 mutual_recursion.g:
   cmpq  $1, %rax
-  jge   .L127
+  jge   .L0
   ret
-.L127:
+.L0:
   addq  $24, %rbx
   addq  $-60, %rax
   jmp   camlTOP3__f_5_8_code@PLT
@@ -94,11 +94,11 @@ f.(fun):
 f:
   subq  $8, %rsp
   cmpq  $1, %rax
-  jge   .L119
+  jge   .L1
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L128
-.L130:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   leaq  .LcamlTOP4__fn$5b$3a1$2c29$2d$2d50$5d_10_15_code(%rip), %rdi
@@ -106,12 +106,12 @@ f:
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
-  jmp   .L123
-.L119:
+  jmp   .L3
+.L1:
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L131
-.L133:
+  jb    <hidden GC jump pad>
+.L2:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   leaq  .LcamlTOP4__fn$5b$3a1$2c56$2d$2d69$5d_9_14_code(%rip), %rdi
@@ -119,7 +119,7 @@ f:
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
-.L123:
+.L3:
   movl  $1, %eax
   movq  (%rbx), %rdi
   addq  $8, %rsp
@@ -134,10 +134,10 @@ let inline_identical x =
 [%%expect_asm X86_64{|
 inline_identical:
   cmpq  $1, %rax
-  jle   .L106
+  jle   .L0
   addq  $2, %rax
   ret
-.L106:
+.L0:
   addq  $2, %rax
   ret
 |}]

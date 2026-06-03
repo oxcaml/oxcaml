@@ -18,7 +18,7 @@ let $camlTests__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let to_inline = %project_value_slot.[`f`].[`to_inline`] (my_closure) in
+   let to_inline = %project_value_slot.[f].[to_inline] (my_closure) in
    (let prim = %int_comp.lt (c, 0) in
     let int_lessthan = %tag_imm (prim) in
     (let untagged = %untag_imm (int_lessthan) in

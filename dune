@@ -639,8 +639,10 @@
   ;; backend/cfg
   cfg
   cfg_available_regs
+  cfg_colours
   cfg_edge
   cfg_intf
+  cfg_quick_hash
   cfg_reducibility
   cfg_to_linear
   cfg_with_layout
@@ -661,6 +663,7 @@
   cfg_merge_blocks
   extra_debug
   label
+  printcfg
   linear_utils
   simplify_terminator
   vectorize

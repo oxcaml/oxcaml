@@ -10,31 +10,31 @@
 type point = { dim : int; x : float; y : float; z : float }
 
 let constant_lift b =
-  let unique_ p = { dim = 3; x = 1.0; y = 2.0; z = 3.0 } in
+  let (p @ unique) = { dim = 3; x = 1.0; y = 2.0; z = 3.0 } in
   if b then p else overwrite_ p with { x = 2.0 }
 
 type fpoint = { x : float; y : float; z : float }
 
 let fconstant_lift b =
-  let unique_ p = { x = 1.0; y = 2.0; z = 3.0 } in
+  let (p @ unique) = { x = 1.0; y = 2.0; z = 3.0 } in
   if b then p else overwrite_ p with { x = 2.0 }
 
 type mpoint = { dim : int option; x : float#; y : float#; z : float# }
 
 let mconstant_lift b =
-  let unique_ p = { dim = Some 3; x = #1.0; y = #2.0; z = #3.0 } in
+  let (p @ unique) = { dim = Some 3; x = #1.0; y = #2.0; z = #3.0 } in
   if b then p else overwrite_ p with { x = #2.0 }
 
 type ufpoint = { x : float#; y : float#; z : float# }
 
 let ufconstant_lift b =
-  let unique_ p = { x = #1.0; y = #2.0; z = #3.0 } in
+  let (p @ unique) = { x = #1.0; y = #2.0; z = #3.0 } in
   if b then p else overwrite_ p with { x = #2.0 }
 
 type utpoint = { xy : #(float * float); z : float }
 
 let ufconstant_lift b =
-  let unique_ p = { xy = #(1.0, 2.0); z = 3.0 } in
+  let (p @ unique) = { xy = #(1.0, 2.0); z = 3.0 } in
   if b then p else overwrite_ p with { xy = #(2.0, 2.0) }
 
 let () =

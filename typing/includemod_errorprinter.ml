@@ -875,6 +875,7 @@ let core env id x =
         (Out_type.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
+           ~pp:(diff.got.val_loc, Structure_item (Value, id))
            "the first" "the second" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
   | Err.Modalities e ->
@@ -925,7 +926,9 @@ let core env id x =
       Fmt.dprintf
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a"
         (Ident.name id)
-        (Includecore.report_mode_sub_error "first is" "second is") e
+        (Includecore.report_mode_sub_error
+           ~pp:(Location.none, Structure_item (Class, id))
+           "first is" "second is") e
   | Err.Jkind_declarations diff ->
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
         "Kind declarations do not match"
@@ -968,8 +971,10 @@ let module_type_declarations id {Err.got=d1 ; expected=d2} =
   Fmt.dprintf
     "@[<hv 2>Module type declarations do not match:@ \
      %a@;<1 -2>does not match@ %a@]"
-    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration ~abbrev:true id d1)
-    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration ~abbrev:true id d2)
+    !Oprint.out_sig_item
+      (Out_type.tree_of_modtype_declaration ~abbrev:true id d1)
+    !Oprint.out_sig_item
+      (Out_type.tree_of_modtype_declaration ~abbrev:true id d2)
 
 let interface_mismatch ppf (diff: _ Err.diff) =
   Fmt.fprintf ppf
@@ -1082,7 +1087,8 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       dwith_context ctx printer :: before
   | Mode e ->
       let printer ppf =
-        Includecore.report_mode_sub_error "Got" "expected" ppf e
+        Includecore.report_mode_sub_error
+          ~pp:(Location.none, Unknown) "Got" "expected" ppf e
       in
       dwith_context ctx printer :: before
 
