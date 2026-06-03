@@ -1665,7 +1665,7 @@ let layout_of_ty_for_idx_set env loc ty =
     | Some mbe -> mbe
     | None ->
       Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
-        (Format_doc.compat Printtyp.type_expr) ty
+        Printtyp.type_expr ty
   in
   let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
   let context = Ctype.mk_jkind_context_check_principal env in

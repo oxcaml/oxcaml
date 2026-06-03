@@ -2045,41 +2045,9 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
-<<<<<<< HEAD
-||||||| e8480d569a
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
-
-=======
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
-
 type unrepresentable_record =
   | Unrepresentable_field of string
 
->>>>>>> 5bddb2acb0
 let compute_record_repr
     loc reprs lbls ~warn ~refining_block_with_any
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
@@ -5749,43 +5717,13 @@ let report_error ~loc = function
     Location.errorf ~loc
       "Atomic record fields must have layout value."
   | Layout_poly_unsupported ->
-<<<<<<< HEAD
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-  | Missing_flatten_floats ->
-    Location.errorf ~loc
-      "This record type mixes boxed and unboxed float fields,@ \
-       which causes the flat float record optimization.@ \
-       You must annotate it with %a."
-      Style.inline_code "[@@flatten_floats]"
-||||||| e8480d569a
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
-  | Missing_flatten_floats ->
-    fprintf ppf
-      "@[This record type mixes boxed and unboxed float fields,@ \
-       which causes the flat float record optimization.@ \
-       You must annotate it with %a.@]"
-      Style.inline_code "[@@flatten_floats]"
-=======
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
->>>>>>> 5bddb2acb0
   | Misplaced_flatten_floats ->
-<<<<<<< HEAD
     Location.errorf ~loc
-      "The %a attribute is only allowed on record types@ \
-       that mix boxed %a and unboxed %a fields."
-||||||| e8480d569a
-    fprintf ppf
-      "@[The %a attribute is only allowed on record types@ \
-       that mix boxed %a and unboxed %a fields.@]"
-=======
-    fprintf ppf
-      "@[The %a attribute is only allowed on records with one or more@ \
+      "The %a attribute is only allowed on records with one or more@ \
        non-atomic %a fields, one or more %a fields, and all other fields@ \
-       void.@]"
->>>>>>> 5bddb2acb0
+       void."
       Style.inline_code "[@@flatten_floats]"
       Style.inline_code "float"
       Style.inline_code "float#"

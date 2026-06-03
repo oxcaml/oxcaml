@@ -99,33 +99,9 @@ jobs:
 #            ocamlparam: '_,Oclassic=1'
 #            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
 
-<<<<<<< HEAD
 #          - name: runtime4 (aarch64-darwin)
 #            config: --disable-runtime5 --disable-warn-error
 #            os: warp-macos-15-arm64-6x
-||||||| e8480d569a
-          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
-            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml'
-
-          - name: runtime4 (aarch64-darwin)
-            config: --disable-runtime5 --disable-warn-error
-            os: warp-macos-15-arm64-6x
-=======
-          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
-            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml'
-
-          - name: runtime4 (aarch64-darwin)
-            config: --disable-runtime5 --disable-warn-error
-            os: warp-macos-15-arm64-6x
->>>>>>> 5bddb2acb0
 
           - name: runtime5 regalloc (aarch64-darwin)
             config: --enable-runtime5 --disable-warn-error

@@ -408,20 +408,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         let arg =
           match args with
             []    -> None
-<<<<<<< HEAD
-          | [arg] -> Some (sub.pat sub arg)
-          | args  ->
-              Some (Pat.tuple ~loc
-                      (List.map (fun p -> None, sub.pat sub p) args)
-||||||| e8480d569a
-          | [arg] -> Some (sub.pat sub arg)
-          | args  -> Some (Pat.tuple ~loc (List.map (fun p -> None, sub.pat sub p) args) Closed)
-=======
           | [(_, arg)] -> Some (sub.pat sub arg)
           | args  ->
               Some (Pat.tuple ~loc
                       (List.map (fun (_, p) -> None, sub.pat sub p) args)
->>>>>>> 5bddb2acb0
                       Closed)
         in
         Ppat_construct (map_loc sub lid,

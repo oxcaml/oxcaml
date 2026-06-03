@@ -247,32 +247,22 @@ val instance_poly_fixed:
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 
 val instance_label:
-<<<<<<< HEAD
   fixed:bool ->
   _ Data_types.gen_label_description ->
   type_expr list * type_expr * type_expr
 (* Same, for a label *)
-||||||| e8480d569a
-        fixed:bool ->
-        _ gen_label_description -> type_expr list * type_expr * type_expr
-        (* Same, for a label *)
-=======
-        fixed:bool ->
-        _ gen_label_description -> type_expr list * type_expr * type_expr
-        (* Same, for a label *)
 val instance_labels:
-        fixed:bool ->
-        _ gen_label_description array ->
-        (type_expr list * type_expr) array * type_expr
-        (* Same, for a whole list of labels *)
+  fixed:bool ->
+  _ Data_types.gen_label_description array ->
+  (type_expr list * type_expr) array * type_expr
+(* Same, for a whole list of labels *)
 val instance_label_declarations:
-        fixed:bool ->
-        label_declaration array ->
-        params:type_expr list ->
-        (type_expr list * type_expr) array * type_expr list
-        (* Same, but for label declarations and the type parameters from the
-           type declaration *)
->>>>>>> 5bddb2acb0
+  fixed:bool ->
+  label_declaration array ->
+  params:type_expr list ->
+  (type_expr list * type_expr) array * type_expr list
+(* Same, but for label declarations and the type parameters from the
+   type declaration *)
 val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
         -> (Mode.allowed * 'r) Mode.Locality.t

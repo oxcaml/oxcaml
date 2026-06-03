@@ -149,14 +149,16 @@ void caml_init_gc_stats (uintnat max_domains)
     caml_fatal_error("Failed to allocate sampled_gc_stats");
 }
 
-<<<<<<< HEAD
 void caml_free_gc_stats(void)
 {
   if (sampled_gc_stats != NULL)
     caml_stat_free(sampled_gc_stats);
   sampled_gc_stats = NULL;
-||||||| e8480d569a
-=======
+  if (sampled_gc_stats_nonzero != NULL)
+    caml_stat_free(sampled_gc_stats_nonzero);
+  sampled_gc_stats_nonzero = NULL;
+}
+
 static void update_nonzero_bitmap(caml_domain_state* domain, uint8_t val)
 {
   uintnat id = (uintnat)domain->id;
@@ -169,7 +171,6 @@ static void update_nonzero_bitmap(caml_domain_state* domain, uint8_t val)
                                              &curr_max, id));
     }
   }
->>>>>>> 5bddb2acb0
 }
 
 /* Update the sampled stats for the given domain during a STW section. */
@@ -218,14 +219,8 @@ void caml_compute_gc_stats(struct gc_stats* buf)
   pool_max = buf->heap_stats.pool_max_words;
   large_max = buf->heap_stats.large_max_words;
 
-<<<<<<< HEAD
-  for (int i = 0; i < caml_params->max_domains; i++) {
-||||||| e8480d569a
-  for (i=0; i<caml_params->max_domains; i++) {
-=======
   uintnat nonzero_max = sampled_gc_stats_nonzero_max;
-  for (i=0; i<=nonzero_max; i++) {
->>>>>>> 5bddb2acb0
+  for (int i = 0; i <= nonzero_max; i++) {
     /* For allocation stats, we use the live stats of the current domain
        and the sampled stats of other domains.
 

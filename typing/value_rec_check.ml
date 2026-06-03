@@ -831,13 +831,7 @@ let rec expression : Typedtree.expression -> term_judg =
             Misc.fatal_error
               "value_rec_check: unexpected unknown representation"
         in
-<<<<<<< HEAD
-        let field ((label : Data_types.label_description), field_def) =
-||||||| e8480d569a
-        let field (label, field_def) =
-=======
-        let field (label, _sort, field_def) =
->>>>>>> 5bddb2acb0
+        let field ((label : Data_types.label_description), _sort, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty

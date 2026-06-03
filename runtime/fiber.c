@@ -1483,7 +1483,7 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
       break;
     default: {
       value exn =
-        caml_failure_exn(caml_copy_string(
+        caml_exception_failure_value(caml_copy_string(
           "caml_tick_fiber: tick_handler returned invalid result"));
       CAMLreturn(Make_exception_result(exn));
     }

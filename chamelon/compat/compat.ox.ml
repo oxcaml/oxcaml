@@ -250,20 +250,12 @@ type matched_expression_desc =
       expression * (Asttypes.arg_label * apply_arg) list * texp_apply_identifier
   | Texp_construct of
       Longident.t Location.loc
-<<<<<<< HEAD
       * Data_types.constructor_description
-      * expression list
-||||||| e8480d569a
-      * constructor_description
-      * expression list
-=======
-      * constructor_description
       * (texp_construct_arg_identifier * expression) list
->>>>>>> 5bddb2acb0
       * texp_construct_identifier
   | Texp_record of
       { fields :
-          (Types.label_description
+          (Data_types.label_description
           * texp_record_field_identifier
           * record_label_definition)
           array;
@@ -450,14 +442,14 @@ type 'a matched_pattern_desc =
       -> value matched_pattern_desc
   | Tpat_construct :
       Longident.t Location.loc
-      * Types.constructor_description
+      * Data_types.constructor_description
       * (value_binding_identifier * value general_pattern) list
       * (tpat_construct_type_arg list * core_type) option
       * tpat_construct_identifier
       -> value matched_pattern_desc
   | Tpat_record :
       (Longident.t Location.loc
-      * Types.label_description
+      * Data_types.label_description
       * value general_pattern)
       list
       * Asttypes.closed_flag
@@ -467,7 +459,7 @@ type 'a matched_pattern_desc =
      everywhere_ *)
   | Tpat_record_unboxed_product :
       (Longident.t Location.loc
-      * Types.unboxed_label_description
+      * Data_types.unboxed_label_description
       * value general_pattern)
       list
       * Asttypes.closed_flag
@@ -522,19 +514,9 @@ let option_of_arg_or_omitted arg =
   match arg with Arg (e, sort) -> Some (e, sort) | Omitted _ -> None
 
 let mk_constructor_description cstr_name =
-<<<<<<< HEAD
   { Data_types.cstr_name;
     cstr_res = Btype.newty2 ~level:0 (mkTvar (Some "a"));
-    cstr_shape = Constructor_uniform_value;
-||||||| e8480d569a
-  { cstr_name;
-    cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
-    cstr_shape = Constructor_uniform_value;
-=======
-  { cstr_name;
-    cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
     cstr_shape = Some Constructor_uniform_value;
->>>>>>> 5bddb2acb0
     cstr_existentials = [];
     cstr_args = [];
     cstr_arity = 0;

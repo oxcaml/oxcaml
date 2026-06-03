@@ -302,12 +302,10 @@ module Sort = struct
 
     let for_class = scannable
 
-<<<<<<< HEAD
     let for_effect = scannable
 
     let for_continuation = scannable
-||||||| e8480d569a
-=======
+
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /
        [some_of_base] to avoid allocating a fresh [Some] block per
@@ -356,7 +354,6 @@ module Sort = struct
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
       | (Product _ | Univar _ | Genvar _) as t -> Some t
->>>>>>> 5bddb2acb0
   end
 
   module Var = struct

@@ -316,16 +316,8 @@ let dummy_label (type rep) (record_form : rep record_form)
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
-<<<<<<< HEAD
-    lbl_sort = Jkind_types.Sort.Const.void;
-    lbl_pos = (-1); lbl_all = [||];
-||||||| e8480d569a
-    lbl_sort = Jkind_types.Sort.Const.void;
-    lbl_pos = -1; lbl_all = [||];
-=======
     lbl_sort = None;
-    lbl_pos = -1; lbl_all = [||];
->>>>>>> 5bddb2acb0
+    lbl_pos = (-1); lbl_all = [||];
     lbl_repres = repres;
     lbl_private = Public;
     lbl_loc = Location.none;

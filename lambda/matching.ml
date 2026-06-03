@@ -1449,17 +1449,9 @@ let can_group discr pat =
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
   | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
       true
-<<<<<<< HEAD
-  | Construct { cstr_tag = Extension p1 },
-    Construct { cstr_tag = Extension p2 }
+  | Construct ({ cstr_tag = Extension p1 }, _, _),
+    Construct ({ cstr_tag = Extension p2 }, _, _)
     ->
-||||||| e8480d569a
-  | Construct { cstr_tag = Extension _ as discr_tag }, Construct pat_cstr
-    ->
-=======
-  | ( Construct ({ cstr_tag = Extension _ as discr_tag }, _, _),
-      Construct (pat_cstr, _, _) )->
->>>>>>> 5bddb2acb0
       (* Extension constructors with distinct names may be equal thanks to
          constructor rebinding. So we need to produce a specialized
          submatrix for each syntactically-distinct constructor (with a threading
@@ -2119,16 +2111,8 @@ let get_pat_args_constr p rem =
     args @ rem
   | _ -> assert false
 
-<<<<<<< HEAD
 let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
-  let cstr =
-||||||| e8480d569a
-let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
-  let cstr =
-=======
-let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
   let cstr, cstr_shape, arg_sorts =
->>>>>>> 5bddb2acb0
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let arg_sorts =
@@ -2207,19 +2191,9 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
     match cstr.cstr_repr with
     | Variant_boxed _ ->
       List.mapi
-<<<<<<< HEAD
-      (fun i { ca_sort } ->
-         make_field_access binding_kind ca_sort ~field:i ~pos:i)
-      cstr.cstr_args
-||||||| e8480d569a
-      (fun i { ca_sort } ->
-         make_field_access str ca_sort ~field:i ~pos:i)
-      cstr.cstr_args
-=======
       (fun i ca_sort ->
-         make_field_access str ca_sort ~field:i ~pos:i)
+         make_field_access binding_kind ca_sort ~field:i ~pos:i)
       arg_sorts
->>>>>>> 5bddb2acb0
         @ rem
     | Variant_unboxed | Variant_with_null ->
       if cstr.cstr_constant then
@@ -2231,11 +2205,6 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
     | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
-<<<<<<< HEAD
-             make_field_access binding_kind ca_sort ~field:i ~pos:(i+1))
-||||||| e8480d569a
-             make_field_access str ca_sort ~field:i ~pos:(i+1))
-=======
              let ca_sort =
                match ca_sort with
                | Some ca_sort -> ca_sort
@@ -2244,8 +2213,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
                      "unexpected variable sort in extensible constructor %s"
                      cstr.cstr_name
              in
-             make_field_access str ca_sort ~field:i ~pos:(i+1))
->>>>>>> 5bddb2acb0
+             make_field_access binding_kind ca_sort ~field:i ~pos:(i+1))
           cstr.cstr_args
         @ rem
 
@@ -2668,16 +2636,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
   in
   make_args 0
 
-<<<<<<< HEAD
-let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
-||||||| e8480d569a
-let get_expr_args_record_unboxed_product ~scopes head
-      (arg, _mut, _sort, _layout) rem =
-=======
 (* CR lmaurer: This is a vastly not-okay amount of duplicated code. *)
-let get_expr_args_record_unboxed_product ~scopes head
-      (arg, _mut, _sort, _layout) rem =
->>>>>>> 5bddb2acb0
+let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let all_labels, all_sorts =
     let open Patterns.Head in
@@ -2712,23 +2672,15 @@ let get_expr_args_record_unboxed_product ~scopes head
         else
           Alias, compose_mut mut Immutable
       in
-<<<<<<< HEAD
-      let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl.lbl_sort in
+      let lbl_sort = unboxed_label_sort lbl all_sorts in
+      let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       {
         arg = access;
         binding_kind;
         mut;
-        sort = lbl.lbl_sort;
+        sort = lbl_sort;
         layout
       } :: make_args (pos + 1)
-||||||| e8480d569a
-      let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl.lbl_sort in
-      (access, str, lbl.lbl_sort, layout) :: make_args (pos + 1)
-=======
-      let lbl_sort = unboxed_label_sort lbl all_sorts in
-      let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
-      (access, str, lbl_sort, layout) :: make_args (pos + 1)
->>>>>>> 5bddb2acb0
   in
   make_args 0
 
@@ -4501,59 +4453,23 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
       | Unboxed_tuple shape ->
           compile_no_test
             (divide_unboxed_tuple ~scopes ph shape)
-<<<<<<< HEAD
             Context.combine
-      | Record [] | Record_unboxed_product [] -> assert false
-      | Record (lbl :: _) ->
-          compile_no_test
-||||||| e8480d569a
-            Context.combine repr partial ctx pm
-      | Record [] | Record_unboxed_product [] -> assert false
-      | Record (lbl :: _) ->
-          compile_no_test ~scopes value_kind
-=======
-            Context.combine repr partial ctx pm
       | Record ([], _, _) | Record_unboxed_product ([], _, _) -> assert false
       | Record ((lbl :: _), _, _) ->
-          compile_no_test ~scopes value_kind
->>>>>>> 5bddb2acb0
-            (divide_record ~scopes lbl.lbl_all ph)
-<<<<<<< HEAD
-            Context.combine
-      | Record_unboxed_product (lbl :: _) ->
           compile_no_test
-||||||| e8480d569a
-            Context.combine repr partial ctx pm
-      | Record_unboxed_product (lbl :: _) ->
-          compile_no_test ~scopes value_kind
-=======
-            Context.combine repr partial ctx pm
+            (divide_record ~scopes lbl.lbl_all ph)
+            Context.combine
       | Record_unboxed_product ((lbl :: _), _, _) ->
-          compile_no_test ~scopes value_kind
->>>>>>> 5bddb2acb0
+          compile_no_test
             (divide_record_unboxed_product ~scopes lbl.lbl_all ph)
             Context.combine
       | Constant (Const_float32 _ | Const_unboxed_float32 _) ->
           Parmatch.raise_matched_float32 ()
       | Constant cst ->
           compile_test
-<<<<<<< HEAD
             divide_constant
             (combine_constant value_kind ploc arg cst arg_partial)
-      | Construct cstr ->
-||||||| e8480d569a
-            (compile_match ~scopes value_kind repr partial)
-            partial divide_constant
-            (combine_constant value_kind ploc arg cst partial)
-            ctx pm
-      | Construct cstr ->
-=======
-            (compile_match ~scopes value_kind repr partial)
-            partial divide_constant
-            (combine_constant value_kind ploc arg cst partial)
-            ctx pm
       | Construct (cstr, _, _) ->
->>>>>>> 5bddb2acb0
           compile_test
             (divide_constructor ~scopes)
             (combine_constructor value_kind ploc arg ph.pat_env
@@ -4592,196 +4508,6 @@ and compile_no_test ~scopes value_kind divide up_ctx repr partial ctx to_match =
 
 (* The entry points *)
 
-<<<<<<< HEAD
-||||||| e8480d569a
-(*
-   If there is a guard in a matching or a lazy pattern,
-   then set exhaustiveness info to Partial.
-   (because of side effects, assume the worst).
-
-   Notice that exhaustiveness information is trusted by the compiler,
-   that is, a match flagged as Total should not fail at runtime.
-   More specifically, for instance if match y with x::_ -> x is flagged
-   total (as it happens during JoCaml compilation) then y cannot be []
-   at runtime. As a consequence, the static Total exhaustiveness information
-   have to be downgraded to Partial, in the dubious cases where guards
-   or lazy pattern execute arbitrary code that may perform side effects
-   and change the subject values.
-LM:
-   Lazy pattern was PR#5992, initial patch by lpw25.
-   I have  generalized the patch, so as to also find mutable fields.
-*)
-
-let is_lazy_pat p =
-  match p.pat_desc with
-  | Tpat_lazy _ -> true
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_record _
-  | Tpat_record_unboxed_product _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
-  | Tpat_tuple _
-  | Tpat_unboxed_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_fun_layout _
-  | Tpat_any ->
-      false
-
-let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
-
-let is_record_with_mutable_field p =
-  let fields_have_mutable_type lps =
-    List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
-  in
-  match p.pat_desc with
-  | Tpat_record (lps, _) -> fields_have_mutable_type lps
-  | Tpat_record_unboxed_product (lps, _) -> fields_have_mutable_type lps
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_lazy _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
-  | Tpat_tuple _
-  | Tpat_unboxed_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_fun_layout _
-  | Tpat_any ->
-      false
-
-let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p
-
-(* Downgrade Total when
-   1. Matching accesses some mutable fields;
-   2. And there are  guards or lazy patterns.
-*)
-
-let check_partial has_mutable has_lazy pat_act_list = function
-  | Partial -> Partial
-  | Total ->
-      if
-        pat_act_list = []
-        || (* allow empty case list *)
-           List.exists
-             (fun (pats, lam) ->
-               has_mutable pats && (is_guarded lam || has_lazy pats))
-             pat_act_list
-      then
-        Partial
-      else
-        Total
-
-let check_partial_list pats_act_list =
-  check_partial (List.exists has_mutable) (List.exists has_lazy) pats_act_list
-
-let check_partial pat_act_list =
-  check_partial has_mutable has_lazy pat_act_list
-
-(* have toplevel handler when appropriate *)
-
-=======
-(*
-   If there is a guard in a matching or a lazy pattern,
-   then set exhaustiveness info to Partial.
-   (because of side effects, assume the worst).
-
-   Notice that exhaustiveness information is trusted by the compiler,
-   that is, a match flagged as Total should not fail at runtime.
-   More specifically, for instance if match y with x::_ -> x is flagged
-   total (as it happens during JoCaml compilation) then y cannot be []
-   at runtime. As a consequence, the static Total exhaustiveness information
-   have to be downgraded to Partial, in the dubious cases where guards
-   or lazy pattern execute arbitrary code that may perform side effects
-   and change the subject values.
-LM:
-   Lazy pattern was PR#5992, initial patch by lpw25.
-   I have  generalized the patch, so as to also find mutable fields.
-*)
-
-let is_lazy_pat p =
-  match p.pat_desc with
-  | Tpat_lazy _ -> true
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_record _
-  | Tpat_record_unboxed_product _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
-  | Tpat_tuple _
-  | Tpat_unboxed_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_fun_layout _
-  | Tpat_any ->
-      false
-
-let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
-
-let is_record_with_mutable_field p =
-  let fields_have_mutable_type lps =
-    List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
-  in
-  match p.pat_desc with
-  | Tpat_record (lps, _, _, _) -> fields_have_mutable_type lps
-  | Tpat_record_unboxed_product (lps, _, _, _) -> fields_have_mutable_type lps
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_lazy _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
-  | Tpat_tuple _
-  | Tpat_unboxed_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_fun_layout _
-  | Tpat_any ->
-      false
-
-let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p
-
-(* Downgrade Total when
-   1. Matching accesses some mutable fields;
-   2. And there are  guards or lazy patterns.
-*)
-
-let check_partial has_mutable has_lazy pat_act_list = function
-  | Partial -> Partial
-  | Total ->
-      if
-        pat_act_list = []
-        || (* allow empty case list *)
-           List.exists
-             (fun (pats, lam) ->
-               has_mutable pats && (is_guarded lam || has_lazy pats))
-             pat_act_list
-      then
-        Partial
-      else
-        Total
-
-let check_partial_list pats_act_list =
-  check_partial (List.exists has_mutable) (List.exists has_lazy) pats_act_list
-
-let check_partial pat_act_list =
-  check_partial has_mutable has_lazy pat_act_list
-
-(* have toplevel handler when appropriate *)
-
->>>>>>> 5bddb2acb0
 type failer_kind =
   | Raise_match_failure
   | Reraise_noloc of lambda

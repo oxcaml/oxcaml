@@ -456,16 +456,8 @@ let get_constructor_type_path ty tenv =
 let simple_match d h =
   let open Patterns.Head in
   match d.pat_desc, h.pat_desc with
-<<<<<<< HEAD
-  | Construct c1, Construct c2 ->
-      Data_types.equal_constr c1 c2
-||||||| e8480d569a
-  | Construct c1, Construct c2 ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag
-=======
   | Construct (c1, _, _), Construct (c2, _, _) ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag
->>>>>>> 5bddb2acb0
+      Data_types.equal_constr c1 c2
   | Variant { tag = t1; _ }, Variant { tag = t2 } ->
       t1 = t2
   | Constant c1, Constant c2 -> const_compare c1 c2 = 0
@@ -629,29 +621,11 @@ let rec read_args xs r = match xs,r with
 | _,_ ->
     fatal_error "Parmatch.read_args"
 
-<<<<<<< HEAD
 let set_args q r = match q with
 | {pat_desc = Tpat_tuple lbls_omegas} ->
     let lbls, omegas = List.split lbls_omegas in
     let args, rest = read_args omegas r in
     make_pat (Tpat_tuple (List.combine lbls args)) q.pat_type q.pat_env :: rest
-||||||| e8480d569a
-let do_set_args ~erase_mutable q r = match q with
-| {pat_desc = Tpat_tuple omegas} ->
-    let args,rest = read_args (List.map snd omegas) r in
-    make_pat
-      (Tpat_tuple
-        (List.map2 (fun (lbl, _) arg -> lbl, arg) omegas args))
-      q.pat_type q.pat_env::rest
-=======
-let do_set_args ~erase_mutable q r = match q with
-| {pat_desc = Tpat_tuple omegas} ->
-    let args,rest = read_args omegas r in
-    make_pat
-      (Tpat_tuple
-        (List.map2 (fun (lbl, _) arg -> lbl, arg) omegas args))
-      q.pat_type q.pat_env::rest
->>>>>>> 5bddb2acb0
 | {pat_desc = Tpat_unboxed_tuple omegas} ->
     let args,rest =
       read_args (List.map (fun (_, pat, _) -> pat) omegas) r
@@ -659,83 +633,20 @@ let do_set_args ~erase_mutable q r = match q with
     make_pat
       (Tpat_unboxed_tuple
         (List.map2 (fun (lbl, _, sort) arg -> lbl, arg, sort) omegas args))
-<<<<<<< HEAD
       q.pat_type q.pat_env :: rest
-| {pat_desc = Tpat_record (omegas,closed)} ->
-||||||| e8480d569a
-      q.pat_type q.pat_env::rest
-| {pat_desc = Tpat_record (omegas,closed)} ->
-=======
-      q.pat_type q.pat_env::rest
 | {pat_desc = Tpat_record (omegas,sorts,repr,closed)} ->
->>>>>>> 5bddb2acb0
     let args,rest = read_args omegas r in
-<<<<<<< HEAD
     let args =
       List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
-    make_pat (Tpat_record (args, closed)) q.pat_type q.pat_env :: rest
-| {pat_desc = Tpat_record_unboxed_product (omegas,closed)} ->
-||||||| e8480d569a
-    make_pat
-      (Tpat_record
-         (List.map2 (fun (lid, lbl,_) arg ->
-           if erase_mutable && Types.is_mutable lbl.lbl_mut
-           then
-             lid, lbl, omega
-           else
-             lid, lbl, arg)
-            omegas args, closed))
-      q.pat_type q.pat_env::
-    rest
-| {pat_desc = Tpat_record_unboxed_product (omegas,closed)} ->
-=======
-    make_pat
-      (Tpat_record
-         (List.map2 (fun (lid, lbl,_) arg ->
-           if erase_mutable && Types.is_mutable lbl.lbl_mut
-           then
-             lid, lbl, omega
-           else
-             lid, lbl, arg)
-            omegas args, sorts, repr, closed))
-      q.pat_type q.pat_env::
-    rest
-| {pat_desc = Tpat_record_unboxed_product (omegas,sorts,repr,closed)} ->
->>>>>>> 5bddb2acb0
-    let args,rest = read_args omegas r in
-<<<<<<< HEAD
-    let args =
-      List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
-    make_pat (Tpat_record_unboxed_product (args, closed))
+    make_pat (Tpat_record (args, sorts, repr, closed))
       q.pat_type q.pat_env :: rest
-| {pat_desc = Tpat_construct (lid, c, omegas, _)} ->
-||||||| e8480d569a
-    make_pat
-      (Tpat_record_unboxed_product
-         (List.map2 (fun (lid, lbl,_) arg ->
-           if Types.is_mutable lbl.lbl_mut then
-             fatal_error
-               "Parmatch.do_set_args: unboxed record labels are never mutable"
-           else
-             lid, lbl, arg)
-            omegas args, closed))
-      q.pat_type q.pat_env::
-    rest
-| {pat_desc = Tpat_construct (lid, c, omegas, _)} ->
-=======
-    make_pat
-      (Tpat_record_unboxed_product
-         (List.map2 (fun (lid, lbl,_) arg ->
-           if Types.is_mutable lbl.lbl_mut then
-             fatal_error
-               "Parmatch.do_set_args: unboxed record labels are never mutable"
-           else
-             lid, lbl, arg)
-            omegas args, sorts, repr, closed))
-      q.pat_type q.pat_env::
-    rest
+| {pat_desc = Tpat_record_unboxed_product (omegas,sorts,repr,closed)} ->
+    let args,rest = read_args omegas r in
+    let args =
+      List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
+    make_pat (Tpat_record_unboxed_product (args, sorts, repr, closed))
+      q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_construct (lid, c, repr, omegas, _)} ->
->>>>>>> 5bddb2acb0
     let args,rest = read_args omegas r in
     let args = List.map2 (fun (sort, _) arg -> sort, arg) omegas args in
     make_pat
@@ -2049,18 +1960,10 @@ let rec le_pat p q =
   | Tpat_alias { pattern = p; _ }, _ -> le_pat p q
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
-<<<<<<< HEAD
-  | Tpat_construct(_,c1,ps,_), Tpat_construct(_,c2,qs,_) ->
-      Data_types.equal_constr c1 c2 && le_pats ps qs
-||||||| e8480d569a
-  | Tpat_construct(_,c1,ps,_), Tpat_construct(_,c2,qs,_) ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag && le_pats ps qs
-=======
   | Tpat_construct(_,c1,_,ps,_), Tpat_construct(_,c2,_,qs,_) ->
       let ps = List.map snd ps in
       let qs = List.map snd qs in
-      Types.equal_tag c1.cstr_tag c2.cstr_tag && le_pats ps qs
->>>>>>> 5bddb2acb0
+      Data_types.equal_constr c1 c2 && le_pats ps qs
   | Tpat_variant(l1,Some p1,_), Tpat_variant(l2,Some p2,_) ->
       (l1 = l2 && le_pat p1 p2)
   | Tpat_variant(l1,None,_r1), Tpat_variant(l2,None,_) ->
@@ -2133,23 +2036,11 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_lazy p, Tpat_lazy q ->
     let r = lub p q in
     make_pat (Tpat_lazy r) p.pat_type p.pat_env
-<<<<<<< HEAD
-| Tpat_construct (lid,c1,ps1,_), Tpat_construct (_,c2,ps2,_)
-      when Data_types.equal_constr c1 c2 ->
-        let rs = lubs ps1 ps2 in
-        make_pat (Tpat_construct (lid, c1, rs, None))
-||||||| e8480d569a
-| Tpat_construct (lid,c1,ps1,_), Tpat_construct (_,c2,ps2,_)
-      when  Types.equal_tag c1.cstr_tag c2.cstr_tag  ->
-        let rs = lubs ps1 ps2 in
-        make_pat (Tpat_construct (lid, c1, rs, None))
-=======
 | Tpat_construct (lid,c1,repr,ps1,_), Tpat_construct (_,c2,_,ps2,_)
-      when  Types.equal_tag c1.cstr_tag c2.cstr_tag  ->
+      when Data_types.equal_constr c1 c2 ->
         let rs = arg_lubs ps1 ps2 in
         (* CR-someday lmaurer: Take lub of reprs? *)
         make_pat (Tpat_construct (lid, c1, repr, rs, None))
->>>>>>> 5bddb2acb0
           p.pat_type p.pat_env
 | Tpat_variant(l1,Some p1,row), Tpat_variant(l2,Some p2,_)
           when  l1=l2 ->
@@ -2160,16 +2051,9 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
               when l1 = l2 -> p
 | Tpat_record (l1,sorts,repr,closed),Tpat_record (l2,_,_,_) ->
     let rs = record_lubs l1 l2 in
-<<<<<<< HEAD
-    make_pat (Tpat_record (rs, closed)) p.pat_type p.pat_env
-||||||| e8480d569a
-    make_pat (Tpat_record (rs, closed))
-      p.pat_type p.pat_env
-=======
     (* CR-someday lmaurer: Take lubs of sorts and reprs? *)
     make_pat (Tpat_record (rs, sorts, repr, closed))
       p.pat_type p.pat_env
->>>>>>> 5bddb2acb0
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
       when am1 = am2 && List.length ps = List.length qs ->
         let rs = lubs ps qs in

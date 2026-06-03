@@ -53,6 +53,9 @@ type (-'a, 'x, +'b) cont : value mod non_float
    the final fiber in the linked list formed by [cont.fiber->parent]. *)
 type last_fiber [@@immediate]
 
+external cont_set_last_fiber :
+  _ cont -> last_fiber -> unit = "%setfield1"
+
 external resume : ('a, _, 'b) cont -> ('c -> 'a) -> 'c -> 'b = "%resume"
 
 type ('a,'x,'b) effc = 'a t -> ('a, 'x, 'b) cont -> last_fiber -> 'b
@@ -97,17 +100,8 @@ let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) tickc f x =
     (update_cont_handler_noexc cont valuec exnc effc tickc) f x
 
 module Deep = struct
-<<<<<<< HEAD
 
   type nonrec ('a,'b) continuation = ('a,'b) continuation
-||||||| e8480d569a
-
-  type ('a,'b) continuation =
-    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
-=======
-  type ('a,'b) continuation =
-    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
->>>>>>> 5bddb2acb0
 
   type ('a,'b) continuation_ =
     | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation_ [@@unboxed]
@@ -156,13 +150,11 @@ module Deep = struct
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
 
-<<<<<<< HEAD
   let[@inline] continue k = of_continuation continue k
   let[@inline] discontinue k = of_continuation discontinue k
   let[@inline] discontinue_with_backtrace k =
     of_continuation discontinue_with_backtrace k
-||||||| e8480d569a
-=======
+
   module Preemptible = struct
     type ('a,'b) handler =
       { retc: 'a -> 'b;
@@ -175,7 +167,7 @@ module Deep = struct
         match handler.effc eff with
         | Some f ->
           cont_set_last_fiber k last_fiber;
-          f (Cont k)
+          to_continuation f (Cont k)
         | None -> reperform eff k last_fiber
       in
       with_stack_preemptible
@@ -191,7 +183,6 @@ module Deep = struct
         };
     ;;
   end
->>>>>>> 5bddb2acb0
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =

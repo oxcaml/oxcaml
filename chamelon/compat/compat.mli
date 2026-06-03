@@ -114,7 +114,7 @@ val mkTexp_construct :
 
 val mkTexp_record :
   id:texp_record_identifier ->
-  (Types.label_description
+  (Data_types.label_description
   * texp_record_field_identifier
   * record_label_definition)
   array
@@ -156,7 +156,7 @@ type matched_expression_desc =
       * texp_construct_identifier
   | Texp_record of
       { fields :
-          (Types.label_description
+          (Data_types.label_description
           * texp_record_field_identifier
           * record_label_definition)
           array;
@@ -220,14 +220,16 @@ val mkTpat_tuple :
 val mkTpat_construct :
   ?id:tpat_construct_identifier ->
   Longident.t Location.loc
-  * Types.constructor_description
+  * Data_types.constructor_description
   * (value_binding_identifier * value general_pattern) list
   * (tpat_construct_type_arg list * core_type) option ->
   value pattern_desc
 
 val mkTpat_record :
   ?id:tpat_record_identifier ->
-  (Longident.t Location.loc * Types.label_description * value general_pattern)
+  (Longident.t Location.loc
+  * Data_types.label_description
+  * value general_pattern)
   list
   * Asttypes.closed_flag ->
   value pattern_desc
@@ -235,7 +237,7 @@ val mkTpat_record :
 val mkTpat_record_unboxed_product :
   ?id:tpat_record_unboxed_product_identifier ->
   (Longident.t Location.loc
-  * Types.unboxed_label_description
+  * Data_types.unboxed_label_description
   * value general_pattern)
   list
   * Asttypes.closed_flag ->
@@ -259,14 +261,14 @@ type 'a matched_pattern_desc =
       -> value matched_pattern_desc
   | Tpat_construct :
       Longident.t Location.loc
-      * Types.constructor_description
+      * Data_types.constructor_description
       * (value_binding_identifier * value general_pattern) list
       * (tpat_construct_type_arg list * core_type) option
       * tpat_construct_identifier
       -> value matched_pattern_desc
   | Tpat_record :
       (Longident.t Location.loc
-      * Types.label_description
+      * Data_types.label_description
       * value general_pattern)
       list
       * Asttypes.closed_flag
@@ -276,7 +278,7 @@ type 'a matched_pattern_desc =
      everywhere_ *)
   | Tpat_record_unboxed_product :
       (Longident.t Location.loc
-      * Types.unboxed_label_description
+      * Data_types.unboxed_label_description
       * value general_pattern)
       list
       * Asttypes.closed_flag

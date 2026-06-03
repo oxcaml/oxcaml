@@ -2431,52 +2431,6 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
              transl_exp ~scopes init_expr_sort init_expr, lam)
     end
 
-<<<<<<< HEAD
-||||||| e8480d569a
-and transl_atomic_loc ~scopes arg arg_sort lbl =
-  let arg = transl_exp ~scopes arg_sort arg in
-  begin match lbl.lbl_repres with
-  | Record_dummy _ ->
-    Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
-  | Record_float | Record_ufloat
-    ->
-      (* Atomic fields not allowed here *)
-      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
-  | Record_boxed
-  | Record_inlined (_, _, ( Variant_boxed _
-                          | Variant_extensible
-                          | Variant_with_null))
-    -> ()
-  end;
-  let field_offset = field_offset_for_label lbl in
-  let lbl = Lconst (Const_base (Const_int field_offset)) in
-  (arg, lbl)
-
-=======
-and transl_atomic_loc ~scopes arg arg_sort lbl repres =
-  let arg = transl_exp ~scopes arg_sort arg in
-  begin match repres with
-  | Record_dummy _ ->
-    Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
-  | Record_variable ->
-    Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
-  | Record_float | Record_ufloat
-    ->
-      (* Atomic fields not allowed here *)
-      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
-  | Record_boxed
-  | Record_inlined (_, _, ( Variant_boxed _
-                          | Variant_extensible
-                          | Variant_with_null))
-    -> ()
-  end;
-  let field_offset = field_offset_for_label lbl repres in
-  let lbl = Lconst (Const_base (Const_int field_offset)) in
-  (arg, lbl)
-
->>>>>>> 5bddb2acb0
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
   | Record_unboxed_product_variable ->
@@ -2585,11 +2539,13 @@ and transl_idx ~scopes loc env ba uas =
     end
   end
 
-and transl_atomic_loc ~scopes arg arg_sort lbl =
+and transl_atomic_loc ~scopes arg arg_sort lbl repres =
   let arg = transl_exp ~scopes arg_sort arg in
-  begin match lbl.lbl_repres with
+  begin match repres with
   | Record_dummy _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
+  | Record_variable ->
+    Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat
     ->
@@ -2601,7 +2557,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
                           | Variant_with_null))
     -> ()
   end;
-  let field_offset = field_offset_for_label lbl in
+  let field_offset = field_offset_for_label lbl repres in
   let lbl = Lconst (Const_base (Const_int field_offset)) in
   (arg, lbl)
 
