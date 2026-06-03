@@ -2656,27 +2656,52 @@ let update_decls_jkind_reason decls =
     )
     decls
 
-let update_decls_jkind env decls =
-  List.map
-    (fun (id, decl) ->
-       Builtin_attributes.warning_scope decl.type_attributes (fun () ->
-         let allow_any_crossing =
-           Builtin_attributes.has_unsafe_allow_any_mode_crossing
-             decl.type_attributes
+(* Note [order of updating decl jkinds].
+
+   [order] is topological of type declarations in the graph where there's an
+   edge from decl [a] to [b] if [a] or [a#] is contained in [b] without
+   indirection. E.g., there is an [a->b] edge for the following:
+   [{
+     type a = #{ x : int; y : int }
+     and b = #{ a : a; other : string}
+   }]
+
+   We process the decls in this order and update the environment as we go, so
+   that when each decl jkind, we sees the computed jkinds of the types it
+   unboxed-contains, rather than the dummy [any] jkinds assigned in
+   [transl_declaration]. See Note [Default jkinds in transl_declaration]. *)
+let update_decls_jkind env order decls =
+  let decls_by_id = Ident.Map.of_list decls in
+  let _env, results =
+    List.fold_left
+      (fun (env, results) id ->
+         let decl = Ident.Map.find id decls_by_id in
+         let new_decl, allow_any_crossing =
+           Builtin_attributes.warning_scope decl.type_attributes (fun () ->
+             let allow_any_crossing =
+               Builtin_attributes.has_unsafe_allow_any_mode_crossing
+                 decl.type_attributes
+             in
+             (* Check that the attribute is valid, if set (unconditionally, for
+               consistency). *)
+             if allow_any_crossing then begin
+               match decl.type_kind with
+               | Type_abstract _ | Type_open ->
+                 raise(Error(
+                   decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+               | _ -> ()
+             end;
+             update_decl_jkind env (Pident id) decl, allow_any_crossing)
          in
-
-         (* Check that the attribute is valid, if set (unconditionally, for
-            consistency). *)
-         if allow_any_crossing then begin
-           match decl.type_kind with
-           | Type_abstract _ | Type_open ->
-             raise(Error(
-               decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-           | _ -> ()
-         end;
-
-         let new_decl = update_decl_jkind env (Pident id) decl in
-         (id, decl, allow_any_crossing, new_decl)))
+         let env = add_type ~check:false id new_decl env in
+         env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
+      (env, Ident.Map.empty) order
+  in
+  (* Return the results in the original [decls] order. *)
+  List.map
+    (fun (id, _decl) ->
+       let decl, allow_any_crossing, new_decl = Ident.Map.find id results in
+       (id, decl, allow_any_crossing, new_decl))
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)
@@ -3048,7 +3073,8 @@ type step_result =
   | Contained of type_expr list
   | Expanded_to of type_expr
   | Is_cyclic
-let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
+let check_unboxed_recursion ~on_visit ~abs_env env loc
+      path0 ty0 to_check =
   let contained_parameters tyl layout =
     (* A type whose layout has [any] could contain all its parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
@@ -3093,27 +3119,44 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
         end
     | _ -> Contained (Ctype.contained_without_boxing env ty), parents
   in
+  (* Called in post-order (after a node's whole containment subtree has been
+     visited) for every [Tconstr] in the recursive group, which visits a
+     particlar declaration after all declarations that contain it without
+     indirection.
+
+     See Note [order of updating decl jkinds].
+  *)
+  let record ty =
+    match get_desc ty with
+    | Tconstr (path, _, _) when to_check path -> on_visit path
+    | _ -> ()
+  in
   let rec visit parents trace ty =
     match step_once parents ty with
     | Contained tys, parents ->
-      List.iter (fun ty' -> visit parents (Contains (ty, ty') :: trace) ty') tys
+      List.iter
+        (fun ty' -> visit parents (Contains (ty, ty') :: trace) ty') tys;
+      record ty
     | Expanded_to ty', parents ->
-      visit parents (Expands_to(ty,ty') :: trace) ty'
+      visit parents (Expands_to(ty,ty') :: trace) ty';
+      record ty
     | Is_cyclic, _ ->
       raise (Error (loc, Unboxed_recursion (path0, abs_env, List.rev trace)))
   in
   Ctype.wrap_trace_gadt_instances env (visit Path.Set.empty []) ty0
 
-let check_unboxed_recursion_decl ~abs_env env loc path decl to_check =
+let check_unboxed_recursion_decl ~on_visit ~abs_env env loc path decl to_check =
   let decl = Ctype.generic_instance_declaration decl in
+  (match decl.type_unboxed_version with
+   | None -> ()
+   | Some udecl ->
+      let upath = Path.unboxed_version path in
+      let uty = Btype.newgenty (Tconstr (upath, udecl.type_params, ref Mnil)) in
+      check_unboxed_recursion ~on_visit ~abs_env env loc
+        (Path.name upath) uty to_check);
   let ty = Btype.newgenty (Tconstr (path, decl.type_params, ref Mnil)) in
-  check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check;
-  match decl.type_unboxed_version with
-  | None -> ()
-  | Some decl ->
-      let path = Path.unboxed_version path in
-      let ty = Btype.newgenty (Tconstr (path, decl.type_params, ref Mnil)) in
-      check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check
+  check_unboxed_recursion ~on_visit ~abs_env env loc (Path.name path) ty
+    to_check
 
 (* Check for non-regular abbreviations; an abbreviation
    [type 'a t = ...] is non-regular if the expansion of [...]
@@ -3536,11 +3579,28 @@ let transl_type_decl env rec_flag sdecl_list =
     decls;
   List.iter
     (check_abbrev_regularity ~abs_env new_env id_loc_list to_check) tdecls;
-  List.iter (fun (id, decl) ->
-    check_unboxed_recursion_decl ~abs_env new_env (List.assoc id id_loc_list)
-      (Path.Pident id)
-      decl to_check)
-    decls;
+  (* When visiting declaration check for infinite-size unboxed types, we also
+     record the ordering of declarations in this recursive group in which to
+     compute their jkinds. See Note [order of updating decl jkinds]. *)
+  let jkind_update_order =
+    let visited = ref Ident.Set.empty in
+    let order = ref [] in
+    let on_visit path =
+      match path with
+      | Path.Pident id | Path.Pextra_ty (Path.Pident id, Punboxed_ty)
+        when not (Ident.Set.mem id !visited) ->
+        visited := Ident.Set.add id !visited;
+        order := id :: !order
+      | _ -> ()
+    in
+    List.iter (fun (id, decl) ->
+      check_unboxed_recursion_decl ~on_visit ~abs_env new_env
+        (List.assoc id id_loc_list)
+        (Path.Pident id)
+        decl to_check)
+      decls;
+    List.rev !order
+  in
   (* Now that we've ruled out ill-formed types, we can perform the delayed
      jkind checks *)
   List.iter (fun (checks,loc) ->
@@ -3598,7 +3658,7 @@ let transl_type_decl env rec_flag sdecl_list =
         |> name_recursion_decls sdecl_list
         |> Typedecl_variance.update_decls env sdecl_list
         |> Typedecl_separability.update_decls env
-        |> update_decls_jkind new_env
+        |> update_decls_jkind new_env jkind_update_order
         |> normalize_decl_jkinds new_env
       in
       let removed, decls = remove_unboxed_versions decls in
@@ -4918,7 +4978,8 @@ let check_recmod_typedecl env loc recmod_ids path decl =
      (path, decl) is the type declaration to be checked. *)
   let to_check path = Path.exists_free recmod_ids path in
   check_well_founded_decl ~abs_env:env env loc path decl to_check;
-  check_unboxed_recursion_decl ~abs_env:env env loc path decl to_check;
+  check_unboxed_recursion_decl ~on_visit:(fun _ -> ()) ~abs_env:env env loc
+    path decl to_check;
   check_regularity ~abs_env:env env loc path decl to_check;
   (* additional coherence check, as one might build an incoherent signature,
      and use it to build an incoherent module, cf. #7851 *)
