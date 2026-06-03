@@ -119,9 +119,10 @@ let run_script ppf name args =
   Compmisc.init_path ~dir:(Filename.dirname filename) ();
                    (* Note: would use [Filename.abspath] here, if we had it. *)
   begin
-    try toplevel_env := Compmisc.initial_env()
-    with Env.Error.In_context _ | Typetexp.Error _ as exn ->
-      Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
+    try toplevel_env := Compmisc.initial_env() with
+    | Env.Error.In_context _
+    | Typetexp.Error.In_context _ as exn ->
+        Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
   Sys.interactive := false;
   run_hooks After_setup;
@@ -394,9 +395,10 @@ let loop ppf =
       (if Topeval.implementation_label = "" then "" else " - ")
       Topeval.implementation_label;
   begin
-    try initialize_toplevel_env ()
-    with Env.Error.In_context _ | Typetexp.Error _ as exn ->
-      Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
+    try initialize_toplevel_env () with
+      Env.Error.In_context _
+    | Typetexp.Error.In_context _ as exn ->
+        Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
   let lb = Lexing.from_function refill_lexbuf in
   Location.init lb "//toplevel//";

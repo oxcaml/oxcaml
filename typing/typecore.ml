@@ -1408,7 +1408,7 @@ let unify_exp_types loc env ty expected_ty =
     Unify err ->
       Error.log_and_raise loc env (Expr_type_clash(err, None, None))
   | Tags(l1,l2) ->
-      raise(Typetexp.Error(loc, env, Typetexp.Variant_tags (l1, l2)))
+      Typetexp.Error.log_and_raise loc env (Typetexp.Variant_tags (l1, l2))
 
 (* helper notation for Pattern_env.t *)
 let (!!) (penv : Pattern_env.t) = penv.env
@@ -1419,7 +1419,7 @@ let unify_pat_types loc env ty ty' =
   | Unify err ->
       Error.log_and_raise loc env (Pattern_type_clash(err, None))
   | Tags(l1,l2) ->
-      raise(Typetexp.Error(loc, env, Typetexp.Variant_tags (l1, l2)))
+      Typetexp.Error.log_and_raise loc env (Typetexp.Variant_tags (l1, l2))
 
 (* GADT unification inside solve_Ppat_construct and check_counter_example_pat *)
 let nothing_equated = TypePairs.create 0
@@ -1431,7 +1431,7 @@ let unify_pat_types_return_equated_pairs ~refine loc penv ty ty' =
   | Unify err ->
       Error.log_and_raise loc !!penv (Pattern_type_clash(err, None))
   | Tags(l1,l2) ->
-      raise(Typetexp.Error(loc, !!penv, Typetexp.Variant_tags (l1, l2)))
+      Typetexp.Error.log_and_raise loc !!penv (Typetexp.Variant_tags (l1, l2))
 
 let unify_pat_types_refine ~refine loc penv ty ty' =
   ignore (unify_pat_types_return_equated_pairs ~refine loc penv ty ty')
@@ -7093,7 +7093,8 @@ and type_expect_
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
        [Nolabel, sbody]) when is_exclave_extension_node txt ->
       if (txt = "extension.exclave") && not (Language_extension.is_enabled Mode) then
-          raise (Typetexp.Error (loc, Env.empty, Unsupported_extension Mode));
+        Typetexp.Error.log_and_raise loc Env.empty
+          (Unsupported_extension Mode);
       begin
         match expected_mode.position with
         | RNontail ->
@@ -8472,7 +8473,8 @@ and type_expect_
         comp
   | Pexp_overwrite (exp1, exp2) ->
       if not (Language_extension.is_enabled Overwriting) then
-        raise (Typetexp.Error (loc, env, Unsupported_extension Overwriting));
+        Typetexp.Error.log_and_raise loc env
+          (Unsupported_extension Overwriting);
       if not (can_be_overwritten exp2.pexp_desc) then
         Error.log_and_raise exp2.pexp_loc env Overwrite_of_invalid_term;
       let cell_mode, _ =
@@ -8532,8 +8534,8 @@ and type_expect_
             exp_env = env }
   | Pexp_quote exp ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
-        raise (Typetexp.Error (loc, env,
-                               Unsupported_extension Runtime_metaprogramming));
+        Typetexp.Error.log_and_raise loc env
+          (Unsupported_extension Runtime_metaprogramming);
       let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let new_env =
         env
@@ -8564,8 +8566,8 @@ and type_expect_
         exp_env = env }
   | Pexp_splice exp ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
-        raise (Typetexp.Error (loc, env,
-                               Unsupported_extension Runtime_metaprogramming));
+        Typetexp.Error.log_and_raise loc env
+          (Unsupported_extension Runtime_metaprogramming);
       (* If we are checking staged modes in the metaprogram,
          we need to assume the splice is at legacy.
          Otherwise, if we are delaying checking modes until program generation
@@ -9022,8 +9024,8 @@ and type_function
         Error.log_and_raise pat.ppat_loc env Optional_poly_param;
       if has_poly
       && not (Language_extension.is_enabled Polymorphic_parameters) then
-        raise (Typetexp.Error (loc, env,
-                               Unsupported_extension Polymorphic_parameters));
+        Typetexp.Error.log_and_raise loc env
+          (Unsupported_extension Polymorphic_parameters);
       let is_final_val_param =
         match body with
         | Pfunction_cases _ -> false

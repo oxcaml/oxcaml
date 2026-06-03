@@ -197,7 +197,12 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
 
-exception Error of Location.t * Env.t * error
+module Error : sig
+    type exn += private In_context of Location.t * Env.t * error
+
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
 
 val report_error: Env.t -> error Format_doc.format_printer
 val report_error_doc: Env.t -> error Format_doc.printer
