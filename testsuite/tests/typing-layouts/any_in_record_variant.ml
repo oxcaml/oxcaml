@@ -8,19 +8,12 @@ type ('a : any, 'b : any) t = Nope | Yeah of { fst : 'a; snd : 'b }
 type ('a : any, 'b : any) t = Nope | Yeah of { fst : 'a; snd : 'b; }
 |}]
 
-(* CR-someday lmaurer: Would be good to infer [value] as the kind here as we do
-   for the record and tuple-constructor cases. *)
 let to_option t =
   match t with
   | Yeah { fst; snd } -> Some (fst, snd)
   | Nope -> None
 [%%expect{|
-Line 3, characters 9-21:
-3 |   | Yeah { fst; snd } -> Some (fst, snd)
-             ^^^^^^^^^^^^
-Error: Cannot access record with unrepresentable field.
-       The record has type ('a, 'b) t.Yeah,
-       whose field fst is not representable.
+val to_option : ('a, 'b) t -> ('a * 'b) option = <fun>
 |}]
 
 let is_yeah (type a : any) (type b : any) (t : (a, b) t) =
