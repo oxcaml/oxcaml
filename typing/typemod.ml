@@ -628,7 +628,7 @@ let check_well_formed_module env loc context mty =
           let (id_mty_l, rem) = extract_next_modules rem in
           begin try
             check_recmod_decls (Lazy.force env) ((id, mty) :: id_mty_l)
-          with Typedecl.Error (_, err) ->
+          with Typedecl.Error.In_context (_, err) ->
             raise (Error (loc, Lazy.force env,
                           Badly_formed_signature(context, err)))
           end;
@@ -3267,8 +3267,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
                 (not_principal "this module unpacking");
             modtype_of_package env smod.pmod_loc p fl
         | Tvar _ ->
-            raise (Typecore.Error
-                     (smod.pmod_loc, env, Typecore.Cannot_infer_signature))
+            Typecore.Error.log_and_raise smod.pmod_loc env
+              Typecore.Cannot_infer_signature
         | _ ->
             raise (Error(smod.pmod_loc, env, Not_a_packed_module exp.exp_type))
       in

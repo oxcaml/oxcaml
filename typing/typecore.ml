@@ -6460,7 +6460,7 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
             unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
              Linearity.disallow_right Linearity.legacy);
             mode = Mode.Value.disallow_right Mode.Value.legacy;
-            desc = Types.{ 
+            desc = Types.{
                 val_type = ty_expected_explained.ty;
                 val_kind =
                   Val_reg (Var (Jkind.Sort.new_var
@@ -6500,7 +6500,7 @@ and type_expect_
   let type_expect_record (type rep) ~overwrite (record_form : rep record_form)
         (lid_sexp_list: (Longident.t loc * Parsetree.expression) list)
         (opt_sexp : Parsetree.expression option) =
-    let delayed () = 
+    let delayed () =
       assert (lid_sexp_list <> []);
       let opt_exp =
         match opt_sexp with
@@ -7921,7 +7921,7 @@ and type_expect_
                 (Longident.Lident ("self-" ^ cl_num))
                 env
             in
-            Texp_setinstvar(path_self, path, lab, newval)            
+            Texp_setinstvar(path_self, path, lab, newval)
         | Mutable_variable (id, mode, ty, sort) ->
             let newval =
               type_expect env (mode_default mode)

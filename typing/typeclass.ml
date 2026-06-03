@@ -2033,7 +2033,7 @@ let check_coercions env { id; id_loc; clty; ty_id; cltydef; obj_id; obj_abbr;
       in
       begin try Ctype.subtype env cl_ty obj_ty ()
       with Ctype.Subtype err ->
-        raise(Typecore.Error(loc, env, Typecore.Not_subtype err))
+        Typecore.Error.log_and_raise loc env (Typecore.Not_subtype err)
       end;
       if not (Ctype.opened_object cl_ty) then
         Error.log_and_raise loc env (Cannot_coerce_self obj_ty)
@@ -2081,7 +2081,7 @@ let type_classes define_class approx kind env cls =
   let decls =
     try Typedecl_variance.update_class_decls env decls
     with Typedecl_variance.Error(loc, err) ->
-      raise (Typedecl.Error(loc, Typedecl.Variance err))
+      Typedecl.Error.log_and_raise loc (Typedecl.Variance err)
   in
   let res = List.map2 merge_type_decls res decls in
   let env = List.fold_left (final_env define_class) env res in
