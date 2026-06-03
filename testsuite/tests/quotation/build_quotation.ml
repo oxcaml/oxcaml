@@ -1707,7 +1707,7 @@ exception E
 <[ fun (module M : T) -> let open M in foo + 1 ]>
 [%%expect {|
 - : <[(module T) -> int]> expr =
-<[fun (module M : T) -> let open! M in M.foo + 1]>
+<[fun (((module M) : (module T)) : (module T)) -> let open! M in M.foo + 1]>
 |}];;
 
 (* Cross-stage open *)
