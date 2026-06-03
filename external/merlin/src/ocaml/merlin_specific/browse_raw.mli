@@ -92,8 +92,8 @@ type node =
   | Method_call of expression * meth * Location.t
   | Record_field :
       [ `Expression of expression | `Pattern of pattern ]
-      * 'rep Types.gen_label_description
-      * 'rep Types.record_form
+      * 'rep Data_types.gen_label_description
+      * 'rep Data_types.record_form
       * Longident.t Location.loc
       -> node
   | Module_binding_name of module_binding
@@ -130,7 +130,7 @@ val node_paths_and_longident : node -> (Path.t Location.loc * Longident.t) list
 
 val node_is_constructor :
   node ->
-  [ `Description of Types.constructor_description
+  [ `Description of Data_types.constructor_description
   | `Declaration of Typedtree.constructor_declaration
   | `Extension_constructor of Typedtree.extension_constructor ]
   Location.loc

@@ -18,6 +18,7 @@
 
 open Asttypes
 open Types
+open Data_types
 open Btype
 module Jkind = Btype.Jkind0
 
@@ -31,13 +32,13 @@ let free_vars ?(param=false) ty =
         | Tvar _ ->
             ret := TypeSet.add ty !ret
         | Tvariant row ->
-          iter_row loop row;
-          if not (static_row row) then begin
-            match get_desc (row_more row) with
-            | Tvar _ when param -> ret := TypeSet.add ty !ret
-            | _ -> loop (row_more row)
-          end
-        (* XXX: What about Tobject ? *)
+            iter_row loop row;
+            if not (static_row row) then begin
+              match get_desc (row_more row) with
+              | Tvar _ when param -> ret := TypeSet.add ty !ret
+              | _ -> loop (row_more row)
+            end
+                (* XXX: What about Tobject ? *)
         | _ ->
             iter_type_expr loop ty
     in
@@ -283,7 +284,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
     lbl_sort = Jkind_types.Sort.Const.void;
-    lbl_pos = -1; lbl_all = [||];
+    lbl_pos = (-1); lbl_all = [||];
     lbl_repres = repres;
     lbl_private = Public;
     lbl_loc = Location.none;
@@ -293,7 +294,7 @@ let dummy_label (type rep) (record_form : rep record_form)
 
 let label_descrs record_form ty_res lbls repres priv =
   let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
-  let rec describe_labels pos = function
+  let rec describe_labels num = function
       [] -> []
     | l :: rest ->
         let lbl =
@@ -303,7 +304,7 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_mut = l.ld_mutable;
             lbl_modalities = l.ld_modalities;
             lbl_sort = l.ld_sort;
-            lbl_pos = pos;
+            lbl_pos = num;
             lbl_all = all_labels;
             lbl_repres = repres;
             lbl_private = priv;
@@ -311,8 +312,8 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_attributes = l.ld_attributes;
             lbl_uid = l.ld_uid;
           } in
-        all_labels.(pos) <- lbl;
-        (l.ld_id, lbl) :: describe_labels (pos+1) rest in
+        all_labels.(num) <- lbl;
+        (l.ld_id, lbl) :: describe_labels (num+1) rest in
   describe_labels 0 lbls
 
 exception Constr_not_found

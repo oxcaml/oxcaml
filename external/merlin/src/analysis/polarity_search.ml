@@ -73,8 +73,10 @@ let build_query ~positive ~negative env =
       incr r;
       None)
     else
-      let set, _ = Env.find_type_by_name l env in
-      Some (normalize_path env set)
+      try
+        let set, _ = Env.find_type_by_name l env in
+        Some (normalize_path env set)
+      with Not_found -> None
   in
   let pos_fun = ref 0 and neg_fun = ref 0 in
   let positive = List.filter_map positive ~f:(prepare pos_fun) in
@@ -103,10 +105,10 @@ let prepare_query env query =
 let directories ~global_modules env =
   let rec explore lident env =
     let add_module name _ (md : Subst.Lazy.module_declaration) l =
+      let lident = Longident.Ldot (Location.mknoloc lident, Location.mknoloc name) in
       match md.md_type with
       | Mty_alias _ -> l
       | _ ->
-        let lident = Longident.Ldot (lident, name) in
         Trie (name, lident, lazy (explore lident env)) :: l
     in
     Env.fold_modules add_module (Some lident) env []
@@ -156,7 +158,7 @@ let execute_query_as_type_search ?(limit = 100) ~env ~query ~modules () =
   |> List.map ~f:(fun (cost, path, desc) ->
       let name =
         Printtyp.wrap_printing_env env @@ fun () ->
-        let path = Printtyp.rewrite_double_underscore_paths env path in
+        let path = Out_type.rewrite_double_underscore_paths env path in
         Format.asprintf "%a" Printtyp.Compat.path path
       in
       let doc = None in
