@@ -2322,6 +2322,16 @@ let try_unbox_desc env = function
       Some (Tunboxed_tuple tys)
   | _ -> None
 
+(* Whether unifying [d1] and [d2] reduces a [box] against a type that has an
+   unboxed version (e.g. [t# box] vs [t], or [#(a * b) box] vs [a * b]).  In
+   that case unification should unbox and recurse rather than reify, so that the
+   resulting equation between the boxed contents is recorded. *)
+let box_reduces_against env d1 d2 =
+  match d1, d2 with
+  | Tbox _, _ -> Option.is_some (try_unbox_desc env d2)
+  | _, Tbox _ -> Option.is_some (try_unbox_desc env d1)
+  | _ -> false
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -5053,7 +5063,8 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)
         when in_pattern_mode uenv
-          && (is_equatable_ty t1 || is_equatable_ty t2) ->
+          && (is_equatable_ty t1 || is_equatable_ty t2)
+          && not (box_reduces_against (get_env uenv) d1 d2) ->
           reify uenv t1';
           reify uenv t2';
           if can_generate_equations uenv then (
