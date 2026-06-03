@@ -2792,7 +2792,6 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
     AC_MSG_NOTICE([the threads library is disabled])],
   [systhread_support=true
   AC_CONFIG_FILES([otherlibs/systhreads/META])
-  AC_CONFIG_FILES([otherlibs/systhreads4/META])
   otherlibraries="$otherlibraries systhreads"
   lib_systhreads=true
   lib_systhreads_path="systhreads"

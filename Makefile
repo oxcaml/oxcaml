@@ -34,7 +34,6 @@ CLEAN_FILES = \
   $(CLEAN_DUNE_WORKSPACES) \
   duneconf/dirs-to-ignore.inc \
   duneconf/ox-extra.inc \
-  otherlibs/dune \
   natdynlinkops \
   otherlibs/dynlink/natdynlinkops \
   ocamlopt_upstream_flags.sexp \
@@ -80,10 +79,6 @@ DISTCLEAN_FILES = \
   runtime/caml/m.h \
   runtime/caml/s.h \
   runtime/caml/version.h \
-  runtime4/caml/exec.h \
-  runtime4/caml/m.h \
-  runtime4/caml/s.h \
-  runtime4/caml/version.h \
   $(wildcard otherlibs/*/META)
 
 ifdef dune
