@@ -1610,11 +1610,8 @@ and find_type_unboxed_version path env seen =
   | Aliases (path, args) ->
     let ud = find_type_unboxed_version path env seen in
     let man =
-      match ud.type_manifest with
-      | Some man -> !apply env ud.type_params man args
-      | None ->
-        Btype.newgenty
-          (Tconstr (Path.unboxed_version path, args, ref Mnil))
+      Btype.newgenty
+        (Tconstr (Path.unboxed_version path, args, ref Mnil))
     in
     let jkind = ud.type_jkind in
     (* CR layouts v7.2: compute the exact separability *)
