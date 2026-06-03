@@ -99,7 +99,7 @@ loop_with_non_dominating_load:
   movl  $201, %edi
 .L0:
   testb $1, %bl
-  je    .L112
+  je    .L1
   movq  camlStdlib__List__Pmakeblock2453@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
