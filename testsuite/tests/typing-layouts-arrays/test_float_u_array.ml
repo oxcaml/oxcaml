@@ -6,6 +6,7 @@
  modules = "${readonly_files} stubs.c";
  flambda2;
  {
+   flat-float-array;
    bytecode;
  }
  {
