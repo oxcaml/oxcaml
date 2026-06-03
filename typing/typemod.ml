@@ -4141,31 +4141,35 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
             sig_acc_include_functor =
     match sstr with
     | [] ->
-      (List.rev str_acc, List.rev sig_acc, shape_map, env)
-    | pstr :: srem ->
+        (List.rev str_acc, List.rev sig_acc, shape_map, env)
+    | item :: srem -> begin
         let previous_saved_types = Cmt_format.get_saved_types () in
-        let desc, sg, shape_map, new_env =
-          type_str_item env shape_map pstr sig_acc_include_functor
-        in
-        let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
-        Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
-                                    :: previous_saved_types);
-        type_struct new_env shape_map srem (str :: str_acc)
+        match type_str_item env shape_map item sig_acc_include_functor with
+        | desc, sg, shape_map, new_env ->
+            let str = { str_desc = desc; str_loc = item.pstr_loc; str_env = env } in
+            Cmt_format.set_saved_types
+              (Cmt_format.Partial_structure_item str :: previous_saved_types);
+            type_struct new_env shape_map srem (str :: str_acc)
           (List.rev_append sg sig_acc)
           (List.rev_append sg sig_acc_include_functor)
+        | exception exn when
+            !Clflags.typing_recovery && Typecore.is_recoverable exn ->
+            type_struct env shape_map srem str_acc sig_acc
+              sig_acc_include_functor
+      end
   in
-  let previous_saved_types = Cmt_format.get_saved_types () in
-  let run () =
+  let delayed () =
     let (items, sg, shape_map, final_env) =
       type_struct env Shape.Map.empty sstr [] [] toplevel_sig
     in
     let str = { str_items = items; str_type = sg; str_final_env = final_env } in
-    Cmt_format.set_saved_types
-      (Cmt_format.Partial_structure str :: previous_saved_types);
     str, sg, md_mode, names, Shape.str shape_map, final_env
   in
-  if Option.is_some toplevel then run ()
-  else Builtin_attributes.warning_scope [] run
+  Typing_recovery_state.with_saved_types
+    ~save_part:(fun (str,_,_,_,_, _) -> Cmt_format.Partial_structure str)
+    (fun () ->
+       if Option.is_some toplevel then delayed ()
+       else Builtin_attributes.warning_scope [] delayed)
 
 (* The toplevel will print some types not present in the signature *)
 let remove_mode_and_jkind_variables_for_toplevel str =
@@ -4847,7 +4851,7 @@ let package_units initial_env objfiles target_cmi modulename =
   let mli = Unit_info.mli_from_artifact target_cmi in
   if Sys.file_exists mli then begin
     if not (Sys.file_exists @@ Unit_info.Artifact.filename target_cmi) then
-      Error.log_and_raise (Location.in_file mli) Env.empty
+      Error.log_or_raise (Location.in_file mli) Env.empty
          (Interface_not_compiled mli);
     let name = Compilation_unit.to_global_name_without_prefix modulename in
     let dclsig, staticity = Env.read_signature name target_cmi in
