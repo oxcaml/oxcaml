@@ -2661,14 +2661,14 @@ let update_decls_jkind_reason decls =
    [order] is topological of type declarations in the graph where there's an
    edge from decl [a] to [b] if [a] or [a#] is contained in [b] without
    indirection. E.g., there is an [a->b] edge for the following:
-   [{
+   {[
      type a = #{ x : int; y : int }
      and b = #{ a : a; other : string}
-   }]
+   ]}
 
    We process the decls in this order and update the environment as we go, so
-   that when each decl jkind, we sees the computed jkinds of the types it
-   unboxed-contains, rather than the dummy [any] jkinds assigned in
+   that when we update each decl jkind, we see the computed jkinds of the types
+   it unboxed-contains, rather than the dummy [any] jkinds assigned in
    [transl_declaration]. See Note [Default jkinds in transl_declaration]. *)
 let update_decls_jkind env order decls =
   let decls_by_id = Ident.Map.of_list decls in
@@ -3073,8 +3073,7 @@ type step_result =
   | Contained of type_expr list
   | Expanded_to of type_expr
   | Is_cyclic
-let check_unboxed_recursion ~on_visit ~abs_env env loc
-      path0 ty0 to_check =
+let check_unboxed_recursion ~on_visit ~abs_env env loc path0 ty0 to_check =
   let contained_parameters tyl layout =
     (* A type whose layout has [any] could contain all its parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
@@ -3121,27 +3120,23 @@ let check_unboxed_recursion ~on_visit ~abs_env env loc
   in
   (* Called in post-order (after a node's whole containment subtree has been
      visited) for every [Tconstr] in the recursive group, which visits a
-     particlar declaration after all declarations that contain it without
+     particular declaration after all declarations that contain it without
      indirection.
 
-     See Note [order of updating decl jkinds].
-  *)
-  let record ty =
-    match get_desc ty with
-    | Tconstr (path, _, _) when to_check path -> on_visit path
-    | _ -> ()
-  in
+     See Note [order of updating decl jkinds]. *)
   let rec visit parents trace ty =
-    match step_once parents ty with
+    begin match step_once parents ty with
     | Contained tys, parents ->
       List.iter
         (fun ty' -> visit parents (Contains (ty, ty') :: trace) ty') tys;
-      record ty
     | Expanded_to ty', parents ->
       visit parents (Expands_to(ty,ty') :: trace) ty';
-      record ty
     | Is_cyclic, _ ->
       raise (Error (loc, Unboxed_recursion (path0, abs_env, List.rev trace)))
+    end;
+    match get_desc ty with
+    | Tconstr (path, _, _) when to_check path -> on_visit path
+    | _ -> ()
   in
   Ctype.wrap_trace_gadt_instances env (visit Path.Set.empty []) ty0
 
