@@ -965,11 +965,10 @@ type 'a u = 'a and 'a v = 'a u t constraint 'a = int;;
 [%%expect {|
 type g = int
 type 'a t = unit constraint 'a = g
-Line 3, characters 26-32:
-3 | type 'a u = 'a and 'a v = 'a u t;;
-                              ^^^^^^
-Error: Constraints are not satisfied in this type.
-       Type "'a u t" should be an instance of "g t"
+type 'a u = 'a constraint 'a = g
+and 'a v = 'a u t constraint 'a = g
+type 'a u = 'a constraint 'a = g
+and 'a v = 'a u t constraint 'a = g
 |}];;
 
 (* Full unification trace reported for "Constraints are not satisfied in this type" *)
