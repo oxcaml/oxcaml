@@ -1858,7 +1858,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
              :> TG.t Name.Map.t))
     in
     let target_env =
-      ME.add_env_extension ~meet_type target_env
+      ME.add_env_extension ~meet_expanded_head target_env
         env_extension_for_inverse_relations
     in
     let target_env =

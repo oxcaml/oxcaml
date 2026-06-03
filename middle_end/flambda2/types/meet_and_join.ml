@@ -1021,9 +1021,11 @@ and reduce_inverse_relations env naked_immediates inverse_relations :
           Name.Set.fold
             (fun name env ->
               let add_equation ty =
-                match add_equation (Simple.name name) ty env ~meet_type with
-                | Ok (_, env) -> env
-                | Bottom _ -> raise Bottom_result
+                match
+                  ME.add_equation_strict env name ty ~meet_expanded_head
+                with
+                | Ok env -> env
+                | Bottom -> raise Bottom_result
               in
               match TG.Relation.descr relation with
               | Is_null -> (
