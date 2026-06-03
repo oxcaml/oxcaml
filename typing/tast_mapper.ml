@@ -361,24 +361,58 @@ let pat
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
+<<<<<<< HEAD
     | Tpat_construct (lid, cd, l, vto) ->
+||||||| e8480d569a
+    | Tpat_construct (loc, cd, l, vto) ->
+=======
+    | Tpat_construct (loc, cd, rep, l, vto) ->
+>>>>>>> 5bddb2acb0
         let vto = Option.map (fun (vl,cty) ->
           List.map
             (fun (v, jk) ->
                (map_loc sub v,
                 Option.map (sub.jkind_annotation sub) jk))
             vl, sub.typ sub cty) vto in
+<<<<<<< HEAD
         Tpat_construct (map_loc_lid sub lid, cd, List.map (sub.pat sub) l, vto)
+||||||| e8480d569a
+        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto)
+=======
+        Tpat_construct (map_loc sub loc, cd, rep,
+                        List.map (fun (sort, pat) -> sort, sub.pat sub pat) l,
+                        vto)
+>>>>>>> 5bddb2acb0
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
+<<<<<<< HEAD
     | Tpat_record (l, closed) ->
         Tpat_record
           (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
     | Tpat_record_unboxed_product (l, closed) ->
+||||||| e8480d569a
+    | Tpat_record (l, closed) ->
+        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
+    | Tpat_record_unboxed_product (l, closed) ->
+=======
+    | Tpat_record (l, sorts, rep, closed) ->
+        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l,
+                     sorts, rep, closed)
+    | Tpat_record_unboxed_product (l, sorts, rep, closed) ->
+>>>>>>> 5bddb2acb0
         Tpat_record_unboxed_product
+<<<<<<< HEAD
           (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) ->
         Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
+||||||| e8480d569a
+          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
+    | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
+=======
+          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, sorts, rep,
+           closed)
+    | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
+>>>>>>> 5bddb2acb0
     | Tpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
@@ -518,20 +552,46 @@ let expr sub x =
   in
   let map_fields fields =
     Array.map (function
+<<<<<<< HEAD
       | label, Kept (t, mut, uu) -> label, Kept (t, mut, uu)
       | label, Overridden (lid, exp) ->
           label, Overridden (map_loc_lid sub lid, sub.expr sub exp))
+||||||| e8480d569a
+      | label, Kept (t, mut, uu) -> label, Kept (t, mut, uu)
+      | label, Overridden (lid, exp) ->
+          label, Overridden (map_loc sub lid, sub.expr sub exp))
+=======
+      | label, sort, Kept (t, mut, uu) -> label, sort, Kept (t, mut, uu)
+      | label, sort, Overridden (lid, exp) ->
+          label, sort, Overridden (map_loc sub lid, sub.expr sub exp))
+>>>>>>> 5bddb2acb0
       fields
   in
   let map_block_access sub = function
+<<<<<<< HEAD
     | Baccess_field (lid, ld) ->
       Baccess_field (map_loc_lid sub lid, ld)
+||||||| e8480d569a
+    | Baccess_field (lid, ld) ->
+      Baccess_field (map_loc sub lid, ld)
+=======
+    | Baccess_field (lid, ld, r) ->
+      Baccess_field (map_loc sub lid, ld, r)
+>>>>>>> 5bddb2acb0
     | Baccess_block (mut, idx) ->
       Baccess_block (mut, sub.expr sub idx)
   in
   let map_unboxed_access sub = function
+<<<<<<< HEAD
     | Uaccess_unboxed_field (lid, ld) ->
       Uaccess_unboxed_field (map_loc_lid sub lid, ld)
+||||||| e8480d569a
+    | Uaccess_unboxed_field (lid, ld) ->
+      Uaccess_unboxed_field (map_loc sub lid, ld)
+=======
+    | Uaccess_unboxed_field (lid, ld, sorts) ->
+      Uaccess_unboxed_field (map_loc sub lid, ld, sorts)
+>>>>>>> 5bddb2acb0
   in
   let exp_desc =
     match x.exp_desc with
@@ -581,9 +641,20 @@ let expr sub x =
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
+<<<<<<< HEAD
     | Texp_construct (lid, cd, args, am) ->
         Texp_construct
           (map_loc_lid sub lid, cd, List.map (sub.expr sub) args, am)
+||||||| e8480d569a
+    | Texp_construct (lid, cd, args, am) ->
+        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am)
+=======
+    | Texp_construct (lid, cd, rep, args, am) ->
+        Texp_construct (map_loc sub lid, cd, rep,
+                        List.map (fun (sort, arg) -> sort, sub.expr sub arg)
+                          args,
+                        am)
+>>>>>>> 5bddb2acb0
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
     | Texp_record { fields; representation; extended_expression; alloc_mode } ->
@@ -602,6 +673,7 @@ let expr sub x =
             Option.map
               (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
         }
+<<<<<<< HEAD
     | Texp_field (exp, sort, lid, ld, float, ubr) ->
         Texp_field (sub.expr sub exp, sort, map_loc_lid sub lid, ld, float, ubr)
     | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
@@ -614,6 +686,41 @@ let expr sub x =
           ld,
           sub.expr sub exp2
         )
+||||||| e8480d569a
+    | Texp_field (exp, sort, lid, ld, float, ubr) ->
+        Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr)
+    | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
+        Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
+    | Texp_setfield (exp1, am, lid, ld, exp2) ->
+        Texp_setfield (
+          sub.expr sub exp1,
+          am,
+          map_loc sub lid,
+          ld,
+          sub.expr sub exp2
+        )
+=======
+    | Texp_field { record; record_sort; record_repres; lid; label; boxing;
+                   unique_barrier; } ->
+        Texp_field { record = sub.expr sub record;
+                     lid = map_loc sub lid;
+                     record_sort; record_repres; label; boxing; unique_barrier;
+                   }
+    | Texp_unboxed_field { record; record_sort; record_sorts; record_repres;
+                           lid; label; unique_use; } ->
+        Texp_unboxed_field { record = sub.expr sub record;
+                             lid = map_loc sub lid; record_sort; record_sorts;
+                             record_repres; label; unique_use;
+                           }
+    | Texp_setfield { record; record_repres; record_sorts; modality; lid; label;
+                      newval } ->
+        Texp_setfield {
+          record = sub.expr sub record;
+          lid = map_loc sub lid;
+          newval = sub.expr sub newval;
+          record_repres; record_sorts; modality; label;
+        }
+>>>>>>> 5bddb2acb0
     | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
         Texp_atomic_loc
           (sub.expr sub exp, sort, map_loc_lid sub lid, ld, alloc_mode)

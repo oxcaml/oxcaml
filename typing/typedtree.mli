@@ -165,6 +165,17 @@ and _ poly_param =
   (** [Method (m, t)] is used when applying a polymorphic method [m]
       with type scheme [t] *)
 
+(** Sort information for all fields in a record, at the point where the record
+    is being matched against or projected from. Depending on whether the record
+    type has a field of kind `any`, this may differ from value to value. *)
+type record_sorts =
+  | Fixed
+  (** The sorts of this record's fields were determined when the type was
+      declared. Invariant: Every description in [lbl_all] for any field has a
+      [lbl_sort] that's [Some]. *)
+  | Variable of Jkind.Sort.Const.t array
+  (** This value has the specified sorts for its fields. *)
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -290,8 +301,17 @@ and 'k pattern_desc =
             Invariant: n >= 2
          *)
   | Tpat_construct :
+<<<<<<< HEAD
       Longident.t loc * Data_types.constructor_description *
         value general_pattern list *
+||||||| e8480d569a
+      Longident.t loc * Types.constructor_description *
+        value general_pattern list *
+=======
+      Longident.t loc * Types.constructor_description *
+        Types.constructor_representation *
+        (Jkind.sort * value general_pattern) list *
+>>>>>>> 5bddb2acb0
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
       value pattern_desc
@@ -314,22 +334,42 @@ and 'k pattern_desc =
             See {!Types.row_desc} for an explanation of the last parameter.
          *)
   | Tpat_record :
+<<<<<<< HEAD
       (Longident.t loc
        * Data_types.label_description
        * value general_pattern
       ) list
       * closed_flag
       -> value pattern_desc
+||||||| e8480d569a
+      (Longident.t loc * Types.label_description * value general_pattern) list *
+        closed_flag ->
+      value pattern_desc
+=======
+      (Longident.t loc * Types.label_description * value general_pattern) list *
+        record_sorts * Types.record_representation * closed_flag ->
+      value pattern_desc
+>>>>>>> 5bddb2acb0
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
 
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
+<<<<<<< HEAD
       (Longident.t loc
        * Data_types.unboxed_label_description
        * value general_pattern) list
       * closed_flag ->
+||||||| e8480d569a
+      (Longident.t loc * Types.unboxed_label_description * value general_pattern) list *
+        closed_flag ->
+=======
+      (Longident.t loc * Types.unboxed_label_description *
+         value general_pattern) list *
+        record_sorts * Types.record_unboxed_product_representation *
+        closed_flag ->
+>>>>>>> 5bddb2acb0
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -554,8 +594,17 @@ and expression_desc =
                 when [el] is [(Some L1, E1, s1); (None, E2, s2)]
           *)
   | Texp_construct of
+<<<<<<< HEAD
       Longident.t loc * Data_types.constructor_description *
       expression list * alloc_mode option
+||||||| e8480d569a
+      Longident.t loc * Types.constructor_description *
+      expression list * alloc_mode option
+=======
+      Longident.t loc * Types.constructor_description *
+      Types.constructor_representation * (Jkind.sort * expression) list *
+      alloc_mode option
+>>>>>>> 5bddb2acb0
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -570,7 +619,15 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
+<<<<<<< HEAD
       fields : ( Data_types.label_description * record_label_definition ) array;
+||||||| e8480d569a
+      fields : ( Types.label_description * record_label_definition ) array;
+=======
+      fields :
+        ( Types.label_description * Jkind.sort * record_label_definition )
+          array;
+>>>>>>> 5bddb2acb0
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
@@ -590,9 +647,16 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record_unboxed_product of {
+<<<<<<< HEAD
       fields :
         ( Data_types.unboxed_label_description
           * record_label_definition ) array;
+||||||| e8480d569a
+      fields : ( Types.unboxed_label_description * record_label_definition ) array;
+=======
+      fields : ( Types.unboxed_label_description * Jkind.sort *
+                 record_label_definition ) array;
+>>>>>>> 5bddb2acb0
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -610,18 +674,65 @@ and expression_desc =
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * Data_types.label_description *
       alloc_mode
+<<<<<<< HEAD
   | Texp_field of expression * Jkind.sort * Longident.t loc *
       Data_types.label_description * texp_field_boxing * Unique_barrier.t
     (** - The sort is the sort of the whole record (which may be non-value if
           the record is @@unboxed).
+||||||| e8480d569a
+  | Texp_field of expression * Jkind.sort * Longident.t loc *
+      Types.label_description * texp_field_boxing * Unique_barrier.t
+    (** - The sort is the sort of the whole record (which may be non-value if
+          the record is @@unboxed).
+=======
+  | Texp_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+    (** - The [record_sort] is the sort of the whole record (which may be
+          non-value if the record is @@unboxed).
+>>>>>>> 5bddb2acb0
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
+<<<<<<< HEAD
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc *
       Data_types.unboxed_label_description * unique_use
   | Texp_setfield of
       expression * Mode.Locality.l * Longident.t loc *
       Data_types.label_description * expression
+||||||| e8480d569a
+  | Texp_unboxed_field of
+      expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
+        unique_use
+  | Texp_setfield of
+      expression * Mode.Locality.l * Longident.t loc *
+      Types.label_description * expression
+=======
+  | Texp_unboxed_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_sorts : record_sorts;
+      record_repres : Types.record_unboxed_product_representation;
+      lid : Longident.t loc;
+      label : Types.unboxed_label_description;
+      unique_use : unique_use;
+    }
+  | Texp_setfield of {
+      record : expression;
+      record_repres : Types.record_representation;
+      record_sorts : record_sorts;
+      modality : Mode.Locality.l;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      newval : expression;
+    }
+>>>>>>> 5bddb2acb0
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
@@ -781,12 +892,25 @@ and ident_kind =
   | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
 
 and block_access =
+<<<<<<< HEAD
   | Baccess_field of Longident.t loc * Data_types.label_description
+||||||| e8480d569a
+  | Baccess_field of Longident.t loc * Types.label_description
+=======
+  | Baccess_field of
+      Longident.t loc * Types.label_description * Types.record_representation
+>>>>>>> 5bddb2acb0
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of
+<<<<<<< HEAD
       Longident.t loc * Data_types.unboxed_label_description
+||||||| e8480d569a
+  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
+=======
+      Longident.t loc * Types.unboxed_label_description * record_sorts
+>>>>>>> 5bddb2acb0
 
 and comprehension =
   {
@@ -1561,5 +1685,25 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
+<<<<<<< HEAD
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
+||||||| e8480d569a
+=======
+(** Compute the sort of a label. Returns [None] when we can't determine the sort
+    for a representable record based off of the label alone, namely for a
+    [Record_unboxed]. In that case, the label has the same sort as the whole
+    record. *)
+val label_sort:
+  'rep Types.record_form -> 'rep Types.gen_label_description -> record_sorts
+  ->
+  [ `Sort of Jkind.Sort.Const.t | `Same_as_record_sort ]
+
+(** Computes the sort of a label. Becuase the sepcial case above doesn't apply
+    to unboxed records, this doesn't return an option. *)
+val unboxed_label_sort :
+  Types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t
+
+val unboxed_label_all_sorts:
+  Types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t array
+>>>>>>> 5bddb2acb0

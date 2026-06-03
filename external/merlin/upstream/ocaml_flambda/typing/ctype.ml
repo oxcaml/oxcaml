@@ -301,27 +301,29 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~allow_recursive_equations =
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  let make ?env_alloc_mode env ~equations_scope ~allow_recursive_equations =
     { env;
       equations_scope;
       allow_recursive_equations;
-      is_lpoly; }
+      env_alloc_mode; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
+  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
 end
 
 (**** unification mode ****)
@@ -1575,20 +1577,23 @@ type existential_treatment =
 let instance_constructor existential_treatment cstr =
   For_copy.with_scope (fun copy_scope ->
     let name_counter = ref 0 in
+    let declared_jkind_of existential =
+      match get_desc existential with
+      | Tvar { jkind } -> jkind
+      | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
+          (* Existential row variable *)
+      | _ -> Misc.fatal_error "Ctype.instance_constructor"
+    in
     let copy_existential =
       match existential_treatment with
-      | Keep_existentials_flexible -> copy copy_scope
+      | Keep_existentials_flexible ->
+          fun existential ->
+            (copy copy_scope existential, declared_jkind_of existential)
       | Make_existentials_abstract penv ->
           fun existential ->
             (* CR layouts v1.5: Add test case that hits this once we have syntax
                for it *)
-            let jkind =
-              match get_desc existential with
-              | Tvar { jkind } -> jkind
-              | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
-                  (* Existential row variable *)
-              | _ -> assert false
-            in
+            let jkind = declared_jkind_of existential in
             let decl = new_local_type (Existential cstr.cstr_name) jkind in
             let name = existential_name name_counter existential in
             let env = penv.env in
@@ -1601,7 +1606,7 @@ let instance_constructor existential_treatment cstr =
             let tv = copy copy_scope existential in
             assert (is_Tvar tv);
             link_type tv to_unify;
-            tv
+            (tv, jkind)
     in
     let ty_ex = List.map copy_existential cstr.cstr_existentials in
     let ty_res = copy copy_scope cstr.cstr_res in
@@ -3259,10 +3264,6 @@ let check_type_externality env ty ext =
   | Ok () -> true
   | Error _ -> false
 
-let is_always_gc_ignorable env ty =
-  check_type_externality
-    env ty (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-
 let check_type_nullability env ty null =
   let upper_bound =
     Jkind.set_root_nullability (Jkind.Builtin.any ~why:Dummy_jkind) null
@@ -3271,13 +3272,28 @@ let check_type_nullability env ty null =
   | Ok () -> true
   | Error _ -> false
 
-let check_type_separability env ty sep =
-  let upper_bound =
-    Jkind.set_root_separability (Jkind.Builtin.any ~why:Dummy_jkind) sep
-  in
+let check_type_separability jkind env ty sep =
+  let upper_bound = Jkind.set_root_separability jkind sep in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
   | Error _ -> false
+
+let is_always_gc_ignorable env ty =
+  (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
+  check_type_externality env ty
+    (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
+  ||
+  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
+     whenever [ty]'s layout is not scannable, the check will be [false]. *)
+  (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
+     a type of kind [value non_pointer & value non_pointer] will fail to be
+     recognized as being always_gc_ignorable, even though it is. To avoid this,
+     [non_pointer(64)] should imply [external(64)]. *)
+  check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty
+      (Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ())
+
+let check_type_separability env ty sep =
+  check_type_separability (Jkind.Builtin.any ~why:Dummy_jkind) env ty sep
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with
@@ -4196,18 +4212,20 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     else
       match decl.type_kind, decl'.type_kind with
       | Type_record (lst,r,umc), Type_record (lst',r',umc')
-        when equal_record_representation r r' ->
+        when equal_record_representation_up_to_scannable_axes r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_record_unboxed_product (lst,r,umc),
         Type_record_unboxed_product (lst',r',umc')
-        when equal_record_unboxed_product_representation r r' ->
+        when
+          equal_record_unboxed_product_representation_up_to_scannable_axes r r'
+        ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_variant (v1,r,umc), Type_variant (v2,r',umc')
-        when equal_variant_representation r r' ->
+        when equal_variant_representation_up_to_scannable_axes r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_variant_description type_pairs env v1 v2;
           mcomp_unsafe_mode_crossing type_pairs env umc umc'

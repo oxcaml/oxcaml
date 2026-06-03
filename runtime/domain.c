@@ -1915,23 +1915,6 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
-/* Request that a preemption occur at the next possible time.
- *
- * XXX aspsmith: This function will almost definitely not last long - it's here
- * basically entirely to test preemption while it's under active development.
- * Importantly, eventually the "thing" that gets preempted will be a fiber, not
- * a domain
- */
-CAMLprim value caml_domain_preempt_self(value unit) {
-  CAMLnoalloc;
-  if (Caml_state->preemption != Val_unit) {
-    return Val_unit;
-  }
-  Caml_state->preemption = Val_long(1);
-  caml_interrupt_self();
-  return Val_unit;
-}
-
 /* If a preemption is pending, allocate a 3-word continuation for the preemption
    and store it in Caml_state->preemption
 
@@ -2298,11 +2281,24 @@ static void tick_thread_wake(void) {}
 
 #endif
 
-void caml_process_tick(void)
+value caml_process_tick_exn(void)
 {
-  if (atomic_exchange(&Caml_state->requested_tick, false)) {
+  CAMLparam0();
+  CAMLlocal1(res);
+  if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
+                               memory_order_acquire)) {
     caml_domain_tick_hook();
+
+    res = caml_tick_fiber_exn(Caml_state->current_stack);
+    if (Is_exception_result(res)) {
+      CAMLreturn(res);
+    }
+
+    if (res == Val_true) {
+      Caml_state->preemption = Val_long(1);
+    }
   }
+  CAMLreturn(Val_unit);
 }
 
 CAMLextern void caml_stop_tick_thread(void)

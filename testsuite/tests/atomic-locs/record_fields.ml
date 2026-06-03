@@ -55,7 +55,13 @@ module Basic = struct
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Basic/332"
+||||||| e8480d569a
+(apply (field_imm 1 (global Toploop!)) "Basic/328"
+=======
+(apply (field_imm 1 (global Toploop!)) "Basic/326"
+>>>>>>> 5bddb2acb0
   (let
     (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
      get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
@@ -190,7 +196,13 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Ok/367" (makeblock 0))
+||||||| e8480d569a
+(apply (field_imm 1 (global Toploop!)) "Ok/363" (makeblock 0))
+=======
+(apply (field_imm 1 (global Toploop!)) "Ok/356" (makeblock 0))
+>>>>>>> 5bddb2acb0
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -204,7 +216,13 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Inline_record/375"
+||||||| e8480d569a
+(apply (field_imm 1 (global Toploop!)) "Inline_record/371"
+=======
+(apply (field_imm 1 (global Toploop!)) "Inline_record/364"
+>>>>>>> 5bddb2acb0
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
@@ -226,7 +244,13 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/383"
+||||||| e8480d569a
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/379"
+=======
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/372"
+>>>>>>> 5bddb2acb0
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -259,11 +283,25 @@ end
 Line 3, characters 2-53:
 3 |   type t = { x : float; mutable y : float [@atomic] }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Warning 214 [atomic-float-record-boxed]: This record contains atomic float fields,
   which prevents the float record optimization.
   The fields of this record will be boxed instead of being
   represented as a flat float array.
 (apply (field_imm 1 (global Toploop!)) "Float_records/409"
+||||||| e8480d569a
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
+(apply (field_imm 1 (global Toploop!)) "Float_records/405"
+=======
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
+(apply (field_imm 1 (global Toploop!)) "Float_records/396"
+>>>>>>> 5bddb2acb0
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -480,10 +518,22 @@ end
 Line 5, characters 14-19:
 5 |   let warning { x } = x
                   ^^^^^
+<<<<<<< HEAD
 Warning 9 [missing-record-field-pattern]: the following labels are not bound
   in this record pattern: "y".
   Either bind these labels explicitly or add "; _" to the pattern.
 (apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/492"
+||||||| e8480d569a
+Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
+y
+Either bind these labels explicitly or add '; _' to the pattern.
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/488"
+=======
+Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
+y
+Either bind these labels explicitly or add '; _' to the pattern.
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/459"
+>>>>>>> 5bddb2acb0
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
      allowed = (function {nlocal = 0} param : int (field_int 0 param))

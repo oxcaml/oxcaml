@@ -762,49 +762,59 @@ and meet_array_type env (element_kind1, length1, contents1, alloc_mode1)
 and meet_array_contents env (array_contents1 : TG.array_contents Or_unknown.t)
     (array_contents2 : TG.array_contents Or_unknown.t)
     ~(meet_element_kind : _ Or_unknown_or_bottom.t) =
-  meet_unknown
-    (fun env (array_contents1 : TG.array_contents)
-         (array_contents2 : TG.array_contents) : TG.array_contents meet_result
-       ->
-      match array_contents1, array_contents2 with
-      | Mutable, Mutable -> Ok (Both_inputs, env)
-      | Mutable, Immutable _ | Immutable _, Mutable -> Bottom (New_result ())
-      | Immutable { fields = fields1 }, Immutable { fields = fields2 } -> (
-        if Array.length fields1 <> Array.length fields2
-        then Bottom (New_result ())
-        else
-          match meet_element_kind with
-          | Bottom ->
-            if Array.length fields1 = 0
-            then
-              (* Both empty arrays. Returning [Both_inputs] would be correct but
-                 may not propagate the Bottom element kind as far as we can.
-                 Using a New_result might lead us to extra work is one or both
-                 of the inputs already have Bottom kind. We choose the
-                 New_result solution because it's a case that is unlikely to
-                 happen, so the extra cost is likely very small (while losing
-                 precision might be noticeable). *)
-              Ok (New_result (Immutable { fields = [||] }), env)
-            else Bottom (New_result ())
-          | Unknown ->
-            (* vlaviron: If the meet of the kinds is Unknown, then both inputs
-               had Unknown kinds. I don't see how we could end up with an array
-               type where the contents are known but we don't know the kind, but
-               in that case we wouldn't be able to call meet because the two
-               sides may have different kinds. So we'll just return the first
-               input, which is guaranteed to be a correct approximation of the
-               meet. *)
-            Ok (Left_input, env)
-          | Ok _ ->
+  let contents_is_bottom (array_contents : TG.array_contents) =
+    match array_contents with
+    | Mutable -> false
+    | Immutable { fields } -> Array.exists TG.is_obviously_bottom fields
+  in
+  match meet_element_kind with
+  | Unknown ->
+    (* If the meet of the kinds is Unknown, then both inputs had Unknown kinds.
+       This is the case for arrays of unboxed products, which are not handled by
+       the types yet. In this case, we can't compute the meet of the array
+       contents because the two sides may have different kinds, so we'll just
+       arbitrarily return one of the inputs. *)
+    meet_unknown
+      (fun env (array_contents1 : TG.array_contents)
+           (array_contents2 : TG.array_contents) ->
+        match array_contents1, array_contents2 with
+        | Mutable, Mutable | Immutable _, Immutable _ -> Ok (Both_inputs, env)
+        | Mutable, Immutable _ | Immutable _, Mutable -> Bottom (New_result ()))
+      ~contents_is_bottom env array_contents1 array_contents2
+  | Bottom -> (
+    (* If the element kind is bottom, only empty (mutable or immutable) arrays
+       are allowed; in all other cases, the situation is impossible. We can't
+       call [meet_unknown] because it would return [Left_input] or [Right_input]
+       if one side is [Unknown] and the other is [Immutable], and we would end
+       up with non-empty arrays of bottom kind. *)
+    match array_contents1, array_contents2 with
+    | Unknown, Unknown
+    | Known Mutable, Known Mutable
+    | Known (Immutable { fields = [||] }), Known (Immutable { fields = [||] })
+      ->
+      Ok (Both_inputs, env)
+    | Unknown, Known (Mutable | Immutable { fields = [||] }) ->
+      Ok (Right_input, env)
+    | Known (Mutable | Immutable { fields = [||] }), Unknown ->
+      Ok (Left_input, env)
+    | _, Known (Immutable _) | Known (Immutable _), _ -> Bottom (New_result ()))
+  | Ok _ ->
+    meet_unknown
+      (fun env (array_contents1 : TG.array_contents)
+           (array_contents2 : TG.array_contents) : TG.array_contents meet_result
+         ->
+        match array_contents1, array_contents2 with
+        | Mutable, Mutable -> Ok (Both_inputs, env)
+        | Mutable, Immutable _ | Immutable _, Mutable -> Bottom (New_result ())
+        | Immutable { fields = fields1 }, Immutable { fields = fields2 } ->
+          if Array.length fields1 <> Array.length fields2
+          then Bottom (New_result ())
+          else
             map_result
               ~f:(fun fields : TG.array_contents -> Immutable { fields })
               (meet_array_of_types env fields1 fields2
-                 ~length:(Array.length fields1))))
-    ~contents_is_bottom:(fun (array_contents : TG.array_contents) ->
-      match array_contents with
-      | Mutable -> false
-      | Immutable { fields } -> Array.exists TG.is_obviously_bottom fields)
-    env array_contents1 array_contents2
+                 ~length:(Array.length fields1)))
+      ~contents_is_bottom env array_contents1 array_contents2
 
 and meet_relation env var1 var2 =
   match var1, var2 with

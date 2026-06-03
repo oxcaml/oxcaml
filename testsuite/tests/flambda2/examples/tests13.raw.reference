@@ -19,10 +19,10 @@ let $camlTests13__first_const = Block 0 () in
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
+   let i = %project_value_slot.[`fn[tests13.ml:27,2--118]`].[i] (my_closure)
+   in
    let map_foo =
      %project_value_slot.[`fn[tests13.ml:27,2--118]`].[map_foo] (my_closure)
-   in
-   let i = %project_value_slot.[`fn[tests13.ml:27,2--118]`].[i] (my_closure)
    in
    let j = %int_barith.add (i, 3) in
    let Popaque = %opaque (j) in

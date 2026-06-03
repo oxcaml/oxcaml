@@ -409,7 +409,8 @@ caml_result caml_do_pending_actions_flags_res(int flags)
      this after all other possibly exception-returning actions, we do not need
      to set the action pending flag in case a context switch happens: all
      actions have been processed at this point. */
-  caml_process_tick();
+  exn = caml_process_tick_exn();
+  check_async_exn(exn, "tick handler");
 
   /* Check for a pending preemption
 

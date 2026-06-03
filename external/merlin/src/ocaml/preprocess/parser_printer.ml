@@ -24,7 +24,6 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_WHEN) -> "when"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_VIRTUAL) -> "virtual"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_VAL) -> "val"
-  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_UNIQUE) -> "unique"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_UNDERSCORE) -> "_"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_UIDENT) -> "UIDENT"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_TYPE) -> "type"
@@ -61,7 +60,6 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_OR) -> "or"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_OPTLABEL) -> "?<label>"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_OPEN) -> "open"
-  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_ONCE) -> "once"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_OF) -> "of"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_OBJECT) -> "object"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_NONREC) -> "nonrec"
@@ -460,7 +458,6 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_WHEN -> (fun _ -> "when")
   | MenhirInterpreter.T MenhirInterpreter.T_VIRTUAL -> (fun _ -> "virtual")
   | MenhirInterpreter.T MenhirInterpreter.T_VAL -> (fun _ -> "val")
-  | MenhirInterpreter.T MenhirInterpreter.T_UNIQUE -> (fun _ -> "unique")
   | MenhirInterpreter.T MenhirInterpreter.T_UNDERSCORE -> (fun _ -> "_")
   | MenhirInterpreter.T MenhirInterpreter.T_UIDENT -> (Printf.sprintf "UIDENT(%S)")
   | MenhirInterpreter.T MenhirInterpreter.T_TYPE -> (fun _ -> "type")
@@ -497,7 +494,6 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_OR -> (fun _ -> "or")
   | MenhirInterpreter.T MenhirInterpreter.T_OPTLABEL -> (Printf.sprintf "OPTLABEL(%S)")
   | MenhirInterpreter.T MenhirInterpreter.T_OPEN -> (fun _ -> "open")
-  | MenhirInterpreter.T MenhirInterpreter.T_ONCE -> (fun _ -> "once")
   | MenhirInterpreter.T MenhirInterpreter.T_OF -> (fun _ -> "of")
   | MenhirInterpreter.T MenhirInterpreter.T_OBJECT -> (fun _ -> "object")
   | MenhirInterpreter.T MenhirInterpreter.T_NONREC -> (fun _ -> "nonrec")
@@ -895,7 +891,6 @@ let print_token = function
   | WHEN -> print_value (MenhirInterpreter.T MenhirInterpreter.T_WHEN) ()
   | VIRTUAL -> print_value (MenhirInterpreter.T MenhirInterpreter.T_VIRTUAL) ()
   | VAL -> print_value (MenhirInterpreter.T MenhirInterpreter.T_VAL) ()
-  | UNIQUE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_UNIQUE) ()
   | UNDERSCORE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_UNDERSCORE) ()
   | UIDENT v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_UIDENT) v
   | TYPE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_TYPE) ()
@@ -932,7 +927,6 @@ let print_token = function
   | OR -> print_value (MenhirInterpreter.T MenhirInterpreter.T_OR) ()
   | OPTLABEL v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_OPTLABEL) v
   | OPEN -> print_value (MenhirInterpreter.T MenhirInterpreter.T_OPEN) ()
-  | ONCE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_ONCE) ()
   | OF -> print_value (MenhirInterpreter.T MenhirInterpreter.T_OF) ()
   | OBJECT -> print_value (MenhirInterpreter.T MenhirInterpreter.T_OBJECT) ()
   | NONREC -> print_value (MenhirInterpreter.T MenhirInterpreter.T_NONREC) ()
@@ -1055,7 +1049,6 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_WHEN -> WHEN
   | MenhirInterpreter.T_VIRTUAL -> VIRTUAL
   | MenhirInterpreter.T_VAL -> VAL
-  | MenhirInterpreter.T_UNIQUE -> UNIQUE
   | MenhirInterpreter.T_UNDERSCORE -> UNDERSCORE
   | MenhirInterpreter.T_UIDENT -> UIDENT v
   | MenhirInterpreter.T_TYPE -> TYPE
@@ -1092,7 +1085,6 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_OR -> OR
   | MenhirInterpreter.T_OPTLABEL -> OPTLABEL v
   | MenhirInterpreter.T_OPEN -> OPEN
-  | MenhirInterpreter.T_ONCE -> ONCE
   | MenhirInterpreter.T_OF -> OF
   | MenhirInterpreter.T_OBJECT -> OBJECT
   | MenhirInterpreter.T_NONREC -> NONREC

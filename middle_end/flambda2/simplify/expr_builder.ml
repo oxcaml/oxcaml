@@ -307,7 +307,6 @@ let remove_unused_value_slots uacc static_const =
           (Set_of_closures.value_slots set_of_closures)
       in
       Set_of_closures.create ~value_slots
-        (Set_of_closures.alloc_mode set_of_closures)
         (Set_of_closures.function_decls set_of_closures))
 
 let create_let_symbols uacc lifted_constant ~body =
