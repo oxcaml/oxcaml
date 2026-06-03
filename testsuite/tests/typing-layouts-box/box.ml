@@ -1152,16 +1152,24 @@ let id (x : t#) = (x :> int)
 val id : t# -> int = <fun>
 |}]
 
-(* Test 38: Unboxing through multiple definitions *)
+(* Test 38: Unboxing through abbreviations *)
 
-type 'c s = 'c box
-type ('a, 'b) t = ('a * 'b) s
+type 'x id = 'x
+
+type 'x s1 = 'x id box
+type 'x s2 = 'x s1 box
+[%%expect{|
+type 'x id = 'x
+type 'x s1 = 'x id box
+type 'x s2 = 'x s1 box
+|}]
+
+type ('a, 'b) t = ('a * 'b) s1
 type ('a, 'b) t' = ('a, 'b) t#
 
 let id (x : (int, string) t') : int * string = x
 [%%expect{|
-type 'c s = 'c box
-type ('a, 'b) t = ('a * 'b) s
+type ('a, 'b) t = ('a * 'b) s1
 type ('a, 'b) t' = ('a, 'b) t#
 val id : (int, string) t' -> int * string = <fun>
 |}]
@@ -1172,6 +1180,31 @@ Line 1, characters 29-32:
 1 | type ('a, 'b) t'' = ('a, 'b) t'#
                                  ^^^
 Error: The type "t'" has no unboxed version.
+|}]
+
+type ('a, 'b) t = ('a * 'b) s2
+type ('a, 'b) t' = ('a, 'b) t#
+type ('a, 'b) t'' = ('a, 'b) t'#
+
+let id (x : (int, string) t'') : int * string = x
+[%%expect{|
+type ('a, 'b) t = ('a * 'b) s2
+type ('a, 'b) t' = ('a, 'b) t#
+type ('a, 'b) t'' = ('a, 'b) t'#
+val id : (int, string) t'' -> int * string = <fun>
+|}]
+
+type ('a, 'b) t'' = ('a, 'b) t'#
+[%%expect{|
+type ('a, 'b) t'' = ('a, 'b) t'#
+|}]
+
+type ('a, 'b) t'' = ('a, 'b) t''#
+[%%expect{|
+Line 1, characters 0-33:
+1 | type ('a, 'b) t'' = ('a, 'b) t''#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type "t''" has no unboxed version.
 |}]
 
 (* Test 38: Unboxing through tuple type abbreviation *)
