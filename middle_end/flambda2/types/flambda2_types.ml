@@ -16,18 +16,18 @@
 
 module Typing_env = struct
   include Typing_env
-  open Meet_env
+  module ME = Meet_env
 
   let add_equation t name ty =
-    add_equation t name ty ~meet_expanded_head:(Meet.meet_expanded_head ())
+    ME.add_equation t name ty ~meet_expanded_head:(Meet.meet_expanded_head ())
 
   let add_equation_on_simple t simple ty =
-    add_equation_on_simple t simple ty
+    ME.add_equation_on_simple t simple ty
       ~meet_expanded_head:(Meet.meet_expanded_head ())
 
   let add_is_null_relation t name ~scrutinee =
     let machine_width = machine_width t in
-    use_meet_env t ~f:(fun t ->
+    ME.use_meet_env t ~f:(fun t ->
         let t =
           add_equation t name (Type_grammar.is_null ~machine_width ~scrutinee)
         in
@@ -44,7 +44,7 @@ module Typing_env = struct
 
   let add_is_int_relation t name ~scrutinee =
     let machine_width = machine_width t in
-    use_meet_env t ~f:(fun t ->
+    ME.use_meet_env t ~f:(fun t ->
         let t =
           add_equation t name
             (Type_grammar.is_int_for_scrutinee ~machine_width ~scrutinee)
@@ -66,7 +66,7 @@ module Typing_env = struct
             add_equation_on_simple t scrutinee scrutinee_ty))
 
   let add_get_tag_relation t name ~scrutinee =
-    use_meet_env t ~f:(fun t ->
+    ME.use_meet_env t ~f:(fun t ->
         let t =
           add_equation t name (Type_grammar.get_tag_for_block ~block:scrutinee)
         in
@@ -90,21 +90,21 @@ module Typing_env = struct
             add_equation_on_simple t scrutinee scrutinee_ty))
 
   let add_equation t name ty =
-    use_meet_env t ~f:(fun t -> add_equation t name ty)
+    ME.use_meet_env t ~f:(fun t -> add_equation t name ty)
 
   let add_equations_on_params t ~params ~param_types =
-    use_meet_env t ~f:(fun t ->
-        add_equations_on_params t ~params ~param_types
+    ME.use_meet_env t ~f:(fun t ->
+        ME.add_equations_on_params t ~params ~param_types
           ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   let add_env_extension t extension =
-    use_meet_env t ~f:(fun t ->
-        add_env_extension t extension
+    ME.use_meet_env t ~f:(fun t ->
+        ME.add_env_extension t extension
           ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   let add_env_extension_with_extra_variables t extension =
-    use_meet_env t ~f:(fun t ->
-        add_env_extension_with_extra_variables t extension
+    ME.use_meet_env t ~f:(fun t ->
+        ME.add_env_extension_with_extra_variables t extension
           ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   module Alias_set = Aliases.Alias_set

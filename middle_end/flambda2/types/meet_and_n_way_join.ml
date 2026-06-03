@@ -1045,106 +1045,6 @@ let meet_inverse_relations inverse_relations1 inverse_relations2 =
       right_inputs_only = !right_inputs_only
     }
 
-let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
-  (* Kind mismatches should have been caught (either turned into Invalid or a
-     fatal error) before we get here. *)
-  if not (K.equal (TG.kind t1) (TG.kind t2))
-  then
-    Misc.fatal_errorf "Kind mismatch upon meet:@ %a@ versus@ %a" TG.print t1
-      TG.print t2;
-  let kind = TG.kind t1 in
-  let simple1 =
-    match
-      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t1
-        ~min_name_mode:Name_mode.in_types
-    with
-    | exception Not_found -> None
-    | canonical_simple -> Some canonical_simple
-  in
-  let simple2 =
-    match
-      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t2
-        ~min_name_mode:Name_mode.in_types
-    with
-    | exception Not_found -> None
-    | canonical_simple -> Some canonical_simple
-  in
-  match simple1 with
-  | None -> (
-    let expanded1 =
-      Expand_head.expand_head0 (ME.typing_env env) t1
-        ~known_canonical_simple_at_in_types_mode:simple1
-    in
-    match simple2 with
-    | None ->
-      let expanded2 =
-        Expand_head.expand_head0 (ME.typing_env env) t2
-          ~known_canonical_simple_at_in_types_mode:simple2
-      in
-      map_result ~f:ET.to_type (meet_expanded_head env expanded1 expanded2)
-    | Some simple2 -> (
-      (* Here we are meeting a non-alias type on the left with an alias on the
-         right. In all cases, the return type is the alias, so we will always
-         return [Right_input]; the interesting part will be the environment.
-
-         [add_equation] will meet [expanded1] with the existing type of
-         [simple2]. *)
-      let env : unit meet_result =
-        add_equation simple2 (ET.to_type expanded1) env ~meet_type
-      in
-      match env with
-      | Ok (_, env) -> Ok (Right_input, env)
-      | Bottom r -> Bottom r))
-  | Some simple1 -> (
-    match simple2 with
-    | None -> (
-      let expanded2 =
-        Expand_head.expand_head0 (ME.typing_env env) t2
-          ~known_canonical_simple_at_in_types_mode:simple2
-      in
-      (* We always return [Left_input] (see comment above) *)
-      let env : unit meet_result =
-        add_equation simple1 (ET.to_type expanded2) env ~meet_type
-      in
-      match env with
-      | Ok (_, env) -> Ok (Left_input, env)
-      | Bottom r -> Bottom r)
-    | Some simple2 -> (
-      if
-        (* We are doing a meet between two alias types. Whatever happens, the
-           resulting environment will contain an alias equation between the two
-           inputs, so both the left-hand alias and the right-hand alias are
-           correct results for the meet, allowing us to return [Both_inputs] in
-           all cases. *)
-        Simple.equal simple1 simple2
-      then
-        (* The alias is already present; no need to add any equation here *)
-        Ok (Both_inputs, env)
-      else
-        let env =
-          Simple.pattern_match simple2
-            ~name:(fun _ ~coercion:_ ->
-              add_equation simple2
-                (TG.alias_type_of kind simple1)
-                env ~meet_type)
-            ~const:(fun const2 ->
-              Simple.pattern_match simple1
-                ~name:(fun _ ~coercion:_ ->
-                  add_equation simple1
-                    (TG.alias_type_of kind simple2)
-                    env ~meet_type)
-                ~const:(fun const1 : unit meet_result ->
-                  if Reg_width_const.equal const1 const2
-                  then Ok (New_result (), env)
-                  else Bottom (New_result ())))
-        in
-        (* [add_equation] will have called [meet] on the underlying types, so
-           [env] now contains all extra equations arising from meeting the
-           expanded heads. *)
-        match env with
-        | Ok (_, env) -> Ok (Both_inputs, env)
-        | Bottom r -> Bottom r))
-
 let rec meet env t1 t2 = ME.meet_type env t1 t2 ~meet_expanded_head
 
 and meet_or_unknown_or_bottom : type a b.
@@ -1603,9 +1503,11 @@ and reduce_inverse_relations env naked_immediates inverse_relations :
           Name.Set.fold
             (fun name env ->
               let add_equation ty =
-                match add_equation (Simple.name name) ty env ~meet_type with
-                | Ok (_, env) -> env
-                | Bottom _ -> raise Bottom_result
+                match
+                  ME.add_equation_strict env name ty ~meet_expanded_head
+                with
+                | Ok env -> env
+                | Bottom -> raise Bottom_result
               in
               match TG.Relation.descr relation with
               | Is_null -> (
