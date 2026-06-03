@@ -591,7 +591,12 @@ let array_vec_primitives =
   |> List.to_seq
   |> String.Map.of_seq
 
-let lookup_primitive loc ~poly_mode ~poly_sort pos p =
+(* Resolve a primitive according to its name. The return value is unspecialized
+   in the sense that the array kind in the various primitives that deal with
+   arrays is set to [Punspecializedarray{,_ref,set}]. The caller is meant to
+   then specialize the array kind based on the context.
+*)
+let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   let runtime5 = Config.runtime5 in
   let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
@@ -1260,11 +1265,6 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   in
   prim
 
-let lookup_primitive_and_mark_used loc ~poly_mode ~poly_sort pos p env path =
-  match lookup_primitive loc ~poly_mode ~poly_sort pos p with
-  | External _ as e -> add_used_primitive loc env path; e
-  | x -> x
-
 let simplify_constant_constructor = function
   | Equal -> true
   | Not_equal -> true
@@ -1646,8 +1646,9 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
 let should_specialize_primitive p =
   match p.prim_name with
   | "%obj_size" | "%obj_field" | "%obj_set_field" ->
-    (* The obj primitives re-use the array primitives (see [lookup_primitive]),
-       but we shouldn't specialize their array kinds.
+    (* The obj primitives re-use the array primitives (see
+       [lookup_primitive_unspecialized]), but we shouldn't specialize
+       their array kinds.
        CR layouts v4: we should just make separate object primitives. *)
     false
   | _ ->
@@ -2340,7 +2341,8 @@ let check_primitive_arity loc p =
      to lie here. *)
   let sort = Some (Jkind.Sort.of_base Scannable) in
   let prim =
-    lookup_primitive loc ~poly_mode:mode ~poly_sort:sort Rc_normal p
+    lookup_primitive_unspecialized loc
+      ~poly_mode:mode ~poly_sort:sort Rc_normal p
   in
   let ok =
     match prim with
@@ -2364,19 +2366,34 @@ let check_primitive_arity loc p =
 
 (* Eta-expand a primitive *)
 
+let transl_primitive_common loc ~poly_mode ~poly_sort
+      pos p env ty path arg_exps =
+  let prim =
+    let loc = to_location loc in
+    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
+    | External _ as e -> add_used_primitive loc env path; e
+    | x -> x
+  in
+  let has_constant_constructor =
+    match arg_exps with
+    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+        cstr_constant
+    | [_; {exp_desc = Texp_variant(_, None)}]
+    | [{exp_desc = Texp_variant(_, None)}; _] -> true
+    | _ -> false
+  in
+  if should_specialize_primitive p then
+    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    | None -> prim
+    | Some prim -> prim
+  else
+    prim
+
 let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   let prim =
-    lookup_primitive_and_mark_used
-      (to_location loc) ~poly_mode ~poly_sort Rc_normal p env path
-  in
-  let has_constant_constructor = false in
-  let prim =
-    if should_specialize_primitive p then
-      match specialize_primitive env loc ty ~has_constant_constructor prim with
-      | None -> prim
-      | Some prim -> prim
-    else
-      prim
+    transl_primitive_common loc
+      ~poly_mode ~poly_sort Rc_normal p env ty path []
   in
   let to_locality = to_locality ~poly:poly_mode in
   let error_loc = to_location loc in
@@ -2599,25 +2616,8 @@ let primitive_needs_event_after = function
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =
   let prim =
-    lookup_primitive_and_mark_used
-      (to_location loc) ~poly_mode ~poly_sort pos p env (Some path)
-  in
-  let has_constant_constructor =
-    match arg_exps with
-    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
-    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
-        cstr_constant
-    | [_; {exp_desc = Texp_variant(_, None)}]
-    | [{exp_desc = Texp_variant(_, None)}; _] -> true
-    | _ -> false
-  in
-  let prim =
-    if should_specialize_primitive p then
-      match specialize_primitive env loc ty ~has_constant_constructor prim with
-      | None -> prim
-      | Some prim -> prim
-    else
-      prim
+    transl_primitive_common
+      loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
   in
   if stack then begin
     match prim with
