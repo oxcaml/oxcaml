@@ -1,10 +1,6 @@
 (* TEST
- {
-   expect;
- }{
-   flags = "-extension layouts_beta";
-   expect;
- }
+ flags = "-extension layouts_beta";
+ expect;
 *)
 
 (* Tests for jkinds in algebraic datatypes *)
@@ -35,31 +31,16 @@ type t_void : void
 
 type t2_any1 = T2_any1 of t_any
 [%%expect {|
-Line 1, characters 0-31:
-1 | type t2_any1 = T2_any1 of t_any
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t2_any1 = T2_any1 of t_any
 |}];;
 
 type t2_any2 = T2_any2 of t_immediate * t_any
 [%%expect {|
-Line 1, characters 0-45:
-1 | type t2_any2 = T2_any2 of t_immediate * t_any
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t2_any2 = T2_any2 of t_immediate * t_any
 |}];;
 
 type t2_any3 = T2_any3 of t_any * t_value
 [%%expect {|
-Line 1, characters 0-41:
-1 | type t2_any3 = T2_any3 of t_any * t_value
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t2_any3 = T2_any3 of t_any * t_value
 |}];;
 
@@ -87,61 +68,31 @@ Error:
 
 type t4_any1 = { x : t_any }
 [%%expect {|
-Line 1, characters 0-28:
-1 | type t4_any1 = { x : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_any1 = { x : t_any; }
 |}];;
 
 type t4_any2 = { x : t_immediate; y : t_any }
 [%%expect {|
-Line 1, characters 0-45:
-1 | type t4_any2 = { x : t_immediate; y : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_any2 = { x : t_immediate; y : t_any; }
 |}];;
 
 type t4_any3 =  { x : t_any; y : t_value }
 [%%expect {|
-Line 1, characters 0-42:
-1 | type t4_any3 =  { x : t_any; y : t_value }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_any3 = { x : t_any; y : t_value; }
 |}];;
 
 type t4_cany1 = C of { x : t_any }
 [%%expect {|
-Line 1, characters 0-34:
-1 | type t4_cany1 = C of { x : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_cany1 = C of { x : t_any; }
 |}];;
 
 type t4_cany2 = C of { x : t_immediate; y : t_any }
 [%%expect {|
-Line 1, characters 0-51:
-1 | type t4_cany2 = C of { x : t_immediate; y : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_cany2 = C of { x : t_immediate; y : t_any; }
 |}];;
 
 type t4_cany3 = C of { x : t_any; y : t_value }
 [%%expect {|
-Line 1, characters 0-47:
-1 | type t4_cany3 = C of { x : t_any; y : t_value }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_cany3 = C of { x : t_any; y : t_value; }
 |}];;
 
@@ -151,61 +102,31 @@ type t4_cany3 = C of { x : t_any; y : t_value; }
 (* CR layouts v5: void parts of this test from datatypes_alpha. *)
 type t4_any1 = { x : t_any }
 [%%expect {|
-Line 1, characters 0-28:
-1 | type t4_any1 = { x : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_any1 = { x : t_any; }
 |}];;
 
 type t4_any2 = { x : t_immediate; y : t_any }
 [%%expect {|
-Line 1, characters 0-45:
-1 | type t4_any2 = { x : t_immediate; y : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_any2 = { x : t_immediate; y : t_any; }
 |}];;
 
 type t4_any3 =  { x : t_any; y : t_value }
 [%%expect {|
-Line 1, characters 0-42:
-1 | type t4_any3 =  { x : t_any; y : t_value }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_any3 = { x : t_any; y : t_value; }
 |}];;
 
 type t4_cany1 = C of { x : t_any }
 [%%expect {|
-Line 1, characters 0-34:
-1 | type t4_cany1 = C of { x : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_cany1 = C of { x : t_any; }
 |}];;
 
 type t4_cany2 = C of { x : t_immediate; y : t_any }
 [%%expect {|
-Line 1, characters 0-51:
-1 | type t4_cany2 = C of { x : t_immediate; y : t_any }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_cany2 = C of { x : t_immediate; y : t_any; }
 |}];;
 
 type t4_cany3 = C of { x : t_any; y : t_value }
 [%%expect {|
-Line 1, characters 0-47:
-1 | type t4_cany3 = C of { x : t_any; y : t_value }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t4_cany3 = C of { x : t_any; y : t_value; }
 |}];;
 

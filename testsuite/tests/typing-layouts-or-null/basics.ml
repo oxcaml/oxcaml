@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension comprehensions";
+ flags += "-extension comprehensions -extension layouts_beta";
  expect;
 *)
 
@@ -36,11 +36,6 @@ Error: This pattern matches values of type "t_any_mod_separable"
 type t = { x : t_any_mod_separable }
 
 [%%expect{|
-Line 1, characters 0-36:
-1 | type t = { x : t_any_mod_separable }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t = { x : t_any_mod_separable; }
 |}]
 

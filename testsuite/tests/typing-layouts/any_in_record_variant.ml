@@ -5,11 +5,6 @@
 
 type ('a : any, 'b : any) t = Nope | Yeah of { fst : 'a; snd : 'b }
 [%%expect{|
-Line 1, characters 0-67:
-1 | type ('a : any, 'b : any) t = Nope | Yeah of { fst : 'a; snd : 'b }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any, 'b : any) t = Nope | Yeah of { fst : 'a; snd : 'b; }
 |}]
 
@@ -161,11 +156,6 @@ let test =
   |> box_all
 
 [%%expect {|
-Line 1, characters 0-74:
-1 | type ('a : any) any_list = Nil | Cons of { head : 'a; tail : 'a any_list }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) any_list = Nil | Cons of { head : 'a; tail : 'a any_list; }
 val map_unboxed_pair :
   #('a * 'b) any_list -> f:(#('a * 'b) -> #('c * 'd)) -> #('c * 'd) any_list =

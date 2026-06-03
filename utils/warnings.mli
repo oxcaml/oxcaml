@@ -156,7 +156,6 @@ type t =
   | Use_during_borrowing                    (* 216 *)
   | Useless_lpoly                           (* 217 *)
   | Lpoly_in_letrec                         (* 218 *)
-  | Experimental_variable_representations   (* 219 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

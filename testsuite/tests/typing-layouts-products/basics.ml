@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -935,11 +936,6 @@ module type S_coherence_deep = sig
   type t2 = #{ i : int; t1 : t1 }
 end
 [%%expect{|
-Line 3, characters 2-33:
-3 |   type t2 = #{ i : int; t1 : t1 }
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 module type S_coherence_deep =
   sig type t1 : any type t2 = #{ i : int; t1 : t1; } end
 |}]
@@ -949,11 +945,6 @@ module type S_coherence_deep = sig
   type t2 = { t1 : t1 } [@@unboxed]
 end
 [%%expect{|
-Line 3, characters 2-35:
-3 |   type t2 = { t1 : t1 } [@@unboxed]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 module type S_coherence_deep =
   sig type t1 : any type t2 = { t1 : t1; } [@@unboxed] end
 |}]

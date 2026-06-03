@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -586,11 +587,6 @@ val update_t : t# -> unit = <fun>
 
 type ('a : any) t = { x : int; y : 'a }
 [%%expect{|
-Line 1, characters 0-39:
-1 | type ('a : any) t = { x : int; y : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = { x : int; y : 'a; }
 |}]
 
@@ -656,11 +652,6 @@ type a = B of b
 and b : any = r#
 and r = { i : int ; j : int }
 [%%expect{|
-Line 1, characters 0-15:
-1 | type a = B of b
-    ^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type a = B of b
 and b = r#
 and r = { i : int; j : int; }
@@ -669,11 +660,6 @@ type a = B of b_portable
 and b_portable : any mod portable = r#
 and r = { i : int ; j : int }
 [%%expect{|
-Line 1, characters 0-24:
-1 | type a = B of b_portable
-    ^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type a = B of b_portable
 and b_portable = r#
 and r = { i : int; j : int; }
@@ -682,11 +668,6 @@ type a = B of b
 and b : any & any & any = r#
 and r = { i : int ; j : int }
 [%%expect{|
-Line 1, characters 0-15:
-1 | type a = B of b
-    ^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 Line 2, characters 0-28:
 2 | and b : any & any & any = r#
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

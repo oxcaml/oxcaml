@@ -1,6 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
- flags = "-w -experimental-variable-representations";
+ flags = "-extension layouts_beta";
  {
    native;
  }{

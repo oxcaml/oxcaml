@@ -153,7 +153,6 @@ type t =
   | Use_during_borrowing                    (* 216 *)
   | Useless_lpoly                           (* 217 *)
   | Lpoly_in_letrec                         (* 218 *)
-  | Experimental_variable_representations   (* 219 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -254,7 +253,6 @@ let number = function
   | Use_during_borrowing -> 216
   | Useless_lpoly -> 217
   | Lpoly_in_letrec -> 218
-  | Experimental_variable_representations -> 219
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -677,11 +675,6 @@ let descriptions = [
     names = ["use-during-borrowing"];
     description = "Use of a value during an active borrow.";
     since = since 5 3 };
-  { number = 219;
-    names = ["experimental-variable-representations"];
-    description = "A type uses a variable representation, an experimental \
-                   feature that currently gets fewer optimizations.";
-    since = None };
 ]
 
 let name_to_number =
@@ -1387,9 +1380,6 @@ let message = function
   | Lpoly_in_letrec ->
       "\"poly_\" has no effect in recursive bindings, which do not support \
        layout polymorphism. Consider using a regular \"let rec\" instead."
-  | Experimental_variable_representations ->
-      "This type uses a variable representation, an experimental feature that \
-       currently gets fewer optimizations."
 ;;
 
 let nerrors = ref 0

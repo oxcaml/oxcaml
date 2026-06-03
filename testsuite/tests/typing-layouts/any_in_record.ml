@@ -8,11 +8,6 @@ open Stdlib_stable
 
 type ('a : any) t = { fst : 'a; mutable snd : 'a }
 [%%expect{|
-Line 3, characters 0-50:
-3 | type ('a : any) t = { fst : 'a; mutable snd : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = { fst : 'a; mutable snd : 'a; }
 |}]
 
@@ -253,11 +248,6 @@ type t = { t : a } [@@unboxed]
 let f { t } = t
 [%%expect{|
 type a : any
-Line 2, characters 0-30:
-2 | type t = { t : a } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t = { t : a; } [@@unboxed]
 Line 3, characters 6-11:
 3 | let f { t } = t
@@ -273,11 +263,6 @@ Error: This expression has type "('a : '_representable_layout_1)"
 type ('a : any) t = { t : 'a } [@@unboxed]
 let f { t } = t
 [%%expect{|
-Line 1, characters 0-42:
-1 | type ('a : any) t = { t : 'a } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = { t : 'a; } [@@unboxed]
 val f : 'a t -> 'a = <fun>
 |}]
@@ -289,11 +274,6 @@ val f : 'a t -> 'a = <fun>
 type ('a : any) t = { i : int ; a : 'a }
 let foo t = (.a)
 [%%expect{|
-Line 1, characters 0-40:
-1 | type ('a : any) t = { i : int ; a : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = { i : int; a : 'a; }
 Line 2, characters 14-15:
 2 | let foo t = (.a)
@@ -307,11 +287,6 @@ Error: Cannot access record with unrepresentable field.
 type ('a : any) t = { a : 'a }
 let foo { a } = ()
 [%%expect{|
-Line 1, characters 0-30:
-1 | type ('a : any) t = { a : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = { a : 'a; }
 Line 2, characters 8-13:
 2 | let foo { a } = ()
@@ -326,11 +301,6 @@ Error: Cannot access record with unrepresentable field.
 type ('a : any) r = { t : 'a }
 let f = (.t)
 [%%expect{|
-Line 1, characters 0-30:
-1 | type ('a : any) r = { t : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) r = { t : 'a; }
 Line 2, characters 10-11:
 2 | let f = (.t)
@@ -348,11 +318,6 @@ let f { a } = ()
 [%%expect{|
 kind_ k
 type a : k
-Line 3, characters 0-18:
-3 | type t = { a : a }
-    ^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type t = { a : a; }
 Line 4, characters 6-11:
 4 | let f { a } = ()
@@ -369,11 +334,6 @@ end with type a := float# = struct
   type t = { a : float# }
 end
 [%%expect{|
-Line 3, characters 2-20:
-3 |   type t = { a : a }
-      ^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 Lines 4-6, characters 28-3:
 4 | ............................struct
 5 |   type t = { a : float# }
@@ -400,11 +360,6 @@ end with kind_ k := float64 and type a := float# = struct
 end
 let f c { M.a = a } = if c then a else #0.
 [%%expect{|
-Line 4, characters 2-20:
-4 |   type t = { a : a }
-      ^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 Lines 5-7, characters 51-3:
 5 | ...................................................struct
 6 |   type t = { a : float# }
@@ -430,11 +385,6 @@ end with kind_ k := void and type t := unit# = struct
   type a = A of unit#
 end
 [%%expect{|
-Line 4, characters 2-17:
-4 |   type a = A of t
-      ^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 Lines 5-7, characters 47-3:
 5 | ...............................................struct
 6 |   type a = A of unit#

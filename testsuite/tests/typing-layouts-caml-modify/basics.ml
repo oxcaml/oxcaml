@@ -4,7 +4,6 @@
    not-macos;
    (* Remove layout_beta here when block indices are out of beta *)
    flags = "-extension layouts_beta \
-            -w -experimental-variable-representations \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
    native;

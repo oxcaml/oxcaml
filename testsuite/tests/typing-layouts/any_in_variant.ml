@@ -5,11 +5,6 @@
 
 type ('a : any) t = Nope | Yeah of 'a
 [%%expect{|
-Line 1, characters 0-37:
-1 | type ('a : any) t = Nope | Yeah of 'a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = Nope | Yeah of 'a
 |}]
 
@@ -142,11 +137,6 @@ let test =
   |> box_all
 
 [%%expect {|
-Line 1, characters 0-56:
-1 | type ('a : any) any_list = [] | (::) of 'a * 'a any_list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) any_list = [] | (::) of 'a * 'a any_list
 val map_unboxed_pair :
   #('a * 'b) any_list -> f:(#('a * 'b) -> #('c * 'd)) -> #('c * 'd) any_list =
@@ -184,11 +174,6 @@ end
 
 (* CR rtjoa for lmaurer: tweaked this wording *)
 [%%expect {|
-Line 8, characters 4-23:
-8 |     type t = A of v | B
-        ^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 Lines 12-18, characters 8-5:
 12 | ........struct
 13 |     type v = unit#
@@ -226,6 +211,22 @@ Error: Signature mismatch:
 |}]
 
 
+(* CR-soon rtjoa: This worked before the any-fields PR, because
+   1. In the temporary environment, [pt] gets a jkind made with
+      [product_of_sorts].
+   2. When updating the constructor [A], those sorts are defaulted to [value].
+
+   But after the first version of the any-fields PR,
+   1. In the temporary environment, [pt] gets a jkind made with
+      [product_of_anys].
+   2. When updating the constructor [A], we see those [any] jkinds, and think
+      erroneously that [t]'s representation is variable.
+   3. The struct gets correctly typechecked as havin a fixed representation, and
+      the mismatch gets reported.
+
+   Possible solution: when working with a temp env, don't use the jkind from the
+   decl of [pt] and instead compute the product of the jkinds of its fields
+*)
 module M : sig
   type pt = #{ x : int; y : int }
   and t = A of pt
@@ -248,7 +249,7 @@ end
 module M : sig type pt = #{ x : unit#; y : unit#; } and t = A of pt end
 |}]
 
-(* The contained type may also be the unboxed version of a boxed record. *)
+(* CR-soon rtjoa: this one should also work *)
 module M : sig
   type pt = { x : int; y : int }
   and t = A of pt#

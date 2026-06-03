@@ -8,11 +8,6 @@ open Stdlib_stable
 
 type ('a : any) t = { fst : 'a; mutable snd : 'a }
 [%%expect{|
-Line 3, characters 0-50:
-3 | type ('a : any) t = { fst : 'a; mutable snd : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) t = { fst : 'a; mutable snd : 'a; }
 |}]
 
@@ -161,11 +156,6 @@ type ('a : any) singleton = { singleton : 'a }
 let test_singleton () = #{ singleton = 1 }
 
 [%%expect {|
-Line 1, characters 0-46:
-1 | type ('a : any) singleton = { singleton : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
-
 type ('a : any) singleton = { singleton : 'a; }
 val test_singleton : unit -> int singleton# = <fun>
 |}]
