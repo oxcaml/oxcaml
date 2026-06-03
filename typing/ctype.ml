@@ -2306,31 +2306,29 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev env t |> new_box_ty
   | _ -> raise Cannot_expand
 
-let try_unbox_desc env = function
+let try_unbox_desc_gen env = function
   | Tconstr (p, args, _) ->
-      let has_unboxed_version =
-        not (Path.is_unboxed_version p) &&
-        match Env.find_type p env with
-        | decl -> Option.is_some decl.type_unboxed_version
-        | exception Not_found -> false
-      in
-      if has_unboxed_version then
-        Some (Tconstr(Path.unboxed_version p, args, ref Mnil))
-      else
-        None
-  | Ttuple tys ->
-      Some (Tunboxed_tuple tys)
+    let pu = Path.unboxed_version p in
+    begin match Env.find_type pu env with
+    | _ -> Some (`Desc (Tconstr (pu, args, ref Mnil)))
+    | exception Not_found -> None
+    end
+  | Ttuple tys -> Some (`Desc (Tunboxed_tuple tys))
+  | Tbox ty -> Some (`Expr ty)
   | _ -> None
 
-(* Whether unifying [d1] and [d2] reduces a [box] against a type that has an
-   unboxed version (e.g. [t# box] vs [t], or [#(a * b) box] vs [a * b]).  In
-   that case unification should unbox and recurse rather than reify, so that the
-   resulting equation between the boxed contents is recorded. *)
-let box_reduces_against env d1 d2 =
-  match d1, d2 with
-  | Tbox _, _ -> Option.is_some (try_unbox_desc env d2)
-  | _, Tbox _ -> Option.is_some (try_unbox_desc env d1)
-  | _ -> false
+let is_unboxable_desc env d = Option.is_some (try_unbox_desc_gen env d)
+let is_unboxable_ty env ty = is_unboxable_desc env (get_desc ty)
+
+(* Only valid on types that pass [is_unboxable_desc] *)
+let unbox_desc_exn env d ~level =
+  match try_unbox_desc_gen env d with
+  | None -> invalid_arg "not unboxable"
+  | Some (`Desc d) -> newty2 ~level d
+  | Some (`Expr e) -> e
+
+(* Only valid on types that pass [is_unboxable_ty] *)
+let unbox_ty_exn env ty = unbox_desc_exn env (get_desc ty) ~level:(get_level ty)
 
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
@@ -4222,16 +4220,10 @@ let rec mcomp type_pairs env t1 t2 =
           mcomp type_pairs (incr_stage env) (new_splice_ty t1') s2
         | (_, Tsplice s2, _, _) when target2 ->
           mcomp type_pairs (decr_stage env) (new_quote_ty t1') s2
-        | (Tbox t, Tconstr (p, args, _), _, _)
-        | (Tconstr (p, args, _), Tbox t, _, _) ->
-          begin match Env.find_type p env with
-          | { type_unboxed_version = Some _ } ->
-            mcomp type_pairs env
-              (newconstr (Path.unboxed_version p) args) t
-          | ({ type_unboxed_version = None } as decl)->
-            if is_aliasable p decl then () else raise Incompatible
-          | exception Not_found -> ()
-          end
+        | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
+          mcomp type_pairs env t (unbox_ty_exn env t2')
+        | (_, Tbox t, _, _) when is_unboxable_ty env t1' ->
+          mcomp type_pairs env (unbox_ty_exn env t1') t
         (* Flexible cases *)
         (* - If [flexible1], then [t1'] is now a [Tvar].
            - If [flexible2], then [t2'] is now a [Tvar]. *)
@@ -4279,14 +4271,10 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
-        | (Tbox t1, Tbox t2, _, _) ->
-            mcomp type_pairs env t1 t2
-        | (Tbox t, Ttuple tl, _, _) ->
-            mcomp type_pairs env t
-              (newty2 ~level:(get_level t2') (Tunboxed_tuple tl))
-        | (Ttuple tl, Tbox t, _, _) ->
-            mcomp type_pairs env t
-              (newty2 ~level:(get_level t1') (Tunboxed_tuple tl))
+        | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
+          mcomp type_pairs env t (unbox_ty_exn env t2')
+        | (_, Tbox t, _, _) when is_unboxable_ty env t1' ->
+          mcomp type_pairs env (unbox_ty_exn env t1') t
         | (Tnil, Tnil, _, _) ->
             ()
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
@@ -5059,40 +5047,23 @@ and unify3 uenv t1 t1' t2 t2' =
               || instantiable_scope s2 >= instantiable_scope t1') ->
           unify_with_incr_stage uenv
             (fun uenv -> unify uenv (new_splice_ty t1') s2)
+      | (_, Tbox t2) when is_unboxable_desc (get_env uenv) d1 ->
+          unify
+            uenv (unbox_desc_exn (get_env uenv) ~level:(get_level t1') d1) t2
+      | (Tbox t1, _) when is_unboxable_desc (get_env uenv) d2 ->
+          unify
+            uenv t1 (unbox_desc_exn (get_env uenv) ~level:(get_level t2') d2)
       | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_))
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)
         when in_pattern_mode uenv
-          && (is_equatable_ty t1 || is_equatable_ty t2)
-          && not (box_reduces_against (get_env uenv) d1 d2) ->
+          && (is_equatable_ty t1 || is_equatable_ty t2) ->
           reify uenv t1';
           reify uenv t2';
           if can_generate_equations uenv then (
             mcomp_for Unify (get_env uenv) t1' t2';
             record_equation uenv t1' t2'
           )
-      | (Tbox t1, Tbox t2) ->
-          unify uenv t1 t2
-      | (_, Tbox t2) ->
-          let env = get_env uenv in
-          begin match try_unbox_desc env d1 with
-          | Some d ->
-            let t1 =
-              newty3 ~level:(get_level t1') ~scope:(get_scope t1') d
-            in
-            unify uenv t1 t2
-          | None -> raise_unexplained_for Unify
-          end
-      | (Tbox t1, _) ->
-          let env = get_env uenv in
-          begin match try_unbox_desc env d2 with
-          | Some d ->
-            let t2 =
-              newty3 ~level:(get_level t2') ~scope:(get_scope t2') d
-            in
-            unify uenv t1 t2
-          | None -> raise_unexplained_for Unify
-          end
       | (Tobject (fi1, nm1), Tobject (fi2, _)) ->
           unify_fields uenv fi1 fi2;
           (* Type [t2'] may have been instantiated by [unify_fields] *)
