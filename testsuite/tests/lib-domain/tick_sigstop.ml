@@ -3,7 +3,6 @@
    include unix;
    hasunix;
    not-windows;
-   runtime5;
    flags = "-alert -unsafe_multidomain";
    { native; }
 *)

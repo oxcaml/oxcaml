@@ -2,7 +2,6 @@
    include systhreads;
    hassysthreads;
    multidomain;
-   runtime5;
    { bytecode; }
    { native; }
 *)

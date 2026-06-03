@@ -1,9 +1,10 @@
 (* TEST
  flags += "-alert +unsafe_multidomain";
- runtime5;
  multidomain;
  { bytecode; }
  { native; }
 *)
+(* Blank lines added here to preserve locations. *)
 
 let _ = Domain.spawn (fun () -> ())
+

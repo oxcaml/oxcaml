@@ -2,7 +2,6 @@
  poll-insertion;
  include unix;
  hasunix;
- runtime5;
  multidomain;
  {
    bytecode;

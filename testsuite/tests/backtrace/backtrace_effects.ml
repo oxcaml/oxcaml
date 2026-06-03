@@ -1,11 +1,11 @@
-(* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
+(* TEST
+ flags = "-g";
+ set OCAMLPARAM = "_,"; (* Turn off optimizations so inlining is consistent *)
+ ocamlrunparam += ",b=1";
+ exit_status = "2";
+ { reference="${test_source_directory}/backtrace_effects.byte.reference"; bytecode; }
+ { native; }
 *)
-
 open Effect
 open Effect.Deep
 
@@ -41,17 +41,3 @@ let baz () =
       | _ -> None }
 
 let _ = baz ()
-
-(* TEST
- flags = "-g";
- (* Turn off optimizations so inlining is consistent *)
- set OCAMLPARAM = "_,";
- ocamlrunparam += ",b=1";
- exit_status = "2";
- runtime5;
- {
-  reference="${test_source_directory}/backtrace_effects.byte.reference";
-  bytecode;
- }
- { native; }
-*)

@@ -1,7 +1,6 @@
 (* TEST
    include systhreads;
    hassysthreads;
-   runtime5;
    poll_insertion;
    multidomain;
    flags += "-alert -unsafe_multidomain -alert -do_not_spawn_domains -w -21";

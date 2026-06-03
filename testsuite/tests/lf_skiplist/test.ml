@@ -1,6 +1,5 @@
 (* TEST
  modules = "stubs.c";
- runtime5;
  { bytecode; }
  { native; }
 *)

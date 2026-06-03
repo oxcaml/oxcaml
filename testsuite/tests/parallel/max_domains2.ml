@@ -1,6 +1,5 @@
 (* TEST
  ocamlrunparam += ",d=129";
- runtime5;
  multidomain;
  { native; }
 *)

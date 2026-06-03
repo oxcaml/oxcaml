@@ -1,6 +1,5 @@
 (* TEST
  include systhreads;
- runtime5;
  multidomain;
  { bytecode; }
  { native; }

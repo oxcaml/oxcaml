@@ -1,10 +1,10 @@
-(* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
-
+(* TEST
+ flags = "-g";
+ ocamlrunparam += ",b=1";
+ include systhreads;
+ hassysthreads;
+ { bytecode; }
+ { native; }
 *)
 
 let throw_exn msg = (failwith [@inlined never]) msg [@@inline never]
@@ -38,19 +38,3 @@ let () =
   List.iter Thread.join threads;
   Condition.signal cond;
   Thread.join backtrace_thread
-
-(* TEST
- flags = "-g";
- ocamlrunparam += ",b=1";
- include systhreads;
- hassysthreads;
- {
-   runtime5;
-   reference = "${test_source_directory}/backtrace_systhreads.r5.reference";
-   {
-     bytecode;
-   }{
-     native;
-   }
- }
-*)

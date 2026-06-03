@@ -1,6 +1,5 @@
 (* TEST
  no-tsan; (* TSan detects the intentional data race *)
- runtime5;
  multidomain;
  { bytecode; }
  { native; }

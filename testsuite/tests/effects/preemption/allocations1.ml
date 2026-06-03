@@ -2,7 +2,6 @@
    modules = "preemption_util.ml";
    include unix;
    hasunix;
-   runtime5;
    poll_insertion;
    flags += "-alert -unsafe_multidomain -w -21";
    { native; }

@@ -3,7 +3,6 @@
    include runtime_events;
    include unix;
    arch_amd64;
-   runtime5;
    libunix;
    set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
    { bytecode; }

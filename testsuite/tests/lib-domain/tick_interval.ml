@@ -1,5 +1,4 @@
 (* TEST
-   runtime5;
    flags = "-alert -unsafe_multidomain -alert -do_not_spawn_domains";
    multidomain;
    { native; }

@@ -4,7 +4,6 @@
  include systhreads;
  hassysthreads;
  multidomain;
- runtime5;
  hasunix;
  native;
 *)

@@ -1,7 +1,6 @@
 (* TEST
  modules = "intextaux_par.c";
  no-tsan;
- runtime5;
  multidomain;
  { bytecode; }
  { native; }

@@ -1,6 +1,5 @@
 (* TEST
 {
-   runtime5;
    include unix;
    include runtime_events;
    libunix;

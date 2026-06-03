@@ -1,13 +1,13 @@
-(* TEST_BELOW
+(* TEST
+ flags = "-g";
+ ocamlrunparam += ",b=1";
+ include systhreads;
+ hassysthreads;
+ { bytecode; }
+ { native; }
+*)
 (* Blank lines added here to preserve locations. *)
 
-
-
-
-
-
-
-*)
 
 (* Testing if uncaught exception handlers are behaving properly  *)
 
@@ -40,18 +40,3 @@ let _ =
   let th = Thread.create fn () in
   Thread.join th
 
-(* TEST
- flags = "-g";
- ocamlrunparam += ",b=1";
- include systhreads;
- hassysthreads;
- {
-   runtime5;
-   reference = "${test_source_directory}/uncaught_exception_handler.r5.reference";
-   {
-     bytecode;
-   }{
-     native;
-   }
- }
-*)

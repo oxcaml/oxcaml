@@ -1,6 +1,5 @@
 (* TEST
  include unix;
- runtime5;
  multidomain;
  libunix;
  {
