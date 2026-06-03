@@ -51,20 +51,10 @@ let caml_symbol_prefix = "caml"
    runtime5 *)
 let this_is_ocamlc = ref false
 
-let upstream_runtime5_symbol_separator =
-  match Config.ccomp_type with
-  | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
-  | _ -> '.'
-
 let separator () =
   if !this_is_ocamlc then
     Misc.fatal_error "Didn't expect utils/symbol.ml to be used in ocamlc";
-  (* CR Keryan : There is some hardcoded symbols expecting runtime4
-     separators *)
-  if Config.runtime5 && false then
-    Printf.sprintf "%c" upstream_runtime5_symbol_separator
-  else
-    "__"
+  "__"
 
 let this_is_ocamlc () = this_is_ocamlc := true
 
