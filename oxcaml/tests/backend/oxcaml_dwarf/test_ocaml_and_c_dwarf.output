@@ -78,12 +78,12 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(arg=1, closure=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Sys.(partial) at sys.ml.in:187 [inlined]
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Sys.(partial) at sys.ml.in:239 [inlined]
 === Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_res
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(arg=<unavailable>, closure=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_res(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_res
