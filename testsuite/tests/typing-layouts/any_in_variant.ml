@@ -5,6 +5,11 @@
 
 type ('a : any) t = Nope | Yeah of 'a
 [%%expect{|
+Line 1, characters 0-37:
+1 | type ('a : any) t = Nope | Yeah of 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type ('a : any) t = Nope | Yeah of 'a
 |}]
 
@@ -137,6 +142,11 @@ let test =
   |> box_all
 
 [%%expect {|
+Line 1, characters 0-56:
+1 | type ('a : any) any_list = [] | (::) of 'a * 'a any_list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type ('a : any) any_list = [] | (::) of 'a * 'a any_list
 val map_unboxed_pair :
   #('a * 'b) any_list -> f:(#('a * 'b) -> #('c * 'd)) -> #('c * 'd) any_list =
@@ -174,6 +184,11 @@ end
 
 (* CR rtjoa for lmaurer: tweaked this wording *)
 [%%expect {|
+Line 8, characters 4-23:
+8 |     type t = A of v | B
+        ^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 Lines 12-18, characters 8-5:
 12 | ........struct
 13 |     type v = unit#
