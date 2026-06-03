@@ -63,12 +63,7 @@ frame 2: meander`camlMeander__omain_1_code
 frame 3: meander`camlMeander__entry
 frame 4: meander`caml_program
 frame 5: meander`caml_start_program
-frame 6: meander`caml_startup_common
-frame 7: meander`caml_startup_exn
-frame 8: meander`caml_startup
-frame 9: meander`caml_main
-frame 10: meander`main
-frame 11: dyld`start
+frame 6: meander`caml_program
 (lldb) continue
 Process XXXX resuming
 Process XXXX stopped
@@ -94,10 +89,5 @@ frame 6: meander`camlMeander__omain_1_code
 frame 7: meander`camlMeander__entry
 frame 8: meander`caml_program
 frame 9: meander`caml_start_program
-frame 10: meander`caml_startup_common
-frame 11: meander`caml_startup_exn
-frame 12: meander`caml_startup
-frame 13: meander`caml_main
-frame 14: meander`main
-frame 15: dyld`start
+frame 10: meander`caml_program
 (lldb) quit
