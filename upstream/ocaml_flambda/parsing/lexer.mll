@@ -92,7 +92,6 @@ let all_keywords =
     "nonrec", NONREC, v4_2;
     "object", OBJECT, v1_0;
     "of", OF, always;
-    "once_", ONCE, oxcaml;
     "open", OPEN, always;
     "or", OR, always;
     "overwrite_", OVERWRITE, oxcaml;
@@ -109,7 +108,6 @@ let all_keywords =
     "true", TRUE, always;
     "try", TRY, always;
     "type", TYPE, always;
-    "unique_", UNIQUE, oxcaml;
     "val", VAL, always;
     "virtual", VIRTUAL, v1_0;
     "when", WHEN, always;
@@ -1293,7 +1291,7 @@ and skip_hash_bang = parse
     in
       loop NoLine Initial lexbuf
 
-  let init ?(keyword_edition=None,[]) () =
+  let init ?(keyword_edition=Config.default_keyword_edition) () =
     populate_keywords keyword_edition;
     is_in_string := false;
     comment_start_loc := [];

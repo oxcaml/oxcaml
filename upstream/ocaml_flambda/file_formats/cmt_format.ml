@@ -409,7 +409,8 @@ let index_occurrences binary_annots =
   in
   let f ~namespace env path lid =
     (* Unlike upstream (which uses [not loc_ghost]), we only filter the [_none_]
-       sentinel location, to avoid filtering useful ghost locations; see #3137. *)
+       sentinel location, to avoid filtering useful ghost locations;
+       see #3137. *)
     let not_none { Location.loc; _ } = not (Location.is_none loc) in
     let reduce_and_store ~namespace lid path = if not_none lid then
       match Env.shape_of_path ~namespace env path with

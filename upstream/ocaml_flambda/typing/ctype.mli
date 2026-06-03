@@ -201,12 +201,15 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       in_counterexample : bool;
       (* true iff checking counter examples *)
-      is_lpoly : bool;
-      (* true iff the pattern is under let poly_ *)
+      mutable env_alloc_mode : Mode.Alloc.r option;
+      (** [Some m] if the pattern is under [let poly_], where [m] is the
+         allocation mode of the captured environment *)
     }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int -> in_counterexample:bool -> t
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
+    -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end
 
 type existential_treatment =
@@ -216,8 +219,11 @@ type existential_treatment =
 val instance_constructor:
   existential_treatment ->
   Data_types.constructor_description ->
-  Types.constructor_argument list * type_expr * type_expr list
-(* Same, for a constructor. Also returns existentials. *)
+  Types.constructor_argument list * type_expr
+    * (type_expr * Types.jkind_lr) list
+(* Same, for a constructor. The third component pairs each existential
+   with its declared jkind (read from the original, not the copy, so it
+   is unaffected by later unification). *)
 
 val instance_parameterized_type:
         ?keep_names:bool ->
@@ -360,11 +366,6 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
 val occur_in: Env.t -> type_expr -> type_expr -> bool
-val deep_occur: type_expr -> type_expr -> bool
-        (* Check whether a type occurs structurally within another. *)
-val deep_occur_list: type_expr -> type_expr list -> bool
-        (* Check whether a type occurs structurally within any type from
-           a list of types. *)
 val moregeneral: Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
   type_expr -> type_expr -> Jkind_types.Sort.t option list
@@ -374,6 +375,11 @@ val moregeneral: Env.t -> bool ->
            Returns, for each pattern sort variable (in order), the sort it was
            constrained to during the check, or [None] if unconstrained. Sorts
            in the result may contain subject sort variables. *)
+val deep_occur: type_expr -> type_expr -> bool
+        (* Check whether a type occurs structurally within another. *)
+val deep_occur_list: type_expr -> type_expr list -> bool
+        (* Check whether a type occurs structurally within any type from
+           a list of types. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
 val all_distinct_vars: Env.t -> type_expr list -> bool
         (* Check those types are all distinct type variables *)

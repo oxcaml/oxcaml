@@ -51,6 +51,7 @@ type abstract_type_constr = [
   | `Atomic_loc
   | `Lexing_position
   | `Code
+  | `Eval
   | `Float32
   | `Int8
   | `Int16
@@ -161,6 +162,11 @@ let small_number_extension_type_constrs : type_constr list = [
   `Int16;
 ]
 
+let metaprogramming_extension_type_constrs : type_constr list = [
+  `Code;
+  `Eval;
+]
+
 let all_type_constrs = (
   base_type_constrs
   @ or_null_extension_type_constrs
@@ -168,6 +174,7 @@ let all_type_constrs = (
   @ simd_stable_extension_type_constrs
   @ simd_beta_extension_type_constrs
   @ simd_alpha_extension_type_constrs
+  @ metaprogramming_extension_type_constrs
 )
 
 let ident_int = ident_create "int"
@@ -250,6 +257,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Atomic_loc -> ident_atomic_loc
   | `Lexing_position -> ident_lexing_position
   | `Code -> ident_code
+  | `Eval -> ident_eval
   | `Float32 -> ident_float32
   | `Int8 -> ident_int8
   | `Int16 -> ident_int16
@@ -396,7 +404,6 @@ and type_iarray t = tconstr path_iarray [t]
 and type_atomic_loc t = tconstr path_atomic_loc [t]
 and type_lexing_position = tconstr path_lexing_position []
 and type_code t = tconstr path_code [t]
-and type_eval t = newgenty (Tquote_eval (newgenty (Tsplice t)))
 
 and type_unboxed_unit = tconstr path_unboxed_unit []
 and type_unboxed_bool = tconstr path_unboxed_bool []
@@ -649,16 +656,19 @@ let decl_of_type_constr tconstr =
       ~jkind
       ?(separability = Separability.Ind)
       ?(kind = fun _ -> Type_abstract Definition)
+      ?manifest
       ()
     =
     let param = newgenvar param_jkind in
     let base = decl0 ~jkind:(jkind param) ~kind:(kind param) () in
+    let manifest = Option.map (fun f -> f param) manifest in
     { base with
       type_params = [param];
       type_arity = 1;
       type_ikind = ikind_of_jkind ~params:[param] base.type_jkind;
       type_variance = [variance];
       type_separability = [separability];
+      type_manifest = manifest;
     }
   in
   let decl2
@@ -883,23 +893,14 @@ let decl_of_type_constr tconstr =
            ("pos_bol", type_int);
            ("pos_cnum", type_int) ]
          in
-         Type_record (
-           labels,
-           (Record_boxed (List.map (fun label -> label.ld_sort) labels |> Array.of_list)),
-           None
-         )
+         Type_record (labels, Record_boxed, None)
        )
        (* Fields are [int] and [string], so [immutable_data] already captures
           their direct contribution. Encoding this directly avoids predef-time
           constructor lookups when deriving ikinds from jkinds. *)
        ~jkind:Jkind.(
          of_builtin Const.Builtin.immutable_data
-           ~why:(Primitive ident_lexing_position) |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id
-          ~type_expr:type_string)
+           ~why:(Primitive ident_lexing_position))
        ()
   | `Code ->
     decl1
@@ -916,6 +917,24 @@ let decl_of_type_constr tconstr =
            Jkind.add_with_bounds
              ~modality:Mode.Modality.Const.id
              ~type_expr:param)
+       ()
+  | `Eval ->
+    decl1
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:(fun param ->
+         newgenty (Tquote_eval (newgenty (Tsplice param))))
+       ~jkind:(fun param ->
+         Jkind.Builtin.any ~why:Evaluated_quote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_eval;
+           position = 1;
+           arity = 1;
+         }))
        ()
   | `Int8x16 ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
@@ -1109,36 +1128,9 @@ let add_small_number_extension_types add_type env =
 let add_small_number_beta_extension_types _add_type env = env
 
 let add_runtime_metaprogramming_types add_type env =
-  let env = add_type ident_code (decl_of_type_constr `Code) env in
-  let param = newgenvar (
-    Jkind.Builtin.any ~why:(Type_argument {
-      parent_path = Path.Pident ident_eval;
-      position = 1; arity = 1 }))
-  in
-  let type_jkind = Jkind.mark_best (
-    Jkind.Builtin.any ~why:Evaluated_quote |>
-      Jkind.add_with_bounds
-        ~modality:Mode.Modality.Const.id ~type_expr:param)
-  in
-  let type_ikind = ikind_of_jkind ~params:[param] type_jkind in
-  add_type ident_eval {
-    type_params = [param];
-    type_arity = 1;
-    type_kind = Type_abstract Definition;
-    type_jkind;
-    type_ikind;
-    type_loc = Location.none;
-    type_private = Asttypes.Public;
-    type_manifest = Some (type_eval param);
-    type_variance = [Variance.covariant];
-    type_separability = [Separability.Ind];
-    type_is_newtype = false;
-    type_expansion_scope = lowest_level;
-    type_attributes = [];
-    type_unboxed_default = false;
-    type_uid = Uid.of_predef_id ident_eval;
-    type_unboxed_version = None;
-  } env
+  List.fold_left (fun env tconstr ->
+    add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
+  ) env metaprogramming_extension_type_constrs
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns
