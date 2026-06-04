@@ -22,21 +22,19 @@ end
 [%%expect{|
 Line 1:
 Error: Module type declarations do not match:
-         module type S =
-           sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
+         module type S = sig val foo : layout_ l. 'a -> 'b end
        does not match
-         module type S =
-           sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
+         module type S = sig val foo : layout_ l. 'a -> 'b end
        At position "module type S = <here>"
        Module types do not match:
-         sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
+         sig val foo : layout_ l. 'a -> 'b end
        is not equal to
-         sig val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b end
+         sig val foo : layout_ l. 'a -> 'b end
        At position "module type S = <here>"
        Values do not match:
-         val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b
+         val foo : layout_ l. 'a -> 'b
        is not included in
-         val foo : layout_ l. ('a : value) ('b : value). 'a -> 'b
+         val foo : layout_ l. 'a -> 'b
        The layout parameter at position 1 in the first
        is instantiated with an unconstrained layout variable,
        which is not supported yet.
@@ -267,11 +265,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : layout_ l. ('a : l) ('b : l). 'a -> 'b end
        is not included in
-         sig val f : layout_ l. ('a : value) ('b : value). 'a -> 'b end
+         sig val f : layout_ l. 'a -> 'b end
        Values do not match:
          val f : layout_ l. ('a : l) ('b : l). 'a -> 'b
        is not included in
-         val f : layout_ l. ('a : value) ('b : value). 'a -> 'b
+         val f : layout_ l. 'a -> 'b
        The layout parameter at position 1 in the first
        is instantiated with layout "value",
        which is not supported yet.
@@ -496,7 +494,7 @@ module type S = sig
 end
 [%%expect {|
 module type S =
-  sig val foo3 : layout_ l. ('a : value) ('b : l). 'a -> 'b -> #('a * 'b) end
+  sig val foo3 : layout_ l. 'a ('b : l). 'a -> 'b -> #('a * 'b) end
 |}]
 
 (* Order of quantified type variables after typing a layout-polymorphic
@@ -506,7 +504,7 @@ module type S = sig
 end
 [%%expect {|
 module type S =
-  sig val foo4 : layout_ l. ('b : l) ('a : value). 'b -> 'a -> #('a * 'b) end
+  sig val foo4 : layout_ l. ('b : l) 'a. 'b -> 'a -> #('a * 'b) end
 |}]
 
 (* Interaction between "val poly_" and "layout_". Currently errors.
@@ -532,8 +530,7 @@ module type S =
   sig
     val baz1 :
       layout_ l.
-        ('a : value) ('b : immediate) ('c : l).
-          'a -> #('b * 'c) -> #('a * 'b * 'c)
+        'a ('b : immediate) ('c : l). 'a -> #('b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
@@ -545,8 +542,7 @@ module type S =
   sig
     val baz2 :
       layout_ l.
-        ('a : immediate) ('b : value) ('c : l).
-          'a -> #('b * 'c) -> #('a * 'b * 'c)
+        ('a : immediate) 'b ('c : l). 'a -> #('b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
@@ -558,8 +554,7 @@ module type S =
   sig
     val baz3 :
       layout_ l.
-        ('b : value) ('a : immediate) ('c : l).
-          'b -> #('a * 'c) -> #('b * 'a * 'c)
+        'b ('a : immediate) ('c : l). 'b -> #('a * 'c) -> #('b * 'a * 'c)
   end
 |}]
 
@@ -595,9 +590,7 @@ end
 module type S =
   sig
     val baz6 :
-      layout_ l.
-        ('a : value) ('b : value) ('c : l).
-          'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
+      layout_ l. 'a 'b ('c : l). 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
@@ -609,9 +602,7 @@ end
 module type S =
   sig
     val baz7 :
-      layout_ l.
-        ('a : value_or_null) ('b : value) ('c : l).
-          'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
+      layout_ l. 'a 'b ('c : l). 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
   end
 |}]
 
@@ -624,7 +615,6 @@ module type S =
   sig
     val baz8 :
       layout_ l l0.
-        ('a : l) ('b : l0) ('c : value).
-          'a -> 'b -> 'c list -> #('a * 'b * 'c)
+        ('a : l) ('b : l0) 'c. 'a -> 'b -> 'c list -> #('a * 'b * 'c)
   end
 |}]
