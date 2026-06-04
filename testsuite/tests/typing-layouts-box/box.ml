@@ -942,61 +942,85 @@ module Shadowing :
 
 (* Test 35: type compatibility *)
 
-module Abs_value : sig
+module Inst_value : sig
   type t
 end = struct
   type t
 end
 [%%expect{|
-module Abs_value : sig type t end
+module Inst_value : sig type t end
 |}]
 
-module Abs_value_value : sig
+module NonInst_value : sig
+  type _ t
+end = struct
+  type _ t
+end
+[%%expect{|
+module NonInst_value : sig type _ t end
+|}]
+
+module Inst_value_value : sig
   type t : value & value
 end = struct
   type t : value & value
 end
 [%%expect{|
-module Abs_value_value : sig type t : value & value end
+module Inst_value_value : sig type t : value & value end
 |}]
 
-module Abs_value2 : sig
+module NonInst_value_value : sig
+  type _ t : value & value
+end = struct
+  type _ t : value & value
+end
+[%%expect{|
+module NonInst_value_value : sig type _ t : value & value end
+|}]
+
+module Inst_value2 : sig
   type t
 end = struct
   type t
 end
 [%%expect{|
-module Abs_value2 : sig type t end
+module Inst_value2 : sig type t end
 |}]
 
-module Abs_untagged_immediate : sig
+module Inst_untagged_immediate : sig
   type t : untagged_immediate
 end = struct
   type t : untagged_immediate
 end
 [%%expect{|
-module Abs_untagged_immediate : sig type t : untagged_immediate end
+module Inst_untagged_immediate : sig type t : untagged_immediate end
 |}]
 
-module Abs_bits64 : sig
+module Inst_bits64 : sig
   type t : bits64
 end = struct
   type t = int64#
 end
 [%%expect{|
-module Abs_bits64 : sig type t : bits64 end
+module Inst_bits64 : sig type t : bits64 end
 |}]
+
+module Comp = struct
+  type _ t  = |
+  type _ t' = |
+end
 
 (* Comparing box with other type constructors *)
 
 (* A boxed aliasable type is compatible with a type with an unboxed version
    (thus [eq] can't be refuted) *)
-let f (eq : (Abs_untagged_immediate.t box, int) Type.eq) : unit =
+let f (eq : (Inst_untagged_immediate.t box, int) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
-Line 2, characters 16-17:
-2 |   match eq with _ -> .
-                    ^
+module Comp : sig type _ t = | type _ t' = | end
+Line 11, characters 16-17:
+11 |   match eq with _ -> .
+                     ^
 Error: This match case could not be refuted.
        Here is an example of a value that would reach it: "Equal"
 |}]
@@ -1004,7 +1028,7 @@ Error: This match case could not be refuted.
 (* as well as *aliasable* type that could be hiding an unboxed version.
    (Techically, this exact test case is conservative, as a type cannot be the
    unboxed version of itself due to the cyclic type check) *)
-let f (eq : (Abs_value.t box, Abs_value.t) Type.eq) : unit =
+let f (eq : (Inst_value.t box, Inst_value.t) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
 Line 2, characters 16-17:
@@ -1016,23 +1040,23 @@ Error: This match case could not be refuted.
 
 (* We can refute the below, as we can see that the unboxed version of [int]
    isn't [value] *)
-let f (eq : (Abs_value.t box, int) Type.eq) : unit =
+let f (eq : (Inst_value.t box, int) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
-val f : (Abs_value.t box, int) Type.eq -> unit = <fun>
+val f : (Inst_value.t box, int) Type.eq -> unit = <fun>
 |}]
 
 (* Boxed types are also incompatible with un-aliasable type without unboxed
    versions *)
-let f (eq : (Abs_value.t box, string) Type.eq) : unit =
+let f (eq : (Inst_value.t box, string) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
-val f : (Abs_value.t box, string) Type.eq -> unit = <fun>
+val f : (Inst_value.t box, string) Type.eq -> unit = <fun>
 |}]
 
 (* ['a box] and ['b box] are compatible if ['a] and ['b] are *)
 
-let f (eq : (Abs_value.t box, Abs_value2.t box) Type.eq) : unit =
+let f (eq : (Inst_value.t box, Inst_value2.t box) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
 Line 2, characters 16-17:
@@ -1049,15 +1073,33 @@ val f : (int box, string box) Type.eq -> unit = <fun>
 |}]
 
 
-let f (eq : (Abs_value.t box, Abs_bits64.t box) Type.eq) : unit =
+let f (eq : (Inst_value.t box, Inst_bits64.t box) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
-val f : (Abs_value.t box, Abs_bits64.t box) Type.eq -> unit = <fun>
+val f : (Inst_value.t box, Inst_bits64.t box) Type.eq -> unit = <fun>
 |}]
 
 (* ['a box] is compatible with tuples *)
 
-let f (eq : (Abs_value_value.t box, int * int) Type.eq) : unit =
+let f (eq : (Inst_value_value.t box, int * int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+Line 2, characters 16-17:
+2 |   match eq with _ -> .
+                    ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "Equal"
+|}]
+let f (eq : (_ NonInst_value_value.t box, int * int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+Line 2, characters 16-17:
+2 |   match eq with _ -> .
+                    ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "Equal"
+|}]
+let f (eq : (_ NonInst_value_value.t box Comp.t, (int * int) Comp.t') Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
 Line 2, characters 16-17:
@@ -1068,10 +1110,21 @@ Error: This match case could not be refuted.
 |}]
 
 (* We refute this one because #(int * int) is not [value] *)
-let f (eq : (Abs_value.t box, int * int) Type.eq) : unit =
+let f (eq : (Inst_value.t box, int * int) Type.eq) : unit =
   match eq with _ -> .
 [%%expect{|
-val f : (Abs_value.t box, int * int) Type.eq -> unit = <fun>
+val f : (Inst_value.t box, int * int) Type.eq -> unit = <fun>
+|}]
+let f (eq : (_ NonInst_value.t box, int * int) Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : ('a NonInst_value.t box, int * int) Type.eq -> unit = <fun>
+|}]
+let f (eq : (_ NonInst_value.t box Comp.t, (int * int) Comp.t') Type.eq) : unit =
+  match eq with _ -> .
+[%%expect{|
+val f : ('a NonInst_value.t box Comp.t, (int * int) Comp.t') Type.eq -> unit =
+  <fun>
 |}]
 
 (* Test 36: preliminary testing of boxing primitives *)
