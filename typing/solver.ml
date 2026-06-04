@@ -727,11 +727,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                then update_upper ~log obj v mu_upper (mupper_hint mu));
             r)
       in
-      if C.le obj v.upper v.lower
-      then begin
-        set_vlower ~log v VarMap.empty;
-        set_vupper ~log v VarMap.empty
-      end;
       r)
 
   and submode_cmv : type a l.
@@ -799,11 +794,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                then update_lower ~log obj v mu_lower mu_lower_hint);
             r)
       in
-      if C.le obj v.upper v.lower
-      then begin
-        set_vlower ~log v VarMap.empty;
-        set_vupper ~log v VarMap.empty
-      end;
       r)
 
   and submode_mvc :
