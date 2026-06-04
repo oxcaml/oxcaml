@@ -1443,6 +1443,35 @@ let f (Equal : (M.r_box, r box) Type.eq) (x : r) = (x : M.r_box#)
 val f : (M.r_box, r box) Type.eq -> r -> M.r_box# = <fun>
 |}]
 
+(* Introducing unboxed versions with a GADT equation *)
+
+(* CR box jbachurski: I think it's doable to support these, but requires
+   some modifications in [add_gadt_equation]. *)
+
+let f (Equal : (M.t#, float#) Type.eq) (x : float#) = (x : M.t#)
+[%%expect{|
+Line 1, characters 16-20:
+1 | let f (Equal : (M.t#, float#) Type.eq) (x : float#) = (x : M.t#)
+                    ^^^^
+Error: The type "M.t" has no unboxed version.
+|}]
+
+let f (Equal : (M.t#, float#) Type.eq) (x : float) = (x : M.t)
+[%%expect{|
+Line 1, characters 16-20:
+1 | let f (Equal : (M.t#, float#) Type.eq) (x : float) = (x : M.t)
+                    ^^^^
+Error: The type "M.t" has no unboxed version.
+|}]
+
+let f (Equal : (M.t#, string) Type.eq) (x : string box) = (x : M.t)
+[%%expect{|
+Line 1, characters 16-20:
+1 | let f (Equal : (M.t#, string) Type.eq) (x : string box) = (x : M.t)
+                    ^^^^
+Error: The type "M.t" has no unboxed version.
+|}]
+
 (* Test 42: Subsumption checks with [box] *)
 
 (* [box] is total *)
