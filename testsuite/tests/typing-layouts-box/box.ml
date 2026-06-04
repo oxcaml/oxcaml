@@ -580,12 +580,12 @@ val int_box_eq : int box -> int box -> bool = <fun>
 
 (* Test 24: Recursive types with box *)
 
-type 'a tree = Leaf | Node of 'a * 'a tree * 'a tree
+type ('a : any) box_tree = Leaf | Node of 'a box * 'a box_tree * 'a box_tree
 
-type float_tree = float# box tree;;
+type float_tree = float# box_tree;;
 [%%expect{|
-type 'a tree = Leaf | Node of 'a * 'a tree * 'a tree
-type float_tree = float tree
+type ('a : any) box_tree = Leaf | Node of 'a box * 'a box_tree * 'a box_tree
+type float_tree = float# box_tree
 |}]
 
 let make_float_tree () : float_tree =
@@ -600,7 +600,7 @@ let sum_tree t =
     | Node (x, l, r) -> go (go (acc +. x) l) r
   in go 0.0 t;;
 [%%expect{|
-val sum_tree : float tree -> float = <fun>
+val sum_tree : float# box_tree -> float = <fun>
 |}]
 
 let sum_float_tree (t : float_tree) = sum_tree t;;
