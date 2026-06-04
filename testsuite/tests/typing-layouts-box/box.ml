@@ -1245,3 +1245,21 @@ type ('a, 'b) t = 'a * 'b
 type 'a t' = ('a, 'a) t#
 val id : int t' -> #(int * int) = <fun>
 |}]
+
+(* Test 39: Cycles *)
+
+type s = t box
+and t = s#
+[%%expect{|
+Line 1, characters 0-14:
+1 | type s = t box
+    ^^^^^^^^^^^^^^
+Error: The definition of "s" contains a cycle:
+         "s" = "t box",
+         "t box" = "t box",
+         "t box" contains "t",
+         "t" = "s#",
+         "s#" = "t box#",
+         "t box#" = "t",
+         "t" = "s#"
+|}]
