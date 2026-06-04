@@ -438,6 +438,8 @@ and 'a foo = int constraint 'a = int
 Line 1, characters 0-22:
 1 | type 'a t = 'a foo foo
     ^^^^^^^^^^^^^^^^^^^^^^
-Error: The definition of "t" contains a cycle:
-         "'a foo as 'a" contains "'a"
+Error: Constraints are not satisfied in this type.
+       Type "'a foo" should be an instance of "int"
+       Type "foo" was considered abstract when checking constraints in this
+       recursive type definition.
 |}]
