@@ -2579,30 +2579,31 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         mksig (Tsig_jkind decl) env loc, [item], newenv
   in
-  let rec transl_sig env sig_items sig_type = function
-    | [] -> List.rev sig_items, List.rev sig_type, env
-    | item :: srem ->
-      let new_item , new_types , env = transl_sig_item env sig_type item in
-      transl_sig env
-        (new_item :: sig_items)
-        (List.rev_append new_types sig_type)
-        srem
+  let rec transl_sig env sig_item sig_type = function
+    | [] -> List.rev sig_item, List.rev sig_type, env
+    | item :: srem -> begin
+        match transl_sig_item env sig_type item with
+        | new_item, new_types, env ->
+            transl_sig env
+              (new_item :: sig_item)
+              (List.rev_append new_types sig_type)
+              srem
+        | exception exn when
+            !Clflags.typing_recovery && Typecore.is_recoverable exn ->
+            transl_sig env sig_item sig_type srem
+      end
   in
-  let previous_saved_types = Cmt_format.get_saved_types () in
-  Builtin_attributes.warning_scope []
+  Typing_recovery_state.with_saved_types
+    ~save_part:(fun sg -> Cmt_format.Partial_signature sg)
     (fun () ->
-       let (trem, rem, final_env) =
-         transl_sig (Env.in_signature true env) [] [] psg_items
-       in
-       let rem = Signature_names.simplify final_env names rem in
-       let sg =
-         { sig_items = trem; sig_type = rem; sig_final_env = final_env;
-           sig_modalities; sig_sloc = psg_loc }
-       in
-       Cmt_format.set_saved_types
-         ((Cmt_format.Partial_signature sg) :: previous_saved_types);
-       sg
-    )
+       Builtin_attributes.warning_scope []
+         (fun () ->
+            let (trem, rem, final_env) =
+              transl_sig (Env.in_signature true env) [] [] psg_items
+            in
+            let rem = Signature_names.simplify final_env names rem in
+            { sig_items = trem; sig_type = rem; sig_final_env = final_env;
+              sig_modalities; sig_sloc = psg_loc }))
 
 and transl_modtype_decl env pmtd =
   Builtin_attributes.warning_scope pmtd.pmtd_attributes
@@ -4103,7 +4104,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
   in
   let toplevel_sig = Option.value toplevel ~default:[] in
   let rec type_struct env shape_map sstr str_acc sig_acc
-            sig_acc_include_functor =
+      sig_acc_include_functor =
     match sstr with
     | [] ->
         (List.rev str_acc, List.rev sig_acc, shape_map, env)
@@ -4115,8 +4116,8 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
             Cmt_format.set_saved_types
               (Cmt_format.Partial_structure_item str :: previous_saved_types);
             type_struct new_env shape_map srem (str :: str_acc)
-          (List.rev_append sg sig_acc)
-          (List.rev_append sg sig_acc_include_functor)
+              (List.rev_append sg sig_acc)
+              (List.rev_append sg sig_acc_include_functor)
         | exception exn when
             !Clflags.typing_recovery && Typecore.is_recoverable exn ->
             type_struct env shape_map srem str_acc sig_acc
