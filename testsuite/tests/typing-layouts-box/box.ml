@@ -924,6 +924,20 @@ Line 6, characters 19-29:
 Error: The type "int_b_b_u" has no unboxed version.
 |}]
 
+module M : sig
+  type t
+  type t_box_unbox_box_unbox = t
+end = struct
+  type t
+  type t_box = t box
+  type t_box_unbox = t_box#
+  type t_box_unbox_box = t_box_unbox box
+  type t_box_unbox_box_unbox = t_box_unbox_box#
+end
+[%%expect{|
+module M : sig type t type t_box_unbox_box_unbox = t end
+|}]
+
 (* Test 34: shadowing the predef [box] disambiguates with [box/2] *)
 
 module Shadowing = struct
@@ -1315,6 +1329,20 @@ Error: The definition of "s" contains a cycle:
          "s#" = "t box#",
          "t box#" = "t",
          "t" = "s#"
+|}]
+
+(* CR box jbachurski: This should probably complain about the cycle instead
+   once we expand abbreviations when determining unboxed versions. *)
+type s1 = t2 box
+type s2 = s1 box
+and t1 = s2#
+and t2 = t1#
+[%%expect{|
+type s1 = t2 box
+Line 4, characters 0-12:
+4 | and t2 = t1#
+    ^^^^^^^^^^^^
+Error: The type "t1" has no unboxed version.
 |}]
 
 (* Test 40: GADT equations commute *)
