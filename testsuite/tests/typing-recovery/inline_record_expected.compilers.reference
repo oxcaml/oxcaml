@@ -11,4 +11,4 @@ File "inline_record_expected.ml", line 14, characters 10-13:
 File "inline_record_expected.ml", line 19, characters 17-18:
 19 | let t : string = u
                       ^
-  The value u has type int but an expression was expected of type string
+  This expression has type "int" but an expression was expected of type "string"

@@ -18,4 +18,4 @@ File "missing_type_constraint.ml", line 17, characters 32-38:
 File "missing_type_constraint.ml", line 22, characters 17-18:
 22 | let t : string = r
                       ^
-  The value r has type int but an expression was expected of type string
+  This expression has type "int" but an expression was expected of type "string"

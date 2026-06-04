@@ -11,8 +11,8 @@ File "modules_not_allowed.ml", line 17, characters 10-21:
 File "modules_not_allowed.ml", line 17, characters 24-25:
 17 |       let (module Ob) = m in
                              ^
-  Unbound value m
+  Unbound value "m"
 File "modules_not_allowed.ml", line 22, characters 14-18:
 22 | let t : int = true
                    ^^^^
-  This expression should not be a boolean literal, the expected type is int
+  This expression has type "bool" but an expression was expected of type "int"

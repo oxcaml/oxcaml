@@ -9,4 +9,4 @@ File "incoherent_label_order.ml", line 10, characters 23-24:
 File "incoherent_label_order.ml", line 11, characters 14-16:
 11 | let t : int = ""
                    ^^
-  This constant has type string but an expression was expected of type int
+  This expression has type "string" but an expression was expected of type "int"

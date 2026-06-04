@@ -5,13 +5,13 @@ File "function_arity_type_clash.ml", line 13, characters 2-44:
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   The syntactic arity of the function doesn't match the type constraint:
   This function has 3 syntactic arguments, but its type is constrained to
-    ?opt:(a, int -> int) eq -> unit -> a.
+    "?opt:(a, int -> int) eq -> unit -> a".
    Hint: consider splitting the function definition into
-     fun ... gadt_pat -> fun ...
-     where gadt_pat is the pattern with the GADT constructor that
-     introduces the local type equation on a.
+     "fun ... gadt_pat -> fun ..."
+     where "gadt_pat" is the pattern with the GADT constructor that
+     introduces the local type equation on "a".
   File "function_arity_type_clash.ml", line 15, characters 17-19:
   15 | let x : string = 10
                         ^^
-    The constant 10 has type int but an expression was expected of type
-      string
+    This expression has type "int" but an expression was expected of type
+      "string"

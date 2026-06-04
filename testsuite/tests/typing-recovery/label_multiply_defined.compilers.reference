@@ -11,4 +11,4 @@ File "label_multiply_defined.ml", line 18, characters 2-25:
 File "label_multiply_defined.ml", line 20, characters 17-19:
 20 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type "int" but an expression was expected of type "string"

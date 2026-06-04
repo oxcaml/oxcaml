@@ -11,4 +11,4 @@ File "exception_pattern_disallowed.ml", line 16, characters 4-23:
 File "exception_pattern_disallowed.ml", line 21, characters 17-22:
 21 | let u : string = t + t
                       ^^^^^
-  This expression has type int but an expression was expected of type string
+  This expression has type "int" but an expression was expected of type "string"

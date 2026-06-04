@@ -3,7 +3,7 @@ Error: Multiple errors were encountered
 File "label_missing.ml", line 12, characters 8-17:
 12 | let _ = { x = 10}
              ^^^^^^^^^
-  Some record fields are undefined: y z
+  Some record fields are undefined: "y" "z"
 File "label_missing.ml", line 16, characters 8-32:
 16 | let _ = {x = 10; y = 10; y = 11}
              ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -11,4 +11,4 @@ File "label_missing.ml", line 16, characters 8-32:
 File "label_missing.ml", line 20, characters 17-19:
 20 | let x : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type "int" but an expression was expected of type "string"
