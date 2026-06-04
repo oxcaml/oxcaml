@@ -1,5 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    native;
  }{
