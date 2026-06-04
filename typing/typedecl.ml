@@ -3136,8 +3136,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
   let rec visit parents trace ty =
     match step_once parents ty with
     | Contained tys, parents ->
-      List.iter
-        (fun ty' -> visit parents (Contains (ty, ty') :: trace) ty') tys
+      List.iter (fun ty' -> visit parents (Contains (ty, ty') :: trace) ty') tys
     | Expanded_to ty', parents ->
       visit parents (Expands_to(ty,ty') :: trace) ty'
     | Is_cyclic, _ ->
@@ -3165,7 +3164,9 @@ let decl_jkind_affects_representations env path =
   | Type_record (_, Record_unboxed, _)
   | Type_variant (_, (Variant_unboxed | Variant_with_null), _) -> true
   | Type_record _ | Type_variant _ | Type_abstract _ | Type_open -> false
-  | exception Not_found -> false
+  | exception Not_found ->
+    (* We only call this on paths in the recursive group *)
+    Misc.fatal_error "Typedecl.decl_jkind_affects_representations"
 
 (* See Note [order of updating decl jkinds]. Returns the declarations'
    [Ident.t]s in an order where each declaration comes after every declaration
