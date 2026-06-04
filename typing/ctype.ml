@@ -4270,10 +4270,8 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
-        | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
-          mcomp type_pairs env t (unbox_ty_exn env t2')
-        | (_, Tbox t, _, _) when is_unboxable_ty env t1' ->
-          mcomp type_pairs env (unbox_ty_exn env t1') t
+        | (Tbox t1, Tbox t2, _, _) ->
+            mcomp type_pairs env t1 t2
         | (Tnil, Tnil, _, _) ->
             ()
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
@@ -4928,6 +4926,8 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tquote_eval t1, Tquote_eval t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
+  | (Tbox t1, Tbox t2) ->
+      unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       unify_with_decr_stage uenv (fun uenv -> unify uenv s1 (new_quote_ty t2'))
   | (Tquote s1, _) when is_flexible_ty s1 ->
