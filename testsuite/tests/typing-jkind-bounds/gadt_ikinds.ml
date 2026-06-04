@@ -64,6 +64,40 @@ module Recursive_boxed_variant_with_bounded_parameter :
   end
 |}]
 
+module Recursive_annotated_list_payload = struct
+  type ('a : value mod contended portable) t : value mod contended portable =
+    A of ('a t list as (_ : any mod contended portable))
+end
+[%%expect{|
+Line 3, characters 28-54:
+3 |     A of ('a t list as (_ : any mod contended portable))
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Bad layout annotation:
+         The kind of "'a t list" is immutable_data with 'a t
+           because it's a boxed variant type.
+         But the kind of "'a t list" must be a subkind of
+             any mod portable contended
+           because of the annotation on the wildcard _ at line 3, characters 28-54.
+|}]
+
+module Alias_annotation_rejects_layout_mismatch = struct
+  type t = A of string
+  type u = (t as (_ : immediate))
+end
+[%%expect{|
+Line 3, characters 22-31:
+3 |   type u = (t as (_ : immediate))
+                          ^^^^^^^^^
+Error: Bad layout annotation:
+         The layout of "t/2" is value non_float
+           because of the definition of t at line 2, characters 2-22.
+         But the layout of "t/2" must be a sublayout of value non_pointer
+           because of the annotation on the wildcard _ at line 3, characters 22-31.
+         Note: The layout of immediate is value non_pointer.
+         Note: The kinds mutable_data, immutable_data, and sync_data have
+         the layout value non_float.
+|}]
+
 (***********************************************************************)
 type 'a eq_int = Eq : int eq_int
 [%%expect{|
