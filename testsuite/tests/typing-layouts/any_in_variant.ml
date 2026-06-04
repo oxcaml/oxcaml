@@ -211,22 +211,6 @@ Error: Signature mismatch:
 |}]
 
 
-(* CR-soon rtjoa: This worked before the any-fields PR, because
-   1. In the temporary environment, [pt] gets a jkind made with
-      [product_of_sorts].
-   2. When updating the constructor [A], those sorts are defaulted to [value].
-
-   But after the first version of the any-fields PR,
-   1. In the temporary environment, [pt] gets a jkind made with
-      [product_of_anys].
-   2. When updating the constructor [A], we see those [any] jkinds, and think
-      erroneously that [t]'s representation is variable.
-   3. The struct gets correctly typechecked as havin a fixed representation, and
-      the mismatch gets reported.
-
-   Possible solution: when working with a temp env, don't use the jkind from the
-   decl of [pt] and instead compute the product of the jkinds of its fields
-*)
 module M : sig
   type pt = #{ x : int; y : int }
   and t = A of pt
@@ -235,27 +219,7 @@ end = struct
   type t = A of pt
 end
 [%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type pt = #{ x : int; y : int }
-6 |   type t = A of pt
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type pt = #{ x : int; y : int; } type t = A of pt end
-       is not included in
-         sig type pt = #{ x : int; y : int; } and t = A of pt end
-       Type declarations do not match:
-         type t = A of pt
-       is not included in
-         type t = A of pt
-       Constructors do not match:
-         "A of pt"
-       is not the same as:
-         "A of pt"
-       The first has a fixed representation and the second doesn't.
-       Hint: Is there a type that has a representable layout in the first
-         but has layout any in the second?
+module M : sig type pt = #{ x : int; y : int; } and t = A of pt end
 |}]
 
 module M : sig
@@ -266,30 +230,10 @@ end = struct
   type t = A of pt
 end
 [%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type pt = #{ x : unit#; y : unit# }
-6 |   type t = A of pt
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type pt = #{ x : unit#; y : unit#; } type t = A of pt end
-       is not included in
-         sig type pt = #{ x : unit#; y : unit#; } and t = A of pt end
-       Type declarations do not match:
-         type t = A of pt
-       is not included in
-         type t = A of pt
-       Constructors do not match:
-         "A of pt"
-       is not the same as:
-         "A of pt"
-       The first has a fixed representation and the second doesn't.
-       Hint: Is there a type that has a representable layout in the first
-         but has layout any in the second?
+module M : sig type pt = #{ x : unit#; y : unit#; } and t = A of pt end
 |}]
 
-(* CR-soon rtjoa: this one should also work *)
+(* The contained type may also be the unboxed version of a boxed record. *)
 module M : sig
   type pt = { x : int; y : int }
   and t = A of pt#
@@ -298,25 +242,5 @@ end = struct
   type t = A of pt#
 end
 [%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type pt = { x : int; y : int }
-6 |   type t = A of pt#
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type pt = { x : int; y : int; } type t = A of pt# end
-       is not included in
-         sig type pt = { x : int; y : int; } and t = A of pt# end
-       Type declarations do not match:
-         type t = A of pt#
-       is not included in
-         type t = A of pt#
-       Constructors do not match:
-         "A of pt#"
-       is not the same as:
-         "A of pt#"
-       The first has a fixed representation and the second doesn't.
-       Hint: Is there a type that has a representable layout in the first
-         but has layout any in the second?
+module M : sig type pt = { x : int; y : int; } and t = A of pt# end
 |}]
