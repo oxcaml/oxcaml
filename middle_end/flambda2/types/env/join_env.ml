@@ -1602,11 +1602,11 @@ let cut_for_join typing_env ~cut_after =
   incremental_equations, symbol_projections
 
 let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
-    source_env joined_envs equations_to_join symbol_projections_to_join =
+    source_env source_tenv joined_envs equations_to_join
+    symbol_projections_to_join =
   try
     let empty_bindings =
-      Bindings_in_target_env.from_source_env
-        (Source_env.create (ME.typing_env source_env))
+      Bindings_in_target_env.from_source_env (Source_env.create source_tenv)
     in
     let joined_envs = Joined_envs.create equations_to_join in
     let concrete_equations_to_join, bindings =
@@ -1852,7 +1852,7 @@ module Analysis = struct
 end
 
 let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
-    source_env joined_envs =
+    source_env source_tenv joined_envs =
   let joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index typing_env
@@ -1868,12 +1868,13 @@ let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
   in
   let target_env, _ =
     cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
-      source_env joined_envs equations_to_join symbol_projections_to_join
+      source_env source_tenv joined_envs equations_to_join
+      symbol_projections_to_join
   in
   target_env
 
 let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
-    ~cut_after source_env joined_envs =
+    ~cut_after source_tenv joined_envs =
   let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index (external_id, typing_env)
@@ -1891,12 +1892,13 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
       joined_envs
       (Index.Map.empty, Index.Map.empty, Index.Map.empty, Index.Map.empty)
   in
-  let source_env = ME.create source_env in
+  let source_env = ME.create source_tenv in
   let target_env, bindings =
     cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
-      source_env joined_envs equations_to_join symbol_projections_to_join
+      source_env source_tenv joined_envs equations_to_join
+      symbol_projections_to_join
   in
-  let target_env = ME.typing_env target_env in
+  let target_env = ME.final_typing_env ~meet_expanded_head target_env in
   let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
   target_env, join_analysis
 
@@ -1947,20 +1949,19 @@ let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
         match
-          ME.add_env_extension_strict ~meet_expanded_head (ME.create typing_env)
-            extension
+          ME.use_meet_env_strict ~meet_expanded_head typing_env
+            ~f:(fun meet_env ->
+              ME.add_env_extension ~meet_expanded_head meet_env extension)
         with
         | Bottom ->
           (* We can reach bottom here if the extension was created in a more
              generic context, but is added in a context where it is no longer
              reachable. *)
           joined_envs_and_extensions
-        | Ok env ->
-          let level = ME.cut env ~cut_after in
+        | Ok tenv ->
+          let level = TE.cut tenv ~cut_after in
           let extension = TEL.as_extension_without_bindings level in
-          Index.Map.add index
-            (ME.typing_env env, extension)
-            joined_envs_and_extensions)
+          Index.Map.add index (tenv, extension) joined_envs_and_extensions)
       Index.Map.empty extensions
   in
   Index.Map.mapi

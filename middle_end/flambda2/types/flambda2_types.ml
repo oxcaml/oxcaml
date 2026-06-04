@@ -26,7 +26,7 @@ module Typing_env = struct
       ~meet_expanded_head:(Meet.meet_expanded_head ())
 
   let add_is_null_relation t name ~scrutinee =
-    use_meet_env t ~f:(fun t ->
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
         let t = add_equation t name (Type_grammar.is_null ~scrutinee) in
         Name.pattern_match name
           ~symbol:(fun _ -> t)
@@ -40,7 +40,7 @@ module Typing_env = struct
             add_equation_on_simple t scrutinee scrutinee_ty))
 
   let add_is_int_relation t name ~scrutinee =
-    use_meet_env t ~f:(fun t ->
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
         let t =
           add_equation t name (Type_grammar.is_int_for_scrutinee ~scrutinee)
         in
@@ -61,7 +61,7 @@ module Typing_env = struct
             add_equation_on_simple t scrutinee scrutinee_ty))
 
   let add_get_tag_relation t name ~scrutinee =
-    use_meet_env t ~f:(fun t ->
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
         let t =
           add_equation t name (Type_grammar.get_tag_for_block ~block:scrutinee)
         in
@@ -85,20 +85,21 @@ module Typing_env = struct
             add_equation_on_simple t scrutinee scrutinee_ty))
 
   let add_equation t name ty =
-    use_meet_env t ~f:(fun t -> add_equation t name ty)
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
+        add_equation t name ty)
 
   let add_equations_on_params t ~params ~param_types =
-    use_meet_env t ~f:(fun t ->
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
         add_equations_on_params t ~params ~param_types
           ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   let add_env_extension t extension =
-    use_meet_env t ~f:(fun t ->
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
         add_env_extension t extension
           ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   let add_env_extension_with_extra_variables t extension =
-    use_meet_env t ~f:(fun t ->
+    use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) t ~f:(fun t ->
         add_env_extension_with_extra_variables t extension
           ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
