@@ -184,17 +184,8 @@ let compute_static_size lam =
       assert false
     | Lsplice _ ->
       fatal_error_invalid_constructor lam
-    | Lkindtemplate { ktmpl_env; _ } ->
-      let shape =
-        Misc.Stdlib.Array.of_list_map
-          (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
-          (Ident.Map.data ktmpl_env)
-      in
-      (match Lambda.mixed_block_of_block_shape (Shape shape) with
-       | None ->
-         let size = all_value_mixed_block_size shape in
-         Block (Regular_block size)
-       | Some arr -> Block (Mixed_record arr))
+    | Lkindtemplate _ ->
+      Misc.fatal_error "letrec: poly_ not supported"
     | Lkindinstantiate _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->

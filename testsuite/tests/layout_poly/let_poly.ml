@@ -15,6 +15,18 @@ let poly_ id x = x
 val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
+let #(a, b, c, d) =
+  let poly_ tuple x y = #(x, y) in
+  let #(a, b) = tuple "a" #1L in
+  let #(c, d) = tuple #42.0 "d" in
+  #(a, b, c, d)
+[%%expect{|
+val a : string = "a"
+val b : int64# = <abstr>
+val c : float# = <abstr>
+val d : string = "d"
+|}]
+
 let poly_ id =
   let f x = x in
   f
@@ -209,9 +221,19 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* tuple: passing when all components are syntactic values *)
-let poly_ f = (42, fun x -> x)
+let #(x, f, a, y, g, b) =
+  let poly_ p = (42, fun x -> x) in
+  let (x, f) = p in
+  let (y, g) = p in
+  let #(a, b) = #(f #1.0, g #3L) in
+  #(x, f, a, y, g, b)
 [%%expect{|
-val f : layout_ l. ('a : l). int * ('a -> 'a) = <lpoly>
+val x : int = 42
+val f : '_weak1 -> '_weak1 = <fun>
+val a : float# = <abstr>
+val y : int = 42
+val g : '_weak2 -> '_weak2 = <fun>
+val b : int64# = <abstr>
 |}]
 
 (* tuple: failing when a component is not a syntactic value *)
@@ -273,7 +295,7 @@ Line 2, characters 10-11:
               ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
 
-val f : ur = #{a = 42; b = 0}
+val f : ur = <abstr>
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
@@ -444,14 +466,17 @@ val b : float# = <abstr>
 |}]
 
 (* closure conversion - uniform block *)
-let #(a, b) =
+let (a, b) =
   let x = true in
-  let y = "true" in
-  let poly_ f z = if x then #(y, z) else #("false", z) in
-  #(f 1, f #2L)
+  let y = ref "first" in
+  let poly_ f z = if x then #(!y, z) else #("false", z) in
+  let #(a1, a2) = f 1 in
+  y := "second";
+  let #(b1, b2) = f #2L in
+  (a1, b1)
 [%%expect{|
-val a : #(string * int) = #("true", 1)
-val b : #(string * int64#) = #("true", <abstr>)
+val a : string = "first"
+val b : string = "second"
 |}]
 
 (* closure conversion - mixed block *)
@@ -462,6 +487,6 @@ let #(a, b) =
   #(f 1, f #2L)
 
 [%%expect{|
-val a : #(int8# * int) = #(<abstr>, 1)
-val b : #(int8# * int64#) = #(<abstr>, <abstr>)
+val a : #(int8# * int) = <abstr>
+val b : #(int8# * int64#) = <abstr>
 |}]

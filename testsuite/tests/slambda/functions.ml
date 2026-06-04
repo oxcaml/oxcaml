@@ -3,72 +3,52 @@
  expect;
 *)
 
-(* Simplest layout polymorphic function *)
-let poly_ id x = x
-[%%expect{|
-(let (id =
-   { c =
-     (template layout_2 ->
-       { c = (missing)
-       ; r =
-         ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout_2] : $layout_2 x))⟫ })
-   ; r = ⟪(makeblock 0)⟫ })
-  { c = (missing)
-  ; r = ⟪(let (id = $id) (apply (field_imm 1 (global Toploop!)) "id" id))⟫ })
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
-|}]
 
 (* Test closure conversion *)
-let bool = true
-let foo = 1
+module M = struct
+  let bool = true
+  let foo = 1
+  let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
+end
 [%%expect{|
 { c = (missing)
 ; r =
-  ⟪(let (bool =[value<int>] 1)
-     (apply (field_imm 1 (global Toploop!)) "bool" bool))⟫ }
-val bool : bool = true
-{ c = (missing)
-; r =
-  ⟪(let (foo =[value<int>] 1)
-     (apply (field_imm 1 (global Toploop!)) "foo" foo))⟫ }
-val foo : int = 1
-|}]
-let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
-[%%expect{|
-(let
-  (foo =
-     { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "foo")⟫ }
-   #body =
-     (let
-       (bool =
-          { c = (missing)
-          ; r = ⟪(apply (field_imm 0 (global Toploop!)) "bool")⟫ }
-        #body =
-          (let (captures =
-             { c =
-               (template layout_15 ->
-                 { c = (missing)
-                 ; r =
-                   ⟪(function {nlocal = 0} closure
-                      (let
-                        (foo =a[value<int>] (field_imm 1 closure)
-                         bool =a[value<int>] (field_imm 0 closure))
-                        (function {nlocal = 0} x[$layout_15] y[$layout_15]
-                          : #($layout_15, ?)
-                          (if bool
-                            (make_unboxed_product #($layout_15, value<int>) x
-                              foo)
-                            (make_unboxed_product #($layout_15, value<int>) y
-                              2)))))⟫ })
-             ; r = ⟪(makeblock 0 (value<int>,value<int>) bool foo)⟫ })
-            { c = (missing)
-            ; r =
-              ⟪(let (captures = $captures)
-                 (apply (field_imm 1 (global Toploop!)) "captures" captures))⟫ }))
-       { c = #body.c; r = ⟪(let (bool =? $bool) $#body)⟫ }))
-  { c = #body.c; r = ⟪(let (foo =? $foo) $#body)⟫ })
-val captures : layout_ l. ('a : l). 'a -> 'a -> #('a * int) = <lpoly>
+  ⟪(apply (field_imm 1 (global Toploop!)) "M/295"
+     $(let
+        (bool = { c = (missing); r = ⟪1⟫ }
+         #body =
+           (let
+             (foo = { c = (missing); r = ⟪1⟫ }
+              #body =
+                (let (captures =
+                   { c =
+                     (template layout_15 ->
+                       { c = (missing)
+                       ; r =
+                         ⟪(function {nlocal = 0} closure
+                            (let
+                              (foo =a[value<int>] (field_imm 1 closure)
+                               bool =a[value<int>] (field_imm 0 closure))
+                              (function {nlocal = 0} x[$layout_15]
+                                y[$layout_15] : #($layout_15, ?)
+                                (if bool
+                                  (make_unboxed_product #($layout_15,
+                                    value<int>) x foo)
+                                  (make_unboxed_product #($layout_15,
+                                    value<int>) y 2)))))⟫ })
+                   ; r = ⟪(makeblock 0 (value<int>,value<int>) bool foo)⟫ })
+                  { c = [ bool.c; foo.c; captures.c; ]
+                  ; r =
+                    ⟪(let (captures = $captures)
+                       (makeblock 0 bool foo captures))⟫ }))
+             { c = #body.c; r = ⟪(let (foo =[value<int>] $foo) $#body)⟫ }))
+        { c = #body.c; r = ⟪(let (bool =[value<int>] $bool) $#body)⟫ }))⟫ }
+module M :
+  sig
+    val bool : bool
+    val foo : int
+    val captures : layout_ l. ('a : l). 'a -> 'a -> #('a * int)
+  end
 |}]
 
 (* Multiple static arguments *)
