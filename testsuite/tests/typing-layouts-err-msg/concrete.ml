@@ -30,6 +30,11 @@ Error: This expression has type "t_any" but an expression was expected of type
 type t = A of t_any
 let f (A _) = ()
 [%%expect {|
+Line 1, characters 0-19:
+1 | type t = A of t_any
+    ^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t = A of t_any
 Line 2, characters 9-10:
 2 | let f (A _) = ()
@@ -74,6 +79,11 @@ Error: This type "t_any" should be an instance of type
 type t = {a: t_any}
 let f (t: t) = t.a
 [%%expect {|
+Line 1, characters 0-19:
+1 | type t = {a: t_any}
+    ^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 type t = { a : t_any; }
 Line 2, characters 15-18:
 2 | let f (t: t) = t.a

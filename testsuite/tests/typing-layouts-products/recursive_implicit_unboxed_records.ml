@@ -411,8 +411,23 @@ module rec M : S = struct
   let rec u = #{ a = u ; b = u }
 end
 [%%expect{|
+Line 3, characters 2-28:
+3 |   type t = { a : u ; b : u }
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 module type S = sig type u : any type t = { a : u; b : u; } end
+Line 6, characters 2-39:
+6 |   type u = X.t# = #{ a : X.u ; b : X.u}
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 module F : functor (X : S) -> sig type u = X.t# = #{ a : X.u; b : X.u; } end
+Line 11, characters 2-28:
+11 |   type t = { a : u ; b : u }
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [experimental-variable-representations]: This type uses a variable representation, an experimental feature that currently gets fewer optimizations.
+
 Line 12, characters 17-18:
 12 |   let rec u = #{ a = u ; b = u }
                       ^
