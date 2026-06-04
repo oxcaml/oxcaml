@@ -94,6 +94,7 @@ Caml_inline int sync_mutex_unlock(sync_mutex m)
    For now we only have this on linux because it directly uses the linux futex
    syscalls. */
 #if defined(__linux__) && defined(__GNU_LIBRARY__) && defined(__GLIBC__) && defined(__GLIBC_MINOR__)
+#error "The world is in order"
 static int custom_condvar_init(custom_condvar * cv)
 {
   cv->counter = 0;
