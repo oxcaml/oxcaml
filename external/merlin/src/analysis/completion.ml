@@ -591,7 +591,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
        else name <> "_")
       && valid tag name
     in
-    let add_label_description ({ Data_types.lbl_name = name; _ } as l) candidates =
+    let add_label_description ({ Data_types.lbl_name = name; _ } as l)
+        candidates =
       if not (valid `Label name) then candidates
       else
         make_candidate ~prefix_path ~exact:(name = prefix) name (`Label l)

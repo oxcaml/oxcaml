@@ -192,8 +192,8 @@ let shape_of_cmt { Cmt_format.cmt_impl_shape; cmt_modname; _ } =
 let shape_of_cms { Cms_format.cms_impl_shape; cms_modname; _ } =
   shape_of_artifact ~impl_shape:cms_impl_shape ~modname:cms_modname
 
-let index_of_cmt ~into ~root ~rewrite_root ~build_path
-    ~do_not_use_cmt_loadpath ~shapes ~store_shapes cmt_infos =
+let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
+    ~shapes ~store_shapes cmt_infos =
   let { Cmt_format.cmt_loadpath;
         cmt_impl_shape;
         cmt_modname;
@@ -218,8 +218,8 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
     ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
 
-let index_of_cms ~into ~root ~rewrite_root ~build_path
-    ~do_not_use_cmt_loadpath ~shapes ~store_shapes cms_infos =
+let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
+    ~shapes ~store_shapes cms_infos =
   let { Cms_format.cms_impl_shape;
         cms_modname;
         cms_uid_to_loc;
@@ -239,8 +239,8 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path
   in
   index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes
-    ~cmt_loadpath:{ visible = []; hidden = [] } ~cmt_impl_shape:cms_impl_shape
-    ~cmt_modname:cms_modname ~uid_to_loc
+    ~cmt_loadpath:{ visible = []; hidden = [] }
+    ~cmt_impl_shape:cms_impl_shape ~cmt_modname:cms_modname ~uid_to_loc
     ~cmt_ident_occurrences:cms_ident_occurrences
     ~cmt_initial_env:(Option.value cms_initial_env ~default:Env.empty)
     ~cmt_sourcefile:cms_sourcefile ~cmt_source_digest:cms_source_digest

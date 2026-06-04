@@ -92,11 +92,10 @@ let rec summarize ~include_types node =
     let deprecated = Type_utils.is_deprecated vd.val_attributes in
     let typ = outline_type ~include_types ~env:node.t_env vd.val_val.val_type in
     Some
-      (mk ~location ~selection:vd.val_name.loc ~deprecated `Value typ
-         vd.val_id)
+      (mk ~location ~selection:vd.val_name.loc ~deprecated `Value typ vd.val_id)
   | Module_declaration md ->
     let children = get_mod_children ~include_types node in
-    begin match md.md_id, md.md_name with
+    begin match (md.md_id, md.md_name) with
     | None, _ | _, { txt = None; _ } -> None
     | Some id, { loc = selection; _ } ->
       let deprecated = Type_utils.is_deprecated md.md_attributes in
@@ -104,7 +103,7 @@ let rec summarize ~include_types node =
     end
   | Module_binding mb ->
     let children = get_mod_children ~include_types node in
-    begin match mb.mb_id, mb.mb_name with
+    begin match (mb.mb_id, mb.mb_name) with
     | None, _ | _, { txt = None; _ } -> None
     | Some id, { loc = selection; _ } ->
       let deprecated = Type_utils.is_deprecated mb.mb_attributes in
@@ -224,8 +223,7 @@ and get_class_expr_elements ~include_types class_expr =
     get_class_expr_elements ~include_types class_expr
   | Tcl_let (_, vbs, _, class_expr) ->
     let bindings =
-      List.filter_map
-        (List.rev vbs)
+      List.filter_map (List.rev vbs)
         ~f:(get_value_binding_element ~include_types)
     in
     bindings @ get_class_expr_elements ~include_types class_expr
@@ -265,8 +263,7 @@ and get_expr_elements ~include_types expr =
     get_class_structure_elements ~include_types class_structure
   | Texp_let (_, vbs, body) ->
     let bindings =
-      List.filter_map
-        (List.rev vbs)
+      List.filter_map (List.rev vbs)
         ~f:(get_value_binding_element ~include_types)
     in
     bindings @ get_expr_elements ~include_types body
@@ -285,8 +282,7 @@ and get_value_binding_element ~include_types vb =
       outline_type ~include_types ~env:vb.vb_expr.exp_env vb.vb_pat.pat_type
     in
     Some
-      (mk ~children ~location:vb.vb_loc ~selection ~deprecated `Value typ
-         ident)
+      (mk ~children ~location:vb.vb_loc ~selection ~deprecated `Value typ ident)
 
 and get_mod_children ~include_types node =
   List.concat_map

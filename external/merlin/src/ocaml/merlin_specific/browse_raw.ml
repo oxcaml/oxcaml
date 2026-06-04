@@ -750,9 +750,10 @@ let of_node node =
       let sort =
         match vd.Types.val_kind with
         | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
-        | Types.Val_prim _ | Types.Val_ivar _ | Types.Val_self _
-        | Types.Val_anc _ ->
-          Jkind.Sort.(of_const Const.for_continuation)
+        | Types.Val_prim _
+        | Types.Val_ivar _
+        | Types.Val_self _
+        | Types.Val_anc _ -> Jkind.Sort.(of_const Const.for_continuation)
       in
       let cont_pat =
         { pat_desc =

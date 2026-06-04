@@ -1008,7 +1008,7 @@ let from_path ~config ~env ~local_defs ~decl ?ident:_ path =
     | `ML | `Smart -> (
       match decl.uid with
       | Predef _ | Internal -> (decl.uid, false)
-      | _ ->
+      | _ -> (
         let traverse_aliases = config.traverse_aliases in
         match find_definition_uid ~config ~env ~decl path with
         | exception Not_found ->
@@ -1025,7 +1025,7 @@ let from_path ~config ~env ~local_defs ~decl ?ident:_ path =
               "No definition uid, falling back to the declaration uid: %a"
               Logger.fmt
               (Fun.flip Shape.Uid.print decl.uid);
-            (decl.uid, true)))
+            (decl.uid, true))))
   in
   (* Step 1': Try refine Uid *)
   let impl_uid =

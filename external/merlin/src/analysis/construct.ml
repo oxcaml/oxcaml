@@ -571,9 +571,7 @@ module Gen = struct
         | Tpackage ({ pack_path = path; _ } as pack) -> begin
           let open Ast_helper in
           try
-            let ty =
-              Typemod.modtype_of_package env Location.none pack
-            in
+            let ty = Typemod.modtype_of_package env Location.none pack in
             let ast =
               Exp.constraint_
                 (Exp.pack (module_ env ty) None)

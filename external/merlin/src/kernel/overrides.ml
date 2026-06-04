@@ -29,10 +29,10 @@ module Override = struct
     | Pexp_record
         ( [ ( { txt = Lident "pos_fname"; _ },
               { pexp_desc =
-                  Pexp_constant { pconst_desc = Pconst_string (pos_fname, _, _); _ };
+                  Pexp_constant
+                    { pconst_desc = Pconst_string (pos_fname, _, _); _ };
                 _
-              }
-            );
+              } );
             ( { txt = Lident "pos_lnum"; _ },
               { pexp_desc =
                   Pexp_constant { pconst_desc = Pconst_integer (lnum, None); _ };
@@ -68,8 +68,7 @@ module Override = struct
       match (attribute_name, expr.pexp_desc) with
       | ( Document,
           Pexp_constant { pconst_desc = Pconst_string (documentation, _, _); _ }
-        ) ->
-        Ok (Document documentation)
+        ) -> Ok (Document documentation)
       | Locate, Pexp_record _ ->
         Result.map (expr_to_pos expr) ~f:(fun pos -> Locate pos)
       | _ -> error_unexpected_payload_expression_structure

@@ -25,7 +25,8 @@ end = struct
     | Path.Pdot (path, name) when List.exists ~f:(Path.same path) opens ->
       Longident.Lident name
     | Path.Pdot (path, name) ->
-      Ldot (Location.mknoloc (to_shortest_lid ~opens path), Location.mknoloc name)
+      Ldot
+        (Location.mknoloc (to_shortest_lid ~opens path), Location.mknoloc name)
     | Pident ident -> Lident (Ident.name ident)
     | _ -> assert false
 

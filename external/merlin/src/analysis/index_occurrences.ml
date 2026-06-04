@@ -50,7 +50,9 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
     log ~title:"index_buffer" "Path: %a" Logger.fmt
       (Fun.flip (Format_doc.compat Path.print) path);
     if not (should_ignore_lid lid) then begin
-      let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
+      let lid =
+        { lid with loc = set_fname ~file:current_buffer_path lid.loc }
+      in
       let index_decl () =
         begin match decl_of_path_or_lid env namespace path lid.txt with
         | (exception _) | None ->
@@ -91,7 +93,7 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
     let rec index_components namespace lid path =
       let module_ = Shape.Sig_component_kind.Module in
       let scraped_path = Path.scrape_extra_ty path in
-      match lid.Location.txt, scraped_path with
+      match (lid.Location.txt, scraped_path) with
       | Longident.Ldot (lid', _), Path.Pdot (path', _) ->
         index_one ~namespace env path lid;
         index_components module_ lid' path'
