@@ -1610,8 +1610,8 @@ let transl_type_scheme_mono env styp =
   remove_mode_and_jkind_variables typ.ctyp_type;
   typ
 
-let transl_type_scheme_poly ~generalize_layouts env attrs loc vars inner_type =
-  let run () =
+let transl_type_scheme_poly env attrs loc vars inner_type =
+  let typed_vars, univars, typ =
     with_local_level begin fun () ->
       TyVarEnv.reset ();
       let vars = List.map (fun (n, jkind) -> (n, jkind, Env.stage env)) vars in
@@ -1628,45 +1628,39 @@ let transl_type_scheme_poly ~generalize_layouts env attrs loc vars inner_type =
       in
       (typed_vars, univars, typ)
     end
-      ~post:(fun (_,_,typ) -> generalize_ctyp typ)
-  in
-  let (typed_vars, univars, typ), sort_vars =
-    if generalize_layouts then Jkind_types.Sort.generalize_with run
-    else run (), []
+    ~post:(fun (_,_,typ) -> generalize_ctyp typ)
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
   remove_mode_and_jkind_variables typ.ctyp_type;
-  (sort_vars,
-   { ctyp_desc = Ttyp_poly (typed_vars, typ);
-     ctyp_type = typ.ctyp_type;
-     ctyp_env = env;
-     ctyp_loc = loc;
-     ctyp_attributes = attrs })
+  { ctyp_desc = Ttyp_poly (typed_vars, typ);
+    ctyp_type = typ.ctyp_type;
+    ctyp_env = env;
+    ctyp_loc = loc;
+    ctyp_attributes = attrs }
 
 let transl_type_scheme_lmono env styp =
   match styp.ptyp_desc with
   | Ptyp_poly (vars, st) ->
-    transl_type_scheme_poly ~generalize_layouts:false env
-      styp.ptyp_attributes styp.ptyp_loc vars st
+    transl_type_scheme_poly env styp.ptyp_attributes
+      styp.ptyp_loc vars st
   | _ ->
-    [], transl_type_scheme_mono env styp
+    transl_type_scheme_mono env styp
 
 let transl_type_scheme_poly_val env styp =
-  let (vars_free, cty), body_sort_vars =
+  let cty, body_sort_vars =
     Jkind_types.Sort.generalize_with (fun () ->
       with_local_level begin fun () ->
         match styp.ptyp_desc with
         | Ptyp_poly (vars, styp) ->
-          transl_type_scheme_poly ~generalize_layouts:true env
-            styp.ptyp_attributes styp.ptyp_loc vars styp
+          transl_type_scheme_poly env styp.ptyp_attributes styp.ptyp_loc
+            vars styp
         | _ ->
-          [],
           transl_simple_type ~new_var_jkind:Sort env ~closed:false
             Alloc.Const.legacy styp
       end
-        ~post:(fun (_, cty) -> generalize_ctyp cty))
+        ~post:(fun cty -> generalize_ctyp cty))
   in
-  let sort_vars = vars_free @ body_sort_vars in
+  let sort_vars = body_sort_vars in
   let vars_names_loc =
     List.map (fun v -> mknoloc (Jkind_types.Sort.Var.name v)) sort_vars
   in
@@ -1686,8 +1680,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         (env', (id, v) :: pairs))
       (env, []) vars
     in
-    let vars_empty, cty = transl_type_scheme_lmono env' inner_type in
-    assert (List.is_empty vars_empty);
+    let cty = transl_type_scheme_lmono env' inner_type in
     let ty = cty.ctyp_type in
     (* Replace references to the ident with a Var at generic_level *)
     let seen = Hashtbl.create 8 in
@@ -1743,7 +1736,7 @@ let transl_type_scheme env styp valdecl_flag =
     transl_type_scheme_newlayout env styp.ptyp_attributes
       styp.ptyp_loc vars st
   | _, Lpoly -> transl_type_scheme_poly_val env styp
-  | _, Lmono -> transl_type_scheme_lmono env styp
+  | _, Lmono -> [], transl_type_scheme_lmono env styp
 
 (* Error report *)
 
