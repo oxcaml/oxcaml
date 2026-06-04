@@ -3012,6 +3012,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let to_const_exn m = S.to_const_exn obj m
 
+  let to_loose_const_exn m = S.to_loose_const_exn obj m
+
   let unhint = S.Unhint.unhint
 
   let hint ?hint = S.Unhint.hint obj ?hint
@@ -3113,6 +3115,8 @@ module Monadic_gen (Obj : Obj) = struct
    fun ?hint a -> S.of_const ?hint obj a
 
   let to_const_exn m = S.to_const_exn obj m
+
+  let to_loose_const_exn m = S.to_loose_const_exn obj m
 
   let unhint = S.Unhint.unhint
 
@@ -3815,6 +3819,12 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.to_const_exn monadic in
     { comonadic; monadic } |> merge
 
+  let to_loose_const_exn m =
+    let { comonadic; monadic } = m in
+    let comonadic = Comonadic.to_loose_const_exn comonadic in
+    let monadic = Monadic.to_loose_const_exn monadic in
+    { comonadic; monadic } |> merge
+
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in
     let monadic = Monadic.unhint monadic in
@@ -3913,6 +3923,29 @@ module Value_with (Areality : Areality) = struct
           visibility = None;
           staticity = None
         }
+
+      let is_none
+          { areality;
+            uniqueness;
+            linearity;
+            portability;
+            contention;
+            forkable;
+            yielding;
+            statefulness;
+            visibility;
+            staticity
+          } =
+        Option.is_none areality
+        && Option.is_none uniqueness
+        && Option.is_none linearity
+        && Option.is_none portability
+        && Option.is_none contention
+        && Option.is_none forkable
+        && Option.is_none yielding
+        && Option.is_none statefulness
+        && Option.is_none visibility
+        && Option.is_none staticity
 
       let value opt ~default =
         let areality = Option.value opt.areality ~default:default.areality in
@@ -4368,6 +4401,32 @@ module Const = struct
       | Right ax -> P ax
   end
 
+  let alloc_option_as_value
+      ({ areality;
+         linearity;
+         portability;
+         uniqueness;
+         contention;
+         forkable;
+         yielding;
+         statefulness;
+         visibility;
+         staticity
+       } :
+        Alloc.Const.Option.t) : Value.Const.Option.t =
+    let areality = Option.map C.locality_as_regionality areality in
+    { areality;
+      linearity;
+      portability;
+      uniqueness;
+      contention;
+      forkable;
+      yielding;
+      statefulness;
+      visibility;
+      staticity
+    }
+
   let locality_as_regionality = C.locality_as_regionality
 end
 
@@ -4527,6 +4586,9 @@ module Modality = struct
        fun ?(hint = Hint.Unknown) t x ->
         match t with Join_const c -> Mode.join_const ~hint c x
 
+      let apply_const t x =
+        match t with Join_const c -> Mode.Const.join c x
+
       let proj ax (Join_const c) : _ Atom.t = Join_const (Axis.proj ax c)
 
       let set ax (Join_const a : _ Atom.t) (Join_const c) =
@@ -4539,7 +4601,6 @@ module Modality = struct
     type t =
       | Const of Const.t
       | Diff of Mode.lr * Mode.lr  (** See "Inferred modalities" comments *)
-      | Undefined
 
     let sub_log left right ~log : (unit, error) Result.t =
       match left, right with
@@ -4567,8 +4628,6 @@ module Modality = struct
       | Const _, Diff _ ->
         Misc.fatal_error
           "inferred modality Diff should not be on the RHS of sub."
-      | Undefined, _ | _, Undefined ->
-        Misc.fatal_error "modality Undefined should not be in sub."
 
     let apply : type r.
         ?hint:(allowed * r) neg Hint.morph ->
@@ -4578,13 +4637,10 @@ module Modality = struct
      fun ?hint t x ->
       match t with
       | Const c -> Const.apply ?hint c x |> Mode.disallow_right
-      | Undefined ->
-        Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
 
     let print ppf = function
       | Const c -> Const.print ppf c
-      | Undefined -> Fmt.fprintf ppf "undefined"
       | Diff _ -> Fmt.fprintf ppf "diff"
 
     (* All zapping functions mutate [mm] and [m] to the degree that's sufficient
@@ -4593,7 +4649,6 @@ module Modality = struct
 
     let zap_to_floor = function
       | Const c -> c
-      | Undefined -> Misc.fatal_error "modality Undefined should not be zapped."
       | Diff (mm, m) ->
         (* Ideally we will take [c = subtract_mm m] and zap it to floor.
            However, [subtract] requires [mm] to be constant. We get the ceil of
@@ -4618,8 +4673,6 @@ module Modality = struct
 
     let to_const_opt = function
       | Const c -> Some c
-      | Undefined ->
-        Misc.fatal_error "modality Undefined should not be looked at"
       | Diff _ -> None
 
     let of_const c = Const c
@@ -4673,6 +4726,9 @@ module Modality = struct
        fun ?(hint = Hint.Unknown) t x ->
         match t with Meet_const c -> Mode.meet_const ~hint c x
 
+      let apply_const t x =
+        match t with Meet_const c -> Mode.Const.meet c x
+
       let proj ax (Meet_const c) : _ Atom.t = Meet_const (Axis.proj ax c)
 
       let set ax (Meet_const a : _ Atom.t) (Meet_const c) =
@@ -4684,7 +4740,6 @@ module Modality = struct
 
     type t =
       | Const of Const.t
-      | Undefined
       | Exactly of Mode.lr * Mode.lr  (** See "Inferred modalities" comments *)
 
     let sub_log left right ~log : (unit, error) Result.t =
@@ -4716,8 +4771,6 @@ module Modality = struct
       | Const _, Exactly _ ->
         Misc.fatal_error
           "inferred modaltiy Exactly should not be on the RHS of sub."
-      | Undefined, _ | _, Undefined ->
-        Misc.fatal_error "modality Undefined should not be in sub."
 
     let apply : type r.
         ?hint:(allowed * r) pos Hint.morph ->
@@ -4727,8 +4780,6 @@ module Modality = struct
      fun ?hint t x ->
       match t with
       | Const c -> Const.apply ?hint c x |> Mode.disallow_right
-      | Undefined ->
-        Misc.fatal_error "modality Undefined should not be applied."
       | Exactly (_mm, m) ->
         (* Ideally want to return [meet_(imply_mm m) x], which we can't do
            without binary mode solver, so instead we return [meet_m x] (See
@@ -4738,7 +4789,6 @@ module Modality = struct
 
     let print ppf = function
       | Const c -> Const.print ppf c
-      | Undefined -> Fmt.fprintf ppf "undefined"
       | Exactly _ -> Fmt.fprintf ppf "exactly"
 
     let infer ~md_mode ~mode = Exactly (md_mode, mode)
@@ -4751,7 +4801,6 @@ module Modality = struct
 
     let zap_to_ceil = function
       | Const c -> c
-      | Undefined -> Misc.fatal_error "modality Undefined should not be zapped."
       | Exactly (mm, m) ->
         (* Ideally we will take [c = imply_mm m] and zap it to ceil. However,
            [imply] requires [mm] to be constant. We get the floor of [mm] to
@@ -4776,7 +4825,6 @@ module Modality = struct
 
     let zap_to_floor = function
       | Const c -> c
-      | Undefined -> Misc.fatal_error "modality Undefined should not be zapped."
       | Exactly (mm, m) ->
         (* The following zaps [mm] to ceil, which might conflict with future
            mode constraints on [mm]. We find constraining [mm] to [legacy] a
@@ -4790,8 +4838,6 @@ module Modality = struct
 
     let to_const_opt = function
       | Const c -> Some c
-      | Undefined ->
-        Misc.fatal_error "modality Undefined should not be looked at"
       | Exactly _ -> None
 
     let of_const c = Const c
@@ -4878,6 +4924,12 @@ module Modality = struct
       in
       { monadic; comonadic }
 
+    let apply_const t (x : Value.Const.t) : Value.Const.t =
+      let { monadic; comonadic } = Value.Const.split x in
+      let monadic = Monadic.apply_const t.monadic monadic in
+      let comonadic = Comonadic.apply_const t.comonadic comonadic in
+      Value.Const.merge { monadic; comonadic }
+
     let concat ~then_ t =
       let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
       let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
@@ -4907,13 +4959,6 @@ module Modality = struct
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
-
-  let undefined : t = { monadic = Undefined; comonadic = Undefined }
-
-  let is_undefined : t -> bool = function
-    | { monadic = Undefined; comonadic = Undefined } -> true
-    | _ -> false
-  [@@ocaml.warning "-4"]
 
   let apply ?hint t { monadic; comonadic } =
     let monadic =

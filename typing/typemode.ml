@@ -462,6 +462,39 @@ let mode_annot_to_modality_annot mode_annot =
       | Monadic ax -> Atom (Monadic ax, Join_const mode))
     mode_annot
 
+let modality_of_mode_annot_option (opt : Alloc.Const.Option.t)
+  : Modality.Const.t =
+  let atom_of_axis (type a) (ax : a Alloc.Axis.t) (v : a option)
+    : Modality.atom option =
+    Option.map
+      (fun v ->
+        let (Atom (ax, v) : Mode.Value.atom) =
+          Mode_axis_pair.to_value (Atom (ax, v))
+        in
+        match[@warning "-18"] ax with
+        | Comonadic ax -> (Atom (Comonadic ax, Meet_const v) : Modality.atom)
+        | Monadic ax -> (Atom (Monadic ax, Join_const v) : Modality.atom))
+      v
+  in
+  let atoms =
+    List.filter_map
+      (fun x -> x)
+      [ atom_of_axis (Comonadic Areality) opt.areality;
+        atom_of_axis (Comonadic Linearity) opt.linearity;
+        atom_of_axis (Comonadic Portability) opt.portability;
+        atom_of_axis (Comonadic Forkable) opt.forkable;
+        atom_of_axis (Comonadic Yielding) opt.yielding;
+        atom_of_axis (Comonadic Statefulness) opt.statefulness;
+        atom_of_axis (Monadic Uniqueness) opt.uniqueness;
+        atom_of_axis (Monadic Contention) opt.contention;
+        atom_of_axis (Monadic Visibility) opt.visibility;
+        atom_of_axis (Monadic Staticity) opt.staticity
+      ]
+  in
+  List.fold_left
+    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
+    Modality.Const.id atoms
+
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
   let mode =

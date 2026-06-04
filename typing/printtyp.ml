@@ -1453,6 +1453,22 @@ let tree_of_modalities mut t =
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
+let tree_of_value_modes_option (modes : Mode.Value.Const.Option.t) =
+  let print_to_string_opt print a = Option.map (Fmt.asprintf "%a" print) a in
+  let modes =
+    [ print_to_string_opt Mode.Regionality.Const.print modes.areality
+    ; print_to_string_opt Mode.Uniqueness.Const.print modes.uniqueness
+    ; print_to_string_opt Mode.Linearity.Const.print modes.linearity
+    ; print_to_string_opt Mode.Portability.Const.print modes.portability
+    ; print_to_string_opt Mode.Contention.Const.print modes.contention
+    ; print_to_string_opt Mode.Forkable.Const.print modes.forkable
+    ; print_to_string_opt Mode.Yielding.Const.print modes.yielding
+    ; print_to_string_opt Mode.Statefulness.Const.print modes.statefulness
+    ; print_to_string_opt Mode.Visibility.Const.print modes.visibility ]
+  in
+  List.filter_map (fun x -> x) modes
+
+
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
@@ -2422,12 +2438,13 @@ let tree_of_value_description id decl =
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   wrap_mutation (fun () ->
-  let moda =
-    if Mode.Modality.is_undefined decl.val_modalities then
-      Mode.Modality.Const.id
-    else
-      Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
-        decl.val_modalities
+  let moda, modes =
+    match (decl.val_modes : Sig_item_modes.t) with
+    | Modality m ->
+        Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha m,
+        Mode.Value.Const.Option.none
+    | Overriding o -> Mode.Modality.Const.id, o
+    | Normalized -> Mode.Modality.Const.id, Mode.Value.Const.Option.none
   in
   let qsvs, qtvs =
     (* Important: process the fvs *after* the type; tree_of_type_scheme
@@ -2472,6 +2489,7 @@ let tree_of_value_description id decl =
   in
   let vd =
     { oval_name = id;
+      oval_modes = tree_of_value_modes_option modes;
       oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
@@ -2954,12 +2972,12 @@ and tree_of_modtype_declaration ?abbrev id decl =
 
 and tree_of_module ?abbrev id md rs = wrap_mutation (fun () ->
   let moda =
-    if Mode.Modality.is_undefined md.md_modalities then
-      Mode.Modality.Const.id
-    else
-      Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities
+    match (md.md_modes : Sig_item_modes.t) with
+    | Modality m -> Ctype.zap_modalities_to_floor_if_at_least Alpha m
+    | Overriding _ | Normalized -> Mode.Modality.Const.id
   in
-    Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
+    Osig_module (Ident.name id,
+    tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities Immutable moda,
     tree_of_rec rs)
   )

@@ -70,7 +70,7 @@ module F : S -> T = functor (M : S) -> struct
   let g = M.f
 end
 [%%expect{|
-module F : S -> T @@ stateless
+module F : S -> T
 |}]
 
 module F (M : S @ portable) (M' : S) = struct
@@ -202,7 +202,39 @@ Error: Modules do not match: sig val f : unit -> unit end @ nonportable
      However, the second is "portable".
 |}]
 
-(* testing generative functor *)
+(* Testing how a functor's return module-type / mode annotations affect
+   inference. The same rules apply to generative and applicative functors.
+
+   Case 1: no return module-type annotation. The return is fully inferred and
+   takes the most permissive mode (portable here, because the structure
+   contains only portable items). *)
+let () =
+    let module F () = struct
+        let f () = ()
+    end in
+    let module M = F () in
+    use_portable M.f
+[%%expect{|
+|}]
+
+(* Case 2: return module-type annotated, AND the mode annotated [@ portable].
+   The return is at [portable], so [use_portable M.f] works. *)
+let () =
+    let module F () : sig
+        val f : unit -> unit
+    end @ portable = struct
+        let f () = ()
+    end in
+    let module M = F () in
+    use_portable M.f
+[%%expect{|
+|}]
+
+(* Case 3: return module-type annotated, but the mode is NOT annotated. The
+   unspecified axes default to legacy (nonportable), so [M.f] is at
+   [nonportable] and [use_portable M.f] fails. To make this work, you must
+   either omit the return module-type (Case 1) or annotate the mode
+   (Case 2). *)
 let () =
     let module F () : sig
         val f : unit -> unit
@@ -212,7 +244,53 @@ let () =
     let module M = F () in
     use_portable M.f
 [%%expect{|
+Line 8, characters 17-20:
+8 |     use_portable M.f
+                     ^^^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
+
+(* The same three cases hold for applicative functors. *)
+
+(* Case 1 (applicative): no return module-type annotation, fully inferred. *)
+let () =
+    let module F (X : sig end) = struct
+        let f () = ()
+    end in
+    let module M = F (struct end) in
+    use_portable M.f
+[%%expect{|
+|}]
+
+(* Case 2 (applicative): return module-type annotated, with [@ portable]. *)
+let () =
+    let module F (X : sig end) : sig
+        val f : unit -> unit
+    end @ portable = struct
+        let f () = ()
+    end in
+    let module M = F (struct end) in
+    use_portable M.f
+[%%expect{|
+|}]
+
+(* Case 3 (applicative): return module-type annotated, no mode annotation.
+   Defaults to legacy / nonportable, so [use_portable M.f] fails. *)
+let () =
+    let module F (X : sig end) : sig
+        val f : unit -> unit
+    end = struct
+        let f () = ()
+    end in
+    let module M = F (struct end) in
+    use_portable M.f
+[%%expect{|
+Line 8, characters 17-20:
+8 |     use_portable M.f
+                     ^^^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
 
 (* testing include functor in signature *)
 module type FT = S @ portable -> T @ portable
@@ -955,7 +1033,7 @@ let (foo @ portable) () =
   let _ : F(M).t = 42 in
   ()
 [%%expect{|
-module F = F @@ stateless nonportable
+module F = F
 module M = M
 val foo : unit -> unit = <fun>
 |}]

@@ -450,7 +450,7 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
   { val_type;
     val_kind;
     val_loc = Location.none;
-    val_modalities = Mode.Modality.(Const.id |> of_const);
+    val_modes = Types.Sig_item_modes.Modality Mode.Modality.(Const.id |> of_const);
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
     val_zero_alloc = Zero_alloc.default;

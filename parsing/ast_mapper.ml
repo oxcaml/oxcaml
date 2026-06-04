@@ -806,14 +806,15 @@ let default_mapper =
     type_exception = T.map_type_exception;
     extension_constructor = T.map_extension_constructor;
     value_description =
-      (fun this {pval_name; pval_type; pval_modalities; pval_prim; pval_poly;
-                 pval_loc; pval_attributes} ->
+      (fun this {pval_name; pval_modes; pval_type; pval_modalities; pval_prim;
+                 pval_poly; pval_loc; pval_attributes} ->
         Val.mk
           (map_loc this pval_name)
           (this.typ this pval_type)
           ~attrs:(this.attributes this pval_attributes)
           ~loc:(this.location this pval_loc)
           ~poly:pval_poly
+          ~modes:(this.modes this pval_modes)
           ~modalities:(this.modalities this pval_modalities)
           ~prim:pval_prim
       );
@@ -823,12 +824,14 @@ let default_mapper =
     binding_op = E.map_binding_op;
 
     module_declaration =
-      (fun this {pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc} ->
+      (fun this {pmd_name; pmd_modes; pmd_type; pmd_modalities; pmd_attributes;
+                 pmd_loc} ->
          Md.mk
            (map_loc this pmd_name)
            (this.module_type this pmd_type)
            ~attrs:(this.attributes this pmd_attributes)
            ~loc:(this.location this pmd_loc)
+           ~modes:(this.modes this pmd_modes)
            ~modalities:(this.modalities this pmd_modalities)
       );
 

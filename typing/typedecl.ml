@@ -141,6 +141,7 @@ type error =
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
+  | Val_modes_and_modalities
   | Invalid_reexport of
       { definition: Path.t
       ; expected: Path.t
@@ -4207,7 +4208,9 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities, val_modal_info =
+  if valdecl.pval_modes <> [] && valdecl.pval_modalities <> []
+  then raise (Error (loc, Val_modes_and_modalities));
+  let mode, val_modes_from_modalities, val_modal_info =
     match modal with
     | Str_primitive ->
         assert (not valdecl.pval_poly);
@@ -4221,7 +4224,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.undefined, Valmi_str_primitive modes
+        mode, Sig_item_modes.Normalized, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
@@ -4235,7 +4238,16 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modalities =
           Mode.Modality.of_const raw_modalities.moda_modalities
         in
-        md_mode, modalities, Valmi_sig_value raw_modalities
+        md_mode, Sig_item_modes.Modality modalities,
+        Valmi_sig_value raw_modalities
+  in
+  let val_modes : Sig_item_modes.t =
+    if valdecl.pval_modes <> []
+    then
+      Overriding
+        (Mode.Const.alloc_option_as_value
+           (Typemode.transl_mode_annots valdecl.pval_modes).mode_modes)
+    else val_modes_from_modalities
   in
   let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
@@ -4298,7 +4310,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
         val_kind = Val_reg sort;
         val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities;
+        val_attributes = valdecl.pval_attributes;
+        val_modes;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
@@ -4343,7 +4356,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       { val_type = ty; val_kind = Val_prim prim;
         val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities;
+        val_attributes = valdecl.pval_attributes;
+        val_modes;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
@@ -5395,6 +5409,10 @@ let report_error_doc ppf = function
   | Zero_alloc_attr_bad_user_arity ->
     fprintf ppf
       "@[Invalid zero_alloc attribute: arity must be greater than 0.@]"
+  | Val_modes_and_modalities ->
+    fprintf ppf
+      "@[A value description cannot have both mode annotations (@ ...) and@ \
+         modality annotations (@@ ...).@]"
   | Invalid_reexport {definition; expected} ->
     fprintf ppf
       "@[Invalid reexport declaration.\

@@ -17,6 +17,12 @@ type modalities =
 *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
 
+(** Convert a partial mode annotation (only some axes specified) into a modality
+    that meets/joins with the specified values on those axes and is the identity
+    on the unspecified axes. *)
+val modality_of_mode_annot_option :
+  Mode.Alloc.Const.Option.t -> Mode.Modality.Const.t
+
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to

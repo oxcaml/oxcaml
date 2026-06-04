@@ -50,7 +50,7 @@ type value_mismatch =
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
-  | Modality of Mode.Modality.error
+  | Sig_item_modes of Types.Sig_item_modes.sub_error
   | Mode of Mode.Value.error
   | Layout_poly_coercion of layout_poly_coercion
 
@@ -178,10 +178,11 @@ val child_modes: string -> mmodes -> mmodes
 
 (** Gives the modes suitable for the inclusion check of a child item. Takes the
     modes suitable for the inclusion check of the parent item, and both hands'
-    modalities between the parent and the child. *)
-val child_modes_with_modalities:
-  string -> modalities:(Mode.Modality.t * Mode.Modality.t) ->
-  mmodes -> (mmodes, Mode.Modality.error) Result.t
+    [Sig_item_modes.t] (the unified mode-related information on the child). *)
+val child_modes_with_sig_item_modes:
+  string ->
+  modes:(Types.Sig_item_modes.t * Types.Sig_item_modes.t) ->
+  mmodes -> (mmodes, Types.Sig_item_modes.sub_error) Result.t
 
 (** Claim the current item is included by the RHS and its mode checked. *)
 val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
@@ -224,8 +225,9 @@ val report_type_mismatch :
   Env.t ->
   type_mismatch Format_doc.printer
 
-val report_modality_sub_error :
-  string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
+val report_sig_item_modes_sub_error :
+  string -> string -> Format_doc.formatter ->
+  Types.Sig_item_modes.sub_error -> unit
 
 val report_mode_sub_error :
   pp:Mode.Hint.pinpoint ->

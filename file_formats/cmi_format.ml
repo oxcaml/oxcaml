@@ -111,7 +111,7 @@ let deserialize data =
     Subst.Lazy.{
       val_type;
       val_lpoly;
-      val_modalities = vd.val_modalities;
+      val_modes = vd.val_modes;
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;
@@ -146,7 +146,7 @@ let serialize oc base =
     Serialized.{
       val_type = marshal (vars, ty);
       val_lpoly = -1; (* invalid offset *)
-      val_modalities = vd.val_modalities;
+      val_modes = vd.val_modes;
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;

@@ -231,6 +231,7 @@ and out_type_extension =
     otyext_private: Asttypes.private_flag }
 and out_val_decl =
   { oval_name: string;
+    oval_modes: out_mode list;
     oval_type: out_type;
     oval_modalities : out_modality list;
     (* Modalities on value descriptions are always new, even for [global_] *)

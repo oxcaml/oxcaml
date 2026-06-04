@@ -247,7 +247,7 @@ module Is_modal = struct
     | Value_descriptions d -> value_mismatch d.symptom
     | Class_declarations d -> class_declaration_symptom d.symptom
     | Type_declarations _ | Extension_constructors _ | Class_type_declarations _
-    | Modalities _ | Jkind_declarations _ -> None
+    | Sig_item_modes _ | Jkind_declarations _ -> None
 
   and class_declaration_symptom = function
     | Class_mode e ->
@@ -779,13 +779,20 @@ let subcase_list l ppf = match l with
         (Fmt.pp_print_list ~pp_sep:space pp_msg)
         (List.rev l)
 
+let report_sig_item_modes_with_id id (e : Types.Sig_item_modes.sub_error) =
+  let prefix = match e with
+    | Modality_error _ -> "Modalities on "
+    | Axis_mismatch _ | Le_failure _ -> "Mode annotations on "
+  in
+  Fmt.dprintf "@[<hv>%s:@;%a@]"
+    (prefix ^ (Ident.name id) ^ " do not match")
+    (Includecore.report_sig_item_modes_sub_error "the first" "the second") e
+
 (* Printers for leaves *)
 let core env id x =
   match x with
-  | Err.Value_descriptions {symptom = Modality e} ->
-      Fmt.dprintf "@[<hv>%s:@;%a@]"
-        ("Modalities on " ^ (Ident.name id) ^ " do not match")
-        (Includecore.report_modality_sub_error "the first" "the second") e
+  | Err.Value_descriptions {symptom = Sig_item_modes e} ->
+      report_sig_item_modes_with_id id e
   | Err.Value_descriptions diff ->
       let is_modal = Is_modal.value_mismatch diff.symptom in
       let mode1, mode2 =
@@ -805,10 +812,8 @@ let core env id x =
            "the first" "the second" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
-  | Err.Modalities e ->
-      Fmt.dprintf "@[<hv>%s:@;%a@]"
-        ("Modalities on " ^ (Ident.name id) ^ " do not match")
-        (Includecore.report_modality_sub_error "the first" "the second") e
+  | Err.Sig_item_modes e ->
+      report_sig_item_modes_with_id id e
   | Err.Type_declarations diff ->
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
         "Type declarations do not match"

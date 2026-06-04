@@ -48,7 +48,7 @@ type value_mismatch =
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
-  | Modality of Mode.Modality.error
+  | Sig_item_modes of Types.Sig_item_modes.sub_error
   | Mode of Mode.Value.error
   | Layout_poly_coercion of layout_poly_coercion
 
@@ -72,25 +72,29 @@ let child_modes id = function
     let c = child_close_over_coercion_opt id c in
     Specific ((m0, c), m1)
 
-let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
+let child_modes_with_sig_item_modes id ~modes:(sim0, sim1) = function
   | All ->
-    begin match Mode.Modality.sub moda0 moda1 with
+    begin match Types.Sig_item_modes.sub sim0 sim1 with
       | Ok () -> Ok All
       | Error e -> Error e
     end
   | Specific ((m0, c), m1)->
     let c = child_close_over_coercion_opt id c in
-    begin match Mode.Modality.to_const_opt moda1 with
+    begin match Types.Sig_item_modes.to_const_opt sim1 with
     | None ->
       (* [wrap_constraint_with_shape] invokes inclusion check with
           identical modes and inferred modalities, which we workaround *)
-      assert (moda0 == moda1);
+      (match (sim0 : Types.Sig_item_modes.t),
+             (sim1 : Types.Sig_item_modes.t) with
+       | Modality moda0, Modality moda1 -> assert (moda0 == moda1)
+       | _ -> assert false);
       Mode.Value.submode_exn m0 m1;
-      (* For children, we only check modality inclusion *)
       Ok All
-    | Some moda1 ->
-      let m0 = Mode.Modality.apply moda0 m0 in
-      let m1 = Mode.Modality.Const.apply moda1 m1 in
+    | Some sim1_const ->
+      let m0 = Types.Sig_item_modes.apply Normalize_exn sim0 m0 in
+      let m1 =
+        Types.Sig_item_modes.Const.apply Normalize_exn sim1_const m1
+      in
       Ok (Specific ((m0, c), m1))
     end
 
@@ -201,11 +205,11 @@ let value_descriptions ~loc env name
   | Error e -> raise (Dont_match (Zero_alloc e))
   end;
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
-  let modalities = vd1.val_modalities, vd2.val_modalities in
+  let sig_item_modes = vd1.val_modes, vd2.val_modes in
   let modes =
-    match child_modes_with_modalities name ~modalities mmodes with
+    match child_modes_with_sig_item_modes name ~modes:sig_item_modes mmodes with
     | Ok modes -> modes
-    | Error e -> raise (Dont_match (Modality e))
+    | Error e -> raise (Dont_match (Sig_item_modes e))
   in
   begin match check_modes env ~crossing ~item:Value ~typ:vd1.val_type modes with
   | Ok () -> ()
@@ -455,6 +459,24 @@ let report_primitive_mismatch first second ppf err =
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
+let report_sig_item_modes_sub_error first second ppf
+      (e : Types.Sig_item_modes.sub_error) =
+  let pr fmt = Fmt.fprintf ppf fmt in
+  match e with
+  | Modality_error e -> report_modality_sub_error first second ppf e
+  | Axis_mismatch (P ax) ->
+      pr "Mode annotations on axis %a differ: one is annotated,@ \
+          the other is not."
+        Mode.Value.Axis.print ax
+  | Le_failure (ax, v0, v1) ->
+      let print_axis ppf v =
+        match ax with
+        | Comonadic ax -> Mode.Value.Comonadic.Const.Per_axis.print ax ppf v
+        | Monadic ax -> Mode.Value.Monadic.Const.Per_axis.print ax ppf v
+      in
+      pr "Mode annotations differ:@ %s is %a,@ %s is %a."
+        first print_axis v0 second print_axis v1
+
 let report_value_mismatch ~pp first second env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
@@ -469,7 +491,8 @@ let report_value_mismatch ~pp first second env ppf err =
         (msg "The type")
         (msg "is not compatible with the type")
   | Zero_alloc e -> Zero_alloc.print_error ppf e
-  | Modality e -> report_modality_sub_error first second ppf e
+  | Sig_item_modes e ->
+      report_sig_item_modes_sub_error first second ppf e
   | Mode e ->
       let got = first ^ " is" in
       let expected = second ^ " is" in

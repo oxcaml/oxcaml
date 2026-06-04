@@ -145,7 +145,7 @@ end = struct
 end
 
 [%%expect{|
-module M : sig type t : immediate_or_null end @@ stateless
+module M : sig type t : immediate_or_null end
 |}]
 
 (* Tests for [immediate64_or_null]. *)
@@ -250,7 +250,7 @@ end = struct
 end
 
 [%%expect{|
-module M64 : sig type t : immediate64_or_null end @@ stateless
+module M64 : sig type t : immediate64_or_null end
 |}]
 
 module Fails : sig

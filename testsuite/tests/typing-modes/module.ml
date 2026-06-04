@@ -161,7 +161,7 @@ module M : S = struct
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
-module M : S @@ stateless nonportable
+module M : S
 |}]
 
 let (bar @ portable) () =
@@ -393,7 +393,7 @@ end
 [%%expect{|
 module F :
   functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
-  stateless
+  portable
 |}]
 
 

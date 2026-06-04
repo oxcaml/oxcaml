@@ -110,7 +110,7 @@ module type S = sig @@ portable
   module M' = M
 end
 [%%expect{|
-module M : T @@ stateless nonportable
+module M : T
 module type S = sig module M' = M end
 |}]
 
@@ -131,10 +131,7 @@ Lines 1-3, characters 15-3:
 2 |   module M' = M
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module M' = M @@ stateless nonportable end
-       is not included in
-         S
+       Modules do not match: sig module M' = M end is not included in S
        In module "M'":
        Modules do not match:
          sig val foo : 'a -> 'a end @ nonportable

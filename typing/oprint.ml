@@ -958,7 +958,7 @@ and print_out_sig_item ppf =
            | Orec_first -> "type"
            | Orec_next  -> "and")
           ppf td
-  | Osig_value { oval_name; oval_type; oval_modalities;
+  | Osig_value { oval_name; oval_modes; oval_type; oval_modalities;
                  oval_prims; oval_attributes } ->
       let kwd = if oval_prims = [] then "val" else "external" in
       let pr_prims ppf =
@@ -968,7 +968,8 @@ and print_out_sig_item ppf =
             fprintf ppf "@ = \"%s\"" s;
             List.iter (fun s -> fprintf ppf "@ \"%s\"" s) sl
       in
-      fprintf ppf "@[<2>%s %a :@ %a%a%a%a@]" kwd value_ident oval_name
+      fprintf ppf "@[<2>%s %a%a :@ %a%a%a%a@]" kwd value_ident oval_name
+        print_out_modes oval_modes
         !out_type oval_type
         print_out_modalities oval_modalities
         pr_prims oval_prims

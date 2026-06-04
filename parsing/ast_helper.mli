@@ -241,7 +241,8 @@ module Exp:
 module Val:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?prim:string list ->
-      ?poly:bool -> ?modalities:modality with_loc list -> str -> core_type ->
+      ?poly:bool -> ?modes:mode with_loc list ->
+      ?modalities:modality with_loc list -> str -> core_type ->
       value_description
   end
 
@@ -392,7 +393,8 @@ module Str:
 (** Module declarations *)
 module Md:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text -> ?modalities:modalities ->
+    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
+      ?modes:modes -> ?modalities:modalities ->
       str_opt -> module_type -> module_declaration
   end
 

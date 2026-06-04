@@ -703,9 +703,16 @@ Line 3, characters 10-11:
 3 |   (module M : S)
               ^
 Error: Signature mismatch:
-       Got "local" to the parent region
-       but expected "global"
-         because it is a module and thus needs to be allocated on the heap.
+       Modules do not match:
+         sig val s : string end @ regional
+       is not included in
+         S @ global
+       Values do not match:
+         val s : string (* in a structure at regional *)
+       is not included in
+         val s : string (* in a structure at global *)
+       The first is "local" to the parent region
+       but the second is "global".
 |}]
 
 (* Don't escape through a lazy value *)

@@ -676,6 +676,9 @@ module type S = sig
 
         val none : t
 
+        (** [true] iff [t] is [none] (all axes are [None]). *)
+        val is_none : t -> bool
+
         val value : t -> default:some -> some
 
         val print : Fmt.formatter -> t -> unit
@@ -738,6 +741,12 @@ module type S = sig
       ('l * 'r) t
 
     val to_const_exn : lr -> Const.t
+
+    (** Similar to [to_const_exn], but works on modes of any allowance.
+        "Loose" refers to the bounds being over-approximations rather than the
+        tight bounds [to_const_exn] uses; for modes that are already constants
+        the result is exact. *)
+    val to_loose_const_exn : ('l * 'r) t -> Const.t
 
     module List : sig
       (* No new types exposed to avoid too many type names *)
@@ -805,6 +814,9 @@ module type S = sig
 
   module Const : sig
     val alloc_as_value : Alloc.Const.t -> Value.Const.t
+
+    val alloc_option_as_value :
+      Alloc.Const.Option.t -> Value.Const.Option.t
 
     module Axis : sig
       val alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed
@@ -926,6 +938,9 @@ module type S = sig
         ('l * 'r) Value.t ->
         ('l * 'r) Value.t
 
+      (** Apply a constant modality on a constant mode. *)
+      val apply_const : t -> Value.Const.t -> Value.Const.t
+
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
 
@@ -950,15 +965,6 @@ module type S = sig
     (** A modality that acts on [Value] modes. Conceptually it is a record where
         individual fields can be [set] or [proj]. *)
     type t
-
-    (* CR-someday zqian: [undefined] is only used for [val_modalities] and
-       [md_modalities]. Consider moving the logic there. *)
-
-    (** The undefined modality. *)
-    val undefined : t
-
-    (** Check if the given modality is [undefined]. *)
-    val is_undefined : t -> bool
 
     (* CR zqian: note that currently, [apply] and [sub] and [zap] are NOT
        coherent for comonadic axes. That is, we do NOT have

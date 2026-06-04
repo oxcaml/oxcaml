@@ -662,12 +662,138 @@ module Lpoly = struct
     | Determined _ -> on_determined ()
 end
 
+module Sig_item_modes = struct
+  type t =
+    | Overriding of Mode.Value.Const.Option.t
+    | Modality of Mode.Modality.t
+    | Normalized
+
+  type normalize =
+    | Normalize_exn
+    | Assert_normalized
+    | Normalize
+
+  module Const = struct
+    type t =
+      | Overriding of Mode.Value.Const.Option.t
+      | Modality of Mode.Modality.Const.t
+      | Normalized
+
+    let apply : type l r.
+        normalize -> t -> (l * r) Mode.Value.t -> (l * r) Mode.Value.t =
+      fun n sim m ->
+      match n, sim with
+      | Normalize, Normalized -> m
+      | Normalize_exn, Normalized ->
+          Misc.fatal_error "mode is already normalized but expected otherwise"
+      | Assert_normalized, Normalized -> m
+      | (Normalize | Normalize_exn), Modality mc ->
+          Mode.Modality.Const.apply mc m
+      | (Normalize | Normalize_exn), Overriding o ->
+          (* Per the invariant: when [val_modes] is [Overriding], the
+             surrounding mode is constant, so the zap is safe. *)
+          let c = Mode.Value.to_loose_const_exn m in
+          let c = Mode.Value.Const.Option.value o ~default:c in
+          Mode.Value.of_const c
+      | Assert_normalized, (Modality _ | Overriding _) ->
+          Misc.fatal_error "mode is not already normalized but expected otherwise"
+  end
+
+  let apply ?(loc_struct : Location.t option)
+        ?(item : Mode.Hint.structure_item option) (n : normalize) (vm : t)
+        mode =
+    match n, vm with
+    | Normalize, Normalized -> Mode.Value.disallow_right mode
+    | Normalize_exn, Normalized ->
+        Misc.fatal_error "mode is already normalized but expected otherwise"
+    | Assert_normalized, Normalized -> Mode.Value.disallow_right mode
+    | (Normalize | Normalize_exn), Modality m ->
+        let hint : _ Mode.monadic_comonadic =
+          match loc_struct, item with
+          | Some loc_struct, Some item ->
+              let is_contained_by : Mode.Hint.is_contained_by =
+                { containing = Structure (item, Modality);
+                  container = (loc_struct, Structure) }
+              in
+              { monadic = Mode.Hint.Is_contained_by (Monadic, is_contained_by);
+                comonadic =
+                  Mode.Hint.Is_contained_by (Comonadic, is_contained_by) }
+          | _ ->
+              {monadic = Mode.Hint.Unknown; comonadic = Mode.Hint.Unknown}
+        in
+        Mode.Modality.apply ~hint m mode
+    | (Normalize | Normalize_exn), Overriding o ->
+        let c = Mode.Value.to_loose_const_exn mode in
+        let c = Mode.Value.Const.Option.value o ~default:c in
+        Mode.Value.of_const c |> Mode.Value.disallow_right
+    | Assert_normalized, (Modality _ | Overriding _) ->
+        Misc.fatal_error "mode is not already normalized but expected otherwise"
+
+  let to_const_opt (sim : t) : Const.t option =
+    match sim with
+    | Overriding o -> Some (Const.Overriding o)
+    | Modality m ->
+      (match Mode.Modality.to_const_opt m with
+       | None -> None
+       | Some m -> Some (Const.Modality m))
+    | Normalized -> Some Const.Normalized
+
+  type sub_error =
+    | Modality_error of Mode.Modality.error
+    | Axis_mismatch of Mode.Value.Axis.packed
+    | Le_failure : 'a Mode.Value.Axis.t * 'a * 'a -> sub_error
+
+  (* Check that for each axis, either both [modes0] and [modes1] are [None],
+     or both are [Some] with [modes0 <= modes1] on that axis. *)
+  let sub_overriding (modes0 : Mode.Value.Const.Option.t)
+        (modes1 : Mode.Value.Const.Option.t) : (unit, sub_error) result =
+    let exception Sub_error of sub_error in
+    let check_axis : type a.
+        a Mode.Value.Axis.t -> a option -> a option -> unit =
+      fun ax v0 v1 ->
+        match v0, v1 with
+        | None, None -> ()
+        | Some v0, Some v1 ->
+          let le =
+            match ax with
+            | Comonadic ax -> Mode.Value.Comonadic.Const.Per_axis.le ax v0 v1
+            | Monadic ax -> Mode.Value.Monadic.Const.Per_axis.le ax v0 v1
+          in
+          if not le then raise (Sub_error (Le_failure (ax, v0, v1)))
+        | None, Some _ | Some _, None ->
+          raise (Sub_error (Axis_mismatch (P ax)))
+    in
+    try
+      List.iter
+        (fun (Mode.Value.Axis.P ax) ->
+          let v0 = Mode.Value.Const.Option.proj ax modes0 in
+          let v1 = Mode.Value.Const.Option.proj ax modes1 in
+          check_axis ax v0 v1)
+        Mode.Value.Axis.all;
+      Ok ()
+    with Sub_error e -> Error e
+
+  let sub (sim0 : t) (sim1 : t) : (unit, sub_error) result =
+    match sim0, sim1 with
+    | Modality m0, Modality m1 ->
+      (match Mode.Modality.sub m0 m1 with
+       | Ok () -> Ok ()
+       | Error e -> Error (Modality_error e))
+    | Overriding o0, Overriding o1 -> sub_overriding o0 o1
+    | Normalized, Normalized -> Ok ()
+    | (Modality _ | Overriding _ | Normalized),
+      (Modality _ | Overriding _ | Normalized) ->
+      Misc.fatal_error
+        "Sig_item_modes.sub: mismatched constructors"
+
+end
+
 module type Wrapped = sig
   type 'a wrapped
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities : Mode.Modality.t;     (* Modalities on the value *)
+      val_modes : Sig_item_modes.t;
       val_kind: value_kind;
       val_lpoly: Lpoly.t wrapped;
       val_loc: Location.t;
@@ -704,7 +830,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
-    md_modalities: Mode.Modality.t;
+    md_modes : Sig_item_modes.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -779,11 +905,11 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
 
   let value_description m vd = m.map_value_description m vd
 
-  let module_declaration m {md_type; md_modalities; md_attributes;
+  let module_declaration m {md_type; md_modes; md_attributes;
     md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
-      md_modalities;
+      md_modes;
       md_attributes;
       md_loc;
       md_uid;

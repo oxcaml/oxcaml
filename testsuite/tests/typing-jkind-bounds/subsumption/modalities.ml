@@ -423,7 +423,7 @@ module type X =
   end
 |}]
 
-module Xm : X = struct
+module Xm : X @ portable = struct
   type t = int ref
 
   let create n = ref n

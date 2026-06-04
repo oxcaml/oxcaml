@@ -679,7 +679,7 @@ module F : S @ portable -> sig end @@ stateless
 
 module M' = (M : S @ portable)
 [%%expect{|
-module M' : S @@ stateless
+module M' : S @@ portable
 |}]
 
 module F (M : S @ portable) : S @ portable = struct
@@ -700,28 +700,45 @@ module F : functor (M : S @ portable) -> sig end @@ stateless
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-module M' = M @@ stateless
+module M' = M @@ portable
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-module M' : S @@ stateless
+module M' : S @@ portable
 |}]
 
 module M @ portable = struct end
 [%%expect{|
-module M : sig end @@ stateless
+module M : sig end @@ portable
 |}]
 
 module M : S @ portable = struct end
 [%%expect{|
-module M : S @@ stateless
+module M : S @@ portable
 |}]
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
 [%%expect{|
 module type S' =
   functor () (M : S @ portable) -> S @ portable -> S @ portable
+|}]
+
+(* Modes on val and module declarations in signatures parse and print. *)
+module type S = sig
+  val foo @ portable : int -> int
+  external baz @ portable : int -> int = "%identity"
+  module M @ portable : sig val x : int end
+  module N @ portable : sig val x : int end @@ portable
+end
+[%%expect{|
+module type S =
+  sig
+    val foo @ portable : int -> int
+    external baz @ portable : int -> int = "%identity"
+    module M : sig val x : int end
+    module N : sig val x : int @@ portable end
+  end
 |}]
 
 
@@ -741,7 +758,7 @@ module type S'' = S @ local -> S -> S
 
 module (F @ portable) () = struct end
 [%%expect{|
-module F : functor () -> sig end @@ stateless
+module F : functor () -> sig end @@ portable
 |}]
 
 module (G @ portable) () = F
@@ -754,12 +771,12 @@ module (G @ portable) (F : (S @ unique -> S @ once) @ local) @ contended = struc
 [%%expect{|
 module G :
   functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
-  stateless
+  portable
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-module G' = F @@ stateless
+module G' = F @@ portable
 |}]
 
 module rec (F @ portable) () = struct end
@@ -975,7 +992,7 @@ module M :
   sig
     val f : (x:int * string) -> x:int * string
     val mk : unit -> x:bool * y:string
-  end @@ stateless
+  end
 module X_int_int : sig type t = x:int * int end @@ stateless
 |}]
 
@@ -1354,7 +1371,7 @@ module M :
     kind_ immutable = value
     kind_ data = value mod many
     kind_ abstract
-  end @@ stateless
+  end
 |}]
 
 module type S = sig kind_ k end

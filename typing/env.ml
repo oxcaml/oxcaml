@@ -1059,48 +1059,26 @@ let scrape_alias =
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
 let md md_type =
-  {md_type; md_modalities = Mode.Modality.undefined; md_attributes=[];
+  {md_type; md_modes = Sig_item_modes.Normalized; md_attributes=[];
    md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
 
-(** The caller is not interested in modes, and thus [val_modalities] is
+(** The caller is not interested in modes, and thus [val_modes] is
 invalidated. *)
 let vda_description vda =
   let vda_description = vda.vda_description in
-  {vda_description with val_modalities = Mode.Modality.undefined}
+  {vda_description with val_modes = Sig_item_modes.Normalized}
 
 module Normalize_mode = struct
-  type t =
-    | Normalize_exn (** Normalize a mode; raise if already normalized. *)
-    | Assert_normalized
-      (** Assert that the mode is already normalized, and return the mode *)
-    | Normalize
-      (** Normalize a mode; do nothing if already normalized.
-          Use the other two instead whenever possible *)
-
-  let modality t modality mode =
-    let normalized = Mode.Modality.is_undefined modality in
-    match t, normalized with
-    | Normalize, true -> modality, mode
-    | Normalize_exn, true ->
-        Misc.fatal_error "mode is already normalized but expected otherwise"
-    | Assert_normalized, true -> modality, mode
-    | (Normalize | Normalize_exn), false ->
-        Mode.Modality.undefined,
-        Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
-          modality mode
-    | Assert_normalized, false ->
-        Misc.fatal_error "mode is not already normalized but expected otherwise"
-
   let vd t (vd : Subst.Lazy.value_description) mode =
-    let val_modalities, mode = modality t vd.val_modalities mode in
-    let vd = {vd with val_modalities} in
+    let mode = Types.Sig_item_modes.apply t vd.val_modes mode in
+    let vd = {vd with val_modes = Normalized} in
     vd, mode
 
   let vda norm vda = vd norm vda.vda_description vda.vda_mode
 
   let md t (md : Subst.Lazy.module_declaration) mode =
-    let md_modalities, mode = modality t md.md_modalities mode in
-    let md = {md with md_modalities} in
+    let mode = Types.Sig_item_modes.apply t md.md_modes mode in
+    let md = {md with md_modes = Normalized} in
     md, mode
 
   let mda norm mda = md norm mda.mda_declaration mda.mda_mode
@@ -1244,7 +1222,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let md =
     { Subst.Lazy.md_type = Mty_signature sign;
-      md_modalities = Mode.Modality.undefined;
+      md_modes = Sig_item_modes.Normalized;
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
@@ -2941,7 +2919,7 @@ and add_cltype ?shape id ty env =
 
 let add_module_lazy ~update_summary id presence mty ?mode env =
   let md = Subst.Lazy.{md_type = mty;
-                       md_modalities = Mode.Modality.undefined;
+                       md_modes = Sig_item_modes.Normalized;
                        md_attributes = [];
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}

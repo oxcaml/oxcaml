@@ -64,7 +64,7 @@ let is_randomized () = Atomic.get randomized
 
 module Rng : sig
   val bits : unit -> int
-end = struct
+end @ portable = struct
   (* This is safe since [bits] is a C call that cannot be preempted,
      we do not yield, and we do not borrow the state. *)
   let key = Domain.Safe.DLS.new_key Random.State.make_self_init

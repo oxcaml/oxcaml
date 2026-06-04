@@ -58,7 +58,7 @@ module Error: sig
         (Types.class_type_declaration, Ctype.class_match_failure list) diff
     | Class_declarations of
         (Types.class_declaration, class_declaration_symptom) mdiff
-    | Modalities of Mode.Modality.error
+    | Sig_item_modes of Types.Sig_item_modes.sub_error
     | Jkind_declarations of (jkind_declaration, Includecore.jkind_mismatch) diff
 
   type core_module_type_symptom =

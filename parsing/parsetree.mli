@@ -708,6 +708,7 @@ and value_description =
     {
      pval_poly: bool; (** val poly_ *)
      pval_name: string loc;
+     pval_modes : modes;
      pval_type: core_type;
      pval_modalities : modalities;
      pval_prim: string list;
@@ -715,9 +716,9 @@ and value_description =
      pval_loc: Location.t;
     }
 (** Values of type {!value_description} represents:
-    - [val x: T],
+    - [val x @ modes : T @@ modalities],
             when {{!value_description.pval_prim}[pval_prim]} is [[]]
-    - [external x: T = "s1" ... "sn"]
+    - [external x @ modes : T @@ modalities = "s1" ... "sn"]
             when {{!value_description.pval_prim}[pval_prim]} is [["s1";..."sn"]]
 *)
 
@@ -1156,12 +1157,14 @@ and signature_item_desc =
 and module_declaration =
     {
      pmd_name: string option loc;
+     pmd_modes: modes;
      pmd_type: module_type;
      pmd_modalities: modalities;
      pmd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pmd_loc: Location.t;
     }
-(** Values of type [module_declaration] represents [S : MT] *)
+(** Values of type [module_declaration] represents
+    [S @ modes : MT @@ modalities] *)
 
 and module_substitution =
     {

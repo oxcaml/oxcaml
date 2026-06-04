@@ -106,14 +106,6 @@ type error =
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
-let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
-  let mode = Mode.Value.newvar () in
-  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
-  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
-  Value.submode_exn (min |> Alloc.of_const |> alloc_as_value) mode;
-  Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
-  mode
-
 let register_allocation () =
   let m, _ =
     Value.(newvar_below (of_const
@@ -174,45 +166,41 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
     would be allowed to performed on the module (and extended to the
     values) that's disallowed for the values.
 
-    For monadic (descriptive) axes, the restriction is not on the
-    construction but on the projection, which is modelled by the
-    [Diff] modality in [mode.ml]. *)
+    For monadic (descriptive) axes, the memory block's mode on
+    construction is pinned to [Value.Monadic.min] in
+    [register_allocation], so soundness is trivial. Projection from the
+    structure to items is still modelled by the [Diff] modality in
+    [mode.ml]. *)
     let mode' = md_mode |> apply_is_contained_by ~loc_md item in
     Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
     Mode.Modality.infer ~md_mode ~mode
 
 (** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
-[M] with [modalities] on it, calculate the modalities on the [item] to be used
-in the enclosing structure which is at [md_mode] and [loc_md]. *)
-let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
+[M] with [Sig_item_modes.t] on it, calculate the [Sig_item_modes.t] on the
+[item] to be used in the enclosing structure which is at [md_mode] and
+[loc_md]. *)
+let rebase_sig_item_modes ~loc ~loc_md item ~md_mode ~mode
+      (sim : Types.Sig_item_modes.t) : Types.Sig_item_modes.t =
   let pp : Hint.pinpoint = (loc, Structure_item item) in
-  let is_contained_by : Hint.is_contained_by =
-    { containing = Structure (item, Modality);
-      container = (loc, Structure)}
+  let mode =
+    Types.Sig_item_modes.apply ~loc_struct:loc ~item Normalize_exn sim mode
   in
-  let hint =
-    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
-      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
-  in
-  let mode = Modality.apply ~hint modalities mode in
-  infer_modalities pp ~loc_md item ~md_mode ~mode
+  Modality (infer_modalities pp ~loc_md item ~md_mode ~mode)
 
-(** Similiar to [rebase_modalities] but lifted to signatures. *)
-let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
+(** Similiar to [rebase_sig_item_modes] but lifted to signatures. *)
+let rebase_sig_item_modes_sg ~loc ~loc_md ~md_mode ~mode sg =
   List.map (function
     | Sig_value (id, vd, vis) ->
-        let val_modalities =
-          vd.val_modalities
-          |> rebase_modalities ~loc ~loc_md (Value, id) ~md_mode ~mode
+        let val_modes =
+          rebase_sig_item_modes ~loc ~loc_md (Value, id) ~md_mode ~mode vd.val_modes
         in
-        let vd = {vd with val_modalities} in
+        let vd = {vd with val_modes} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
-        let md_modalities =
-          md.md_modalities
-          |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~mode
+        let md_modes =
+          rebase_sig_item_modes ~loc ~loc_md (Module, id) ~md_mode ~mode md.md_modes
         in
-        let md = {md with md_modalities} in
+        let md = {md with md_modes} in
         Sig_module (id, pres, md, rec_, vis)
     | item -> item
     ) sg
@@ -726,23 +714,29 @@ let params_are_constrained =
 let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
   let sg_item = function
     | Sig_value (id, desc, vis) ->
-        let val_modalities =
-          desc.val_modalities |> zap_modality |> Mode.Modality.of_const
+        let val_modes : Types.Sig_item_modes.t =
+          match desc.val_modes with
+          | Modality m ->
+              Modality (m |> zap_modality |> Mode.Modality.of_const)
+          | (Overriding _ | Normalized) as vm -> vm
         in
         let val_zero_alloc =
           Zero_alloc.create_const (Zero_alloc.get desc.val_zero_alloc)
         in
-        let desc = {desc with val_modalities; val_zero_alloc} in
+        let desc = {desc with val_modes; val_zero_alloc} in
         Sig_value (id, desc, vis)
     | Sig_module (id, pres, md, re, vis) ->
         let md_type =
           remove_modality_and_zero_alloc_variables_mty env ~zap_modality
             md.md_type
         in
-        let md_modalities =
-          md.md_modalities |> zap_modality |> Mode.Modality.of_const
+        let md_modes : Types.Sig_item_modes.t =
+          match md.md_modes with
+          | Modality m ->
+              Modality (m |> zap_modality |> Mode.Modality.of_const)
+          | (Overriding _ | Normalized) as vm -> vm
         in
-        let md = {md with md_type; md_modalities} in
+        let md = {md with md_type; md_modes} in
         Sig_module (id, pres, md, re, vis)
     | item -> item
   in
@@ -1122,9 +1116,16 @@ module Merge = struct
               remove_modality_and_zero_alloc_variables_mty sig_env
                 ~zap_modality:Mode.Modality.zap_to_id mty
             in
-            assert (Modality.is_undefined md'.md_modalities);
-            let modalities = Modality.(Const.id |> of_const) in
-            let md'' = { md' with md_type = mty; md_modalities = modalities} in
+            (match md'.md_modes with
+             | Normalized -> ()
+             | Modality _ | Overriding _ ->
+               Misc.fatal_error
+                 "expected md_modes = Normalized here");
+            let md'' =
+              { md' with
+                md_type = mty;
+                md_modes = Modality Modality.(Const.id |> of_const) }
+            in
             let newmd =
               Mtype.strengthen_decl ~aliasable:false md'' path in
             (* Inclusion check with the original signature *)
@@ -1362,13 +1363,18 @@ let rec apply_modalities_signature ~recursive env modalities sg =
   let env = Env.add_signature sg env in
   List.map (function
   | Sig_value (id, vd, vis) ->
-      let val_modalities =
-        vd.val_modalities
-        |> Mode.Modality.to_const_exn
-        |> (fun then_ -> Mode.Modality.Const.concat ~then_ modalities)
-        |> Mode.Modality.of_const
+      let val_modes : Types.Sig_item_modes.t =
+        match vd.val_modes with
+        | Modality m ->
+            Modality
+              (m
+              |> Mode.Modality.to_const_exn
+              |> (fun then_ ->
+                   Mode.Modality.Const.concat ~then_ modalities)
+              |> Mode.Modality.of_const)
+        | (Overriding _ | Normalized) as vm -> vm
       in
-      let vd = {vd with val_modalities} in
+      let vd = {vd with val_modes} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
       let md_type = apply_modalities_module_type env modalities md.md_type in
@@ -1513,7 +1519,7 @@ let rec approx_modtype env smty =
 and approx_module_declaration env pmd =
   {
     Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.(Const.id |> of_const);
+    md_modes = Modality Mode.Modality.(Const.id |> of_const);
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -2065,7 +2071,7 @@ and transl_modtype_aux env smty =
               let id, newenv =
                 let arg_md =
                   { md_type = arg.mty_type;
-                    md_modalities = Mode.Modality.undefined;
+                    md_modes = Normalized;
                     md_attributes = [];
                     md_loc = param.loc;
                     md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2203,7 +2209,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         in
         let sg =
           sg
-          |> rebase_modalities_sg ~loc:smty.pmty_loc ~loc_md:psg_loc
+          |> rebase_sig_item_modes_sg ~loc:smty.pmty_loc ~loc_md:psg_loc
               ~md_mode ~mode
           |> remove_modality_and_zero_alloc_variables_sg env ~zap_modality
         in
@@ -2339,7 +2345,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         in
         let md = {
           md_type=tmty.mty_type;
-          md_modalities = Modality.of_const md_modalities.moda_modalities;
+          md_modes =
+            Modality (Modality.of_const md_modalities.moda_modalities);
           md_attributes=pmd.pmd_attributes;
           md_loc=pmd.pmd_loc;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2382,7 +2389,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.(Const.id |> of_const);
+              md_modes = Modality Mode.Modality.(Const.id |> of_const);
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2431,8 +2438,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let sig_items =
           map_rec (fun rs (id, md, uid) ->
             let d = {Types.md_type = md.md_type.mty_type;
-                     md_modalities =
-                       Mode.Modality.of_const md.md_modalities.moda_modalities;
+                     md_modes =
+                       Modality
+                         (Mode.Modality.of_const
+                            md.md_modalities.moda_modalities);
                      md_attributes = md.md_attributes;
                      md_loc = md.md_loc;
                      md_uid = uid;
@@ -2623,7 +2632,8 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
         let md =
           { md with
             Types.md_type = tmty.mty_type;
-            md_modalities = Modality.of_const md_modalities.moda_modalities
+            md_modes =
+              Modality (Modality.of_const md_modalities.moda_modalities)
           }
         in
         (id_shape, id_loc, md, mmode, md_modalities, tmty))
@@ -2663,7 +2673,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
          let md_modalities = Modality.of_const md_modalities.moda_modalities in
          let md =
            { md_type;
-             md_modalities;
+             md_modes = Modality md_modalities;
              md_loc = pmd.pmd_loc;
              md_attributes = pmd.pmd_attributes;
              md_uid }
@@ -3175,7 +3185,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
               let md_uid =  Uid.mk ~current_unit:(Env.get_unit_name ()) in
               let arg_md =
                 { md_type = mty.mty_type;
-                  md_modalities = Modality.undefined;
+                  md_modes = Normalized;
                   md_attributes = [];
                   md_loc = param.loc;
                   md_uid;
@@ -3219,9 +3229,10 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
-      let tmode = Typemode.transl_mode_annots smode in
+      let tmode = Typemode.transl_alloc_mode smode in
       let mode =
-        { tmode with mode_modes = new_mode_var_from_annots tmode.mode_modes }
+        { tmode with mode_modes = tmode.mode_modes |> Alloc.of_const
+                                  |> alloc_as_value }
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
@@ -3610,10 +3621,22 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     open_descr, mode, sg, newenv
 
 and type_structure ?(toplevel = None) funct_body anchor env sstr =
+  (* [md_mode] tracks the "real mode of the memory block" of this structure:
+     it is constrained by the items inside the structure (via inferred
+     modalities) and by the heap allocation invariant. The caller of
+     [type_structure] simply takes this real mode as the surface mode of the
+     module ([Tmod_structure.mod_mode]). That is sound because the consumer
+     of the module derives item modes and the memaddr mode from the surface
+     mode plus the per-item modalities. *)
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
+  (* c0 story: the memory block's monadic axes on construction are pinned
+     to the strongest mode ([Value.Monadic.min]); soundness on monadic
+     follows trivially. Comonadic axes are still constrained per-item via
+     [infer_modalities]. *)
+  Value.Monadic.submode_exn md_mode.monadic Value.Monadic.min;
   let loc_md = location_of_structure sstr in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
@@ -3642,7 +3665,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         modl_shape sg ~mode env
     in
     let sg =
-      rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
+      rebase_sig_item_modes_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
     in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
@@ -3717,7 +3740,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
               let vd =
                 { vd with
                   val_zero_alloc = zero_alloc;
-                  val_modalities = modalities }
+                  val_modes = Types.Sig_item_modes.Modality modalities }
               in
               Sig_value(id, vd, Exported) :: acc,
               Shape.Map.add_value shape_map id vd.val_uid
@@ -3736,12 +3759,18 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           Typedecl.transl_value_decl env ~modal:Str_primitive
             ~why:Structure_item loc sdesc
         in
-        assert (desc.val_val.val_modalities |> Modality.is_undefined);
+        (match desc.val_val.val_modes with
+         | Normalized -> ()
+         | Modality _ | Overriding _ ->
+           Misc.fatal_error
+             "Pstr_primitive: expected val_modes = Normalized");
         let pp : Mode.Hint.pinpoint = (desc.val_loc, Expression) in
         let val_modalities =
           infer_modalities pp ~loc_md (Value, desc.val_id) ~md_mode ~mode
         in
-        let val_val = {desc.val_val with val_modalities} in
+        let val_val =
+          {desc.val_val with val_modes = Modality val_modalities}
+        in
         let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;
         Tstr_primitive desc,
@@ -3821,7 +3850,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         let mode = mode_without_locks_exn modl.mod_mode in
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
-            md_modalities = Modality.undefined;
+            md_modes = Normalized;
             md_attributes = attrs;
             md_loc = pmb_loc;
             md_uid;
@@ -3845,7 +3874,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
             Some id, e,
             [Sig_module(id, pres,
                         {md_type = modl.mod_type;
-                         md_modalities;
+                         md_modes = Modality md_modalities;
                          md_attributes = attrs;
                          md_loc = pmb_loc;
                          md_uid;
@@ -3881,7 +3910,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           transl_recmodule_modtypes env
             ~sig_modalities:Mode.Modality.Const.id
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
-                 ({pmd_name=name; pmd_type=smty;
+                 ({pmd_name=name; pmd_modes=[]; pmd_type=smty;
                    pmd_attributes=attrs; pmd_loc=loc; pmd_modalities=[]}
                   , Some smode)) sbind
             ) in
@@ -3915,7 +3944,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
                    let mdecl =
                      {
                        md_type = mty.mty_type;
-                       md_modalities = Modality.undefined;
+                       md_modes = Normalized;
                        md_attributes = attrs;
                        md_loc = loc;
                        md_uid = uid;
@@ -3947,7 +3976,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
             in
             Sig_module(id, Mp_present, {
                 md_type=mb.mb_expr.mod_type;
-                md_modalities;
+                md_modes = Modality md_modalities;
                 md_attributes=mb.mb_attributes;
                 md_loc=mb.mb_loc;
                 md_uid = uid;
@@ -3968,7 +3997,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           type_open_decl ~toplevel funct_body names env sod
         in
         let sg =
-          rebase_modalities_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
+          rebase_sig_item_modes_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
             ~md_mode ~mode sg
         in
         Tstr_open od, sg, shape_map, newenv
@@ -4645,7 +4674,7 @@ let package_signatures units =
       let sg = Subst.signature Make_local subst sg in
       let md =
         { md_type=Mty_signature sg;
-          md_modalities=Modality.(Const.id |> of_const);
+          md_modes = Modality Modality.(Const.id |> of_const);
           md_attributes=[];
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());

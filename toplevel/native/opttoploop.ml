@@ -416,7 +416,7 @@ let name_expression ~loc ~attrs sort exp =
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
-      val_modalities = Mode.Modality.(Const.id |> of_const);
+      val_modes = Types.Sig_item_modes.Modality Mode.Modality.(Const.id |> of_const);
       val_uid = Uid.internal_not_actually_unique;
       val_lpoly = Lpoly.determined []; }
   in

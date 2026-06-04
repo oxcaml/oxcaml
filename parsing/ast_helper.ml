@@ -476,10 +476,11 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(poly = false) ?(modalities=[]) name typ =
+        ?(prim = []) ?(poly = false) ?(modes=[]) ?(modalities=[]) name typ =
     {
      pval_poly = poly;
      pval_name = name;
+     pval_modes = modes;
      pval_type = typ;
      pval_attributes = add_docs_attrs docs attrs;
      pval_modalities = modalities;
@@ -489,10 +490,11 @@ module Val = struct
 end
 
 module Md = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) ?(modalities=[]) name typ =
+  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs) ?(text = [])
+        ?(modes=[]) ?(modalities=[]) name typ =
     {
      pmd_name = name;
+     pmd_modes = modes;
      pmd_type = typ;
      pmd_modalities = modalities;
      pmd_attributes =

@@ -61,6 +61,7 @@ module Example = struct
   let signature_item   = { psig_desc =
                              Psig_module
                                { pmd_name = located (Some "M")
+                               ; pmd_modes = []
                                ; pmd_type = module_type
                                ; pmd_attributes = []
                                ; pmd_modalities = []

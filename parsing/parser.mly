@@ -2149,6 +2149,7 @@ signature_item:
   MODULE
   ext = ext attrs1 = attributes
   name_ = module_name_modal(atat_modalities_expr)
+  modes = optional_at_mode_expr
   body = module_declaration_body(
     module_type optional_atat_modalities_expr { ($1, $2) }
   )
@@ -2160,7 +2161,7 @@ signature_item:
     let name, modalities' = name_ in
     let mty, modalities = body in
     let modalities = modalities' @ modalities in
-    Md.mk name mty ~attrs ~loc ~docs ~modalities, ext
+    Md.mk name mty ~attrs ~loc ~docs ~modes ~modalities, ext
   }
 ;
 
@@ -3899,6 +3900,7 @@ value_description:
   attrs1 = attributes
   poly_flag = poly_flag
   id = mkrhs(val_ident)
+  modes = optional_at_mode_expr
   COLON
   ty = possibly_poly(core_type)
   modalities = optional_atat_modalities_expr
@@ -3906,7 +3908,7 @@ value_description:
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~poly:poly_flag ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~poly:poly_flag ~attrs ~modes ~modalities ~loc ~docs,
       ext }
 ;
 
@@ -3917,6 +3919,7 @@ primitive_declaration:
   ext = ext
   attrs1 = attributes
   id = mkrhs(val_ident)
+  modes = optional_at_mode_expr
   COLON
   ty = possibly_poly(core_type)
   modalities = optional_atat_modalities_expr
@@ -3926,7 +3929,7 @@ primitive_declaration:
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~prim ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~prim ~attrs ~modes ~modalities ~loc ~docs,
       ext }
 ;
 

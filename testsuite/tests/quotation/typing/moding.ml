@@ -13,7 +13,7 @@ module M : sig
   val save : 'a @ global -> unit
   val free : 'a @ unique -> unit
   val send : 'a @ portable -> unit
-end = struct
+end @ portable = struct
   type t = string
   let x = "default"
   let x_unique = fun () -> "unique"

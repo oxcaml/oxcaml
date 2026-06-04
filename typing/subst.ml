@@ -1136,7 +1136,7 @@ let to_lazy =
     Lazy_types.{
       val_type = Wrap.of_value vd.val_type;
       val_lpoly = Wrap.of_value vd.val_lpoly;
-      val_modalities = vd.val_modalities;
+      val_modes = vd.val_modes;
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;
@@ -1166,14 +1166,17 @@ let force_lpoly lpoly = Wrap.force (fun _ s lpoly ->
   Types.Lpoly.determined vars) lpoly
 
 let rec subst_lazy_value_description s descr =
-  let val_modalities =
-    match s.additional_action with
-    | Prepare_for_saving { prepare_modality; _ } ->
-        prepare_modality descr.val_modalities
-    | _ -> descr.val_modalities
+  let val_modes : Types.Sig_item_modes.t =
+    match descr.val_modes with
+    | Modality m -> (
+      match s.additional_action with
+      | Prepare_for_saving { prepare_modality; _ } ->
+          Modality (prepare_modality m)
+      | _ -> Modality m)
+    | Overriding _ | Normalized -> descr.val_modes
   in
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
-    val_modalities;
+    val_modes;
     val_kind = descr.val_kind;
     val_lpoly = Wrap.substitute ~compose Keep s descr.val_lpoly;
     val_loc = loc s descr.val_loc;
@@ -1194,14 +1197,17 @@ let rec subst_lazy_value_description s descr =
 
 and subst_lazy_module_decl scoping s md =
   let md_type = subst_lazy_modtype scoping s md.md_type in
-  let md_modalities =
-    match s.additional_action with
-    | Prepare_for_saving { prepare_modality; _ } ->
-        prepare_modality md.md_modalities
-    | _ -> md.md_modalities
+  let md_modes : Types.Sig_item_modes.t =
+    match md.md_modes with
+    | Modality m -> (
+      match s.additional_action with
+      | Prepare_for_saving { prepare_modality; _ } ->
+          Modality (prepare_modality m)
+      | _ -> Modality m)
+    | Overriding _ | Normalized -> md.md_modes
   in
   { md_type;
-    md_modalities;
+    md_modes;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid }
@@ -1342,7 +1348,7 @@ and from_lazy =
     Types.{
       val_type = force_type_expr vd.val_type;
       val_lpoly = force_lpoly vd.val_lpoly;
-      val_modalities = vd.val_modalities;
+      val_modes = vd.val_modes;
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;

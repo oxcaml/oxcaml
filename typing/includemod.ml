@@ -74,7 +74,7 @@ module Error = struct
         (class_type_declaration, Ctype.class_match_failure list) diff
     | Class_declarations of
         (class_declaration, class_declaration_symptom) mdiff
-    | Modalities of Mode.Modality.error
+    | Sig_item_modes of Types.Sig_item_modes.sub_error
     | Jkind_declarations of
         (jkind_declaration, Includecore.jkind_mismatch) diff
 
@@ -687,15 +687,27 @@ and try_modtypes ~direction ~loc env subst ~modes
         end
     end
   | (Mty_signature sig1, Mty_signature sig2) ->
-      let* () =
-        Includecore.check_modes env ~item:Module
-          ~crossing:Ctype.mode_crossing_structure_memaddr modes
-        |> map_error (fun e -> Error.Mode e)
-      in
       begin match
         signatures ~direction ~loc env subst ~modes sig1 sig2 orig_shape
       with
-      | Ok _ as ok -> ok
+      | Ok (Tcoerce_none, _) as ok ->
+        (* the "real mode" of a structure (the mode of the memory block) is
+        defined as the meet (for comonadic axes) or join (for monadic axes) of
+        all its items and the structure's surface mode. Therefore, it suffices
+        to check submode for all its items as well as the surface modes. *)
+        (* CR-someday zqian: check the "real mode" instead of the "surface mode"
+           to allow more programs. *)
+        begin match
+          Includecore.check_modes env ~item:Module
+            ~crossing:Ctype.mode_crossing_structure_memaddr modes
+        with
+        | Ok () -> ok
+        | Error e -> Error (Error.Mode e)
+        end
+      | Ok _ as ok ->
+        (* coercion happens and a new memory block constructed, therefore, the
+           RHS memaddr mode is not constrained by the LHS memaddr mode. *)
+        ok
       | Error e -> Error (Error.Signature e)
       end
 
@@ -1113,11 +1125,13 @@ and module_declarations ~direction ~loc env subst id1 ~mmodes md1 md2 orig_shape
   let p1 = Path.Pident id1 in
   if Directionality.mark_as_used direction then
     Env.mark_module_used md1.md_uid;
-  let modalities = md1.md_modalities, md2.md_modalities in
+  let modes : Types.Sig_item_modes.t * Types.Sig_item_modes.t =
+    md1.md_modes, md2.md_modes
+  in
   let id = Ident.name id1 in
   let* modes =
-    Includecore.child_modes_with_modalities id ~modalities mmodes
-    |> map_error (fun e -> Error.(Core (Modalities e)))
+    Includecore.child_modes_with_sig_item_modes id ~modes mmodes
+    |> map_error (fun e -> Error.(Core (Sig_item_modes e)))
   in
   strengthened_modtypes ~direction ~loc ~aliasable:true env subst ~modes
     md1.md_type p1 md2.md_type orig_shape

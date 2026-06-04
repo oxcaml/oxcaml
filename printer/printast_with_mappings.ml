@@ -647,6 +647,7 @@ and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_string_loc
        x.pval_name fmt_location x.pval_loc;
   attributes i ppf x.pval_attributes;
+  modes (i+1) ppf x.pval_modes;
   core_type (i+1) ppf x.pval_type;
   list (i+1) string ppf x.pval_prim;
   modalities (i+1) ppf x.pval_modalities;
@@ -1003,7 +1004,9 @@ and signature_item i ppf x =
   | Psig_module pmd ->
       line i ppf "Psig_module %a\n" fmt_str_opt_loc pmd.pmd_name;
       attributes i ppf pmd.pmd_attributes;
-      module_type i ppf pmd.pmd_type
+      modes i ppf pmd.pmd_modes;
+      module_type i ppf pmd.pmd_type;
+      modalities i ppf pmd.pmd_modalities
   | Psig_modsubst pms ->
       line i ppf "Psig_modsubst %a = %a\n"
         fmt_string_loc pms.pms_name
@@ -1196,7 +1199,9 @@ and structure_item i ppf x =
 and module_declaration i ppf pmd =
   str_opt_loc i ppf pmd.pmd_name;
   attributes i ppf pmd.pmd_attributes;
+  modes (i+1) ppf pmd.pmd_modes;
   module_type (i+1) ppf pmd.pmd_type;
+  modalities (i+1) ppf pmd.pmd_modalities;
 
 and module_binding i ppf x =
   str_opt_loc i ppf x.pmb_name;

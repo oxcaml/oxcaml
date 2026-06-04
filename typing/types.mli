@@ -1136,20 +1136,151 @@ module Lpoly : sig
     -> unit
 end
 
+module Sig_item_modes : sig
+  (** The mode-related information on a signature item (value description or
+      module declaration).
+
+      Note: in the discussion below, "structure's mode" / "surrounding
+      mode" refers to the "surface mode" (the mode the user annotates and
+      sees), as distinct from the real "memory block" mode of the
+      structure described later.
+
+      Conceptually, the mode at which an item is exposed from its surrounding
+      structure can be derived in two ways:
+      - From the structure's mode plus a modality ([Modality]).
+      - From an explicit per-axis annotation that overrides the surrounding
+        mode ([Overriding]).
+
+      After this information has been consumed (i.e., the item's actual mode
+      has been computed), the field is replaced with [Normalized] to prevent
+      double-consumption.
+
+      Invariant: if an item has [Overriding _], then the surrounding
+      structure must have a constant mode. In particular,
+      [Mode.Value.to_loose_const_exn] applied to that mode is guaranteed to
+      succeed.
+
+      Note on the "memory block of the structure" mode (aka the real mode):
+      - For comonadic axes, upon constructing the structure, the memory
+        block's mode is the join of (a) all the items' modes inside (for
+        soundness) and (b) the surface mode of the module (for user
+        flexibility).
+      - For monadic axes, upon consuming/accessing the structure, the
+        memory block's mode is the meet of (a) all the items'
+        consume/access modes and (b) the surface mode of the module (for
+        user flexibility).
+      - Soundness additionally requires that the memory block is not
+        consumed/accessed at modes stronger than how it was constructed.
+        However, the memory block's mode is not reflected in types (and so
+        not passed around during type-checking). So we rely on the items'
+        modes and the surface mode to carry that information. On
+        construction, the comonadic axes are described above as [m0]; for
+        monadic axes we just take the strongest mode allowed (some
+        constant [c0]). On consumption, the monadic axes are described
+        above as [m1]; for comonadic axes we just take the weakest mode
+        allowed (some constant [c1]). Then we just have to ensure that
+        [c0 <= m1] and [m0 <= c1]. *)
+
+  type t =
+    | Overriding of Mode.Value.Const.Option.t
+        (** On each axis where the option is [Some], the mode overrides
+            whatever is derived from the surrounding structure's mode.
+            By the invariant above, the surrounding mode is constant on every
+            axis. *)
+    | Modality of Mode.Modality.t
+        (** A modality from the surrounding structure's mode to the item's
+            mode. *)
+    | Normalized
+        (** This field has been consumed and shouldn't be consumed again. *)
+
+  (** Operation modes for normalizing an item: i.e., consuming its
+      [Sig_item_modes.t] by applying it to the surrounding mode, and replacing
+      the field with [Normalized]. *)
+  type normalize =
+    | Normalize_exn
+        (** Normalize a mode; raise if already normalized. *)
+    | Assert_normalized
+        (** Assert that the mode is already normalized, and return the mode. *)
+    | Normalize
+        (** Normalize a mode; do nothing if already normalized. Use the other
+            two instead whenever possible. *)
+
+  (** Constant version of [t]: same constructors, but [Modality] holds a
+      constant [Mode.Modality.Const.t] instead of a variable
+      [Mode.Modality.t]. *)
+  module Const : sig
+    type t =
+      | Overriding of Mode.Value.Const.Option.t
+      | Modality of Mode.Modality.Const.t
+      | Normalized
+
+    (** [apply n sim m] computes the item's mode given the surrounding
+        structure's mode [m] and the [sim] on the item:
+        - For [Modality mc], applies [mc] to [m].
+        - For [Overriding o], overrides [m] on the axes specified by [o]
+          ([m] is required to be constant by the [Overriding] invariant).
+        - For [Normalized], returns [m] unchanged.
+
+        [n] controls behavior when [sim] is [Normalized] (already normalized)
+        or when [sim] is [Modality]/[Overriding] (not yet normalized). See
+        [normalize] for details.
+
+        Preserves allowances on both sides. *)
+    val apply :
+      normalize ->
+      t -> ('l * 'r) Mode.Value.t -> ('l * 'r) Mode.Value.t
+  end
+
+  (** [apply ?loc_struct ?item n sim mode] computes the item's mode given
+      the surrounding structure's [mode] and the [sim] on the item.
+      [loc_struct] is the location of the enclosing structure (not the
+      item).
+      - For [Modality m], applies [m] to [mode]. When both [loc_struct] and
+        [item] are provided, uses them for the [Is_contained_by] hint;
+        otherwise uses [Unknown].
+      - For [Overriding o], overrides [mode] on the axes specified by [o]
+        (the unspecified axes of [mode] must be a constant).
+      - For [Normalized], returns [mode] unchanged.
+
+      [n] controls behavior when [sim] is [Normalized] (already normalized)
+      or when [sim] is [Modality]/[Overriding] (not yet normalized). See
+      the [normalize] type for details.
+
+      Loses right-allowance because the [Modality m] case requires that. *)
+  (* CR-someday zqian: [loc_struct] and [item] should be mandatory. *)
+  val apply :
+    ?loc_struct:Location.t ->
+    ?item:Mode.Hint.structure_item ->
+    normalize ->
+    t -> (Allowance.allowed * 'r) Mode.Value.t -> Mode.Value.l
+
+  (** Convert to the constant version. Returns [None] when [Modality m] but
+      [m] is not constant; otherwise returns [Some _]. *)
+  val to_const_opt : t -> Const.t option
+
+  type sub_error =
+    | Modality_error of Mode.Modality.error
+        (** Modality submode check failed (both sides are [Modality]). *)
+    | Axis_mismatch of Mode.Value.Axis.packed
+        (** Both sides are [Overriding]; one specifies the axis, the other
+            does not. *)
+    | Le_failure : 'a Mode.Value.Axis.t * 'a * 'a -> sub_error
+        (** Both sides are [Overriding] and specify the axis, but [<=] does
+            not hold. *)
+
+  (** [sub sim0 sim1] checks that [sim0] is more permissive than [sim1] at
+      the same surface mode. Both must be the same constructor (otherwise
+      raises [Misc.Fatal_error]). *)
+  val sub : t -> t -> (unit, sub_error) result
+
+end
+
 module type Wrapped = sig
   type 'a wrapped
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities: Mode.Modality.t;
-   (** The modalities on the value in a signature. It is [undefined] in several
-      cases:
-    - The value is not in a structure, so there is no modalities
-      to talk about. For example, adding [let x = ... in] to the environment
-      will have [val_modalities] set to [undefined].
-    - The value was from a structure, but the original modalities
-      have been applied and we have the real mode of the value. The original
-      modalities shouldn't be looked again and is replaced by [undefined]. *)
+      val_modes : Sig_item_modes.t;
       val_kind: value_kind;
       val_lpoly: Lpoly.t wrapped;
       (** Guaranteed [determined] for all values visible outside [type_let].
@@ -1189,8 +1320,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
-    md_modalities : Mode.Modality.t;
-    (** Similiar to [val_modalities]; see comments there. *)
+    md_modes : Sig_item_modes.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;

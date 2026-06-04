@@ -1136,6 +1136,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (Fmt.compat (C.print obj))
         ceil
 
+  let to_loose_const_exn obj m =
+    let floor = get_loose_floor obj m in
+    let ceil = get_loose_ceil obj m in
+    if C.le obj ceil floor
+    then ceil
+    else
+      Misc.fatal_errorf "mode is not tight: floor = %a, ceil = %a"
+        (Fmt.compat (C.print obj))
+        floor
+        (Fmt.compat (C.print obj))
+        ceil
+
   let print : type a l r.
       ?verbose:bool -> a C.obj -> Fmt.formatter -> (a, l * r) mode -> unit =
    fun ?verbose (obj : a C.obj) ppf m ->
