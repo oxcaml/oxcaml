@@ -908,6 +908,7 @@ type int_b = int box
 type int_b_b = int_b box
 type int_b_b_u = int_b_b#
 let check : int_b_b_u -> int_b = fun x -> x
+(* CR box rtjoa: Unboxing is approximate. This should typecheck *)
 type int_b_b_u_u = int_b_b_u#
 let check : int_b_b_u_u -> int = fun x -> x
 type int_b_b_u_u_u = int_b_b_u_u#
@@ -917,10 +918,10 @@ type int_b = int box
 type int_b_b = int_b box
 type int_b_b_u = int_b_b#
 val check : int_b_b_u -> int_b = <fun>
-type int_b_b_u_u = int_b_b_u#
-val check : int_b_b_u_u -> int = <fun>
-type int_b_b_u_u_u = int_b_b_u_u#
-val check : int_b_b_u_u_u -> int# = <fun>
+Line 6, characters 19-29:
+6 | type int_b_b_u_u = int_b_b_u#
+                       ^^^^^^^^^^
+Error: The type "int_b_b_u" has no unboxed version.
 |}]
 
 (* Test 34: shadowing the predef [box] disambiguates with [box/2] *)
@@ -1154,6 +1155,25 @@ val id : t# -> int = <fun>
 
 (* Test 38: Unboxing through abbreviations *)
 
+(* CR box rtjoa: Unboxing is approximate. This should typecheck *)
+type dummy
+type ('a, 'b) box' = 'b box
+type a = (dummy, (dummy, int) box') box'
+type b = a#
+type c = b#
+[%%expect{|
+type dummy
+type ('a, 'b) box' = 'b box
+type a = (dummy, (dummy, int) box') box'
+type b = a#
+Line 5, characters 9-11:
+5 | type c = b#
+             ^^
+Error: The type "b" has no unboxed version.
+|}]
+
+(* ... *)
+
 type 'x id = 'x
 
 type 'x s1 = 'x id box
@@ -1186,17 +1206,24 @@ type ('a, 'b) t = ('a * 'b) s2
 type ('a, 'b) t' = ('a, 'b) t#
 type ('a, 'b) t'' = ('a, 'b) t'#
 
+(* CR box rtjoa: this should typecheck, but unboxing is approximate *)
 let id (x : (int, string) t'') : int * string = x
 [%%expect{|
 type ('a, 'b) t = ('a * 'b) s2
 type ('a, 'b) t' = ('a, 'b) t#
-type ('a, 'b) t'' = ('a, 'b) t'#
-val id : (int, string) t'' -> int * string = <fun>
+Line 3, characters 29-32:
+3 | type ('a, 'b) t'' = ('a, 'b) t'#
+                                 ^^^
+Error: The type "t'" has no unboxed version.
 |}]
 
+(* CR box rtjoa: this should typecheck, but unboxing is approximate *)
 type ('a, 'b) t'' = ('a, 'b) t'#
 [%%expect{|
-type ('a, 'b) t'' = ('a, 'b) t'#
+Line 1, characters 29-32:
+1 | type ('a, 'b) t'' = ('a, 'b) t'#
+                                 ^^^
+Error: The type "t'" has no unboxed version.
 |}]
 
 type ('a, 'b) t'' = ('a, 'b) t''#
