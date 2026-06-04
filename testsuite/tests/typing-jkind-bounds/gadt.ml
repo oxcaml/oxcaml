@@ -32,6 +32,169 @@ type ('a : value mod external_) require_external
 |}]
 
 (***********************************************************************)
+(* GADT result-argument projection should apply only to direct variables,
+   and the effective bound for a direct variable should be the intersection
+   of the declaration parameter's bound and the constructor-local bound. *)
+
+module Direct_projection_same_bound = struct
+  type ('a : value mod portable) t : value mod portable =
+    | K : ('b : value mod portable). 'b -> 'b t
+end
+[%%expect{|
+module Direct_projection_same_bound :
+  sig
+    type ('a : value mod portable) t =
+        K : ('b : value mod portable). 'b -> 'b t
+  end
+|}]
+
+(* CR layouts v2.8: This should be accepted. The check should use the
+   constructor-local bound when the GADT result argument is a direct variable. *)
+module Direct_projection_constructor_stricter = struct
+  type ('a : value mod portable) t : value mod portable contended =
+    | K : ('b : value mod portable contended). 'b -> 'b t
+end
+[%%expect{|
+Lines 2-3, characters 2-57:
+2 | ..type ('a : value mod portable) t : value mod portable contended =
+3 |     | K : ('b : value mod portable contended). 'b -> 'b t
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+module Direct_projection_constructor_stricter_with_bound = struct
+  type ('a : value mod portable) t : value mod portable contended with 'a =
+    | K : ('b : value mod portable contended). 'b -> 'b t
+end
+[%%expect{|
+module Direct_projection_constructor_stricter_with_bound :
+  sig
+    type ('a : value mod portable) t =
+        K : ('b : value mod portable contended). 'b -> 'b t
+  end
+|}]
+
+(* CR layouts v2.8: This should be accepted. The effective bound is the
+   intersection of the declaration parameter bound and constructor-local bound. *)
+module Direct_projection_constructor_weaker = struct
+  type ('a : value mod portable contended) t : value mod portable contended =
+    | K : ('b : value mod portable). 'b -> 'b t
+end
+[%%expect{|
+Line 3, characters 4-47:
+3 |     | K : ('b : value mod portable). 'b -> 'b t
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The universal type variable 'b was declared to have kind value
+                                                                  mod
+                                                                  portable.
+       But it was inferred to have kind value mod portable contended
+         because of the annotation on 'a in the declaration of the type t.
+|}]
+
+(* CR layouts v2.8: This should be accepted. The effective bound is the
+   intersection of the declaration parameter bound and constructor-local bound. *)
+module Direct_projection_constructor_incomparable = struct
+  type ('a : value mod portable) t : value mod portable contended =
+    | K : ('b : value mod contended). 'b -> 'b t
+end
+[%%expect{|
+Line 3, characters 4-48:
+3 |     | K : ('b : value mod contended). 'b -> 'b t
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The universal type variable 'b was declared to have kind value
+                                                                  mod
+                                                                  contended.
+       But it was inferred to have kind value mod portable contended
+         because of the annotation on 'a in the declaration of the type t.
+|}]
+
+(* CR layouts v2.8: This should be accepted. The effective bound is the
+   intersection of the declaration parameter bound and constructor-local bound. *)
+module Direct_projection_constructor_weaker_immutable = struct
+  type ('a : value mod contended) t
+    : immutable_data with 'a @@ portable contended =
+    | K : ('b : value mod portable). 'b -> 'b t
+end
+[%%expect{|
+Line 4, characters 4-47:
+4 |     | K : ('b : value mod portable). 'b -> 'b t
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The universal type variable 'b was declared to have kind value
+                                                                  mod
+                                                                  portable.
+       But it was inferred to have kind value mod portable contended
+         because of the annotation on 'a in the declaration of the type t.
+|}]
+
+module Compound_result_argument_without_parameter_bound = struct
+  type 'a t =
+    | K : ('b : value mod portable). 'b -> 'b option t
+end
+[%%expect{|
+module Compound_result_argument_without_parameter_bound :
+  sig type 'a t = K : ('b : value mod portable). 'b -> 'b option t end
+|}]
+
+(* CR layouts v2.8: Should this be accepted by using the projected bound on
+   ['b], or is rejecting compound result arguments the intended behavior? *)
+module Compound_result_argument_checks_whole_argument = struct
+  type ('a : value mod portable) t : value mod portable =
+    | K : ('b : value mod portable). 'b -> 'b option t
+end
+[%%expect{|
+Line 3, characters 43-52:
+3 |     | K : ('b : value mod portable). 'b -> 'b option t
+                                               ^^^^^^^^^
+Error: This type "'b option" should be an instance of type
+         "('a : value mod portable)"
+       The kind of 'b option is immutable_data with 'b
+         because it's a boxed variant type.
+       But the kind of 'b option must be a subkind of value mod portable
+         because of the annotation on 'a in the declaration of the type t.
+|}]
+
+(* CR layouts v2.8: Should this be accepted by using the projected bound on
+   ['b], or is rejecting compound result arguments the intended behavior? *)
+module Compound_result_argument_is_not_projected = struct
+  type ('a : value mod portable contended) t : value mod portable contended =
+    | K : ('b : value mod portable). 'b -> 'b option t
+end
+[%%expect{|
+Line 3, characters 43-52:
+3 |     | K : ('b : value mod portable). 'b -> 'b option t
+                                               ^^^^^^^^^
+Error: This type "'b option" should be an instance of type
+         "('a : value mod portable contended)"
+       The kind of 'b option is immutable_data with 'b
+         because it's a boxed variant type.
+       But the kind of 'b option must be a subkind of
+           value mod portable contended
+         because of the annotation on 'a in the declaration of the type t.
+|}]
+
+(* CR layouts v2.8: This should be accepted. Repeated direct projections of
+   the same result variable should contribute all projected bounds. *)
+module Repeated_direct_projection_uses_first_argument = struct
+  type ('a : value mod portable, 'c : value mod contended) t
+    : value mod portable contended =
+    | K : ('b : value mod portable contended). 'b -> ('b, 'b) t
+end
+[%%expect{|
+Lines 2-4, characters 2-63:
+2 | ..type ('a : value mod portable, 'c : value mod contended) t
+3 |     : value mod portable contended =
+4 |     | K : ('b : value mod portable contended). 'b -> ('b, 'b) t
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(***********************************************************************)
 type 'a eq_int = Eq : int eq_int
 [%%expect{|
 type 'a eq_int = Eq : int eq_int
@@ -147,7 +310,6 @@ type 'a t : value mod contended portable =
   | Shared : ('b : value mod contended portable). 'b  -> 'b t
   | Unshared : (unit -> 'c) @@ portable               -> 'c t
 ;;
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
