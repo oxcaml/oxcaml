@@ -46,7 +46,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail1.%{env:OXCAML_NAME_MANGLING=flat}.output fail1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail1.%{env:OXCAML_NAME_MANGLING=flat}.output fail1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -66,7 +65,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail2.%{env:OXCAML_NAME_MANGLING=flat}.output fail2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail2.%{env:OXCAML_NAME_MANGLING=flat}.output fail2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -86,7 +84,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail3.%{env:OXCAML_NAME_MANGLING=flat}.output fail3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail3.%{env:OXCAML_NAME_MANGLING=flat}.output fail3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -106,7 +103,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail4.%{env:OXCAML_NAME_MANGLING=flat}.output fail4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail4.%{env:OXCAML_NAME_MANGLING=flat}.output fail4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -126,7 +122,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail5.%{env:OXCAML_NAME_MANGLING=flat}.output fail5.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail5.%{env:OXCAML_NAME_MANGLING=flat}.output fail5.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -146,7 +141,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail6.%{env:OXCAML_NAME_MANGLING=flat}.output fail6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail6.%{env:OXCAML_NAME_MANGLING=flat}.output fail6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -166,7 +160,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail7.%{env:OXCAML_NAME_MANGLING=flat}.output fail7.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail7.%{env:OXCAML_NAME_MANGLING=flat}.output fail7.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -186,7 +179,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail8.%{env:OXCAML_NAME_MANGLING=flat}.output fail8.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail8.%{env:OXCAML_NAME_MANGLING=flat}.output fail8.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -206,7 +198,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail9.%{env:OXCAML_NAME_MANGLING=flat}.output fail9.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail9.%{env:OXCAML_NAME_MANGLING=flat}.output fail9.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -226,7 +217,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail10.%{env:OXCAML_NAME_MANGLING=flat}.output fail10.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail10.%{env:OXCAML_NAME_MANGLING=flat}.output fail10.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -246,7 +236,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail12.%{env:OXCAML_NAME_MANGLING=flat}.output fail12.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail12.%{env:OXCAML_NAME_MANGLING=flat}.output fail12.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -266,7 +255,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail13.%{env:OXCAML_NAME_MANGLING=flat}.output fail13.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail13.%{env:OXCAML_NAME_MANGLING=flat}.output fail13.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -286,7 +274,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail14.%{env:OXCAML_NAME_MANGLING=flat}.output fail14.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail14.%{env:OXCAML_NAME_MANGLING=flat}.output fail14.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -306,7 +293,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail15.%{env:OXCAML_NAME_MANGLING=flat}.output fail15.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail15.%{env:OXCAML_NAME_MANGLING=flat}.output fail15.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -326,7 +312,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail16.%{env:OXCAML_NAME_MANGLING=flat}.output fail16.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail16.%{env:OXCAML_NAME_MANGLING=flat}.output fail16.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -346,7 +331,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail17.%{env:OXCAML_NAME_MANGLING=flat}.output fail17.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail17.%{env:OXCAML_NAME_MANGLING=flat}.output fail17.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -366,7 +350,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail18.%{env:OXCAML_NAME_MANGLING=flat}.output fail18.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail18.%{env:OXCAML_NAME_MANGLING=flat}.output fail18.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -386,7 +369,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail19.%{env:OXCAML_NAME_MANGLING=flat}.output fail19.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail19.%{env:OXCAML_NAME_MANGLING=flat}.output fail19.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -406,7 +388,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail20.%{env:OXCAML_NAME_MANGLING=flat}.output fail20.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail20.%{env:OXCAML_NAME_MANGLING=flat}.output fail20.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -426,7 +407,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail21.%{env:OXCAML_NAME_MANGLING=flat}.output fail21.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail21.%{env:OXCAML_NAME_MANGLING=flat}.output fail21.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -446,7 +426,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -466,7 +445,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -486,7 +464,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps t6.%{env:OXCAML_NAME_MANGLING=flat}.output t6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff t6.%{env:OXCAML_NAME_MANGLING=flat}.output t6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -518,7 +495,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps t1.%{env:OXCAML_NAME_MANGLING=flat}.output t1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff t1.%{env:OXCAML_NAME_MANGLING=flat}.output t1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -538,7 +514,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -558,7 +533,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -578,7 +552,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -598,7 +571,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail22.%{env:OXCAML_NAME_MANGLING=flat}.output fail22.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail22.%{env:OXCAML_NAME_MANGLING=flat}.output fail22.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -618,7 +590,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail23.%{env:OXCAML_NAME_MANGLING=flat}.output fail23.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail23.%{env:OXCAML_NAME_MANGLING=flat}.output fail23.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -650,7 +621,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -670,7 +640,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -690,7 +659,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -710,7 +678,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -730,7 +697,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -750,7 +716,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -770,7 +735,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -790,7 +754,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail24.%{env:OXCAML_NAME_MANGLING=flat}.output fail24.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail24.%{env:OXCAML_NAME_MANGLING=flat}.output fail24.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -816,7 +779,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail25.%{env:OXCAML_NAME_MANGLING=flat}.output fail25.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail25.%{env:OXCAML_NAME_MANGLING=flat}.output fail25.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -836,7 +798,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail26.%{env:OXCAML_NAME_MANGLING=flat}.output fail26.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail26.%{env:OXCAML_NAME_MANGLING=flat}.output fail26.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -856,7 +817,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -876,7 +836,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -896,7 +855,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -916,7 +874,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -943,7 +900,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -963,7 +919,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -990,7 +945,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1010,7 +964,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1030,7 +983,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1050,7 +1002,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1070,7 +1021,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_stub.output test_assume_stub.output.corrected)
  (action (diff test_assume_stub.output test_assume_stub.output.corrected)))
 
 (rule
@@ -1090,7 +1040,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1110,7 +1059,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1130,7 +1078,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1150,7 +1097,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1170,7 +1116,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1190,7 +1135,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1210,7 +1154,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1236,7 +1179,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail27.%{env:OXCAML_NAME_MANGLING=flat}.output fail27.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail27.%{env:OXCAML_NAME_MANGLING=flat}.output fail27.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1256,7 +1198,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1276,7 +1217,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1296,7 +1236,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail28.%{env:OXCAML_NAME_MANGLING=flat}.output fail28.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail28.%{env:OXCAML_NAME_MANGLING=flat}.output fail28.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1316,7 +1255,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1343,7 +1281,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail29.%{env:OXCAML_NAME_MANGLING=flat}.output fail29.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail29.%{env:OXCAML_NAME_MANGLING=flat}.output fail29.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1370,7 +1307,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1397,7 +1333,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1417,7 +1352,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1443,7 +1377,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1463,7 +1396,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1483,7 +1415,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1503,7 +1434,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1523,7 +1453,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1543,7 +1472,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1563,7 +1491,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1583,7 +1510,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1603,7 +1529,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
@@ -1623,5 +1548,4 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (action (diff test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))

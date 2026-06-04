@@ -100,7 +100,6 @@ let () =
 (rule
  (alias   runtest)
  ${enabled_if}
- (deps ${output} ${output}.corrected)
  (action (diff ${output} ${output}.corrected)))
 |};
     Buffer.output_buffer Out_channel.stdout buf
