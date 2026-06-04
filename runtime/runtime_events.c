@@ -539,9 +539,9 @@ static void write_to_ring(ev_category category, ev_message_type type,
     int min_e = 0;
     while ((1ULL << min_e) < length_with_header_ts) min_e++;
     caml_fatal_error(
-        "runtime_events: event of %" PRIu64 " words exceeds the ring "
-        "buffer (%d words, from OCAMLRUNPARAM=e=%" CAML_PRIuNAT
-        "). Use OCAMLRUNPARAM=e=%d or higher.",
+        "runtime_events: event of %" PRIu64 " words exceeds the ring buffer "
+        "(%d words, from OCAMLRUNPARAM=e=%" CAML_PRIuNAT "). "
+        "Use OCAMLRUNPARAM=e=%d or higher.",
         length_with_header_ts, ring_size_words,
         caml_params->runtime_events_log_wsize, min_e);
   }
