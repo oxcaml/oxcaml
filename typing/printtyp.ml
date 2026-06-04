@@ -1758,8 +1758,8 @@ and tree_of_typexp mode alloc_mode ty =
   tree_of_modal_typexp mode (Other alloc_mode) ty
 
 (* qtvs = quantified type variables *)
-(* this silently drops any arguments that are not generic Tvar or Tunivar, *)
-(* unless we're printing a layout-polymorphic value description *)
+(* this silently drops any arguments that are not generic Tvar or Tunivar,
+   unless we're printing a layout-polymorphic value description *)
 and tree_of_qtvs ~in_layout_poly qtvs =
   let tree_of_qtv v : (string * out_jkind option) option =
     (* CR layouts: We possibly ignore nullability here to avoid needlessly
