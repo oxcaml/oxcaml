@@ -1236,17 +1236,12 @@ Error: The type "t''" has no unboxed version.
 
 (* Test 38: Unboxing through tuple type abbreviation *)
 
-(* CR box jbachurski: I think this should work for consistency with type checking:
-   Since [t = #('a * 'b) box], we should have [t# = #('a * 'b)]. *)
-
 type ('a, 'b) t = 'a * 'b
 type 'a t' = ('a, 'a) t#
 
 let id (x : int t') : #(int * int) = x
 [%%expect{|
 type ('a, 'b) t = 'a * 'b
-Line 2, characters 22-24:
-2 | type 'a t' = ('a, 'a) t#
-                          ^^
-Error: The type "t" has no unboxed version.
+type 'a t' = ('a, 'a) t#
+val id : int t' -> #(int * int) = <fun>
 |}]

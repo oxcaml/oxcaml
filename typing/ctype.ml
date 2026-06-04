@@ -2306,16 +2306,16 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev env t |> new_box_ty
   | _ -> raise Cannot_expand
 
-let try_unbox_desc_gen env = function
+let try_unbox_desc_gen env d =
+  match d with
   | Tconstr (p, args, _) ->
     let pu = Path.unboxed_version p in
     begin match Env.find_type pu env with
     | _ -> Some (`Desc (Tconstr (pu, args, ref Mnil)))
     | exception Not_found -> None
     end
-  | Ttuple tys -> Some (`Desc (Tunboxed_tuple tys))
-  | Tbox ty -> Some (`Expr ty)
-  | _ -> None
+  | _ ->
+    unbox_type_structurally d
 
 let is_unboxable_desc env d = Option.is_some (try_unbox_desc_gen env d)
 let is_unboxable_ty env ty = is_unboxable_desc env (get_desc ty)

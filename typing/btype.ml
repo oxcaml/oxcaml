@@ -839,6 +839,17 @@ let tpoly_get_mono ty =
   | Tpoly(ty, []) -> ty
   | _ -> assert false
 
+                  (*******************************)
+                  (*  Utilities for box types    *)
+                  (*******************************)
+
+let unbox_type_structurally =
+  function
+  | Ttuple tys -> Some (`Desc (Tunboxed_tuple tys))
+  | Tbox ty -> Some (`Expr ty)
+  | _ -> None
+
+
                   (**********)
                   (*  Misc  *)
                   (**********)
