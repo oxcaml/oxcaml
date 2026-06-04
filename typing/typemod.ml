@@ -5199,13 +5199,19 @@ let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
     (fun () -> report_error env ~loc err)
 
+let report_errors ~loc errors =
+  let errors = Typing_recovery.Error_set.to_list errors in
+  Location.multiple_errors ~loc errors
+
 let () =
   Location.register_error_of_exn
     (function
       | Error.In_context (loc, env, err) ->
         Some (report_error ~loc env err)
       | Error_forward err ->
-        Some err
+          Some err
+      | Errors (loc, errors) ->
+          Some (report_errors ~loc errors)
       | _ ->
         None
     )
