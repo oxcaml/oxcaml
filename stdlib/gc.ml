@@ -72,8 +72,8 @@ external get_minor_free : unit -> int @@ portable = "caml_get_minor_free"
    from the runtime -- they're already marked as deprecated in the mli.
 *)
 
-external eventlog_pause : unit -> unit @@ portable = "caml_eventlog_pause"
-external eventlog_resume : unit -> unit @@ portable = "caml_eventlog_resume"
+let eventlog_pause () = ()
+let eventlog_resume () = ()
 
 open Printf
 

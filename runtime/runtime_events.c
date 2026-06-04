@@ -892,10 +892,10 @@ CAMLexport value caml_runtime_events_user_resolve(
 
 CAMLprim value caml_eventlog_resume(value v)
 {
-  caml_failwith("Called caml_eventlog_resume in runtime5: not supported.");
+  caml_failwith("caml_eventlog_resume: not supported in OCaml 5.");
 }
 
 CAMLprim value caml_eventlog_pause(value v)
 {
-  caml_failwith("Called caml_eventlog_pause in runtime5: not supported.");
+  caml_failwith("caml_eventlog_pause: not supported in OCaml 5.");
 }
