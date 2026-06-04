@@ -568,18 +568,18 @@ CAMLprim value caml_runtime_parameters (value unit)
   CAMLassert (unit == Val_unit);
   char *tweaks = format_gc_tweaks();
   char *no_tweaks = "";
-  /* keep in sync with runtime4 and with parse_ocamlrunparam */
+  /* keep in sync with parse_ocamlrunparam */
   value res = caml_alloc_sprintf
     ("b=%d,c="F_Z",d="F_Z",e="F_Z",H="F_Z",i="F_Z",l="F_Z
      ",m="F_Z",M="F_Z",n="F_Z",o="F_Z",O="F_Z
      ",p="F_Z",s="F_Z",t="F_Z",v="F_Z",V="F_Z
      ",W="F_Z"%s",
-       /* a is runtime 4 allocation policy */
+       /* a was OCaml 4 allocation policy */
        /* b */ (int) Caml_state->backtrace_active,
        /* c */ caml_params->cleanup_on_exit,
        /* d */ caml_params->max_domains,
        /* e */ caml_params->runtime_events_log_wsize,
-       /* h is runtime 4 init heap size */
+       /* h was OCaml 4 init heap size */
        /* H */ caml_params->use_hugetlb_pages,
        /* i */ caml_major_heap_increment,
        /* l */ caml_max_stack_wsize,
@@ -594,7 +594,7 @@ CAMLprim value caml_runtime_parameters (value unit)
        /* t */ caml_params->trace_level,
        /* v */ caml_verb_gc,
        /* V */ caml_params->verify_heap,
-       /* w is runtime 4 major window */
+       /* w was OCaml 4 major window */
        /* W */ caml_runtime_warnings,
        /* X */ tweaks ? tweaks : no_tweaks
        );

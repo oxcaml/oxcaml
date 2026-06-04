@@ -137,9 +137,7 @@ void caml_stash_backtrace_wrapper(value exn, char* rsp, char* trapsp)
 #ifdef STACK_GUARD_PAGES
   /* If we get an rsp that lies in the guard page, just do nothing - using rsp
    * would trigger another segfault, and we are probably in the process of
-   * raising the exception from a segfault.  In any case this behaviour seems
-   * consistent with runtime4, where no backtrace appears to be available at
-   * this point. */
+   * raising the exception from a segfault. */
   struct stack_info *block = Caml_state->current_stack;
   char* protected_low = Protected_stack_page(block);
   char* protected_high = protected_low + caml_plat_pagesize;

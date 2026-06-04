@@ -46,8 +46,8 @@ type stat =
     (** Total size of the major heap, in words. *)
 
     heap_chunks : int;
-    (** Number of contiguous pieces of memory that make up the major heap.
-        For runtime 5, these are the chunks used for small block allocation. *)
+    (** Number of contiguous pieces of memory used for small block allocation
+        on the major heap. *)
 
     live_words : int;
     (** Number of words of live data in the major heap, including the header
@@ -75,12 +75,12 @@ type stat =
 
     free_blocks : int;
     (** Number of blocks in the free list.
-        This metric is currently not available in OCaml 5: the field value is
+        This metric is currently not available: the field value is
         always [0]. *)
 
     largest_free : int;
     (** Size (in words) of the largest block in the free list.
-        This metric is currently not available in OCaml 5: the field value
+        This metric is currently not available: the field value
         is always [0]. *)
 
     fragments : int;
@@ -96,7 +96,7 @@ type stat =
 
     stack_size: int;
     (** Current size of the stack, in words.
-        This metric is currently not available in OCaml 5: the field value is
+        This metric is currently not available: the field value is
         always [0].
         @since 3.12 *)
 
@@ -114,8 +114,6 @@ type stat =
    the number of bytes.
 *)
 
-(* CR ocaml 5 all-runtime5: pretty much revert this file to upstream *)
-
 type control =
   { minor_heap_size : int;
     (** The size (in words) of the minor heap.  Changing
@@ -130,8 +128,8 @@ type control =
         size at each increase). If it is more than 1000, it is a fixed
         number of words that will be added to the heap. Default: 15.
 
-        In runtime5, the "current heap size" metric does not include those
-        allocations of more than 128 words. *)
+        The "current heap size" metric does not include those allocations of
+        more than 128 words. *)
 
     space_overhead : int;
     (** The major GC speed is computed from this parameter.
@@ -140,10 +138,7 @@ type control =
         percentage of the memory used for live data.
         The GC will work more (use more CPU time and collect
         blocks more eagerly) if [space_overhead] is smaller.
-        On runtime 4 this doesn't account correctly for bigarrays; you
-        may find the GC works much harder than necessary to satisfy this
-        parameter.
-        Runtime 4 default: 100. Runtime 5 default: 80. *)
+        Default: 80. *)
 
     verbose : int;
     (** This value controls the GC messages on standard error output.
@@ -169,22 +164,6 @@ type control =
         - [0x20000]    Changes to the major GC mark stack
         - [0x10000000] Do not include timestamp and domain ID in log messages
 
-        For runtime 4, the flags are as follows (although the messages
-        produced may not fit these descriptions very well):
-       - [0x0001] Start and end of major GC cycle.
-       - [0x0002] Minor collection and major GC slice.
-       - [0x0004] Growing and shrinking of the heap.
-       - [0x0008] Resizing of stacks and memory manager tables.
-       - [0x0010] Heap compaction.
-       - [0x0020] Change of GC parameters.
-       - [0x0040] Computation of major GC slice size.
-       - [0x0080] Calling of finalisation functions.
-       - [0x0100] Bytecode executable and shared library search at start-up.
-       - [0x0200] Computation of compaction-triggering condition.
-       - [0x0400] Output GC statistics at program exit.
-       - [0x0800] GC debugging messages.
-       - [0x1000] Include domain ID in log messages.
-       - [0x2000] Include timestamp in log messages.
        Default: 0. *)
 
     max_overhead : int;
@@ -194,8 +173,6 @@ type control =
        compaction is triggered at the end of each major GC cycle
        (this setting is intended for testing purposes only).
        If [max_overhead >= 1000000], compaction is never triggered.
-       On runtime4, if compaction is permanently disabled, it is strongly
-       suggested to set [allocation_policy] to 2.
         Default: 500. *)
 
     stack_limit : int;
@@ -203,56 +180,15 @@ type control =
        Default: 1024k. *)
 
     allocation_policy : int;
-    (** The policy used for allocating in the major heap.
+    (** This metric is not available: the field value is always [0].
 
-        This option is ignored when using runtime5.
-
-        Prior to runtime5, possible values were 0, 1 and 2.
+        In OCaml 4, possible values were 0, 1 and 2.
 
         - 0 was the next-fit policy
 
         - 1 was the first-fit policy (since OCaml 3.11)
 
         - 2 was the best-fit policy (since OCaml 4.10)
-
-        More details for runtime4: -------------------------------------
-
-        Possible values are 0, 1 and 2.
-
-        - 0 is the next-fit policy, which is usually fast but can
-          result in fragmentation, increasing memory consumption.
-
-        - 1 is the first-fit policy, which avoids fragmentation but
-          has corner cases (in certain realistic workloads) where it
-          is sensibly slower.
-
-        - 2 is the best-fit policy, which is fast and avoids
-          fragmentation. In our experiments it is faster and uses less
-          memory than both next-fit and first-fit.
-          (since OCaml 4.10)
-
-        The default is best-fit.
-
-        On one example that was known to be bad for next-fit and first-fit,
-        next-fit takes 28s using 855Mio of memory,
-        first-fit takes 47s using 566Mio of memory,
-        best-fit takes 27s using 545Mio of memory.
-
-        Note: If you change to next-fit, you may need to reduce
-        the [space_overhead] setting, for example using [80] instead
-        of the default [120] which is tuned for best-fit. Otherwise,
-        your program will need more memory.
-
-        Note: changing the allocation policy at run-time forces
-        a heap compaction, which is a lengthy operation unless the
-        heap is small (e.g. at the start of the program).
-
-        Default: 2.
-
-        This metric is currently not available in OCaml 5: the field value is
-        always [0].
-
-        ----------------------------------------------------------------
 
         @since 3.11 *)
 
@@ -261,8 +197,7 @@ type control =
         out variations in its workload. This is an integer between
         1 and 50.
         Default: 1.
-        This metric is currently not available in OCaml 5: the field value is
-        always [0].
+        This metric is not available: the field value is always [0].
         @since 4.03 *)
 
     custom_major_ratio : int;
@@ -297,18 +232,7 @@ type control =
         @since 4.08 *)
 
     custom_minor_max_size : int;
-    (** For runtime4:
-        Maximum amount of out-of-heap memory for each custom value
-        allocated in the minor heap. When a custom value is allocated
-        on the minor heap and holds more than this many bytes, only
-        this value is counted against [custom_minor_ratio] and the
-        rest is directly counted against [custom_major_ratio].
-        Note: this only applies to values allocated with
-        [caml_alloc_custom_mem] (e.g. bigarrays).
-        Default: 8192 bytes.
-
-        For runtime5:
-        Maximum amount of out-of-heap memory for each custom value
+    (** Maximum amount of out-of-heap memory for each custom value
         allocated in the minor heap. Custom values that hold more
         than this many bytes are allocated on the major heap.
         Note: this only applies to values allocated with
@@ -329,18 +253,13 @@ external stat : unit -> stat = "caml_gc_stat"
 (** Return the current values of the memory management counters in a
     [stat] record that represent the program's total memory stats.
 
-    This is expensive: in runtime 4, it traverses all of memory to gather
-    statistics, while in runtime 5, it causes a full major collection. *)
+    This causes a full major collection, so is expensive. *)
 
 external quick_stat : unit -> stat = "caml_gc_quick_stat"
 (** Same as [stat] except much cheaper.
 
-    In runtime 4, the heap is not traversed, and [live_words], [live_blocks],
-    [free_words], [free_blocks], [largest_free], and [fragments] are all set
-    to 0.
-
-    In runtime 5, no major collection is triggered, and the values returned
-    (except [minor_collections]) represent the state of memory at the end of
+    No major collection is triggered, and the values returned (except
+    [minor_collections]) represent the state of memory at the end of
     last major collection cycle (and as for [stat], the values [free_blocks],
     [largest_free], and [stack_size] are set to 0).
     *)
@@ -603,9 +522,6 @@ end
 
    Note: this API is EXPERIMENTAL. It may change without prior
    notice.
-
-   (The docs in the comments here relate to runtime5; runtime4 should be
-    similar in most regards.)
 
    *)
 module (Memprof @@ nonportable) :
