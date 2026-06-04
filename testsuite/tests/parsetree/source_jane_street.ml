@@ -1728,8 +1728,7 @@ end
 module type S_poly =
   sig
     val f : 'a -> 'a
-    val g :
-      layout_ l. ('a : value) ('b : value) ('c : l). 'a -> 'b -> 'c -> 'a
+    val g : layout_ l. 'a 'b ('c : l). 'a -> 'b -> 'c -> 'a
     val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
   end
 |}]
