@@ -6310,9 +6310,11 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
-              moregen inst_nongen variance type_pairs env t (unbox_ty_exn env t2')
+              moregen inst_nongen variance type_pairs
+                env t (unbox_ty_exn env t2')
           | (_, Tbox t) when is_unboxable_ty env t1' ->
-              moregen inst_nongen variance type_pairs env (unbox_ty_exn env t1') t
+              moregen inst_nongen variance type_pairs
+                env (unbox_ty_exn env t1') t
           | (_, _) ->
               raise_unexplained_for Moregen
         end
