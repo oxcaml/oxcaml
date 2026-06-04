@@ -1649,16 +1649,7 @@ let transl_type_scheme_lmono env styp =
 let transl_type_scheme_poly_val env styp =
   let cty, body_sort_vars =
     Jkind_types.Sort.generalize_with (fun () ->
-      with_local_level begin fun () ->
-        match styp.ptyp_desc with
-        | Ptyp_poly (vars, styp) ->
-          transl_type_scheme_poly env styp.ptyp_attributes styp.ptyp_loc
-            vars styp
-        | _ ->
-          transl_simple_type ~new_var_jkind:Sort env ~closed:false
-            Alloc.Const.legacy styp
-      end
-        ~post:(fun cty -> generalize_ctyp cty))
+      transl_type_scheme_lmono env styp)
   in
   let sort_vars = body_sort_vars in
   let vars_names_loc =
