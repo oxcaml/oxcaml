@@ -1043,8 +1043,6 @@ Error: This expression has type "int t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-39.
        But the kind of int t must be a subkind of value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]
 
 module M : sig type t end = struct type t = int end
@@ -1062,6 +1060,4 @@ Error: This expression has type "M.t many"
          because of the definition of many at line 2, characters 0-43.
        But the kind of M.t many must be a subkind of value mod contended
          because of the definition of cross_contended at line 9, characters 59-70.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]

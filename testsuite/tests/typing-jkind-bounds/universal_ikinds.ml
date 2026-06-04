@@ -50,8 +50,6 @@ Error: This expression has type "'a t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-28.
        But the kind of 'a t must be a subkind of immutable_data
          because of the definition of require_immutable_data at line 2, characters 27-58.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]
 
 type 'a t : immutable_data = { f : 'b. 'b t }
