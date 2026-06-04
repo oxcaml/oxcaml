@@ -481,7 +481,7 @@ module type S =
   sig val foo1 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
 |}]
 
-(* When quantified, type variables still have kind value *)
+(* When quantified and unconstrained, type variables still have kind value *)
 module type S = sig
   val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
 end
@@ -499,6 +499,8 @@ module type S =
   sig val foo3 : layout_ l. ('a : value) ('b : l). 'a -> 'b -> #('a * 'b) end
 |}]
 
+(* Order of quantified type variables after typing a layout-polymorphic
+   [Ptyp_poly(vars, ty)] depends on the order of type variables in [ty]. *)
 module type S = sig
   val poly_ foo4 : 'a. 'b -> 'a -> #('a * 'b)
 end
@@ -599,7 +601,7 @@ module type S =
   end
 |}]
 
-(* "value_or_null" gets swallowed *)
+(* "value_or_null" stays the same. *)
 module type S = sig
   val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
 end
