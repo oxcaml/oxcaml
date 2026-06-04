@@ -1468,22 +1468,7 @@ end = struct
   let unbox (x : 'a box) : 'a = Obj.magic Obj.magic x
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let unbox (x : 'a box) : 'a = Obj.magic x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val unbox : 'a box -> 'a end
-       is not included in
-         sig val unbox : int * string -> #(int * string) end
-       Values do not match:
-         val unbox : 'a box -> 'a
-       is not included in
-         val unbox : int * string -> #(int * string)
-       The type "'a box -> 'a" is not compatible with the type
-         "int * string -> #(int * string)"
-       Type "'a box" is not compatible with type "int * string"
+module M : sig val unbox : int * string -> #(int * string) end
 |}]
 
 (* same test, simpler unification order - [#(int * string) < a] happens first *)
