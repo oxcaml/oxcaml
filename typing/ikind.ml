@@ -214,7 +214,11 @@ module Solver = struct
         (* We add the parameters to the TyTbl so that they will refer to
            rigid variables that represent them in the solver. *)
         List.iter2
-          (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.node_of_var var))
+          (fun ty var ->
+            let param_kind =
+              Ldd.meet (Ldd.node_of_var var) (kind ~use_tables:true ctx ty)
+            in
+            TyTbl.add ctx.ty_to_kind ty param_kind)
           params rigid_vars;
         (* Compute body kind *)
         (* CR jujacobs: potential efficiency win:
