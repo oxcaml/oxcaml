@@ -843,10 +843,10 @@ let tpoly_get_mono ty =
                   (*  Utilities for box types    *)
                   (*******************************)
 
-let unbox_type_structurally =
-  function
-  | Ttuple tys -> Some (`Desc (Tunboxed_tuple tys))
-  | Tbox ty -> Some (`Expr ty)
+let simple_unbox_ty ty =
+  match get_desc ty with
+  | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
+  | Tbox ty -> Some ty
   | _ -> None
 
 

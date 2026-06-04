@@ -2306,29 +2306,24 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev env t |> new_box_ty
   | _ -> raise Cannot_expand
 
-let try_unbox_desc_gen env d =
-  match d with
+let unbox_ty env ty =
+  match get_desc ty with
   | Tconstr (p, args, _) ->
     let pu = Path.unboxed_version p in
     begin match Env.find_type pu env with
-    | _ -> Some (`Desc (Tconstr (pu, args, ref Mnil)))
+    | _ -> Some (newty2 ~level:(get_level ty) (Tconstr (pu, args, ref Mnil)))
     | exception Not_found -> None
     end
   | _ ->
-    unbox_type_structurally d
+    simple_unbox_ty ty
 
-let is_unboxable_desc env d = Option.is_some (try_unbox_desc_gen env d)
-let is_unboxable_ty env ty = is_unboxable_desc env (get_desc ty)
-
-(* Only valid on types that pass [is_unboxable_desc] *)
-let unbox_desc_exn env d ~level =
-  match try_unbox_desc_gen env d with
-  | None -> invalid_arg "not unboxable"
-  | Some (`Desc d) -> newty2 ~level d
-  | Some (`Expr e) -> e
+let is_unboxable_ty env ty = unbox_ty env ty |> Option.is_some
 
 (* Only valid on types that pass [is_unboxable_ty] *)
-let unbox_ty_exn env ty = unbox_desc_exn env (get_desc ty) ~level:(get_level ty)
+let unbox_ty_exn env ty =
+  match unbox_ty env ty with
+  | Some ty -> ty
+  | None -> invalid_arg "not unboxable"
 
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
@@ -4936,6 +4931,10 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
+      unify uenv (unbox_ty_exn (get_env uenv) t1') t2
+  | (Tbox t1, _) when is_unboxable_ty (get_env uenv) t2' ->
+      unify uenv t1 (unbox_ty_exn (get_env uenv) t2)
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -5046,12 +5045,6 @@ and unify3 uenv t1 t1' t2 t2' =
               || instantiable_scope s2 >= instantiable_scope t1') ->
           unify_with_incr_stage uenv
             (fun uenv -> unify uenv (new_splice_ty t1') s2)
-      | (_, Tbox t2) when is_unboxable_desc (get_env uenv) d1 ->
-          unify
-            uenv (unbox_desc_exn (get_env uenv) ~level:(get_level t1') d1) t2
-      | (Tbox t1, _) when is_unboxable_desc (get_env uenv) d2 ->
-          unify
-            uenv t1 (unbox_desc_exn (get_env uenv) ~level:(get_level t2') d2)
       | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_))
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)

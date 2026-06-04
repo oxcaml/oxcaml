@@ -129,9 +129,9 @@ val tpoly_is_mono : type_expr -> bool
 val tpoly_get_mono : type_expr -> type_expr
 val tpoly_get_poly : type_expr -> type_expr * type_expr list
 
-(* Box types. *)
-val unbox_type_structurally :
-  type_desc -> [> `Desc of type_desc | `Expr of type_expr ] option
+(* Create an expression for the unboxing of the given type
+   if one exists in an empty environment *)
+val simple_unbox_ty : type_expr -> type_expr option
 
 (**** Utilities for private abbreviations with fixed rows ****)
 val row_of_type: type_expr -> type_expr

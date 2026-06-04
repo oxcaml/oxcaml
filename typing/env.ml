@@ -1528,9 +1528,8 @@ let step_find_unboxed_version decl =
       match decl.type_manifest with
       | None -> Lacks_unboxed_version
       | Some ty ->
-        match Btype.unbox_type_structurally (get_desc ty) with
-        | Some (`Desc d) -> Boxes (newty2 ~level:(get_level ty) d)
-        | Some (`Expr e) -> Boxes e
+        match Btype.simple_unbox_ty ty with
+        | Some ty -> Boxes ty
         | None ->
           match get_desc ty with
           | Tconstr (path, args, _) -> Aliases (path, args)
