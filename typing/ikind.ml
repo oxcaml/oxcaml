@@ -219,7 +219,14 @@ module Solver = struct
         (* We add the parameters to the TyTbl so that they will refer to
            rigid variables that represent them in the solver. *)
         List.iter2
-          (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.node_of_var var))
+          (fun ty var ->
+            let param_kind =
+              match Types.get_desc ty with
+              | Types.Tvar { jkind; _ } | Types.Tunivar { jkind; _ } ->
+                Ldd.meet (Ldd.node_of_var var) (ckind_of_jkind ctx jkind)
+              | _ -> Ldd.node_of_var var
+            in
+            TyTbl.add ctx.ty_to_kind ty param_kind)
           params rigid_vars;
         (* Compute body kind *)
         (* CR jujacobs: potential efficiency win:
@@ -614,15 +621,20 @@ let local_var_bounds (ctx : Solver.ctx)
     local_vars;
   bounds
 
-(* For a plain-variable result argument, map it directly to [lhs_kind]. *)
-let add_plain_var_projection ~(local_vars : ('a, Types.type_expr) Hashtbl.t)
+(* For a plain-variable result argument, map it to the intersection of the
+   declaration parameter's kind and the result variable's own jkind. *)
+let add_plain_var_projection ~(ctx : Solver.ctx)
+    ~(local_vars : ('a, Types.type_expr) Hashtbl.t)
     ~(local_subst : ('a, Ldd.node) Hashtbl.t) ~(lhs_kind : Ldd.node)
     (res_arg : Types.type_expr) : unit =
   match Types.get_desc res_arg with
-  | Types.Tvar _ | Types.Tunivar _ ->
+  | Types.Tvar { jkind; _ } | Types.Tunivar { jkind; _ } ->
     let id = Types.get_id res_arg in
-    if Hashtbl.mem local_vars id && not (Hashtbl.mem local_subst id)
-    then Hashtbl.add local_subst id lhs_kind
+    if Hashtbl.mem local_vars id && not (Hashtbl.mem local_subst id) then
+      let projected_kind =
+        Ldd.meet lhs_kind (Solver.ckind_of_jkind ctx jkind)
+      in
+      Hashtbl.add local_subst id projected_kind
   | _ -> ()
 
 let make_gadt_payload_projector
@@ -668,6 +680,7 @@ let make_gadt_payload_projector
           List.iter2
             (fun decl_param res_arg ->
               add_plain_var_projection
+                ~ctx
                 ~local_vars
                 ~local_subst
                 ~lhs_kind:(Solver.kind ~use_tables:true ctx decl_param)

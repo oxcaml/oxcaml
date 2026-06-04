@@ -76,26 +76,22 @@ module Recursive_boxed_variant_with_bounded_parameter = struct
   end
 end
 [%%expect{|
-Lines 8-13, characters 4-56:
- 8 | ....type ('v : value mod contended portable) t
- 9 |       : value mod contended portable =
-10 |       | Variable of 'v Variable.t
-11 |       | Linear_combination of ('v t * int)
-12 |       | Abs of 'v t * (int * (int * int))
-13 |       | Max of { ts : ('v t * int) * ('v t * int) list }
-Error: The kind of type "t" is
-           immutable_data
-             with 'v Variable.t
-             with 'v t
-             with 'v t * int
-             with ('v t * int) * ('v t * int) list
-             with int * (int * int)
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of
-           value mod portable contended
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+module Recursive_boxed_variant_with_bounded_parameter :
+  sig
+    module Variable :
+      sig
+        type ('v : value mod portable contended) t
+          : value mod portable contended with 'v
+      end
+    module Record_t :
+      sig
+        type ('v : value mod portable contended) t =
+            Variable of 'v Variable.t
+          | Linear_combination of ('v t * int)
+          | Abs of 'v t * (int * (int * int))
+          | Max of { ts : ('v t * int) * ('v t * int) list; }
+      end
+  end
 |}]
 
 module Recursive_annotated_list_payload = struct
@@ -107,9 +103,9 @@ Line 3, characters 28-54:
 3 |     A of ('a t list as (_ : any mod contended portable))
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Bad layout annotation:
-         The kind of "'a t/2 list" is immutable_data with 'a t/2
+         The kind of "'a t list" is immutable_data with 'a t
            because it's a boxed variant type.
-         But the kind of "'a t/2 list" must be a subkind of
+         But the kind of "'a t list" must be a subkind of
              any mod portable contended
            because of the annotation on the wildcard _ at line 3, characters 28-54.
 |}]

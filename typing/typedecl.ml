@@ -368,6 +368,12 @@ in
         Btype.newgenvar ?name jkind)
       sdecl.ptype_params
   in
+  let type_ikind =
+    Ikind.type_declaration_ikind_of_jkind
+      ~env:(Some env)
+      ~params:type_params
+      type_jkind
+  in
   (* In the temporary environment, all types get an unboxed version.
      See Note [Typechecking unboxed versions of types]. *)
   let type_unboxed_version =
@@ -375,7 +381,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
-      type_ikind = Types.ikinds_todo "transl_declaration initial unboxed";
+      type_ikind;
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -394,7 +400,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
-      type_ikind = Types.ikinds_todo "transl_declaration initial";
+      type_ikind;
       type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
