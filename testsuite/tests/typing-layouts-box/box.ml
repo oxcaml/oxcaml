@@ -1414,3 +1414,84 @@ let f (Equal : (M.r_box, r box) Type.eq) (x : r) = (x : M.r_box#)
 [%%expect{|
 val f : (M.r_box, r box) Type.eq -> r -> M.r_box# = <fun>
 |}]
+
+(* Test 42: Subsumption checks with [box] *)
+
+(* [box] is total *)
+module M : sig
+  val f : 'a box -> 'c
+end = struct
+  let f (x : 'b) : 'c = Obj.magic x
+end
+[%%expect{|
+module M : sig val f : 'a box -> 'c end
+|}]
+
+(* [box] is not surjective *)
+module M : sig
+  val f : 'b -> 'c
+end = struct
+  let f (x : 'a box) : 'c = Obj.magic x
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (x : 'a box) : 'c = Obj.magic x
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : ('a : any) 'c. 'a box -> 'c end
+       is not included in
+         sig val f : 'b -> 'c end
+       Values do not match:
+         val f : ('a : any) 'c. 'a box -> 'c
+       is not included in
+         val f : 'b -> 'c
+       The type "'a box -> 'b" is not compatible with the type "'c -> 'd"
+       Type "'a box" is not compatible with type "'c"
+|}]
+
+(* [box] is covariant *)
+module M : sig
+  type +'a t
+end = struct
+  type 'a t = 'a box
+end
+[%%expect{|
+module M : sig type +'a t end
+|}]
+
+(* [box] can reduce [moregen]s via unboxing - [int * string < 'a box] *)
+module M : sig
+  val unbox : int * string -> #(int * string)
+end = struct
+  let unbox (x : 'a box) : 'a = Obj.magic Obj.magic x
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let unbox (x : 'a box) : 'a = Obj.magic x
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val unbox : 'a box -> 'a end
+       is not included in
+         sig val unbox : int * string -> #(int * string) end
+       Values do not match:
+         val unbox : 'a box -> 'a
+       is not included in
+         val unbox : int * string -> #(int * string)
+       The type "'a box -> 'a" is not compatible with the type
+         "int * string -> #(int * string)"
+       Type "'a box" is not compatible with type "int * string"
+|}]
+
+(* same test, simpler unification order - [#(int * string) < a] happens first *)
+module M : sig
+  val unbox : #(int * string) -> int * string
+end = struct
+  let unbox (x : 'a) : 'a box = Obj.magic Obj.magic x
+end
+[%%expect{|
+module M : sig val unbox : #(int * string) -> int * string end
+|}]
