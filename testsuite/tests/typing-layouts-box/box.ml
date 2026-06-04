@@ -88,15 +88,15 @@ Error: This expression has type "u box" but an expression was expected of type
 |}]
 
 (* and float records don't get unboxed versions *)
-type r = { x : float }
-let r_id (rub : _ box) : r = rub;;
+type r_float = { x : float }
+let r_id (rub : _ box) : r_float = rub;;
 [%%expect{|
-type r = { x : float; }
-Line 2, characters 29-32:
-2 | let r_id (rub : _ box) : r = rub;;
-                                 ^^^
+type r_float = { x : float; }
+Line 2, characters 35-38:
+2 | let r_id (rub : _ box) : r_float = rub;;
+                                       ^^^
 Error: This expression has type "'a box" but an expression was expected of type
-         "r"
+         "r_float"
 |}]
 
 (* Test 5: box types unify with themselves in function types *)
@@ -1382,4 +1382,35 @@ let f (type a) (type (au : float64))
 val f :
   'a ('au : float64). ('a, float) Type.eq -> ('a, 'au) boxes -> 'au -> 'au =
   <fun>
+|}]
+
+(* Test 41: GADTs refine unboxed versions *)
+
+(* We can learn that types have an unboxed version from GADT equations *)
+
+module M : sig
+  type t
+  type r
+  type r_box
+end = struct
+  type nonrec t = float
+  type nonrec r = r
+  type r_box = r box
+end
+
+(* The lookup for [M.t#] cannot succeed until we match on [Equal] *)
+let f (Equal : (M.t, float) Type.eq) (x : float#) = (x : M.t#)
+[%%expect{|
+module M : sig type t type r type r_box end
+val f : (M.t, float) Type.eq -> float# -> M.t# = <fun>
+|}]
+
+let f (Equal : (M.r, r) Type.eq) (x : r#) = (x : M.r#)
+[%%expect{|
+val f : (M.r, r) Type.eq -> r# -> M.r# = <fun>
+|}]
+
+let f (Equal : (M.r_box, r box) Type.eq) (x : r) = (x : M.r_box#)
+[%%expect{|
+val f : (M.r_box, r box) Type.eq -> r -> M.r_box# = <fun>
 |}]
