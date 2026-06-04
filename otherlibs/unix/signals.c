@@ -64,11 +64,7 @@ CAMLprim value caml_unix_sigprocmask(value vaction, value vset)
   how = sigprocmask_cmd[Int_val(vaction)];
   decode_sigset(vset, &set);
   caml_enter_blocking_section();
-#ifdef CAML_RUNTIME_5
   retcode = pthread_sigmask(how, &set, &oldset);
-#else
-  retcode = caml_sigmask_hook(how, &set, &oldset);
-#endif
   caml_leave_blocking_section();
   /* Run any handlers for just-unmasked pending signals */
   caml_process_pending_actions();
@@ -80,7 +76,6 @@ CAMLprim value caml_unix_sigpending(value unit)
 {
   sigset_t pending;
   if (sigpending(&pending) == -1) caml_uerror("sigpending", Nothing);
-#ifdef CAML_RUNTIME_5
   /* Add signals which are "pending" in the runtime */
   for (int i = 0; i < NSIG_WORDS; i++) {
     uintnat curr = atomic_load(&caml_pending_signals[i]);
@@ -91,11 +86,6 @@ CAMLprim value caml_unix_sigpending(value unit)
       }
     }
   }
-#else
-  for (int i = 0; i < NSIG; i++)
-    if(caml_pending_signals[i])
-      sigaddset(&pending, i);
-#endif
   return encode_sigset(&pending);
 }
 

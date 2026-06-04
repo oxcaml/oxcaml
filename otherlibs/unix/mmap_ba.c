@@ -77,12 +77,7 @@ caml_unix_mapped_alloc(int flags, int num_dims, void * data, intnat * dim)
   res = caml_alloc_custom(&caml_ba_mapped_ops, asize, 0, 1);
   mem_bytes = num_elts * caml_ba_element_size[flags & CAML_BA_KIND_MASK];
   mem_words = (mem_bytes + sizeof(value) - 1) / sizeof(value);
-#ifdef CAML_RUNTIME_5
   caml_memprof_sample_block(res, mem_words, mem_words, CAML_MEMPROF_SRC_CUSTOM);
-#else
-  (void)mem_words; /* unused in runtime4 */
-  caml_memprof_track_custom(res, mem_bytes);
-#endif
   b = Caml_ba_array_val(res);
   b->data = data;
   b->num_dims = num_dims;
