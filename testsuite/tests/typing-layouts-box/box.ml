@@ -1480,3 +1480,26 @@ end
 [%%expect{|
 module M : sig val unbox : #(int * string) -> int * string end
 |}]
+
+(* Test 43: Type equality checks with [box] *)
+
+(* trivial *)
+module M : sig
+  type 'a t = 'a box
+end = struct
+  type 'a t = 'a box
+end
+[%%expect{|
+module M : sig type 'a t = 'a box end
+|}]
+
+(* reductions still happen *)
+module M : sig
+  type t = float
+end = struct
+  type t = float# box
+end
+
+[%%expect{|
+module M : sig type t = float end
+|}]
