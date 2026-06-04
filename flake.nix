@@ -27,27 +27,19 @@
       {
         packages = {
           inherit oxcaml;
-          oxcaml-fp = oxcaml.override { framePointers = true; };
-          oxcaml-r5 = oxcaml.override { runtime5 = true; };
+          oxcaml-r5 = oxcaml;
           oxcaml-fp-r5 = oxcaml.override {
             framePointers = true;
-            runtime5 = true;
           };
-          oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           oxcaml-asan-r5 = oxcaml.override {
             addressSanitizer = true;
-            runtime5 = true;
           };
-          default = oxcaml;
         };
 
         checks = lib.attrsets.filterAttrs (key: drv: !(drv.meta.broken or false)) {
           inherit (self.packages.${system})
-            oxcaml
-            oxcaml-fp
             oxcaml-r5
             oxcaml-fp-r5
-            oxcaml-asan
             oxcaml-asan-r5
             ;
         };
