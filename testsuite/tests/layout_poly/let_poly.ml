@@ -195,10 +195,8 @@ end
 Line 2, characters 12-13:
 2 |   let poly_ f = 42
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* layout-polymorphic id is not included in regular id,
@@ -264,10 +262,8 @@ let poly_ f = `A
 Line 1, characters 10-11:
 1 | let poly_ f = `A
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* variant: passing - payload is a syntactic value *)
@@ -332,10 +328,8 @@ type r = { a : int; b : int -> int; }
 Line 2, characters 10-11:
 2 | let poly_ f = { a = 42; b = fun x -> x }
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* record: failing when a field is not a syntactic value *)
@@ -356,10 +350,8 @@ type ur = #{ a : int; b : int; }
 Line 2, characters 10-11:
 2 | let poly_ f = #{ a = 42; b = 0 }
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
@@ -431,19 +423,8 @@ end
 Line 4, characters 12-13:
 4 |   let poly_ f x = (x : (_ : value))
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
-
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let poly_ f x = (x : (_ : value))
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : int end
-       Values do not match: val f : 'a -> 'a is not included in val f : int
-       The type "'a -> 'a" is not compatible with the type "int"
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* [assert false] is layout poly *)
@@ -611,23 +592,12 @@ Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
    regional, and that makes the captured environment to be local, which makes [f] unable
    to escape the regiohn. *)
 let _bar (x @ local) =
-  let poly_ f = x in
+  let poly_ f _ = x in
   f
 [%%expect{|
-Line 2, characters 12-13:
-2 |   let poly_ f = x in
-                ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Skip hint should not be printed
+Uncaught exception: Typecore.Error(_, _, _)
 
-Line 3, characters 2-3:
-3 |   f
-      ^
-Error: This value is "local"
-         because it is defined by a layout-polymorphic expression (at line 2, characters 12-13)
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
 |}]
 
 (* multiple poly can be have different captured environment mode *)
@@ -639,18 +609,6 @@ let f (x @ local) =
 Line 3, characters 12-13:
 3 |   and poly_ g = () in
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
-
-Line 2, characters 12-13:
-2 |   let poly_ f = x
-                ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
-
-Line 2, characters 12-13:
-2 |   let poly_ f = x
-                ^
-Warning 26 [unused-var]: unused variable f.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
