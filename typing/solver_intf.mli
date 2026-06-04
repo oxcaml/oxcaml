@@ -194,6 +194,15 @@ module type Solver_mono = sig
 
   type pinpoint
 
+  (** Represents a sequence of local changes to the copying scope of a mode
+      variable. Copying a mode takes a [copy_scope], and it is up to the caller
+      to create a new copy scope, and reset it once all copies have been made *)
+  type copy_scope
+
+  (** Runs a function [f] in a fresh mode copy scope, which gets cleaned up once
+      [f] is finished *)
+  val with_copy_scope : (copy_scope -> 'a) -> 'a
+
   type 'd hint_morph constraint 'd = 'l * 'r
 
   type 'd hint_const constraint 'd = 'l * 'r
@@ -316,6 +325,19 @@ module type Solver_mono = sig
     ('a, 'l * 'r) mode ->
     log:changes ref option ->
     unit
+
+  (** If the variable has not yet been copied within the same [copy_scope],
+      [copy] copies all reachable variables whose level is at or above
+      [copy_from_level], and enforces that the copy is below [copy_to_level].
+      Returns either the freshly copied mode, or the copy cached in
+      [copy_scope]. *)
+  val copy :
+    copy_scope:copy_scope ->
+    copy_from_level:int ->
+    copy_to_level:int ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    ('a, 'l * 'r) mode
 
   (** Creates a new mode variable above the given mode and returns [true]. In
       the speical case where the given mode is top, returns the constant top and
