@@ -1,4 +1,0 @@
-File "invalid_continuation_pattern.ml", line 16, characters 11-12:
-16 |   | effect A, [k] -> "bar"
-                ^
-Error: Syntax error
