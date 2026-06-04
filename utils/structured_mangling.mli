@@ -80,6 +80,12 @@ type 'cu path = 'cu path_item list
     for creating a {!LinkageName.t} *)
 val mangle_ident : Compilation_unit.t -> Compilation_unit.t path -> string
 
+(** [encode buf str] appends the encoding of [str] into [buf] as a
+    length-prefixed identifier.
+
+    This function is exposed just for testing uses *)
+val encode : Buffer.t -> string -> unit
+
 (** Inverse direction: parse a mangled symbol back into a structured path. *)
 module Parse : sig
   (** [starts_with_prefix sym] is [true] iff [sym] starts with one of the
@@ -92,4 +98,11 @@ module Parse : sig
       mangled path). Returns [None] if [sym] is not a valid structured mangled
       symbol. *)
   val parse : string -> (string path * string) option
+
+  (** [decode str pos] reverse {!encode}: decode a single length-prefixed
+      identifier at [pos] in [str], returning the decoded string and the number
+      of bytes consumed.
+
+      This function is exposed just for testing uses *)
+  val decode : string -> int -> (string * int) option
 end

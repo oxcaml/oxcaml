@@ -266,30 +266,54 @@ let demangle_with_format format str =
   | Flat1 -> Flat1.unmangle str
   | Structured -> Structured.unmangle str
 
+type codecops = Encode | Decode
+
+let encode s =
+  let b = Buffer.create (String.length s) in
+  Structured_mangling.encode b s;
+  Buffer.contents b
+
+let decode str =
+  match Structured_mangling.Parse.decode str 0 with
+  | Some (s, n) when n = String.length str -> s
+  | Some (s, n) ->
+    Printf.sprintf "Error: partial decoding (\"%s\"), leaving %d bytes" s
+      (String.length str - n)
+  | None -> Printf.sprintf "Error: failure in decoding \"%s\"" str
+
 (* Mirroring c++filt / rustfilt: print the demangled form when we recognise the
    symbol, otherwise pass the input through unchanged. The exit code is always 0
    so the tool is safe to drop into a shell pipeline. *)
-let process_line format line =
-  match demangle_with_format format line with
-  | Some demangled -> print_endline demangled
-  | None -> print_endline line
+let process_line format codecops line =
+  print_endline
+    (match codecops with
+    | [] -> (
+      match demangle_with_format format line with
+      | Some demangled -> demangled
+      | None -> line)
+    | _ ->
+      List.fold_left
+        (fun s codec ->
+          match codec with Encode -> encode s | Decode -> decode s)
+        line codecops)
 
-let process_stdin format () =
+let process_stdin format codecops () =
   let rec aux () =
     match In_channel.input_line In_channel.stdin with
     | Some line ->
-      process_line format line;
+      process_line format codecops line;
       aux ()
     | None -> ()
   in
   aux ()
 
-let process_symbols format symbols = List.iter (process_line format) symbols
+let process_symbols format codecops symbols =
+  List.iter (process_line format codecops) symbols
 
-let main format symbols =
+let main format codecops symbols =
   match symbols with
-  | [] -> process_stdin format ()
-  | symbols -> process_symbols format symbols
+  | [] -> process_stdin format codecops ()
+  | symbols -> process_symbols format codecops symbols
 
 (* Command line interface *)
 let usage_msg =
@@ -300,6 +324,8 @@ let usage_msg =
 let format_ref = ref Auto
 
 let symbols_ref = ref []
+
+let codecops_ref = ref []
 
 let specs =
   [ ( "--format",
@@ -313,8 +339,16 @@ let specs =
                | "structured" -> Structured
                | _ -> raise (Arg.Bad (Printf.sprintf "unknown format: '%s'" s))),
       "<format>  Set mangling format: auto, flat0 (<= 5.2.1), flat1 (>= 5.3), \
-       structured  (default: auto)" ) ]
+       structured  (default: auto)" );
+    ( "--encode",
+      Arg.Unit (fun () -> codecops_ref := Encode :: !codecops_ref),
+      " Encode input as an identifier, instead of demangling; can be pipelined \
+       with --decode to round-trip" );
+    ( "--decode",
+      Arg.Unit (fun () -> codecops_ref := Decode :: !codecops_ref),
+      " Decode input as an identifier, instead of demangling; can be pipelined \
+       with --encode to round-trip" ) ]
 
 let () =
   Arg.parse specs (fun s -> symbols_ref := !symbols_ref @ [s]) usage_msg;
-  main !format_ref !symbols_ref
+  main !format_ref (List.rev !codecops_ref) !symbols_ref
