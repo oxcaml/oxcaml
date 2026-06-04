@@ -4214,10 +4214,6 @@ let rec mcomp type_pairs env t1 t2 =
           mcomp type_pairs (incr_stage env) (new_splice_ty t1') s2
         | (_, Tsplice s2, _, _) when target2 ->
           mcomp type_pairs (decr_stage env) (new_quote_ty t1') s2
-        | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
-          mcomp type_pairs env t (unbox_ty_exn env t2')
-        | (_, Tbox t, _, _) when is_unboxable_ty env t1' ->
-          mcomp type_pairs env (unbox_ty_exn env t1') t
         (* Flexible cases *)
         (* - If [flexible1], then [t1'] is now a [Tvar].
            - If [flexible2], then [t2'] is now a [Tvar]. *)
@@ -4259,6 +4255,8 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp_fields type_pairs env fi1 fi2
         | (Tfield _, Tfield _, _, _) ->       (* Actually unused *)
             mcomp_fields type_pairs env t1' t2'
+        | (Tnil, Tnil, _, _) ->
+            ()
         | (Tquote t1, Tquote t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
@@ -4267,8 +4265,10 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs (incr_stage env) t1 t2
         | (Tbox t1, Tbox t2, _, _) ->
             mcomp type_pairs env t1 t2
-        | (Tnil, Tnil, _, _) ->
-            ()
+        | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
+          mcomp type_pairs env t (unbox_ty_exn env t2')
+        | (_, Tbox t, _, _) when is_unboxable_ty env t1' ->
+          mcomp type_pairs env (unbox_ty_exn env t1') t
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
             mcomp type_pairs env t1 t2
         | (Tpoly (t1, tl1), Tpoly (t2, tl2), _, _) ->
@@ -4921,8 +4921,6 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tquote_eval t1, Tquote_eval t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
-  | (Tbox t1, Tbox t2) ->
-      unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       unify_with_decr_stage uenv (fun uenv -> unify uenv s1 (new_quote_ty t2'))
   | (Tquote s1, _) when is_flexible_ty s1 ->
@@ -4931,6 +4929,8 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tbox t1, Tbox t2) ->
+      unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
       unify uenv (unbox_ty_exn (get_env uenv) t1') t2
   | (Tbox t1, _) when is_unboxable_ty (get_env uenv) t2' ->
