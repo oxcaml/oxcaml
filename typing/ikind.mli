@@ -64,6 +64,13 @@ val sub_or_error :
   ('l2 * Allowance.allowed) Types.jkind ->
   (unit, Jkind.Violation.t) result
 
+val type_expr_sub_jkind :
+  ?check_principality:bool ->
+  Env.t ->
+  Types.type_expr ->
+  ('l * Allowance.allowed) Types.jkind ->
+  bool
+
 (** Apply path substitutions to a constructor ikind. *)
 val substitute_decl_ikind_with_lookup :
   lookup_type:(Path.t -> Subst.Ikind_substitution.type_lookup_result) ->

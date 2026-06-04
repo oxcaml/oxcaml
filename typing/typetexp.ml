@@ -1398,7 +1398,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
         jkind_of_annotation env (Type_wildcard jkind_annot.pjka_loc)
           attrs jkind_annot
       in
-      begin match constrain_type_jkind env cty_expr jkind with
+      begin match constrain_type_jkind_for_alias env cty_expr jkind with
       | Ok () -> ()
       | Error err ->
         raise (Error(jkind_annot.pjka_loc, env,

@@ -3384,6 +3384,15 @@ let check_type_jkind env ty jkind =
 let constrain_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:false env ty jkind
 
+let constrain_type_jkind_for_alias env ty jkind =
+  let ty = Btype.proxy ty in
+  if match get_desc ty with
+    | Tconstr _ ->
+      Ikind.type_expr_sub_jkind ~check_principality:false env ty jkind
+    | _ -> false
+  then Ok ()
+  else constrain_type_jkind env ty jkind
+
 let () =
   Env.constrain_type_jkind := constrain_type_jkind
 

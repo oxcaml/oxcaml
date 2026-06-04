@@ -736,6 +736,9 @@ val check_type_jkind :
 val constrain_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
 
+val constrain_type_jkind_for_alias :
+  Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
+
 (* Check whether a type's externality's upper bound is less than some target.
    Potentially cheaper than just calling [type_jkind], because this can stop
    expansion once it succeeds. *)

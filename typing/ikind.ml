@@ -83,6 +83,7 @@ module Solver = struct
     { env : Env.t option;
       lookup_of_env : Env.t -> Path.t -> constr_decl;
       mode : mode;
+      check_principality : bool;
       ty_to_kind : Ldd.node TyTbl.t;
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
@@ -101,6 +102,7 @@ module Solver = struct
       env;
       lookup_of_env;
       mode;
+      check_principality = true;
       ty_to_kind = global_ty_to_kind;
       constr_to_coeffs = global_constr_to_coeffs
     }
@@ -389,9 +391,8 @@ module Solver = struct
    fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
 
   (** Compute the kind for [t]. *)
-  and kind ?(check_principality = true) ~use_tables
-      (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
-    if check_principality && not (is_principal_type ty)
+  and kind ~use_tables (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
+    if ctx.check_principality && not (is_principal_type ty)
     then Ldd.const Axis_lattice.top
     else
     match TyTbl.find_opt ctx.ty_to_kind ty with
@@ -456,7 +457,7 @@ module Solver = struct
            breaks the stdlib build, and the old env-var escape hatch never had
            a viable setting in practice. Track removing this workaround as part
            of internal ticket 5746. *)
-        kind ~check_principality:false ~use_tables:true ctx ty
+        kind ~use_tables:true { ctx with check_principality = false } ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
@@ -1343,6 +1344,21 @@ let sub_or_error ?origin:_origin
     | _ ->
       (* Delegate to Jkind for detailed error reporting. *)
       Jkind.sub_or_error ~type_equal ~context env t1 t2
+
+let type_expr_sub_jkind ?(check_principality = true) env ty
+    (jkind : ('l * Allowance.allowed) Types.jkind) =
+  if not !Clflags.ikinds
+  then false
+  else
+    let ctx =
+      create_ctx ~mode:Solver.Normal ~env:(Some env)
+    in
+    let ctx = { ctx with Solver.check_principality } in
+    let sub_poly =
+      Solver.normalize (Solver.kind ~use_tables:true ctx ty)
+    in
+    let super_poly = Solver.normalize (Solver.ckind_of_jkind ctx jkind) in
+    Ldd.leq_with_reason sub_poly super_poly = []
 
 (** Substitute constructor ikinds according to [lookup] without requiring
     Env. *)

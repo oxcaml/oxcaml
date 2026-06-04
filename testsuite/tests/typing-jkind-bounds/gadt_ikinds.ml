@@ -99,15 +99,8 @@ module Recursive_annotated_list_payload = struct
     A of ('a t list as (_ : any mod contended portable))
 end
 [%%expect{|
-Line 3, characters 28-54:
-3 |     A of ('a t list as (_ : any mod contended portable))
-                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Bad layout annotation:
-         The kind of "'a t list" is immutable_data with 'a t
-           because it's a boxed variant type.
-         But the kind of "'a t list" must be a subkind of
-             any mod portable contended
-           because of the annotation on the wildcard _ at line 3, characters 28-54.
+module Recursive_annotated_list_payload :
+  sig type ('a : value mod portable contended) t = A of 'a t list end
 |}]
 
 (***********************************************************************)
