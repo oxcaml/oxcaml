@@ -418,15 +418,94 @@ end
 Exception: Match_failure ("", 2, 23).
 |}]
 
-(* functor application are always dynamic. *)
-(* CR-soon zqian: remove this restriction *)
-module F (X : sig end) = struct
-end
+(* The staticity of a functor application is the join of the functor's
+   staticity and the staticity of its result. So a static application requires
+   both the functor and its (explicitly annotated) return mode to be static. *)
+
+(* A static functor with a static return mode yields a static application.
+   The functor's type is annotated explicitly so its staticity is not zapped. *)
+module F : functor (X : sig end) -> sig end @ static =
+  functor (X : sig end) -> struct end
+module (Y @ static) = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* Such an application can of course also be used at dynamic. *)
+module F : functor (X : sig end) -> sig end @ static =
+  functor (X : sig end) -> struct end
+module Y = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* Currying applies the functor one argument at a time. The intermediate
+   functor (the result of the first application) is dynamic unless its mode is
+   annotated, so the curried application is dynamic. The error points at the
+   intermediate application via the functor-application hint. *)
+module F : functor (A : sig end) (B : sig end) -> sig end @ static =
+  functor (A : sig end) (B : sig end) -> struct end
+module (Y @ static) = F(struct end)(struct end)
+[%%expect{|
+module F : functor (A : sig end) (B : sig end) -> sig end
+Line 3, characters 22-47:
+3 | module (Y @ static) = F(struct end)(struct end)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The module is "dynamic"
+         because it is an application of the functor at line 3, characters 22-35
+         which is "dynamic".
+       However, the module highlighted is expected to be "static".
+|}]
+
+(* Annotating the intermediate functor as static too makes the whole curried
+   application static. *)
+module F :
+  functor (A : sig end)
+  -> (functor (B : sig end) -> sig end @ static) @ static =
+  functor (A : sig end) (B : sig end) -> struct end
+module (Y @ static) = F(struct end)(struct end)
+[%%expect{|
+module F : functor (A : sig end) (B : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* A dynamic return mode yields a dynamic application, even though the functor
+   itself is static. *)
+module F : functor (X : sig end) -> sig end @ dynamic =
+  functor (X : sig end) -> struct end
 module (Y @ static) = F(struct end)
 [%%expect{|
 module F : functor (X : sig end) -> sig end
 Line 3, characters 22-35:
 3 | module (Y @ static) = F(struct end)
+                          ^^^^^^^^^^^^^
+Error: The module is "dynamic" but is expected to be "static".
+|}]
+
+(* Without a return-mode annotation, the return mode defaults to dynamic. *)
+module F : functor (X : sig end) -> sig end =
+  functor (X : sig end) -> struct end
+module (Y @ static) = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+Line 3, characters 22-35:
+3 | module (Y @ static) = F(struct end)
+                          ^^^^^^^^^^^^^
+Error: The module is "dynamic" but is expected to be "static".
+|}]
+
+(* A result-type annotation on the functor binding (rather than on the functor
+   type) does not set the return mode, which therefore defaults to dynamic. So
+   the application is dynamic because of the return mode, not the functor - the
+   error makes no mention of the functor. *)
+module F (X : sig end) : sig end @ static = struct end
+module (Y @ static) = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+Line 2, characters 22-35:
+2 | module (Y @ static) = F(struct end)
                           ^^^^^^^^^^^^^
 Error: The module is "dynamic" but is expected to be "static".
 |}]

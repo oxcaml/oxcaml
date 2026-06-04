@@ -3429,7 +3429,7 @@ and quote_module_exp ~transl stage loc env mod_exp =
   | Tmod_ident (path, _) ->
     let m = module_for_path loc env path in
     Module.ident loc m |> Module.wrap
-  | Tmod_apply (funct, arg, _) ->
+  | Tmod_apply (funct, arg, _, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     let transl_arg = quote_module_exp ~transl stage loc env arg in
     Module.apply loc transl_funct transl_arg |> Module.wrap

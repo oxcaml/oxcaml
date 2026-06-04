@@ -2723,7 +2723,7 @@ exception Not_a_path
 let rec path_of_module mexp =
   match mexp.mod_desc with
   | Tmod_ident (p,_) -> p
-  | Tmod_apply(funct, arg, _coercion) when !Clflags.applicative_functors ->
+  | Tmod_apply(funct, arg, _coercion, _) when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
       path_of_module mexp
@@ -3521,9 +3521,24 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
-      { mod_desc = Tmod_apply(funct, arg, coercion);
+      let mode_funct = mode_without_locks_exn funct.mod_mode in
+      let funct_staticity =
+        let hint : _ Mode.Hint.morph =
+          Application_of_functor (funct.mod_loc, Functor)
+        in
+        Value.proj_monadic Staticity
+          { mode_funct with
+            monadic = Value.Monadic.apply_hint hint mode_funct.monadic }
+      in
+      let ap_mode =
+        Value.join
+          [ Value.disallow_right mm_res;
+            Value.min_with_monadic Staticity funct_staticity ]
+      in
+      let staticity = Value.proj_monadic Staticity ap_mode in
+      { mod_desc = Tmod_apply(funct, arg, coercion, staticity);
         mod_type = mty_appl;
-        mod_mode = Value.disallow_right mm_res, None;
+        mod_mode = ap_mode, None;
         mod_env = env;
         mod_attributes = app_attributes;
         mod_loc = app_loc },
