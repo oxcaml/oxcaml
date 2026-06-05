@@ -41,6 +41,9 @@ Line 1, characters 40-41:
 1 | let dup (x @ unique) = ((x : @ unique), x, x)
                                             ^
 Error: This value is used here, but it is also being used as unique at:
+Line 1, characters 24-38:
+1 | let dup (x @ unique) = ((x : @ unique), x, x)
+                            ^^^^^^^^^^^^^^
 
 |}]
 
@@ -63,6 +66,9 @@ Line 1, characters 40-41:
 1 | let dup (x @ unique) = ((x : @ unique), x)
                                             ^
 Error: This value is used here, but it is also being used as unique at:
+Line 1, characters 24-38:
+1 | let dup (x @ unique) = ((x : @ unique), x)
+                            ^^^^^^^^^^^^^^
 
 |}]
 
