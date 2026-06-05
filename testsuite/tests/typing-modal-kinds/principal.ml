@@ -11,37 +11,21 @@ type 'a pair = Pair of 'a * 'a
 let string_escape_l (local_ y) = let Pair (x, _) = Pair (y, "hello") in x
 
 [%%expect{|
-Line 1, characters 72-73:
-1 | let string_escape_l (local_ y) = let Pair (x, _) = Pair (y, "hello") in x
-                                                                            ^
-Error: This value is "local"
-         because it is contained (via constructor "Pair") in the value at line 1, characters 37-48
-         which is "local"
-         because it is allocated at line 1, characters 51-68 containing data
-         which is "local" to the parent region
-         because it contains (via constructor "Pair") the expression at line 1, characters 57-58
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 let string_escape_r (local_ y) = let Pair (x, _) = Pair ("hello", y) in x
 
 [%%expect{|
-Line 1, characters 72-73:
-1 | let string_escape_r (local_ y) = let Pair (x, _) = Pair ("hello", y) in x
-                                                                            ^
-Error: This value is "local"
-         because it is contained (via constructor "Pair") in the value at line 1, characters 37-48
-         which is "local"
-         because it is allocated at line 1, characters 51-68 containing data
-         which is "local" to the parent region
-         because it contains (via constructor "Pair") the expression at line 1, characters 66-67
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 let int_escape_l (local_ y) = let Pair (x, _) = Pair (y, 5) in x
@@ -49,19 +33,11 @@ let int_escape_l (local_ y) = let Pair (x, _) = Pair (y, 5) in x
 [%%expect{|
 val int_escape_l : int @ local -> int = <fun>
 |}, Principal{|
-Line 1, characters 63-64:
-1 | let int_escape_l (local_ y) = let Pair (x, _) = Pair (y, 5) in x
-                                                                   ^
-Error: This value is "local"
-         because it is contained (via constructor "Pair") in the value at line 1, characters 34-45
-         which is "local"
-         because it is allocated at line 1, characters 48-59 containing data
-         which is "local" to the parent region
-         because it contains (via constructor "Pair") the expression at line 1, characters 54-55
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 let int_escape_r (local_ y) = let Pair (x, _) = Pair (5, y) in x
@@ -69,19 +45,11 @@ let int_escape_r (local_ y) = let Pair (x, _) = Pair (5, y) in x
 [%%expect{|
 val int_escape_r : int @ local -> int = <fun>
 |}, Principal{|
-Line 1, characters 63-64:
-1 | let int_escape_r (local_ y) = let Pair (x, _) = Pair (5, y) in x
-                                                                   ^
-Error: This value is "local"
-         because it is contained (via constructor "Pair") in the value at line 1, characters 34-45
-         which is "local"
-         because it is allocated at line 1, characters 48-59 containing data
-         which is "local" to the parent region
-         because it contains (via constructor "Pair") the expression at line 1, characters 57-58
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 let string_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, "hello")

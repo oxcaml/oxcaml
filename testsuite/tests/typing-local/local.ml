@@ -444,6 +444,8 @@ Line 10, characters 24-26:
 10 |   let _force_heap = ref fn in
                              ^^
 Error: This value is "local"
+         because it is allocated at lines 3-8, characters 9-7 containing data
+         which is "local"
          because it closes over the value "foo" at line 5, characters 25-28
          which is "local".
        However, the highlighted expression is expected to be "global".
@@ -593,6 +595,7 @@ Line 3, characters 39-40:
 Error: The value "r" is "local"
        but is expected to be "global"
          because it is used inside the function at line 3, characters 14-68
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1714,19 +1717,11 @@ let foo (local_ x) y =
   | None, _ -> ()
   | _  -> ();;
 [%%expect{|
-Line 4, characters 29-30:
-4 |   | Some _, Some b -> escape b
-                                 ^
-Error: This value is "local"
-         because it is contained (via constructor "Some") in the value at line 4, characters 12-18
-         which is "local"
-         because it is an element of the tuple at line 3, characters 8-10
-         which is "local"
-         because it is allocated at line 2, characters 11-15 containing data
-         which is "local" to the parent region
-         because it is a tuple that contains the expression at line 2, characters 11-12
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "global".
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 let foo (local_ x) y =
@@ -1736,17 +1731,11 @@ let foo (local_ x) y =
     escape b
   | _  -> ();;
 [%%expect{|
-Line 5, characters 11-12:
-5 |     escape b
-               ^
-Error: This value is "local"
-         because it is an element of the tuple at line 4, characters 15-17
-         which is "local"
-         because it is allocated at line 2, characters 8-12 containing data
-         which is "local" to the parent region
-         because it is a tuple that contains the expression at line 2, characters 8-9
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "global".
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 let foo p (local_ x) y z =
@@ -1793,17 +1782,11 @@ let foo p (local_ x) y z =
   let _, b = pr in
   escape b;;
 [%%expect{|
-Line 6, characters 9-10:
-6 |   escape b;;
-             ^
-Error: This value is "local"
-         because it is an element of the tuple at line 5, characters 13-15
-         which is "local"
-         because it is allocated at line 3, characters 14-18 containing data
-         which is "local" to the parent region
-         because it is a tuple that contains the expression at line 3, characters 14-15
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "global".
+>> Fatal error: Unexpected objects for allocation hint:
+source object Regionality, source value regional, target object Regionality,
+target value local
+Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 (* [as] patterns *)

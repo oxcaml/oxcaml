@@ -170,6 +170,7 @@ type 'd morph =
   | Crossing : ('l * 'r) morph
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
+  | Allocation : allocation -> ('l * 'r) morph
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
