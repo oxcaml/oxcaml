@@ -1560,3 +1560,29 @@ end
 [%%expect{|
 module M : sig type t = float end
 |}]
+
+(* Test 44: Signature avoidance can cause errors at functor application *)
+
+module type S = sig
+  type t
+end
+module F(X : S) = struct
+  type x = X.t
+  type y = X.t box
+  type yu = y#
+end
+
+module M = F(struct
+  type t
+end)
+[%%expect{|
+module type S = sig type t end
+module F :
+  functor (X : S) -> sig type x = X.t type y = X.t box type yu = y# end
+Lines 10-12, characters 11-4:
+10 | ...........F(struct
+11 |   type t
+12 | end)
+Error: In the signature of this functor application:
+       The type "y" has no unboxed version.
+|}]
