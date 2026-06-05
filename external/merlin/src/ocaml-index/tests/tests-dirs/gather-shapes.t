@@ -27,13 +27,21 @@ us to avoid loading the cms files of dependencies.
   $ ocaml-index aggregate -o main.merlin-index lib/lib.merlin-shapes main.cms
 
   $ ocaml-index dump main.merlin-index
-  8 uids:
-  {uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 8-17
+  9 uids:
+  {uid: Foo; locs:
+     "Foo": File "main.ml", line 1, characters 8-11;
+     "Foo": File "main.ml", line 2, characters 8-11;
+     "Foo": File "main.ml", line 3, characters 8-11;
+     "Foo": File "main.ml", line 3, characters 16-19;
+     "Foo": File "main.ml", line 4, characters 13-16
+   uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 8-17
    uid: Foo.0; locs:
      "Foo.a": File "main.ml", line 2, characters 8-13;
      "Foo.a": File "main.ml", line 3, characters 8-13
    uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5
-   uid: Foo.1; locs: "Foo.Bar": File "main.ml", line 4, characters 13-20
+   uid: Foo.1; locs:
+     "Foo.Bar": File "main.ml", line 1, characters 8-15;
+     "Foo.Bar": File "main.ml", line 4, characters 13-20
    uid: Main.1; locs: "a": File "main.ml", line 2, characters 4-5
    uid: Foo.2; locs: "Foo.b": File "main.ml", line 3, characters 16-21
    uid: Main.2; locs: "b": File "main.ml", line 3, characters 4-5
@@ -45,8 +53,14 @@ Order matters; if we don't load the shapes file before the cms, we will fail to 
 properly:
   $ ocaml-index aggregate -o main-out-of-order.merlin-index main.cms lib/lib.merlin-shapes
   $ ocaml-index dump main-out-of-order.merlin-index
-  4 uids:
-  {uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5
+  5 uids:
+  {uid: Foo; locs:
+     "Foo": File "main.ml", line 1, characters 8-11;
+     "Foo": File "main.ml", line 2, characters 8-11;
+     "Foo": File "main.ml", line 3, characters 8-11;
+     "Foo": File "main.ml", line 3, characters 16-19;
+     "Foo": File "main.ml", line 4, characters 13-16
+   uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5
    uid: Main.1; locs: "a": File "main.ml", line 2, characters 4-5
    uid: Main.2; locs: "b": File "main.ml", line 3, characters 4-5
    uid: Main.3; locs: "Bar": File "main.ml", line 4, characters 7-10 },

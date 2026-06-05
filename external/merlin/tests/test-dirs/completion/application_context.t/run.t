@@ -4,7 +4,7 @@
   [
     "application",
     {
-      "argument_type": "'_weak2",
+      "argument_type": "'b",
       "labels": [
         {
           "name": "~j",
@@ -12,7 +12,7 @@
         },
         {
           "name": "?k",
-          "type": "'_weak1 option"
+          "type": "'a option"
         },
         {
           "name": "~l",

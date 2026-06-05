@@ -36,6 +36,8 @@ type pinpoint_desc =
   | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Effect_match  (** A pattern match with effect cases *)
+  | Effect_try  (** A try-with expression with effect cases *)
   | Class  (** A class declaration *)
   | Object  (** An object declaration *)
   | Loop  (** A loop *)
@@ -140,6 +142,7 @@ type allocation_desc =
   | Optional_argument
   | Function_coercion
   | Float_projection
+  | Lpoly_captured_environment
 
 type allocation = allocation_desc Location.loc
 

@@ -13,7 +13,7 @@ module Namespace : sig
   val to_string : t -> string
 
   type packed_label_description =
-    | P : 'rep Types.gen_label_description -> packed_label_description
+    | P : 'rep Data_types.gen_label_description -> packed_label_description
 
   type under_type = [ `Constr | `Labels ]
   type inferred_basic = [ `Constr | `Labels | `Mod | `Modtype | `Type | `Vals ]
@@ -22,7 +22,7 @@ module Namespace : sig
     | `Labels
     | `Mod
     | `Modtype
-    | `This_cstr of Types.constructor_description
+    | `This_cstr of Data_types.constructor_description
     | `This_label of packed_label_description
     | `Type
     | `Vals ]

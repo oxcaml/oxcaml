@@ -17,6 +17,7 @@
 open Asttypes
 open Typedtree
 open Types
+open Data_types
 
 val omega : pattern
 (** aka. "Tpat_any" or "_"  *)
@@ -73,6 +74,7 @@ module General : sig
     | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
     | `Fun_layout of Ident.t * string loc * Uid.t
                    * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
+                   * alloc_mode
     | `Alias of pattern * Ident.t * string loc * Uid.t
                 * Jkind.Sort.t * Mode.Value.l * Types.type_expr
   ]

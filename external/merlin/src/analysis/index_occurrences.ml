@@ -46,21 +46,21 @@ let should_ignore_lid (lid : Longident.t Location.loc) =
 
 let iterator ~current_buffer_path ~index ~reduce_for_uid =
   let add uid loc = index := Shape.Uid.Map.add_to_list uid loc !index in
-  let f ~namespace env path (lid : Longident.t Location.loc) =
+  let index_one ~namespace env path (lid : Longident.t Location.loc) =
     log ~title:"index_buffer" "Path: %a" Logger.fmt
       (Fun.flip (Format_doc.compat Path.print) path);
-    let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
-    let index_decl () =
-      begin match decl_of_path_or_lid env namespace path lid.txt with
-      | (exception _) | None ->
-        log ~title:"index_buffer" "Declaration not found"
-      | Some decl ->
-        log ~title:"index_buffer" "Found declaration: %a" Logger.fmt
-          (Fun.flip Location.print_loc decl.loc);
-        add decl.uid lid
-      end
-    in
-    if not (should_ignore_lid lid) then
+    if not (should_ignore_lid lid) then begin
+      let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
+      let index_decl () =
+        begin match decl_of_path_or_lid env namespace path lid.txt with
+        | (exception _) | None ->
+          log ~title:"index_buffer" "Declaration not found"
+        | Some decl ->
+          log ~title:"index_buffer" "Found declaration: %a" Logger.fmt
+            (Fun.flip Location.print_loc decl.loc);
+          add decl.uid lid
+        end
+      in
       match Env.shape_of_path ~namespace env path with
       | exception Not_found -> ()
       | path_shape ->
@@ -69,7 +69,7 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
         let result = reduce_for_uid env path_shape in
         begin match Locate.uid_of_result ~traverse_aliases:false result with
         | Some uid, false ->
-          log ~title:"index_buffer" "Found %a (%a) wiht uid %a" Logger.fmt
+          log ~title:"index_buffer" "Found %a (%a) with uid %a" Logger.fmt
             (Fun.flip Pprintast.longident lid.txt)
             Logger.fmt
             (Fun.flip Location.print_loc lid.loc)
@@ -85,6 +85,23 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
           log ~title:"index_buffer" "Reduction failed: missing uid";
           index_decl ()
         end
+    end
+  in
+  let f ~namespace env path lid =
+    let rec index_components namespace lid path =
+      let module_ = Shape.Sig_component_kind.Module in
+      let scraped_path = Path.scrape_extra_ty path in
+      match lid.Location.txt, scraped_path with
+      | Longident.Ldot (lid', _), Path.Pdot (path', _) ->
+        index_one ~namespace env path lid;
+        index_components module_ lid' path'
+      | Longident.Lapply (lid', lid''), Path.Papply (path', path'') ->
+        index_components module_ lid'' path'';
+        index_components module_ lid' path'
+      | Longident.Lident _, _ -> index_one ~namespace env path lid
+      | _, _ -> ()
+    in
+    index_components namespace lid path
   in
   Ast_iterators.iterator_on_usages ~include_hidden:true ~f
 
