@@ -52,6 +52,9 @@ module Recursive_list_alias_annotation = struct
     | A of ('a t list as (_ : any mod contended portable))
 end
 [%%expect{|
+module Recursive_list_alias_annotation :
+  sig type ('a : value mod portable contended) t = A of 'a t list end
+|}, Principal{|
 Line 3, characters 30-56:
 3 |     | A of ('a t list as (_ : any mod contended portable))
                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
