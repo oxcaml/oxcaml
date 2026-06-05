@@ -1705,7 +1705,14 @@ and precompile_or ~arg ~arg_sort (cls : Simple.clause list) ors args def k =
               (* variables bound in the or-pattern
                  that are used in the orpm actions *)
               Typedtree.pat_bound_idents_full orp
-              |> List.filter (fun (id, _, _, _, _) -> Ident.Set.mem id pm_fv)
+              |> List.filter (fun (id, _, _, uid, _) ->
+                  let is_free = Ident.Set.mem id pm_fv in
+                  if not is_free then
+                    Type_shape.Variable_availability
+                    .register_ok_drop ~uid
+                      ~reason:Ignored_variable;
+                  is_free
+                  )
               |> List.map (fun (id, _, ty, uid, id_sort) ->
                   (id, uid, Typeopt.layout orp.pat_env orp.pat_loc id_sort ty))
             in

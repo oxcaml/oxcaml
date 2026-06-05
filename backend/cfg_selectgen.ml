@@ -755,7 +755,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:(Some v) with
       | Never_returns -> Never_returns
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
-    | Cphantom_let (_var, _defining_expr, body) ->
+    | Cphantom_let (var, _defining_expr, body) ->
+      SU.record_cmm_observation_for_var var;
       emit_expr env sub_cfg body ~bound_name
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
@@ -806,7 +807,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
-    | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
+    | Cphantom_let (var, _defining_expr, body) ->
+      SU.record_cmm_observation_for_var var;
+      emit_tail env sub_cfg body
     | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
       ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -899,10 +902,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           then
             let bound_name = VP.var bound_name in
             let naming_op =
-              Operation.Name_for_debugger
-                { ident = bound_name; provenance; which_parameter = None; regs }
+              SU.make_name_for_debugger ~ident:bound_name ~which_parameter:None
+                ~provenance ~regs
             in
-            insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
+            insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]
       in
       let ty = SU.oper_result_type op in
       let label_after = Cmm.new_label () in
@@ -1109,15 +1112,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 then
                   let var = VP.var var in
                   let naming_op =
-                    Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                    SU.make_name_for_debugger ~ident:var ~which_parameter:None
+                      ~provenance ~regs:r
                   in
-                  insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
-                    [||] [||])
+                  insert_debug new_env sub_cfg naming_op Debuginfo.none [||] [||])
               ids_and_rs)
       in
       (rs, label), (r, sub)
@@ -1389,15 +1387,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 then
                   let var = VP.var var in
                   let naming_op =
-                    Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                    SU.make_name_for_debugger ~ident:var ~which_parameter:None
+                      ~provenance ~regs:r
                   in
-                  insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
-                    [||] [||])
+                  insert_debug new_env sub_cfg naming_op Debuginfo.none [||] [||])
               ids_and_rs)
       in
       Sub_cfg.add_empty_block_at_start seq ~label;
@@ -1468,16 +1461,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         if Option.is_some provenance
         then
           let naming_op =
-            Operation.Name_for_debugger
-              { ident = var;
-                provenance;
-                which_parameter = Some param_index;
-                regs = hard_regs_for_arg
-              }
+            SU.make_name_for_debugger ~ident:var
+              ~which_parameter:(Some param_index) ~provenance
+              ~regs:hard_regs_for_arg
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
-               Debuginfo.none))
+            (Sub_cfg.make_instr naming_op hard_regs_for_arg [||] Debuginfo.none))
       fun_args
 
   (* Sequentialization of a function definition *)
