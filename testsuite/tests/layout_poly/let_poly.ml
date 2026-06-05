@@ -187,7 +187,7 @@ Line 3, characters 2-13:
 Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
-(* Warning when poly_ binding generalizes no layout variables *)
+(* Error when poly_ binding generalizes no layout variables *)
 module M = struct
   let poly_ f = 42
 end
@@ -257,13 +257,11 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* variant: passing - no payload *)
-let poly_ f = `A
+let poly_ f _ = `A
 [%%expect{|
-Line 1, characters 10-11:
-1 | let poly_ f = `A
-              ^
-Error: This binding has no layout variables, so "poly_" has no effect.
-       Consider using a regular "let" instead.
+>> Fatal error: layout: unexpected genvar
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* variant: passing - payload is a syntactic value *)
@@ -322,14 +320,12 @@ Error: This expression is not allowed in a "let poly_" definition;
 
 (* record: passing when all fields are syntactic values *)
 type r = { a : int; b : int -> int }
-let poly_ f = { a = 42; b = fun x -> x }
+let poly_ f _ = { a = 42; b = fun x -> x }
 [%%expect{|
 type r = { a : int; b : int -> int; }
-Line 2, characters 10-11:
-2 | let poly_ f = { a = 42; b = fun x -> x }
-              ^
-Error: This binding has no layout variables, so "poly_" has no effect.
-       Consider using a regular "let" instead.
+>> Fatal error: layout: unexpected genvar
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* record: failing when a field is not a syntactic value *)
@@ -344,14 +340,12 @@ Error: This expression is not allowed in a "let poly_" definition;
 
 (* unboxed product record: passing when all fields are syntactic values *)
 type ur = #{ a : int; b : int }
-let poly_ f = #{ a = 42; b = 0 }
+let poly_ f _ = #{ a = 42; b = 0 }
 [%%expect{|
 type ur = #{ a : int; b : int; }
-Line 2, characters 10-11:
-2 | let poly_ f = #{ a = 42; b = 0 }
-              ^
-Error: This binding has no layout variables, so "poly_" has no effect.
-       Consider using a regular "let" instead.
+>> Fatal error: layout: unexpected genvar
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
@@ -518,13 +512,13 @@ Error: Signature mismatch:
 (* [rec] prevents layout polymorphism, even for fake recursion (no
    self-reference). *)
 module M : sig
-  val f : 'a -> 'a
+  val f : 'b -> 'a -> 'a
 end = struct
-  let rec poly_ f x = x
+  let rec poly_ f _ x = x
 end
 [%%expect{|
 Line 4, characters 16-17:
-4 |   let rec poly_ f x = x
+4 |   let rec poly_ f _ x = x
                     ^
 Warning 218: "poly_" has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular "let rec" instead.
 >> Fatal error: Translcore.transl_let
@@ -602,13 +596,16 @@ Uncaught exception: Typecore.Error(_, _, _)
 
 (* multiple poly can be have different captured environment mode *)
 let f (x @ local) =
-  let poly_ f = x
-  and poly_ g = () in
+  let poly_ f _ = x
+  and poly_ g _ = () in
   g
 [%%expect{|
-Line 3, characters 12-13:
-3 |   and poly_ g = () in
+Line 2, characters 12-13:
+2 |   let poly_ f _ = x
                 ^
-Error: This binding has no layout variables, so "poly_" has no effect.
-       Consider using a regular "let" instead.
+Warning 26 [unused-var]: unused variable f.
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value])
+Uncaught exception: Misc.Fatal_error
+
 |}]
