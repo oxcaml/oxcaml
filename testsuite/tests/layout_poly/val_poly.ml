@@ -484,6 +484,12 @@ module type S = sig
   val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
 end
 [%%expect {|
+Line 2, characters 19-48:
+2 |   val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables, so
+"poly_" has no effect. Consider using a regular "val" instead.
+
 module type S = sig val foo2 : 'a -> 'b -> #('a * 'b) end
 |}]
 
@@ -562,6 +568,12 @@ module type S = sig
   val poly_ baz4 : ('a : immediate) 'b 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
 end
 [%%expect {|
+Line 2, characters 19-78:
+2 |   val poly_ baz4 : ('a : immediate) 'b 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables, so
+"poly_" has no effect. Consider using a regular "val" instead.
+
 module type S =
   sig
     val baz4 : 'b ('a : immediate) 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
