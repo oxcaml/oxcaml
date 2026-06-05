@@ -7,6 +7,7 @@ type token =
   | WHEN
   | VIRTUAL
   | VAL
+  | UNIQUE
   | UNDERSCORE
   | UIDENT of (string)
   | TYPE
@@ -43,6 +44,7 @@ type token =
   | OR
   | OPTLABEL of (string)
   | OPEN
+  | ONCE
   | OF
   | OBJECT
   | NONREC
@@ -54,6 +56,9 @@ type token =
   | MINUSDOT
   | MINUS
   | METHOD
+  | METAOCAML_ESCAPE
+  | METAOCAML_BRACKET_OPEN
+  | METAOCAML_BRACKET_CLOSE
   | MATCH
   | LPAREN
   | LOCAL
@@ -120,6 +125,7 @@ type token =
   | EOF
   | END
   | ELSE
+  | EFFECT
   | DOWNTO
   | DOTTILDE
   | DOTOP of (string)
@@ -209,6 +215,7 @@ module MenhirInterpreter : sig
     | T_WHEN : unit terminal
     | T_VIRTUAL : unit terminal
     | T_VAL : unit terminal
+    | T_UNIQUE : unit terminal
     | T_UNDERSCORE : unit terminal
     | T_UIDENT : (string) terminal
     | T_TYPE : unit terminal
@@ -245,6 +252,7 @@ module MenhirInterpreter : sig
     | T_OR : unit terminal
     | T_OPTLABEL : (string) terminal
     | T_OPEN : unit terminal
+    | T_ONCE : unit terminal
     | T_OF : unit terminal
     | T_OBJECT : unit terminal
     | T_NONREC : unit terminal
@@ -256,6 +264,9 @@ module MenhirInterpreter : sig
     | T_MINUSDOT : unit terminal
     | T_MINUS : unit terminal
     | T_METHOD : unit terminal
+    | T_METAOCAML_ESCAPE : unit terminal
+    | T_METAOCAML_BRACKET_OPEN : unit terminal
+    | T_METAOCAML_BRACKET_CLOSE : unit terminal
     | T_MATCH : unit terminal
     | T_LPAREN : unit terminal
     | T_LOCAL : unit terminal
@@ -322,6 +333,7 @@ module MenhirInterpreter : sig
     | T_EOF : unit terminal
     | T_END : unit terminal
     | T_ELSE : unit terminal
+    | T_EFFECT : unit terminal
     | T_DOWNTO : unit terminal
     | T_DOTTILDE : unit terminal
     | T_DOTOP : (string) terminal
@@ -527,7 +539,7 @@ module MenhirInterpreter : sig
     | N_mk_longident_mod_ext_longident_type_trailing_no_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_type_trailing_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_ident_ : (Longident.t) nonterminal
-    | N_mk_longident_mod_ext_longident___anonymous_53_ : (Longident.t) nonterminal
+    | N_mk_longident_mod_ext_longident___anonymous_52_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_UIDENT_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_LIDENT_ : (Longident.t) nonterminal
     | N_method_ : ((string Location.loc * Asttypes.private_flag * Parsetree.class_field_kind) *
@@ -560,6 +572,8 @@ module MenhirInterpreter : sig
   Parsetree.value_constraint option * Parsetree.modes) nonterminal
     | N_let_binding_body : (Parsetree.pattern * Parsetree.expression *
   Parsetree.value_constraint option * Parsetree.modes * bool * bool) nonterminal
+    | N_labeled_tuple_pattern_pattern_no_exn_ : (Parsetree.pattern_desc) nonterminal
+    | N_labeled_tuple_pattern_pattern_ : (Parsetree.pattern_desc) nonterminal
     | N_labeled_tuple_pat_element_list_pattern_no_exn_ : ((string option * Parsetree.pattern) list) nonterminal
     | N_labeled_tuple_pat_element_list_pattern_ : ((string option * Parsetree.pattern) list) nonterminal
     | N_labeled_simple_pattern : (Parsetree.arg_label * Parsetree.expression option * Parsetree.pattern) nonterminal

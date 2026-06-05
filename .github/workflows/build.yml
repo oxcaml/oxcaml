@@ -410,7 +410,6 @@ jobs:
       - name: Run OxCaml testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
-          # CR dallsopp: this mechanism is messy and runtime4 only?
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
@@ -427,7 +426,6 @@ jobs:
       - name: Run upstream testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
-          # CR dallsopp: this mechanism is messy and runtime4 only?
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
@@ -444,7 +442,6 @@ jobs:
       - name: Run minimizer
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
-          # CR dallsopp: this mechanism is messy and runtime4 only?
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"

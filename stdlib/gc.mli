@@ -787,7 +787,7 @@ end
 
 type suspended_collection_work
 
-external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work @@ nonportable
+external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
   = "caml_ml_gc_ramp_up"
 (** In general, the OCaml GC assumes that the program runs in
     a "steady state" where peak memory usage remains constant: for
@@ -830,7 +830,7 @@ external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work @@ nonportable
     [Effect.Unhandled] exception is thrown instead.
 *)
 
-external ramp_down : suspended_collection_work -> unit @@ nonportable
+external ramp_down : suspended_collection_work -> unit
   = "caml_ml_gc_ramp_down"
 (** Notify the GC about some amount of collection work that was
     suspended during a ramp-up phase, to be resumed now. *)

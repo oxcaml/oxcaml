@@ -40,6 +40,8 @@ type private_flag = Private | Public
 
 type mutable_flag = Immutable | Mutable
 
+type atomic_flag = Nonatomic | Atomic
+
 type virtual_flag = Virtual | Concrete
 
 type override_flag = Override | Fresh
@@ -64,8 +66,10 @@ type variance =
   | Covariant
   | Contravariant
   | NoVariance
+  | Bivariant
 
 type injectivity =
   | Injective
   | NoInjectivity
 
+val string_of_label: arg_label -> string

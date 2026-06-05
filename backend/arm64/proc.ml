@@ -23,10 +23,6 @@ open Misc
 open Reg
 open Arch
 
-(* Instruction selection *)
-
-let word_addressed = false
-
 (* Registers available for register allocation *)
 
 (* Integer register map:

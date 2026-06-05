@@ -136,12 +136,13 @@ and core_type type_expr =
   | Trepr (ty, _) ->
     (* CR modes: We should do something proper here. Internal ticket 6601. *)
     core_type ty
-  | Tpackage (path, lids_type_exprs) ->
+  | Tpackage { pack_path = path; pack_cstrs = lids_type_exprs } ->
     let loc = mknoloc (Untypeast.lident_of_path path) in
     let args =
-      List.map lids_type_exprs ~f:(fun (id, t) -> (mknoloc id, core_type t))
+      List.map lids_type_exprs ~f:(fun (id, t) ->
+          (mknoloc (Longident.unflatten id |> Option.get), core_type t))
     in
-    Typ.package loc args
+    Typ.package (Typ.package_type loc args)
 
 and modtype_declaration id { mtd_type; mtd_attributes; _ } =
   Ast_helper.Mtd.mk ~attrs:mtd_attributes
@@ -176,11 +177,11 @@ and modes mode =
   let snapshot = Btype.snapshot () in
   let mode = Mode.Alloc.zap_to_legacy mode in
   Btype.backtrack snapshot;
-  Printtyp.tree_of_modes mode
+  Out_type.tree_of_modes mode
   |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
 
 and const_modalities ~mut modality =
-  Printtyp.tree_of_modalities mut modality
+  Out_type.tree_of_modalities mut modality
   |> List.map ~f:(fun modality ->
       Location.mknoloc (Parsetree.Modality modality))
 

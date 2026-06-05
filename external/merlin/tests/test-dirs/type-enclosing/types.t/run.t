@@ -108,7 +108,7 @@ FIXME: A type with a type param shouldn't equal itself - aliasing a list type
         "line": 11,
         "col": 19
       },
-      "type": "type 'a l = 'a l",
+      "type": "type 'a l = 'a list",
       "tail": "no"
     }
   ]
@@ -127,7 +127,7 @@ Shows kind with increased verbosity:
         "line": 11,
         "col": 19
       },
-      "type": "type 'a l : immutable_data with 'a = 'a l",
+      "type": "type 'a l : immutable_data with 'a = 'a list",
       "tail": "no"
     }
   ]

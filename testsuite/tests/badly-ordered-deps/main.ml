@@ -55,7 +55,7 @@
 (* Make sure ocamlc and ocamlopt print badly ordered dependencies only once.
    See issue #12074. We test with ocamlc.byte only. *)
 
-(* CR sspies: We have not pulled in the dependecy check changes from upstream
-   yet for native compilation, so for the time being, our errors differ here. *)
+(* FIXME We have not pulled in the dependecy check changes from upstream yet for
+         native compilation, so for the time being, our errors differ here. *)
 
 let value = ()

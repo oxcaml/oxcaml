@@ -53,7 +53,9 @@ let structure : type_definition -> type_structure = fun def ->
   | Type_abstract _, _ ->
       begin match def.type_manifest with
       | None -> Abstract
-      | Some type_expr -> Synonym type_expr
+      | Some type_expr ->
+        if Msupport.erroneous_type_check type_expr then Abstract else
+        Synonym type_expr
       end
   | (Type_record _ | Type_variant _), None -> Algebraic
   | Type_record_unboxed_product _, None -> Algebraic
@@ -130,7 +132,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
       [ty1; ty2]
   | Ttuple(tys) -> List.map snd tys
   | Tunboxed_tuple(tys) -> List.map snd tys
-  | Tpackage(_, fl) -> (snd (List.split fl))
+  | Tpackage pack -> (snd (List.split pack.pack_cstrs))
   | Tobject(row,class_ty) ->
       let class_subtys =
         match !class_ty with
@@ -427,7 +429,7 @@ let check_type
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
     | (Tquote_eval(_)     , Sep    )
-    | (Tpackage(_,_)      , Sep    )
+    | (Tpackage _         , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
     (* "Deeply separable" case for these same constructors. *)
     | (Tarrow _           , Deepsep)
@@ -439,7 +441,7 @@ let check_type
     | (Tquote(_)          , Deepsep)
     | (Tsplice(_)         , Deepsep)
     | (Tquote_eval(_)     , Deepsep)
-    | (Tpackage(_,_)      , Deepsep) ->
+    | (Tpackage _         , Deepsep) ->
         let tys = immediate_subtypes ty in
         let on_subtype context ty =
           context ++ check_type (Hyps.guard hyps) ty Deepsep in

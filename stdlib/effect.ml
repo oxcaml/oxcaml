@@ -121,8 +121,8 @@ module Deep = struct
   external reperform :
     'a t -> ('a, _, 'b) cont -> last_fiber -> 'b = "%reperform"
 
-  (* CR effect-syntax: Upstream the 3-parameter version of continuation and use
-     it to maintain type safety here. *)
+  (* FIXME Upstream the 3-parameter version of continuation and use it to
+           maintain type safety here. *)
   let[@inline] to_continuation (f : _ continuation -> 'a) (k : _ continuation_)
       =
     f (Obj.magic k)

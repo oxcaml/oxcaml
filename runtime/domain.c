@@ -1220,12 +1220,15 @@ static void install_backup_thread (dom_internal* di)
 #endif
 
   CAMLassert(di == domain_self);
-  if (!backup_thread_running(di)) {
-    uintnat msg;
-    msg = atomic_load_acquire(&di->backup_thread_msg);
-    CAMLassert (msg == BT_INIT || /* Using fresh domain */
-                msg == BT_TERMINATE); /* Reusing domain */
-
+  /* Guard on the message directly rather than [backup_thread_running]: the
+     latter is derived from [backup_thread_msg] and is also true for
+     BT_TERMINATE, i.e. a backup thread from a previous user of this reused
+     domain slot that has been asked to terminate but has not yet reached
+     BT_INIT. We must install in that case too (after waiting for the old
+     thread to finish), otherwise a reused domain is left with no backup
+     thread and STW sections requested while it blocks are never serviced. */
+  uintnat msg = atomic_load_acquire(&di->backup_thread_msg);
+  if (msg == BT_INIT || msg == BT_TERMINATE) {
     while (msg != BT_INIT) {
       /* Give a chance for backup thread on this domain to terminate */
       caml_domain_unlock_hook();
@@ -1259,8 +1262,12 @@ static void terminate_backup_thread(dom_internal *di)
 
   if (backup_thread_running(di)) {
     atomic_store_release(&di->backup_thread_msg, BT_TERMINATE);
-    /* Wakeup backup thread if it is sleeping */
+    /* Wakeup backup thread if it is sleeping. Hold the lock across the signal:
+       [backup_thread_func] checks the message and waits under this lock, so an
+       unlocked signal can be lost, stranding the thread at BT_TERMINATE. */
+    caml_plat_lock_blocking(&di->backup_thread_lock);
     caml_plat_signal(&di->backup_thread_cond);
+    caml_plat_unlock(&di->backup_thread_lock);
   }
 }
 
