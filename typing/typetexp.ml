@@ -1647,11 +1647,12 @@ let transl_type_scheme_lmono env styp =
     transl_type_scheme_mono env styp
 
 let transl_type_scheme_poly_val env styp =
-  let cty, body_sort_vars =
+  let cty, sort_vars =
     Jkind_types.Sort.generalize_with (fun () ->
       transl_type_scheme_lmono env styp)
   in
-  let sort_vars = body_sort_vars in
+  if List.is_empty sort_vars then
+    Location.prerr_warning cty.ctyp_loc Warnings.Useless_valpoly;
   let vars_names_loc =
     List.map (fun v -> mknoloc (Jkind_types.Sort.Var.name v)) sort_vars
   in

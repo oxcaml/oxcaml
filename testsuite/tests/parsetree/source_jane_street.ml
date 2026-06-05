@@ -1725,6 +1725,12 @@ module type S_poly = sig
   val poly_ h : 'a -> 'b -> 'a
 end
 [%%expect{|
+Line 2, characters 16-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+                    ^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables, so
+"poly_" has no effect. Consider using a regular "val" instead.
+
 module type S_poly =
   sig
     val f : 'a -> 'a
