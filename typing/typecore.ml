@@ -292,7 +292,6 @@ type error =
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
-  | Field_projection_not_rep of type_expr * Jkind.Violation.t
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
@@ -1749,7 +1748,7 @@ let determined_lbl_repres (type rep) (form : rep record_form)
   if is_variable_repres form rep then None else Some rep
 
 let update_labels (type rep) env (form : rep record_form) ~representative_label
-      ~loc ~containing_type
+      ~why ~loc ~containing_type
     : record_sorts * rep =
   (* Might be good to short-circuit this. Possible we could do so by noticing
      that [containing_type] has no arguments (or only variables as
@@ -1771,7 +1770,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
           vars_and_ty_args
       in
       match
-        Typedecl.update_record_representation env loc form
+        Typedecl.update_record_representation ~why env loc form
           (lbls_and_ty_args |> Array.to_list)
       with
       | Ok (sorts, rep) ->
@@ -3249,6 +3248,7 @@ and type_pat_aux
       in
       let sorts, rep =
         update_labels !!penv record_form ~representative_label ~loc
+          ~why:Field_projection
           ~containing_type:(instance record_ty)
       in
       let lbl_a_list = List.map (type_label_pat sorts) lbl_a_list in
@@ -6561,11 +6561,16 @@ and type_expect_
                 label_descriptions label_definitions
               |> Array.to_list
             in
+            let why : Jkind.History.concrete_creation_reason =
+              if opt_sexp = None
+              then Field_assignment
+              else Field_functional_update
+            in
             begin match
               (* XXX This is redundantly going to get the sort and jkind for
                  each label all over again. Possibly we're doing things in the
                  wrong order. *)
-              Typedecl.update_record_representation env
+              Typedecl.update_record_representation ~why env
                 sexp.pexp_loc record_form labels_with_updated_types
             with
             | Ok (_, rep) -> rep
@@ -7263,6 +7268,7 @@ and type_expect_
       unify_exp env record ty_record;
       let record_sorts, record_repres =
         update_labels env Legacy ~representative_label:label ~loc
+          ~why:Field_assignment
           ~containing_type:ty_record
       in
       rue {
@@ -8335,6 +8341,7 @@ and type_block_access env expected_base_ty principal
     if mut then Env.mark_label_used Mutation label.lbl_uid;
     let _sorts, rep =
       update_labels env Legacy ~representative_label:label ~loc:lid.loc
+        ~why:Field_in_indexed_record
         ~containing_type:expected_base_ty
     in
     let ba = Baccess_field (lid, label, rep) in
@@ -8364,7 +8371,8 @@ and type_block_access env expected_base_ty principal
     let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
     let el_ty =
       newvar
-        (Jkind.of_new_sort ~why:Idx_element ~level:(Ctype.get_current_level ()))
+        (Jkind.of_new_sort ~why:Idx_element
+           ~level:(Ctype.get_current_level ()))
     in
     let idx_type_expected =
       match mut with
@@ -8408,6 +8416,7 @@ and type_unboxed_access env loc el_ty ua =
     end;
     let sorts, _rep =
       update_labels env Unboxed_product ~representative_label:label ~loc:lid.loc
+        ~why:Field_in_indexed_record
         ~containing_type:el_ty
     in
     (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, sorts)
@@ -9123,15 +9132,6 @@ and type_label_projection
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
       unify_exp env record ty_res;
-      (* CR-soon rtjoa: merge this type of check with
-         [Typedecl.check_representable]. It should also be done within
-         [update_labels] - this will allow sort variables to be created for
-         other places that use [update_labels], such as for block indices *)
-      begin match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-      | Ok _ -> ()
-      | Error err ->
-          raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
-      end;
       let record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
@@ -9141,7 +9141,7 @@ and type_label_projection
            necessary to do it in _this_ inner level so that the correct type
            hits a [generalize_structure] *)
         update_labels env record_form ~representative_label:label ~loc
-          ~containing_type:record.exp_type
+          ~why:Field_projection ~containing_type:record.exp_type
       in
       ty_arg, record_sorts, record_repres
     end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
@@ -12832,12 +12832,6 @@ let report_error ~loc env =
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           env) violation
-  | Field_projection_not_rep (ty, violation) ->
-      Location.errorf ~loc
-        "@[Fields being projected must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
