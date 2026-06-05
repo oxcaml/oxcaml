@@ -26,17 +26,15 @@ let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
       word1 word2 word3 word4 word5 word6 word7
   | Stackoffset n -> fprintf ppf "offset stack %i" n
   | Load { memory_chunk; addressing_mode; mutability = Immutable; is_atomic } ->
-    fprintf ppf "%s %a[%a]"
+    fprintf ppf "%s%s[%a]"
       (Printcmm.chunk memory_chunk)
-      (fun pp a -> if a then fprintf pp "atomic" else ())
-      is_atomic
+      (if is_atomic then " atomic" else "")
       (Arch.print_addressing reg addressing_mode)
       arg
   | Load { memory_chunk; addressing_mode; mutability = Mutable; is_atomic } ->
-    fprintf ppf "%s %a mut[%a]"
+    fprintf ppf "%s %smut[%a]"
       (Printcmm.chunk memory_chunk)
-      (fun pp a -> if a then fprintf pp "atomic" else ())
-      is_atomic
+      (if is_atomic then "atomic " else "")
       (Arch.print_addressing reg addressing_mode)
       arg
   | Store (chunk, addr, is_assign) ->
