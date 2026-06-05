@@ -760,8 +760,33 @@ let is_useful_set (type a) (module S : Container_types_intf.Set with type t = a)
     _env (s : a) =
   match S.get_singleton s with Some _ -> true | None -> false
 
+exception Maybe_useful
+
 let rec is_useful full_kind env t =
-  let expanded = expand_head env t in
+  match TG.get_alias_opt t with
+  | None -> is_useful_expanded_head full_kind env (ET.of_non_alias_type t)
+  | Some simple -> (
+    (* A symbol or a variable that has a canonical at the normal name mode (i.e.
+       a canonical that is available in terms) is maybe useful, as we can access
+       it directly instead of using projections from the argument. *)
+    match
+      Simple.pattern_match' simple ~const:ET.create_const
+        ~var:(fun var ~coercion:_ ->
+          match
+            TE.get_canonical_simple_exn env (Simple.var var)
+              ~min_name_mode:Name_mode.normal
+          with
+          | exception Not_found -> expand_head env t
+          | _canonical -> raise_notrace Maybe_useful)
+        ~symbol:(fun _symbol ~coercion:_ ->
+          (* A symbol is always useful, as we can use the symbol directly
+             instead of going through the projections from the parameter. *)
+          raise_notrace Maybe_useful)
+    with
+    | exception Maybe_useful -> true
+    | expanded -> is_useful_expanded_head full_kind env expanded)
+
+and is_useful_expanded_head full_kind env expanded =
   is_useful_or_unknown_or_bottom is_useful_expanded_head_descr full_kind env
     (ET.descr expanded)
 
@@ -918,9 +943,8 @@ and is_useful_head_of_kind_value_non_null env
     false
 
 and is_useful_variant ~consts ~non_consts env ~immediates ~blocks =
-  match is_useful_tagged_immediate ~consts env ~immediates with
-  | true -> true
-  | false -> is_useful_block ~non_consts env ~blocks
+  is_useful_tagged_immediate ~consts env ~immediates
+  || is_useful_block ~non_consts env ~blocks
 
 and is_useful_tagged_immediate ~consts env ~immediates =
   if Target_ocaml_int.Set.is_empty consts
@@ -944,62 +968,52 @@ and is_useful_tagged_immediate ~consts env ~immediates =
         false)
 
 and is_useful_block ~non_consts env ~blocks =
+  (* If the kind knows there are no non-constant constructors, no type is going
+     to be more precise. *)
   if Tag.Scannable.Map.is_empty non_consts
   then false
   else
     match (blocks : TG.row_like_for_blocks Or_unknown.t) with
     | Unknown -> false
     | Known row_like_for_blocks ->
-      if TG.Row_like_for_blocks.is_bottom row_like_for_blocks
-      then true
-      else if
-        Tag.Scannable.Map.exists
-          (fun tag (_block_shape, field_kinds) ->
-            let tag = Tag.Scannable.to_tag tag in
-            let[@local] process_case
-                (row_like_block_case : TG.row_like_block_case) =
-              (* Note: if there is a mismatch in the number of fields, it is OK
-                 to return [true]; we should be able to prove [Bottom] during
-                 inlining. *)
-              let types = row_like_block_case.maps_to in
-              try
-                List.iteri
-                  (fun ix field_kind ->
-                    if ix < Array.length types
-                    then
-                      match is_useful field_kind env types.(ix) with
-                      | true -> raise Exit
-                      | false -> ()
-                    else raise Exit)
-                  field_kinds;
-                false
-              with Exit -> true
-            in
-            match Tag.Map.find tag row_like_for_blocks.known_tags with
-            | Unknown -> false
-            | Known row_like_block_case -> process_case row_like_block_case
-            | exception Not_found -> (
-              match row_like_for_blocks.other_tags with
-              | Bottom -> true
-              | Ok row_like_block_case -> process_case row_like_block_case))
-          non_consts
-      then true
-      else false
+      TG.Row_like_for_blocks.is_bottom row_like_for_blocks
+      || Tag.Scannable.Map.exists
+           (fun tag (_block_shape, field_kinds) ->
+             let tag = Tag.Scannable.to_tag tag in
+             let[@local] process_case
+                 (row_like_block_case : TG.row_like_block_case) =
+               (* Note: if there is a mismatch in the number of fields, it is OK
+                  to return [true]; we should be able to prove [Bottom] during
+                  inlining. *)
+               let types = row_like_block_case.maps_to in
+               try
+                 List.iteri
+                   (fun ix field_kind ->
+                     if
+                       ix >= Array.length types
+                       || is_useful field_kind env types.(ix)
+                     then raise_notrace Maybe_useful)
+                   field_kinds;
+                 false
+               with Maybe_useful -> true
+             in
+             match Tag.Map.find tag row_like_for_blocks.known_tags with
+             | Unknown -> false
+             | Known row_like_block_case -> process_case row_like_block_case
+             | exception Not_found -> (
+               match row_like_for_blocks.other_tags with
+               | Bottom -> true
+               | Ok row_like_block_case -> process_case row_like_block_case))
+           non_consts
 
 and is_useful_float_block ~num_fields:_ env ~blocks =
   match (blocks : TG.row_like_for_blocks Or_unknown.t) with
   | Unknown -> false
   | Known row_like_for_blocks -> (
     let[@local] process_case (row_like_block_case : TG.row_like_block_case) =
-      if
-        Array.exists
-          (fun ty ->
-            match is_useful K.With_subkind.naked_float env ty with
-            | true -> true
-            | false -> false)
-          row_like_block_case.maps_to
-      then true
-      else false
+      Array.exists
+        (fun ty -> is_useful K.With_subkind.naked_float env ty)
+        row_like_block_case.maps_to
     in
     match Tag.Map.find Tag.double_array_tag row_like_for_blocks.known_tags with
     | Unknown -> false
@@ -1013,26 +1027,25 @@ and is_useful_array (known_element_kind : _ Or_unknown.t) env ~element_kind
     ~length ~contents:_ ~alloc_mode:_ =
   (* If we know the length, that's maybe useful (we could eliminate some bounds
      check). *)
-  match is_useful K.With_subkind.tagged_immediate env length with
-  | true -> true
-  | false -> (
-    (* If the [known_element_kind] from the kind can be used as the
-       [element_kind] from the types, the [element_kind] is not more precise.
+  is_useful K.With_subkind.tagged_immediate env length
+  (* If the [known_element_kind] from the kind can be used as the [element_kind]
+     from the types, the [element_kind] is not more precise.
 
-       But if it can't (not compatible), then the [element_kind] from the types
-       is more precise than the one from the kind -- that's maybe useful.
+     But if it can't (not compatible), then the [element_kind] from the types is
+     more precise than the one from the kind -- that's maybe useful.
 
-       If the element kind from the kind is not known, but the kind from the
-       type is known (including if it is bottom, in which case this must be an
-       empty array), it is maybe useful. *)
-    match known_element_kind, (element_kind : _ Or_unknown_or_bottom.t) with
-    | Unknown, (Ok _ | Bottom) -> true
-    | Known known_element_kind, Ok element_kind
-      when not
-             (K.With_subkind.compatible known_element_kind
-                ~when_used_at:element_kind) ->
-      true
-    | (Unknown | Known _), (Unknown | Bottom | Ok _) -> false)
+     If the element kind from the kind is not known, but the kind from the type
+     is known (including if it is bottom, in which case this must be an empty
+     array), it is maybe useful. *)
+  ||
+  match known_element_kind, (element_kind : _ Or_unknown_or_bottom.t) with
+  | Unknown, (Ok _ | Bottom) -> true
+  | Known known_element_kind, Ok element_kind
+    when not
+           (K.With_subkind.compatible known_element_kind
+              ~when_used_at:element_kind) ->
+    true
+  | (Unknown | Known _), (Unknown | Bottom | Ok _) -> false
 
 and is_useful_head_of_kind_naked_immediate
     (consts : Target_ocaml_int.Set.t Or_unknown.t) env
@@ -1043,7 +1056,7 @@ and is_useful_head_of_kind_naked_immediate
   | Known consts, Naked_immediates set ->
     (* The type is useful as long as we can eliminate at least one of the
        constructors. *)
-    if I.Set.subset consts set then false else true
+    not (I.Set.subset consts set)
   | (Known _ | Unknown), (Is_null _ | Is_int _ | Get_tag _) -> false
 
 and is_useful_head_of_kind_naked_float32 env head =
@@ -1121,5 +1134,11 @@ and is_useful_head_of_kind_rec_info _env _head = false
 and is_useful_head_of_kind_region _env () = false
 
 let type_is_useful full_kind env name =
+  (* Always expand the type of the argument to a concrete type: knowing that we
+     have a name for the argument is not actually useful for the simplification
+     of the function, as that is always true.
+
+     On the other hand, knowing a name for the inner (structural) components of
+     the argument is maybe useful, as it can allow to remove projections. *)
   let ty = TE.find env name (Some (K.With_subkind.kind full_kind)) in
-  is_useful full_kind env ty
+  is_useful_expanded_head full_kind env (expand_head env ty)
