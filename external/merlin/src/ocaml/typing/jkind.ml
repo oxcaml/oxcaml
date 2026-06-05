@@ -2333,11 +2333,12 @@ let of_type_decl_overapproximate_unknown ~context env
     of_type_decl ~use_abstract_jkinds:false ~context ~transl_type env decl
     |> Option.map fst
 
-let for_unboxed_record lbls layouts =
+let for_unboxed_record_with_updates lbls =
   let open Types in
   let tys_modalities =
-    List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities) lbls
+    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
   in
+  let layouts = List.map (fun (_, _, layout) -> layout) lbls in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
@@ -2522,20 +2523,30 @@ let get t = Jkind_desc.get t.jkind
 
 (* CR layouts: this function is suspect; it seems likely to reisenberg
    that refactoring could get rid of it *)
-let sort_of_jkind env (t : jkind_l) : sort =
+let sort_option_of_jkind env (t : jkind_l) : sort option =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
-    | Any _ -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
-    | Sort (s, _) -> s
-    | Product ls -> Sort.Product (List.map sort_of_layout ls)
+    | Any _ -> None
+    | Sort (s, _) -> Some s
+    | Product ls -> (
+      match Misc.Stdlib.List.map_option sort_of_layout ls with
+      | None -> None
+      | Some sorts -> Some (Sort.Product sorts))
   in
-  let layout =
-    match extract_layout env t with
-    | Ok l -> l
-    | Error _ ->
-      Misc.fatal_error "Jkind.sort_of_jkind: unable to expand jkind abbrev"
-  in
-  sort_of_layout layout
+  match extract_layout env t with
+  | Ok layout -> sort_of_layout layout
+  | Error _ ->
+    (* CR-someday lmaurer: This assumes that the only reason [extract_layout]
+       would return an [Error] is because of an abstract kind, which is not
+       true: there could be worse problems like a path missing from the
+       environment. Unfortunately, being more careful would require changing
+       [Env.find_jkind_expansion] (see comment there). *)
+    None
+
+let sort_of_jkind env (t : jkind_l) : sort =
+  match sort_option_of_jkind env t with
+  | Some sort -> sort
+  | None -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
 
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
@@ -2807,16 +2818,28 @@ module Format_history = struct
   let format_concrete_creation_reason ppf :
       History.concrete_creation_reason -> unit = function
     | Match -> fprintf ppf "a value of this type is matched against a pattern"
-    | Constructor_declaration _ ->
-      fprintf ppf "it's the type of a constructor field"
-    | Label_declaration lbl ->
-      fprintf ppf "it is the type of record field %s" (Ident.name lbl)
+    | Extension_constructor_declaration _ ->
+      fprintf ppf "it's the type of an argument to an extension constructor"
+    | Extension_label_declaration lbl ->
+      fprintf ppf "it is the type of field %s of an extension constructor"
+        (Ident.name lbl)
     | Record_projection ->
       fprintf ppf "it's the record type used in a projection"
     | Record_assignment ->
       fprintf ppf "it's the record type used in an assignment"
     | Record_functional_update ->
       fprintf ppf "it's the record type used in a functional update"
+    | Field_projection ->
+      fprintf ppf "it's the type of a field in a record being projected from"
+    | Field_assignment ->
+      fprintf ppf "it's the type of a field being assigned a value"
+    | Field_functional_update ->
+      fprintf ppf "it's the type of a field involved in a functional update"
+    | Constructor_arg_projection ->
+      fprintf ppf "it's the type of a constructor argument being projected"
+    | Constructor_arg_assignment ->
+      fprintf ppf
+        "it's the type of a constructor argument being assigned a value"
     | Let_binding -> fprintf ppf "it's the type of a variable bound by a `let`"
     | Function_argument ->
       fprintf ppf "we must know concretely how to pass a function argument"
@@ -2840,12 +2863,15 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
-         (idx or mut_idx)"
+         (idx_imm or idx_mut)"
+    | Field_in_indexed_record ->
+      fprintf ppf
+        "it's the type of a field in a record type into which a@ block index \
+         (idx_imm or idx_mut) is being created"
     | Structure_item ->
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
@@ -2925,6 +2951,7 @@ module Format_history = struct
     | Inside_quote ->
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -3895,13 +3922,18 @@ module Debug_printers = struct
   let concrete_creation_reason ppf : History.concrete_creation_reason -> unit =
     function
     | Match -> fprintf ppf "Match"
-    | Constructor_declaration idx ->
-      fprintf ppf "Constructor_declaration %d" idx
-    | Label_declaration lbl ->
-      fprintf ppf "Label_declaration %a" Ident.print lbl
+    | Extension_constructor_declaration idx ->
+      fprintf ppf "Extension_constructor_declaration %d" idx
+    | Extension_label_declaration lbl ->
+      fprintf ppf "Extension_label_declaration %a" Ident.print lbl
     | Record_projection -> fprintf ppf "Record_projection"
     | Record_assignment -> fprintf ppf "Record_assignment"
     | Record_functional_update -> fprintf ppf "Record_functional_update"
+    | Field_projection -> fprintf ppf "Field_projection"
+    | Field_assignment -> fprintf ppf "Field_assignment"
+    | Field_functional_update -> fprintf ppf "Field_functional_update"
+    | Constructor_arg_projection -> fprintf ppf "Constructor_arg_projection"
+    | Constructor_arg_assignment -> fprintf ppf "Constructor_arg_assignment"
     | Let_binding -> fprintf ppf "Let_binding"
     | Function_argument -> fprintf ppf "Function_argument"
     | Function_result -> fprintf ppf "Function_result"
@@ -3913,9 +3945,9 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
@@ -3973,6 +4005,7 @@ module Debug_printers = struct
       fprintf ppf "Overapproximation_of_with_bounds"
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
