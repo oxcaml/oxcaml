@@ -45,6 +45,24 @@ type 'a require_nonnull
 type ('a : value mod external_) require_external
 |}]
 
+(**** Test 0: Payload alias annotations ****)
+
+module Recursive_list_alias_annotation = struct
+  type ('a : value mod contended portable) t : value mod contended portable =
+    | A of ('a t list as (_ : any mod contended portable))
+end
+[%%expect{|
+Line 3, characters 30-56:
+3 |     | A of ('a t list as (_ : any mod contended portable))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Bad layout annotation:
+         The kind of "'a t list" is immutable_data with 'a t
+           because it's a boxed variant type.
+         But the kind of "'a t list" must be a subkind of
+             any mod portable contended
+           because of the annotation on the wildcard _ at line 3, characters 30-56.
+|}]
+
 (**** Test 1: Annotations without "with" are accepted when appropriate ****)
 
 (* immutable variants *)
