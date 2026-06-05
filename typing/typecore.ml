@@ -792,6 +792,12 @@ let register_allocation_value_mode ~loc
   register_allocation_mode alloc_mode;
   (* We must apply each morphism separately so that their hints correspond to
      the correct morphism *)
+  (* CR ageorges: this split is necessary, but causes a regression in the
+     hints: previously, by treating the two morphisms as one, the hint could be
+     treated as a fixed point (the composed morphisms act as id) and would thus
+     be skipped, since Allocation_r is non_rigid. However, while we correctly
+     skip the Allocation hint, we no longer skip Allocation_r, and it gets
+     printed as a superfluous hint. *)
   let mode =
     value_to_alloc_r2g ~hint:(Allocation_r {loc; txt = desc})
       (Mode.Value.disallow_left mode)
