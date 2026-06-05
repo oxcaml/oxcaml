@@ -502,9 +502,14 @@ let first_class_module () =
   ()
 [%%expect{|
 module type T = sig val x : int option end
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 4, characters 50-51:
+4 |   let _m : (module T) = local_ (module struct let x = thing end) in
+                                                      ^
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 46-59
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 let local_module () =
   let thing = local_ Some 1 in
@@ -513,9 +518,14 @@ let local_module () =
     local_ ()
   in ()
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 4, characters 30-31:
+4 |     let module M = struct let x = thing end in
+                                  ^
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 26-39
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 let obj () =
   let thing = local_ Some 1 in
@@ -572,6 +582,7 @@ Line 3, characters 43-44:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Some") in the value at line 3, characters 38-44
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -599,6 +610,7 @@ Line 3, characters 64-65:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Some") in the value at line 3, characters 59-65
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -619,6 +631,7 @@ Line 2, characters 66-67:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Invalid_argument") in the value at line 2, characters 48-68
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -692,9 +705,13 @@ let bar (local_ m) =
   let module M = (val m : S) in
   (module M : S)
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Typemod.Error(_, _, _)
-
+Line 3, characters 10-11:
+3 |   (module M : S)
+              ^
+Error: Signature mismatch:
+       Got "local" to the parent region
+       but expected "global"
+         because it is a module and thus needs to be allocated on the heap.
 |}]
 
 (* Don't escape through a lazy value *)
@@ -722,9 +739,14 @@ let foo (local_ x) =
   let module _ = Foo(struct end) in
   ()
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -736,9 +758,14 @@ let foo (local_ x) =
   let module _ = Foo(struct end) in
   ()
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -750,9 +777,14 @@ let foo (local_ x) =
   let module _ = Foo() in
   ()
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -764,9 +796,14 @@ let foo (local_ x) =
   let module _ = Foo(struct end) in
   ()
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -778,9 +815,14 @@ let foo (local_ x) =
   let module _ = Foo() in
   ()
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a class method *)
@@ -980,6 +1022,7 @@ Line 3, characters 14-15:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "::") in the value at line 3, characters 14-20
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1678,11 +1721,19 @@ let foo (local_ x) y =
   | None, _ -> ()
   | _  -> ();;
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 4, characters 29-30:
+4 |   | Some _, Some b -> escape b
+                                 ^
+Error: This value is "local"
+         because it is contained (via constructor "Some") in the value at line 4, characters 12-18
+         which is "local"
+         because it is an element of the tuple at line 3, characters 8-10
+         which is "local"
+         because it is allocated at line 2, characters 11-15 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 11-12
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ x) y =
@@ -1692,11 +1743,17 @@ let foo (local_ x) y =
     escape b
   | _  -> ();;
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 5, characters 11-12:
+5 |     escape b
+               ^
+Error: This value is "local"
+         because it is an element of the tuple at line 4, characters 15-17
+         which is "local"
+         because it is allocated at line 2, characters 8-12 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 8-9
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1743,11 +1800,17 @@ let foo p (local_ x) y z =
   let _, b = pr in
   escape b;;
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 6, characters 9-10:
+6 |   escape b;;
+             ^
+Error: This value is "local"
+         because it is an element of the tuple at line 5, characters 13-15
+         which is "local"
+         because it is allocated at line 3, characters 14-18 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 3, characters 14-15
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* [as] patterns *)
@@ -2090,9 +2153,16 @@ module M = struct
       | (None, None, z) = (Some (ref 0), (local_ (Some (ref 0))), (ref 0))
 end
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 2, characters 12-13:
+2 |   let (Some z, _, _) | (None, Some z, _)
+                ^
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 30-36
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 module M = struct
@@ -2100,9 +2170,16 @@ module M = struct
       | (None, None, z) = ((local_ Some (ref 0)), (Some (ref 0)), (ref 0))
 end
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 2, characters 12-13:
+2 |   let (Some z, _, _) | (None, Some z, _)
+                ^
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 7-13
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Example of backtracking after mode error *)
@@ -2531,6 +2608,7 @@ Line 3, characters 8-9:
 Error: This value is "local"
        but is expected to be "global"
          because it is contained (via constructor "GFoo") in the value at line 3, characters 2-17
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -2602,6 +2680,7 @@ Line 1, characters 35-36:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the array at line 1, characters 32-46
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 

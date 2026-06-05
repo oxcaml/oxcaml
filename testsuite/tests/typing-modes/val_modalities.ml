@@ -79,9 +79,14 @@ module M = struct
     let local_ x = "hello"
 end
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 2, characters 15-16:
+2 |     let local_ x = "hello"
+                   ^
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 2, characters 4-26
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 module M @ many = struct

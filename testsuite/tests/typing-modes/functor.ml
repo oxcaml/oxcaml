@@ -963,9 +963,16 @@ val foo : unit -> unit = <fun>
 (* CR-someday zqian: this should be allowed *)
 module F (M : S @ local) : S @ global = struct include M end
 [%%expect{|
->> Fatal error: Skip hint should not be printed
-Uncaught exception: Mode.Submode_error_simple_context(_, _)
-
+Line 1, characters 55-56:
+1 | module F (M : S @ local) : S @ global = struct include M end
+                                                           ^
+Error: The value "f" in the structure is "local"
+         because it is the value "f" in the structure at line 1, characters 55-56
+         which is "local".
+       However, the value "f" in the structure highlighted is expected to be "global"
+         because it is the value "f" in the structure at line 1, characters 47-56
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* some higher order functor *)

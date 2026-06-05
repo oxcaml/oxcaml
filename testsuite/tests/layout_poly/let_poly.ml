@@ -618,11 +618,16 @@ Line 2, characters 12-13:
 2 |   let poly_ f = x in
                 ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
 
+Line 3, characters 2-3:
+3 |   f
+      ^
+Error: This value is "local"
+         because it is defined by a layout-polymorphic expression (at line 2, characters 12-13)
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* multiple poly can be have different captured environment mode *)

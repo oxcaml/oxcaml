@@ -73,6 +73,7 @@ Line 2, characters 21-22:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Bar0") in the value at line 2, characters 11-23
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -92,6 +93,7 @@ Line 2, characters 24-25:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is the field "y" of the record at line 2, characters 11-26
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -124,7 +126,9 @@ let f : local_ _ -> [> `Text of string] =
 Line 2, characters 17-18:
 2 |   fun n -> `Text n
                      ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       but is expected to be "global" because it is an allocation
+         which is expected to be "global".
 |}]
 
 (* tuple elements crosses mode at construction *)
@@ -143,6 +147,7 @@ Line 2, characters 12-13:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 2, characters 11-17
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
