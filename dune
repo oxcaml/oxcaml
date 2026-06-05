@@ -777,7 +777,7 @@
   asm_targets
   arm64_ast
   arm64_binary_emitter)
- (modules oxcaml_args oxcaml_colours oxcaml_flags))
+ (modules oxcaml_args oxcaml_flags))
 
 (executable
  (name oxcaml_main)

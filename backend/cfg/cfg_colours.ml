@@ -27,30 +27,30 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-type directive = Oxcaml_colours.directive
+type directive = Misc.Colours.directive
 
-let pop = Oxcaml_colours.pop
+let pop = Misc.Colours.pop
 
-let none = Oxcaml_colours.none
+let none = Misc.Colours.none
 
-let without_colours = Oxcaml_colours.without_colours
+let without_colours = Misc.Colours.without_colours
 
-let terminator ppf = Oxcaml_colours.push ~fg:111 ppf
+let terminator ppf = Misc.Colours.push ~fg:111 ppf
 
-let block_label ppf = Oxcaml_colours.push ~fg:198 ppf
+let block_label ppf = Misc.Colours.push ~fg:198 ppf
 
-let block_label_exn ppf = Oxcaml_colours.push ~fg:198 ~bg:197 ppf
+let block_label_exn ppf = Misc.Colours.push ~fg:198 ~bg:197 ppf
 
-let instr_id ppf = Oxcaml_colours.push ~fg:43 ppf
+let instr_id ppf = Misc.Colours.push ~fg:43 ppf
 
-let pred_succ ppf = Oxcaml_colours.push ~fg:243 ppf
+let pred_succ ppf = Misc.Colours.push ~fg:243 ppf
 
-let liveness ppf = Oxcaml_colours.push ~fg:243 ppf
+let liveness ppf = Misc.Colours.push ~fg:243 ppf
 
-let function_name ppf = Oxcaml_colours.push ~fg:1 ~bg:169 ppf
+let function_name ppf = Misc.Colours.push ~fg:1 ~bg:169 ppf
 
-let basic ppf = Oxcaml_colours.push ~fg:65 ppf
+let basic ppf = Misc.Colours.push ~fg:65 ppf
 
-let result ppf = Oxcaml_colours.push ~fg:220 ppf
+let result ppf = Misc.Colours.push ~fg:220 ppf
 
-let argument ppf = Oxcaml_colours.push ~fg:81 ppf
+let argument ppf = Misc.Colours.push ~fg:81 ppf
