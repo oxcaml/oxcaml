@@ -210,16 +210,11 @@ end = struct
      (It is a bit tricky to build an object that does not contain
      functional values where marshalling fails, see [fresh ()] below
      for how we do it.) *)
-  (* CR dallsopp: WIP for avoiding the magic
-  type 'stamp dummy : immutable_data =
-    { dummy : < > } [@@unboxed] [@@unsafe_allow_any_mode_crossing]
-  type fresh_dummy : immutable_data =
-    Fresh : 'stamp dummy -> fresh_dummy
-  *)
 
   type 'stamp dummy = < >
   type fresh_dummy : value mod portable contended =
     Fresh : 'stamp dummy -> fresh_dummy [@@unsafe_allow_any_mode_crossing]
+                             (* cf https://github.com/oxcaml/oxcaml/pull/5956 *)
 
   let fresh () =
     (* dummies and marshalling: we intentionally
@@ -364,14 +359,9 @@ end = struct
 end
 
 type !'a t : mutable_data with 'a =
-(* CR dallsopp: WIP for avoiding the magic
-  Pack : ('a, 'stamp) t_ -> 'a t [@@unboxed]
-and ('a, 'stamp) t_ : mutable_data with 'a =
-  { mutable length : int
-  ; mutable arr : ('a, 'stamp) with_dummy array
-  ; dummy : 'stamp dummy
-  }
-*)
+  (* FIXME Known issue: spurious inclusion check failure with unboxed GADT,
+           prevents this from typing without the
+           [@@unsafe_allow_any_mode_crossing] *)
   Pack : ('a, 'stamp) t_ -> 'a t [@@unboxed] [@@unsafe_allow_any_mode_crossing]
 and ('a, 'stamp) t_ = {
   mutable length : int;
