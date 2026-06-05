@@ -580,7 +580,7 @@ end
 module M : sig type t : immutable_data end
 |}]
 
-module M : sig 
+module M : sig
   type t : immutable_data
 end = struct
   type q : immutable_data = { bar : int ref }
@@ -589,4 +589,15 @@ end = struct
 end
 [%%expect{|
 module M : sig type t : immutable_data end
+|}]
+
+(* A type in the same mutually recursive group sees the crossed jkind of an
+   [@@unsafe_allow_any_mode_crossing] type, not its structural one. *)
+type t : value mod contended = { mutable i : int }
+[@@unsafe_allow_any_mode_crossing]
+and s : value mod contended = { t : t } [@@unboxed]
+[%%expect{|
+type t : value non_float mod contended = { mutable i : int; }
+[@@unsafe_allow_any_mode_crossing]
+and s = { t : t; } [@@unboxed]
 |}]
