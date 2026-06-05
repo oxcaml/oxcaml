@@ -2656,27 +2656,67 @@ let update_decls_jkind_reason decls =
     )
     decls
 
-let update_decls_jkind env decls =
-  List.map
-    (fun (id, decl) ->
-       Builtin_attributes.warning_scope decl.type_attributes (fun () ->
-         let allow_any_crossing =
-           Builtin_attributes.has_unsafe_allow_any_mode_crossing
-             decl.type_attributes
+(* Note [order of updating decl jkinds].
+
+   [order] is topological of type declarations in the graph where there's an
+   edge from decl [a] to [b] if the layout of [a] or [a#] is necessary to
+   compute the representation of [b] without indirection.
+
+   Equivalently, there is an [a -> b] edge when [a] (or its unboxed version
+   [a#]) is contained "flatly" within [b], directly or nested through other
+   unboxed types. E.g., there is an [a -> b] edge for the following:
+   {[
+     (* [a] is a field of the unboxed record [b] *)
+     type a = #{ x : int; y : int }
+     and b = #{ f : a; other : string }
+
+     (* [a]'s unboxed version is an argument to the variant [b] *)
+     type b = A of a#
+     and a = #{ x : int; y : int }
+
+     (* [a] is included in [b] through [c] *)
+     type b = { c : c }
+     and c = #{ a : a }
+     and a = #{ i : int; j : int }
+   ]}
+
+   We process the decls in this order and update the environment as we go, so
+   that when we update each decl we see the computed jkinds of the types it
+   depends on, rather than the dummy [any] jkinds assigned in
+   [transl_declaration]. See Note [Default jkinds in transl_declaration].
+*)
+let update_decls_jkind env order decls =
+  let decls_by_id = Ident.Map.of_list decls in
+  let _env, results =
+    List.fold_left
+      (fun (env, results) id ->
+         let decl = Ident.Map.find id decls_by_id in
+         let new_decl, allow_any_crossing =
+           Builtin_attributes.warning_scope decl.type_attributes (fun () ->
+             let allow_any_crossing =
+               Builtin_attributes.has_unsafe_allow_any_mode_crossing
+                 decl.type_attributes
+             in
+             (* Check that the attribute is valid, if set (unconditionally, for
+               consistency). *)
+             if allow_any_crossing then begin
+               match decl.type_kind with
+               | Type_abstract _ | Type_open ->
+                 raise(Error(
+                   decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+               | _ -> ()
+             end;
+             update_decl_jkind env (Pident id) decl, allow_any_crossing)
          in
-
-         (* Check that the attribute is valid, if set (unconditionally, for
-            consistency). *)
-         if allow_any_crossing then begin
-           match decl.type_kind with
-           | Type_abstract _ | Type_open ->
-             raise(Error(
-               decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-           | _ -> ()
-         end;
-
-         let new_decl = update_decl_jkind env (Pident id) decl in
-         (id, decl, allow_any_crossing, new_decl)))
+         let env = add_type ~check:false id new_decl env in
+         env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
+      (env, Ident.Map.empty) order
+  in
+  (* Return the results in the original [decls] order. *)
+  List.map
+    (fun (id, _decl) ->
+       let decl, allow_any_crossing, new_decl = Ident.Map.find id results in
+       (id, decl, allow_any_crossing, new_decl))
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)
@@ -3115,6 +3155,66 @@ let check_unboxed_recursion_decl ~abs_env env loc path decl to_check =
       let ty = Btype.newgenty (Tconstr (path, decl.type_params, ref Mnil)) in
       check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check
 
+(* True for unboxed types, which are flattened into their container, so its
+   representation depends on this type's jkind (a boxed type just contributes a
+   [value]). *)
+let decl_jkind_affects_representations env path =
+  match (Env.find_type path env).type_kind with
+  | Type_record_unboxed_product _
+  | Type_record (_, Record_unboxed, _)
+  | Type_variant (_, (Variant_unboxed | Variant_with_null), _) -> true
+  | Type_record _ | Type_variant _ | Type_abstract _ | Type_open -> false
+  | exception Not_found ->
+    (* We only call this on paths in the recursive group *)
+    Misc.fatal_error "Typedecl.decl_jkind_affects_representations"
+
+(* See Note [order of updating decl jkinds]. Returns the declarations'
+   [Ident.t]s in an order where each declaration comes after every declaration
+   in the group whose layout its representation depends on.
+
+   In particular, the representation of a {boxed,unboxed} {record,variant}
+   depends on the kinds of its fields/args, as well as all types transitively
+   contained-without-boxing in those args. *)
+let jkind_update_order env to_check decls =
+  let visited = ref Ident.Set.empty in
+  let order = ref [] in
+  (* Prepend [id] after visiting what it depends on; [order] is thus built in
+     reverse, and reversed at the end. *)
+  let rec visit id contained =
+    if not (Ident.Set.mem id !visited) then begin
+      visited := Ident.Set.add id !visited;
+      List.iter follow contained;
+      order := id :: !order
+    end
+  (* Reach the in-group types a container depends on: expand the head (so
+     [u# id] becomes [u#]), then look through what it contains without
+     boxing. *)
+  and follow ty =
+    let ty = Ctype.expand_head_opt env ty in
+    let contained = Ctype.contained_without_boxing env ty in
+    match get_desc ty with
+    | Tconstr ((Path.Pident id | Path.Pextra_ty (Path.Pident id, Punboxed_ty))
+               as path, _, _)
+      when to_check path && decl_jkind_affects_representations env path ->
+      visit id contained
+    | _ ->
+      (* In-group boxed types are recorded by the loop below instead (their args
+         hide behind the box); other types just pass their contents through. *)
+      List.iter follow contained
+  in
+  let snap = Btype.snapshot () in
+  List.iter
+    (fun (id, decl) ->
+       (* Read fields/args directly: a boxed variant/record's args are
+          flattened, but [contained_without_boxing] stops at the box. *)
+       let contained = ref (Option.to_list decl.type_manifest) in
+       Btype.iter_type_expr_kind
+         (fun ty -> contained := ty :: !contained) decl.type_kind;
+       visit id !contained)
+    decls;
+  Btype.backtrack snap;
+  List.rev !order
+
 (* Check for non-regular abbreviations; an abbreviation
    [type 'a t = ...] is non-regular if the expansion of [...]
    contains instances [ty t] where [ty] is not equal to ['a].
@@ -3541,6 +3641,9 @@ let transl_type_decl env rec_flag sdecl_list =
       (Path.Pident id)
       decl to_check)
     decls;
+  (* Cycles through unboxed types are now ruled out, so this order exists. See
+     Note [order of updating decl jkinds]. *)
+  let jkind_update_order = jkind_update_order new_env to_check decls in
   (* Now that we've ruled out ill-formed types, we can perform the delayed
      jkind checks *)
   List.iter (fun (checks,loc) ->
@@ -3598,7 +3701,7 @@ let transl_type_decl env rec_flag sdecl_list =
         |> name_recursion_decls sdecl_list
         |> Typedecl_variance.update_decls env sdecl_list
         |> Typedecl_separability.update_decls env
-        |> update_decls_jkind new_env
+        |> update_decls_jkind new_env jkind_update_order
         |> normalize_decl_jkinds new_env
       in
       let removed, decls = remove_unboxed_versions decls in
