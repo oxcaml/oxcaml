@@ -49,7 +49,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
       | Unknown -> (Location.none, Unknown), Unknown
-      | Allocation_r loc -> pp, Allocation_l loc
+      | Allocation_r loc -> pp, Allocation loc
+      | Allocation loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
         contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_l (Monadic, { containing; contained }) ->
@@ -72,7 +73,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
       | Unknown -> (Location.none, Unknown), Unknown
-      | Allocation_l loc -> pp, Allocation_r loc
+      | Allocation_l loc -> pp, Allocation loc
+      | Allocation loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
         contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_r (Monadic, { containing; contained }) ->
@@ -96,6 +98,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
           Adj_captured_by_partial_application
         | Crossing -> Crossing
         | Allocation_l loc -> Allocation_l loc
+        | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -111,6 +114,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Captured_by_partial_application -> Captured_by_partial_application
         | Crossing -> Crossing
         | Allocation_r loc -> Allocation_r loc
+        | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -131,6 +135,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
+        | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -153,6 +158,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
+        | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -4914,6 +4920,10 @@ module Report = struct
       ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Allocation _ ->
+      Misc.fatal_error
+        "This hint is from turning an allocation mode into a value mode, and \
+         should never be printed"
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
@@ -5006,26 +5016,55 @@ module Report = struct
     | Contains_l _ | Contains_r _ | Is_contained_by _
     | Adj_captured_by_partial_application ->
       true
-    | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
+    | Allocation_r _ | Allocation_l _ | Allocation _ | Skip | Crossing -> false
+
+  (** The [Allocation] hint is special, and should always be skipped. Here, we
+      additionally assert that the objects and values implement the
+      [alloc_as_value] morphism *)
+  let is_allocation_skip : type l r a b.
+      (l * r) morph -> src:a C.obj -> dst:b C.obj -> a -> b -> bool =
+   fun hint ~src ~dst a b ->
+    match hint with
+    | Unknown | Close_over _ | Is_closed_by _ | Captured_by_partial_application
+    | Contains_l _ | Contains_r _ | Is_contained_by _
+    | Adj_captured_by_partial_application | Allocation_r _ | Allocation_l _
+    | Skip | Crossing ->
+      false
+    | Allocation _ -> (
+      match src, dst with
+      | Locality, Regionality ->
+        Misc.Le_result.equal ~le:(C.le dst)
+          (C.Locality_morph.apply Locality_as_regionality a)
+          b
+      | Comonadic_with_locality, Comonadic_with_regionality ->
+        Misc.Le_result.equal ~le:(C.le dst)
+          (C.Core_morph.apply dst (Locality_full Locality_as_regionality) a)
+          b
+      (* | Regionality, Locality ->
+          Misc.Le_result.equal ~le:(C.le src)
+            a
+            (C.Locality_morph.apply Locality_as_regionality b)
+        | Comonadic_with_regionality, Comonadic_with_locality ->
+          Misc.Le_result.equal ~le:(C.le src)
+            a
+            (C.Core_morph.apply src
+               (Locality_full Locality_as_regionality)
+               b) *)
+      | _, _ ->
+        let Refl = C.equal_obj dst src |> Misc.get_eq_exn in
+        if not (Misc.Le_result.equal ~le:(C.le dst) a b)
+        then
+          Misc.fatal_errorf_doc
+            "Unexpected objects for allocation hint:@ source object %a,@ \
+             source value %a,@ target object %a,@ target value %a"
+            C.print_obj src (C.print src) a C.print_obj dst (C.print dst) b
+        else true)
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
     match C.equal_obj a_obj b_obj with
     | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Misc.Is_not_eq -> (
-      (* CR-someday ageorges: Strictly speaking, these are not in fact equal. Here we
-         are doing a hack so that we in fact skip the Skip hint of an alloc_as_value
-         morphism. However, a proper solution is to instead define a specific hint for
-         this morphism. *)
-      match a_obj, b_obj with
-      | Locality, Regionality ->
-        Misc.Le_result.equal ~le:(C.le b_obj)
-          (C.Locality_morph.apply Locality_as_regionality a)
-          b
-      | Regionality, Locality ->
-        Misc.Le_result.equal ~le:(C.le a_obj) a
-          (C.Locality_morph.apply Locality_as_regionality b)
-      | _, _ -> false)
+    | Misc.Is_not_eq -> false
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -5039,7 +5078,10 @@ module Report = struct
     match hint with
     | Apply (morph_hint, src, ahint) ->
       let fixpoint = equal_mode obj src a (fst ahint) in
-      if (not (is_rigid morph_hint)) && fixpoint
+      let is_alloc_skip =
+        is_allocation_skip morph_hint ~src ~dst:obj (fst ahint) a
+      in
+      if ((not (is_rigid morph_hint)) && fixpoint) || is_alloc_skip
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;

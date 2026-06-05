@@ -57,7 +57,8 @@ Line 2, characters 18-30:
 2 |   let g = stack_ (fun x y -> x : 'a -> 'a -> 'a) in
                       ^^^^^^^^^^^^
 Error: The allocation is "local" because it is "stack_"-allocated.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation which is expected to be "global".
 |}]
 
 let f () =

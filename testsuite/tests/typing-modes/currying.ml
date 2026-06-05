@@ -301,6 +301,7 @@ Line 3, characters 63-64:
 Error: The value "a" is "local" to the parent region
        but is expected to be "global"
          because it is used inside the function at line 3, characters 14-64
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()

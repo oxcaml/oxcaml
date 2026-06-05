@@ -776,7 +776,8 @@ let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
   in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
   let closed_over_mode =
-    alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)
+    alloc_as_value ~hint:(Allocation {loc; txt = Unknown})
+      (Alloc.disallow_left alloc_mode)
   in
   alloc_mode, closed_over_mode
 

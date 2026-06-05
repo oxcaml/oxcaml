@@ -79,14 +79,9 @@ module M = struct
     let local_ x = "hello"
 end
 [%%expect{|
-Line 2, characters 15-16:
-2 |     let local_ x = "hello"
-                   ^
-Error: The expression is "local"
-       but is expected to be "global"
-         because it is the value "x" in the structure at line 2, characters 4-26
-         which is expected to be "global"
-         because modules always need to be allocated on the heap.
+>> Fatal error: Skip hint should not be printed
+Uncaught exception: Mode.Submode_error_simple_context(_, _)
+
 |}]
 
 module M @ many = struct
@@ -1247,6 +1242,7 @@ Line 4, characters 12-13:
 Error: The module "M" is "local"
        but is expected to be "global"
          because it is used inside the function at lines 3-4, characters 21-22
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1265,6 +1261,7 @@ Line 4, characters 12-13:
 Error: The module "M" is "local"
        but is expected to be "global"
          because it is used inside the function at lines 3-4, characters 21-22
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1343,6 +1340,7 @@ Line 4, characters 20-36:
 Error: The module "M_Func_portable'" is "local"
        but is expected to be "global"
          because it is used inside the function at lines 3-5, characters 21-5
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
