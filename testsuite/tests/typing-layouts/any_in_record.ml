@@ -406,3 +406,38 @@ Error: Signature mismatch:
        Hint: Is there a type that has a representable layout in the first
          but has layout any in the second?
 |}]
+
+(* [@@flatten_floats] *)
+
+type ('a : any) t = { a : 'a }
+[@@flatten_floats]
+[%%expect{|
+Lines 1-2, characters 0-18:
+1 | type ('a : any) t = { a : 'a }
+2 | [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}]
+
+type ('a : any) t = { a : 'a; f : float }
+[@@flatten_floats]
+[%%expect{|
+Lines 1-2, characters 0-18:
+1 | type ('a : any) t = { a : 'a; f : float }
+2 | [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}]
+
+type ('a : any) t = { a : 'a; f : float# }
+[@@flatten_floats]
+[%%expect{|
+Lines 1-2, characters 0-18:
+1 | type ('a : any) t = { a : 'a; f : float# }
+2 | [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}]
