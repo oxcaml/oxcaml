@@ -1868,7 +1868,8 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
      that [containing_type] has no arguments (or only variables as
      arguments). *)
   let vars_and_ty_args, ty_res =
-    Ctype.instance_labels ~fixed:false representative_label.lbl_all
+    Ctype.instance_labels ~fixed:false ~representative:representative_label
+      representative_label.lbl_all
   in
   unify_exp_types loc env containing_type ty_res;
   let sorts, rep =
@@ -9507,7 +9508,7 @@ and type_label_access
         lbl_loc = lid.loc;
         lbl_attributes = [];
         lbl_uid = Uid.internal_not_actually_unique;
-        lbl_sort = Jkind.Sort.Const.scannable;
+        lbl_sort = None;
       }
     in
     (record, record_sort, Mode.Value.disallow_right mode,

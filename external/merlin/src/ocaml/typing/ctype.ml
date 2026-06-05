@@ -1907,14 +1907,18 @@ let instance_label' copy_scope ~fixed lbl =
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
 
-let instance_labels ~fixed lbls =
+let instance_labels ~fixed ~representative lbls =
+  (* Merlin-only: Merlin sometimes calls this function with an empty lbls (since lbl_all
+     is empty for dummy labels). In the compiler, this function assumes the array is
+     non-empty to get the result type. But in Merlin, we explicitly pass representative to
+     avoid an index-out-of-bounds exception. *)
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
       Array.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
-    let ty_res = copy copy_scope lbls.(0).lbl_res in
+    let ty_res = copy copy_scope representative.lbl_res in
     (vars_and_ty_args, ty_res)
   )
 
