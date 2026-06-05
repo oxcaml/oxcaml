@@ -78,6 +78,7 @@ Line 1, characters 59-60:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 1, characters 59-63
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -96,6 +97,7 @@ Line 1, characters 74-75:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 1, characters 74-78
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -108,6 +110,7 @@ Line 1, characters 65-66:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 1, characters 65-69
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -121,6 +124,7 @@ Line 2, characters 11-12:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 2, characters 11-15
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -141,6 +145,7 @@ Line 1, characters 56-57:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 1, characters 56-60
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -182,6 +187,7 @@ Line 2, characters 11-12:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 2, characters 11-15
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -196,6 +202,7 @@ Line 3, characters 11-12:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 3, characters 11-15
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -208,6 +215,7 @@ Line 1, characters 73-74:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 1, characters 73-77
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -221,6 +229,7 @@ Line 2, characters 11-12:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the tuple at line 2, characters 11-15
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 

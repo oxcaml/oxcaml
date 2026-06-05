@@ -582,6 +582,7 @@ Line 3, characters 43-44:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Some") in the value at line 3, characters 38-44
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -609,6 +610,7 @@ Line 3, characters 64-65:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Some") in the value at line 3, characters 59-65
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -629,6 +631,7 @@ Line 2, characters 66-67:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Invalid_argument") in the value at line 2, characters 48-68
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1019,6 +1022,7 @@ Line 3, characters 14-15:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "::") in the value at line 3, characters 14-20
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1717,11 +1721,19 @@ let foo (local_ x) y =
   | None, _ -> ()
   | _  -> ();;
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 4, characters 29-30:
+4 |   | Some _, Some b -> escape b
+                                 ^
+Error: This value is "local"
+         because it is contained (via constructor "Some") in the value at line 4, characters 12-18
+         which is "local"
+         because it is an element of the tuple at line 3, characters 8-10
+         which is "local"
+         because it is allocated at line 2, characters 11-15 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 11-12
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ x) y =
@@ -1731,11 +1743,17 @@ let foo (local_ x) y =
     escape b
   | _  -> ();;
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 5, characters 11-12:
+5 |     escape b
+               ^
+Error: This value is "local"
+         because it is an element of the tuple at line 4, characters 15-17
+         which is "local"
+         because it is allocated at line 2, characters 8-12 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 8-9
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1782,11 +1800,17 @@ let foo p (local_ x) y z =
   let _, b = pr in
   escape b;;
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 6, characters 9-10:
+6 |   escape b;;
+             ^
+Error: This value is "local"
+         because it is an element of the tuple at line 5, characters 13-15
+         which is "local"
+         because it is allocated at line 3, characters 14-18 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 3, characters 14-15
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* [as] patterns *)
@@ -2585,6 +2609,7 @@ Line 3, characters 8-9:
 Error: This value is "local"
        but is expected to be "global"
          because it is contained (via constructor "GFoo") in the value at line 3, characters 2-17
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -2656,6 +2681,7 @@ Line 1, characters 35-36:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the array at line 1, characters 32-46
+         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 

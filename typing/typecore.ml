@@ -790,10 +790,13 @@ let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
   let alloc_mode = value_to_alloc_r2g mode in
   register_allocation_mode alloc_mode;
+  (* We must apply each morphism separately so that their hints correspond to
+     the correct morphism *)
   let mode =
-    value_r2g ~hint:(Allocation_r {loc; txt = desc})
+    value_to_alloc_r2g ~hint:(Allocation_r {loc; txt = desc})
       (Mode.Value.disallow_left mode)
   in
+  let mode = alloc_as_value ~hint:(Allocation {loc; txt = desc}) mode in
   alloc_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by

@@ -28,6 +28,8 @@ Line 5, characters 4-5:
 Error: This value is "local"
          because it is an element of the tuple at line 3, characters 6-25
          which is "local"
+         because it is allocated at line 3, characters 6-25 containing data
+         which is "local"
          because it is a tuple that contains the expression at line 3, characters 10-25
          which is "local".
        However, the highlighted expression is expected to be "local" to the parent region or "global"
@@ -94,11 +96,15 @@ let f e0 (e1 @ local) =
     | x0, x1 when x0 = x1 -> use_global x0; use_local x1; ()
     | x -> use_global x; ()
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 4, characters 22-23:
+4 |     | x -> use_global x; ()
+                          ^
+Error: This value is "local"
+         because it is allocated at line 2, characters 10-16 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 14-16
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -140,11 +146,19 @@ let f e0 (e1 @ local) =
     | x0, x1 when x0 = x1 -> use_global x0; use_local x1; e1
     | x -> use_local x; let (x0, x1) = x in x0
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 4, characters 44-46:
+4 |     | x -> use_local x; let (x0, x1) = x in x0
+                                                ^^
+Error: This value is "local"
+         because it is an element of the tuple at line 4, characters 39-40
+         which is "local"
+         because it is allocated at line 2, characters 10-16 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 14-16
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let f e0 (e1 @ local) =
@@ -231,9 +245,17 @@ let f_boxed_tuple (local_ a) (local_ b) =
   let (a', _) = t in
   a'
 [%%expect{|
->> Fatal error: Unexpected objects for allocation hint:
-source object Regionality, source value regional, target object Regionality,
-target value local
-Uncaught exception: Typecore.Error(_, _, _)
-
+Line 4, characters 2-4:
+4 |   a'
+      ^^
+Error: This value is "local"
+         because it is an element of the tuple at line 3, characters 16-17
+         which is "local"
+         because it is allocated at line 2, characters 10-16 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 11-12
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
