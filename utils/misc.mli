@@ -1130,6 +1130,9 @@ type (_, _) is_eq =
   | Is_eq : ('a, 'a) is_eq
   | Is_not_eq : ('a, 'b) is_eq
 
+(** Raises an exception if propositional equality test does not hold *)
+val get_eq_exn : ('a, 'b) is_eq -> ('a, 'b) eq
+
 (** Utilities for module-level programming *)
 module type T = sig
   type t

@@ -57,6 +57,8 @@ val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref
 
+val frametables_in_rodata : bool ref
+
 val default_heap_reduction_threshold : int
 val heap_reduction_threshold : int ref
 val dump_zero_alloc : bool ref

@@ -154,7 +154,6 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
@@ -930,16 +929,22 @@ let transl_declaration env sdecl (id, uid) =
   let represent_as_float_array =
     Builtin_attributes.has_represent_as_float_array sdecl.ptype_attributes
   in
+  let flatten_floats =
+    Builtin_attributes.has_flatten_floats sdecl.ptype_attributes
+  in
   let unbox, unboxed_default =
     (* [unboxed_default] is [true] iff the user did not specify an explicit
-       representation attribute ([@@unboxed] or [@@represent_as_float_array]) *)
+       representation attribute ([@@unboxed], [@@represent_as_float_array],
+       or [@@flatten_floats]) *)
     match sdecl.ptype_kind with
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
     | Ptype_variant [{pcd_args = Pcstr_record [{pld_mutable=Immutable; _}]; _}]
     | Ptype_record [{pld_mutable=Immutable; _}] ->
       Option.value unboxed_attr
         ~default:(!Clflags.unboxed_types && not represent_as_float_array),
-      Option.is_none unboxed_attr && not represent_as_float_array
+      Option.is_none unboxed_attr
+      && not represent_as_float_array
+      && not flatten_floats
     | Ptype_record_unboxed_product _ -> false, false
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
@@ -948,6 +953,11 @@ let transl_declaration env sdecl (id, uid) =
     | Ptype_record _ when not unbox -> ()
     | _ ->
       raise (Error (sdecl.ptype_loc, Bad_represent_as_float_array_attribute))
+  end;
+  if flatten_floats then begin
+    match sdecl.ptype_kind with
+    | Ptype_record _ when not unbox -> ()
+    | _ -> raise (Error (sdecl.ptype_loc, Misplaced_flatten_floats))
   end;
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
@@ -1122,7 +1132,8 @@ let transl_declaration env sdecl (id, uid) =
               Record_unboxed,
               Jkind.Builtin.any ~why:Old_style_unboxed_type
             else
-              Record_dummy { represent_as_float_array },
+              (* See Note [Record_dummy] in [typing/types.mli] *)
+              Record_dummy { represent_as_float_array; flatten_floats },
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
@@ -1258,9 +1269,9 @@ let transl_declaration env sdecl (id, uid) =
    1. In the temporary environment computed by [enter_type], all types get an
       unboxed version.
 
-   2. After translating declarations, [derive_unboxed_versions] gives all
-      [Record_dummy { represent_as_float_array = false }] records unboxed
-      versions.
+   2. After translating declarations, [derive_unboxed_versions] gives unboxed
+      versions to all [Record_dummy]s whose [represent_as_float_array] and
+      [flatten_floats] flags are both false.
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
@@ -1306,8 +1317,8 @@ let record_gets_unboxed_version lbls repr =
   match repr with
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed | Record_variable -> true
-  | Record_dummy { represent_as_float_array } ->
-    not represent_as_float_array
+  | Record_dummy { represent_as_float_array; flatten_floats } ->
+    not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
 
 let gets_unboxed_version decl =
@@ -1989,6 +2000,30 @@ let mixed_block_element env ty jkind =
   let unboxed_element = Element_repr.classify env ty jkind in
   Option.map Element_repr.to_shape_element unboxed_element
 
+(* Atomic fields must have layout value and must not appear in mixed blocks
+   (records that have any non-value field). *)
+let check_atomic_fields reprs lbls =
+  let is_value (repr : Element_repr.t option) =
+    match repr with
+    | Some (Value_element _ | Float_element) -> true
+    | Some (Unboxed_element _ | Void) | None -> false
+  in
+  List.iter2
+    (fun repr (lbl : Types.label_declaration) ->
+       if Types.is_atomic lbl.ld_mutable && not (is_value repr) then
+         raise (Error (lbl.ld_loc, Non_value_atomic_field)))
+    reprs lbls;
+  let has_non_value = List.exists (fun r -> not (is_value r)) reprs in
+  if has_non_value then
+    match
+      List.find_opt
+        (fun (lbl : Types.label_declaration) -> Types.is_atomic lbl.ld_mutable)
+        lbls
+    with
+    | Some (lbl : Types.label_declaration) ->
+      raise (Error (lbl.ld_loc, Atomic_field_in_mixed_block))
+    | None -> ()
+
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
@@ -2012,6 +2047,7 @@ let update_constructor_representation
             ld.Types.ld_type)
             fields arg_jkinds
         in
+        check_atomic_fields (List.map fst arg_reprs) fields;
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
         |> Result.map_error (fun (Element_repr.Unrepresentable_element i) ->
              let bad_field = List.nth fields i in
@@ -2050,7 +2086,12 @@ let compute_record_repr
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
     ~represent_as_float_array
+    ~flatten_floats
   =
+  (* Reject atomic fields with a non-value layout or in mixed blocks. After
+     this, atomic_fields:true should imply Record_boxed (value-only or
+     atomic-float) *)
+  check_atomic_fields (List.map fst reprs) (List.map fst lbls);
   let mixed_record () =
     let shape =
       Element_repr.mixed_product_shape loc reprs Record
@@ -2069,81 +2110,65 @@ let compute_record_repr
       ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
       ~first_any )
   with
-  (* We store floats flatly in mixed records if all fields are
-      float/float64/void. *)
+  (* If all fields are float/float64/void, we flatten the floats only when
+     opted in via [@@flatten_floats]. *)
   | ~refining_block_with_any:false, ~values:false, ~floats:true,
       ~atomic_floats:false, ~float64s:true,
       ~non_float64_unboxed_fields:false, ~atomic_fields:false,
       ~first_any:None, ..  ->
-    let shape =
-      List.map
-        (fun ((repr : Element_repr.t option), _lbl) ->
-          match repr with
-          | Some Float_element -> Float_boxed
-          | Some (Unboxed_element Float64) -> Float64
-          | Some Void -> Void
-          | Some (Unboxed_element (Float32
-                                  | Bits8 | Bits16 | Bits32 | Bits64
-                                  | Vec128 | Vec256 | Vec512 | Word
-                                  | Untagged_immediate | Product _))
-          | Some Value_element _ | None ->
-              Misc.fatal_error "Expected only floats and float64s")
-        reprs
-      |> Array.of_list
-    in
-    assert_mixed_product_support loc Record ~value_prefix_len:0;
-    Ok (Record_mixed shape)
-  (* Forbid atomic fields in mixed (or potentially mixed) blocks *)
-  | ~values:true, ~voids:true, ~atomic_fields:true, ..
-  | ~floats:true, ~voids:true, ~atomic_fields:true, ..
-  | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
-  | ~values:true, ~float64s:true, ~atomic_fields:true, ..
-  | ~non_float64_unboxed_fields:true, ~atomic_fields:true, ..
-  | ~first_any:(Some _), ~atomic_fields:true, .. ->
-    let error =
-      (* Print a different error if an atomic field itself is
-          non-value *)
-      match
-        List.find_map
-          (fun ((repr : Element_repr.t option), lbl) ->
-              match repr with
-              | Some (Value_element _ | Float_element) | None -> None
-              | Some _ ->
-                if Types.is_atomic lbl.Types.ld_mutable
-                then Some lbl
-                else None)
-          (List.map2 (fun (repr, _) (lbl, _) -> repr, lbl)
-              reprs lbls)
-      with
-      | Some lbl ->
-        Error(lbl.Types.ld_loc, Non_value_atomic_field)
-      | None ->
-        (* Find the first atomic field, to get a better location for the
-            error *)
-        let lbl, _ =
-          List.find (fun (lbl, _) -> Types.is_atomic lbl.Types.ld_mutable)
-            lbls
-        in
-        Error(lbl.Types.ld_loc, Atomic_field_in_mixed_block)
-    in
-    raise error
+    if flatten_floats then
+      let shape =
+        List.map
+          (fun ((repr : Element_repr.t option), _lbl) ->
+            match repr with
+            | Some Float_element -> Float_boxed
+            | Some (Unboxed_element Float64) -> Float64
+            | Some Void -> Void
+            | Some (Unboxed_element (Float32
+                                    | Bits8 | Bits16 | Bits32 | Bits64
+                                    | Vec128 | Vec256 | Vec512 | Word
+                                    | Untagged_immediate | Product _))
+            | Some Value_element _ | None ->
+                Misc.fatal_error "Expected only floats and float64s")
+          reprs
+        |> Array.of_list
+      in
+      assert_mixed_product_support loc Record ~value_prefix_len:0;
+      Ok (Record_mixed shape)
+    else
+      mixed_record ()
   (* Any record with a field of kind [any] can't be represented. *)
   | ~first_any:(Some id), .. ->
     Result.Error (Unrepresentable_field (Ident.name id))
+  | ~values:false, ~floats:false, ~atomic_floats:false,
+    ~float64s:true, ~non_float64_unboxed_fields:false,
+    ~voids:false, ~first_any:None, .. ->
+    if represent_as_float_array then begin
+      if refining_block_with_any then
+        (* CR-soon rtjoa: This fatal error is included for an abundance of
+           caution. We should make this function more defensive as a whole *)
+        Misc.fatal_error
+          "Typedecl.compute_record_repr: refining any with \
+           [@@represent_as_float_array]";
+      Ok Record_ufloat
+    end else
+      mixed_record ()
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
   *)
   | ~values:true, ~voids:true, ~atomic_fields:false, ..
   | ~floats:true, ~voids:true, ~atomic_fields:false, ..
+  | ~floats:true, ~float64s:true, ~atomic_fields:false, ..
   | ~float64s:true, ~voids:true, ~atomic_fields:false, ..
   | ~values:true, ~float64s:true, ~atomic_fields:false, ..
   | ~non_float64_unboxed_fields:true, ~atomic_fields:false, .. ->
     mixed_record ()
-  (* value-only records are stored as boxed records, as are records whose
-      declared types have fields of kind [any] *)
-  | ~values:true, ~float64s:false, ~non_float64_unboxed_fields: false,
+  (* value-only records are stored as boxed records, including records whose
+     declared types have fields of kind [any] *)
+  | ~values:true, ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:false, ..
-  | ~refining_block_with_any:true, .. ->
+  | ~refining_block_with_any:true, ~float64s:false,
+      ~non_float64_unboxed_fields:false, ~voids:false, .. ->
     Ok Record_boxed
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
       flat float records.
@@ -2152,24 +2177,17 @@ let compute_record_repr
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:false, ~first_any:None, .. ->
     Ok Record_float
-  | ~values:false, ~floats:false, ~atomic_floats:false,
-    ~float64s:true, ~non_float64_unboxed_fields:false,
-    ~voids:false, ~first_any:None, .. ->
-    if represent_as_float_array then
-      Ok Record_ufloat
-    else
-      mixed_record ()
   (* Records with atomic float fields cannot use flat representation *)
   | ~atomic_floats:true, ~first_any:None, .. ->
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
     Ok Record_boxed
-  | ~voids:false, ~values:false, ~floats:true, ~atomic_floats:false,
-      ~atomic_fields:true, ~float64s:true,
-      ~non_float64_unboxed_fields:false, .. ->
+  (* Any remaining atomic-bearing shape should have been rejected by
+     [check_atomic_fields] above. *)
+  | ~atomic_fields:true, .. ->
     Misc.fatal_error
-      "Typedecl.compute_record_repr: invariant broken in repr_summary \
-        (only floats, some atomic fields, no atomic floats?)"
+      "Typedecl.compute_record_repr: atomic field should have been \
+       rejected by check_atomic_fields"
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:_, ~atomic_fields:_, ~first_any:None, ..
@@ -2296,19 +2314,25 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       let refining_block_with_any = false in
       match form with
       | Legacy ->
-        let represent_as_float_array =
+        let ~represent_as_float_array, ~flatten_floats =
           match rep with
-          | Record_dummy { represent_as_float_array } ->
-            represent_as_float_array
+          | Record_dummy { represent_as_float_array; flatten_floats } ->
+            ~represent_as_float_array, ~flatten_floats
           | _ -> assert false (* outer match *)
         in
         let rep =
-          compute_record_repr loc reprs lbls ~represent_as_float_array ~warn
-            ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
-            ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
+          compute_record_repr loc reprs lbls ~represent_as_float_array
+            ~flatten_floats ~warn ~refining_block_with_any ~values ~floats
+            ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
+            ~voids ~first_any
         in
         if represent_as_float_array && rep <> Ok Record_ufloat then
           raise (Error (loc, Bad_represent_as_float_array_attribute));
+        if flatten_floats then begin
+          match rep with
+          | Ok rep when record_has_float_boxed rep -> ()
+          | _ -> raise (Error (loc, Misplaced_flatten_floats));
+        end;
         rep
       | Unboxed_product ->
         (match first_any with
@@ -2345,7 +2369,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     | Legacy ->
       let rep =
         compute_record_repr loc reprs lbls
-          ~represent_as_float_array:false ~warn
+          ~represent_as_float_array:false ~flatten_floats:false ~warn
           ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
@@ -2635,45 +2659,67 @@ let update_decls_jkind_reason decls =
     )
     decls
 
-let update_decls_jkind env decls =
+(* Note [order of updating decl jkinds].
+
+   [order] is topological of type declarations in the graph where there's an
+   edge from decl [a] to [b] if the layout of [a] or [a#] is necessary to
+   compute the representation of [b] without indirection.
+
+   Equivalently, there is an [a -> b] edge when [a] (or its unboxed version
+   [a#]) is contained "flatly" within [b], directly or nested through other
+   unboxed types. E.g., there is an [a -> b] edge for the following:
+   {[
+     (* [a] is a field of the unboxed record [b] *)
+     type a = #{ x : int; y : int }
+     and b = #{ f : a; other : string }
+
+     (* [a]'s unboxed version is an argument to the variant [b] *)
+     type b = A of a#
+     and a = #{ x : int; y : int }
+
+     (* [a] is included in [b] through [c] *)
+     type b = { c : c }
+     and c = #{ a : a }
+     and a = #{ i : int; j : int }
+   ]}
+
+   We process the decls in this order and update the environment as we go, so
+   that when we update each decl we see the computed jkinds of the types it
+   depends on, rather than the dummy [any] jkinds assigned in
+   [transl_declaration]. See Note [Default jkinds in transl_declaration].
+*)
+let update_decls_jkind env order decls =
+  let decls_by_id = Ident.Map.of_list decls in
+  let _env, results =
+    List.fold_left
+      (fun (env, results) id ->
+         let decl = Ident.Map.find id decls_by_id in
+         let new_decl, allow_any_crossing =
+           Builtin_attributes.warning_scope decl.type_attributes (fun () ->
+             let allow_any_crossing =
+               Builtin_attributes.has_unsafe_allow_any_mode_crossing
+                 decl.type_attributes
+             in
+             (* Check that the attribute is valid, if set (unconditionally, for
+               consistency). *)
+             if allow_any_crossing then begin
+               match decl.type_kind with
+               | Type_abstract _ | Type_open ->
+                 raise(Error(
+                   decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+               | _ -> ()
+             end;
+             update_decl_jkind env (Pident id) decl, allow_any_crossing)
+         in
+         let env = add_type ~check:false id new_decl env in
+         env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
+      (env, Ident.Map.empty) order
+  in
+  (* Return the results in the original [decls] order. *)
   List.map
-    (fun (id, decl) ->
-       Builtin_attributes.warning_scope decl.type_attributes (fun () ->
-         let allow_any_crossing =
-           Builtin_attributes.has_unsafe_allow_any_mode_crossing
-             decl.type_attributes
-         in
-
-         (* Check that the attribute is valid, if set (unconditionally, for
-            consistency). *)
-         if allow_any_crossing then begin
-           match decl.type_kind with
-           | Type_abstract _ | Type_open ->
-             raise(Error(
-               decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-           | _ -> ()
-         end;
-
-         let new_decl = update_decl_jkind env (Pident id) decl in
-         let has_flatten_floats =
-           Builtin_attributes.has_flatten_floats decl.type_attributes
-         in
-         let is_mixed_float_float64 =
-           match new_decl.type_kind with
-           | Type_record (_, (Record_unboxed | Record_inlined _ | Record_boxed
-                            | Record_float | Record_ufloat | Record_mixed _
-                            | Record_dummy _ as rep), _) ->
-             record_has_float_boxed rep
-           | _ -> false
-         in
-         begin match has_flatten_floats, is_mixed_float_float64 with
-         | false, true ->
-           raise (Error (decl.type_loc, Missing_flatten_floats))
-         | true, false ->
-           raise (Error (decl.type_loc, Misplaced_flatten_floats))
-         | true, true | false, false -> ()
-         end;
-         (id, decl, allow_any_crossing, new_decl)))
+    (fun (id, _decl) ->
+       let decl, allow_any_crossing, new_decl = Ident.Map.find id results in
+       (id, decl, allow_any_crossing, new_decl))
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)
@@ -3112,6 +3158,66 @@ let check_unboxed_recursion_decl ~abs_env env loc path decl to_check =
       let ty = Btype.newgenty (Tconstr (path, decl.type_params, ref Mnil)) in
       check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check
 
+(* True for unboxed types, which are flattened into their container, so its
+   representation depends on this type's jkind (a boxed type just contributes a
+   [value]). *)
+let decl_jkind_affects_representations env path =
+  match (Env.find_type path env).type_kind with
+  | Type_record_unboxed_product _
+  | Type_record (_, Record_unboxed, _)
+  | Type_variant (_, (Variant_unboxed | Variant_with_null), _) -> true
+  | Type_record _ | Type_variant _ | Type_abstract _ | Type_open -> false
+  | exception Not_found ->
+    (* We only call this on paths in the recursive group *)
+    Misc.fatal_error "Typedecl.decl_jkind_affects_representations"
+
+(* See Note [order of updating decl jkinds]. Returns the declarations'
+   [Ident.t]s in an order where each declaration comes after every declaration
+   in the group whose layout its representation depends on.
+
+   In particular, the representation of a {boxed,unboxed} {record,variant}
+   depends on the kinds of its fields/args, as well as all types transitively
+   contained-without-boxing in those args. *)
+let jkind_update_order env to_check decls =
+  let visited = ref Ident.Set.empty in
+  let order = ref [] in
+  (* Prepend [id] after visiting what it depends on; [order] is thus built in
+     reverse, and reversed at the end. *)
+  let rec visit id contained =
+    if not (Ident.Set.mem id !visited) then begin
+      visited := Ident.Set.add id !visited;
+      List.iter follow contained;
+      order := id :: !order
+    end
+  (* Reach the in-group types a container depends on: expand the head (so
+     [u# id] becomes [u#]), then look through what it contains without
+     boxing. *)
+  and follow ty =
+    let ty = Ctype.expand_head_opt env ty in
+    let contained = Ctype.contained_without_boxing env ty in
+    match get_desc ty with
+    | Tconstr ((Path.Pident id | Path.Pextra_ty (Path.Pident id, Punboxed_ty))
+               as path, _, _)
+      when to_check path && decl_jkind_affects_representations env path ->
+      visit id contained
+    | _ ->
+      (* In-group boxed types are recorded by the loop below instead (their args
+         hide behind the box); other types just pass their contents through. *)
+      List.iter follow contained
+  in
+  let snap = Btype.snapshot () in
+  List.iter
+    (fun (id, decl) ->
+       (* Read fields/args directly: a boxed variant/record's args are
+          flattened, but [contained_without_boxing] stops at the box. *)
+       let contained = ref (Option.to_list decl.type_manifest) in
+       Btype.iter_type_expr_kind
+         (fun ty -> contained := ty :: !contained) decl.type_kind;
+       visit id !contained)
+    decls;
+  Btype.backtrack snap;
+  List.rev !order
+
 (* Check for non-regular abbreviations; an abbreviation
    [type 'a t = ...] is non-regular if the expansion of [...]
    contains instances [ty t] where [ty] is not equal to ['a].
@@ -3538,6 +3644,9 @@ let transl_type_decl env rec_flag sdecl_list =
       (Path.Pident id)
       decl to_check)
     decls;
+  (* Cycles through unboxed types are now ruled out, so this order exists. See
+     Note [order of updating decl jkinds]. *)
+  let jkind_update_order = jkind_update_order new_env to_check decls in
   (* Now that we've ruled out ill-formed types, we can perform the delayed
      jkind checks *)
   List.iter (fun (checks,loc) ->
@@ -3595,7 +3704,7 @@ let transl_type_decl env rec_flag sdecl_list =
         |> name_recursion_decls sdecl_list
         |> Typedecl_variance.update_decls env sdecl_list
         |> Typedecl_separability.update_decls env
-        |> update_decls_jkind new_env
+        |> update_decls_jkind new_env jkind_update_order
         |> normalize_decl_jkinds new_env
       in
       let removed, decls = remove_unboxed_versions decls in
@@ -5643,16 +5752,11 @@ let report_error_doc ppf = function
   | Layout_poly_unsupported ->
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
-  | Missing_flatten_floats ->
-    fprintf ppf
-      "@[This record type mixes boxed and unboxed float fields,@ \
-       which causes the flat float record optimization.@ \
-       You must annotate it with %a.@]"
-      Style.inline_code "[@@flatten_floats]"
   | Misplaced_flatten_floats ->
     fprintf ppf
-      "@[The %a attribute is only allowed on record types@ \
-       that mix boxed %a and unboxed %a fields.@]"
+      "@[The %a attribute is only allowed on records with one or more@ \
+       non-atomic %a fields, one or more %a fields, and all other fields@ \
+       void.@]"
       Style.inline_code "[@@flatten_floats]"
       Style.inline_code "float"
       Style.inline_code "float#"

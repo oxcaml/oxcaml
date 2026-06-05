@@ -96,10 +96,11 @@ let rec eval_constant state ~all_sections const =
   C.eval ~this ~lookup_label ~lookup_symbol ~lookup_variable const
 
 (* Handle cross-section (Label - This) + offset pattern. This occurs in
-   frametable entries where a DATA section location references a TEXT section
-   label (return address), or when DATA references read-only data sections like
-   .rodata.cst8. On ELF with function sections, we emit R_AARCH64_PREL32 with
-   section name and addend. On macOS, we emit PREL32_PAIR using symbol pairs. *)
+   frametable entries where a DATA or Read_only_data section location references
+   a TEXT section label (return address), or when DATA references read-only data
+   sections like .rodata.cst8. On ELF with function sections, we emit
+   R_AARCH64_PREL32 with section name and addend. On macOS, we emit PREL32_PAIR
+   using symbol pairs. *)
 let is_cross_section_relative_reference state ~all_sections ~current_section c =
   match extract_target_this_offset c with
   | None -> None
@@ -110,6 +111,10 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
     | None -> (
       let macosx = String.equal Config.system "macosx" in
       let for_jit = All_section_states.for_jit all_sections in
+      let current_section_supports_cross_section_reference =
+        Asm_section.equal current_section Asm_section.Data
+        || Asm_section.equal current_section Asm_section.Read_only_data
+      in
       (* On ELF (not JIT) with function sections, check individual sections
          first. The assembler emits R_AARCH64_PREL32 with section symbol and
          addend. For JIT mode, we aggregate sections so can't use section
@@ -122,11 +127,11 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
             all_sections target
         with
         | Some (target_offset, section, _target_state) ->
-          if not (Asm_section.equal current_section Asm_section.Data)
+          if not current_section_supports_cross_section_reference
           then
             Misc.fatal_errorf
-              "Cross-section (Label - This) from non-DATA section %s to %s not \
-               supported"
+              "Cross-section (Label - This) from unsupported source section %s \
+               to %s not supported"
               (Asm_section.to_string current_section)
               (Asm_section.to_string section)
           else
@@ -150,11 +155,11 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
         | Some (target_offset, label_section, _target_state) -> (
           if Asm_section.equal label_section current_section
           then None (* Same section after all *)
-          else if not (Asm_section.equal current_section Asm_section.Data)
+          else if not current_section_supports_cross_section_reference
           then
             Misc.fatal_errorf
-              "Cross-section (Label - This) from non-DATA section %s to %s not \
-               supported"
+              "Cross-section (Label - This) from unsupported source section %s \
+               to %s not supported"
               (Asm_section.to_string current_section)
               (Asm_section.to_string label_section)
           else if (not macosx) && not for_jit
@@ -171,11 +176,12 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
                linker computes: plus_sym - minus_sym + addend So: addend =
                (target - plus_sym) - (current - minus_sym) *)
             let current_pos = SS.offset_in_bytes state in
-            (* Find nearest symbol in DATA for SUBTRACTOR *)
+            (* Find nearest symbol in the current source section for
+               SUBTRACTOR *)
             match SS.find_nearest_symbol_before state current_pos with
             | None ->
               Misc.fatal_error
-                "No symbol in DATA section for cross-section relocation"
+                "No symbol in source section for cross-section relocation"
             | Some (minus_symbol, minus_sym_offset) -> (
               (* Find nearest symbol in target section for UNSIGNED. Note: when
                  using find_in_any_section_with_state, we get the target offset
