@@ -2740,7 +2740,7 @@ let update_decls_jkind env order decls =
              end;
              update_decl_jkind env (Pident id) decl, allow_any_crossing)
          in
-         let env = add_type ~check:false id new_decl env in
+         let env = add_type ~long_path:true ~check:false id new_decl env in
          env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
       (env, Ident.Map.empty) order
   in
