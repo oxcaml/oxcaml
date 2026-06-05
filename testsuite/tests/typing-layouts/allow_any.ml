@@ -56,6 +56,21 @@ Error: The layout of type "t" is value non_float
        the layout value non_float.
 |}]
 
+(* Can't change the layout for mutually recursive types. This *should*
+   typecheck; i.e. allow_any_mode_crossing shouldn't replace [t]'s layout with
+   [any]. *)
+type ('a : float64) require_f64
+
+type t : any = #{ f : float# }
+[@@unsafe_allow_any_mode_crossing]
+
+and s : value = t require_f64
+[%%expect{|
+type ('a : float64) require_f64
+type t : float64 = #{ f : float#; } [@@unsafe_allow_any_mode_crossing]
+and s = t require_f64
+|}]
+
 (* Annotations with with-bounds are allowed *)
 type 'a t : value mod contended with 'a = { mutable contents : 'a }
 [@@unsafe_allow_any_mode_crossing]
@@ -569,7 +584,7 @@ let f (type a b) (eq : ((a, b) M7.t, (a, b) M9.t) eq) = match eq with Refl -> ()
 val f : (('a, 'b) M7.t, ('a, 'b) M9.t) eq -> unit = <fun>
 |}]
 
-module M : sig 
+module M : sig
   type t : immutable_data
 end = struct
   type q : immutable_data = { bar : int ref }
