@@ -2883,6 +2883,38 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
         | Error err -> Error err
       end
 
+(* Fill in the forward declaration used by [Typeopt.value_kind] to recover a
+   precise variant shape for a constructor whose declared representation is
+   [Cstr_layout_variable] (i.e. it mentions an [any]-kinded parameter), given
+   its argument types already instantiated at a use site. This lives here rather
+   than in [Typedecl] because [Typedecl] is also linked into [dynlink], which
+   does not include [Typeopt]. Returns [None] (rather than raising) on any
+   difficulty: [value_kind] runs at lambda-translation time and must not raise
+   type errors. *)
+let () =
+  Typeopt.constructor_representation_for_value_kind :=
+    (fun env ~loc (cd_args : Types.constructor_arguments) ->
+       let arg_jkinds =
+         match cd_args with
+         | Cstr_tuple fields ->
+           List.map
+             (fun (ca : Types.constructor_argument) ->
+                Ctype.type_jkind env ca.ca_type)
+             fields
+         | Cstr_record lbls ->
+           List.map
+             (fun (ld : Types.label_declaration) ->
+                Ctype.type_jkind env ld.ld_type)
+             lbls
+       in
+       match
+         Typedecl.update_constructor_representation env cd_args arg_jkinds ~loc
+           ~is_extension_constructor:false
+       with
+       | Ok shape -> Some shape
+       | Error _ -> None
+       | exception Typedecl.Error _ -> None)
+
 (* Typing of patterns *)
 
 (* "untyped" cases are prior to checking the pattern. *)

@@ -580,6 +580,14 @@ let add_nullability_from_ty env ty raw_kind =
 let fallback_if_missing_cmi ~default f =
   try f () with Missing_cmi_fallback -> default
 
+(* Forward declaration -- filled in by [Typecore]. See the .mli. The default
+   returns [None] so that, if the ref is somehow unset, [value_kind] degrades to
+   its previous (conservative) behavior rather than crashing. *)
+let constructor_representation_for_value_kind :
+      (Env.t -> loc:Location.t -> Types.constructor_arguments
+       -> Types.constructor_representation option) ref =
+  ref (fun _env ~loc:_ _cd_args -> None)
+
 (* CR layouts v2.5: It will be possible for subcomponents of types to be
    non-values for non-error reasons (e.g., [type t = { x : float# }
    [@@unboxed]).  And in later releases, this will also happen in normal
@@ -698,7 +706,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           || Path.same p Predef.path_iarray) ->
     let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
-  | Tconstr(p, _, _) -> begin
+  | Tconstr(p, args, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
          with with-kinds, [decl.type_jkind] will mention variables bound
          by the parameters of the declaration. The code below loses this
@@ -724,7 +732,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
-                         ~num_nodes_visited cstrs rep)
+                         ~num_nodes_visited ~type_params:decl.type_params ~args
+                         cstrs rep)
         | Type_record (_, Record_variable, _) ->
           num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
@@ -877,6 +886,7 @@ and value_kind_mixed_block
   num_nodes_visited, Constructor_mixed (Array.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
+      ~type_params ~args
       (cstrs : Types.constructor_declaration list) rep =
   match rep with
   | Variant_extensible -> assert false
@@ -901,6 +911,33 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
+    (* For constructors whose declared representation is [Cstr_layout_variable]
+       (those mentioning [any]-kinded parameters), we recompute the
+       representation from the argument types instantiated with [args]. *)
+    let type_params = List.map Ctype.correct_levels type_params in
+    let instantiate_ty ty =
+      let ty = Ctype.correct_levels ty in
+      (* [args] is already corrected by [scrape_ty]. *)
+      try Some (Ctype.apply env type_params ty args)
+      with Ctype.Cannot_apply -> None
+    in
+    let instantiate_cd_args (cd_args : Types.constructor_arguments) =
+      match cd_args with
+      | Cstr_tuple fields ->
+        Misc.Stdlib.List.map_option
+          (fun (ca : Types.constructor_argument) ->
+             Option.map (fun ty -> { ca with ca_type = ty })
+               (instantiate_ty ca.ca_type))
+          fields
+        |> Option.map (fun fields -> Types.Cstr_tuple fields)
+      | Cstr_record lbls ->
+        Misc.Stdlib.List.map_option
+          (fun (ld : Types.label_declaration) ->
+             Option.map (fun ty -> { ld with ld_type = ty })
+               (instantiate_ty ld.ld_type))
+          lbls
+        |> Option.map (fun lbls -> Types.Cstr_record lbls)
+    in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
       let num_nodes_visited, shape =
@@ -974,38 +1011,58 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     if List.for_all is_constant cstrs then
       (num_nodes_visited, Pintval)
     else
+      let process_constructor ~constructor ~cstr_shape
+            (num_nodes_visited, next_const, consts, next_tag, non_consts) =
+        let (is_mutable, num_nodes_visited), fields =
+          for_one_constructor constructor ~depth ~num_nodes_visited
+            ~cstr_shape
+        in
+        if is_mutable then None
+        else match fields with
+        | Constructor_uniform xs
+            when List.compare_length_with xs 0 = 0 ->
+          let consts = next_const :: consts in
+          Some (num_nodes_visited,
+                next_const + 1, consts, next_tag, non_consts)
+        | Constructor_mixed shape
+            when mixed_block_shape_is_empty shape ->
+          let consts = next_const :: consts in
+          Some (num_nodes_visited,
+                next_const + 1, consts, next_tag, non_consts)
+        | Constructor_mixed _ | Constructor_uniform _ ->
+          let non_consts =
+            (next_tag, fields) :: non_consts
+          in
+          Some (num_nodes_visited,
+                next_const, consts, next_tag + 1, non_consts)
+      in
       let _idx, result =
-        List.fold_left (fun (idx, result) constructor ->
+        List.fold_left
+          (fun (idx, result) (constructor : Types.constructor_declaration) ->
           idx+1,
           match result with
           | None -> None
-          | Some (num_nodes_visited,
-                  next_const, consts, next_tag, non_consts) ->
+          | Some acc ->
             match cstr_layouts.(idx) with
-            | Cstr_layout_variable -> None
+            | Cstr_layout_variable ->
+                (* Declared representation is unknown because the constructor
+                   mentions an [any]-kinded parameter. Recompute it from the
+                   argument types instantiated with [args]. *)
+                begin match instantiate_cd_args constructor.cd_args with
+                | None -> None
+                | Some inst_cd_args ->
+                  match
+                    !constructor_representation_for_value_kind env ~loc
+                      inst_cd_args
+                  with
+                  | None -> None
+                  | Some cstr_shape ->
+                    process_constructor
+                      ~constructor:{ constructor with cd_args = inst_cd_args }
+                      ~cstr_shape acc
+                end
             | Cstr_layout_known { shape = cstr_shape; _ } ->
-                let (is_mutable, num_nodes_visited), fields =
-                  for_one_constructor constructor ~depth ~num_nodes_visited
-                    ~cstr_shape
-                in
-                if is_mutable then None
-                else match fields with
-                | Constructor_uniform xs
-                    when List.compare_length_with xs 0 = 0 ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed shape
-                    when mixed_block_shape_is_empty shape ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed _ | Constructor_uniform _ ->
-                  let non_consts =
-                    (next_tag, fields) :: non_consts
-                  in
-                  Some (num_nodes_visited,
-                        next_const, consts, next_tag + 1, non_consts))
+                process_constructor ~constructor ~cstr_shape acc)
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in

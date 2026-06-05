@@ -77,6 +77,15 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
+(* Forward declaration -- filled in by [Typecore] to recompute a constructor's
+   representation from its (instantiated) argument types. Used by [value_kind]
+   to recover a precise variant shape for constructors whose declared
+   representation is [Cstr_layout_variable] (i.e. those mentioning [any]-kinded
+   parameters). *)
+val constructor_representation_for_value_kind :
+  (Env.t -> loc:Location.t -> Types.constructor_arguments
+   -> Types.constructor_representation option) ref
+
 val transl_mixed_block_element :
   Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
   -> unit Lambda.mixed_block_element
