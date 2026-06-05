@@ -5030,35 +5030,31 @@ module Report = struct
     | Adj_captured_by_partial_application | Allocation_r _ | Allocation_l _
     | Skip | Crossing ->
       false
-    | Allocation _ -> (
-      match src, dst with
-      | Locality, Regionality ->
-        Misc.Le_result.equal ~le:(C.le dst)
-          (C.Locality_morph.apply Locality_as_regionality a)
-          b
-      | Comonadic_with_locality, Comonadic_with_regionality ->
-        Misc.Le_result.equal ~le:(C.le dst)
-          (C.Core_morph.apply dst (Locality_full Locality_as_regionality) a)
-          b
-      (* | Regionality, Locality ->
-          Misc.Le_result.equal ~le:(C.le src)
-            a
-            (C.Locality_morph.apply Locality_as_regionality b)
-        | Comonadic_with_regionality, Comonadic_with_locality ->
-          Misc.Le_result.equal ~le:(C.le src)
-            a
-            (C.Core_morph.apply src
-               (Locality_full Locality_as_regionality)
-               b) *)
-      | _, _ ->
-        let Refl = C.equal_obj dst src |> Misc.get_eq_exn in
-        if not (Misc.Le_result.equal ~le:(C.le dst) a b)
-        then
-          Misc.fatal_errorf_doc
-            "Unexpected objects for allocation hint:@ source object %a,@ \
-             source value %a,@ target object %a,@ target value %a"
-            C.print_obj src (C.print src) a C.print_obj dst (C.print dst) b
-        else true)
+    | Allocation _ ->
+      let is_alloc_as_value_morph =
+        match src, dst with
+        | Locality, Regionality ->
+          Misc.Le_result.equal ~le:(C.le dst)
+            (C.Locality_morph.apply Locality_as_regionality a)
+            b
+        | Comonadic_with_locality, Comonadic_with_regionality ->
+          Misc.Le_result.equal ~le:(C.le dst)
+            (C.Core_morph.apply dst (Locality_full Locality_as_regionality) a)
+            b
+        | _, _ -> (
+          (* alloc_as_value acts as identity on all other axes. This case is hit
+             when a projection is applied to an alloc_as_value morphism *)
+          match C.equal_obj src dst with
+          | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le src) a b
+          | Misc.Is_not_eq -> false)
+      in
+      if not is_alloc_as_value_morph
+      then
+        Misc.fatal_errorf_doc
+          "Unexpected objects for allocation hint:@ source object %a,@ source \
+           value %a,@ target object %a,@ target value %a"
+          C.print_obj src (C.print src) a C.print_obj dst (C.print dst) b
+      else true
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
