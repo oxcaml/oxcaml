@@ -109,6 +109,7 @@ let () =
       (List.rev !input_files_rev)
   | Some Dump ->
     List.iter
+<<<<<<< HEAD
       (fun file -> Index_format.(read_exn ~file |> pp Format.std_formatter))
       (List.rev !input_files_rev)
   | Some Dump_file_stats ->
@@ -126,6 +127,15 @@ let () =
       (List.rev !input_files_rev)
   | Some Gather_shapes ->
     Index.gather_shapes ~output_file:!output_file (List.rev !input_files_rev)
+||||||| c76379cdae
+      (fun file -> Index_format.(read_exn ~file |> pp Format.std_formatter))
+      !input_files
+=======
+      (fun file ->
+        let index = Index_format.read_exn ~file in
+        Index_format.pp Format.std_formatter index)
+      !input_files
+>>>>>>> v5.6-504
   | Some Stats ->
     List.iter
       (fun file ->

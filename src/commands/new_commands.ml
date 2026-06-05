@@ -486,6 +486,23 @@ let all_commands =
       | `None -> failwith "-position <pos> is mandatory"
       | #Msource.position as pos -> run buffer (Query_protocol.Locate_types pos)
       end;
+    command "locate-types"
+      ~spec:
+        [ arg "-position" "<position> Position to locate the type of"
+            (marg_position (fun pos _ -> pos))
+        ]
+      ~doc:
+        "Locate the declaration of the type of the expression. If the type is \
+         expressed via multiple identifiers, it returns the location of each \
+         identifier."
+      ~default:`None
+      begin
+        fun buffer pos ->
+          match pos with
+          | `None -> failwith "-position <pos> is mandatory"
+          | #Msource.position as pos ->
+            run buffer (Query_protocol.Locate_types pos)
+      end;
     command "occurrences"
       ~spec:
         [ arg "-identifier-at" "<position> Position of the identifier"
@@ -551,7 +568,11 @@ let all_commands =
       ~spec:
         [ arg "-position" "<position> Position to complete"
             (marg_position (fun pos (query, _pos) -> (query, pos)));
-          arg "-query" "<string> Query of the form TODO"
+          arg "-query"
+            "<string> Query of the form every input parameters prefixed by `-` \
+             and output parameters prefixed by `+`. In example: -string \
+             +option will fetch function that takes string and returns an \
+             option. (You can't parametrize types in polarity queries)"
             (Marg.param "string" (fun query (_prefix, pos) -> (query, pos)))
         ] ~default:("", `None) begin fun buffer (query, pos) ->
       match pos with
@@ -589,28 +610,95 @@ let all_commands =
       ~spec:
         [ arg "-start" "<position> Where inlay-hints generation start"
             (marg_position
-               (fun start (_start, stop, let_binding, pattern_binding, ghost) ->
-                 (start, stop, let_binding, pattern_binding, ghost)));
+               (fun
+                 start
+                 ( _start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )
+               ->
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )));
           arg "-end" "<position> Where inlay-hints generation stop"
             (marg_position
-               (fun stop (start, _stop, let_binding, pattern_binding, ghost) ->
-                 (start, stop, let_binding, pattern_binding, ghost)));
+               (fun
+                 stop
+                 ( start,
+                   _stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )
+               ->
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )));
           optional "-let-binding" "<bool> Hint let-binding (default is false)"
             (Marg.bool
                (fun
                  let_binding
-                 (start, stop, _let_binding, pattern_binding, ghost)
-               -> (start, stop, let_binding, pattern_binding, ghost)));
+                 ( start,
+                   stop,
+                   _let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )
+               ->
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )));
           optional "-pattern-binding"
             "<bool> Hint pattern-binding (default is false)"
             (Marg.bool
                (fun
                  pattern_binding
-                 (start, stop, let_binding, _pattern_binding, ghost)
-               -> (start, stop, let_binding, pattern_binding, ghost)));
+                 ( start,
+                   stop,
+                   let_binding,
+                   _pattern_binding,
+                   function_params,
+                   ghost )
+               ->
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )));
+          optional "-function-params"
+            "<bool> Hint function parameters (default is false)"
+            (Marg.bool
+               (fun
+                 function_params
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   _function_params,
+                   ghost )
+               ->
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )));
           optional "-avoid-ghost-location"
             "<bool> Avoid hinting ghost location (default is true)"
             (Marg.bool
+<<<<<<< HEAD
                (fun ghost (start, stop, let_binding, pattern_binding, _ghost) ->
                  (start, stop, let_binding, pattern_binding, ghost)))
         ] ~default:(`None, `None, false, false, true)
@@ -627,6 +715,64 @@ let all_commands =
         run buffer
           (Query_protocol.Inlay_hints
              (start, stop, let_binding, pattern_binding, avoid_ghost))
+||||||| c76379cdae
+               (fun ghost (start, stop, let_binding, pattern_binding, _ghost) ->
+                 (start, stop, let_binding, pattern_binding, ghost)))
+        ]
+      ~default:(`None, `None, false, false, true)
+      begin
+        fun buffer (start, stop, let_binding, pattern_binding, avoid_ghost) ->
+          match (start, stop) with
+          | `None, `None -> failwith "-start <pos> and -end are mandatory"
+          | `None, _ -> failwith "-start <pos> is mandatory"
+          | _, `None -> failwith "-end <pos> is mandatory"
+          | (#Msource.position, #Msource.position) as position ->
+            let start, stop = position in
+            run buffer
+              (Query_protocol.Inlay_hints
+                 (start, stop, let_binding, pattern_binding, avoid_ghost))
+=======
+               (fun
+                 ghost
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   _ghost )
+               ->
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   ghost )))
+        ]
+      ~default:(`None, `None, false, false, false, true)
+      begin
+        fun buffer
+          ( start,
+            stop,
+            let_binding,
+            pattern_binding,
+            function_params,
+            avoid_ghost )
+        ->
+          match (start, stop) with
+          | `None, `None -> failwith "-start <pos> and -end are mandatory"
+          | `None, _ -> failwith "-start <pos> is mandatory"
+          | _, `None -> failwith "-end <pos> is mandatory"
+          | (#Msource.position, #Msource.position) as position ->
+            let start, stop = position in
+            run buffer
+              (Query_protocol.Inlay_hints
+                 ( start,
+                   stop,
+                   let_binding,
+                   pattern_binding,
+                   function_params,
+                   avoid_ghost ))
+>>>>>>> v5.6-504
       end;
     command "shape"
       ~doc:

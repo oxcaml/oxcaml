@@ -90,10 +90,12 @@ and item =
       | `Type
       | `Exn
       | `Class
+      | `ClassType
       | `Method ];
     outline_type : string option;
     deprecated : bool;
-    location : Location_aux.t;
+    location : Location.t;
+    selection : Location.t;
     children : outline
   }
 
@@ -141,6 +143,7 @@ type _ _bool = bool
 type occurrences_status =
   [ `Not_requested | `Out_of_sync of string list | `No_def | `Included ]
 
+<<<<<<< HEAD
 type occurrence = { loc : Location.t; is_stale : bool }
 
 module Locate_context = struct
@@ -216,6 +219,31 @@ module Locate_types_result = struct
   type t = Success of Tree.t | Invalid_context
 end
 
+||||||| c76379cdae
+=======
+type occurrence = { loc : Location.t; is_stale : bool }
+
+module Locate_types_result = struct
+  module Tree = struct
+    type 'a node_data = Arrow | Tuple | Object | Poly_variant | Type_ref of 'a
+
+    type 'a t = { data : 'a node_data; children : 'a t list }
+  end
+
+  type type_ref_payload =
+    { type_ : string;
+      result :
+        [ `Found of string option * Lexing.position
+        | `Builtin of string
+        | `Not_in_env of string
+        | `File_not_found of string
+        | `Not_found of string * string option ]
+    }
+
+  type t = Success of type_ref_payload Tree.t | Invalid_context
+end
+
+>>>>>>> v5.6-504
 type _ t =
   | Type_expr (* *) : string * Msource.position -> string t
   | Stack_or_heap_enclosing (* *) :
@@ -309,7 +337,7 @@ type _ t =
       Msource.position * [ `None | `Local ] option * int option
       -> (Location.t * string list) t
   | Inlay_hints :
-      Msource.position * Msource.position * bool * bool * bool
+      Msource.position * Msource.position * bool * bool * bool * bool
       -> (Lexing.position * string) list t
   | Outline (* *) : { include_types : bool } -> outline t
   | Shape (* *) : Msource.position -> shape list t

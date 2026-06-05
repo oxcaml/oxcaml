@@ -34,14 +34,31 @@ let sherlodoc_type_of _env typ =
   let open Merlin_sherlodoc in
   let rec aux typ =
     match Types.get_desc typ with
+<<<<<<< HEAD
     | Types.Tvar { name = None; jkind = _ } -> Type_parsed.Wildcard
     | Types.Tvar { name = Some ty; jkind = _ } -> Type_parsed.Tyvar ty
     | Types.Ttuple elts ->
       let aux_tuple_element (_, typ) = aux typ in
       Type_parsed.tuple @@ List.map ~f:aux_tuple_element elts
+||||||| c76379cdae
+    | Types.Tvar None -> Type_parsed.Wildcard
+    | Types.Tvar (Some ty) -> Type_parsed.Tyvar ty
+    | Types.Ttuple elts -> Type_parsed.tuple @@ List.map ~f:aux elts
+=======
+    | Types.Tvar None -> Type_parsed.Wildcard
+    | Types.Tvar (Some ty) -> Type_parsed.Tyvar ty
+    | Types.Ttuple elts ->
+      Type_parsed.tuple @@ List.map ~f:(fun (_, t) -> aux t) elts
+>>>>>>> v5.6-504
     | Types.Tarrow (_, a, b, _) -> Type_parsed.Arrow (aux a, aux b)
     | Types.Tconstr (p, args, _) ->
+<<<<<<< HEAD
       let p = p in
+||||||| c76379cdae
+      let p = Printtyp.rewrite_double_underscore_paths env p in
+=======
+      let p = Out_type.rewrite_double_underscore_paths env p in
+>>>>>>> v5.6-504
       let name = Format.asprintf "%a" Printtyp.path p in
       Type_parsed.Tycon (name, List.map ~f:aux args)
     | Types.Tpoly (typ, []) -> aux typ
@@ -121,6 +138,7 @@ let values_from_module query env lident acc =
     | _ ->
       let acc = compute_values query env (Some lident) acc in
       Env.fold_modules
+<<<<<<< HEAD
         (fun name _ (mdl : Subst.Lazy.module_declaration) acc ->
           match mdl.md_type with
           | Mty_alias _ -> acc
@@ -129,6 +147,23 @@ let values_from_module query env lident acc =
               Longident.Ldot (Location.mknoloc lident, Location.mknoloc name)
             in
             aux acc lident)
+||||||| c76379cdae
+        (fun name _ mdl acc ->
+          match mdl.Types.md_type with
+          | Types.Mty_alias _ -> acc
+          | _ ->
+            let lident = Longident.Ldot (lident, name) in
+            aux acc lident)
+=======
+        (fun name _ mdl acc ->
+           match mdl.Types.md_type with
+           | Types.Mty_alias _ -> acc
+           | _ ->
+             let lident =
+               Longident.Ldot (Location.mknoloc lident, Location.mknoloc name)
+             in
+             aux acc lident)
+>>>>>>> v5.6-504
         (Some lident) env acc
   in
   aux acc lident

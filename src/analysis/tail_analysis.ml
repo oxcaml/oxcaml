@@ -46,11 +46,25 @@ let tail_operator = function
   | _ -> false
 
 let expr_tail_positions = function
+<<<<<<< HEAD
   | Texp_apply (callee, args, _, _, _) when tail_operator callee ->
     begin match List.last args with
     | None | Some (_, Omitted _) -> []
     | Some (_, Arg (expr, _)) -> [ Expression expr ]
     end
+||||||| c76379cdae
+  | Texp_apply (callee, args) when tail_operator callee -> begin
+    match List.last args with
+    | None | Some (_, None) -> []
+    | Some (_, Some expr) -> [ Expression expr ]
+  end
+=======
+  | Texp_apply (callee, args) when tail_operator callee -> begin
+    match List.last args with
+    | None | Some (_, Omitted ()) -> []
+    | Some (_, Arg expr) -> [ Expression expr ]
+  end
+>>>>>>> v5.6-504
   | Texp_instvar _
   | Texp_setinstvar _
   | Texp_override _
@@ -79,6 +93,7 @@ let expr_tail_positions = function
   | Texp_unreachable
   | Texp_extension_constructor _
   | Texp_letop _
+<<<<<<< HEAD
   | Texp_typed_hole
   | Texp_list_comprehension _
   | Texp_array_comprehension _
@@ -97,6 +112,16 @@ let expr_tail_positions = function
   | Texp_unboxed_bool _ -> []
   | Texp_match (_, _, cs, _, _) -> List.map cs ~f:(fun c -> Case c)
   | Texp_try (_, cs, _) -> List.map cs ~f:(fun c -> Case c)
+||||||| c76379cdae
+  | Texp_hole -> []
+  | Texp_match (_, cs, _) -> List.map cs ~f:(fun c -> Case c)
+  | Texp_try (_, cs) -> List.map cs ~f:(fun c -> Case c)
+=======
+  | Texp_atomic_loc _
+  | Texp_typed_hole -> []
+  | Texp_match (_, cs, _, _) -> List.map cs ~f:(fun c -> Case c)
+  | Texp_try (_, cs, _) -> List.map cs ~f:(fun c -> Case c)
+>>>>>>> v5.6-504
   | Texp_letmodule (_, _, _, _, e)
   | Texp_letexception (_, e)
   | Texp_let (_, _, e)

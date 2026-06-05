@@ -35,22 +35,32 @@ open Typedtree
 open Browse_raw
 open Browse_tree
 
+<<<<<<< HEAD
 let id_of_patt = function
   | { pat_desc = Tpat_var { id; _ }; _ } -> Some id
+||||||| c76379cdae
+let id_of_patt = function
+  | { pat_desc = Tpat_var (id, _, _); _ } -> Some id
+=======
+let name_of_patt = function
+  | { pat_desc = Tpat_var (_, name, _); _ } -> Some name
+>>>>>>> v5.6-504
   | _ -> None
 
-let mk ?(children = []) ~location ~deprecated outline_kind outline_type id =
+let mk ?(children = []) ~location ~deprecated outline_kind outline_type
+    (name : string Location.loc) =
   { Query_protocol.outline_kind;
     outline_type;
     location;
+    selection = name.loc;
     children;
-    outline_name = Ident.name id;
+    outline_name = name.txt;
     deprecated
   }
 
-let get_class_field_desc_infos = function
-  | Typedtree.Tcf_val (str_loc, _, _, _, _) -> Some (str_loc, `Value)
-  | Typedtree.Tcf_method (str_loc, _, _) -> Some (str_loc, `Method)
+let get_class_signature_field_desc_infos = function
+  | Typedtree.Tctf_val (outline_name, _, _, _) -> Some (outline_name, `Value)
+  | Typedtree.Tctf_method (outline_name, _, _, _) -> Some (outline_name, `Method)
   | _ -> None
 
 let outline_type ~include_types ~env typ =
@@ -67,7 +77,11 @@ let rec summarize ~include_types node =
   let location = node.t_loc in
   match node.t_node with
   | Value_binding vb ->
+    let children =
+      List.concat_map (Lazy.force node.t_children) ~f:get_val_elements
+    in
     let deprecated = Type_utils.is_deprecated vb.vb_attributes in
+<<<<<<< HEAD
     begin match id_of_patt vb.vb_pat with
     | None -> None
     | Some ident ->
@@ -75,31 +89,90 @@ let rec summarize ~include_types node =
         outline_type ~include_types ~env:node.t_env vb.vb_pat.pat_type
       in
       Some (mk ~location ~deprecated `Value typ ident)
+||||||| c76379cdae
+    begin
+      match id_of_patt vb.vb_pat with
+      | None -> None
+      | Some ident ->
+        let typ = outline_type ~env:node.t_env vb.vb_pat.pat_type in
+        Some (mk ~location ~deprecated `Value typ ident)
+=======
+    begin
+      match name_of_patt vb.vb_pat with
+      | None -> None
+      | Some name ->
+        let typ = outline_type ~env:node.t_env vb.vb_pat.pat_type in
+        Some (mk ~children ~location ~deprecated `Value typ name)
+>>>>>>> v5.6-504
     end
   | Value_description vd ->
     let deprecated = Type_utils.is_deprecated vd.val_attributes in
+<<<<<<< HEAD
     let typ = outline_type ~include_types ~env:node.t_env vd.val_val.val_type in
     Some (mk ~location ~deprecated `Value typ vd.val_id)
+||||||| c76379cdae
+    let typ = outline_type ~env:node.t_env vd.val_val.val_type in
+    Some (mk ~location ~deprecated `Value typ vd.val_id)
+=======
+    let typ = outline_type ~env:node.t_env vd.val_val.val_type in
+    Some (mk ~location ~deprecated `Value typ vd.val_name)
+>>>>>>> v5.6-504
   | Module_declaration md ->
+<<<<<<< HEAD
     let children = get_mod_children ~include_types node in
     begin match md.md_id with
     | None -> None
     | Some id ->
       let deprecated = Type_utils.is_deprecated md.md_attributes in
       Some (mk ~children ~location ~deprecated `Module None id)
+||||||| c76379cdae
+    let children = get_mod_children node in
+    begin
+      match md.md_id with
+      | None -> None
+      | Some id ->
+        let deprecated = Type_utils.is_deprecated md.md_attributes in
+        Some (mk ~children ~location ~deprecated `Module None id)
+=======
+    let children = get_mod_children node in
+    begin
+      match md.md_name with
+      | { txt = None; _ } -> None
+      | { txt = Some txt; loc } ->
+        let deprecated = Type_utils.is_deprecated md.md_attributes in
+        Some (mk ~children ~location ~deprecated `Module None { txt; loc })
+>>>>>>> v5.6-504
     end
   | Module_binding mb ->
+<<<<<<< HEAD
     let children = get_mod_children ~include_types node in
     begin match mb.mb_id with
     | None -> None
     | Some id ->
       let deprecated = Type_utils.is_deprecated mb.mb_attributes in
       Some (mk ~children ~location ~deprecated `Module None id)
+||||||| c76379cdae
+    let children = get_mod_children node in
+    begin
+      match mb.mb_id with
+      | None -> None
+      | Some id ->
+        let deprecated = Type_utils.is_deprecated mb.mb_attributes in
+        Some (mk ~children ~location ~deprecated `Module None id)
+=======
+    let children = get_mod_children node in
+    begin
+      match mb.mb_name with
+      | { txt = None; _ } -> None
+      | { txt = Some txt; loc } ->
+        let deprecated = Type_utils.is_deprecated mb.mb_attributes in
+        Some (mk ~children ~location ~deprecated `Module None { txt; loc })
+>>>>>>> v5.6-504
     end
   | Module_type_declaration mtd ->
     let children = get_mod_children ~include_types node in
     let deprecated = Type_utils.is_deprecated mtd.mtd_attributes in
-    Some (mk ~deprecated ~children ~location `Modtype None mtd.mtd_id)
+    Some (mk ~deprecated ~children ~location `Modtype None mtd.mtd_name)
   | Type_declaration td ->
     let children =
       List.concat_map (Lazy.force node.t_children) ~f:(fun child ->
@@ -109,15 +182,15 @@ let rec summarize ~include_types node =
                 match x.t_node with
                 | Constructor_declaration c ->
                   let deprecated = Type_utils.is_deprecated c.cd_attributes in
-                  mk `Constructor None c.cd_id ~deprecated ~location:c.cd_loc
+                  mk `Constructor None c.cd_name ~deprecated ~location:c.cd_loc
                 | Label_declaration ld ->
                   let deprecated = Type_utils.is_deprecated ld.ld_attributes in
-                  mk `Label None ld.ld_id ~deprecated ~location:ld.ld_loc
+                  mk `Label None ld.ld_name ~deprecated ~location:ld.ld_loc
                 | _ -> assert false (* ! *))
           | _ -> [])
     in
     let deprecated = Type_utils.is_deprecated td.typ_attributes in
-    Some (mk ~children ~location ~deprecated `Type None td.typ_id)
+    Some (mk ~children ~location ~deprecated `Type None td.typ_name)
   | Type_extension te ->
     let name = Path.name te.tyext_path in
     let children =
@@ -131,25 +204,58 @@ let rec summarize ~include_types node =
         outline_kind = `Type;
         outline_type = None;
         location;
+        selection = te.tyext_txt.loc;
         children;
         deprecated
       }
   | Extension_constructor ec ->
     let deprecated = Type_utils.is_deprecated ec.ext_attributes in
-    Some (mk ~location `Exn None ec.ext_id ~deprecated)
+    Some (mk ~location `Exn None ec.ext_name ~deprecated)
   | Class_declaration cd ->
     let children =
       List.concat_map (Lazy.force node.t_children) ~f:get_class_elements
     in
     let deprecated = Type_utils.is_deprecated cd.ci_attributes in
-    Some (mk ~children ~location `Class None cd.ci_id_class_type ~deprecated)
+    Some (mk ~children ~location `Class None cd.ci_id_name ~deprecated)
+  | Class_type_declaration ctd ->
+    let children =
+      List.concat_map (Lazy.force node.t_children) ~f:get_class_elements
+    in
+    let deprecated = Type_utils.is_deprecated ctd.ci_attributes in
+    Some (mk ~children ~location `ClassType None ctd.ci_id_name ~deprecated)
   | _ -> None
+
+and get_val_elements node =
+  match node.t_node with
+  | Expression _ ->
+    List.concat_map (Lazy.force node.t_children) ~f:get_val_elements
+  | Class_expr _ | Class_structure _ -> get_class_elements node
+  | _ -> Option.to_list (summarize node)
 
 and get_class_elements node =
   match node.t_node with
   | Class_expr _ ->
     List.concat_map (Lazy.force node.t_children) ~f:get_class_elements
+  | Class_field cf ->
+    let children =
+      List.concat_map (Lazy.force node.t_children) ~f:get_class_elements
+    in
+    cf.cf_desc |> get_class_field_desc_infos
+    |> Option.map ~f:(fun (str_loc, outline_kind) ->
+           let deprecated = Type_utils.is_deprecated cf.cf_attributes in
+           { Query_protocol.outline_name = str_loc.Location.txt;
+             outline_kind;
+             outline_type = None;
+             location = cf.cf_loc;
+             selection = str_loc.loc;
+             children;
+             deprecated
+           })
+    |> Option.to_list
+  | Class_field_kind _ ->
+    List.concat_map (Lazy.force node.t_children) ~f:get_val_elements
   | Class_structure _ ->
+<<<<<<< HEAD
     List.filter_map (Lazy.force node.t_children) ~f:(fun child ->
         match child.t_node with
         | Class_field cf ->
@@ -167,12 +273,60 @@ and get_class_elements node =
           | None -> None
           end
         | _ -> None)
+||||||| c76379cdae
+    List.filter_map (Lazy.force node.t_children) ~f:(fun child ->
+        match child.t_node with
+        | Class_field cf -> begin
+          match get_class_field_desc_infos cf.cf_desc with
+          | Some (str_loc, outline_kind) ->
+            let deprecated = Type_utils.is_deprecated cf.cf_attributes in
+            Some
+              { Query_protocol.outline_name = str_loc.Location.txt;
+                outline_kind;
+                outline_type = None;
+                location = str_loc.Location.loc;
+                children = [];
+                deprecated
+              }
+          | None -> None
+        end
+        | _ -> None)
+=======
+    List.concat_map (Lazy.force node.t_children) ~f:get_class_elements
+  | Class_type { cltyp_desc = Tcty_signature { csig_fields; _ }; _ } ->
+    List.filter_map csig_fields ~f:(fun field ->
+        get_class_signature_field_desc_infos field.ctf_desc
+        |> Option.map ~f:(fun (name, outline_kind) ->
+               let deprecated = Type_utils.is_deprecated field.ctf_attributes in
+               { Query_protocol.outline_name = name;
+                 outline_kind;
+                 outline_type = None;
+                 location = field.ctf_loc;
+                 selection = field.ctf_loc;
+                 (* TODO: could we have more precised location information? *)
+                 children = [];
+                 deprecated
+               }))
+>>>>>>> v5.6-504
   | _ -> []
 
+<<<<<<< HEAD
 and get_mod_children ~include_types node =
   List.concat_map
     (Lazy.force node.t_children)
     ~f:(remove_mod_indir ~include_types)
+||||||| c76379cdae
+and get_mod_children node =
+  List.concat_map (Lazy.force node.t_children) ~f:remove_mod_indir
+=======
+and get_class_field_desc_infos = function
+  | Typedtree.Tcf_val (str_loc, _, _, _field_kind, _) -> Some (str_loc, `Value)
+  | Typedtree.Tcf_method (str_loc, _, _field_kind) -> Some (str_loc, `Method)
+  | _ -> None
+
+and get_mod_children node =
+  List.concat_map (Lazy.force node.t_children) ~f:remove_mod_indir
+>>>>>>> v5.6-504
 
 and remove_mod_indir ~include_types node =
   match node.t_node with

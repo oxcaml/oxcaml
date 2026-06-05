@@ -300,6 +300,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
        aroung the cursor's position and 2. the result of reconstructing the
        identifier around the cursor and typing the resulting paths.
 
+<<<<<<< HEAD
        Having the results from 2 is useful because ot is finer-grained than the
        typedtree's nodes and can provide types for modules appearing in paths.
 
@@ -318,6 +319,30 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
 
     (* Enclosings of cursor in given expression *)
     let exprs = Misc_utils.reconstruct_identifier pipeline pos expro in
+||||||| c76379cdae
+    (* enclosings of cursor in given expression *)
+    let exprs = reconstruct_identifier pipeline pos expro in
+=======
+       Having the results from 2 is useful because ot is finer-grained than the
+       typedtree's nodes and can provide types for modules appearing in paths.
+
+       This introduces two possible sources of duplicate results:
+       - Sometimes the typedtree nodes in 1 overlaps and we simply remove these.
+       - The last reconstructed enclosing usually overlaps with the first
+         typedtree node but the printed types are not always the same (generic /
+         specialized types). Because systematically printing these types to
+         compare them can be very expensive in the presence of large modules, we
+         defer this deduplication to the clients.
+    *)
+    let enclosing_nodes =
+      let cmp (loc1, _, _) (loc2, _, _) = Location_aux.compare loc1 loc2 in
+      (* There might be duplicates in the list: we remove them *)
+      Type_enclosing.from_nodes ~path |> List.dedup_adjacent ~cmp
+    in
+
+    (* Enclosings of cursor in given expression *)
+    let exprs = Misc_utils.reconstruct_identifier pipeline pos expro in
+>>>>>>> v5.6-504
     let () =
       Logger.log ~section:Type_enclosing.log_section
         ~title:"reconstruct identifier" "%a" Logger.json (fun () ->
@@ -351,6 +376,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
         Some (number_of_results - 1)
       | index -> index
     in
+<<<<<<< HEAD
     List.mapi all_results ~f:(fun i (loc, text, tail) ->
         let print =
           match index with
@@ -407,6 +433,33 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
        unlike printing types. *)
     List.map result ~f:(fun (loc, mode_info) ->
         (loc, Mode_enclosing.Mode_info.to_string ~verbosity mode_info))
+||||||| c76379cdae
+    let normalize ({ Location.loc_start; loc_end; _ }, text, _tail) =
+      (Lexing.split_pos loc_start, Lexing.split_pos loc_end, text)
+    in
+    (* We remove duplicates from the list. Duplicates can appear when the type
+       from the reconstructed identifier is the same as the one stored in the
+       typedtree *)
+    List.merge_cons
+      ~f:(fun a b ->
+        if compare (normalize a) (normalize b) = 0 then Some b else None)
+      all_results
+=======
+    List.mapi all_results ~f:(fun i (loc, text, tail) ->
+        let print =
+          match index with
+          | None -> true
+          | Some index -> index = i
+        in
+        let ret x = (loc, x, tail) in
+        match text with
+        | Type_enclosing.String str -> ret (`String str)
+        | type_info ->
+          if print then
+            let printed_type = Type_enclosing.print_type ~verbosity type_info in
+            ret (`String printed_type)
+          else ret (`Index i))
+>>>>>>> v5.6-504
   | Enclosing pos ->
     let typer = Mpipeline.typer_result pipeline in
     let structures = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in
@@ -444,6 +497,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
             end
           | _ -> None)
     in
+<<<<<<< HEAD
     begin match path with
     | None -> `Invalid_context
     | Some (env, path) -> (
@@ -461,7 +515,51 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       | `Not_found _ as s -> s
       | `Found { file; location; _ } -> `Found (Some file, location.loc_start)
       | `File_not_found { file = reason; _ } -> `File_not_found reason)
+||||||| c76379cdae
+    begin
+      match path with
+      | None -> `Invalid_context
+      | Some (env, path) -> (
+        Locate.log ~title:"debug" "found type: %s" (Path.name path);
+        let config =
+          Locate.
+            { mconfig = Mpipeline.final_config pipeline;
+              ml_or_mli = `MLI;
+              traverse_aliases = true
+            }
+        in
+        match
+          Locate.from_path ~config ~env ~local_defs ~namespace:Type path
+        with
+        | `Builtin (_, s) -> `Builtin s
+        | `Not_in_env _ as s -> s
+        | `Not_found _ as s -> s
+        | `Found { file; location; _ } -> `Found (Some file, location.loc_start)
+        | `File_not_found _ as s -> s)
+=======
+    begin
+      match path with
+      | None -> `Invalid_context
+      | Some (env, path) -> (
+        Locate.log ~title:"debug" "found type: %s" (Path.name path);
+        let config =
+          Locate.
+            { mconfig = Mpipeline.final_config pipeline;
+              ml_or_mli = `MLI;
+              traverse_aliases = true
+            }
+        in
+        match
+          Locate.from_path ~config ~env ~local_defs ~namespace:Type path
+        with
+        | `Builtin (_, s) -> `Builtin s
+        | `Not_in_env _ as s -> s
+        | `Not_found _ as s -> s
+        | `Found { file; location; _ } -> `Found (Some file, location.loc_start)
+        | `File_not_found { file = reason; _ } -> `File_not_found reason)
+>>>>>>> v5.6-504
     end
+<<<<<<< HEAD
   | Locate_types pos -> (
     let typer = Mpipeline.typer_result pipeline in
     let verbosity = verbosity pipeline in
@@ -532,6 +630,77 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     match result with
     | Some result -> Success result
     | None -> Invalid_context)
+||||||| c76379cdae
+=======
+  | Locate_types pos -> (
+    let typer = Mpipeline.typer_result pipeline in
+    let verbosity = verbosity pipeline in
+    let local_defs = Mtyper.get_typedtree typer in
+    let structures = Mbrowse.of_typedtree local_defs in
+    let pos = Mpipeline.get_lexing_pos pipeline pos in
+    let result =
+      let open Option.Infix in
+      let* env, node =
+        match Mbrowse.enclosing pos [ structures ] with
+        | path :: _ -> Some path
+        | [] -> None
+      in
+      let* overall_ty =
+        Locate.log ~title:"query_commands Locate_types" "inspecting node: %s"
+          (Browse_raw.string_of_node node);
+        match node with
+        | Expression { exp_type = ty; _ }
+        | Pattern { pat_type = ty; _ }
+        | Core_type { ctyp_type = ty; _ }
+        | Value_description { val_desc = { ctyp_type = ty; _ }; _ } -> Some ty
+        | _ -> None
+      in
+      let+ type_tree = Locate_types.create_type_tree overall_ty in
+      let type_to_string ~env ty =
+        Printtyp.wrap_printing_env env ~verbosity (fun () ->
+            Type_utils.print_type_with_decl ~verbosity env Format.str_formatter
+              ty);
+        Format.flush_str_formatter ()
+      in
+      let rec make_result ({ data; children } : Locate_types.Type_tree.t) :
+          Locate_types_result.(type_ref_payload Tree.t) =
+        let data : Locate_types_result.(type_ref_payload Tree.node_data) =
+          match data with
+          | Arrow -> Arrow
+          | Tuple -> Tuple
+          | Object -> Object
+          | Poly_variant -> Poly_variant
+          | Type_ref { path; ty } ->
+            Locate.log ~title:"debug" "found type: %s" (Path.name path);
+            let config : Locate.config =
+              { mconfig = Mpipeline.final_config pipeline;
+                ml_or_mli = `MLI;
+                traverse_aliases = true
+              }
+            in
+            let result =
+              match
+                Locate.from_path ~config ~env ~local_defs ~namespace:Type path
+              with
+              | `Builtin (_, s) -> `Builtin s
+              | `Not_in_env _ as s -> s
+              | `Not_found _ as s -> s
+              | `Found { file; location; _ } ->
+                `Found (Some file, location.loc_start)
+              | `File_not_found result -> `File_not_found result.file
+            in
+            let type_ = type_to_string ~env ty in
+            Type_ref { type_; result }
+        in
+        let children = List.map children ~f:make_result in
+        { data; children }
+      in
+      make_result type_tree
+    in
+    match result with
+    | Some result -> Success result
+    | None -> Invalid_context)
+>>>>>>> v5.6-504
   | Complete_prefix (prefix, pos, kinds, with_doc, with_types) ->
     let pipeline, typer = for_completion pipeline pos in
     let config = Mpipeline.final_config pipeline in
@@ -642,9 +811,33 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     Refactor_open.get_rewrites ~mode typer pos
   | Document (patho, pos) -> (
     let pos = Mpipeline.get_lexing_pos pipeline pos in
+<<<<<<< HEAD
     let from_document_override_attribute =
       pipeline |> Mpipeline.document_overrides |> Overrides.find ~cursor:pos
       |> Option.map ~f:Overrides.Override.payload
+||||||| c76379cdae
+    let comments = Mpipeline.reader_comments pipeline in
+    let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
+    let path =
+      match patho with
+      | Some p -> p
+      | None ->
+        let path = reconstruct_identifier pipeline pos None in
+        let path = Mreader_lexer.identifier_suffix path in
+        let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
+        String.concat ~sep:"." path
+=======
+    let comments = Mpipeline.reader_comments pipeline in
+    let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
+    let path =
+      match patho with
+      | Some p -> p
+      | None ->
+        let path = Misc_utils.reconstruct_identifier pipeline pos None in
+        let path = Mreader_lexer.identifier_suffix path in
+        let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
+        String.concat ~sep:"." path
+>>>>>>> v5.6-504
     in
     match from_document_override_attribute with
     | Some document_override -> `Found document_override
@@ -687,11 +880,38 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     | None -> `No_ppx)
   | Locate (patho, ml_or_mli, pos, context) -> (
     let pos = Mpipeline.get_lexing_pos pipeline pos in
+<<<<<<< HEAD
     let mconfig = Mpipeline.final_config pipeline in
     let from_locate_override_attribute =
       pipeline |> Mpipeline.locate_overrides |> Overrides.find ~cursor:pos
       |> Option.map ~f:Overrides.Override.payload
+||||||| c76379cdae
+    let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
+    let path =
+      match patho with
+      | Some p -> p
+      | None ->
+        let path = reconstruct_identifier pipeline pos None in
+        let path = Mreader_lexer.identifier_suffix path in
+        let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
+        let path = String.concat ~sep:"." path in
+        Locate.log ~title:"reconstructed identifier" "%s" path;
+        path
+=======
+    let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
+    let path =
+      match patho with
+      | Some p -> p
+      | None ->
+        let path = Misc_utils.reconstruct_identifier pipeline pos None in
+        let path = Mreader_lexer.identifier_suffix path in
+        let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
+        let path = String.concat ~sep:"." path in
+        Locate.log ~title:"reconstructed identifier" "%s" path;
+        path
+>>>>>>> v5.6-504
     in
+<<<<<<< HEAD
     match from_locate_override_attribute with
     | Some source_position ->
       let absolute_file_path =
@@ -701,7 +921,32 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
            [Sys.getcwd ()]. *)
         Misc.canonicalize_filename ?cwd:mconfig.merlin.source_root
           source_position.pos_fname
+||||||| c76379cdae
+    if path = "" then `Invalid_context
+    else
+      let config =
+        Locate.
+          { mconfig = Mpipeline.final_config pipeline;
+            ml_or_mli;
+            traverse_aliases = true
+          }
+=======
+    if path = "" then `Invalid_context
+    else
+      let ml_or_mli =
+        match ml_or_mli with
+        | `ML -> `Smart
+        | `MLI -> `MLI
       in
+      let config =
+        Locate.
+          { mconfig = Mpipeline.final_config pipeline;
+            ml_or_mli;
+            traverse_aliases = true
+          }
+>>>>>>> v5.6-504
+      in
+<<<<<<< HEAD
       let source_position =
         { source_position with pos_fname = absolute_file_path }
       in
@@ -756,6 +1001,41 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
             Locate.log ~title:"result" "not found";
             otherwise
         end)
+||||||| c76379cdae
+      begin
+        match Locate.from_string ~config ~env ~local_defs ~pos path with
+        | `Found { file; location; _ } ->
+          Locate.log ~title:"result" "found: %s" file;
+          `Found (Some file, location.loc_start)
+        | `Missing_labels_namespace ->
+          (* Can't happen because we haven't passed a namespace as input. *)
+          assert false
+        | `Builtin (_, s) ->
+          Locate.log ~title:"result" "found builtin %s" s;
+          `Builtin s
+        | (`Not_found _ | `At_origin | `Not_in_env _ | `File_not_found _) as
+          otherwise ->
+          Locate.log ~title:"result" "not found";
+          otherwise
+      end
+=======
+      begin
+        match Locate.from_string ~config ~env ~local_defs ~pos path with
+        | `Found { file; location; _ } ->
+          Locate.log ~title:"result" "found: %s" file;
+          `Found (Some file, location.loc_start)
+        | `Missing_labels_namespace ->
+          (* Can't happen because we haven't passed a namespace as input. *)
+          assert false
+        | `Builtin (_, s) ->
+          Locate.log ~title:"result" "found builtin %s" s;
+          `Builtin s
+        | `File_not_found { file = reason; _ } -> `File_not_found reason
+        | (`Not_found _ | `At_origin | `Not_in_env _) as otherwise ->
+          Locate.log ~title:"result" "not found";
+          otherwise
+      end
+>>>>>>> v5.6-504
   | Jump (target, pos) ->
     let typer = Mpipeline.typer_result pipeline in
     let typedtree = Mtyper.get_typedtree typer in
@@ -842,6 +1122,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     let typedtree = Mtyper.get_typedtree typer in
     let pos = Mpipeline.get_lexing_pos pipeline pos in
     let structures = Mbrowse.enclosing pos [ Mbrowse.of_typedtree typedtree ] in
+<<<<<<< HEAD
     begin match structures with
     | ( _,
         (Browse_raw.Module_expr { mod_desc = Tmod_typed_hole; _ } as
@@ -858,6 +1139,37 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       (loc, Construct.node ~config ~keywords ?depth ~values_scope node)
     | _ :: _ -> raise Construct.Not_a_hole
     | [] -> raise No_nodes
+||||||| c76379cdae
+    begin
+      match structures with
+      | (_, (Browse_raw.Module_expr { mod_desc = Tmod_hole; _ } as node_for_loc))
+        :: (_, node)
+        :: _parents ->
+        let loc = Mbrowse.node_loc node_for_loc in
+        (loc, Construct.node ~config ~keywords ?depth ~values_scope node)
+      | (_, (Browse_raw.Expression { exp_desc = Texp_hole; _ } as node))
+        :: _parents ->
+        let loc = Mbrowse.node_loc node in
+        (loc, Construct.node ~config ~keywords ?depth ~values_scope node)
+      | _ :: _ -> raise Construct.Not_a_hole
+      | [] -> raise No_nodes
+=======
+    begin
+      match structures with
+      | ( _,
+          (Browse_raw.Module_expr { mod_desc = Tmod_typed_hole; _ } as
+           node_for_loc) )
+        :: (_, node)
+        :: _parents ->
+        let loc = Mbrowse.node_loc node_for_loc in
+        (loc, Construct.node ~config ~keywords ?depth ~values_scope node)
+      | (_, (Browse_raw.Expression { exp_desc = Texp_typed_hole; _ } as node))
+        :: _parents ->
+        let loc = Mbrowse.node_loc node in
+        (loc, Construct.node ~config ~keywords ?depth ~values_scope node)
+      | _ :: _ -> raise Construct.Not_a_hole
+      | [] -> raise No_nodes
+>>>>>>> v5.6-504
     end
   | Outline { include_types } ->
     let typer = Mpipeline.typer_result pipeline in
@@ -1028,16 +1340,36 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     in
     (occurrences, status)
   | Inlay_hints
-      (start, stop, hint_let_binding, hint_pattern_binding, avoid_ghost_location)
-    ->
+      ( start,
+        stop,
+        hint_let_binding,
+        hint_pattern_binding,
+        hint_function_params,
+        avoid_ghost_location ) ->
     let start = Mpipeline.get_lexing_pos pipeline start
     and stop = Mpipeline.get_lexing_pos pipeline stop in
     let typer_result = Mpipeline.typer_result pipeline in
+<<<<<<< HEAD
     begin match Mtyper.get_typedtree typer_result with
     | `Interface _ -> []
     | `Implementation structure ->
       Inlay_hints.of_structure ~hint_let_binding ~hint_pattern_binding
         ~avoid_ghost_location ~start ~stop structure
+||||||| c76379cdae
+    begin
+      match Mtyper.get_typedtree typer_result with
+      | `Interface _ -> []
+      | `Implementation structure ->
+        Inlay_hints.of_structure ~hint_let_binding ~hint_pattern_binding
+          ~avoid_ghost_location ~start ~stop structure
+=======
+    begin
+      match Mtyper.get_typedtree typer_result with
+      | `Interface _ -> []
+      | `Implementation structure ->
+        Inlay_hints.of_structure ~hint_let_binding ~hint_pattern_binding
+          ~hint_function_params ~avoid_ghost_location ~start ~stop structure
+>>>>>>> v5.6-504
     end
   | Signature_help { position; _ } -> (
     (* Todo: additionnal contextual information could help us provide better

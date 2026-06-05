@@ -24,7 +24,13 @@ provide better result.
           "line": 4,
           "col": 15
         },
+<<<<<<< HEAD
         "type": "type 'k t : any = 'k t",
+||||||| c76379cdae
+        "type": "type 'a t = 'b",
+=======
+        "type": "'a t",
+>>>>>>> v5.6-504
         "tail": "no"
       },
       {
