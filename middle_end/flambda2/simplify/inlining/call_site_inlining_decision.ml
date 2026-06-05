@@ -126,7 +126,26 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   let cost_metrics_of_lifted_constants =
     if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
     then
+      (* If we are not at toplevel, there might still be lifted constants to be
+         placed in the accumulator whose size must be taken into account for
+         speculative inlining. *)
       let lifted_constants = UA.lifted_constants uacc in
+      (* CR-someday bclement: Ideally we would simply call
+         [place_lifted_constants] in [after_rebuild] above so that we can share
+         the code with the non-speculative inlining code path; however, that
+         function expects to be called at toplevel and there could be unintended
+         consequences -- notably regarding the validity of the used value slots.
+
+         At the time of writing, this means that we incorrectly:
+
+         - Ignore the size of the symbol projections created during speculative
+         inlining;
+
+         - Count the size of unused value slots of lifted sets of closures
+         created during speculative inlining (but again, it is not clear that it
+         is always possible to compute a correct set of "used value slots" at
+         the time we are doing speculative inlining, because some value slots
+         could be used later in the compilation unit). *)
       Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
         ~f:(fun cost_metrics lifted_constant ->
           List.fold_left
