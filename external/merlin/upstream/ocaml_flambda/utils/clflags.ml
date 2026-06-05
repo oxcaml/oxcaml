@@ -79,6 +79,7 @@ and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
+and print_variance = ref false          (* -i-variance *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_full = ref false              (* For full DWARF support *)
@@ -167,8 +168,9 @@ and make_package = ref false            (* -pack *)
 and for_package = ref (None: string option) (* -for-pack *)
 and error_size = ref 256                (* -error-size *)
 and float_const_prop = ref true         (* -no-float-const-prop *)
-and transparent_modules = ref false     (* -trans-mod *)
-let unique_ids = ref true               (* -d(no-)unique-ds *)
+and no_alias_deps = ref false           (* -no-alias-deps *)
+let unique_ids = ref true               (* -d(no-)unique-ids *)
+let canonical_ids = ref false           (* -d(no-)canonical-ids *)
 let locations = ref true                (* -d(no-)locations *)
 let parameters = ref ([] : string list) (* -parameter *)
 let as_parameter = ref false            (* -as-parameter *)
@@ -180,6 +182,7 @@ and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
 and dump_tlambda = ref false            (* -dtlambda *)
 and dump_slambda = ref false            (* -dslambda *)
+and dump_matchcomp = ref false          (* -dmatchcomp *)
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)
 and dump_blambda = ref false             (* -dblambda *)
@@ -194,6 +197,8 @@ and dump_jsir = ref false               (* -djsir *)
 and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
+let keyword_edition: string option ref = ref None
+
 let keep_asm_file = ref false           (* -S *)
 let optimize_for_speed = ref true       (* -compact *)
 and opaque = ref false                  (* -opaque *)
@@ -204,7 +209,7 @@ let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
-let ikinds = ref false                  (* -ikinds *)
+let ikinds = ref true                   (* -no-ikinds *)
 let ikinds_debug = ref false            (* -ikinds-debug *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
@@ -233,6 +238,9 @@ let clambda_checks = ref false          (* -clambda-checks *)
 let cmm_invariants =
   ref Config.with_cmm_invariants        (* -dcmm-invariants *)
 
+let parsetree_ghost_loc_invariant = ref false
+  (* -dparsetree-ghost-loc-invariant *)
+
 let flambda_invariant_checks =
   let v = if Config.with_flambda_invariants then Light_checks else No_checks in
   ref v (* -flambda-(no-)invariants *)
@@ -253,8 +261,8 @@ let shared = ref false (* -shared *)
 let dlcode = ref true (* not -nodynlink *)
 
 let pic_code = ref (match Config.architecture with (* -fPIC *)
-                     | "amd64" -> true
-                     | _       -> false)
+                     | "amd64" | "s390x" -> true
+                     | _                 -> false)
 
 let runtime_variant = ref ""
 let ocamlrunparam = ref ""
@@ -877,6 +885,164 @@ module Register_allocator = struct
   let format ppf regalloc =
     Format.fprintf ppf "%s" (to_string regalloc)
 end
+
+module Dump_option = struct
+  type t =
+    | Source
+    | Parsetree
+    | Typedtree
+    | Shape
+    | Match_comp
+    | Raw_lambda
+    | Lambda
+    | Instr
+    | Raw_clambda
+    | Clambda
+    | Raw_flambda
+    | Flambda
+    | Cmm
+    | CSE
+    | Linear
+
+  let compare (op1 : t) op2 =
+    Stdlib.compare op1 op2
+
+  let to_string = function
+    | Source -> "source"
+    | Parsetree -> "parsetree"
+    | Typedtree -> "typedtree"
+    | Shape -> "shape"
+    | Match_comp -> "matchcomp"
+    | Raw_lambda -> "rawlambda"
+    | Lambda -> "lambda"
+    | Instr -> "instr"
+    | Raw_clambda -> "rawclambda"
+    | Clambda -> "clambda"
+    | Raw_flambda -> "rawflambda"
+    | Flambda -> "flambda"
+    | Cmm -> "cmm"
+    | CSE -> "cse"
+    | Linear -> "linear"
+
+  let of_string = function
+    | "source" -> Some Source
+    | "parsetree" -> Some Parsetree
+    | "typedtree" -> Some Typedtree
+    | "shape" -> Some Shape
+    | "matchcomp" -> Some Match_comp
+    | "rawlambda" -> Some Raw_lambda
+    | "lambda" -> Some Lambda
+    | "instr" -> Some Instr
+    | "rawclambda" -> Some Raw_clambda
+    | "clambda" -> Some Clambda
+    | "rawflambda" -> Some Raw_flambda
+    | "flambda" -> Some Flambda
+    | "cmm" -> Some Cmm
+    | "cse" -> Some CSE
+    | "linear" -> Some Linear
+    | _ -> None
+
+  let flag = function
+    | Source -> dump_source
+    | Parsetree -> dump_parsetree
+    | Typedtree -> dump_typedtree
+    | Shape -> dump_shape
+    | Match_comp -> dump_matchcomp
+    | Raw_lambda -> dump_rawlambda
+    | Lambda -> dump_lambda
+    | Instr -> dump_instr
+    | Raw_clambda -> dump_rawclambda
+    | Clambda -> dump_clambda
+    | Raw_flambda -> dump_rawflambda
+    | Flambda -> dump_flambda
+    | Cmm -> dump_cmm
+    | CSE -> dump_cse
+    | Linear -> dump_linear
+
+  type middle_end =
+    | Flambda
+    | Any
+    | Closure
+
+  type class_ =
+    | Frontend
+    | Bytecode
+    | Middle of middle_end
+    | Backend
+
+  let _ =
+    (* no Closure-specific dump option for now, silence a warning *)
+    Closure
+
+  let classify : t -> class_ = function
+    | Source
+    | Parsetree
+    | Typedtree
+    | Shape
+    | Match_comp
+    | Raw_lambda
+    | Lambda
+      -> Frontend
+    | Instr
+      -> Bytecode
+    | Raw_clambda
+    | Clambda
+      -> Middle Any
+    | Raw_flambda
+    | Flambda
+      -> Middle Flambda
+    | Cmm
+    | CSE
+    | Linear
+      -> Backend
+
+  let available (option : t) : (unit, string) result =
+    let pass = Result.ok () in
+    let ( let* ) = Result.bind in
+    let fail descr =
+      Error (
+        Printf.sprintf
+          "this compiler does not support %s-specific options"
+          descr
+      ) in
+    let guard descr cond =
+      if cond then pass
+      else fail descr in
+    let check_bytecode = guard "bytecode" (not !native_code) in
+    let check_native = guard "native" !native_code in
+    let check_middle_end = function
+      | Flambda -> guard "flambda" Config.flambda
+      | Closure -> guard "closure" (not Config.flambda)
+      | Any -> pass
+    in
+    match classify option with
+    | Frontend ->
+        pass
+    | Bytecode ->
+        check_bytecode
+    | Middle middle_end ->
+        let* () = check_native in
+        check_middle_end middle_end
+    | Backend ->
+        check_native
+end
+
+let parse_keyword_edition s =
+  let parse_version s =
+  let bad_version () =
+    raise (Arg.Bad "Ill-formed version in keywords flag,\n\
+                    the supported format is <major>.<minor>, for example 5.2 .")
+  in
+  if s = "" then None else match String.split_on_char '.' s with
+  | [] | [_] | _ :: _ :: _ :: _ -> bad_version ()
+  | [major;minor] -> match int_of_string_opt major, int_of_string_opt minor with
+    | Some major, Some minor -> Some (major,minor)
+    | _ -> bad_version ()
+  in
+  match String.split_on_char '+' s with
+  | [] -> None, []
+  | [s] -> parse_version s, []
+  | v :: rest -> parse_version v, rest
 
 module String = Misc.Stdlib.String
 

@@ -237,6 +237,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           a, Branch (Meet, ahint1, ahint2))
   end
 
+  (* All keys in a particular [VarMap] should have the same destination object,
+     but the key type does not encode that invariant.  The comparator orders by
+     variable id first, only checking object equality when equal ids force it to
+     compare morphisms. *)
   type key = Key : 'b C.obj * int * ('a, 'b, 'd) C.morph -> key
 
   module VarMap = Map.Make (struct
@@ -247,10 +251,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if c <> 0
       then c
       else
-        match C.compare_obj obj1 obj2 with
-        | Less_than -> 1
-        | Greater_than -> -1
-        | Equal -> Misc.comparison_result (C.compare_morph obj1 m1 m2)
+        match C.equal_obj obj1 obj2 with
+        | Misc.Is_eq -> C.compare_morph obj1 m1 m2
+        | Misc.Is_not_eq ->
+          Misc.fatal_error
+            "Solver.VarMap.compare: inconsistent destination objects"
   end)
 
   (** Map the function to the list, and returns the first [Error] found; Returns
@@ -760,12 +765,16 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        (Amorphvar (v1, f1, _f1_hint) as mv1) ->
     (* To align l0/l1, r0/r1; The existing disallow_left/right] is for [mode],
        not [morphvar]. *)
-    Morphvar.(
-      disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
-    ||
-    match C.compare_morph dst f0 f1 with
-    | Less_than | Greater_than -> false
-    | Equal -> v0 == v1
+    if v0.id <> v1.id
+    then false
+    else if
+      Morphvar.(
+        disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
+    then true
+    else
+      match C.equal_morph dst f0 f1 with
+      | Misc.Is_not_eq -> false
+      | Misc.Is_eq -> true
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =

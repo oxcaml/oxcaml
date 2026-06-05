@@ -15,7 +15,6 @@ type _ t =
   | Module_strengthening : unit t
   | Layouts : maturity t
   | SIMD : maturity t
-  | Labeled_tuples : unit t
   | Small_numbers : maturity t
   | Instances : unit t
   | Let_mutable : unit t
@@ -34,7 +33,6 @@ let to_string : type a. a t -> string = function
   | Module_strengthening -> "module_strengthening"
   | Layouts -> "layouts"
   | SIMD -> "simd"
-  | Labeled_tuples -> "labeled_tuples"
   | Small_numbers -> "small_numbers"
   | Instances -> "instances"
   | Let_mutable -> "let_mutable"
