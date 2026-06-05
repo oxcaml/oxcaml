@@ -2814,6 +2814,7 @@ let type_for_annotation ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
+        | Tmod (ty, _) -> (go ty).ctyp_desc
         | Tobject (fields, _) ->
           let Out_type.{ fields; open_row } =
             Out_type.tree_of_typobject_repr fields

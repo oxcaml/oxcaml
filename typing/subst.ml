@@ -751,6 +751,8 @@ let rec typexp copy_scope s ty =
           let ret = typexp copy_scope s ret in
           let comm = copy_commu comm in
           Tarrow ((label, marg, mret), arg, ret, comm)
+      | Tmod (ty, mod_bounds) ->
+          Tmod (typexp copy_scope s ty, mod_bounds)
       | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;

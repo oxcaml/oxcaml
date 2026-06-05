@@ -351,6 +351,7 @@ let fold_type_expr f init ty =
   | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tunboxed_tuple l    -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tconstr (_, l, _)   -> List.fold_left f init l
+  | Tmod (ty, _)        -> f init ty
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
       List.fold_left f result p
@@ -594,6 +595,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tunboxed_tuple l    ->
     Tunboxed_tuple (List.map (fun (label, t) -> label, f t) l)
   | Tconstr (p, l, _)   -> Tconstr (p, List.map f l, ref Mnil)
+  | Tmod (ty, mod_bounds) -> Tmod (f ty, mod_bounds)
   | Tobject(ty, {contents = Some (p, tl)})
                         -> Tobject (f ty, ref (Some(p, List.map f tl)))
   | Tobject (ty, _)     -> Tobject (f ty, ref None)
@@ -1035,6 +1037,34 @@ module Jkind0 = struct
     let max = create Crossing.max ~externality:Externality.max
 
     let[@inline] is_max m = m = max
+
+    let get_max_axes t =
+      let[@inline] add_if b ax axis_set =
+        if b then Jkind_axis.Axis_set.add axis_set ax else axis_set
+      in
+      let[@inline] add_crossing_if ax axis_set =
+        if
+          Crossing.Per_axis.(
+            (le [@inlined hint]) ax ((max [@inlined hint]) ax)
+              ((Crossing.proj [@inlined hint]) ax (crossing t)))
+        then Jkind_axis.Axis_set.add axis_set (Jkind_axis.Axis.Modal ax)
+        else axis_set
+      in
+      let open Crossing.Axis in
+      Jkind_axis.Axis_set.empty
+      |> add_crossing_if (Comonadic Areality)
+      |> add_crossing_if (Comonadic Linearity)
+      |> add_crossing_if (Monadic Uniqueness)
+      |> add_crossing_if (Comonadic Portability)
+      |> add_crossing_if (Monadic Contention)
+      |> add_crossing_if (Comonadic Forkable)
+      |> add_crossing_if (Comonadic Yielding)
+      |> add_crossing_if (Comonadic Statefulness)
+      |> add_crossing_if (Monadic Visibility)
+      |> add_crossing_if (Monadic Staticity)
+      |> add_if
+           (Externality.le Externality.max (externality t))
+           (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
 
     let for_arrow =
       let crossing =
@@ -2394,12 +2424,17 @@ module Jkind0 = struct
             acc
           else
             match get_desc res_arg with
-            | Tvar _ ->
+            | Tvar { jkind; _ } ->
               (* Only add types which are direct variables. Note that types
                  which aren't variables might themselves /contain/ variables; if
                  those variables don't show up on another parameter, they're
                  treated as orphaned. See example K2 from Note [With-bounds for
                  GADTs]. *)
+              let projected_param =
+                if Mod_bounds.is_max jkind.jkind.mod_bounds
+                then projected_param
+                else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
+              in
               res_arg :: domain, projected_param :: range,
               TypeSet.add res_arg seen
             | _ -> acc)

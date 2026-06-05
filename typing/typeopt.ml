@@ -194,7 +194,7 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~classify_product env ty layout : _ classification =
+let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _sa) -> begin
@@ -210,6 +210,7 @@ let classify ~classify_product env ty layout : _ classification =
   else match get_desc ty with
   | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
+  | Tmod (ty, _) -> classify ~classify_product env ty layout
   | Tconstr (p, _args, _abbrev) ->
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
@@ -839,6 +840,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tmod (ty, _) -> [| Some ty |]
         | Tconstr(p, args, _) ->
           begin match Env.find_type p env with
           | exception Not_found -> unknown ()

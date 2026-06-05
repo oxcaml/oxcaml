@@ -147,17 +147,10 @@ type 'a t : value mod contended portable =
   | Shared : ('b : value mod contended portable). 'b  -> 'b t
   | Unshared : (unit -> 'c) @@ portable               -> 'c t
 ;;
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-3, characters 0-61:
-1 | type 'a t : value mod contended portable =
-2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
-3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value non_float mod portable immutable with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of
-           value mod portable contended
-         because of the annotation on the declaration of the type t.
+type 'a t =
+    Shared : ('b : value mod portable contended). 'b -> 'b t
+  | Unshared : (unit -> 'c) @@ portable -> 'c t
 |}]
 
 (***********************************************************************)

@@ -1017,8 +1017,8 @@ let generalize ty =
 
 (*
    Build a copy of a type in which nodes reachable through a path composed
-   only of Tarrow, Tpoly, Ttuple, Trepr, Tpackage and Tconstr, and whose level
-   was no lower than [!current_level], are at [generic_level].
+   only of Tarrow, Tmod, Tpoly, Ttuple, Trepr, Tpackage and Tconstr, and whose
+   level was no lower than [!current_level], are at [generic_level].
    This is different from [with_local_level_gen], which generalizes in place,
    and only nodes with a level higher than [!current_level].
    This is used for typing classes, to indicate which types have been
@@ -1040,6 +1040,7 @@ let rec copy_spine copy_scope ty =
   | Tsplice _
   | Tquote_eval _
   | Tof_kind _ -> ty
+  | Tmod _
   | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
     | Tconstr _ ) as desc ->
       let level = get_level ty in
@@ -1065,6 +1066,8 @@ let rec copy_spine copy_scope ty =
           Tpackage {pack_path; pack_cstrs = fl}
       | Tconstr (path, tyl, _) ->
           Tconstr (path, List.map copy_rec tyl, ref Mnil)
+      | Tmod (ty, mod_bounds) ->
+          Tmod (copy_rec ty, mod_bounds)
       | _ -> assert false
       in
       Transient_expr.set_stub_desc t desc';
@@ -2428,6 +2431,8 @@ let rec try_reduce_once env t =
     | Tconstr (p, tl, a) ->
       path_must_be_toplevel env p;
       Tconstr (p, List.map new_quote_eval_ty tl, a)
+    | Tmod (ty, mod_bounds) ->
+      Tmod (new_quote_eval_ty ty, mod_bounds)
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
       (* Attempt to reduce the field list immediately:
@@ -2609,6 +2614,7 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tmod (ty, _) -> extract_concrete_typedecl env ty
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
@@ -2749,6 +2755,8 @@ let unbox_once env ty =
       { ty = instance_poly_for_jkind univars ty
       ; modality = Mode.Modality.Const.id
       ; or_null = None }
+  | Tmod (ty, _) ->
+    Stepped { ty; modality = Mode.Modality.Const.id; or_null = None }
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -2763,6 +2771,7 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
+  | Tmod (ty, _) -> [ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
@@ -2979,6 +2988,20 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
        a [Missing_cmi]. Internal ticket 5109. *)
     | Cannot_subst | Not_found -> Jkind.Builtin.any ~why:(Missing_cmi p)
     end
+  | Tmod (ty, mod_bounds) ->
+    let jkind =
+      estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty
+    in
+    if ignore_mod_bounds
+    then jkind
+    else
+      { jkind with
+        jkind =
+          { jkind.jkind with
+            mod_bounds =
+              Jkind0.Mod_bounds.meet jkind.jkind.mod_bounds mod_bounds
+          }
+      }
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
    (* CR quoted-kinds jbachurski: These quote/splice the jkind. *)
@@ -7430,6 +7453,10 @@ let rec build_subtype env (visited : transient_expr list)
   | Tunboxed_tuple labeled_tlist ->
       build_subtype_tuple env visited loops posi level t labeled_tlist
         (fun x -> Tunboxed_tuple x)
+  | Tmod (ty, mod_bounds) ->
+      let ty', c = build_subtype env visited loops posi level ty in
+      if c > Unchanged then (newty (Tmod (ty', mod_bounds)), c)
+      else (t, Unchanged)
   | Tconstr(p, tl, abbrev)
     when level > 0 && generic_abbrev env p && safe_abbrev env t
     && not (has_constr_row' env t) ->
