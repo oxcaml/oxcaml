@@ -91,19 +91,19 @@ let _ : <[<[<['a]>]>]> -> <[<[<['a]>]>]> = fun (() as x) -> x
 let _ : <[ $('a) -> $('a) ]> expr  =
   <[fun (() as x) -> x]>
 [%%expect {|
-- : <[unit -> unit]> expr = <[fun () as x -> x]>
+- : <[unit -> unit]> expr = <[fun (() as x) -> x]>
 |}]
 (* $($('a)) ~ unit *)
 let _ : <[ <[ $($('a)) -> $($('a)) ]> expr ]> expr =
   <[<[fun (() as x) -> x]>]>
 [%%expect {|
-- : <[<[unit -> unit]> expr]> expr = <[<[fun () as x -> x]>]>
+- : <[<[unit -> unit]> expr]> expr = <[<[fun (() as x) -> x]>]>
 |}]
 (* $($($('a))) ~ unit *)
 let _ : <[ <[ <[ $($($('a))) -> $($($('a))) ]> expr ]> expr ]> expr =
   <[<[<[fun (() as x) -> x]>]>]>
 [%%expect {|
-- : <[<[<[unit -> unit]> expr]> expr]> expr = <[<[<[fun () as x -> x]>]>]>
+- : <[<[<[unit -> unit]> expr]> expr]> expr = <[<[<[fun (() as x) -> x]>]>]>
 |}]
 
 
