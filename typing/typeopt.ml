@@ -580,6 +580,48 @@ let add_nullability_from_ty env ty raw_kind =
 let fallback_if_missing_cmi ~default f =
   try f () with Missing_cmi_fallback -> default
 
+module Value_kind_cache = struct
+  type result = int * value_kind
+
+  let cache : (Types.type_declaration * result) Path.Tbl.t option ref =
+    ref None
+
+  let with_cache f =
+    let old = !cache in
+    cache := Some (Path.Tbl.create 20);
+    Fun.protect f ~finally:(fun () -> cache := old)
+
+  let add ~env path decl res =
+    if not (Env.has_local_constraints env) then begin
+      match !cache with
+      | None -> ()
+      | Some tbl -> Path.Tbl.replace tbl path (decl, res)
+    end
+
+  let find_opt ~env path =
+    match !cache with
+    | None -> None
+    | Some _ when Env.has_local_constraints env -> None
+    | Some tbl ->
+       match Path.Tbl.find tbl path with
+       | exception Not_found -> None
+       | (decl, res) ->
+          (* Some paths can't have different bindings in different
+             environments, because they refer to global modules *)
+          let rec unique_path : Path.t -> bool = function
+            | Pident id -> Ident.is_global_or_predef id
+            | Pdot (p, _) | Pextra_ty (p, _) -> unique_path p
+            | Papply _ -> false
+          in
+          if unique_path path then
+            Some res
+          else
+            match Env.find_type path env with
+            | exception Not_found -> None
+            | decl' ->
+               if decl == decl' then Some res else None
+end
+
 (* CR layouts v2.5: It will be possible for subcomponents of types to be
    non-values for non-error reasons (e.g., [type t = { x : float# }
    [@@unboxed]).  And in later releases, this will also happen in normal
@@ -705,14 +747,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
          connection and will continue processing with e.g. ['a : value]
          instead of [string] when looking at a [string list]. This should
          probably just call a [type_jkind] function. Internal ticket 5101. *)
-      let decl =
-        try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
-      in
-      if cannot_proceed () then
-        num_nodes_visited,
-        add_nullability_from_ty env scty
-          (value_kind_of_scannable_jkind env decl.type_jkind)
-      else
+      let value_kind_decl decl =
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
            in the case of @@unboxed variant and records, due to the precondition
@@ -752,6 +787,22 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           add_nullability_from_ty env scty
             (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
+      in
+      match Value_kind_cache.find_opt ~env p with
+      | Some (num_nodes, k) ->
+         num_nodes_visited + num_nodes, k
+      | None ->
+         let decl =
+           try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
+         in
+         if cannot_proceed () then
+           num_nodes_visited,
+           add_nullability_from_ty env scty
+             (value_kind_of_scannable_jkind env decl.type_jkind)
+         else
+           let visited', k = value_kind_decl decl in
+           Value_kind_cache.add ~env p decl (visited' - num_nodes_visited, k);
+           visited', k
     end
   | Ttuple labeled_fields ->
     if cannot_proceed () then
@@ -1117,6 +1168,8 @@ let value_kind env loc ty =
   with
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
+
+let with_cache = Value_kind_cache.with_cache
 
 let transl_mixed_block_element env loc ty mbe =
   try
