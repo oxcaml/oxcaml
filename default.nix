@@ -114,6 +114,10 @@ let
           menhirLib
           menhirSdk
         ];
+        # The nixpkgs patch targets `base/Installation.ml`, which only exists in
+        # newer menhir releases; menhir 20231231 has no such file. The postInstall
+        # symlink below provides menhirLib's location instead, so drop the patch.
+        patches = [ ];
         postInstall = ''
           ln -s ${menhirLib}/lib/ocaml/*/site-lib/menhirLib $out/lib/
         '';
@@ -213,6 +217,13 @@ stdenv.mkDerivation {
 
   OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
+
+  # GCC 15 (nixpkgs 26.05) defaults to C23, where an empty parameter list `()`
+  # means `(void)`. OCaml's runtime still uses K&R-style declarations such as
+  # `extern value caml_get_public_method();`, which then conflict with their real
+  # prototypes. configure assumes the compiler defaults to gnu11/gnu17, so pin
+  # that standard explicitly. (The core build is C-only, so this is safe.)
+  NIX_CFLAGS_COMPILE = "-std=gnu17";
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
