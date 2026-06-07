@@ -18,8 +18,14 @@
 let
   inherit (pkgs) lib fetchpatch;
 
-  # Select stdenv based on whether asan is enabled
-  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  # Select stdenv based on whether asan is enabled.
+  #
+  # ASan uses clang. OxCaml's hand-rolled ASan codegen targets an older
+  # compiler-rt (its CI uses LLVM 14); clang 21 (the nixpkgs 26.05 default)
+  # produces ASan-instrumented OCaml binaries that segfault on startup. Pin to
+  # clang 19, the version the previously-used nixpkgs provided and which oxcaml's
+  # ASan support is known to work with.
+  stdenv = if addressSanitizer then pkgs.llvmPackages_19.stdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -59,6 +65,11 @@ let
       minor_version = "4";
       patch_version = "0";
       sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
+      # Under ASan the boot compiler is built with clang, whose handling of the
+      # non-ASCII object filenames in OCaml's `tests/unicode` testsuite fails the
+      # build. The boot compiler is only a build tool here, so skip its test run
+      # in that configuration (the gcc/non-asan path still runs it).
+      doCheck = !addressSanitizer;
     }) {
       inherit stdenv;
     }).overrideAttrs {
