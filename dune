@@ -39,8 +39,6 @@
     -warn-error
     +A))))
 
-(dirs (:standard \ runtime4 debugger4))
-
 (copy_files# utils/*.ml{,i})
 
 (copy_files# parsing/*.ml{,i})

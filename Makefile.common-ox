@@ -185,11 +185,7 @@ dune_config_targets = \
   duneconf/main.ws \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
-  dune-project \
-  $(ocamldir)/otherlibs/dune
-
-$(ocamldir)/otherlibs/dune:
-	echo "(dirs (:standard \ systhreads4))" > $@
+  dune-project
 
 _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
