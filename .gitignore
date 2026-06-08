@@ -316,15 +316,14 @@ ocaml/primitives.new
 /runtime4/domain_state32.inc
 /runtime4/domain_state64.inc
 
+/runtime/api-testing
 /runtime/domain_state.inc
-/runtime/caml/jumptbl.h
 /runtime/caml/m.h
 /runtime/caml/s.h
 /runtime/primitives
 /runtime/primitives*.new
 /runtime/prims.c
 /runtime/caml/exec.h
-/runtime/caml/opnames.h
 /runtime/caml/version.h
 /runtime/ocamlrun
 /runtime/ocamlrund
@@ -386,8 +385,6 @@ ocaml/primitives.new
 /tools/cmpbyt.opt
 /tools/stripdebug
 /tools/stripdebug.opt
-/tools/make_opcodes
-/tools/make_opcodes.ml
 /tools/ocamltex
 /tools/eventlog_metadata
 /tools/debug_printers

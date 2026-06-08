@@ -16,7 +16,7 @@
 #ifndef CAML_SOCKETADDR_H
 #define CAML_SOCKETADDR_H
 
-#include "caml/misc.h"
+#include <caml/mlvalues.h>
 
 #ifdef _WIN32
 

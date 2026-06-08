@@ -16,9 +16,10 @@
 #ifndef CAML_STARTUP_H
 #define CAML_STARTUP_H
 
+#include "mlvalues.h"
+
 #ifdef CAML_INTERNALS
 
-#include "mlvalues.h"
 #include "exec.h"
 #include "startup_aux.h"
 
