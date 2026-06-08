@@ -1718,9 +1718,9 @@ let rec exp_is_nominal exp =
   | _ when exp.exp_attributes <> [] -> false
   | Texp_ident _ | Texp_instvar _ | Texp_constant _
   | Texp_variant (_, None)
-  | Texp_construct (_, _, [], _) ->
+  | Texp_construct (_, _, _, [], _) ->
       true
-  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
+  | Texp_field { record = parent } | Texp_send (parent, _, _) ->
       exp_is_nominal parent
   | _ -> false
 
