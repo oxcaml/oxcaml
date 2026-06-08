@@ -166,7 +166,7 @@ endif
 endif # ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
 
 # List of other libraries
-ALL_OTHERLIBS = dynlink str systhreads$(RUNTIME_SUFFIX) unix \
+ALL_OTHERLIBS = dynlink str systhreads unix \
   runtime_events eval
 
 # Flags to pass to the C preprocessor when preprocessing assembly files
