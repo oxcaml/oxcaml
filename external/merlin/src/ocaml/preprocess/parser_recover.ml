@@ -32,7 +32,6 @@ module Default = struct
     | MenhirInterpreter.T MenhirInterpreter.T_WHEN -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_VIRTUAL -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_VAL -> ()
-    | MenhirInterpreter.T MenhirInterpreter.T_UNIQUE -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_UNDERSCORE -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_UIDENT -> "_"
     | MenhirInterpreter.T MenhirInterpreter.T_TYPE -> ()
@@ -69,7 +68,6 @@ module Default = struct
     | MenhirInterpreter.T MenhirInterpreter.T_OR -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_OPTLABEL -> "_"
     | MenhirInterpreter.T MenhirInterpreter.T_OPEN -> ()
-    | MenhirInterpreter.T MenhirInterpreter.T_ONCE -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_OF -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_OBJECT -> ()
     | MenhirInterpreter.T MenhirInterpreter.T_NONREC -> ()
@@ -492,7 +490,6 @@ let can_pop (type a) : a terminal -> bool = function
   | T_WHEN -> true
   | T_VIRTUAL -> true
   | T_VAL -> true
-  | T_UNIQUE -> true
   | T_UNDERSCORE -> true
   | T_TYPE -> true
   | T_TRY -> true
@@ -523,7 +520,6 @@ let can_pop (type a) : a terminal -> bool = function
   | T_OVERWRITE -> true
   | T_OR -> true
   | T_OPEN -> true
-  | T_ONCE -> true
   | T_OF -> true
   | T_OBJECT -> true
   | T_NONREC -> true

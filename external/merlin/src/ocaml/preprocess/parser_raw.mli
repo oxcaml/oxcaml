@@ -7,7 +7,6 @@ type token =
   | WHEN
   | VIRTUAL
   | VAL
-  | UNIQUE
   | UNDERSCORE
   | UIDENT of (string)
   | TYPE
@@ -44,7 +43,6 @@ type token =
   | OR
   | OPTLABEL of (string)
   | OPEN
-  | ONCE
   | OF
   | OBJECT
   | NONREC
@@ -215,7 +213,6 @@ module MenhirInterpreter : sig
     | T_WHEN : unit terminal
     | T_VIRTUAL : unit terminal
     | T_VAL : unit terminal
-    | T_UNIQUE : unit terminal
     | T_UNDERSCORE : unit terminal
     | T_UIDENT : (string) terminal
     | T_TYPE : unit terminal
@@ -252,7 +249,6 @@ module MenhirInterpreter : sig
     | T_OR : unit terminal
     | T_OPTLABEL : (string) terminal
     | T_OPEN : unit terminal
-    | T_ONCE : unit terminal
     | T_OF : unit terminal
     | T_OBJECT : unit terminal
     | T_NONREC : unit terminal
