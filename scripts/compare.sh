@@ -106,7 +106,6 @@ shared_objects_to_compare="\
   "
 
 sundry_text_files_to_compare="\
-  eventlog_metadata \
   ld.conf
   "
 

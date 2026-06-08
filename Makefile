@@ -66,7 +66,6 @@ DISTCLEAN_FILES = \
   manual/src/html_processing/src/common.ml \
   ocamltest/ocamltest_config.ml \
   ocamltest/ocamltest_unix.ml \
-  tools/eventlog_metadata \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
