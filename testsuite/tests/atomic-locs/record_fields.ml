@@ -55,7 +55,7 @@ module Basic = struct
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Basic/328"
+(apply (field_imm 1 (global Toploop!)) "Basic/326"
   (let
     (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
      get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
@@ -190,7 +190,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/363" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Ok/356" (makeblock 0))
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -204,7 +204,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/371"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/364"
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
@@ -226,7 +226,7 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/379"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/372"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -263,7 +263,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic
 float fields, which prevents the float record optimization. The
 fields of this record will be boxed instead of being
 represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/405"
+(apply (field_imm 1 (global Toploop!)) "Float_records/396"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -483,7 +483,7 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
 y
 Either bind these labels explicitly or add '; _' to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/488"
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/459"
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
      allowed = (function {nlocal = 0} param : int (field_int 0 param))
@@ -578,4 +578,59 @@ Line 3, characters 4-31:
 3 |     mutable field : u [@atomic]
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
+|}]
+
+module Non_value_atomic_single_float64 = struct
+type t = { mutable f : float# [@atomic] }
+end
+
+[%%expect{|
+Line 2, characters 11-39:
+2 | type t = { mutable f : float# [@atomic] }
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Non_value_atomic_single_bits32 = struct
+  type t = { mutable f : int32# [@atomic] }
+end
+
+[%%expect{|
+Line 2, characters 13-41:
+2 |   type t = { mutable f : int32# [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Inline_record_non_value_atomic = struct
+  type t = A of { mutable f : float# [@atomic] }
+end
+
+[%%expect{|
+Line 2, characters 18-46:
+2 |   type t = A of { mutable f : float# [@atomic] }
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Atomic_float_with_float_hash = struct
+  type t = { mutable f : float [@atomic]; u : float# }
+end
+
+[%%expect{|
+Line 2, characters 13-41:
+2 |   type t = { mutable f : float [@atomic]; u : float# }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]
+
+module Inline_record_atomic_in_mixed = struct
+  type t = A of { mutable f : int [@atomic]; u : int# }
+end
+
+[%%expect{|
+Line 2, characters 18-44:
+2 |   type t = A of { mutable f : int [@atomic]; u : int# }
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
 |}]

@@ -433,6 +433,58 @@ let test_meet_bottom_after_alias () =
   Format.eprintf "@[<hov 2>after meet:@ %a@]@." T.print meet_ty;
   assert (T.is_bottom env meet_ty)
 
+let test_meet_array_element_kinds () =
+  let env = create_env () in
+  let define ?(kind = K.value) env v =
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
+    TE.add_definition env (Bound_name.create_var v') kind
+  in
+  let join ty1 ty2 =
+    let kind = T.kind ty1 in
+    let x = Variable.create "x" kind in
+    let env = define ~kind env x in
+    let scope = TE.current_scope env in
+    let scoped_env = TE.increment_scope env in
+    let env1 = TE.add_equation scoped_env (Name.var x) ty1 in
+    let env2 = TE.add_equation scoped_env (Name.var x) ty2 in
+    let env, _ =
+      T.cut_and_n_way_join scoped_env
+        [ env1, Apply_cont_rewrite_id.create (), Inlinable;
+          env2, Apply_cont_rewrite_id.create (), Inlinable ]
+        ~params:Bound_parameters.empty ~cut_after:scope
+        ~extra_allowed_names:Name_occurrences.empty
+        ~extra_lifted_consts_in_use_envs:Symbol.Set.empty
+    in
+    TE.find env (Name.var x) (Some kind)
+  in
+  let machine_width = TE.machine_width env in
+  let immutable_array ?(alloc_mode = Alloc_mode.For_types.heap) kind =
+    T.immutable_array ~element_kind:(Ok kind)
+      ~fields:[T.unknown_with_subkind ~machine_width kind]
+      alloc_mode ~machine_width
+  in
+  let mutable_array ?(alloc_mode = Alloc_mode.For_types.heap) kind =
+    T.mutable_array ~element_kind:(Ok kind) ~length:T.any_tagged_immediate
+      alloc_mode
+  in
+  let unknown_array ?alloc_mode kind =
+    join (mutable_array ?alloc_mode kind) (immutable_array ?alloc_mode kind)
+  in
+  let left_ty = unknown_array K.With_subkind.any_value in
+  let right_ty =
+    immutable_array
+      ~alloc_mode:(Alloc_mode.For_types.local ())
+      K.With_subkind.naked_float
+  in
+  Format.eprintf
+    "@[<v>The meet of:@ @;<1 2>@[%a@]@ @ and@ @;<1 2>@[%a@]@ @ is:@]@." T.print
+    left_ty T.print right_ty;
+  (* We expect this to be bottom, but it used to be a bogus array with an empty
+     element kind but non-empty fields. *)
+  match T.meet env left_ty right_ty with
+  | Bottom -> Format.eprintf "@.Bottom@."
+  | Ok (meet_ty, _env) -> Format.eprintf "@[<v>@;<1 2>%a@]@.@." T.print meet_ty
+
 let () =
   let comp_unit = "Meet_test" |> Compilation_unit.of_string in
   let unit_info = Unit_info.make_dummy ~input_name:"meet_test" comp_unit in
@@ -452,4 +504,6 @@ let () =
   Format.eprintf "@.JOIN WITH EXTENSIONS@\n@.";
   test_join_with_extensions ();
   Format.eprintf "@.JOIN WITH COMPLEX EXTENSIONS@\n@.";
-  test_join_with_complex_extensions ()
+  test_join_with_complex_extensions ();
+  Format.eprintf "@.MEET ARRAY ELEMENT KINDS@\n@.";
+  test_meet_array_element_kinds ()

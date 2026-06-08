@@ -105,6 +105,9 @@ val split_last: 'a list -> 'a list * 'a
 val last : 'a list -> 'a option
         (** Return the last element of a list if it's nonempty *)
 
+val repeated_label : (string option * 'a) list -> string option
+       (** Detects a repeated label - for use with labeled tuples. *)
+
 (** {1 Hash table operations} *)
 
 val create_hashtable: int -> ('a * 'b) list -> ('a, 'b) Hashtbl.t
@@ -141,6 +144,13 @@ module Stdlib : sig
     val map_option : ('a -> 'b option) -> 'a t -> 'b t option
     (** [map_option f l] is [some_if_all_elements_are_some (map f l)], but with
         short circuiting. *)
+
+    val mapi_result
+       : (int -> 'a -> ('b, 'e) Result.t)
+      -> 'a t
+      -> ('b t, 'e) Result.t
+    (** [mapi_result f l] is similar to [map_option f l] but returns the first
+        error result if [f] returns one. *)
 
     val map2_option : ('a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t option
 
@@ -1115,13 +1125,13 @@ end
 (** Propositional equality *)
 type (_, _) eq = Refl : ('a, 'a) eq
 
-(** Propositional comparison *)
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
+(** Propositional equality test *)
+type (_, _) is_eq =
+  | Is_eq : ('a, 'a) is_eq
+  | Is_not_eq : ('a, 'b) is_eq
 
-val comparison_result : ('a, 'b) comparison -> int
+(** Raises an exception if propositional equality test does not hold *)
+val get_eq_exn : ('a, 'b) is_eq -> ('a, 'b) eq
 
 (** Utilities for module-level programming *)
 module type T = sig

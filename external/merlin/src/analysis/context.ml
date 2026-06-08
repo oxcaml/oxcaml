@@ -102,7 +102,7 @@ let inspect_pattern (type a) ~cursor ~lid (p : a Typedtree.general_pattern) =
     (* Assumption: if [Browse.enclosing] stopped on this node and not on the
        subpattern, then it must mean that the cursor is on the alias. *)
     None
-  | Tpat_construct (lid_loc, cd, _, _)
+  | Tpat_construct (lid_loc, cd, _, _, _)
     when cursor_on_longident_end ~cursor ~lid_loc cd.cstr_name
          && Longident.last lid = Longident.last lid_loc.txt ->
     (* Assumption: if [Browse.enclosing] stopped on this node and not on the
@@ -114,7 +114,7 @@ let inspect_pattern (type a) ~cursor ~lid (p : a Typedtree.general_pattern) =
 
 let inspect_expression ~cursor ~lid e : t =
   match e.Typedtree.exp_desc with
-  | Texp_construct (lid_loc, cd, _, _) ->
+  | Texp_construct (lid_loc, cd, _, _, _) ->
     (* TODO: is this first test necessary ? *)
     if Longident.last lid = Longident.last lid_loc.txt then
       if cursor_on_longident_end ~cursor ~lid_loc cd.cstr_name then

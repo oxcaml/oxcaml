@@ -47,6 +47,8 @@ type right_only = disallowed * allowed
 
 type both = allowed * allowed
 
+type neither = disallowed * disallowed
+
 (** Arrange the permissions appropriately for a positive lattice, by doing
     nothing. *)
 type 'a pos = 'b * 'c constraint 'a = 'b * 'c

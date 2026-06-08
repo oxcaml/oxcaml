@@ -45,6 +45,7 @@ type t = safe subst
 (** Standard substitution*)
 
 val identity: 'a subst
+val for_loading_cmi : unit -> t
 val unsafe: t -> unsafe subst
 
 val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
@@ -71,10 +72,11 @@ type additional_action_config =
 val with_additional_action: additional_action_config -> t -> t
 
 (* Any of the additional actions involve copying type variables. Calling
-   [reset_additional_action_type_id] resets the id counter used when the copying
+   [reset_additional_action_id] resets the id counter used when the copying
    of type variables needs to mint new type variable ids.
+   The function additionally reset the counter used for sort ids.
 *)
-val reset_additional_action_type_id: unit -> unit
+val reset_additional_action_id: unit -> unit
 
 val make_loc_ghost: t -> t
 val change_locs: 'k subst -> Location.t -> 'k subst
@@ -119,13 +121,20 @@ val module_declaration: scoping -> t -> module_declaration -> module_declaration
 val compose: t -> t -> t
 
 module Ikind_substitution : sig
-  type lookup_result =
+  type type_lookup_result =
     | Lookup_identity
     | Lookup_path of Path.t
     | Lookup_type_fun of type_expr list * type_expr
 
+  type jkind_lookup_result =
+    | Lookup_jkind_identity
+    | Lookup_jkind_path of Path.t
+    | Lookup_jkind_const of jkind_const_desc_lr
+
   val substitute_decl_ikind_with_lookup :
-    (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
+    (lookup_type:(Path.t -> type_lookup_result) ->
+     lookup_jkind:(Path.t -> jkind_lookup_result) ->
+     type_ikind -> type_ikind) ref
 end
 
 module Unsafe: sig

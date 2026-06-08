@@ -90,6 +90,7 @@ type record_mismatch =
   | Ufloat_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
+  | Representation_shape_mismatch
 
 type constructor_mismatch =
   | Type of Errortrace.equality_error
@@ -98,6 +99,7 @@ type constructor_mismatch =
   | Kind of position
   | Explicit_return_type of position
   | Modality of int * Mode.Modality.equate_error
+  | Fixed_representation of position
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -106,7 +108,9 @@ type extension_constructor_mismatch =
                             * extension_constructor
                             * constructor_mismatch
 type variant_change =
-  (Types.constructor_declaration as 'cd, 'cd, constructor_mismatch)
+  (Types.constructor_declaration * Types.constructor_representation option
+     as 'cd,
+   'cd, constructor_mismatch)
     Diffing_with_keys.change
 
 type private_variant_mismatch =
@@ -139,6 +143,7 @@ type type_mismatch =
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
+  | Fixed_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
@@ -213,6 +218,7 @@ val class_types:
 *)
 
 val report_value_mismatch :
+  pp:Mode.Hint.pinpoint ->
   string -> string ->
   Env.t ->
   value_mismatch Format_doc.printer
@@ -226,6 +232,7 @@ val report_modality_sub_error :
   string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
 
 val report_mode_sub_error :
+  pp:Mode.Hint.pinpoint ->
   string -> string -> Format_doc.formatter -> Mode.Value.error -> unit
 
 val report_extension_constructor_mismatch :

@@ -211,6 +211,8 @@ type error =
   | Partial_tuple_pattern_bad_type
   | Extra_tuple_label of string option * type_expr
   | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
   | Label_mismatch of record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
       Errortrace.unification_error * Parsetree.pattern_desc option
@@ -310,6 +312,7 @@ type error =
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
+  | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
@@ -317,9 +320,7 @@ type error =
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_record_unboxed
-  | Block_access_private_record
-  | Block_index_flattened_record of type_expr
+  | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Block_index_atomic_unsupported
@@ -339,6 +340,11 @@ type error =
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
+  | Field_value_not_rep of type_expr * Jkind.Violation.t
+  | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
+  | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
+  | Indeterminate_record_layout of type_expr * string
+  | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Unsupported_stack_allocation of unsupported_stack_allocation
@@ -348,6 +354,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
+  | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =

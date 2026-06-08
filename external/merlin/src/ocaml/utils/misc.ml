@@ -215,6 +215,17 @@ module Stdlib = struct
       in
       aux l1 l2 []
 
+    let mapi_result f l =
+      let rec aux l i acc =
+        match l with
+        | [] -> Ok (List.rev acc)
+        | x :: xs ->
+          match f i x with
+          | Error e -> Error e
+          | Ok x -> aux xs (i + 1) (x :: acc)
+      in
+      aux l 0 []
+
     let split_at n l =
       let rec aux n acc l =
         if n = 0
@@ -666,6 +677,16 @@ module Stdlib = struct
 end
 
 module Int = Stdlib.Int
+
+let repeated_label l =
+  let module Set = Stdlib.String.Set in
+  let rec go s = function
+    | [] -> None
+    | (None, _) :: l -> go s l
+    | (Some lbl, _) :: l ->
+      if Set.mem lbl s then Some lbl else go (Set.add lbl s) l
+  in
+  go Set.empty l
 
 (* File functions *)
 
@@ -2117,15 +2138,13 @@ end
 
 type (_, _) eq = Refl : ('a, 'a) eq
 
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
+type (_, _) is_eq =
+  | Is_eq : ('a, 'a) is_eq
+  | Is_not_eq : ('a, 'b) is_eq
 
-let comparison_result : type a b. (a, b) comparison -> int = function
-  | Less_than -> -1
-  | Equal -> 0
-  | Greater_than -> 1
+let get_eq_exn : type a b. (a, b) is_eq -> (a, b) eq = function
+  | Is_eq -> Refl
+  | Is_not_eq -> fatal_error "Propositional equality does not hold"
 
 (*********************************************)
 (* Fancy modules *)

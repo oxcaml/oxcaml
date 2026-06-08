@@ -259,13 +259,12 @@ let record_representation i ppf = let open Types in function
   | Record_mixed shape ->
     line i ppf "Record_mixed\n";
     array (i+1) mixed_block_element ppf shape
-  | Record_dummy { represent_as_float_array = true } ->
-    line i ppf "Record_dummy [@@represent_as_float_array]\n"
-  | Record_dummy { represent_as_float_array = false } ->
-    line i ppf "Record_dummy\n"
+  | Record_dummy { represent_as_float_array; flatten_floats } ->
+    line i ppf "Record_dummy%s%s\n"
+      (if represent_as_float_array then " [@@represent_as_float_array]" else "")
+      (if flatten_floats then " [@@flatten_floats]" else "")
   | Record_variable ->
     line i ppf "Record_variable\n"
-
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
