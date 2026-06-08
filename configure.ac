@@ -273,7 +273,6 @@ AC_ARG_ENABLE([stack_checks],
 ## Output variables
 
 AC_SUBST([enable_runtime5], [yes])
-AC_SUBST([runtime_suffix], [])
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
@@ -3027,10 +3026,10 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
   [systhread_support=true
   AC_CONFIG_FILES([otherlibs/systhreads/META])
   AC_CONFIG_FILES([otherlibs/systhreads4/META])
-  otherlibraries="$otherlibraries systhreads${runtime_suffix}"
-  otherlibs="$otherlibs systhreads${runtime_suffix}"
+  otherlibraries="$otherlibraries systhreads"
+  otherlibs="$otherlibs systhreads"
   lib_systhreads=true
-  lib_systhreads_path="systhreads${runtime_suffix}"
+  lib_systhreads_path="systhreads"
   AC_MSG_NOTICE([the threads library is supported])])
 
 ## Does the assembler support debug prefix map and CFI directives
