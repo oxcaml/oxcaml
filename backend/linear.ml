@@ -53,7 +53,10 @@ and instruction_desc =
   | Lcondbranch3 of label option * label option * label option
   | Lswitch of label array
   | Lentertrap
-  | Ladjust_stack_offset of { delta_bytes : int }
+  | Ladjust_stack_offset of
+      { delta_bytes : int;
+        pushed_slots : Cmm.machtype_component list
+      }
   | Lpushtrap of { lbl_handler : label }
   | Lpoptrap of { lbl_handler : label }
   | Lraise of Lambda.raise_kind

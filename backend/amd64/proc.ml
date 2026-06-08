@@ -564,7 +564,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32
-                  | Ilfence | Isfence | Imfence)
+                  | Ilfence | Isfence | Imfence
+                  | Ipush_to_stack | Ipop_from_stack)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then destroyed_rbp else [||]
@@ -573,6 +574,16 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        restored by the sequence to which [Stack_check] is expanded, but it may
        be clobbered in the middle. *)
     destroyed_r10
+
+let[@ocaml.warning "-4"] is_push_to_stack (basic : Cfg_intf.S.basic) =
+  match basic with
+  | Op (Specific Ipush_to_stack) -> true
+  | _ -> false
+
+let[@ocaml.warning "-4"] is_pop_from_stack (basic : Cfg_intf.S.basic) =
+  match basic with
+  | Op (Specific Ipop_from_stack) -> true
+  | _ -> false
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =

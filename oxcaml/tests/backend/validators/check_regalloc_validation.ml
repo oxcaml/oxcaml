@@ -221,7 +221,10 @@ let check =
           | Some desc -> desc
         in
         let res =
-          try Regalloc_validate.test desc after
+          try
+            Regalloc_validate.test desc
+              ~push_pop_slots:(InstructionId.Tbl.create 0)
+              after
           with Misc.Fatal_error ->
             Format.printf "fatal exception raised when validating description";
             raise Break_test
