@@ -79,12 +79,7 @@ caml_unix_mapped_alloc(int flags, int num_dims, void * data, intnat * dim)
   b->proxy = NULL;
   for (int i = 0; i < num_dims; i++) b->dim[i] = dimcopy[i];
   mem_words = (caml_ba_byte_size(b) + sizeof(value) - 1) / sizeof(value);
-#ifdef CAML_RUNTIME_5
   caml_memprof_sample_block(
     res, mem_words, mem_words, CAML_MEMPROF_SRC_MAP_FILE);
-#else
-  (void)mem_words; /* unused in runtime4 */
-  caml_memprof_track_custom(res, caml_ba_byte_size(b));
-#endif
   return res;
 }
