@@ -1,17 +1,17 @@
-(* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
-
-
-
-
-
-
-
+(* TEST
+ flags = "-g";
+ {
+   bytecode;
+ }{
+   no-flambda;
+   native;
+ }{
+   reference = "${test_source_directory}/backtrace_effects_nested.flambda.reference";
+   flambda;
+   native;
+ }
 *)
+
 
 open Effect
 open Effect.Deep
@@ -46,18 +46,3 @@ let f () =
           | _ -> None }
 
 let () = f ()
-
-(* TEST
- flags = "-g";
- runtime5;
- {
-   bytecode;
- }{
-   no-flambda;
-   native;
- }{
-   reference = "${test_source_directory}/backtrace_effects_nested.flambda.reference";
-   flambda;
-   native;
- }
-*)

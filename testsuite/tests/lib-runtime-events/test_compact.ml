@@ -1,6 +1,5 @@
 (* TEST
  {
-   runtime5;
    include runtime_events;
    { bytecode; }
    { native; }

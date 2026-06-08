@@ -2,7 +2,6 @@
    modules = "preemption_util.ml";
    include systhreads;
    hassysthreads;
-   runtime5;
    poll_insertion;
    multicore;
    flags += "-w -21";
