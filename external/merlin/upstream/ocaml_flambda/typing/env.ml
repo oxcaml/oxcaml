@@ -1082,7 +1082,7 @@ module Normalize_mode = struct
     | Assert_normalized, true -> modality, mode
     | (Normalize | Normalize_exn), false ->
         Mode.Modality.undefined,
-        Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
+        Mode.Modality.apply_left
           modality mode
     | Assert_normalized, false ->
         Misc.fatal_error "mode is not already normalized but expected otherwise"
@@ -2032,7 +2032,12 @@ let find_type_expansion_opt path env =
 let find_jkind_expansion path env =
   let decl = find_jkind path env in
   match decl.jkind_manifest with
-  | None -> raise Not_found
+  | None ->
+      (* CR-someday lmaurer: Raising [Not_found] here makes it impossible to
+         differentiate an abstract kind (normal) from a path missing from the
+         environment (big error). We should instead be returning [None] or
+         [`Kind_is_abstract] or some such. *)
+      raise Not_found
   | Some body -> body
 
 let find_modtype_expansion_lazy path env =
@@ -4675,7 +4680,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let mode =
             m0
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
-            |> Mode.Modality.Const.apply
+            |> Mode.Modality.Const.apply_right
                 Typemode.let_mutable_modalities
           in
           mutate_value ~use ~loc path vda;
@@ -5315,16 +5320,31 @@ let report_lookup_error_doc loc env = function
            env ppf v)
         err
   | No_unboxed_version (lid, decl) ->
+      let has_atomic_field lbls =
+        List.exists
+          (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
+          lbls
+      in
       let sub =
         match decl.type_kind with
         | Type_record (_, Record_unboxed, _) ->
           [Location.msg
              "@{<hint>Hint@}: [@@@@unboxed] records don't get unboxed \
               versions."]
-        | Type_record (_, (Record_float | Record_ufloat |
-                           Record_mixed _), _) ->
+        | Type_record (lbls, _, _) when has_atomic_field lbls ->
+          [Location.msg
+             "@{<hint>Hint@}: Records with [@@atomic] fields don't get \
+              unboxed versions."]
+        | Type_record (_, (Record_float | Record_ufloat), _) ->
           [Location.msg
             "@{<hint>Hint@}: Float records don't get unboxed versions."]
+        | Type_record (_, Record_mixed _, _) ->
+          (* A [Record_mixed] only lacks an unboxed version when its shape
+             contains a [Float_boxed] element, which only happens via
+             [@@flatten_floats]. *)
+          [Location.msg
+            "@{<hint>Hint@}: Records with [@@@@flatten_floats] don't get \
+             unboxed versions."]
         | Type_record_unboxed_product _ ->
           [Location.msg
             "@{<hint>Hint@}: It is already an unboxed record."]
