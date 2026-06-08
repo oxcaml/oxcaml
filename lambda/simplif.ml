@@ -427,13 +427,10 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   in
   let optimize = !Clflags.native_code || not !Clflags.debug in
   let optimize_except_alias_bindings =
-    (* This doesn't yet include Alias bindings of variables to variables
-       because of what is described in this CR.  Other used-once Alias
-       bindings will not be substituted out when we want to preserve them
-       for DWARF.  (They will only be let-bound again by Flambda 2
-       anyway, even if substituted - it's just a matter of placement.) *)
-    (* CR mshinwell: Fix bug whereby Alias bindings of variables to variables
-      are being generated (probably by Matching) with the wrong layout. *)
+    (* The debug info degrades when we substitute let x = y in ... bindings. We
+       disable their simplification when [dwarf_wants_to_prevent_substitutions].
+       Flambda2 runs more simplification subsequently, which should take care of
+       these. *)
     optimize && not dwarf_wants_to_prevent_substitutions
   in
 
@@ -494,7 +491,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       end
   | Lfunction fn ->
       count_lfunction fn
-  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize ->
+  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       (* v will be replaced by w in l2, so each occurrence of v in l2
          increases w's refcount *)
       count (bind_var bv v) l2;
@@ -638,7 +635,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       | kind, ret_mode, body ->
           lfunction ~kind ~params ~return:outer_return ~body ~attr:attr1 ~loc ~mode ~ret_mode
       end
-  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize ->
+  | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       Hashtbl.add subst v (simplif (Lvar w));
       simplif l2
   | Llet(Strict, kind, v, duid,
