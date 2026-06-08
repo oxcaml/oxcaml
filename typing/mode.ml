@@ -6756,9 +6756,9 @@ let alloc_to_value_l2r_unhint m =
   in
   { comonadic; monadic }
 
-let alloc_to_value_l2r m =
+let alloc_to_value_l2r ?hint m =
   m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
-  |> Value.hint ~monadic:Skip
+  |> Value.hint ~monadic:Skip ?comonadic:hint
 
 let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
@@ -7738,12 +7738,14 @@ module Crossing = struct
      where [regional_to_global] is the right adjoint of [alloc_as_value], and
      [regional_to_local] the left adjoint. *)
 
-  let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left_unhint t |> value_to_alloc_r2l_unhint
+  let apply_left_alloc ?hint t m =
+    m |> alloc_as_value ?hint |> apply_left_unhint t
+    |> value_to_alloc_r2l_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
-  let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right_unhint t |> value_to_alloc_r2g_unhint
+  let apply_right_alloc ?hint t m =
+    m |> alloc_as_value ?hint |> apply_right_unhint t
+    |> value_to_alloc_r2g_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_left_right_alloc t m =

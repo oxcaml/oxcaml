@@ -98,6 +98,11 @@ type 'variety obj =
   (* Unification *)
   | Self_cannot_be_closed : unification obj
 
+type mode_mismatch =
+  { context : string;
+    left_pos : position;
+    error : Mode.Alloc.error }
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -113,6 +118,7 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Mode_mismatch : mode_mismatch -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
@@ -130,6 +136,7 @@ let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
   | Bad_jkind_sort _ as x -> x
   | Unequal_var_jkinds _ as x -> x
   | Unequal_tof_kind_jkinds _ as x -> x
+  | Mode_mismatch _ as x -> x
 
 let map f t = List.map (map_elt f) t
 
@@ -146,6 +153,8 @@ let swap_elt (type variety) : ('a, variety) elt -> ('a, variety) elt = function
     Variant (Fixed_row(swap_position pos,k,f))
   | Variant (No_tags(pos,f)) ->
     Variant (No_tags(swap_position pos,f))
+  | Mode_mismatch m ->
+    Mode_mismatch { m with left_pos = swap_position m.left_pos }
   | x -> x
 
 let swap_trace e = List.map swap_elt e

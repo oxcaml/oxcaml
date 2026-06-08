@@ -780,12 +780,43 @@ let subcase_list l ppf = match l with
         (List.rev l)
 
 (* Printers for leaves *)
+let get_mode_mismatch trace =
+  let get_mode_mismatch : _ Errortrace.elt -> _ = function
+    | Errortrace.Mode_mismatch mode_mismatch -> Some mode_mismatch
+    | _ -> None
+  in
+  List.find_map get_mode_mismatch trace
+
 let core env id x =
   match x with
   | Err.Value_descriptions {symptom = Modality e} ->
       Fmt.dprintf "@[<hv>%s:@;%a@]"
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
+  | Err.Value_descriptions ({ symptom = Type { Errortrace.trace }; _ } as diff)
+      when Option.is_some (get_mode_mismatch trace) ->
+      let { Errortrace.context; left_pos; error } =
+        Option.get (get_mode_mismatch trace)
+      in
+      let actual, expected =
+        match left_pos with
+        | First -> "implementation", "interface"
+        | Second -> "interface", "implementation"
+      in
+      let report_alloc_mode_sub_error ppf =
+        Includecore.report_mode_sub_error_printers
+          (Printf.sprintf "the mode of %s in the %s is" context actual)
+          (Printf.sprintf "the %s expects it to be" expected)
+          ppf
+          (Mode.Alloc.print_error
+             (diff.expected.val_loc, Structure_item (Value, id))
+             error)
+      in
+      Fmt.dprintf "@[<v>@[<hv 2>Value %s does not match:@ %t@]%a%t@]"
+        (Ident.name id)
+        report_alloc_mode_sub_error
+        show_locs (diff.got.val_loc, diff.expected.val_loc)
+        Printtyp.Conflicts.print_explanations
   | Err.Value_descriptions diff ->
       let is_modal = Is_modal.value_mismatch diff.symptom in
       let mode1, mode2 =

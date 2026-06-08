@@ -231,6 +231,9 @@ val report_type_mismatch :
 val report_modality_sub_error :
   string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
 
+val report_mode_sub_error_printers :
+  string -> string -> Format_doc.formatter -> Mode_intf.print_error -> unit
+
 val report_mode_sub_error :
   pp:Mode.Hint.pinpoint ->
   string -> string -> Format_doc.formatter -> Mode.Value.error -> unit

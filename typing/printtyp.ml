@@ -3454,6 +3454,7 @@ let explanation (type variety) intro prev env
       Some (doc_printf "@ because their kinds are different.\
                      @ @[<v>%t@;%t@]"
               (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Mode_mismatch _ -> None
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
@@ -3516,7 +3517,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
            | Unequal_tof_kind_jkinds _) ->
         true
     | Some (Diff _ | Escape _ | Variant _ | Obj _ | Incompatible_fields _
-           | Rec_occur _)
+           | Rec_occur _ | Mode_mismatch _)
     | None ->
         false
   in

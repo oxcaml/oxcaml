@@ -31,12 +31,11 @@ Error: Signature mismatch:
          sig val with_ : f:('a -> 'b) -> unit end
        is not included in
          sig val with_ : f:('a -> 'a) @ local -> unit end
-       Values do not match:
-         val with_ : f:('a -> 'b) -> unit
-       is not included in
-         val with_ : f:('a -> 'a) @ local -> unit
-       The type "f:('a -> 'a) -> unit" is not compatible with the type
-         "f:('a -> 'a) @ local -> unit"
+       Value with_ does not match:
+         The mode of argument f in the interface is "yielding"
+         but the implementation expects it to be "unyielding"
+           because it is used inside the function at lines 6-7, characters 35-9
+           which is expected to be "unyielding".
 |}]
 
 (* Putting an unyielding annotation in the signature fixes the inclusion error *)
@@ -81,12 +80,11 @@ Error: Signature mismatch:
          sig val with_ : ('a -> 'b) -> unit end
        is not included in
          sig val with_ : ('a -> 'a) @ local -> unit end
-       Values do not match:
-         val with_ : ('a -> 'b) -> unit
-       is not included in
-         val with_ : ('a -> 'a) @ local -> unit
-       The type "('a -> 'a) -> unit" is not compatible with the type
-         "('a -> 'a) @ local -> unit"
+       Value with_ does not match:
+         The mode of the argument in the interface is "yielding"
+         but the implementation expects it to be "unyielding"
+           because it is used inside the function at lines 6-7, characters 35-9
+           which is expected to be "unyielding".
 |}]
 
 module M : sig
@@ -105,10 +103,7 @@ Error: Signature mismatch:
          sig val local_ret : 'a @ local -> 'a @ local end
        is not included in
          sig val local_ret : 'a @ local -> 'a @ local unyielding end
-       Values do not match:
-         val local_ret : 'a @ local -> 'a @ local
-       is not included in
-         val local_ret : 'a @ local -> 'a @ local unyielding
-       The type "'a @ local -> 'a @ local" is not compatible with the type
-         "'a @ local -> 'a @ local unyielding"
+       Value local_ret does not match:
+         The mode of the return in the implementation is "yielding"
+         but the interface expects it to be "unyielding".
 |}]
