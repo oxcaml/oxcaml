@@ -429,18 +429,9 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_unboxed_tuple list -> List.iter (fun (_, e, _) -> sub.expr sub e) list
   | Texp_construct (lid, _, _, args, _) ->
       iter_loc_lid sub lid;
-<<<<<<< janestreet/merlin-jst:liam-merlin-for-5.4-and-minus-40
-      List.iter (sub.expr sub) args
-  | Texp_variant (_, expo) -> Option.iter (fun (expr, _) -> sub.expr sub expr) expo
-||||||| oxcaml/oxcaml:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-      List.iter (sub.expr sub) args
-  | Texp_variant (_, expo) ->
-      Option.iter (fun (expr, _) -> sub.expr sub expr) expo
-=======
       List.iter (sub.expr sub) (List.map snd args)
   | Texp_variant (_, expo) ->
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
->>>>>>> oxcaml/oxcaml:26b451f8fbb8ba54da6f356c4f0c48c9e9d7d551
   | Texp_record { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _, _) -> sub.expr sub exp) extended_expression;

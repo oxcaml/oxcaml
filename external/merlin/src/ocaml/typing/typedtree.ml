@@ -1688,37 +1688,6 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
 
-(* Expressions are considered nominal if they can be used as the subject of a
-   sentence or action. In practice, we consider that an expression is nominal
-   if it is similar to an identifier or does not contain spaces when printed. *)
-let rec exp_is_nominal exp =
-  match exp.exp_desc with
-  | _ when exp.exp_attributes <> [] -> false
-  | Texp_ident _ | Texp_instvar _ | Texp_constant _
-  | Texp_variant (_, None)
-  | Texp_construct (_, _, [], _) ->
-      true
-  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
-      exp_is_nominal parent
-  | _ -> false
-
-let unpack_functor_me me =
-  match me.mod_desc with
-  | Tmod_functor (fp, me) -> fp, me
-  | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
-
-<<<<<<< janestreet/merlin-jst:liam-merlin-for-5.4-and-minus-40
-let unpack_functor_mty mty =
-  match mty.mty_desc with
-  | Tmty_functor (fp, mty, _) -> fp, mty
-  | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"
-||||||| oxcaml/oxcaml:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-and fold_antiquote_binding_op f acc op =
-  fold_antiquote_exp f acc op.bop_exp
-=======
-and fold_antiquote_binding_op f acc op =
-  fold_antiquote_exp f acc op.bop_exp
-
 let label_sort (type rep)
       (record_form : rep record_form)
       (label : rep gen_label_description) record_sorts =
@@ -1740,4 +1709,27 @@ let unboxed_label_sort label record_sorts =
 
 let unboxed_label_all_sorts label record_sorts =
   Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all
->>>>>>> oxcaml/oxcaml:26b451f8fbb8ba54da6f356c4f0c48c9e9d7d551
+
+(* Expressions are considered nominal if they can be used as the subject of a
+   sentence or action. In practice, we consider that an expression is nominal
+   if it is similar to an identifier or does not contain spaces when printed. *)
+let rec exp_is_nominal exp =
+  match exp.exp_desc with
+  | _ when exp.exp_attributes <> [] -> false
+  | Texp_ident _ | Texp_instvar _ | Texp_constant _
+  | Texp_variant (_, None)
+  | Texp_construct (_, _, [], _) ->
+      true
+  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
+      exp_is_nominal parent
+  | _ -> false
+
+let unpack_functor_me me =
+  match me.mod_desc with
+  | Tmod_functor (fp, me) -> fp, me
+  | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
+
+let unpack_functor_mty mty =
+  match mty.mty_desc with
+  | Tmty_functor (fp, mty, _) -> fp, mty
+  | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"

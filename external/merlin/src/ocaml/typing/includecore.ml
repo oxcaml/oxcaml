@@ -680,19 +680,9 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
         prefix x Style.inline_code (Ident.name cd_id) first decl
   | Insert { insert = { cd_id }, _ } ->
       Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
-<<<<<<< janestreet/merlin-jst:liam-merlin-for-5.4-and-minus-40
-        prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
-  | Change Type {got; expected; reason} ->
-    Printtyp.Doc.wrap_printing_env ~error:true env (fun () ->
-||||||| oxcaml/oxcaml:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-        prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
-  | Change Type {got; expected; reason} ->
-    Printtyp.wrap_printing_env ~error:true env (fun () ->
-=======
         prefix x Style.inline_code (Ident.name cd_id) first decl
   | Change Type {got = got, _; expected = expected, _; reason} ->
-    Printtyp.wrap_printing_env ~error:true env (fun () ->
->>>>>>> oxcaml/oxcaml:26b451f8fbb8ba54da6f356c4f0c48c9e9d7d551
+    Printtyp.Doc.wrap_printing_env ~error:true env (fun () ->
       Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
          %a@ is not the same as:\

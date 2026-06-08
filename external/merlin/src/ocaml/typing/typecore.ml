@@ -7906,16 +7906,8 @@ and type_expect_
       | Baccess_block (Mutable, _) ->
         true
       | Baccess_field
-<<<<<<< janestreet/merlin-jst:liam-merlin-for-5.4-and-minus-40
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
-        raise (error(loc, env, Block_index_atomic_unsupported))
-||||||| oxcaml/oxcaml:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
-=======
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
->>>>>>> oxcaml/oxcaml:26b451f8fbb8ba54da6f356c4f0c48c9e9d7d551
+        raise (error(loc, env, Block_index_atomic_unsupported))
     in
     let (el_ty, modality), uas =
       List.fold_left_map

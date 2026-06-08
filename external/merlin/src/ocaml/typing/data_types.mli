@@ -27,24 +27,9 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-<<<<<<< janestreet/merlin-jst:liam-merlin-for-5.4-and-minus-40
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-||||||| oxcaml/oxcaml:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-    cstr_constant: bool;                (* True if all args are void *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
-=======
     cstr_shape: constructor_representation option;
                                         (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if all args are void *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
->>>>>>> oxcaml/oxcaml:26b451f8fbb8ba54da6f356c4f0c48c9e9d7d551
-    cstr_constant: bool;
-    (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
-       payload. (Or equivalently, if it's represented as either a tagged int or
-       the null pointer) *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
     cstr_generalized: bool;             (* Constrained return type? *)

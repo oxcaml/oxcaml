@@ -1595,26 +1595,10 @@ val min_mode_with_locks : mode_with_locks
 (** Get the mode, asserting no held locks. *)
 val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 
-(* Merlin specific *)
-
 (** Fold over the antiquotations in an expression. This function defines the
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
-val map_apply_arg:
-  ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
-
-(** Whether an expression looks nice as the subject of a sentence in an error
-    message. *)
-val exp_is_nominal : expression -> bool
-
-<<<<<<< janestreet/merlin-jst:liam-merlin-for-5.4-and-minus-40
-val unpack_functor_me : module_expr -> functor_parameter * module_expr
-val unpack_functor_mty : module_type -> functor_parameter * module_type
-||||||| oxcaml/oxcaml:66e2f59fada7a8317c56fad3ed30c0a2c244ef66
-val map_apply_arg:
-  ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
-=======
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
 
@@ -1635,4 +1619,13 @@ val unboxed_label_sort :
 val unboxed_label_all_sorts:
   Data_types.unboxed_label_description -> record_sorts
   -> Jkind.Sort.Const.t array
->>>>>>> oxcaml/oxcaml:26b451f8fbb8ba54da6f356c4f0c48c9e9d7d551
+
+(** Whether an expression looks nice as the subject of a sentence in an error
+    message. *)
+val exp_is_nominal : expression -> bool
+
+
+(* Merlin specific *)
+
+val unpack_functor_me : module_expr -> functor_parameter * module_expr
+val unpack_functor_mty : module_type -> functor_parameter * module_type
