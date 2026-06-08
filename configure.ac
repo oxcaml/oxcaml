@@ -35,6 +35,7 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
+# TODO: Remove this check
 AC_ARG_ENABLE([runtime5], [],
   [AS_IF([test "x$enableval" != 'xyes'],
     [AC_MSG_ERROR(m4_normalize([OxCaml 5.4 does not support runtime4 and must be
@@ -2745,10 +2746,6 @@ AC_CHECK_HEADER([spawn.h],
   [AC_CHECK_FUNC([posix_spawn],
     [AC_CHECK_FUNC([posix_spawnp], [AC_DEFINE([HAS_POSIX_SPAWN], [1])])])])
 
-## ffs or _BitScanForward
-# CR mshinwell all-runtime5: remove ffs check, it's only needed for runtime4
-AC_CHECK_FUNC([ffs], [AC_DEFINE([HAS_FFS])])
-
 ## pthread_getaffinity_np, args differ from GNU and BSD
 AC_MSG_CHECKING([arguments for pthread_getaffinity_np])
 AC_LINK_IFELSE(
@@ -3302,7 +3299,7 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
 AS_IF([test x"$enable_multidomain" = "xyes"],
   [AS_IF([test x"$enable_poll_insertion" = "xyes"],
     [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=yes],
-    [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
+    [AC_MSG_ERROR([Creating multiple domains is only supported with \
 poll insertion enabled.])])], [])
 
 AC_SUBST([has_popcnt])
