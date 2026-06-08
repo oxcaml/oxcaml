@@ -36,15 +36,6 @@ let () =
  flags = "-g";
  ocamlrunparam += ",b=1";
  {
-   runtime4;
-   {
-     reference = "${test_source_directory}/backtrace_c_exn.byte4.reference";
-     bytecode;
-   }{
-     reference = "${test_source_directory}/backtrace_c_exn.opt4.reference";
-     native;
-   }
- }{
    runtime5;
    {
      reference = "${test_source_directory}/backtrace_c_exn.r5.reference";

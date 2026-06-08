@@ -4,9 +4,6 @@
    runtime5;
    { bytecode; }
    { native; }
- }{
-   runtime4;
-   skip;
  }
 *)
 open Runtime_events
