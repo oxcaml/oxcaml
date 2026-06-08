@@ -87,13 +87,13 @@ boot_targets = \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
+	$(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
 
 boot-runtest: boot-compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
+	$(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
 
 runtime-stdlib: boot-compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
+	$(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
 	rm -rf _build/runtime_stdlib_install
 # Dune 3.11+ clears `_build/install` before building, move the runtime stdlib
 # to a separate directory.
@@ -107,10 +107,10 @@ runtime-stdlib: boot-compiler
 # This target is a polling version of "make runtime-stdlib"
 .PHONY: runtime-stdlib-hacking
 runtime-stdlib-hacking: boot-compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build -w $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
+	$(dune) build -w $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
 
 compiler: runtime-stdlib
-	RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
@@ -126,7 +126,7 @@ compiler: runtime-stdlib
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler runtime-stdlib
-	RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           ./_build/default/chamelon/chamelon.exe dune build \
           $(ws_main) \
@@ -142,8 +142,7 @@ minimize-failure: boot-minimizer boot-compiler runtime-stdlib
 
 .PHONY: minimize-stdlib
 minimize-stdlib: boot-minimizer boot-compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) \
-          ./_build/default/chamelon/chamelon.exe dune build \
+	./_build/default/chamelon/chamelon.exe dune build \
           $(ws_runstd) \
           --only-packages=ocaml_runtime_stdlib @install
 
@@ -152,13 +151,13 @@ minimize-stdlib: boot-minimizer boot-compiler
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
 
 runtest-llvmize: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -190,11 +189,7 @@ dune_config_targets = \
   $(ocamldir)/otherlibs/dune
 
 $(ocamldir)/otherlibs/dune:
-	if [ "$(RUNTIME_DIR)" = "runtime4" ]; then \
-          echo "(dirs (:standard \ systhreads runtime_events))" > $@; \
-	else \
-          echo "(dirs (:standard \ systhreads4))" > $@; \
-	fi
+	echo "(dirs (:standard \ systhreads4))" > $@
 
 _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
@@ -339,9 +334,9 @@ install_for_test: install
          touch ocamlc.opt ocamlopt.opt; \
 	 done; \
 	 ln -s _install/lib/ocaml stdlib; \
-	 mkdir $(RUNTIME_DIR); \
-	 for f in ocamlrun* stdlib/caml stdlib/stublibs/* $(RUNTIME_DIR)/caml/threads.h; do \
-	   ln -s ../$$f $(RUNTIME_DIR)/`basename $$f`; \
+	 mkdir runtime; \
+	 for f in ocamlrun* stdlib/caml stdlib/stublibs/* runtime/caml/threads.h; do \
+	   ln -s ../$$f runtime/`basename $$f`; \
 	 done; \
 	 ln -s . lex; ln -s . yacc; \
 	 ln -s _install/lib/ocaml/compiler-libs compilerlibs; \
@@ -355,9 +350,7 @@ install_for_test: install
 		mkdir -p otherlibs/{stdlib_,}$${universe}; \
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
 	 done; \
-     if [[ x"$(RUNTIME_DIR)" = x"runtime" ]]; then \
-	     $(cpl) stdlib/runtime_events/{lib,}runtime_events* otherlibs/runtime_events; \
-     fi; \
+	 $(cpl) stdlib/runtime_events/{lib,}runtime_events* otherlibs/runtime_events; \
 	 ln -s ../_build/main/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
 	)
 
@@ -478,7 +471,7 @@ promote-one-no-rebuild:
 # This target is like a polling version of upstream "make ocamlopt"
 .PHONY: hacking
 hacking: _build/_bootinstall
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) -w $(boot_targets)
+	$(dune) build $(ws_boot) -w $(boot_targets)
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run
@@ -488,7 +481,7 @@ hacking: _build/_bootinstall
 
 .PHONY: hacking-emacs-poller
 hacking-emacs-poller: _build/_bootinstall
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) --passive-watch-mode
+	$(dune) build $(ws_boot) --passive-watch-mode
 
 .PHONY: hacking-emacs-builder
 hacking-emacs-builder: _build/_bootinstall
@@ -497,7 +490,7 @@ hacking-emacs-builder: _build/_bootinstall
 
 .PHONY: debug-printers
 debug-printers: runtime-stdlib # required for $(ws_main) to work
-	RUNTIME_DIR=$(RUNTIME_DIR)  $(dune) build $(ws_main) $(ocamldir)/tools/debug_printers
+	 $(dune) build $(ws_main) $(ocamldir)/tools/debug_printers
 	@echo
 	@echo To load into ocamldebug, use:
 	@echo source \"$$(realpath _build/main/$(ocamldir)/tools/debug_printers)\"

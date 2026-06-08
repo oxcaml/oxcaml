@@ -1493,13 +1493,13 @@ AS_IF([test x"$build" = x"$target" -o x"$target_runnable" = xtrue],
         /link /out:\$(1) $oc_exe_ldflags \$(OC_LDFLAGS) \$(LDFLAGS)"])],
     [SAK_BUILD=m4_normalize([
       '$(MKEXE_VIA_CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS)'])])
-  SAK="\$(ROOTDIR)/\$(RUNTIME_DIR)/sak${EXEEXT}"],
+  SAK="\$(ROOTDIR)/runtime/sak${EXEEXT}"],
   [AC_MSG_NOTICE([detecting the C toolchain for build])
   AX_PROG_CC_FOR_BUILD
   # Note that *-pc-windows is not supported for _build_ so we can use '-o'
   SAK_BUILD=m4_normalize(["$CC_FOR_BUILD $LDFLAGS_FOR_BUILD -o \$(1) \$(2)
     $CFLAGS_FOR_BUILD $CPPFLAGS_FOR_BUILD"])
-  SAK="\$(ROOTDIR)/\$(RUNTIME_DIR)/sak${BUILD_EXEEXT}"])
+  SAK="\$(ROOTDIR)/runtime/sak${BUILD_EXEEXT}"])
 
 # sak command to use to encode C literal strings
 

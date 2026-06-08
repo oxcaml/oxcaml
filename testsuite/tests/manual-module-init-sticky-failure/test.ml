@@ -24,7 +24,7 @@
    all_modules = "fail_config.cmx fail_c.cmx fail_b.cmx fail_a.cmx fail_d.cmx sticky_failure_test.cmx";
    ocamlopt.byte;
 
-   script = "${mkexe} -I${ocamlsrcdir}/${runtime_dir} -o test_driver test_modules.${objext} ${bytecc_libs} driver.c";
+   script = "${mkexe} -I${ocamlsrcdir}/runtime -o test_driver test_modules.${objext} ${bytecc_libs} driver.c";
    script;
 
    program = "./test_driver";

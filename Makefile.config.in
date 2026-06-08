@@ -242,8 +242,6 @@ OPAM=@opam@
 OPAM_SWITCH=@opam_switch@
 OPAM_EXEC=@opam_exec@
 
-RUNTIME_DIR=runtime
-
 # Deprecated variables
 
 ## Variables deprecated since OCaml 5.3
