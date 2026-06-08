@@ -1247,7 +1247,6 @@ Line 4, characters 12-13:
 Error: The module "M" is "local"
        but is expected to be "global"
          because it is used inside the function at lines 3-4, characters 21-22
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1266,7 +1265,6 @@ Line 4, characters 12-13:
 Error: The module "M" is "local"
        but is expected to be "global"
          because it is used inside the function at lines 3-4, characters 21-22
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1345,7 +1343,6 @@ Line 4, characters 20-36:
 Error: The module "M_Func_portable'" is "local"
        but is expected to be "global"
          because it is used inside the function at lines 3-5, characters 21-5
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 

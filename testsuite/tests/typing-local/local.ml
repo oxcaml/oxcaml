@@ -444,8 +444,6 @@ Line 10, characters 24-26:
 10 |   let _force_heap = ref fn in
                              ^^
 Error: This value is "local"
-         because it is allocated at lines 3-8, characters 9-7 containing data
-         which is "local"
          because it closes over the value "foo" at line 5, characters 25-28
          which is "local".
        However, the highlighted expression is expected to be "global".
@@ -582,7 +580,6 @@ Line 3, characters 43-44:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Some") in the value at line 3, characters 38-44
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -596,7 +593,6 @@ Line 3, characters 39-40:
 Error: The value "r" is "local"
        but is expected to be "global"
          because it is used inside the function at line 3, characters 14-68
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -610,7 +606,6 @@ Line 3, characters 64-65:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Some") in the value at line 3, characters 59-65
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -631,7 +626,6 @@ Line 2, characters 66-67:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Invalid_argument") in the value at line 2, characters 48-68
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -1022,7 +1016,6 @@ Line 3, characters 14-15:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "::") in the value at line 3, characters 14-20
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -2608,7 +2601,6 @@ Line 3, characters 8-9:
 Error: This value is "local"
        but is expected to be "global"
          because it is contained (via constructor "GFoo") in the value at line 3, characters 2-17
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -2680,7 +2672,6 @@ Line 1, characters 35-36:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is an element of the array at line 1, characters 32-46
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
