@@ -769,7 +769,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
         non_nullable
           (Pvariant { consts = [];
                       non_consts =
-                        [0, Lambda.mixed_block_shape_of_value_kinds fields] }))
+                        [0, Lambda.block_shape_of_value_kinds fields] }))
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -781,7 +781,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
-  : int * unit Lambda.mixed_block_element =
+  : int * unit Lambda.block_element =
   match field with
   | Scannable { separability } ->
     begin match ty with
@@ -931,11 +931,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | Cstr_record lbls ->
         List.for_all (fun lbl -> Jkind.Sort.Const.all_void lbl.ld_sort) lbls
     in
-    let rec mixed_block_shape_is_empty shape =
+    let rec block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
-    and mixed_block_element_is_empty (element : _ mixed_block_element) =
+    and mixed_block_element_is_empty (element : _ block_element) =
       match element with
-      | Product shape -> mixed_block_shape_is_empty shape
+      | Product shape -> block_shape_is_empty shape
       | _ -> false
     in
     let num_nodes_visited, raw_kind =
@@ -960,7 +960,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
               let consts = next_const :: consts in
               Some (num_nodes_visited,
                     next_const + 1, consts, next_tag, non_consts)
-            | shape when mixed_block_shape_is_empty shape ->
+            | shape when block_shape_is_empty shape ->
               let consts = next_const :: consts in
               Some (num_nodes_visited,
                     next_const + 1, consts, next_tag, non_consts)
@@ -1032,7 +1032,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                     num_nodes_visited, field)
                   num_nodes_visited labels
               in
-              num_nodes_visited, Lambda.mixed_block_shape_of_value_kinds fields
+              num_nodes_visited, Lambda.block_shape_of_value_kinds fields
           | Record_inlined (_, shape, _)
           | Record_boxed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in

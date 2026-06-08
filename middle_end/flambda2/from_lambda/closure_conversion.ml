@@ -235,7 +235,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     register_const acc dbg const "const_block"
   | Const_block (tag, shape, args) ->
     let shape =
-      Mixed_block_shape.of_mixed_block_elements
+      Mixed_block_shape.of_block_elements
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
         shape
     in
@@ -289,7 +289,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       | Value_only ->
         (* See Note [Constant all-value mixed records] in translcore.ml *)
         Misc.fatal_error
-          "Const_block: from_mixed_block_shape returned Value_only"
+          "Const_block: from_block_shape returned Value_only"
       | Mixed_record _ as block_shape -> block_shape
     in
     let acc, fields =
@@ -3878,7 +3878,7 @@ let final_module_block_representation acc
   let (block_shape : K.Scannable_block_shape.t), block_access, field_count =
     match module_repr with
     | shape, _ when Lambda.is_uniform_block_shape shape ->
-      let rec count_fields acc (elt : unit Lambda.mixed_block_element) =
+      let rec count_fields acc (elt : unit Lambda.block_element) =
         match elt with
         | Value _ -> acc + 1
         | Product elts -> Array.fold_left count_fields acc elts
@@ -3901,7 +3901,7 @@ let final_module_block_representation acc
       Value_only, block_access, field_count
     | shape, _ ->
       let shape =
-        K.Mixed_block_lambda_shape.of_mixed_block_elements shape
+        K.Mixed_block_lambda_shape.of_block_elements shape
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
       in
       let flattened_reordered_shape =

@@ -43,11 +43,11 @@ exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
-let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
-let mixed_block_shape_for_field pos value_kind =
+let block_shape_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -117,7 +117,7 @@ let transl_extension_constructor ~scopes env path ext =
          to pattern typing, as patterns can close over them. *)
       Lprim (Pmakeblock
           (Obj.object_tag, Immutable_unique,
-           mixed_block_shape_of_generic_values 2, alloc_heap),
+           block_shape_of_generic_values 2, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
          Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
@@ -248,10 +248,10 @@ let assert_failed loc ~scopes exp =
   in
   let loc = of_location ~scopes exp.exp_loc in
   Lprim(Praise Raise_regular, [event_after ~scopes exp
-    (Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 2,
+    (Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 2,
                       alloc_heap),
           [slot;
-           Lconst(Const_block(0, mixed_block_shape_of_generic_values 3,
+           Lconst(Const_block(0, block_shape_of_generic_values 3,
               [Const_base(Const_string (fname, exp.exp_loc, None));
                Const_base(Const_int line);
                Const_base(Const_int char)]))], loc))], loc)
@@ -524,11 +524,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
       begin try
-        Lconst(Const_block(0, Lambda.mixed_block_shape_of_value_kinds shape,
+        Lconst(Const_block(0, Lambda.block_shape_of_value_kinds shape,
                            List.map extract_constant ll))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable,
-                         Lambda.mixed_block_shape_of_value_kinds shape,
+                         Lambda.block_shape_of_value_kinds shape,
                          transl_alloc_mode alloc_mode),
               ll,
               (of_location ~scopes e.exp_loc))
@@ -647,11 +647,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
-            Lconst(Const_block(0, mixed_block_shape_of_generic_values 2,
+            Lconst(Const_block(0, block_shape_of_generic_values 2,
                                [const_int tag; extract_constant lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable,
-                             mixed_block_shape_of_generic_values 2,
+                             block_shape_of_generic_values 2,
                              transl_alloc_mode alloc_mode),
                   [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
@@ -698,7 +698,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               ( Pfield
                   ( [lbl.lbl_pos],
-                    mixed_block_shape_with_locality_mode_for_field
+                    block_shape_with_locality_mode_for_field
                       lbl.lbl_pos
                       { Lambda.generic_value with
                         raw_kind =
@@ -730,7 +730,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               ( Pfield
                   ( [lbl.lbl_pos + 1],
-                    mixed_block_shape_with_locality_mode_for_field
+                    block_shape_with_locality_mode_for_field
                       (lbl.lbl_pos + 1)
                       { Lambda.generic_value with
                         raw_kind =
@@ -817,7 +817,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           else
             Psetfield
               ( [lbl.lbl_pos],
-                mixed_block_shape_for_field
+                block_shape_for_field
                   lbl.lbl_pos
                   { Lambda.generic_value with
                     raw_kind =
@@ -841,7 +841,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           else
             Psetfield
               ( [lbl.lbl_pos + 1],
-                mixed_block_shape_for_field
+                block_shape_for_field
                   (lbl.lbl_pos + 1)
                   { Lambda.generic_value with
                     raw_kind =
@@ -926,7 +926,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 | Paddrarray | Pgcignorableaddrarray | Pintarray ->
                   Lconst
                     (Const_block
-                       (0, mixed_block_shape_of_generic_values (List.length cl),
+                       (0, block_shape_of_generic_values (List.length cl),
                         cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
@@ -1042,7 +1042,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         ap_func=
           Lprim(Pfield
                   ([0],
-                   Lambda.mixed_block_shape_of_generic_values 1,
+                   Lambda.block_shape_of_generic_values 1,
                    Reads_vary),
               [transl_class_path loc e.exp_env cl], loc);
         ap_args=[lambda_unit];
@@ -1389,7 +1389,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         ]
       in
       Lconst(
-        Const_block(0, mixed_block_shape_of_generic_values (List.length cl), cl))
+        Const_block(0, block_shape_of_generic_values (List.length cl), cl))
   | Texp_overwrite (_, _) ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
@@ -2492,7 +2492,7 @@ and transl_idx ~scopes loc env ba uas =
       (* CR layouts v8: this might unnecessarily compute the value kind, which
          shouldn't be needed for deepening *)
       let base_layout = layout env lbl.lbl_loc base_sort lbl.lbl_res in
-      let mbe = mixed_block_element_of_layout base_layout in
+      let mbe = block_element_of_layout base_layout in
       (* [uas_path] is a path into [mbe] *)
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
@@ -2510,7 +2510,7 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pmake_idx_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     | Record_float | Record_ufloat ->
-      let shape = Lambda.mixed_block_shape_of_generic_values (lbl.lbl_pos + 1) in
+      let shape = Lambda.block_shape_of_generic_values (lbl.lbl_pos + 1) in
       Lprim (Pmake_idx_field (shape, lbl.lbl_pos, []), [],
              (of_location ~scopes loc))
     | Record_inlined _ | Record_unboxed ->

@@ -43,7 +43,7 @@
 
 open Lambda
 
-let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -53,7 +53,7 @@ let mixed_block_shape_with_locality_mode_for_field pos value_kind =
 type block_size =
   | Regular_block of int
   | Float_record of int
-  | Mixed_record of Lambda.mixed_block_shape
+  | Mixed_record of Lambda.block_shape
 
 type size =
   | Unreachable
@@ -518,7 +518,7 @@ let rec split_static_function lfun block_var local_idents lam :
       Lprim
         ( Pfield
             ( [0],
-              mixed_block_shape_with_locality_mode_for_field
+              block_shape_with_locality_mode_for_field
                 0 Lambda.generic_value,
               lifted_block_read_sem ),
           [Lvar block_var],
@@ -553,7 +553,7 @@ let rec split_static_function lfun block_var local_idents lam :
     Reachable (lifted,
       Lprim (Pmakeblock
                         (0, lifted_block_mut,
-                         Lambda.mixed_block_shape_of_generic_values 1,
+                         Lambda.block_shape_of_generic_values 1,
                          Lambda.alloc_heap),
                       [Lvar v], no_loc))
   | Lfunction lfun ->
@@ -564,7 +564,7 @@ let rec split_static_function lfun block_var local_idents lam :
           let access =
             Lprim (Pfield
                      ( [i],
-                       mixed_block_shape_with_locality_mode_for_field
+                       block_shape_with_locality_mode_for_field
                          i Lambda.generic_value,
                        lifted_block_read_sem),
                    [Lvar block_var],
@@ -587,7 +587,7 @@ let rec split_static_function lfun block_var local_idents lam :
       Lprim (Pmakeblock
                ( 0,
                  lifted_block_mut,
-                 Lambda.mixed_block_shape_of_generic_values
+                 Lambda.block_shape_of_generic_values
                    (List.length block_fields_rev),
                  Lambda.alloc_heap),
              List.rev block_fields_rev,
@@ -968,7 +968,7 @@ let compile_letrec input_bindings body =
           | Mixed_record shape ->
             if !Clflags.native_code then
               let shape =
-                Mixed_block_shape.of_mixed_block_elements
+                Mixed_block_shape.of_block_elements
                   ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
                   shape
               in

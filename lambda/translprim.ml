@@ -25,7 +25,7 @@ open Translmode
 
 module String = Misc.Stdlib.String
 
-let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -666,35 +666,35 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%field0" ->
        Primitive
          (Pfield
-            ([0], mixed_block_shape_of_generic_values 1,
+            ([0], block_shape_of_generic_values 1,
              Reads_vary),
           1)
     | "%field1" ->
        Primitive
-         (Pfield ([1], mixed_block_shape_of_generic_values 2, Reads_vary), 1)
+         (Pfield ([1], block_shape_of_generic_values 2, Reads_vary), 1)
     | "%field0_immut" ->
        Primitive
-         (Pfield ([0], mixed_block_shape_of_generic_values 1, Reads_agree), 1)
+         (Pfield ([0], block_shape_of_generic_values 1, Reads_agree), 1)
     | "%field1_immut" ->
        Primitive
-         (Pfield ([1], mixed_block_shape_of_generic_values 2, Reads_agree), 1)
+         (Pfield ([1], block_shape_of_generic_values 2, Reads_agree), 1)
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
        Primitive
          (Psetfield
-            ([0], mixed_block_shape_of_generic_values 1, Assignment mode),
+            ([0], block_shape_of_generic_values 1, Assignment mode),
           2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive
          (Psetfield
-            ([1], mixed_block_shape_of_generic_values 2, Assignment mode),
+            ([1], block_shape_of_generic_values 2, Assignment mode),
           2);
     | "%makeblock" ->
        Primitive ((Pmakeblock(0, Immutable,
-                              mixed_block_shape_of_generic_values 0, mode)), 1)
+                              block_shape_of_generic_values 0, mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, mixed_block_shape_of_generic_values 0,
+       Primitive ((Pmakeblock(0, Mutable, block_shape_of_generic_values 0,
                               mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
@@ -1675,10 +1675,10 @@ let layout_of_ty_for_idx_set env loc ty =
     thing. *)
   let jkind = Ctype.type_jkind env ty in
   let mbe = Typedecl.mixed_block_element env ty jkind in
-  let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
+  let be = transl_mixed_block_element env (to_location loc) ty mbe in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
-  layout_of_mixed_block_element_for_idx_set ext mbe
+  layout_of_block_element_for_idx_set ext be
 
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
@@ -1837,11 +1837,11 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
         Some (Primitive (Pmakeblock(tag, mut,
-                           Lambda.mixed_block_shape_of_value_kinds shape,
+                           Lambda.block_shape_of_value_kinds shape,
                            mode), arity))
       else if List.length fields <> Array.length old_shape then
         Some (Primitive (Pmakeblock(tag, mut,
-                           Lambda.mixed_block_shape_of_generic_values
+                           Lambda.block_shape_of_generic_values
                              (List.length fields),
                            mode), arity))
       else None
@@ -2114,7 +2114,7 @@ let lambda_of_loc kind sloc =
         ] in
     Lconst
       (Const_block
-        (0, mixed_block_shape_of_generic_values (List.length fields), fields))
+        (0, block_shape_of_generic_values (List.length fields), fields))
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
@@ -2218,7 +2218,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
             Lprim
               ( Pfield
                   ( [0],
-                    mixed_block_shape_with_locality_mode_for_field 0 generic_value,
+                    block_shape_with_locality_mode_for_field 0 generic_value,
                     Reads_agree ),
                 [Lvar varg],
                 loc )
@@ -2227,7 +2227,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
             Lprim
               ( Pfield
                   ( [1],
-                    mixed_block_shape_with_locality_mode_for_field
+                    block_shape_with_locality_mode_for_field
                       1 { generic_value with raw_kind = Pintval },
                     Reads_agree ),
                 [Lvar varg],
@@ -2296,7 +2296,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 2,
+      Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 2,
                        alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
@@ -2346,7 +2346,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, mixed_block_shape_of_generic_values 2,
+          Pmakeblock (0, Immutable, block_shape_of_generic_values 2,
                       alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],

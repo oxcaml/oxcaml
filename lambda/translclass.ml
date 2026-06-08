@@ -36,11 +36,11 @@ let layout_table = layout_block
 let layout_meth = layout_any_value
 let layout_tables = layout_any_value
 
-let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
-let mixed_block_shape_for_field pos value_kind =
+let block_shape_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -102,7 +102,7 @@ let lfield v i =
   Lprim
     ( Pfield
         ( [i],
-          mixed_block_shape_with_locality_mode_for_field i generic_value,
+          block_shape_with_locality_mode_for_field i generic_value,
           Reads_vary ),
       [Lvar v],
       Loc_unknown )
@@ -113,7 +113,7 @@ let transl_meth_list lst =
   if lst = [] then Lconst const_unit else
   let fields = List.map (fun lab -> Const_immstring lab) lst in
   share (Const_block (0,
-                      mixed_block_shape_of_generic_values (List.length fields),
+                      block_shape_of_generic_values (List.length fields),
                       fields))
 
 let set_inst_var ~scopes obj id expr =
@@ -184,7 +184,7 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
         | Some envs ->
             let i = List.length inh_init + 1 in
             [Lprim(Pfield ([i],
-                           mixed_block_shape_with_locality_mode_for_field
+                           block_shape_with_locality_mode_for_field
                              i generic_value,
                            Reads_vary),
                    [Lvar envs],
@@ -339,7 +339,7 @@ let output_methods tbl methods lam =
   | _ ->
       let methods =
         Lprim (Pmakeblock (0, Immutable,
-                           mixed_block_shape_of_generic_values
+                           block_shape_of_generic_values
                             (List.length methods),
                            alloc_heap),
                methods, Loc_unknown)
@@ -364,7 +364,7 @@ let bind_id_as_val (id, _) = ("", id)
 
 let class_field i =
   Pfield
-    ([i], mixed_block_shape_with_locality_mode_for_field i generic_value, Reads_vary)
+    ([i], block_shape_with_locality_mode_for_field i generic_value, Reads_vary)
 
 let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
   match cl.cl_desc with
@@ -652,7 +652,7 @@ let transl_class_rebind ~scopes cl vf =
     Llet(
     Alias, layout_block, cla, cla_duid, path_lam,
     Lprim(Pmakeblock
-            (0, Immutable, mixed_block_shape_of_generic_values 4, alloc_heap),
+            (0, Immutable, block_shape_of_generic_values 4, alloc_heap),
           [mkappl(Lvar new_init, [lfield cla 0], layout_function);
            lfunction layout_function [lparam table table_duid layout_table]
              (Llet(Strict, layout_function, env_init, env_init_duid,
@@ -972,14 +972,14 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
       mkappl (Lvar class_init, [Lvar table], layout_function),
       Lsequence(
       mkappl (oo_prim "init_class", [Lvar table], layout_unit),
-      Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 4,
+      Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 4,
                        alloc_heap),
             [mkappl (Lvar env_init, [lambda_unit], layout_obj);
              Lvar class_init; Lvar env_init; lambda_unit],
             Loc_unknown)))),
       Static
   and lbody_virt lenvs =
-    Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 4,
+    Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 4,
                      alloc_heap),
           [lambda_unit; Lambda.lfunction
                           ~kind:(Curried {nlocal=0})
@@ -1011,14 +1011,14 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
     let menv =
       if !new_ids_meths = [] then lambda_unit else
       Lprim(Pmakeblock(0, Immutable,
-                       mixed_block_shape_of_generic_values
+                       block_shape_of_generic_values
                          (List.length !new_ids_meths),
                        alloc_heap),
             List.map (fun id -> Lvar id) !new_ids_meths,
             Loc_unknown) in
     if !new_ids_init = [] then menv else
     Lprim(Pmakeblock(0, Immutable,
-                     mixed_block_shape_of_generic_values
+                     block_shape_of_generic_values
                        (1 + List.length !new_ids_init),
                      alloc_heap),
           menv :: List.map (fun id -> Lvar id) !new_ids_init,
@@ -1032,7 +1032,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
     Llet(StrictOpt, layout_block, envs, envs_duid,
          (if linh_envs = [] then lenv else
          Lprim(Pmakeblock(0, Immutable,
-                          mixed_block_shape_of_generic_values
+                          block_shape_of_generic_values
                             (1 + List.length linh_envs),
                           alloc_heap),
                lenv :: linh_envs, Loc_unknown)),
@@ -1065,7 +1065,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                    ~ret_mode:alloc_heap
                    ~body:(def_ids cla cl_init), lam)
   and lset cached i lam =
-    Lprim(Psetfield([i], mixed_block_shape_for_field i generic_value,
+    Lprim(Psetfield([i], block_shape_for_field i generic_value,
                     Assignment modify_heap),
           [Lvar cached; lam], Loc_unknown)
   in
@@ -1121,7 +1121,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   if ids = []
   then mkappl (lfield cached 0, [lenvs], layout_obj), Dynamic
   else
-    Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 4,
+    Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 4,
                      alloc_heap),
         (if concrete then
           [mkappl (lfield cached 0, [lenvs], layout_obj);

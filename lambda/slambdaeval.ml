@@ -313,7 +313,7 @@ and eval_lam_shallow env lam =
 and eval_structured_const env const =
   match const with
   | Const_block (n, old_shape, old_consts) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_block_shape env old_shape in
     let new_consts =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
@@ -324,21 +324,21 @@ and eval_structured_const env const =
   | Const_null ->
     const
 
-and eval_mixed_block_shape :
-    'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
+and eval_block_shape :
+    'a. Env.t -> 'a block_element array -> 'a block_element array =
  fun env shape ->
-  Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
+  Misc.Stdlib.Array.map_sharing (eval_block_element env) shape
 
-and eval_mixed_block_element :
-    'a. Env.t -> 'a mixed_block_element -> 'a mixed_block_element =
+and eval_block_element :
+    'a. Env.t -> 'a block_element -> 'a block_element =
  fun env element ->
   match element with
   | Splice_variable id ->
     eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
+    |> expect_not_missing |> expect Tlayout |> block_element_of_layout
   | Product old_elements ->
     let new_elements =
-      Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
+      Misc.Stdlib.Array.map_sharing (eval_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
@@ -387,13 +387,13 @@ and eval_lfunction_shallow env
 and eval_prim env prim =
   match prim with
   | Pmakeblock (n, mut, old_shape, mode) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
   | Pfield (is, old_shape, sem) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape then prim else Pfield (is, new_shape, sem)
   | Psetfield (is, old_shape, init_or_assign) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape
     then prim
     else Psetfield (is, new_shape, init_or_assign)
@@ -412,17 +412,17 @@ and eval_prim env prim =
     then prim
     else Punboxed_product_field (i, new_layouts)
   | Pmake_idx_field (old_shape, i, path) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape
     then prim
     else Pmake_idx_field (new_shape, i, path)
   | Pmake_idx_array (kind, index_kind, old_element, path) ->
-    let new_element = eval_mixed_block_element env old_element in
+    let new_element = eval_block_element env old_element in
     if new_element == old_element
     then prim
     else Pmake_idx_array (kind, index_kind, new_element, path)
   | Pidx_deepen (old_element, path) ->
-    let new_element = eval_mixed_block_element env old_element in
+    let new_element = eval_block_element env old_element in
     if new_element == old_element then prim else Pidx_deepen (new_element, path)
   | Popaque old_layout ->
     let new_layout = eval_layout env old_layout in
@@ -498,17 +498,17 @@ let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Punboxed_product layouts ->
     List.iter assert_layout_contains_no_splices layouts
 
-let rec assert_mixed_block_element_contains_no_splices : type a.
-    a Lambda.mixed_block_element -> unit = function
+let rec assert_block_element_contains_no_splices : type a.
+    a Lambda.block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     ()
   | Product elements ->
-    Array.iter assert_mixed_block_element_contains_no_splices elements
+    Array.iter assert_block_element_contains_no_splices elements
 
-let assert_mixed_block_shape_contains_no_splices shape =
-  Array.iter assert_mixed_block_element_contains_no_splices shape
+let assert_block_shape_contains_no_splices shape =
+  Array.iter assert_block_element_contains_no_splices shape
 
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
@@ -524,11 +524,11 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pmakeblock (_, _, shape, _)
   | Psetfield (_, shape, _)
   | Pmake_idx_field (shape, _, _) ->
-    assert_mixed_block_shape_contains_no_splices shape
+    assert_block_shape_contains_no_splices shape
   | Pfield (_, shape, _) ->
-    assert_mixed_block_shape_contains_no_splices shape
+    assert_block_shape_contains_no_splices shape
   | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
-    assert_mixed_block_element_contains_no_splices element
+    assert_block_element_contains_no_splices element
   | _ -> ()
 
 let assert_function_contains_no_splices { Lambda.params; return; _ } =

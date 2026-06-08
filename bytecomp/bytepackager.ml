@@ -321,8 +321,8 @@ let package_object_files ~ppf_dump files target coercion =
       (* Open modules not supported with packs, so always just a record *)
       Mb_struct
         { mb_repr =
-            (Lambda.mixed_block_shape_of_generic_values main_module_block_size,
-             Lambda.mixed_block_shape_of_generic_values main_module_block_size)
+            (Lambda.block_shape_of_generic_values main_module_block_size,
+             Lambda.block_shape_of_generic_values main_module_block_size)
         }
     in
     let compunit =

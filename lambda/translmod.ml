@@ -28,7 +28,7 @@ open Debuginfo.Scoped_location
 
 let const_int i = Lambda.const_int i
 
-let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -300,7 +300,7 @@ let undefined_location loc =
       const_int char
     ]
   in
-  Lconst(Const_block(0, mixed_block_shape_of_generic_values (List.length fields),
+  Lconst(Const_block(0, block_shape_of_generic_values (List.length fields),
                      fields))
 
 exception Initialization_failure of unsafe_info
@@ -317,11 +317,11 @@ let init_shape id modl =
         let inner_fields = init_shape_struct env sg in
         let fields =
           [ Const_block
-              (0, mixed_block_shape_of_generic_values (List.length inner_fields),
+              (0, block_shape_of_generic_values (List.length inner_fields),
                inner_fields)
           ]
         in
-        Const_block(0, mixed_block_shape_of_generic_values (List.length fields),
+        Const_block(0, block_shape_of_generic_values (List.length fields),
                     fields)
     | Mty_functor _ ->
         (* can we do better? *)
@@ -1040,9 +1040,8 @@ let required_globals ~flambda body =
 
 let add_arg_block_to_module_representation (shape, shape_for_read) =
   (* NB: this assumes [arg_block] has layout value *)
-  ( Array.append shape [| mixed_block_element_for_module |],
-    Array.append shape_for_read
-      [| mixed_block_element_with_locality_mode_for_module |]
+  ( Array.append shape [| block_element_for_module |],
+    Array.append shape_for_read  [| block_element_with_locality_mode_for_module |]
   )
 
 let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
@@ -1108,7 +1107,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, mixed_block_shape_of_generic_values 1,
+  Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 1,
                    Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
@@ -1198,7 +1197,7 @@ let toploop_getvalue id =
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield
                     ([toploop_getvalue_pos],
-                     mixed_block_shape_with_locality_mode_for_field
+                     block_shape_with_locality_mode_for_field
                        toploop_getvalue_pos generic_value,
                      Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
@@ -1222,7 +1221,7 @@ let toploop_setvalue id lam =
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield
                     ([toploop_setvalue_pos],
-                     mixed_block_shape_with_locality_mode_for_field
+                     block_shape_with_locality_mode_for_field
                        toploop_setvalue_pos generic_value,
                      Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
@@ -1414,8 +1413,8 @@ let transl_package component_names coercion =
   field_count,
   apply_coercion Loc_unknown Strict coercion
     (Lprim(block_of_module_representation ~loc:Location.none
-             ( mixed_block_shape_of_generic_values (List.length component_names),
-               mixed_block_shape_of_generic_values
+             ( block_shape_of_generic_values (List.length component_names),
+               block_shape_of_generic_values
                  (List.length component_names) ),
            List.map get_component component_names,
            Loc_unknown))
@@ -1457,8 +1456,8 @@ let transl_instance_impl
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
     Lprim (mod_field 0
-             ( mixed_block_shape_of_generic_values 1,
-               mixed_block_shape_of_generic_values 1 ),
+             ( block_shape_of_generic_values 1,
+               block_shape_of_generic_values 1 ),
       [Lprim (Pgetglobal (base_compilation_unit, Dynamic), [], Loc_unknown)],
       Loc_unknown)
   in

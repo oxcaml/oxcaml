@@ -258,7 +258,7 @@ let init () =
       let c = slot_for_setglobal global in
       let cst = Const_block
           (Obj.object_tag,
-           Lambda.mixed_block_shape_of_generic_values 2,
+           Lambda.block_shape_of_generic_values 2,
            [Const_base(Const_string (name, Location.none,None));
             Const_base(Const_int (-i-1))
            ])

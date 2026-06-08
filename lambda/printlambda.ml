@@ -165,8 +165,8 @@ let or_null_suffix ppf nullable =
   | Non_nullable -> ()
   | Nullable -> fprintf ppf "_or_null"
 
-let rec mixed_block_element
-  : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
+let rec block_element
+  : 'a. (_ -> 'a -> _) -> _ -> 'a block_element -> _ =
   fun print_mode ppf elt ->
   match elt with
   | Value vk -> value_kind ppf vk
@@ -184,22 +184,22 @@ let rec mixed_block_element
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a"
-      (mixed_block_shape print_mode) shape
+      (block_shape print_mode) shape
   | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
-and mixed_block_shape
-  : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
+and block_shape
+  : 'a. (_ -> 'a -> _) -> _ -> 'a block_element array -> _
   = fun print_mode ppf shape ->
   match Array.length shape with
   | 0 -> ()
   | 1 -> fprintf ppf "(%a)"
-          (mixed_block_element print_mode) shape.(0)
+          (block_element print_mode) shape.(0)
   | _ -> begin
     Array.iteri (fun i elt ->
       if i = 0 then
-        fprintf ppf "(%a" (mixed_block_element print_mode) elt
+        fprintf ppf "(%a" (block_element print_mode) elt
       else
-        fprintf ppf ",%a" (mixed_block_element print_mode) elt)
+        fprintf ppf ",%a" (block_element print_mode) elt)
       shape;
     fprintf ppf ")"
   end
@@ -207,7 +207,7 @@ and mixed_block_shape
 and tag_and_constructor_shape ppf (tag, shape) =
   fprintf ppf "@[<hov 1>[%d:@ %a]@]"
     tag
-    (mixed_block_shape (fun ppf () -> fprintf ppf "()"))
+    (block_shape (fun ppf () -> fprintf ppf "()"))
     shape
 
 
@@ -334,9 +334,9 @@ let record_rep ppf r = match r with
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
 
-let block_shape ppf shape =
+let block_shape_elide_uniform ppf shape =
   if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) shape then ()
-  else fprintf ppf " %a" (mixed_block_shape (fun _ () -> ())) shape
+  else fprintf ppf " %a" (block_shape (fun _ () -> ())) shape
 
 let field_path ppf path =
   pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int ppf path
@@ -364,7 +364,7 @@ let singleton_value_field path shape =
       None)
   | [] | _ :: _ -> None
 
-let rec is_value_or_void_element : 'a. 'a mixed_block_element -> bool = function
+let rec is_value_or_void_element : 'a. 'a block_element -> bool = function
   | Value _ -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
@@ -413,13 +413,13 @@ let primitive ppf = function
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
-        (locality_mode_if_local mode) tag block_shape shape
+        (locality_mode_if_local mode) tag block_shape_elide_uniform shape
   | Pmakeblock(tag, Immutable_unique, shape, mode) ->
       fprintf ppf "make%sblock_unique %i%a"
-        (locality_mode_if_local mode) tag block_shape shape
+        (locality_mode_if_local mode) tag block_shape_elide_uniform shape
   | Pmakeblock(tag, Mutable, shape, mode) ->
       fprintf ppf "make%smutable %i%a"
-        (locality_mode_if_local mode) tag block_shape shape
+        (locality_mode_if_local mode) tag block_shape_elide_uniform shape
   | Pmakefloatblock (Immutable, mode) ->
       fprintf ppf "make%sfloatblock Immutable"
         (locality_mode_if_local mode)
@@ -456,13 +456,13 @@ let primitive ppf = function
       | _, false ->
         fprintf ppf "mixedfield%a %a %a"
           field_read_semantics sem field_path path
-          (mixed_block_shape
+          (block_shape
             (fun ppf mode -> fprintf ppf "%s" (locality_mode_if_local mode)))
           shape
       | None, true ->
       fprintf ppf "field%a %a %a"
         field_read_semantics sem field_path path
-        (mixed_block_shape
+        (block_shape
           (fun ppf mode -> fprintf ppf "%s" (locality_mode_if_local mode)))
         shape
     end
@@ -488,10 +488,10 @@ let primitive ppf = function
         fprintf ppf "setfield_%s%s %i" instr init pos
       | _, false ->
         fprintf ppf "setmixedfield%s %a %a"
-          init field_path path (mixed_block_shape (fun _ _ -> ())) shape
+          init field_path path (block_shape (fun _ _ -> ())) shape
       | None, true ->
       fprintf ppf "setfield%s %a %a"
-        init field_path path (mixed_block_shape (fun _ _ -> ())) shape
+        init field_path path (block_shape (fun _ _ -> ())) shape
       end
   | Psetfield_computed (ptr, init) ->
       let instr =
@@ -549,18 +549,18 @@ let primitive ppf = function
       fprintf ppf "array_element_size_in_bytes (%s)" (array_kind ak)
   | Pmake_idx_field (shape, pos, path) ->
       fprintf ppf "idx_field %a %a %a"
-        (mixed_block_shape (fun _ _ -> ())) shape
+        (block_shape (fun _ _ -> ())) shape
         pp_print_int pos
         field_path path
   | Pmake_idx_array (ak, ik, mbe, path) ->
       fprintf ppf "idx_array %s %a %a %a"
         (array_kind ak) array_index_kind ik
-        (mixed_block_element (fun _ppf () -> ())) mbe
+        (block_element (fun _ppf () -> ())) mbe
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
           path
   | Pidx_deepen (mbe, path) ->
       fprintf ppf "idx_deepen %a %a"
-        (mixed_block_element (fun _ppf () -> ())) mbe
+        (block_element (fun _ppf () -> ())) mbe
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
           path
   | Pccall p -> fprintf ppf "%s" p.prim_name
@@ -1241,7 +1241,7 @@ let rec struct_const ppf = function
       then fprintf ppf "@[<1>[%i:@ @[%a@]]@]" tag struct_consts (hd, tl)
       else
       fprintf ppf "@[<1>[%i:@ (shape@ %a)@ @[%a@]]@]" tag
-        (mixed_block_shape (fun _ _ -> ())) shape struct_consts (hd, tl)
+        (block_shape (fun _ _ -> ())) shape struct_consts (hd, tl)
   | Const_float_block [] ->
       fprintf ppf "[|b |]"
   | Const_float_block (f1 :: fl) ->

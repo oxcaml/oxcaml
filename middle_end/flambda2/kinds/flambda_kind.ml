@@ -1024,7 +1024,7 @@ module With_subkind = struct
                     if Lambda.is_uniform_block_shape shape
                     then
                       let fields =
-                        Lambda.mixed_block_element_leaves (Product shape)
+                        Lambda.block_element_leaves (Product shape)
                         |> List.map (function
                           | Lambda.Value value_kind -> value_kind
                           | Lambda.Product _ | Lambda.Float_boxed _
@@ -1042,7 +1042,7 @@ module With_subkind = struct
                       )
                     else
                       let mixed_block_shape =
-                        Mixed_block_lambda_shape.of_mixed_block_elements
+                        Mixed_block_lambda_shape.of_block_elements
                           ~print_locality:(fun ppf () ->
                             Format.fprintf ppf "()")
                           shape

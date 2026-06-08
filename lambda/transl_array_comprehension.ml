@@ -233,7 +233,7 @@ end = struct
     Lprim
       ( Praise Raise_regular,
         [ Lprim
-            ( Pmakeblock (0, Immutable, mixed_block_shape_of_generic_values 2,
+            ( Pmakeblock (0, Immutable, block_shape_of_generic_values 2,
                           alloc_heap),
               [ slot;
                 string ~loc:loc'

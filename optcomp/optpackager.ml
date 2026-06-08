@@ -132,9 +132,9 @@ end) : S = struct
         let main_module_block_format : Lambda.main_module_block_format =
           Mb_struct
             { mb_repr =
-                ( Lambda.mixed_block_shape_of_generic_values
+                ( Lambda.block_shape_of_generic_values
                     main_module_block_size,
-                  Lambda.mixed_block_shape_of_generic_values
+                  Lambda.block_shape_of_generic_values
                     main_module_block_size )
             }
         in
@@ -202,8 +202,8 @@ end) : S = struct
       (* Open modules not supported with packs, so always just a record *)
       Mb_struct
         { mb_repr =
-            (Lambda.mixed_block_shape_of_generic_values main_module_block_size,
-             Lambda.mixed_block_shape_of_generic_values main_module_block_size)
+            (Lambda.block_shape_of_generic_values main_module_block_size,
+             Lambda.block_shape_of_generic_values main_module_block_size)
         }
     in
     let pkg_infos =

@@ -172,8 +172,8 @@ type ('a, 'b) singleton_or_product =
   | Singleton of 'a
   | Product of 'b
 
-let singleton_or_product_of_mixed_block_element
-    (elt : _ Lambda.mixed_block_element) :
+let singleton_or_product_of_block_element
+    (elt : _ Lambda.block_element) :
     (_ Singleton_mixed_block_element.t, _) singleton_or_product =
   match elt with
   | Value vk -> Singleton (Value vk)
@@ -195,20 +195,20 @@ let singleton_or_product_of_mixed_block_element
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
     Misc.fatal_error
-      "singleton_or_product_of_mixed_block_element: Splice_variable"
+      "singleton_or_product_of_block_element: Splice_variable"
 
 (* CR-soon xclerc for xclerc: it is probably quite inefficient to map/concat
    repeatedly. *)
 let rec flatten_one :
-    int -> 'a Lambda.mixed_block_element -> 'a shape_with_paths =
+    int -> 'a Lambda.block_element -> 'a shape_with_paths =
  fun index element ->
-  match singleton_or_product_of_mixed_block_element element with
+  match singleton_or_product_of_block_element element with
   | Singleton element -> [| element, [index] |]
   | Product sub_elements ->
     flatten_list sub_elements
     |> Array.map (fun (sub_element, path) -> sub_element, index :: path)
 
-and flatten_list : 'a Lambda.mixed_block_element array -> 'a shape_with_paths =
+and flatten_list : 'a Lambda.block_element array -> 'a shape_with_paths =
  fun sub_elements ->
   Array.mapi flatten_one sub_elements |> Misc.Stdlib.Array.concat_arrays
 
@@ -216,10 +216,10 @@ let rec build_tree_one :
     (path, int) Hashtbl.t ->
     path ->
     int ->
-    'a Lambda.mixed_block_element ->
+    'a Lambda.block_element ->
     'a tree =
  fun old_path_to_new_index path index element ->
-  match singleton_or_product_of_mixed_block_element element with
+  match singleton_or_product_of_block_element element with
   | Singleton element -> (
     let path = List.rev (index :: path) in
     match Hashtbl.find_opt old_path_to_new_index path with
@@ -236,7 +236,7 @@ let rec build_tree_one :
 and build_tree_list :
     (path, int) Hashtbl.t ->
     path ->
-    'a Lambda.mixed_block_element array ->
+    'a Lambda.block_element array ->
     'a tree array =
  fun old_path_to_new_index path sub_elements ->
   Array.mapi
@@ -244,8 +244,8 @@ and build_tree_list :
       build_tree_one old_path_to_new_index path i sub_element)
     sub_elements
 
-let of_mixed_block_elements ~print_locality
-    (original_shape : 'a Lambda.mixed_block_element array) : 'a t =
+let of_block_elements ~print_locality
+    (original_shape : 'a Lambda.block_element array) : 'a t =
   let flattened_shape_with_paths = flatten_list original_shape in
   let prefix = ref [] in
   let suffix = ref [] in

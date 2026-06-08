@@ -52,7 +52,7 @@ val zero : t
 
 val add : t -> t -> t
 
-val count : _ Lambda.mixed_block_element -> t
+val count : _ Lambda.block_element -> t
 
 val count_types_shape : Types.mixed_product_shape -> t
 
@@ -63,7 +63,7 @@ val value_prefix_len : t -> int
 val all_value : t -> bool
 
 (* shape_is_all_value shape = all_value (count (Product shape)) *)
-val shape_is_all_value : _ Lambda.mixed_block_element array -> bool
+val shape_is_all_value : _ Lambda.block_element array -> bool
 
 (* shape_is_all_value shape = all_value (count_types_shape shape) *)
 val types_shape_is_all_value : Types.mixed_product_shape -> bool
@@ -91,12 +91,12 @@ module Wrt_path : sig
   (** Given an outer mixed block element, and a path into that as a list of
       positions, count value/flat bytes to the left, at, and to the right that
       subelement *)
-  val count : unit Lambda.mixed_block_element -> int list -> t
+  val count : unit Lambda.block_element -> int list -> t
 
-  (** Similar to the above, except for a [mixed_block_shape] (which corresponds
-      to a boxed record, while a [unit mixed_block_element] corresponds to an
+  (** Similar to the above, except for a [block_shape] (which corresponds
+      to a boxed record, while a [unit block_element] corresponds to an
       unboxed record (within an array or boxed record). *)
-  val count_shape : Lambda.mixed_block_shape -> int -> int list -> t
+  val count_shape : Lambda.block_shape -> int -> int list -> t
 
   val all : t -> mpb
 

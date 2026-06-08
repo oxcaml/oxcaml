@@ -25,7 +25,7 @@ val program: formatter -> program -> unit
 val primitive: formatter -> primitive -> unit
 val name_of_primitive : primitive -> string
 val variant_kind :
-  formatter -> consts:int list -> non_consts:(int * mixed_block_shape) list ->
+  formatter -> consts:int list -> non_consts:(int * block_shape) list ->
   unit
 val value_kind : formatter -> value_kind -> unit
 val layout : formatter -> layout -> unit
@@ -40,4 +40,4 @@ val array_kind : array_kind -> string
 val array_set_kind : formatter -> array_set_kind -> unit
 val array_ref_kind : formatter -> array_ref_kind -> unit
 
-val tag_and_constructor_shape : formatter -> int * mixed_block_shape -> unit
+val tag_and_constructor_shape : formatter -> int * block_shape -> unit

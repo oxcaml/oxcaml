@@ -99,7 +99,7 @@ module Scoped_location = Debuginfo.Scoped_location
 
 let dbg = false
 
-let mixed_block_shape_with_locality_mode_for_field pos value_kind =
+let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -2037,7 +2037,7 @@ let nonconstant_variant_field ubr index =
   let sem = add_barrier_to_read ubr Reads_agree in
   Lambda.Pfield
     ( [index],
-      mixed_block_shape_with_locality_mode_for_field index generic_value,
+      block_shape_with_locality_mode_for_field index generic_value,
       sem )
 
 let get_expr_args_variant_nonconst ~scopes head (arg, _mut, _sort, _layout)
@@ -2167,7 +2167,7 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
 let lazy_forward_field =
   Lambda.Pfield
     ( [0],
-      mixed_block_shape_with_locality_mode_for_field 0 generic_value,
+      block_shape_with_locality_mode_for_field 0 generic_value,
       Reads_vary )
 
 let inline_lazy_force_cond arg pos loc =
@@ -2230,7 +2230,7 @@ let inline_lazy_force_switch arg pos loc =
                       Lprim
                         ( Pfield
                             ( [0],
-                              mixed_block_shape_with_locality_mode_for_field
+                              block_shape_with_locality_mode_for_field
                                 0 generic_value,
                               Reads_vary ),
                           [varg],
@@ -2317,7 +2317,7 @@ let get_expr_args_tuple ~scopes head (arg, _mut, _sort, _layout) rem =
       (Lprim
          (Pfield
             ([pos],
-             mixed_block_shape_with_locality_mode_for_field pos generic_value,
+             block_shape_with_locality_mode_for_field pos generic_value,
              sem),
           [arg], loc),
        str,
@@ -2412,7 +2412,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
             Lprim
               (Pfield
                  ([lbl.lbl_pos],
-                  mixed_block_shape_with_locality_mode_for_field
+                  block_shape_with_locality_mode_for_field
                     lbl.lbl_pos
                     { generic_value with
                       raw_kind = value_kind_of_pointerness ptr
@@ -2436,7 +2436,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
             Lprim
               (Pfield
                  ([lbl.lbl_pos + 1],
-                  mixed_block_shape_with_locality_mode_for_field
+                  block_shape_with_locality_mode_for_field
                     (lbl.lbl_pos + 1)
                     { generic_value with
                       raw_kind = value_kind_of_pointerness ptr
@@ -3417,7 +3417,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                     Lprim
                       (Pfield
                          ([0],
-                          mixed_block_shape_with_locality_mode_for_field
+                          block_shape_with_locality_mode_for_field
                             0 generic_value,
                           sem),
                        [ arg ], loc),
@@ -4197,13 +4197,13 @@ let failure_handler ~scopes loc ~failer () =
     Lprim
       ( Praise Raise_regular,
         [ Lprim
-            ( Pmakeblock (0, Immutable, mixed_block_shape_of_generic_values 2,
+            ( Pmakeblock (0, Immutable, block_shape_of_generic_values 2,
                           alloc_heap),
               [ slot;
                 Lconst
                   (Const_block
                      ( 0,
-                       mixed_block_shape_of_generic_values 3,
+                       block_shape_of_generic_values 3,
                        [ Const_base (Const_string (fname, loc, None));
                          Const_base (Const_int line);
                          Const_base (Const_int char)
@@ -4581,7 +4581,7 @@ let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list pa
     let shape =
       paraml
       |> List.map (fun (_lam, _sort, layout) -> must_be_value layout)
-      |> mixed_block_shape_of_value_kinds
+      |> block_shape_of_value_kinds
     in
     Lprim
       (Pmakeblock (0, Immutable, shape, mode),
@@ -4678,7 +4678,7 @@ let for_optional_arg_default
               that could degrade performance of programs not using uniqueness *)
            (Pfield
               ([0],
-               mixed_block_shape_with_locality_mode_for_field 0 generic_value,
+               block_shape_with_locality_mode_for_field 0 generic_value,
                Reads_agree),
             [ Lvar param ],
             sloc))

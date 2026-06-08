@@ -115,7 +115,7 @@ let ( rev_list_to_list,
 let rev_list_snoc_local ~loc ~init ~last =
   Lprim
     (Pmakeblock
-      (0, Immutable, mixed_block_shape_of_generic_values 2, alloc_local),
+      (0, Immutable, block_shape_of_generic_values 2, alloc_local),
      [init; last], loc)
 
 (** The [CamlinternalComprehension.Nil] constructor, for building the
