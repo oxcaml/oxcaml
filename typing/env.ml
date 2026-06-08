@@ -1510,6 +1510,7 @@ let type_of_cstr path = function
 type unboxed_version_step =
   | Lacks_unboxed_version
   | Aliases of Path.t * type_expr list
+  | Boxes of type_expr
   | Has_unboxed_version of type_declaration
 let step_find_unboxed_version decl =
   match decl.type_unboxed_version with
@@ -1527,9 +1528,12 @@ let step_find_unboxed_version decl =
       match decl.type_manifest with
       | None -> Lacks_unboxed_version
       | Some ty ->
-        match get_desc ty with
-        | Tconstr (path, args, _) -> Aliases (path, args)
-        | _ -> Lacks_unboxed_version
+        match Btype.simple_unbox_ty ty with
+        | Some ty -> Boxes ty
+        | None ->
+          match get_desc ty with
+          | Tconstr (path, args, _) -> Aliases (path, args)
+          | _ -> Lacks_unboxed_version
 
 let rec find_type_data path env seen =
   match
@@ -1577,11 +1581,44 @@ and find_type_unboxed_version path env seen =
   match step_find_unboxed_version decl with
   | Has_unboxed_version ud -> ud
   | Lacks_unboxed_version -> raise Not_found
+  | Boxes inner ->
+    {
+      type_params = decl.type_params;
+      type_arity = decl.type_arity;
+      type_kind = Type_abstract Definition;
+      type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf
+             "env unboxed Tbox manifest path=%a" Path.print path);
+      type_private = decl.type_private;
+      type_manifest = Some inner;
+      type_variance = decl.type_variance;
+      type_separability =
+        Types.Separability.default_signature ~arity:decl.type_arity;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = decl.type_loc;
+      type_attributes = decl.type_attributes;
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version decl.type_uid;
+      type_unboxed_version = None;
+    }
   | Aliases (path, args) ->
+    (* CR box rtjoa: Here, we are approximate. Say we have [type 'a id = 'a],
+       and we try to find the unboxed version of [type t = float id]. We'll step
+       to [Aliases (id, [float])], and then mistakenly assume here that [id]
+       doesn't have an unboxed version, because we look up its path - even
+       though it could, depending on the arguments.
+
+       Nested boxed types fail for the same reason, as [box#] is like [id] (the
+       unboxed version of ['a box] is ['a]).
+    *)
     let ud = find_type_unboxed_version path env seen in
     let man =
       Btype.newgenty
-        (Tconstr (Path.unboxed_version path, args, ref Mnil)) in
+        (Tconstr (Path.unboxed_version path, args, ref Mnil))
+    in
     let jkind = ud.type_jkind in
     (* CR layouts v7.2: compute the exact separability *)
     (* As this unboxed version aliases [ud], its params' separabilities can

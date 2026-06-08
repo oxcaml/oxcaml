@@ -361,7 +361,7 @@ do_pause:
 
 (* Native pointer load/store - int64 *)
 
-let ptr_load_int64 (p : nativeint#) =
+let ptr_load_int64 (p : nativeint_u) =
   Builtins.native_pointer_load_int64 p
 [%%expect_asm X86_64{|
 ptr_load_int64:
@@ -369,7 +369,7 @@ ptr_load_int64:
   ret
 |}]
 
-let ptr_store_int64 (p : nativeint#) (v : int64#) =
+let ptr_store_int64 (p : nativeint_u) (v : int64_u) =
   Builtins.native_pointer_store_int64 p v
 [%%expect_asm X86_64{|
 ptr_store_int64:
@@ -380,7 +380,7 @@ ptr_store_int64:
 
 (* Native pointer load/store - int32 *)
 
-let ptr_load_int32 (p : nativeint#) =
+let ptr_load_int32 (p : nativeint_u) =
   Builtins.native_pointer_load_int32 p
 [%%expect_asm X86_64{|
 ptr_load_int32:
@@ -388,7 +388,7 @@ ptr_load_int32:
   ret
 |}]
 
-let ptr_store_int32 (p : nativeint#) (v : int32#) =
+let ptr_store_int32 (p : nativeint_u) (v : int32_u) =
   Builtins.native_pointer_store_int32 p v
 [%%expect_asm X86_64{|
 ptr_store_int32:
@@ -399,7 +399,7 @@ ptr_store_int32:
 
 (* Native pointer load/store - nativeint *)
 
-let ptr_load_nativeint (p : nativeint#) =
+let ptr_load_nativeint (p : nativeint_u) =
   Builtins.native_pointer_load_nativeint p
 [%%expect_asm X86_64{|
 ptr_load_nativeint:
@@ -407,7 +407,7 @@ ptr_load_nativeint:
   ret
 |}]
 
-let ptr_store_nativeint (p : nativeint#) (v : nativeint#) =
+let ptr_store_nativeint (p : nativeint_u) (v : nativeint_u) =
   Builtins.native_pointer_store_nativeint p v
 [%%expect_asm X86_64{|
 ptr_store_nativeint:
@@ -418,7 +418,7 @@ ptr_store_nativeint:
 
 (* Native pointer load/store - float *)
 
-let ptr_load_float (p : nativeint#) =
+let ptr_load_float (p : nativeint_u) =
   Builtins.native_pointer_load_float p
 [%%expect_asm X86_64{|
 ptr_load_float:
@@ -426,7 +426,7 @@ ptr_load_float:
   ret
 |}]
 
-let ptr_store_float (p : nativeint#) (v : float#) =
+let ptr_store_float (p : nativeint_u) (v : float#) =
   Builtins.native_pointer_store_float p v
 [%%expect_asm X86_64{|
 ptr_store_float:
@@ -437,7 +437,7 @@ ptr_store_float:
 
 (* Native pointer load/store - uint8 *)
 
-let ptr_load_uint8 (p : nativeint#) =
+let ptr_load_uint8 (p : nativeint_u) =
   Builtins.native_pointer_load_uint8 p
 [%%expect_asm X86_64{|
 ptr_load_uint8:
@@ -445,7 +445,7 @@ ptr_load_uint8:
   ret
 |}]
 
-let ptr_store_uint8 (p : nativeint#) (v : int) =
+let ptr_store_uint8 (p : nativeint_u) (v : int) =
   Builtins.native_pointer_store_uint8 p v
 [%%expect_asm X86_64{|
 ptr_store_uint8:
@@ -456,7 +456,7 @@ ptr_store_uint8:
 
 (* Native pointer load/store - sint8 *)
 
-let ptr_load_sint8 (p : nativeint#) =
+let ptr_load_sint8 (p : nativeint_u) =
   Builtins.native_pointer_load_sint8 p
 [%%expect_asm X86_64{|
 ptr_load_sint8:
@@ -464,7 +464,7 @@ ptr_load_sint8:
   ret
 |}]
 
-let ptr_store_sint8 (p : nativeint#) (v : int) =
+let ptr_store_sint8 (p : nativeint_u) (v : int) =
   Builtins.native_pointer_store_sint8 p v
 [%%expect_asm X86_64{|
 ptr_store_sint8:
@@ -475,7 +475,7 @@ ptr_store_sint8:
 
 (* Native pointer load/store - uint16 *)
 
-let ptr_load_uint16 (p : nativeint#) =
+let ptr_load_uint16 (p : nativeint_u) =
   Builtins.native_pointer_load_uint16 p
 [%%expect_asm X86_64{|
 ptr_load_uint16:
@@ -483,7 +483,7 @@ ptr_load_uint16:
   ret
 |}]
 
-let ptr_store_uint16 (p : nativeint#) (v : int) =
+let ptr_store_uint16 (p : nativeint_u) (v : int) =
   Builtins.native_pointer_store_uint16 p v
 [%%expect_asm X86_64{|
 ptr_store_uint16:
@@ -494,7 +494,7 @@ ptr_store_uint16:
 
 (* Native pointer load/store - sint16 *)
 
-let ptr_load_sint16 (p : nativeint#) =
+let ptr_load_sint16 (p : nativeint_u) =
   Builtins.native_pointer_load_sint16 p
 [%%expect_asm X86_64{|
 ptr_load_sint16:
@@ -502,7 +502,7 @@ ptr_load_sint16:
   ret
 |}]
 
-let ptr_store_sint16 (p : nativeint#) (v : int) =
+let ptr_store_sint16 (p : nativeint_u) (v : int) =
   Builtins.native_pointer_store_sint16 p v
 [%%expect_asm X86_64{|
 ptr_store_sint16:
@@ -513,7 +513,7 @@ ptr_store_sint16:
 
 (* Native pointer atomics - int *)
 
-let ptr_fetch_add_int (p : nativeint#) v =
+let ptr_fetch_add_int (p : nativeint_u) v =
   Builtins.native_pointer_fetch_add_int
     (Nativeint_u.to_nativeint p) v
 [%%expect_asm X86_64{|
@@ -524,7 +524,7 @@ ptr_fetch_add_int:
   ret
 |}]
 
-let ptr_fetch_sub_int (p : nativeint#) v =
+let ptr_fetch_sub_int (p : nativeint_u) v =
   Builtins.native_pointer_fetch_sub_int
     (Nativeint_u.to_nativeint p) v
 [%%expect_asm X86_64{|
@@ -537,7 +537,7 @@ ptr_fetch_sub_int:
   ret
 |}]
 
-let ptr_cas_int (p : nativeint#) old_v new_v =
+let ptr_cas_int (p : nativeint_u) old_v new_v =
   Builtins.native_pointer_cas_int
     (Nativeint_u.to_nativeint p) old_v new_v
 [%%expect_asm X86_64{|
@@ -556,7 +556,7 @@ ptr_cas_int:
 
 (* Native pointer atomics - int64 *)
 
-let ptr_fetch_add_int64 (p : nativeint#) (v : int64#) =
+let ptr_fetch_add_int64 (p : nativeint_u) (v : int64_u) =
   Int64_u.of_int64
     (Builtins.native_pointer_fetch_add_int64
        (Nativeint_u.to_nativeint p) (Int64_u.to_int64 v))
@@ -568,7 +568,7 @@ ptr_fetch_add_int64:
   ret
 |}]
 
-let ptr_fetch_sub_int64 (p : nativeint#) (v : int64#) =
+let ptr_fetch_sub_int64 (p : nativeint_u) (v : int64_u) =
   Int64_u.of_int64
     (Builtins.native_pointer_fetch_sub_int64
        (Nativeint_u.to_nativeint p) (Int64_u.to_int64 v))
@@ -581,8 +581,8 @@ ptr_fetch_sub_int64:
   ret
 |}]
 
-let ptr_cas_int64 (p : nativeint#)
-    (old_v : int64#) (new_v : int64#) =
+let ptr_cas_int64 (p : nativeint_u)
+    (old_v : int64_u) (new_v : int64_u) =
   Builtins.native_pointer_cas_int64
     (Nativeint_u.to_nativeint p)
     (Int64_u.to_int64 old_v) (Int64_u.to_int64 new_v)
@@ -600,7 +600,7 @@ ptr_cas_int64:
 
 (* Native pointer atomics - int32 *)
 
-let ptr_fetch_add_int32 (p : nativeint#) (v : int32#) =
+let ptr_fetch_add_int32 (p : nativeint_u) (v : int32_u) =
   Int32_u.of_int32
     (Builtins.native_pointer_fetch_add_int32
        (Nativeint_u.to_nativeint p) (Int32_u.to_int32 v))
@@ -611,7 +611,7 @@ ptr_fetch_add_int32:
   ret
 |}]
 
-let ptr_fetch_sub_int32 (p : nativeint#) (v : int32#) =
+let ptr_fetch_sub_int32 (p : nativeint_u) (v : int32_u) =
   Int32_u.of_int32
     (Builtins.native_pointer_fetch_sub_int32
        (Nativeint_u.to_nativeint p) (Int32_u.to_int32 v))
@@ -624,8 +624,8 @@ ptr_fetch_sub_int32:
   ret
 |}]
 
-let ptr_cas_int32 (p : nativeint#)
-    (old_v : int32#) (new_v : int32#) =
+let ptr_cas_int32 (p : nativeint_u)
+    (old_v : int32_u) (new_v : int32_u) =
   Builtins.native_pointer_cas_int32
     (Nativeint_u.to_nativeint p)
     (Int32_u.to_int32 old_v) (Int32_u.to_int32 new_v)
@@ -643,7 +643,7 @@ ptr_cas_int32:
 
 (* Native pointer atomics - nativeint *)
 
-let ptr_fetch_add_nativeint (p : nativeint#) (v : nativeint#) =
+let ptr_fetch_add_nativeint (p : nativeint_u) (v : nativeint_u) =
   Nativeint_u.of_nativeint
     (Builtins.native_pointer_fetch_add_nativeint
        (Nativeint_u.to_nativeint p)
@@ -656,7 +656,7 @@ ptr_fetch_add_nativeint:
   ret
 |}]
 
-let ptr_fetch_sub_nativeint (p : nativeint#) (v : nativeint#) =
+let ptr_fetch_sub_nativeint (p : nativeint_u) (v : nativeint_u) =
   Nativeint_u.of_nativeint
     (Builtins.native_pointer_fetch_sub_nativeint
        (Nativeint_u.to_nativeint p)
@@ -670,8 +670,8 @@ ptr_fetch_sub_nativeint:
   ret
 |}]
 
-let ptr_cas_nativeint (p : nativeint#)
-    (old_v : nativeint#) (new_v : nativeint#) =
+let ptr_cas_nativeint (p : nativeint_u)
+    (old_v : nativeint_u) (new_v : nativeint_u) =
   Builtins.native_pointer_cas_nativeint
     (Nativeint_u.to_nativeint p)
     (Nativeint_u.to_nativeint old_v)
@@ -718,7 +718,7 @@ ext_load_int64:
   ret
 |}]
 
-let ext_store_int64 (p : Builtins.ext_pointer) (v : int64#) =
+let ext_store_int64 (p : Builtins.ext_pointer) (v : int64_u) =
   Builtins.ext_pointer_store_unboxed_int64
     p (Int64_u.to_int64 v)
 [%%expect_asm X86_64{|
@@ -737,7 +737,7 @@ ext_load_int32:
   ret
 |}]
 
-let ext_store_int32 (p : Builtins.ext_pointer) (v : int32#) =
+let ext_store_int32 (p : Builtins.ext_pointer) (v : int32_u) =
   Builtins.ext_pointer_store_unboxed_int32
     p (Int32_u.to_int32 v)
 [%%expect_asm X86_64{|
@@ -757,7 +757,7 @@ ext_load_nativeint:
 |}]
 
 let ext_store_nativeint
-    (p : Builtins.ext_pointer) (v : nativeint#) =
+    (p : Builtins.ext_pointer) (v : nativeint_u) =
   Builtins.ext_pointer_store_unboxed_nativeint
     p (Nativeint_u.to_nativeint v)
 [%%expect_asm X86_64{|
@@ -851,7 +851,7 @@ ext_cas_int:
 |}]
 
 let ext_fetch_add_int64
-    (p : Builtins.ext_pointer) (v : int64#) =
+    (p : Builtins.ext_pointer) (v : int64_u) =
   Int64_u.of_int64
     (Builtins.ext_pointer_fetch_add_int64
        p (Int64_u.to_int64 v))
@@ -865,7 +865,7 @@ ext_fetch_add_int64:
 |}]
 
 let ext_fetch_add_int32
-    (p : Builtins.ext_pointer) (v : int32#) =
+    (p : Builtins.ext_pointer) (v : int32_u) =
   Int32_u.of_int32
     (Builtins.ext_pointer_fetch_add_int32
        p (Int32_u.to_int32 v))
@@ -878,7 +878,7 @@ ext_fetch_add_int32:
 |}]
 
 let ext_fetch_add_nativeint
-    (p : Builtins.ext_pointer) (v : nativeint#) =
+    (p : Builtins.ext_pointer) (v : nativeint_u) =
   Nativeint_u.of_nativeint
     (Builtins.ext_pointer_fetch_add_nativeint
        p (Nativeint_u.to_nativeint v))
@@ -908,7 +908,7 @@ bs_fetch_add_int:
 |}]
 
 let bs_fetch_add_int64
-    (bs : Builtins.bigstring) pos (v : int64#) =
+    (bs : Builtins.bigstring) pos (v : int64_u) =
   Int64_u.of_int64
     (Builtins.bigstring_fetch_add_int64
        bs pos (Int64_u.to_int64 v))
@@ -924,7 +924,7 @@ bs_fetch_add_int64:
 |}]
 
 let bs_fetch_add_int32
-    (bs : Builtins.bigstring) pos (v : int32#) =
+    (bs : Builtins.bigstring) pos (v : int32_u) =
   Int32_u.of_int32
     (Builtins.bigstring_fetch_add_int32
        bs pos (Int32_u.to_int32 v))
@@ -960,7 +960,7 @@ bs_cas_int:
 
 let bs_cas_int64
     (bs : Builtins.bigstring) pos
-    (old_v : int64#) (new_v : int64#) =
+    (old_v : int64_u) (new_v : int64_u) =
   Builtins.bigstring_cas_int64
     bs pos (Int64_u.to_int64 old_v)
     (Int64_u.to_int64 new_v)

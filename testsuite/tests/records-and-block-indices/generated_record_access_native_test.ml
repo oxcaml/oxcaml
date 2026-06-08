@@ -75,26 +75,26 @@ type t3 = { mutable a3 : int; mutable b3 : float } (* { int; float } *)
 type t4 = { mutable a4 : int; mutable b4 : int64x2#; mutable c4 : int64x2# } (* { int; int64x2#; int64x2# } *)
 type t5 = #{ a5 : int; b5 : int } (* #{ int; int } *)
 type t6 = { mutable a6 : int; mutable b6 : t5 } (* { int; #{ int; int } } *)
-type t7 = #{ a7 : int32#; b7 : int32# } (* #{ int32#; int32# } *)
-type t8 = { mutable a8 : int; mutable b8 : t7 } (* { int; #{ int32#; int32# } } *)
+type t7 = #{ a7 : int32_u; b7 : int32_u } (* #{ int32_u; int32_u } *)
+type t8 = { mutable a8 : int; mutable b8 : t7 } (* { int; #{ int32_u; int32_u } } *)
 type t9 = #{ a9 : float } (* #{ float } *)
 type t10 = { mutable a10 : int; mutable b10 : t9 } (* { int; #{ float } } *)
 type t11 = #{ a11 : int64x2#; b11 : int64x2# } (* #{ int64x2#; int64x2# } *)
 type t12 = { mutable a12 : int; mutable b12 : t11 } (* { int; #{ int64x2#; int64x2# } } *)
 type t13 = { mutable a13 : int64; mutable b13 : int64 } (* { int64; int64 } *)
-type t14 = { mutable a14 : int64#; mutable b14 : int } (* { int64#; int } *)
-type t15 = { mutable a15 : int64#; mutable b15 : nativeint# } (* { int64#; nativeint# } *)
-type t16 = { mutable a16 : int32# } (* { int32# } *)
-type t17 = { mutable a17 : int32#; mutable b17 : int } (* { int32#; int } *)
-type t18 = { mutable a18 : int32#; mutable b18 : int64 } (* { int32#; int64 } *)
-type t19 = { mutable a19 : int32#; mutable b19 : int32#; mutable c19 : int32# } (* { int32#; int32#; int32# } *)
-type t20 = { mutable a20 : int32#; mutable b20 : float } (* { int32#; float } *)
-type t21 = #{ a21 : int32# } (* #{ int32# } *)
-type t22 = { mutable a22 : int32#; mutable b22 : t21 } (* { int32#; #{ int32# } } *)
-type t23 = { mutable a23 : nativeint# } (* { nativeint# } *)
-type t24 = { mutable a24 : nativeint#; mutable b24 : int } (* { nativeint#; int } *)
-type t25 = { mutable a25 : nativeint#; mutable b25 : int64# } (* { nativeint#; int64# } *)
-type t26 = { mutable a26 : nativeint#; mutable b26 : nativeint# } (* { nativeint#; nativeint# } *)
+type t14 = { mutable a14 : int64_u; mutable b14 : int } (* { int64_u; int } *)
+type t15 = { mutable a15 : int64_u; mutable b15 : nativeint_u } (* { int64_u; nativeint_u } *)
+type t16 = { mutable a16 : int32_u } (* { int32_u } *)
+type t17 = { mutable a17 : int32_u; mutable b17 : int } (* { int32_u; int } *)
+type t18 = { mutable a18 : int32_u; mutable b18 : int64 } (* { int32_u; int64 } *)
+type t19 = { mutable a19 : int32_u; mutable b19 : int32_u; mutable c19 : int32_u } (* { int32_u; int32_u; int32_u } *)
+type t20 = { mutable a20 : int32_u; mutable b20 : float } (* { int32_u; float } *)
+type t21 = #{ a21 : int32_u } (* #{ int32_u } *)
+type t22 = { mutable a22 : int32_u; mutable b22 : t21 } (* { int32_u; #{ int32_u } } *)
+type t23 = { mutable a23 : nativeint_u } (* { nativeint_u } *)
+type t24 = { mutable a24 : nativeint_u; mutable b24 : int } (* { nativeint_u; int } *)
+type t25 = { mutable a25 : nativeint_u; mutable b25 : int64_u } (* { nativeint_u; int64_u } *)
+type t26 = { mutable a26 : nativeint_u; mutable b26 : nativeint_u } (* { nativeint_u; nativeint_u } *)
 type t27 = { mutable a27 : float; mutable b27 : int } (* { float; int } *)
 type t28 = { mutable a28 : float; mutable b28 : float; mutable c28 : int } (* { float; float; int } *)
 type t29 = #{ a29 : float; b29 : float# } (* #{ float; float# } *)
@@ -110,19 +110,19 @@ type t38 = #{ a38 : int } (* #{ int } *)
 type t39 = { mutable a39 : int64x2#; mutable b39 : t38 } (* { int64x2#; #{ int } } *)
 type t40 = { mutable a40 : t5 } (* { #{ int; int } } *)
 type t41 = { mutable a41 : t5; mutable b41 : int } (* { #{ int; int }; int } *)
-type t42 = { mutable a42 : t5; mutable b42 : int32# } (* { #{ int; int }; int32# } *)
+type t42 = { mutable a42 : t5; mutable b42 : int32_u } (* { #{ int; int }; int32_u } *)
 type t43 = { mutable a43 : t5; mutable b43 : float } (* { #{ int; int }; float } *)
-type t44 = #{ a44 : int; b44 : int32# } (* #{ int; int32# } *)
-type t45 = { mutable a45 : t44; mutable b45 : int } (* { #{ int; int32# }; int } *)
-type t46 = #{ a46 : int64; b46 : int64# } (* #{ int64; int64# } *)
-type t47 = #{ a47 : int64#; b47 : float# } (* #{ int64#; float# } *)
-type t48 = { mutable a48 : t46; mutable b48 : t47 } (* { #{ int64; int64# }; #{ int64#; float# } } *)
+type t44 = #{ a44 : int; b44 : int32_u } (* #{ int; int32_u } *)
+type t45 = { mutable a45 : t44; mutable b45 : int } (* { #{ int; int32_u }; int } *)
+type t46 = #{ a46 : int64; b46 : int64_u } (* #{ int64; int64_u } *)
+type t47 = #{ a47 : int64_u; b47 : float# } (* #{ int64_u; float# } *)
+type t48 = { mutable a48 : t46; mutable b48 : t47 } (* { #{ int64; int64_u }; #{ int64_u; float# } } *)
 type t49 = #{ a49 : int64; b49 : string } (* #{ int64; string } *)
-type t50 = #{ a50 : int64#; b50 : string } (* #{ int64#; string } *)
-type t51 = { mutable a51 : t49; mutable b51 : t50 } (* { #{ int64; string }; #{ int64#; string } } *)
-type t52 = { mutable a52 : t21 } (* { #{ int32# } } *)
-type t53 = #{ a53 : int32#; b53 : int } (* #{ int32#; int } *)
-type t54 = { mutable a54 : t53; mutable b54 : int32# } (* { #{ int32#; int }; int32# } *)
+type t50 = #{ a50 : int64_u; b50 : string } (* #{ int64_u; string } *)
+type t51 = { mutable a51 : t49; mutable b51 : t50 } (* { #{ int64; string }; #{ int64_u; string } } *)
+type t52 = { mutable a52 : t21 } (* { #{ int32_u } } *)
+type t53 = #{ a53 : int32_u; b53 : int } (* #{ int32_u; int } *)
+type t54 = { mutable a54 : t53; mutable b54 : int32_u } (* { #{ int32_u; int }; int32_u } *)
 type t55 = { mutable a55 : t9; mutable b55 : int } (* { #{ float }; int } *)
 type t56 = { mutable a56 : t9; mutable b56 : float } (* { #{ float }; float } *)
 type t57 = { mutable a57 : t34 } (* { #{ float; float } } *)
@@ -131,9 +131,9 @@ type t59 = #{ a59 : float# } (* #{ float# } *)
 type t60 = { mutable a60 : t59; mutable b60 : float } (* { #{ float# }; float } *)
 type t61 = #{ a61 : float#; b61 : float } (* #{ float#; float } *)
 type t62 = { mutable a62 : t61 } (* { #{ float#; float } } *)
-type t63 = #{ a63 : float32#; b63 : int64# } (* #{ float32#; int64# } *)
-type t64 = #{ a64 : string; b64 : int64# } (* #{ string; int64# } *)
-type t65 = { mutable a65 : t63; mutable b65 : t64 } (* { #{ float32#; int64# }; #{ string; int64# } } *)
+type t63 = #{ a63 : float32#; b63 : int64_u } (* #{ float32#; int64_u } *)
+type t64 = #{ a64 : string; b64 : int64_u } (* #{ string; int64_u } *)
+type t65 = { mutable a65 : t63; mutable b65 : t64 } (* { #{ float32#; int64_u }; #{ string; int64_u } } *)
 type t66 = #{ a66 : string } (* #{ string } *)
 type t67 = { mutable a67 : t66 } (* { #{ string } } *)
 type t68 = #{ a68 : string; b68 : string } (* #{ string; string } *)
@@ -618,9 +618,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*****************************************)
-  (*   t8 = { int; #{ int32#; int32# } }   *)
-  (*****************************************)
+  (*******************************************)
+  (*   t8 = { int; #{ int32_u; int32_u } }   *)
+  (*******************************************)
   let r = { a8 = 0; b8 = #{ a7 = #1l; b7 = #2l } } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -935,9 +935,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*****************************)
-  (*   t14 = { int64#; int }   *)
-  (*****************************)
+  (******************************)
+  (*   t14 = { int64_u; int }   *)
+  (******************************)
   let r = { a14 = #0L; b14 = 1 } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1004,9 +1004,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (************************************)
-  (*   t15 = { int64#; nativeint# }   *)
-  (************************************)
+  (**************************************)
+  (*   t15 = { int64_u; nativeint_u }   *)
+  (**************************************)
   let r = { a15 = #0L; b15 = #1n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1073,9 +1073,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (************************)
-  (*   t16 = { int32# }   *)
-  (************************)
+  (*************************)
+  (*   t16 = { int32_u }   *)
+  (*************************)
   let r = { a16 = #0l } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1120,9 +1120,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*****************************)
-  (*   t17 = { int32#; int }   *)
-  (*****************************)
+  (******************************)
+  (*   t17 = { int32_u; int }   *)
+  (******************************)
   let r = { a17 = #0l; b17 = 1 } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1189,9 +1189,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*******************************)
-  (*   t18 = { int32#; int64 }   *)
-  (*******************************)
+  (********************************)
+  (*   t18 = { int32_u; int64 }   *)
+  (********************************)
   let r = { a18 = #0l; b18 = 1L } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1258,9 +1258,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************************)
-  (*   t19 = { int32#; int32#; int32# }   *)
-  (****************************************)
+  (*******************************************)
+  (*   t19 = { int32_u; int32_u; int32_u }   *)
+  (*******************************************)
   let r = { a19 = #0l; b19 = #1l; c19 = #2l } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1349,9 +1349,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*******************************)
-  (*   t20 = { int32#; float }   *)
-  (*******************************)
+  (********************************)
+  (*   t20 = { int32_u; float }   *)
+  (********************************)
   let r = { a20 = #0l; b20 = 1. } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1418,9 +1418,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*************************************)
-  (*   t22 = { int32#; #{ int32# } }   *)
-  (*************************************)
+  (***************************************)
+  (*   t22 = { int32_u; #{ int32_u } }   *)
+  (***************************************)
   let r = { a22 = #0l; b22 = #{ a21 = #1l } } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1494,9 +1494,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************)
-  (*   t23 = { nativeint# }   *)
-  (****************************)
+  (*****************************)
+  (*   t23 = { nativeint_u }   *)
+  (*****************************)
   let r = { a23 = #0n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1541,9 +1541,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*********************************)
-  (*   t24 = { nativeint#; int }   *)
-  (*********************************)
+  (**********************************)
+  (*   t24 = { nativeint_u; int }   *)
+  (**********************************)
   let r = { a24 = #0n; b24 = 1 } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1610,9 +1610,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (************************************)
-  (*   t25 = { nativeint#; int64# }   *)
-  (************************************)
+  (**************************************)
+  (*   t25 = { nativeint_u; int64_u }   *)
+  (**************************************)
   let r = { a25 = #0n; b25 = #1L } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -1679,9 +1679,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************************)
-  (*   t26 = { nativeint#; nativeint# }   *)
-  (****************************************)
+  (******************************************)
+  (*   t26 = { nativeint_u; nativeint_u }   *)
+  (******************************************)
   let r = { a26 = #0n; b26 = #1n } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -2621,9 +2621,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (***************************************)
-  (*   t42 = { #{ int; int }; int32# }   *)
-  (***************************************)
+  (****************************************)
+  (*   t42 = { #{ int; int }; int32_u }   *)
+  (****************************************)
   let r = { a42 = #{ a5 = 0; b5 = 1 }; b42 = #2l } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -2793,9 +2793,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (***************************************)
-  (*   t45 = { #{ int; int32# }; int }   *)
-  (***************************************)
+  (****************************************)
+  (*   t45 = { #{ int; int32_u }; int }   *)
+  (****************************************)
   let r = { a45 = #{ a44 = 0; b44 = #1l }; b45 = 2 } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -2879,9 +2879,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*********************************************************)
-  (*   t48 = { #{ int64; int64# }; #{ int64#; float# } }   *)
-  (*********************************************************)
+  (***********************************************************)
+  (*   t48 = { #{ int64; int64_u }; #{ int64_u; float# } }   *)
+  (***********************************************************)
   let r = { a48 = #{ a46 = 0L; b46 = #1L }; b48 = #{ a47 = #2L; b47 = #3. } } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -2982,9 +2982,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*********************************************************)
-  (*   t51 = { #{ int64; string }; #{ int64#; string } }   *)
-  (*********************************************************)
+  (**********************************************************)
+  (*   t51 = { #{ int64; string }; #{ int64_u; string } }   *)
+  (**********************************************************)
   let r = { a51 = #{ a49 = 0L; b49 = "1" }; b51 = #{ a50 = #2L; b50 = "3" } } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -3085,9 +3085,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*****************************)
-  (*   t52 = { #{ int32# } }   *)
-  (*****************************)
+  (******************************)
+  (*   t52 = { #{ int32_u } }   *)
+  (******************************)
   let r = { a52 = #{ a21 = #0l } } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -3139,9 +3139,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (******************************************)
-  (*   t54 = { #{ int32#; int }; int32# }   *)
-  (******************************************)
+  (********************************************)
+  (*   t54 = { #{ int32_u; int }; int32_u }   *)
+  (********************************************)
   let r = { a54 = #{ a53 = #0l; b53 = 1 }; b54 = #2l } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)
@@ -3667,9 +3667,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (************************************************************)
-  (*   t65 = { #{ float32#; int64# }; #{ string; int64# } }   *)
-  (************************************************************)
+  (**************************************************************)
+  (*   t65 = { #{ float32#; int64_u }; #{ string; int64_u } }   *)
+  (**************************************************************)
   let r = { a65 = #{ a63 = #0.s; b63 = #1L }; b65 = #{ a64 = "2"; b64 = #3L } } in
   ref_to_force_heap_allocation := P r;
   (* 1. Test field get *)

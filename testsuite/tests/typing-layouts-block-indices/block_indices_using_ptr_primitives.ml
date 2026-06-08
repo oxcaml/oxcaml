@@ -115,10 +115,10 @@ let () =
   Printf.printf "%f\n" (Float_u.to_float rr.r2.#f2);
   print_newline ()
 
-type mixed_int32_record = { j : int32#; mutable i : int32# }
+type mixed_int32_record = { j : int32_u; mutable i : int32_u }
 
 let () =
-  print_endline "Mixed block record (int32# field)";
+  print_endline "Mixed block record (int32_u field)";
   let r = { j = -#100l; i = #1l } in
   let x = unsafe_get_ptr #(r, (.i)) in
   Printf.printf "%d\n" (Int32_u.to_int x);
@@ -126,10 +126,10 @@ let () =
   Printf.printf "%d\n" (Int32_u.to_int r.i);
   print_newline ()
 
-type mixed_int64_record = { j : int64#; mutable i : int64# }
+type mixed_int64_record = { j : int64_u; mutable i : int64_u }
 
 let () =
-  print_endline "Mixed block record (int64# field)";
+  print_endline "Mixed block record (int64_u field)";
   let r = { j = -#100L; i = #1L } in
   let x = unsafe_get_ptr #(r, (.i)) in
   Printf.printf "%d\n" (Int64_u.to_int x);
@@ -137,10 +137,10 @@ let () =
   Printf.printf "%d\n" (Int64_u.to_int r.i);
   print_newline ()
 
-type mixed_nativeint_record = { j : nativeint#; mutable i : nativeint# }
+type mixed_nativeint_record = { j : nativeint_u; mutable i : nativeint_u }
 
 let () =
-  print_endline "Mixed block record (nativeint# field)";
+  print_endline "Mixed block record (nativeint_u field)";
   let r = { j = -#100n; i = #1n } in
   let x = unsafe_get_ptr #(r, (.i)) in
   Printf.printf "%d\n" (Nativeint_u.to_int x);
@@ -178,8 +178,8 @@ let () =
 (***************************************)
 (* Nested product update and deepening *)
 
-type a = { s : string; i : int64# }
-type b = { i : int64#; a : a#; s : string }
+type a = { s : string; i : int64_u }
+type b = { i : int64_u; a : a#; s : string }
 type c = { mutable b : b#; s : string }
 
 let print_t_b t =

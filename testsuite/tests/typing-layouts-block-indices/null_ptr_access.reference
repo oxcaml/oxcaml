@@ -7,13 +7,13 @@ Test 2: float# field (flat type)
 Test 3: float32# field (flat type)
   get: expected 20.5, got 20.5
   set: expected (10, 200.5), got (10, 200.5)
-Test 4: int32# field (flat type)
+Test 4: int32_u field (flat type)
   get: expected 20, got 20
   set: expected (10, 200), got (10, 200)
-Test 5: int64# field (flat type)
+Test 5: int64_u field (flat type)
   get: expected 20, got 20
   set: expected (10, 200), got (10, 200)
-Test 6: nativeint# field (flat type)
+Test 6: nativeint_u field (flat type)
   get: expected 20, got 20
   set: expected (10, 200), got (10, 200)
 Test 7: unboxed product of ints (value types)

@@ -2480,9 +2480,9 @@ let type_for_path loc env = function
         | "expr" -> Identifier.Type.expr
         | "eval" -> Identifier.Type.eval
         | "float#" -> Identifier.Type.unboxed_float
-        | "nativeint#" -> Identifier.Type.unboxed_nativeint
-        | "int32#" -> Identifier.Type.unboxed_int32
-        | "int64#" -> Identifier.Type.unboxed_int64
+        | "nativeint_u" -> Identifier.Type.unboxed_nativeint
+        | "int32_u" -> Identifier.Type.unboxed_int32
+        | "int64_u" -> Identifier.Type.unboxed_int64
         | "int8x16" -> Identifier.Type.int8x16
         | "int16x8" -> Identifier.Type.int16x8
         | "int32x4" -> Identifier.Type.int32x4
@@ -2847,6 +2847,9 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_variant (fields, (if closed then Closed else Open), tags)
         | Tquote ty -> Ttyp_quote (go ty)
+        | Tbox ty ->
+          let lident = Untypeast.lident_of_path Predef.path_box in
+          Ttyp_constr (Predef.path_box, mkloc lident loc, [go ty])
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \

@@ -18,9 +18,9 @@
 type t_any_mod_separable : any mod separable
 
 type t1 = float# array
-type t2 = int32# array
-type t3 = int64# array
-type t4 = nativeint# array
+type t2 = int32_u array
+type t3 = int64_u array
+type t4 = nativeint_u array
 type t5 = t_any_mod_separable array
 type t6 = float32# array
 
@@ -34,9 +34,9 @@ type ('a : float32) t6' = 'a array
 [%%expect{|
 type t_any_mod_separable : any separable
 type t1 = float# array
-type t2 = int32# array
-type t3 = int64# array
-type t4 = nativeint# array
+type t2 = int32_u array
+type t3 = int64_u array
+type t4 = nativeint_u array
 type t5 = t_any_mod_separable array
 type t6 = float32# array
 type ('a : float64) t1' = 'a array
@@ -58,19 +58,19 @@ val v1 : float# array = [|<abstr>|]
 
 let v2 = [| #1l |]
 [%%expect{|
-val v2 : int32# array = [|<abstr>|]
+val v2 : int32_u array = [|<abstr>|]
 |}];;
 
 
 let v3 = [| #1L |]
 [%%expect{|
-val v3 : int64# array = [|<abstr>|]
+val v3 : int64_u array = [|<abstr>|]
 |}];;
 
 
 let v4 = [| #1n |]
 [%%expect{|
-val v4 : nativeint# array = [|<abstr>|]
+val v4 : nativeint_u array = [|<abstr>|]
 |}];;
 
 let v5 = [| #1.s |]
@@ -139,38 +139,38 @@ external get : ('a : any separable). 'a array -> int -> float
 val d : ('a : value_maybe_null). 'a array -> float = <fun>
 |}];;
 
-external get : int32# array -> int -> float = "%floatarray_safe_get"
-let d (x : int32# array) = get x 0
+external get : int32_u array -> int -> float = "%floatarray_safe_get"
+let d (x : int32_u array) = get x 0
 
 [%%expect{|
-external get : int32# array -> int -> float = "%floatarray_safe_get"
-Line 2, characters 27-34:
-2 | let d (x : int32# array) = get x 0
-                               ^^^^^^^
+external get : int32_u array -> int -> float = "%floatarray_safe_get"
+Line 2, characters 28-35:
+2 | let d (x : int32_u array) = get x 0
+                                ^^^^^^^
 Error: Floatarray primitives can't be used on arrays containing
        unboxed types.
 |}];;
 
-external get : int64# array -> int -> float = "%floatarray_safe_get"
-let d (x : int64# array) = get x 0
+external get : int64_u array -> int -> float = "%floatarray_safe_get"
+let d (x : int64_u array) = get x 0
 
 [%%expect{|
-external get : int64# array -> int -> float = "%floatarray_safe_get"
-Line 2, characters 27-34:
-2 | let d (x : int64# array) = get x 0
-                               ^^^^^^^
+external get : int64_u array -> int -> float = "%floatarray_safe_get"
+Line 2, characters 28-35:
+2 | let d (x : int64_u array) = get x 0
+                                ^^^^^^^
 Error: Floatarray primitives can't be used on arrays containing
        unboxed types.
 |}];;
 
-external get : nativeint# array -> int -> float = "%floatarray_safe_get"
-let d (x : nativeint# array) = get x 0
+external get : nativeint_u array -> int -> float = "%floatarray_safe_get"
+let d (x : nativeint_u array) = get x 0
 
 [%%expect{|
-external get : nativeint# array -> int -> float = "%floatarray_safe_get"
-Line 2, characters 31-38:
-2 | let d (x : nativeint# array) = get x 0
-                                   ^^^^^^^
+external get : nativeint_u array -> int -> float = "%floatarray_safe_get"
+Line 2, characters 32-39:
+2 | let d (x : nativeint_u array) = get x 0
+                                    ^^^^^^^
 Error: Floatarray primitives can't be used on arrays containing
        unboxed types.
 |}];;
@@ -192,35 +192,35 @@ Error: Floatarray primitives can't be used on arrays containing
 
 external[@layout_poly] get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_get"
 let f1 (x : float# array) = get x 0
-let f2 (x : int32# array) = get x 0
-let f3 (x : int64# array) = get x 0
-let f4 (x : nativeint# array) = get x 0
+let f2 (x : int32_u array) = get x 0
+let f3 (x : int64_u array) = get x 0
+let f4 (x : nativeint_u array) = get x 0
 let f5 (x : float32# array) = get x 0
 
 [%%expect{|
 external get : ('a : any separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f1 : float# array -> float# = <fun>
-val f2 : int32# array -> int32# = <fun>
-val f3 : int64# array -> int64# = <fun>
-val f4 : nativeint# array -> nativeint# = <fun>
+val f2 : int32_u array -> int32_u = <fun>
+val f3 : int64_u array -> int64_u = <fun>
+val f4 : nativeint_u array -> nativeint_u = <fun>
 val f5 : float32# array -> float32# = <fun>
 |}];;
 
 external[@layout_poly] set : ('a : any mod separable). 'a array -> int -> 'a -> unit = "%array_safe_set"
 let f1 (x : float# array) v = set x 0 v
-let f2 (x : int32# array) v = set x 0 v
-let f3 (x : int64# array) v = set x 0 v
-let f4 (x : nativeint# array) v = set x 0 v
+let f2 (x : int32_u array) v = set x 0 v
+let f3 (x : int64_u array) v = set x 0 v
+let f4 (x : nativeint_u array) v = set x 0 v
 let f5 (x : float32# array) v = set x 0 v
 
 [%%expect{|
 external set : ('a : any separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f1 : float# array -> float# -> unit = <fun>
-val f2 : int32# array -> int32# -> unit = <fun>
-val f3 : int64# array -> int64# -> unit = <fun>
-val f4 : nativeint# array -> nativeint# -> unit = <fun>
+val f2 : int32_u array -> int32_u -> unit = <fun>
+val f3 : int64_u array -> int64_u -> unit = <fun>
+val f4 : nativeint_u array -> nativeint_u -> unit = <fun>
 val f5 : float32# array -> float32# -> unit = <fun>
 |}]
 
@@ -244,11 +244,11 @@ end
 Line 11, characters 79-82:
 11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
                                                                                     ^^^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : bits32)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of bits32
+Error: This expression has type "int64_u"
+       but an expression was expected of type "('a : bits32)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a sublayout of bits32
          because of the definition of get_third at lines 4-7, characters 16-23.
 |}]
 
@@ -260,18 +260,18 @@ module M6_2 = struct
   let arr = [||]
 
   let f1 idx : float# = get arr idx
-  let f2 idx : int32# = get arr idx
+  let f2 idx : int32_u = get arr idx
 end
 
 [%%expect{|
-Line 9, characters 24-35:
-9 |   let f2 idx : int32# = get arr idx
-                            ^^^^^^^^^^^
+Line 9, characters 25-36:
+9 |   let f2 idx : int32_u = get arr idx
+                             ^^^^^^^^^^^
 Error: This expression has type "('a : float64)"
-       but an expression was expected of type "int32#"
-       The layout of int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a sublayout of float64
+       but an expression was expected of type "int32_u"
+       The layout of int32_u is bits32
+         because it is the primitive type int32_u.
+       But the layout of int32_u must be a sublayout of float64
          because of the definition of arr at line 6, characters 12-16.
 |}]
 
@@ -303,11 +303,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42l in
                                            ^^^^
-Error: This expression has type "int32#" but an expression was expected of type
-         "('a : value_maybe_null)"
-       The layout of int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a value layout
+Error: This expression has type "int32_u"
+       but an expression was expected of type "('a : value_maybe_null)"
+       The layout of int32_u is bits32
+         because it is the primitive type int32_u.
+       But the layout of int32_u must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -319,11 +319,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42L in
                                            ^^^^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_maybe_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+Error: This expression has type "int64_u"
+       but an expression was expected of type "('a : value_maybe_null)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -335,11 +335,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42n in
                                            ^^^^
-Error: This expression has type "nativeint#"
+Error: This expression has type "nativeint_u"
        but an expression was expected of type "('a : value_maybe_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
+       The layout of nativeint_u is word
+         because it is the primitive type nativeint_u.
+       But the layout of nativeint_u must be a value layout
          because it's the type of an array element.
 |}]
 

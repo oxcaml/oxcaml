@@ -302,7 +302,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int8
         = "%caml_string_geti8_indexed_by_nativeint#"
 
@@ -310,7 +310,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int8
         = "%caml_string_geti8u_indexed_by_nativeint#"
 
@@ -338,7 +338,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8
         = "%caml_bytes_geti8_indexed_by_nativeint#"
 
@@ -346,7 +346,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8
         = "%caml_bytes_geti8u_indexed_by_nativeint#"
 
@@ -361,7 +361,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8
         -> unit
         = "%caml_bytes_set8_indexed_by_nativeint#"
@@ -370,7 +370,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8
         -> unit
         = "%caml_bytes_set8u_indexed_by_nativeint#"
@@ -398,7 +398,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8
         = "%caml_bigstring_geti8_indexed_by_nativeint#"
 
@@ -406,7 +406,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8
         = "%caml_bigstring_geti8u_indexed_by_nativeint#"
 
@@ -421,7 +421,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8
         -> unit
         = "%caml_bigstring_set8_indexed_by_nativeint#"
@@ -430,7 +430,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8
         -> unit
         = "%caml_bigstring_set8u_indexed_by_nativeint#"
@@ -489,7 +489,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int
         = "%caml_string_get16_indexed_by_nativeint#"
 
@@ -497,7 +497,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int
         = "%caml_string_get16u_indexed_by_nativeint#"
 
@@ -525,7 +525,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int
         = "%caml_bytes_get16_indexed_by_nativeint#"
 
@@ -533,7 +533,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int
         = "%caml_bytes_get16u_indexed_by_nativeint#"
 
@@ -548,7 +548,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int
         -> unit
         = "%caml_bytes_set16_indexed_by_nativeint#"
@@ -557,7 +557,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int
         -> unit
         = "%caml_bytes_set16u_indexed_by_nativeint#"
@@ -585,7 +585,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int
         = "%caml_bigstring_get16_indexed_by_nativeint#"
 
@@ -593,7 +593,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int
         = "%caml_bigstring_get16u_indexed_by_nativeint#"
 
@@ -608,7 +608,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int
         -> unit
         = "%caml_bigstring_set16_indexed_by_nativeint#"
@@ -617,7 +617,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int
         -> unit
         = "%caml_bigstring_set16u_indexed_by_nativeint#"
@@ -674,7 +674,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int16
         = "%caml_string_geti16_indexed_by_nativeint#"
 
@@ -682,7 +682,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int16
         = "%caml_string_geti16u_indexed_by_nativeint#"
 
@@ -710,7 +710,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16
         = "%caml_bytes_geti16_indexed_by_nativeint#"
 
@@ -718,7 +718,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16
         = "%caml_bytes_geti16u_indexed_by_nativeint#"
 
@@ -733,7 +733,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16
         -> unit
         = "%caml_bytes_set16_indexed_by_nativeint#"
@@ -742,7 +742,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16
         -> unit
         = "%caml_bytes_set16u_indexed_by_nativeint#"
@@ -770,7 +770,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16
         = "%caml_bigstring_geti16_indexed_by_nativeint#"
 
@@ -778,7 +778,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16
         = "%caml_bigstring_geti16u_indexed_by_nativeint#"
 
@@ -793,7 +793,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16
         -> unit
         = "%caml_bigstring_set16_indexed_by_nativeint#"
@@ -802,7 +802,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16
         -> unit
         = "%caml_bigstring_set16u_indexed_by_nativeint#"
@@ -859,7 +859,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int32
         = "%caml_string_get32_indexed_by_nativeint#"
 
@@ -867,7 +867,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int32
         = "%caml_string_get32u_indexed_by_nativeint#"
 
@@ -895,7 +895,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int32
         = "%caml_bytes_get32_indexed_by_nativeint#"
 
@@ -903,7 +903,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int32
         = "%caml_bytes_get32u_indexed_by_nativeint#"
 
@@ -918,7 +918,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int32
         -> unit
         = "%caml_bytes_set32_indexed_by_nativeint#"
@@ -927,7 +927,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int32
         -> unit
         = "%caml_bytes_set32u_indexed_by_nativeint#"
@@ -955,7 +955,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int32
         = "%caml_bigstring_get32_indexed_by_nativeint#"
 
@@ -963,7 +963,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int32
         = "%caml_bigstring_get32u_indexed_by_nativeint#"
 
@@ -978,7 +978,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int32
         -> unit
         = "%caml_bigstring_set32_indexed_by_nativeint#"
@@ -987,7 +987,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int32
         -> unit
         = "%caml_bigstring_set32u_indexed_by_nativeint#"
@@ -1044,7 +1044,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int64
         = "%caml_string_get64_indexed_by_nativeint#"
 
@@ -1052,7 +1052,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int64
         = "%caml_string_get64u_indexed_by_nativeint#"
 
@@ -1080,7 +1080,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int64
         = "%caml_bytes_get64_indexed_by_nativeint#"
 
@@ -1088,7 +1088,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int64
         = "%caml_bytes_get64u_indexed_by_nativeint#"
 
@@ -1103,7 +1103,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int64
         -> unit
         = "%caml_bytes_set64_indexed_by_nativeint#"
@@ -1112,7 +1112,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int64
         -> unit
         = "%caml_bytes_set64u_indexed_by_nativeint#"
@@ -1140,7 +1140,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int64
         = "%caml_bigstring_get64_indexed_by_nativeint#"
 
@@ -1148,7 +1148,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int64
         = "%caml_bigstring_get64u_indexed_by_nativeint#"
 
@@ -1163,7 +1163,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int64
         -> unit
         = "%caml_bigstring_set64_indexed_by_nativeint#"
@@ -1172,7 +1172,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int64
         -> unit
         = "%caml_bigstring_set64u_indexed_by_nativeint#"
@@ -1229,7 +1229,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         = "%caml_string_geti8#_indexed_by_nativeint#"
 
@@ -1237,7 +1237,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         = "%caml_string_geti8u#_indexed_by_nativeint#"
 
@@ -1265,7 +1265,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         = "%caml_bytes_geti8#_indexed_by_nativeint#"
 
@@ -1273,7 +1273,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         = "%caml_bytes_geti8u#_indexed_by_nativeint#"
 
@@ -1288,7 +1288,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         -> unit
         = "%caml_bytes_set8#_indexed_by_nativeint#"
@@ -1297,7 +1297,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         -> unit
         = "%caml_bytes_set8u#_indexed_by_nativeint#"
@@ -1325,7 +1325,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         = "%caml_bigstring_geti8#_indexed_by_nativeint#"
 
@@ -1333,7 +1333,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         = "%caml_bigstring_geti8u#_indexed_by_nativeint#"
 
@@ -1348,7 +1348,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         -> unit
         = "%caml_bigstring_set8#_indexed_by_nativeint#"
@@ -1357,7 +1357,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int8#
         -> unit
         = "%caml_bigstring_set8u#_indexed_by_nativeint#"
@@ -1414,7 +1414,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         = "%caml_string_geti16#_indexed_by_nativeint#"
 
@@ -1422,7 +1422,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         = "%caml_string_geti16u#_indexed_by_nativeint#"
 
@@ -1450,7 +1450,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         = "%caml_bytes_geti16#_indexed_by_nativeint#"
 
@@ -1458,7 +1458,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         = "%caml_bytes_geti16u#_indexed_by_nativeint#"
 
@@ -1473,7 +1473,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         -> unit
         = "%caml_bytes_set16#_indexed_by_nativeint#"
@@ -1482,7 +1482,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         -> unit
         = "%caml_bytes_set16u#_indexed_by_nativeint#"
@@ -1510,7 +1510,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         = "%caml_bigstring_geti16#_indexed_by_nativeint#"
 
@@ -1518,7 +1518,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         = "%caml_bigstring_geti16u#_indexed_by_nativeint#"
 
@@ -1533,7 +1533,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         -> unit
         = "%caml_bigstring_set16#_indexed_by_nativeint#"
@@ -1542,7 +1542,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> int16#
         -> unit
         = "%caml_bigstring_set16u#_indexed_by_nativeint#"
@@ -1599,16 +1599,16 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         = "%caml_string_get32#_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  string
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         = "%caml_string_get32u#_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1635,16 +1635,16 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         = "%caml_bytes_get32#_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bytes
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         = "%caml_bytes_get32u#_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1658,8 +1658,8 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         -> unit
         = "%caml_bytes_set32#_indexed_by_nativeint#"
 
@@ -1667,8 +1667,8 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         -> unit
         = "%caml_bytes_set32u#_indexed_by_nativeint#"
 
@@ -1695,16 +1695,16 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         = "%caml_bigstring_get32#_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         = "%caml_bigstring_get32u#_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1718,8 +1718,8 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32#_indexed_by_nativeint#"
 
@@ -1727,8 +1727,8 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
-        -> int32#
+        -> nativeint_u
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32u#_indexed_by_nativeint#"
 
@@ -1784,16 +1784,16 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         = "%caml_string_get64#_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  string
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         = "%caml_string_get64u#_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1820,16 +1820,16 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         = "%caml_bytes_get64#_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bytes
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         = "%caml_bytes_get64u#_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1843,8 +1843,8 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         -> unit
         = "%caml_bytes_set64#_indexed_by_nativeint#"
 
@@ -1852,8 +1852,8 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         -> unit
         = "%caml_bytes_set64u#_indexed_by_nativeint#"
 
@@ -1880,16 +1880,16 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         = "%caml_bigstring_get64#_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         = "%caml_bigstring_get64u#_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1903,8 +1903,8 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64#_indexed_by_nativeint#"
 
@@ -1912,8 +1912,8 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
-        -> int64#
+        -> nativeint_u
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64u#_indexed_by_nativeint#"
 
@@ -1965,7 +1965,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> float32
         = "%caml_string_getf32_indexed_by_nativeint#"
 
@@ -1973,7 +1973,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> float32
         = "%caml_string_getf32u_indexed_by_nativeint#"
 
@@ -2001,7 +2001,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32
         = "%caml_bytes_getf32_indexed_by_nativeint#"
 
@@ -2009,7 +2009,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32
         = "%caml_bytes_getf32u_indexed_by_nativeint#"
 
@@ -2024,7 +2024,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32
         -> unit
         = "%caml_bytes_setf32_indexed_by_nativeint#"
@@ -2033,7 +2033,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32
         -> unit
         = "%caml_bytes_setf32u_indexed_by_nativeint#"
@@ -2061,7 +2061,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32
         = "%caml_bigstring_getf32_indexed_by_nativeint#"
 
@@ -2069,7 +2069,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32
         = "%caml_bigstring_getf32u_indexed_by_nativeint#"
 
@@ -2084,7 +2084,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32
         -> unit
         = "%caml_bigstring_setf32_indexed_by_nativeint#"
@@ -2093,7 +2093,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32
         -> unit
         = "%caml_bigstring_setf32u_indexed_by_nativeint#"
@@ -2146,7 +2146,7 @@ open struct
 
       external get_safe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         = "%caml_string_getf32#_indexed_by_nativeint#"
 
@@ -2154,7 +2154,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         = "%caml_string_getf32u#_indexed_by_nativeint#"
 
@@ -2182,7 +2182,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         = "%caml_bytes_getf32#_indexed_by_nativeint#"
 
@@ -2190,7 +2190,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         = "%caml_bytes_getf32u#_indexed_by_nativeint#"
 
@@ -2205,7 +2205,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         -> unit
         = "%caml_bytes_setf32#_indexed_by_nativeint#"
@@ -2214,7 +2214,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         -> unit
         = "%caml_bytes_setf32u#_indexed_by_nativeint#"
@@ -2242,7 +2242,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         = "%caml_bigstring_getf32#_indexed_by_nativeint#"
 
@@ -2250,7 +2250,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         = "%caml_bigstring_getf32u#_indexed_by_nativeint#"
 
@@ -2265,7 +2265,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         -> unit
         = "%caml_bigstring_setf32#_indexed_by_nativeint#"
@@ -2274,7 +2274,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> nativeint#
+        -> nativeint_u
         -> float32#
         -> unit
         = "%caml_bigstring_setf32u#_indexed_by_nativeint#"
@@ -3629,7 +3629,7 @@ open struct
       external get_safe
         :  string
         -> int8#
-        -> int32#
+        -> int32_u
         = "%caml_string_get32#_indexed_by_int8#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -3637,7 +3637,7 @@ open struct
       external get_unsafe
         :  string
         -> int8#
-        -> int32#
+        -> int32_u
         = "%caml_string_get32u#_indexed_by_int8#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -3665,7 +3665,7 @@ open struct
       external get_safe
         :  bytes
         -> int8#
-        -> int32#
+        -> int32_u
         = "%caml_bytes_get32#_indexed_by_int8#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -3673,7 +3673,7 @@ open struct
       external get_unsafe
         :  bytes
         -> int8#
-        -> int32#
+        -> int32_u
         = "%caml_bytes_get32u#_indexed_by_int8#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -3688,7 +3688,7 @@ open struct
       external set_safe
         :  bytes
         -> int8#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bytes_set32#_indexed_by_int8#"
 
@@ -3697,7 +3697,7 @@ open struct
       external set_unsafe
         :  bytes
         -> int8#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bytes_set32u#_indexed_by_int8#"
 
@@ -3725,7 +3725,7 @@ open struct
       external get_safe
         :  bigstring
         -> int8#
-        -> int32#
+        -> int32_u
         = "%caml_bigstring_get32#_indexed_by_int8#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -3733,7 +3733,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> int8#
-        -> int32#
+        -> int32_u
         = "%caml_bigstring_get32u#_indexed_by_int8#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -3748,7 +3748,7 @@ open struct
       external set_safe
         :  bigstring
         -> int8#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32#_indexed_by_int8#"
 
@@ -3757,7 +3757,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> int8#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32u#_indexed_by_int8#"
 
@@ -3814,7 +3814,7 @@ open struct
       external get_safe
         :  string
         -> int8#
-        -> int64#
+        -> int64_u
         = "%caml_string_get64#_indexed_by_int8#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -3822,7 +3822,7 @@ open struct
       external get_unsafe
         :  string
         -> int8#
-        -> int64#
+        -> int64_u
         = "%caml_string_get64u#_indexed_by_int8#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -3850,7 +3850,7 @@ open struct
       external get_safe
         :  bytes
         -> int8#
-        -> int64#
+        -> int64_u
         = "%caml_bytes_get64#_indexed_by_int8#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -3858,7 +3858,7 @@ open struct
       external get_unsafe
         :  bytes
         -> int8#
-        -> int64#
+        -> int64_u
         = "%caml_bytes_get64u#_indexed_by_int8#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -3873,7 +3873,7 @@ open struct
       external set_safe
         :  bytes
         -> int8#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bytes_set64#_indexed_by_int8#"
 
@@ -3882,7 +3882,7 @@ open struct
       external set_unsafe
         :  bytes
         -> int8#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bytes_set64u#_indexed_by_int8#"
 
@@ -3910,7 +3910,7 @@ open struct
       external get_safe
         :  bigstring
         -> int8#
-        -> int64#
+        -> int64_u
         = "%caml_bigstring_get64#_indexed_by_int8#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -3918,7 +3918,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> int8#
-        -> int64#
+        -> int64_u
         = "%caml_bigstring_get64u#_indexed_by_int8#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -3933,7 +3933,7 @@ open struct
       external set_safe
         :  bigstring
         -> int8#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64#_indexed_by_int8#"
 
@@ -3942,7 +3942,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> int8#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64u#_indexed_by_int8#"
 
@@ -5658,7 +5658,7 @@ open struct
       external get_safe
         :  string
         -> int16#
-        -> int32#
+        -> int32_u
         = "%caml_string_get32#_indexed_by_int16#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -5666,7 +5666,7 @@ open struct
       external get_unsafe
         :  string
         -> int16#
-        -> int32#
+        -> int32_u
         = "%caml_string_get32u#_indexed_by_int16#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -5694,7 +5694,7 @@ open struct
       external get_safe
         :  bytes
         -> int16#
-        -> int32#
+        -> int32_u
         = "%caml_bytes_get32#_indexed_by_int16#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -5702,7 +5702,7 @@ open struct
       external get_unsafe
         :  bytes
         -> int16#
-        -> int32#
+        -> int32_u
         = "%caml_bytes_get32u#_indexed_by_int16#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -5717,7 +5717,7 @@ open struct
       external set_safe
         :  bytes
         -> int16#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bytes_set32#_indexed_by_int16#"
 
@@ -5726,7 +5726,7 @@ open struct
       external set_unsafe
         :  bytes
         -> int16#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bytes_set32u#_indexed_by_int16#"
 
@@ -5754,7 +5754,7 @@ open struct
       external get_safe
         :  bigstring
         -> int16#
-        -> int32#
+        -> int32_u
         = "%caml_bigstring_get32#_indexed_by_int16#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -5762,7 +5762,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> int16#
-        -> int32#
+        -> int32_u
         = "%caml_bigstring_get32u#_indexed_by_int16#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -5777,7 +5777,7 @@ open struct
       external set_safe
         :  bigstring
         -> int16#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32#_indexed_by_int16#"
 
@@ -5786,7 +5786,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> int16#
-        -> int32#
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32u#_indexed_by_int16#"
 
@@ -5843,7 +5843,7 @@ open struct
       external get_safe
         :  string
         -> int16#
-        -> int64#
+        -> int64_u
         = "%caml_string_get64#_indexed_by_int16#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -5851,7 +5851,7 @@ open struct
       external get_unsafe
         :  string
         -> int16#
-        -> int64#
+        -> int64_u
         = "%caml_string_get64u#_indexed_by_int16#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -5879,7 +5879,7 @@ open struct
       external get_safe
         :  bytes
         -> int16#
-        -> int64#
+        -> int64_u
         = "%caml_bytes_get64#_indexed_by_int16#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -5887,7 +5887,7 @@ open struct
       external get_unsafe
         :  bytes
         -> int16#
-        -> int64#
+        -> int64_u
         = "%caml_bytes_get64u#_indexed_by_int16#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -5902,7 +5902,7 @@ open struct
       external set_safe
         :  bytes
         -> int16#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bytes_set64#_indexed_by_int16#"
 
@@ -5911,7 +5911,7 @@ open struct
       external set_unsafe
         :  bytes
         -> int16#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bytes_set64u#_indexed_by_int16#"
 
@@ -5939,7 +5939,7 @@ open struct
       external get_safe
         :  bigstring
         -> int16#
-        -> int64#
+        -> int64_u
         = "%caml_bigstring_get64#_indexed_by_int16#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -5947,7 +5947,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> int16#
-        -> int64#
+        -> int64_u
         = "%caml_bigstring_get64u#_indexed_by_int16#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -5962,7 +5962,7 @@ open struct
       external set_safe
         :  bigstring
         -> int16#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64#_indexed_by_int16#"
 
@@ -5971,7 +5971,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> int16#
-        -> int64#
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64u#_indexed_by_int16#"
 
@@ -6389,7 +6389,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int8
         = "%caml_string_geti8_indexed_by_int32#"
 
@@ -6397,7 +6397,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int8
         = "%caml_string_geti8u_indexed_by_int32#"
 
@@ -6425,7 +6425,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8
         = "%caml_bytes_geti8_indexed_by_int32#"
 
@@ -6433,7 +6433,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8
         = "%caml_bytes_geti8u_indexed_by_int32#"
 
@@ -6448,7 +6448,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8
         -> unit
         = "%caml_bytes_set8_indexed_by_int32#"
@@ -6457,7 +6457,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8
         -> unit
         = "%caml_bytes_set8u_indexed_by_int32#"
@@ -6485,7 +6485,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8
         = "%caml_bigstring_geti8_indexed_by_int32#"
 
@@ -6493,7 +6493,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8
         = "%caml_bigstring_geti8u_indexed_by_int32#"
 
@@ -6508,7 +6508,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8
         -> unit
         = "%caml_bigstring_set8_indexed_by_int32#"
@@ -6517,7 +6517,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8
         -> unit
         = "%caml_bigstring_set8u_indexed_by_int32#"
@@ -6576,7 +6576,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int
         = "%caml_string_get16_indexed_by_int32#"
 
@@ -6584,7 +6584,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int
         = "%caml_string_get16u_indexed_by_int32#"
 
@@ -6612,7 +6612,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int
         = "%caml_bytes_get16_indexed_by_int32#"
 
@@ -6620,7 +6620,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int
         = "%caml_bytes_get16u_indexed_by_int32#"
 
@@ -6635,7 +6635,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int
         -> unit
         = "%caml_bytes_set16_indexed_by_int32#"
@@ -6644,7 +6644,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int
         -> unit
         = "%caml_bytes_set16u_indexed_by_int32#"
@@ -6672,7 +6672,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int
         = "%caml_bigstring_get16_indexed_by_int32#"
 
@@ -6680,7 +6680,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int
         = "%caml_bigstring_get16u_indexed_by_int32#"
 
@@ -6695,7 +6695,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int
         -> unit
         = "%caml_bigstring_set16_indexed_by_int32#"
@@ -6704,7 +6704,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int
         -> unit
         = "%caml_bigstring_set16u_indexed_by_int32#"
@@ -6761,7 +6761,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int16
         = "%caml_string_geti16_indexed_by_int32#"
 
@@ -6769,7 +6769,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int16
         = "%caml_string_geti16u_indexed_by_int32#"
 
@@ -6797,7 +6797,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16
         = "%caml_bytes_geti16_indexed_by_int32#"
 
@@ -6805,7 +6805,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16
         = "%caml_bytes_geti16u_indexed_by_int32#"
 
@@ -6820,7 +6820,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16
         -> unit
         = "%caml_bytes_set16_indexed_by_int32#"
@@ -6829,7 +6829,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16
         -> unit
         = "%caml_bytes_set16u_indexed_by_int32#"
@@ -6857,7 +6857,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16
         = "%caml_bigstring_geti16_indexed_by_int32#"
 
@@ -6865,7 +6865,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16
         = "%caml_bigstring_geti16u_indexed_by_int32#"
 
@@ -6880,7 +6880,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16
         -> unit
         = "%caml_bigstring_set16_indexed_by_int32#"
@@ -6889,7 +6889,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16
         -> unit
         = "%caml_bigstring_set16u_indexed_by_int32#"
@@ -6946,7 +6946,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int32
         = "%caml_string_get32_indexed_by_int32#"
 
@@ -6954,7 +6954,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int32
         = "%caml_string_get32u_indexed_by_int32#"
 
@@ -6982,7 +6982,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int32
         = "%caml_bytes_get32_indexed_by_int32#"
 
@@ -6990,7 +6990,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int32
         = "%caml_bytes_get32u_indexed_by_int32#"
 
@@ -7005,7 +7005,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int32
         -> unit
         = "%caml_bytes_set32_indexed_by_int32#"
@@ -7014,7 +7014,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int32
         -> unit
         = "%caml_bytes_set32u_indexed_by_int32#"
@@ -7042,7 +7042,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int32
         = "%caml_bigstring_get32_indexed_by_int32#"
 
@@ -7050,7 +7050,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int32
         = "%caml_bigstring_get32u_indexed_by_int32#"
 
@@ -7065,7 +7065,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int32
         -> unit
         = "%caml_bigstring_set32_indexed_by_int32#"
@@ -7074,7 +7074,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int32
         -> unit
         = "%caml_bigstring_set32u_indexed_by_int32#"
@@ -7131,7 +7131,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int64
         = "%caml_string_get64_indexed_by_int32#"
 
@@ -7139,7 +7139,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int64
         = "%caml_string_get64u_indexed_by_int32#"
 
@@ -7167,7 +7167,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int64
         = "%caml_bytes_get64_indexed_by_int32#"
 
@@ -7175,7 +7175,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int64
         = "%caml_bytes_get64u_indexed_by_int32#"
 
@@ -7190,7 +7190,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int64
         -> unit
         = "%caml_bytes_set64_indexed_by_int32#"
@@ -7199,7 +7199,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int64
         -> unit
         = "%caml_bytes_set64u_indexed_by_int32#"
@@ -7227,7 +7227,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int64
         = "%caml_bigstring_get64_indexed_by_int32#"
 
@@ -7235,7 +7235,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int64
         = "%caml_bigstring_get64u_indexed_by_int32#"
 
@@ -7250,7 +7250,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int64
         -> unit
         = "%caml_bigstring_set64_indexed_by_int32#"
@@ -7259,7 +7259,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int64
         -> unit
         = "%caml_bigstring_set64u_indexed_by_int32#"
@@ -7316,7 +7316,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int8#
         = "%caml_string_geti8#_indexed_by_int32#"
 
@@ -7324,7 +7324,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int8#
         = "%caml_string_geti8u#_indexed_by_int32#"
 
@@ -7352,7 +7352,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8#
         = "%caml_bytes_geti8#_indexed_by_int32#"
 
@@ -7360,7 +7360,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8#
         = "%caml_bytes_geti8u#_indexed_by_int32#"
 
@@ -7375,7 +7375,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8#
         -> unit
         = "%caml_bytes_set8#_indexed_by_int32#"
@@ -7384,7 +7384,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int8#
         -> unit
         = "%caml_bytes_set8u#_indexed_by_int32#"
@@ -7412,7 +7412,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8#
         = "%caml_bigstring_geti8#_indexed_by_int32#"
 
@@ -7420,7 +7420,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8#
         = "%caml_bigstring_geti8u#_indexed_by_int32#"
 
@@ -7435,7 +7435,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8#
         -> unit
         = "%caml_bigstring_set8#_indexed_by_int32#"
@@ -7444,7 +7444,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int8#
         -> unit
         = "%caml_bigstring_set8u#_indexed_by_int32#"
@@ -7501,7 +7501,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> int16#
         = "%caml_string_geti16#_indexed_by_int32#"
 
@@ -7509,7 +7509,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> int16#
         = "%caml_string_geti16u#_indexed_by_int32#"
 
@@ -7537,7 +7537,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16#
         = "%caml_bytes_geti16#_indexed_by_int32#"
 
@@ -7545,7 +7545,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16#
         = "%caml_bytes_geti16u#_indexed_by_int32#"
 
@@ -7560,7 +7560,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16#
         -> unit
         = "%caml_bytes_set16#_indexed_by_int32#"
@@ -7569,7 +7569,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> int16#
         -> unit
         = "%caml_bytes_set16u#_indexed_by_int32#"
@@ -7597,7 +7597,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16#
         = "%caml_bigstring_geti16#_indexed_by_int32#"
 
@@ -7605,7 +7605,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16#
         = "%caml_bigstring_geti16u#_indexed_by_int32#"
 
@@ -7620,7 +7620,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16#
         -> unit
         = "%caml_bigstring_set16#_indexed_by_int32#"
@@ -7629,7 +7629,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> int16#
         -> unit
         = "%caml_bigstring_set16u#_indexed_by_int32#"
@@ -7686,16 +7686,16 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         = "%caml_string_get32#_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  string
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         = "%caml_string_get32u#_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -7722,16 +7722,16 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         = "%caml_bytes_get32#_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bytes
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         = "%caml_bytes_get32u#_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -7745,8 +7745,8 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         -> unit
         = "%caml_bytes_set32#_indexed_by_int32#"
 
@@ -7754,8 +7754,8 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         -> unit
         = "%caml_bytes_set32u#_indexed_by_int32#"
 
@@ -7782,16 +7782,16 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         = "%caml_bigstring_get32#_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bigstring
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         = "%caml_bigstring_get32u#_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -7805,8 +7805,8 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32#_indexed_by_int32#"
 
@@ -7814,8 +7814,8 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
-        -> int32#
+        -> int32_u
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32u#_indexed_by_int32#"
 
@@ -7871,16 +7871,16 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         = "%caml_string_get64#_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  string
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         = "%caml_string_get64u#_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -7907,16 +7907,16 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         = "%caml_bytes_get64#_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bytes
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         = "%caml_bytes_get64u#_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -7930,8 +7930,8 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         -> unit
         = "%caml_bytes_set64#_indexed_by_int32#"
 
@@ -7939,8 +7939,8 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         -> unit
         = "%caml_bytes_set64u#_indexed_by_int32#"
 
@@ -7967,16 +7967,16 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         = "%caml_bigstring_get64#_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bigstring
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         = "%caml_bigstring_get64u#_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -7990,8 +7990,8 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64#_indexed_by_int32#"
 
@@ -7999,8 +7999,8 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
-        -> int64#
+        -> int32_u
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64u#_indexed_by_int32#"
 
@@ -8052,7 +8052,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> float32
         = "%caml_string_getf32_indexed_by_int32#"
 
@@ -8060,7 +8060,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> float32
         = "%caml_string_getf32u_indexed_by_int32#"
 
@@ -8088,7 +8088,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32
         = "%caml_bytes_getf32_indexed_by_int32#"
 
@@ -8096,7 +8096,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32
         = "%caml_bytes_getf32u_indexed_by_int32#"
 
@@ -8111,7 +8111,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32
         -> unit
         = "%caml_bytes_setf32_indexed_by_int32#"
@@ -8120,7 +8120,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32
         -> unit
         = "%caml_bytes_setf32u_indexed_by_int32#"
@@ -8148,7 +8148,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32
         = "%caml_bigstring_getf32_indexed_by_int32#"
 
@@ -8156,7 +8156,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32
         = "%caml_bigstring_getf32u_indexed_by_int32#"
 
@@ -8171,7 +8171,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32
         -> unit
         = "%caml_bigstring_setf32_indexed_by_int32#"
@@ -8180,7 +8180,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32
         -> unit
         = "%caml_bigstring_setf32u_indexed_by_int32#"
@@ -8233,7 +8233,7 @@ open struct
 
       external get_safe
         :  string
-        -> int32#
+        -> int32_u
         -> float32#
         = "%caml_string_getf32#_indexed_by_int32#"
 
@@ -8241,7 +8241,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int32#
+        -> int32_u
         -> float32#
         = "%caml_string_getf32u#_indexed_by_int32#"
 
@@ -8269,7 +8269,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32#
         = "%caml_bytes_getf32#_indexed_by_int32#"
 
@@ -8277,7 +8277,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32#
         = "%caml_bytes_getf32u#_indexed_by_int32#"
 
@@ -8292,7 +8292,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32#
         -> unit
         = "%caml_bytes_setf32#_indexed_by_int32#"
@@ -8301,7 +8301,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int32#
+        -> int32_u
         -> float32#
         -> unit
         = "%caml_bytes_setf32u#_indexed_by_int32#"
@@ -8329,7 +8329,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32#
         = "%caml_bigstring_getf32#_indexed_by_int32#"
 
@@ -8337,7 +8337,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32#
         = "%caml_bigstring_getf32u#_indexed_by_int32#"
 
@@ -8352,7 +8352,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32#
         -> unit
         = "%caml_bigstring_setf32#_indexed_by_int32#"
@@ -8361,7 +8361,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int32#
+        -> int32_u
         -> float32#
         -> unit
         = "%caml_bigstring_setf32u#_indexed_by_int32#"
@@ -8418,7 +8418,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int8
         = "%caml_string_geti8_indexed_by_int64#"
 
@@ -8426,7 +8426,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int8
         = "%caml_string_geti8u_indexed_by_int64#"
 
@@ -8454,7 +8454,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8
         = "%caml_bytes_geti8_indexed_by_int64#"
 
@@ -8462,7 +8462,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8
         = "%caml_bytes_geti8u_indexed_by_int64#"
 
@@ -8477,7 +8477,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8
         -> unit
         = "%caml_bytes_set8_indexed_by_int64#"
@@ -8486,7 +8486,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8
         -> unit
         = "%caml_bytes_set8u_indexed_by_int64#"
@@ -8514,7 +8514,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8
         = "%caml_bigstring_geti8_indexed_by_int64#"
 
@@ -8522,7 +8522,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8
         = "%caml_bigstring_geti8u_indexed_by_int64#"
 
@@ -8537,7 +8537,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8
         -> unit
         = "%caml_bigstring_set8_indexed_by_int64#"
@@ -8546,7 +8546,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8
         -> unit
         = "%caml_bigstring_set8u_indexed_by_int64#"
@@ -8605,7 +8605,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int
         = "%caml_string_get16_indexed_by_int64#"
 
@@ -8613,7 +8613,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int
         = "%caml_string_get16u_indexed_by_int64#"
 
@@ -8641,7 +8641,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int
         = "%caml_bytes_get16_indexed_by_int64#"
 
@@ -8649,7 +8649,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int
         = "%caml_bytes_get16u_indexed_by_int64#"
 
@@ -8664,7 +8664,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int
         -> unit
         = "%caml_bytes_set16_indexed_by_int64#"
@@ -8673,7 +8673,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int
         -> unit
         = "%caml_bytes_set16u_indexed_by_int64#"
@@ -8701,7 +8701,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int
         = "%caml_bigstring_get16_indexed_by_int64#"
 
@@ -8709,7 +8709,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int
         = "%caml_bigstring_get16u_indexed_by_int64#"
 
@@ -8724,7 +8724,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int
         -> unit
         = "%caml_bigstring_set16_indexed_by_int64#"
@@ -8733,7 +8733,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int
         -> unit
         = "%caml_bigstring_set16u_indexed_by_int64#"
@@ -8790,7 +8790,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int16
         = "%caml_string_geti16_indexed_by_int64#"
 
@@ -8798,7 +8798,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int16
         = "%caml_string_geti16u_indexed_by_int64#"
 
@@ -8826,7 +8826,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16
         = "%caml_bytes_geti16_indexed_by_int64#"
 
@@ -8834,7 +8834,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16
         = "%caml_bytes_geti16u_indexed_by_int64#"
 
@@ -8849,7 +8849,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16
         -> unit
         = "%caml_bytes_set16_indexed_by_int64#"
@@ -8858,7 +8858,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16
         -> unit
         = "%caml_bytes_set16u_indexed_by_int64#"
@@ -8886,7 +8886,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16
         = "%caml_bigstring_geti16_indexed_by_int64#"
 
@@ -8894,7 +8894,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16
         = "%caml_bigstring_geti16u_indexed_by_int64#"
 
@@ -8909,7 +8909,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16
         -> unit
         = "%caml_bigstring_set16_indexed_by_int64#"
@@ -8918,7 +8918,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16
         -> unit
         = "%caml_bigstring_set16u_indexed_by_int64#"
@@ -8975,7 +8975,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int32
         = "%caml_string_get32_indexed_by_int64#"
 
@@ -8983,7 +8983,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int32
         = "%caml_string_get32u_indexed_by_int64#"
 
@@ -9011,7 +9011,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int32
         = "%caml_bytes_get32_indexed_by_int64#"
 
@@ -9019,7 +9019,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int32
         = "%caml_bytes_get32u_indexed_by_int64#"
 
@@ -9034,7 +9034,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int32
         -> unit
         = "%caml_bytes_set32_indexed_by_int64#"
@@ -9043,7 +9043,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int32
         -> unit
         = "%caml_bytes_set32u_indexed_by_int64#"
@@ -9071,7 +9071,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int32
         = "%caml_bigstring_get32_indexed_by_int64#"
 
@@ -9079,7 +9079,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int32
         = "%caml_bigstring_get32u_indexed_by_int64#"
 
@@ -9094,7 +9094,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int32
         -> unit
         = "%caml_bigstring_set32_indexed_by_int64#"
@@ -9103,7 +9103,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int32
         -> unit
         = "%caml_bigstring_set32u_indexed_by_int64#"
@@ -9160,7 +9160,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int64
         = "%caml_string_get64_indexed_by_int64#"
 
@@ -9168,7 +9168,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int64
         = "%caml_string_get64u_indexed_by_int64#"
 
@@ -9196,7 +9196,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int64
         = "%caml_bytes_get64_indexed_by_int64#"
 
@@ -9204,7 +9204,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int64
         = "%caml_bytes_get64u_indexed_by_int64#"
 
@@ -9219,7 +9219,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int64
         -> unit
         = "%caml_bytes_set64_indexed_by_int64#"
@@ -9228,7 +9228,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int64
         -> unit
         = "%caml_bytes_set64u_indexed_by_int64#"
@@ -9256,7 +9256,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int64
         = "%caml_bigstring_get64_indexed_by_int64#"
 
@@ -9264,7 +9264,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int64
         = "%caml_bigstring_get64u_indexed_by_int64#"
 
@@ -9279,7 +9279,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int64
         -> unit
         = "%caml_bigstring_set64_indexed_by_int64#"
@@ -9288,7 +9288,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int64
         -> unit
         = "%caml_bigstring_set64u_indexed_by_int64#"
@@ -9345,7 +9345,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int8#
         = "%caml_string_geti8#_indexed_by_int64#"
 
@@ -9353,7 +9353,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int8#
         = "%caml_string_geti8u#_indexed_by_int64#"
 
@@ -9381,7 +9381,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8#
         = "%caml_bytes_geti8#_indexed_by_int64#"
 
@@ -9389,7 +9389,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8#
         = "%caml_bytes_geti8u#_indexed_by_int64#"
 
@@ -9404,7 +9404,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8#
         -> unit
         = "%caml_bytes_set8#_indexed_by_int64#"
@@ -9413,7 +9413,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int8#
         -> unit
         = "%caml_bytes_set8u#_indexed_by_int64#"
@@ -9441,7 +9441,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8#
         = "%caml_bigstring_geti8#_indexed_by_int64#"
 
@@ -9449,7 +9449,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8#
         = "%caml_bigstring_geti8u#_indexed_by_int64#"
 
@@ -9464,7 +9464,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8#
         -> unit
         = "%caml_bigstring_set8#_indexed_by_int64#"
@@ -9473,7 +9473,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int8#
         -> unit
         = "%caml_bigstring_set8u#_indexed_by_int64#"
@@ -9530,7 +9530,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> int16#
         = "%caml_string_geti16#_indexed_by_int64#"
 
@@ -9538,7 +9538,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> int16#
         = "%caml_string_geti16u#_indexed_by_int64#"
 
@@ -9566,7 +9566,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16#
         = "%caml_bytes_geti16#_indexed_by_int64#"
 
@@ -9574,7 +9574,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16#
         = "%caml_bytes_geti16u#_indexed_by_int64#"
 
@@ -9589,7 +9589,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16#
         -> unit
         = "%caml_bytes_set16#_indexed_by_int64#"
@@ -9598,7 +9598,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> int16#
         -> unit
         = "%caml_bytes_set16u#_indexed_by_int64#"
@@ -9626,7 +9626,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16#
         = "%caml_bigstring_geti16#_indexed_by_int64#"
 
@@ -9634,7 +9634,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16#
         = "%caml_bigstring_geti16u#_indexed_by_int64#"
 
@@ -9649,7 +9649,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16#
         -> unit
         = "%caml_bigstring_set16#_indexed_by_int64#"
@@ -9658,7 +9658,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> int16#
         -> unit
         = "%caml_bigstring_set16u#_indexed_by_int64#"
@@ -9715,16 +9715,16 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         = "%caml_string_get32#_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  string
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         = "%caml_string_get32u#_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -9751,16 +9751,16 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         = "%caml_bytes_get32#_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bytes
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         = "%caml_bytes_get32u#_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -9774,8 +9774,8 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         -> unit
         = "%caml_bytes_set32#_indexed_by_int64#"
 
@@ -9783,8 +9783,8 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         -> unit
         = "%caml_bytes_set32u#_indexed_by_int64#"
 
@@ -9811,16 +9811,16 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         = "%caml_bigstring_get32#_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bigstring
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         = "%caml_bigstring_get32u#_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -9834,8 +9834,8 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32#_indexed_by_int64#"
 
@@ -9843,8 +9843,8 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
-        -> int32#
+        -> int64_u
+        -> int32_u
         -> unit
         = "%caml_bigstring_set32u#_indexed_by_int64#"
 
@@ -9900,16 +9900,16 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         = "%caml_string_get64#_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  string
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         = "%caml_string_get64u#_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -9936,16 +9936,16 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         = "%caml_bytes_get64#_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bytes
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         = "%caml_bytes_get64u#_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -9959,8 +9959,8 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         -> unit
         = "%caml_bytes_set64#_indexed_by_int64#"
 
@@ -9968,8 +9968,8 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         -> unit
         = "%caml_bytes_set64u#_indexed_by_int64#"
 
@@ -9996,16 +9996,16 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         = "%caml_bigstring_get64#_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
 
       external get_unsafe
         :  bigstring
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         = "%caml_bigstring_get64u#_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -10019,8 +10019,8 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64#_indexed_by_int64#"
 
@@ -10028,8 +10028,8 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
-        -> int64#
+        -> int64_u
+        -> int64_u
         -> unit
         = "%caml_bigstring_set64u#_indexed_by_int64#"
 
@@ -10081,7 +10081,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> float32
         = "%caml_string_getf32_indexed_by_int64#"
 
@@ -10089,7 +10089,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> float32
         = "%caml_string_getf32u_indexed_by_int64#"
 
@@ -10117,7 +10117,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32
         = "%caml_bytes_getf32_indexed_by_int64#"
 
@@ -10125,7 +10125,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32
         = "%caml_bytes_getf32u_indexed_by_int64#"
 
@@ -10140,7 +10140,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32
         -> unit
         = "%caml_bytes_setf32_indexed_by_int64#"
@@ -10149,7 +10149,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32
         -> unit
         = "%caml_bytes_setf32u_indexed_by_int64#"
@@ -10177,7 +10177,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32
         = "%caml_bigstring_getf32_indexed_by_int64#"
 
@@ -10185,7 +10185,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32
         = "%caml_bigstring_getf32u_indexed_by_int64#"
 
@@ -10200,7 +10200,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32
         -> unit
         = "%caml_bigstring_setf32_indexed_by_int64#"
@@ -10209,7 +10209,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32
         -> unit
         = "%caml_bigstring_setf32u_indexed_by_int64#"
@@ -10262,7 +10262,7 @@ open struct
 
       external get_safe
         :  string
-        -> int64#
+        -> int64_u
         -> float32#
         = "%caml_string_getf32#_indexed_by_int64#"
 
@@ -10270,7 +10270,7 @@ open struct
 
       external get_unsafe
         :  string
-        -> int64#
+        -> int64_u
         -> float32#
         = "%caml_string_getf32u#_indexed_by_int64#"
 
@@ -10298,7 +10298,7 @@ open struct
 
       external get_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32#
         = "%caml_bytes_getf32#_indexed_by_int64#"
 
@@ -10306,7 +10306,7 @@ open struct
 
       external get_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32#
         = "%caml_bytes_getf32u#_indexed_by_int64#"
 
@@ -10321,7 +10321,7 @@ open struct
 
       external set_safe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32#
         -> unit
         = "%caml_bytes_setf32#_indexed_by_int64#"
@@ -10330,7 +10330,7 @@ open struct
 
       external set_unsafe
         :  bytes
-        -> int64#
+        -> int64_u
         -> float32#
         -> unit
         = "%caml_bytes_setf32u#_indexed_by_int64#"
@@ -10358,7 +10358,7 @@ open struct
 
       external get_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32#
         = "%caml_bigstring_getf32#_indexed_by_int64#"
 
@@ -10366,7 +10366,7 @@ open struct
 
       external get_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32#
         = "%caml_bigstring_getf32u#_indexed_by_int64#"
 
@@ -10381,7 +10381,7 @@ open struct
 
       external set_safe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32#
         -> unit
         = "%caml_bigstring_setf32#_indexed_by_int64#"
@@ -10390,7 +10390,7 @@ open struct
 
       external set_unsafe
         :  bigstring
-        -> int64#
+        -> int64_u
         -> float32#
         -> unit
         = "%caml_bigstring_setf32u#_indexed_by_int64#"

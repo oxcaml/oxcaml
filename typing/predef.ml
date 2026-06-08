@@ -46,10 +46,13 @@ and ident_iarray = ident_create "iarray"
 and ident_list = ident_create "list"
 and ident_option = ident_create "option"
 and ident_nativeint = ident_create "nativeint"
+and ident_nativeint_u = ident_create "nativeint_u"
 and ident_int8 = ident_create "int8"
 and ident_int16 = ident_create "int16"
 and ident_int32 = ident_create "int32"
 and ident_int64 = ident_create "int64"
+and ident_int32_u = ident_create "int32_u"
+and ident_int64_u = ident_create "int64_u"
 and ident_lazy_t = ident_create "lazy_t"
 and ident_string = ident_create "string"
 and ident_extension_constructor = ident_create "extension_constructor"
@@ -60,6 +63,7 @@ and ident_atomic_loc = ident_create "atomic_loc"
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
 and ident_eval = ident_create "eval"
+and ident_box = ident_create "box"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -100,10 +104,13 @@ and path_iarray = Pident ident_iarray
 and path_list = Pident ident_list
 and path_option = Pident ident_option
 and path_nativeint = Pident ident_nativeint
+and path_nativeint_u = Pident ident_nativeint_u
 and path_int8 = Pident ident_int8
 and path_int16 = Pident ident_int16
 and path_int32 = Pident ident_int32
 and path_int64 = Pident ident_int64
+and path_int32_u = Pident ident_int32_u
+and path_int64_u = Pident ident_int64_u
 and path_lazy_t = Pident ident_lazy_t
 and path_string = Pident ident_string
 and path_extension_constructor = Pident ident_extension_constructor
@@ -114,6 +121,7 @@ and path_idx_mut = Pident ident_idx_mut
 and path_atomic_loc = Pident ident_atomic_loc
 and path_code = Pident ident_code
 and path_eval = Pident ident_eval
+and path_box = Pident ident_box
 
 and path_or_null = Pident ident_or_null
 
@@ -143,13 +151,10 @@ let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_unit = Path.unboxed_version path_unit
 and path_unboxed_bool = Path.unboxed_version path_bool
 and path_unboxed_float32 = Path.unboxed_version path_float32
-and path_unboxed_nativeint = Path.unboxed_version path_nativeint
 and path_unboxed_char = Path.unboxed_version path_char
 and path_unboxed_int = Path.unboxed_version path_int
 and path_unboxed_int8 = Path.unboxed_version path_int8
 and path_unboxed_int16 = Path.unboxed_version path_int16
-and path_unboxed_int32 = Path.unboxed_version path_int32
-and path_unboxed_int64 = Path.unboxed_version path_int64
 
 and path_unboxed_int8x16 = Path.unboxed_version path_int8x16
 and path_unboxed_int16x8 = Path.unboxed_version path_int16x8
@@ -188,8 +193,11 @@ and type_iarray t = newgenty (Tconstr(path_iarray, [t], ref Mnil))
 and type_list t = newgenty (Tconstr(path_list, [t], ref Mnil))
 and type_option t = newgenty (Tconstr(path_option, [t], ref Mnil))
 and type_nativeint = newgenty (Tconstr(path_nativeint, [], ref Mnil))
+and type_nativeint_u = newgenty (Tconstr(path_nativeint_u, [], ref Mnil))
 and type_int32 = newgenty (Tconstr(path_int32, [], ref Mnil))
 and type_int64 = newgenty (Tconstr(path_int64, [], ref Mnil))
+and type_int32_u = newgenty (Tconstr(path_int32_u, [], ref Mnil))
+and type_int64_u = newgenty (Tconstr(path_int64_u, [], ref Mnil))
 and type_lazy_t t = newgenty (Tconstr(path_lazy_t, [t], ref Mnil))
 and type_string = newgenty (Tconstr(path_string, [], ref Mnil))
 and type_extension_constructor =
@@ -199,15 +207,12 @@ and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil)
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 and type_eval t = newgenty (Tquote_eval (newgenty (Tsplice t)))
+and type_box t = newgenty (Tbox t)
 
 and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
 and type_unboxed_bool = newgenty (Tconstr(path_unboxed_bool, [], ref Mnil))
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
-and type_unboxed_nativeint =
-      newgenty (Tconstr(path_unboxed_nativeint, [], ref Mnil))
-and type_unboxed_int32 = newgenty (Tconstr(path_unboxed_int32, [], ref Mnil))
-and type_unboxed_int64 = newgenty (Tconstr(path_unboxed_int64, [], ref Mnil))
 and type_unboxed_char = newgenty (Tconstr(path_unboxed_char, [], ref Mnil))
 and type_unboxed_int = newgenty (Tconstr(path_unboxed_int, [], ref Mnil))
 and type_unboxed_int8 = newgenty (Tconstr(path_unboxed_int8, [], ref Mnil))
@@ -633,9 +638,11 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_int
   |> add_type ident_int32 ~jkind:Jkind.Const.Builtin.immutable_data
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
   |> add_type ident_int64 ~jkind:Jkind.Const.Builtin.immutable_data
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int64
+  |> add_type ident_int32_u
+       ~jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
+  |> add_type ident_int64_u
+       ~jkind:Jkind.Const.Builtin.kind_of_unboxed_int64
   |> add_type1 ident_lazy_t
        ~variance:Variance.covariant
        ~separability:Separability.Ind
@@ -656,7 +663,8 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~jkind:list_jkind
   |> add_type ident_nativeint
       ~jkind:Jkind.Const.Builtin.immutable_data
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
+  |> add_type ident_nativeint_u
+       ~jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
   |> add_type1 ident_option
        ~variance:Variance.covariant
        ~separability:Separability.Ind
@@ -744,6 +752,17 @@ let build_initial_env add_type add_extension add_jkind empty_env =
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
+  |> add_type1 ident_box
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:type_box
+       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_box;
+           position = 1;
+           arity = 1;
+         }))
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit

@@ -188,10 +188,9 @@ module Type_shape = struct
     let unboxed_of_path = function
       | p when Path.same p Predef.path_unboxed_float -> Some Unboxed_float
       | p when Path.same p Predef.path_unboxed_float32 -> Some Unboxed_float32
-      | p when Path.same p Predef.path_unboxed_nativeint ->
-        Some Unboxed_nativeint
-      | p when Path.same p Predef.path_unboxed_int64 -> Some Unboxed_int64
-      | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
+      | p when Path.same p Predef.path_nativeint_u -> Some Unboxed_nativeint
+      | p when Path.same p Predef.path_int64_u -> Some Unboxed_int64
+      | p when Path.same p Predef.path_int32_u -> Some Unboxed_int32
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
       | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
@@ -325,7 +324,7 @@ module Type_shape = struct
                 | Tpoly (_, _)
                 | Trepr (_, _)
                 | Tpackage (_, _)
-                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ ->
+                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
                   assert false
               in
               Misc.fatal_errorf
@@ -366,6 +365,7 @@ module Type_shape = struct
           | Tquote_eval _ -> unknown_shape_any
           | Tunivar _ -> unknown_shape_any
           | Tof_kind _ -> unknown_shape_any
+          | Tbox _ -> unknown_shape_value
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
         in

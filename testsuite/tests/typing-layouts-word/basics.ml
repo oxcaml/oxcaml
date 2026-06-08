@@ -9,29 +9,29 @@
 
 (* This file contains typing tests for the layout [word].
 
-   Runtime tests for the type [nativeint#] can be found in the
+   Runtime tests for the type [nativeint_u] can be found in the
    [unboxed_nativeint], [alloc], and [test_nativeint_u] tests in this
-   directory.  The type [nativeint#] here is used as a convenient example of a
+   directory.  The type [nativeint_u] here is used as a convenient example of a
    concrete [word] type in some tests, but its behavior isn't the primary
    purpose of this test. *)
 
 type t_word : word
 type ('a : word) t_word_id = 'a
-external of_isize : nativeint# -> t_word = "%opaque"
+external of_isize : nativeint_u -> t_word = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
 
 let f1_1 (x : t_word) = x;;
 let f1_2 (x : 'a t_word_id) = x;;
-let f1_3 (x : nativeint#) = x;;
+let f1_3 (x : nativeint_u) = x;;
 [%%expect{|
 type t_word : word
 type ('a : word) t_word_id = 'a
-external of_isize : nativeint# -> t_word = "%opaque"
+external of_isize : nativeint_u -> t_word = "%opaque"
 val f1_1 : t_word -> t_word = <fun>
 val f1_2 : ('a : word). 'a t_word_id -> 'a t_word_id = <fun>
-val f1_3 : nativeint# -> nativeint# = <fun>
+val f1_3 : nativeint_u -> nativeint_u = <fun>
 |}];;
 
 (*****************************************)
@@ -44,13 +44,13 @@ let f2_2 (x : 'a t_word_id) =
   let y = x in
   y;;
 
-let f2_3 (x : nativeint#) =
+let f2_3 (x : nativeint_u) =
   let y = x in
   y;;
 [%%expect{|
 val f2_1 : t_word -> t_word = <fun>
 val f2_2 : ('a : word). 'a t_word_id -> 'a t_word_id = <fun>
-val f2_3 : nativeint# -> nativeint# = <fun>
+val f2_3 : nativeint_u -> nativeint_u = <fun>
 |}];;
 
 (**********************************)
@@ -64,13 +64,13 @@ val x3_1 : t_word = <abstr>
 let x3_2_1 : 'a t_word_id = #42n;;
 let x3_2_2 : 'a t_word_id = of_isize #42n;;
 [%%expect{|
-val x3_2_1 : nativeint# t_word_id = <abstr>
+val x3_2_1 : nativeint_u t_word_id = <abstr>
 val x3_2_2 : t_word t_word_id = <abstr>
 |}];;
 
-let x3_3 : nativeint# = #42n;;
+let x3_3 : nativeint_u = #42n;;
 [%%expect{|
-val x3_3 : nativeint# = <abstr>
+val x3_3 : nativeint_u = <abstr>
 |}];;
 
 module M3_4 = struct
@@ -81,12 +81,12 @@ module M3_4 : sig val x : t_word end
 |}];;
 
 module M3_5 = struct
-  let f (x : nativeint#) = x
+  let f (x : nativeint_u) = x
 
   let y = f #42n
 end
 [%%expect{|
-module M3_5 : sig val f : nativeint# -> nativeint# val y : nativeint# end
+module M3_5 : sig val f : nativeint_u -> nativeint_u val y : nativeint_u end
 |}];;
 
 (*************************************)
@@ -118,16 +118,16 @@ Error: This expression has type "'a t_word_id" = "('a : word)"
          because it's the type of a tuple element.
 |}];;
 
-let f4_3 (x : nativeint#) = x, false;;
+let f4_3 (x : nativeint_u) = x, false;;
 [%%expect{|
-Line 1, characters 28-29:
-1 | let f4_3 (x : nativeint#) = x, false;;
-                                ^
-Error: This expression has type "nativeint#"
+Line 1, characters 29-30:
+1 | let f4_3 (x : nativeint_u) = x, false;;
+                                 ^
+Error: This expression has type "nativeint_u"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
+       The layout of nativeint_u is word
+         because it is the primitive type nativeint_u.
+       But the layout of nativeint_u must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -143,15 +143,15 @@ Error: Tuple element types must have layout value.
          because it's the type of a tuple element.
 |}];;
 
-type t4_5 = int * nativeint#;;
+type t4_5 = int * nativeint_u;;
 [%%expect{|
-Line 1, characters 18-28:
-1 | type t4_5 = int * nativeint#;;
-                      ^^^^^^^^^^
+Line 1, characters 18-29:
+1 | type t4_5 = int * nativeint_u;;
+                      ^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "nativeint#" is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of "nativeint#" must be a value layout
+       The layout of "nativeint_u" is word
+         because it is the primitive type nativeint_u.
+       But the layout of "nativeint_u" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -253,9 +253,9 @@ module type S6_2 = sig val x : 'a t_word_id end
 module type S6_2 = sig val x : ('a : word). 'a t_word_id end
 |}];;
 
-module type S6_3 = sig val x : nativeint# end
+module type S6_3 = sig val x : nativeint_u end
 [%%expect{|
-module type S6_3 = sig val x : nativeint# end
+module type S6_3 = sig val x : nativeint_u end
 |}];;
 
 
@@ -287,16 +287,16 @@ Error: This expression has type "'a t_word_id" = "('a : word)"
          because it's the type of the field of a polymorphic variant.
 |}];;
 
-let f7_3 (x : nativeint#) = `A x;;
+let f7_3 (x : nativeint_u) = `A x;;
 [%%expect{|
-Line 1, characters 31-32:
-1 | let f7_3 (x : nativeint#) = `A x;;
-                                   ^
-Error: This expression has type "nativeint#"
+Line 1, characters 32-33:
+1 | let f7_3 (x : nativeint_u) = `A x;;
+                                    ^
+Error: This expression has type "nativeint_u"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
+       The layout of nativeint_u is word
+         because it is the primitive type nativeint_u.
+       But the layout of nativeint_u must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -329,13 +329,13 @@ Error: Polymorphic variant constructor argument types must have layout value.
 
 let make_t_word () : t_word = assert false
 let make_t_word_id () : 'a t_word_id = assert false
-let make_nativeintu () : nativeint# = assert false
+let make_nativeintu () : nativeint_u = assert false
 
 let id_value x = x;;
 [%%expect{|
 val make_t_word : unit -> t_word = <fun>
 val make_t_word_id : ('a : word). unit -> 'a t_word_id = <fun>
-val make_nativeintu : unit -> nativeint# = <fun>
+val make_nativeintu : unit -> nativeint_u = <fun>
 val id_value : 'a -> 'a = <fun>
 |}];;
 
@@ -370,11 +370,11 @@ let x8_3 = id_value (make_nativeintu ());;
 Line 1, characters 20-40:
 1 | let x8_3 = id_value (make_nativeintu ());;
                         ^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "nativeint#"
+Error: This expression has type "nativeint_u"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
+       The layout of nativeint_u is word
+         because it is the primitive type nativeint_u.
+       But the layout of nativeint_u must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -392,7 +392,7 @@ val twice :
   <fun>
 val f9_1 : unit -> t_word t_word_id = <fun>
 val f9_2 : ('a : word). unit -> 'a t_word_id = <fun>
-val f9_3 : unit -> nativeint# t_word_id = <fun>
+val f9_3 : unit -> nativeint_u t_word_id = <fun>
 |}];;
 
 (**************************************************)
@@ -406,11 +406,11 @@ val f9_3 : unit -> nativeint# t_word_id = <fun>
      true for [@untagged].
 *)
 
-external f10_1 : int -> bool -> nativeint# = "foo";;
+external f10_1 : int -> bool -> nativeint_u = "foo";;
 [%%expect{|
-Line 1, characters 0-50:
-1 | external f10_1 : int -> bool -> nativeint# = "foo";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-51:
+1 | external f10_1 : int -> bool -> nativeint_u = "foo";;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
@@ -424,35 +424,35 @@ Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
 
-external f10_6 : (nativeint#[@unboxed]) -> bool -> string  = "foo" "bar";;
+external f10_6 : (nativeint_u[@unboxed]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-external f10_6 : nativeint# -> bool -> string = "foo" "bar"
+external f10_6 : nativeint_u -> bool -> string = "foo" "bar"
 |}];;
 
-external f10_7 : string -> (nativeint#[@unboxed])  = "foo" "bar";;
+external f10_7 : string -> (nativeint_u[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f10_7 : string -> nativeint# = "foo" "bar"
+external f10_7 : string -> nativeint_u = "foo" "bar"
 |}];;
 
-external f10_8 : nativeint -> nativeint#  = "foo" "bar" [@@unboxed];;
+external f10_8 : nativeint -> nativeint_u  = "foo" "bar" [@@unboxed];;
 [%%expect{|
-external f10_8 : (nativeint [@unboxed]) -> nativeint# = "foo" "bar"
+external f10_8 : (nativeint [@unboxed]) -> nativeint_u = "foo" "bar"
 |}];;
 
-external f10_9 : (nativeint#[@untagged]) -> bool -> string  = "foo" "bar";;
+external f10_9 : (nativeint_u[@untagged]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 18-28:
-1 | external f10_9 : (nativeint#[@untagged]) -> bool -> string  = "foo" "bar";;
-                      ^^^^^^^^^^
+Line 1, characters 18-29:
+1 | external f10_9 : (nativeint_u[@untagged]) -> bool -> string  = "foo" "bar";;
+                      ^^^^^^^^^^^
 Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
 
-external f10_10 : string -> (nativeint#[@untagged])  = "foo" "bar";;
+external f10_10 : string -> (nativeint_u[@untagged])  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 29-39:
-1 | external f10_10 : string -> (nativeint#[@untagged])  = "foo" "bar";;
-                                 ^^^^^^^^^^
+Line 1, characters 29-40:
+1 | external f10_10 : string -> (nativeint_u[@untagged])  = "foo" "bar";;
+                                 ^^^^^^^^^^^
 Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
@@ -474,11 +474,11 @@ Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
 
-type t11_1 += B of nativeint#;;
+type t11_1 += B of nativeint_u;;
 [%%expect{|
-Line 1, characters 14-29:
-1 | type t11_1 += B of nativeint#;;
-                  ^^^^^^^^^^^^^^^
+Line 1, characters 14-30:
+1 | type t11_1 += B of nativeint_u;;
+                  ^^^^^^^^^^^^^^^^
 Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
@@ -576,27 +576,27 @@ Error: Variables bound in a class must have layout value.
          because it's the type of a class field.
 |}];;
 
-class type c12_6 = object method x : nativeint# end;;
+class type c12_6 = object method x : nativeint_u end;;
 [%%expect{|
-Line 1, characters 26-47:
-1 | class type c12_6 = object method x : nativeint# end;;
-                              ^^^^^^^^^^^^^^^^^^^^^
-Error: The method "x" has type "nativeint#" but is expected to have type
+Line 1, characters 26-48:
+1 | class type c12_6 = object method x : nativeint_u end;;
+                              ^^^^^^^^^^^^^^^^^^^^^^
+Error: The method "x" has type "nativeint_u" but is expected to have type
          "('a : value)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
+       The layout of nativeint_u is word
+         because it is the primitive type nativeint_u.
+       But the layout of nativeint_u must be a value layout
          because it's the type of an object field.
 |}];;
 
-class type c12_7 = object val x : nativeint# end
+class type c12_7 = object val x : nativeint_u end
 [%%expect{|
-Line 1, characters 26-44:
-1 | class type c12_7 = object val x : nativeint# end
-                              ^^^^^^^^^^^^^^^^^^
+Line 1, characters 26-45:
+1 | class type c12_7 = object val x : nativeint_u end
+                              ^^^^^^^^^^^^^^^^^^^
 Error: Variables bound in a class must have layout value.
        The layout of x is word
-         because it is the unboxed version of the primitive type nativeint.
+         because it is the primitive type nativeint_u.
        But the layout of x must be a value layout
          because it's the type of an instance variable.
 |}];;

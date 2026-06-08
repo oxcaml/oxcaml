@@ -21,7 +21,7 @@ external unbox_unit : unit -> void = "%unbox_unit"
 - : string = "Hello, world!"
 |}]
 
-type t = #{ x: int; v: void; y: int32# }
+type t = #{ x: int; v: void; y: int32_u }
 
 let _ =
   let mutable r = #{ x = 10; v = unbox_unit (); y = #20l } in
@@ -29,6 +29,6 @@ let _ =
   r.#x, Stdlib_upstream_compatible.Int32_u.to_int r.#y
 
 [%%expect{|
-type t = #{ x : int; v : void; y : int32#; }
+type t = #{ x : int; v : void; y : int32_u; }
 - : int * int = (50, 60)
 |}]

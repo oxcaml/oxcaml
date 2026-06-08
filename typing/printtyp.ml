@@ -753,6 +753,8 @@ and raw_type_desc ppf = function
         raw_lid_type_list fl
   | Tof_kind jkind ->
     fprintf ppf "Tof_kind@ %a" (Jkind.format !printing_env) jkind
+  | Tbox t ->
+    fprintf ppf "@[Tbox@ %a@]" raw_type t
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
@@ -1387,9 +1389,9 @@ let add_type_to_preparation = prepare_type
 (* Disabled in classic mode when printing an unification error *)
 let print_labels = ref true
 
-(* Whether to expand [eval] in types for reductions before printing.
+(* Whether to expand [eval] and [box] in types for reductions before printing.
    Disabled when printing errors, as they usually contain an expansion trace. *)
-let print_reduced_evals = ref true
+let print_reduced_abbrevs = ref true
 
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
@@ -1555,7 +1557,8 @@ let rec tree_of_modal_typexp mode modal ty =
     | Other _ -> tree
   in
   let ty =
-    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
+    Ctype.reduce_head ~expand_reducible_abbrevs:!print_reduced_abbrevs
+      !printing_env ty
   in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
@@ -1732,6 +1735,13 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_module (tree_of_path (Some Module_type) p, fl)
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
+    | Tbox ty ->
+      (* Render as if a regular Tconstr application of Predef.path_box,
+         so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
+      let p', s = best_type_path Predef.path_box in
+      let tyl' = apply_subst s [ty] in
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
   in
   if List.memq px !delayed then delayed := List.filter ((!=) px) !delayed;
   alias_nongen_row mode px ty;
@@ -3086,9 +3096,9 @@ let trees_of_type_expansion'
     let t' = if proxy t == proxy t' then unalias t' else t' in
     (* beware order matter due to side effect,
        e.g. when printing object types *)
-    print_reduced_evals := false; (* preserve unreduced eval in types *)
+    print_reduced_abbrevs := false; (* preserve unreduced abbrevs in types *)
     let first = tree_of_typexp' t in
-    print_reduced_evals := true;
+    print_reduced_abbrevs := true;
     let second = tree_of_typexp' t' in
     if first = second then Same first
     else Diff(first,second)
@@ -3556,7 +3566,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       print_labels := true
     with exn ->
       print_labels := true;
-      print_reduced_evals := true;
+      print_reduced_abbrevs := true;
       raise exn
 
 let report_error trace_format ppf mode env tr

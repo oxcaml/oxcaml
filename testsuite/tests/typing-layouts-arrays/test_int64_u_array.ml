@@ -39,10 +39,10 @@ end
 module _ = Test_gen_u_array.Test (Int64_array)
 
 module Int64_u_array0 : Gen_u_array.S0
-                        with type element_t = int64#
+                        with type element_t = int64_u
                         and type ('a : any) array_t = 'a array = struct
 
-  type element_t = int64#
+  type element_t = int64_u
   type ('a : any) array_t = 'a array
   type element_arg = unit -> element_t
   type t = element_t array

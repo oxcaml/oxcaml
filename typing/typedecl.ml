@@ -1335,12 +1335,12 @@ let gets_unboxed_version decl =
        (you'll want to consult [update_record_kind]). *)
     true
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
+
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
-  | Type_variant _ ->
-    None
+  | Type_variant _ -> None
   | Type_record (lbls, repr, _)
     when not (record_gets_unboxed_version lbls repr) ->
     None
@@ -4142,9 +4142,9 @@ let is_upstream_compatible_non_value_unbox env ty =
       (Path.same path)
       [
         Predef.path_unboxed_float;
-        Predef.path_unboxed_int32;
-        Predef.path_unboxed_int64;
-        Predef.path_unboxed_nativeint;
+        Predef.path_int32_u;
+        Predef.path_int64_u;
+        Predef.path_nativeint_u;
       ]
   | _ ->
     false

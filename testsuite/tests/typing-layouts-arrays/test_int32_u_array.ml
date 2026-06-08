@@ -39,10 +39,10 @@ end
 module _ = Test_gen_u_array.Test (Int32_array)
 
 module Int32_u_array0 : Gen_u_array.S0
-                        with type element_t = int32#
+                        with type element_t = int32_u
                         and type ('a : any) array_t = 'a array = struct
 
-  type element_t = int32#
+  type element_t = int32_u
   type ('a : any) array_t = 'a array
   type element_arg = unit -> element_t
   type t = element_t array
@@ -68,7 +68,7 @@ module Int32_u_array0 : Gen_u_array.S0
 end
 
 module Int32_u_array = Gen_u_array.Make (Int32_u_array0)
-module Int32_u_array_boxed : Test_gen_u_array.S with type t = int32# array = Test_gen_u_array.Make_boxed (struct
+module Int32_u_array_boxed : Test_gen_u_array.S with type t = int32_u array = Test_gen_u_array.Make_boxed (struct
   module M = Int32_u_array
   module I = Int32_I
   module E = struct
