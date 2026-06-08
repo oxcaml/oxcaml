@@ -28,8 +28,6 @@ Line 5, characters 4-5:
 Error: This value is "local"
          because it is an element of the tuple at line 3, characters 6-25
          which is "local"
-         because it is allocated at line 3, characters 6-25 containing data
-         which is "local"
          because it is a tuple that contains the expression at line 3, characters 10-25
          which is "local".
        However, the highlighted expression is expected to be "local" to the parent region or "global"

@@ -93,7 +93,6 @@ Line 1, characters 67-68:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Pair") in the value at line 1, characters 61-78
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -106,7 +105,6 @@ Line 1, characters 76-77:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Pair") in the value at line 1, characters 61-78
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -121,7 +119,6 @@ Line 1, characters 64-65:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Pair") in the value at line 1, characters 58-69
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -136,7 +133,6 @@ Line 1, characters 67-68:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is contained (via constructor "Pair") in the value at line 1, characters 58-69
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 

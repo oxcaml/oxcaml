@@ -111,7 +111,6 @@ Line 2, characters 19-35:
 Error: This value is "local"
        but is expected to be "global"
          because it is contained (via constructor "Payload") in the value at line 2, characters 10-36
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 

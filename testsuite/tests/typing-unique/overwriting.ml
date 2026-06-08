@@ -86,7 +86,6 @@ Line 2, characters 31-32:
 Error: This value is "local"
        but is expected to be "global"
          because it is the field "x" of the record at line 2, characters 29-34
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -99,7 +98,6 @@ Line 2, characters 22-23:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is the field "x" of the record at line 2, characters 20-25
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -112,7 +110,6 @@ Line 2, characters 31-32:
 Error: This value is "local"
        but is expected to be "global"
          because it is the field "x" of the record at line 2, characters 29-34
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
@@ -125,7 +122,6 @@ Line 2, characters 22-23:
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is the field "x" of the record at line 2, characters 20-25
-         which is expected to be "global" because it is an allocation
          which is expected to be "global".
 |}]
 
