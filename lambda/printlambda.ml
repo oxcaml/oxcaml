@@ -1457,7 +1457,7 @@ let rec lam ppf = function
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
-      fprintf ppf "@[<2>(ktemplate%s@ %a@ %a%a%a)]"
+      fprintf ppf "@[<2>(ktemplate%s@ %a@ %a%a%a)@]"
         (locality_kind ktmpl_mode)
         pr_env ktmpl_env
         pr_params ktmpl_params
@@ -1467,7 +1467,7 @@ let rec lam ppf = function
                       kinst_mode = _; kinst_loc = _} ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
-      fprintf ppf "@[<2>(kinstantiate@ %a@%a)]"
+      fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
         lam kinst_func lams kinst_args
 
 and slam ppf = function

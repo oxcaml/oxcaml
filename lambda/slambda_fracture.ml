@@ -399,19 +399,33 @@ let rec fracture_lam lambda : slambda =
                   ~mode:ktmpl_mode ~ret_mode:ktmpl_mode
             })
     in
-    let free_var_capture = List.map (fun (_, (lam, _)) -> lam) env in
-    SLhalves
-      { sval_comptime =
-          SLtemplate
-            { sfun_params = ktmpl_params |> Array.of_list;
-              sfun_body = templated_function_body
-            };
-        sval_runtime =
-          Lprim
-            ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, ktmpl_mode),
-              free_var_capture,
-              ktmpl_loc )
-      }
+    let free_var_capture =
+      List.map
+        (fun (id, _) -> Lsplice (ktmpl_loc, SLvar (Slambdaident.of_ident id)))
+        env
+    in
+    let kind_function =
+      SLhalves
+        { sval_comptime =
+            SLtemplate
+              { sfun_params = ktmpl_params |> Array.of_list;
+                sfun_body = templated_function_body
+              };
+          sval_runtime =
+            Lprim
+              ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, ktmpl_mode),
+                free_var_capture,
+                ktmpl_loc )
+        }
+    in
+    List.fold_left
+      (fun slam (id, (lam, _)) ->
+        SLlet
+          { slet_name = Slambdaident.of_ident id;
+            slet_value = fracture_lam lam;
+            slet_body = slam
+          })
+      kind_function env
   | Lkindinstantiate
       { kinst_func; kinst_args; kinst_result_layout; kinst_mode; kinst_loc } ->
     slet_local "fun" kinst_func (fun fun_c fun_r ->

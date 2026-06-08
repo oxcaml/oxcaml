@@ -465,6 +465,19 @@ val a : int = 42
 val b : float# = <abstr>
 |}]
 
+(* let poly_ instantiation with multiple variables *)
+let #(a, b, c, d) =
+  let poly_ tuple x y = #(x, y) in
+  let #(a, b) = tuple 42s #43.0 in
+  let #(c, d) = tuple 44L 45n in
+  #(a, b, c, d)
+[%%expect{|
+val a : int8 = 42s
+val b : float# = <abstr>
+val c : int64 = 44L
+val d : nativeint = 45n
+|}]
+
 (* closure conversion - uniform block *)
 let (a, b) =
   let x = true in
@@ -489,4 +502,41 @@ let #(a, b) =
 [%%expect{|
 val a : #(int8# * int) = <abstr>
 val b : #(int8# * int64#) = <abstr>
+|}]
+
+(* closure-conversion - capture lpoly function *)
+let #(a, b, y) =
+  let a = #2n in
+  let poly_ f x = #(a, x) in
+  let poly_ g x =
+    let #(b, y) = f x in
+    #(a, b, y)
+  in
+  g #1.0
+[%%expect {|
+val a : nativeint# = <abstr>
+val b : nativeint# = <abstr>
+val y : float# = <abstr>
+|}]
+
+(* Nested lpoly functions *)
+let #(x, y) =
+  let poly_ f x =
+    let poly_ g y = #(x, y) in
+    g x
+  in
+  f #1.0
+[%%expect {|
+File "_none_", line 1:
+Error: Static computation and layout polymorphism are not yet supported in mixed blocks.
+|}]
+
+(* Module containing lpoly function *)
+let x =
+  let module M = struct
+    let poly_ id x = x
+  end in
+  M.id 1s
+[%%expect {|
+val x : int8 = 1s
 |}]

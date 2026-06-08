@@ -152,7 +152,7 @@ let rec eval_slam env slam : value Or_missing.t =
     let slv_comptime = eval_slam env sval_comptime in
     let slv_runtime = eval_lam env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
-  | SLlayout layout -> Present (SLVlayout layout)
+  | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
   | SLglobal _ -> errf "cross-module eval not implemented"
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->

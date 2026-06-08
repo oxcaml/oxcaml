@@ -13,7 +13,7 @@ end
 [%%expect{|
 { c = (missing)
 ; r =
-  ⟪(apply (field_imm 1 (global Toploop!)) "M/295"
+  ⟪(apply (field_imm 1 (global Toploop!)) "M/291"
      $(let
         (bool = { c = (missing); r = ⟪1⟫ }
          #body =
@@ -21,22 +21,25 @@ end
              (foo = { c = (missing); r = ⟪1⟫ }
               #body =
                 (let (captures =
-                   { c =
-                     (template layout_15 ->
-                       { c = (missing)
-                       ; r =
-                         ⟪(function {nlocal = 0} closure
-                            (let
-                              (foo =a[value<int>] (field_imm 1 closure)
-                               bool =a[value<int>] (field_imm 0 closure))
-                              (function {nlocal = 0} x[$layout_15]
-                                y[$layout_15] : #($layout_15, ?)
-                                (if bool
-                                  (make_unboxed_product #($layout_15,
-                                    value<int>) x foo)
-                                  (make_unboxed_product #($layout_15,
-                                    value<int>) y 2)))))⟫ })
-                   ; r = ⟪(makeblock 0 (value<int>,value<int>) bool foo)⟫ })
+                   (let
+                     (foo = { c = foo.c; r = ⟪foo⟫ }
+                      bool = { c = bool.c; r = ⟪bool⟫ })
+                     { c =
+                       (template layout_10 ->
+                         { c = (missing)
+                         ; r =
+                           ⟪(function {nlocal = 0} closure
+                              (let
+                                (foo =a[value<int>] (field_imm 1 closure)
+                                 bool =a[value<int>] (field_imm 0 closure))
+                                (function {nlocal = 0} x[$layout_10]
+                                  y[$layout_10] : #($layout_10, ?)
+                                  (if bool
+                                    (make_unboxed_product #($layout_10,
+                                      value<int>) x foo)
+                                    (make_unboxed_product #($layout_10,
+                                      value<int>) y 2)))))⟫ })
+                     ; r = ⟪(makeblock 0 (value<int>,value<int>) $bool $foo)⟫ }))
                   { c = [ bool.c; foo.c; captures.c; ]
                   ; r =
                     ⟪(let (captures = $captures)
@@ -56,13 +59,13 @@ let poly_ f x y = #(x, y)
 [%%expect{|
 (let (f =
    { c =
-     (template layout_28 layout_29 ->
+     (template layout_23 layout_24 ->
        { c = (missing)
        ; r =
          ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout_28] y[$layout_29]
-              : #($layout_28, $layout_29)
-              (make_unboxed_product #($layout_28, $layout_29) x y)))⟫ })
+            (function {nlocal = 0} x[$layout_23] y[$layout_24]
+              : #($layout_23, $layout_24)
+              (make_unboxed_product #($layout_23, $layout_24) x y)))⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (f = $f) (apply (field_imm 1 (global Toploop!)) "f" f))⟫ })
@@ -79,11 +82,11 @@ let _ =
    (let
      (f =
         { c =
-          (template layout_36 ->
+          (template layout_31 ->
             { c = (missing)
             ; r =
               ⟪(function[L] {nlocal = 1} closure[L] : local
-                 (function[L] {nlocal = 1} x[$layout_36] : $layout_36 x))⟫ })
+                 (function[L] {nlocal = 1} x[$layout_31] : $layout_31 x))⟫ })
         ; r = ⟪(makelocalblock 0)⟫ }
       #body =
         { c = (missing)
@@ -107,13 +110,13 @@ let _ =
    (let
      (f =
         { c =
-          (template layout_42 ->
+          (template layout_37 ->
             { c = [ (missing); (missing); ]
             ; r =
               ⟪(function[L] {nlocal = 1} closure[L]
                  : (consts ()) (non_consts ([0: value<int>, *]))
                  (makelocalblock 0 (value<int>,*) 2
-                   (function[L] {nlocal = 1} x[$layout_42] : $layout_42 x)))⟫ })
+                   (function[L] {nlocal = 1} x[$layout_37] : $layout_37 x)))⟫ })
         ; r = ⟪(makelocalblock 0)⟫ }
       #body =
         (let (*match* =
