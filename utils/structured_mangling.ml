@@ -304,31 +304,37 @@ module Parse = struct
       identifier (the part after the [u<len>] prefix), reconstruct the original
       string by interleaving the raw and escaped parts. *)
   let decode_split_parts sym =
-    let initial_raw_pos =
-      try String.index sym '_' + 1
-      with Not_found ->
-        invalid_arg
-          (Printf.sprintf "\"%s\" is not a valid component of a mangled name"
-             sym)
-    in
-    let res = Buffer.create (String.length sym) in
-    let esc_pos = ref 0 and raw_pos = ref initial_raw_pos in
-    let rec loop () =
-      match unbase26 sym !esc_pos with
-      | Some (nb, l) ->
-        if nb > 0
-        then (
-          Buffer.add_substring res sym !raw_pos nb;
-          incr_n raw_pos nb);
-        incr_n esc_pos l;
-        incr_n esc_pos (unhexes res sym !esc_pos);
-        loop ()
-      | None ->
-        let len = String.length sym - !raw_pos in
-        if len > 0 then Buffer.add_substring res sym !raw_pos len
-    in
-    loop ();
-    Buffer.contents res
+    match String.index sym '_' + 1 with
+    | exception Not_found -> None
+    | initial_raw_pos ->
+      let sym_len = String.length sym in
+      let res = Buffer.create sym_len in
+      let esc_pos = ref 0 and raw_pos = ref initial_raw_pos in
+      let rec loop () =
+        match unbase26 sym !esc_pos with
+        | Some (nb, l) ->
+          if !raw_pos + nb > sym_len
+          then
+            (* Buffer.add_substring below would raise an exception otherwise *)
+            None
+          else (
+            if nb > 0
+            then (
+              Buffer.add_substring res sym !raw_pos nb;
+              incr_n raw_pos nb);
+            incr_n esc_pos l;
+            match unhexes res sym !esc_pos with
+            | n ->
+              incr_n esc_pos n;
+              loop ()
+            | exception Invalid_argument _ -> None)
+        | None ->
+          let len = sym_len - !raw_pos in
+          if len > 0 then Buffer.add_substring res sym !raw_pos len;
+          Some (Buffer.contents res)
+        | exception Invalid_argument _ -> None
+      in
+      loop ()
 
   (** Inverse of {!encode}: decode a single length-prefixed identifier at [pos]
       in [str], returning the decoded string and the number of bytes consumed.
@@ -338,7 +344,7 @@ module Parse = struct
     let flag_len = if is_escaped then 1 else 0 in
     match undecimal str (pos + flag_len) with
     | None -> None
-    | Some (payload_len, length_len) -> (
+    | Some (payload_len, length_len) ->
       let full_len = flag_len + length_len + payload_len in
       if payload_len <= 0 || pos + full_len > String.length str
       then None
@@ -346,13 +352,9 @@ module Parse = struct
         let payload =
           String.sub str (pos + flag_len + length_len) payload_len
         in
-        try
-          Some
-            ( (if is_escaped then decode_split_parts payload else payload),
-              full_len )
-          (* decode_split_parts raises Invalid_argument exceptions when the
-             symbol is not correctly formatted *)
-        with Invalid_argument _ -> None)
+        if is_escaped
+        then Option.map (fun p -> p, full_len) (decode_split_parts payload)
+        else Some (payload, full_len)
 
   (** Inverse of {!tag_prefixed_loc}: split a decoded [file_line_col] payload
       back into its components. Returns [None] if the payload does not have the

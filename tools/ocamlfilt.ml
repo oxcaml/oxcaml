@@ -153,22 +153,18 @@ module Flat1 = struct
   let unmangle str =
     match matched_prefix_len str with
     | None -> None
-    | Some prefix_len -> (
+    | Some prefix_len ->
       let style = detect_style ~prefix_len str in
       let len = String.length str in
       let result = Bytes.create len in
-      (* [loop] should raise [Invalid_argument] {e only} when the input [str] is
-         not a well-formed symbol. So accesses such as [str.[k]] are used only
-         when [k] {e must} be a valid index in a well-formed mangled [str]. Note
-         the invariant [j <= i < len] when [prefix_len >= 0] so all [Bytes.set]
-         are within bounds. *)
       let rec loop i j =
         if i >= len
         then j
         else
           match style, str.[i] with
           | Macosx, '$'
-            when Char.equal str.[i + 1] '$'
+            when i + 3 < len
+                 && Char.equal str.[i + 1] '$'
                  && is_xdigit str.[i + 2]
                  && is_xdigit str.[i + 3] ->
             (* "$$xx" -> hex-encoded character *)
@@ -179,7 +175,8 @@ module Flat1 = struct
             (* bare "$" -> separator *)
             Bytes.set result j '.';
             loop (i + 1) (j + 1)
-          | Linux_like, '$' when is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
+          | Linux_like, '$'
+            when i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
             ->
             (* "$xx" -> hex-encoded character *)
             let a = (hex str.[i + 1] lsl 4) lor hex str.[i + 2] in
@@ -193,11 +190,7 @@ module Flat1 = struct
             Bytes.set result j c;
             loop (i + 1) (j + 1)
       in
-      try
-        Some (Bytes.sub_string result 0 (loop prefix_len 0))
-        (* Out-of-bounds index accesses on a truncated symbol raise
-           [Invalid_argument]; everything else should propagate. *)
-      with Invalid_argument _ -> None)
+      Some (Bytes.sub_string result 0 (loop prefix_len 0))
 end
 
 (** OCaml flat0 style demangling 5.2 and earlier. *)
@@ -207,11 +200,9 @@ module Flat0 = struct
   let unmangle str =
     match matched_prefix_len str with
     | None -> None
-    | Some prefix_len -> (
+    | Some prefix_len ->
       let len = String.length str in
       let result = Bytes.create len in
-      (* See the comment above for [loop] in [Flat1.unmangle] about
-         [Invalid_argument] *)
       let rec loop i j =
         if i >= len
         then j
@@ -221,7 +212,9 @@ module Flat0 = struct
             (* "__" -> "." *)
             Bytes.set result j '.';
             loop (i + 2) (j + 1)
-          | '$' when is_xdigit str.[i + 1] && is_xdigit str.[i + 2] ->
+          | '$'
+            when i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
+            ->
             (* "$xx" is a hex-encoded character *)
             let a = Char.chr ((hex str.[i + 1] lsl 4) lor hex str.[i + 2]) in
             Bytes.set result j a;
@@ -231,12 +224,7 @@ module Flat0 = struct
             Bytes.set result j c;
             loop (i + 1) (j + 1)
       in
-      try
-        Some (Bytes.sub_string result 0 (loop prefix_len 0))
-        (* Same rationale as [Flat1.unmangle]: catch the [Invalid_argument] from
-           out-of-bounds index accesses on a truncated symbol, propagate
-           everything else. *)
-      with Invalid_argument _ -> None)
+      Some (Bytes.sub_string result 0 (loop prefix_len 0))
 end
 
 (* Auto-detect and demangle *)

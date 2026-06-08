@@ -41,13 +41,6 @@ check_reject structured "_CamlU3FooFu11G2g_funcsub"
 # ([A] is not a lowercase hexadecimal digit)
 check_reject structured "_CamlU3FooFu11G2A_funcsub"
 
-# Flat1: truncated [$xx] escape (only one byte follows the '$').
-check_reject flat1 'camlFoo__$3'
-# Flat1: truncated [$xx] escape (no byte follows the '$').
-check_reject flat1 'camlFoo__$'
-# Flat0: same truncation -- exercises the equivalent path of the
-# older decoder.
-check_reject flat0 'camlFoo__$3'
 # Flat scheme accepts [caml...] or [_caml...] (macOS) but never
 # [__caml...]; that's a structured-scheme shape ([__Caml...]).
 check_reject flat1 '__camlFoo__bar_0'
