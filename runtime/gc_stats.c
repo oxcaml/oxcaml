@@ -211,6 +211,7 @@ void caml_compute_gc_stats(struct gc_stats* buf)
   large_max = buf->heap_stats.large_max_words;
 
   uintnat nonzero_max = sampled_gc_stats_nonzero_max;
+  if (nonzero_max < my_id) nonzero_max = my_id;
   for (i=0; i<=nonzero_max; i++) {
     /* For allocation stats, we use the live stats of the current domain
        and the sampled stats of other domains.
