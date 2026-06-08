@@ -2083,9 +2083,6 @@ let update_constructor_representation
 type unrepresentable_record =
   | Unrepresentable_field of string
 
-type unrepresentable_record =
-  | Unrepresentable_field of string
-
 let compute_record_repr
     loc reprs lbls ~warn ~refining_block_with_any
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
@@ -2354,7 +2351,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
        appear here when updating later for dealing with [any]. Since none of
        these cases can have an [any], we don't need to do anything further. *)
     Misc.fatal_error
-<<<<<<< HEAD
       "Typedecl.update_record_kind: unexpected record representation"
 
 (* Given a record with a variable representation, but updated labels, compute
@@ -2428,83 +2424,6 @@ let update_record_representation
     | None -> Misc.fatal_error "missing sort for representable field"
     end
   | Error _ as e -> e
-||||||| 083478d04f
-      "Typedecl.compute_record_kind: unexpected record representation"
-=======
-      "Typedecl.update_record_kind: unexpected record representation"
-
-(* Given a record with a variable representation, but updated labels, compute
-   the updated sorts and representation *)
-let update_record_kind (type rep) env loc (form : rep record_form)
-      lbls ~warn :
-    _ * (rep, _) Result.t =
-  let types = List.map snd lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
-  let reprs, repr_summary = compute_repr_summary env lbls jkinds in
-  let rep : (rep, _) Result.t =
-    (* CR layouts: improve the readability of this match *)
-    let { values; floats; atomic_floats; float64s;
-            non_float64_unboxed_fields; atomic_fields; voids;
-            first_any } = repr_summary
-    in
-    let refining_block_with_any = true in
-    match form with
-    | Legacy ->
-      let rep =
-        compute_record_repr loc reprs lbls
-          ~represent_as_float_array:false ~flatten_floats:false ~warn
-          ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
-          ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
-      in
-      begin match rep with
-      | Ok (Record_boxed | Record_mixed _) -> ()
-      | Ok _ ->
-        Misc.fatal_error "none became something other than mixed"
-      | Error _ -> ()
-      end;
-      rep
-    | Unboxed_product ->
-      (match first_any with
-      | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
-      | None -> Ok Record_unboxed_product)
-  in
-  sorts, rep
-
-let update_record_representation
-      (type rep) ~why env loc (form : rep Types.record_form) lbls_and_types =
-  let kloc : jkind_sort_loc =
-    match form with
-    | Legacy -> Record { unboxed = false }
-    | Unboxed_product -> Record_unboxed_product
-  in
-  List.iter
-    (fun (_lbl, ld_type) ->
-       constrain_to_representable ~why env loc kloc ld_type)
-    lbls_and_types;
-  let sorts, rep =
-    let warn =
-      (* Only warn during initial typechecking rather than when updating at
-         use sites, so that we only warn once and honour suppressed warnings *)
-      false
-    in
-    (* lmaurer: This isn't great. We currently believe that determining layouts
-       and record representations and such shouldn't cause problems with
-       information escaping GADT matches, but that could easily change with
-       layout/mode polymorphism introducing concerns about principality of
-       inferred layouts/modes. *)
-    let snap = Btype.snapshot () in
-    let ans = update_record_kind env loc form lbls_and_types ~warn in
-    Btype.backtrack snap;
-    ans
-  in
-  match rep with
-  | Ok rep ->
-    begin match Misc.Stdlib.List.some_if_all_elements_are_some sorts with
-    | Some sorts -> Ok (sorts, rep)
-    | None -> Misc.fatal_error "missing sort for representable field"
-    end
-  | Error _ as e -> e
->>>>>>> origin/main
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
@@ -2761,77 +2680,6 @@ let update_decls_jkind_reason decls =
     )
     decls
 
-<<<<<<< HEAD
-(* Note [order of updating decl jkinds].
-
-   [order] is topological of type declarations in the graph where there's an
-   edge from decl [a] to [b] if the layout of [a] or [a#] is necessary to
-   compute the representation of [b] without indirection.
-
-   Equivalently, there is an [a -> b] edge when [a] (or its unboxed version
-   [a#]) is contained "flatly" within [b], directly or nested through other
-   unboxed types. E.g., there is an [a -> b] edge for the following:
-   {[
-     (* [a] is a field of the unboxed record [b] *)
-     type a = #{ x : int; y : int }
-     and b = #{ f : a; other : string }
-
-     (* [a]'s unboxed version is an argument to the variant [b] *)
-     type b = A of a#
-     and a = #{ x : int; y : int }
-
-     (* [a] is included in [b] through [c] *)
-     type b = { c : c }
-     and c = #{ a : a }
-     and a = #{ i : int; j : int }
-   ]}
-
-   We process the decls in this order and update the environment as we go, so
-   that when we update each decl we see the computed jkinds of the types it
-   depends on, rather than the dummy [any] jkinds assigned in
-   [transl_declaration]. See Note [Default jkinds in transl_declaration].
-*)
-let update_decls_jkind env order decls =
-  let decls_by_id = Ident.Map.of_list decls in
-  let _env, results =
-    List.fold_left
-      (fun (env, results) id ->
-         let decl = Ident.Map.find id decls_by_id in
-         let new_decl, allow_any_crossing =
-           Builtin_attributes.warning_scope decl.type_attributes (fun () ->
-             let allow_any_crossing =
-               Builtin_attributes.has_unsafe_allow_any_mode_crossing
-                 decl.type_attributes
-             in
-             (* Check that the attribute is valid, if set (unconditionally, for
-               consistency). *)
-             if allow_any_crossing then begin
-               match decl.type_kind with
-               | Type_abstract _ | Type_open ->
-                 raise(Error(
-                   decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-               | _ -> ()
-             end;
-             update_decl_jkind env (Pident id) decl, allow_any_crossing)
-         in
-         (* In the temporary env that gets updated jkinds, we should reflect
-            the overriden kind from [@@unsafe_allow_any_mode_crossing] *)
-         let env_decl =
-           if allow_any_crossing then
-             { new_decl with
-               type_jkind =
-                 Jkind.unsafely_set_bounds env ~from:decl.type_jkind
-                   new_decl.type_jkind }
-           else new_decl
-         in
-         let env = add_type ~check:false id env_decl env in
-         env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
-      (env, Ident.Map.empty) order
-  in
-  (* Return the results in the original [decls] order. *)
-||||||| 083478d04f
-let update_decls_jkind env decls =
-=======
 (* Note [order of updating decl jkinds].
 
    [order] is topological of type declarations in the graph where there's an
@@ -2899,7 +2747,6 @@ let update_decls_jkind env order decls =
       (env, Ident.Map.empty) order
   in
   (* Return the results in the original [decls] order. *)
->>>>>>> origin/main
   List.map
     (fun (id, _decl) ->
        let decl, allow_any_crossing, new_decl = Ident.Map.find id results in
@@ -3832,7 +3679,6 @@ let transl_type_decl env rec_flag sdecl_list =
       (Path.Pident id)
       decl to_check)
     decls;
-<<<<<<< HEAD
   (* Update temporary definitions (for well-founded recursive types) *)
   let delayed_jkind_checks =
     match rec_flag with
@@ -3847,12 +3693,6 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Cycles through unboxed types are now ruled out, so this order exists. See
      Note [order of updating decl jkinds]. *)
   let jkind_update_order = jkind_update_order new_env to_check decls in
-||||||| 083478d04f
-=======
-  (* Cycles through unboxed types are now ruled out, so this order exists. See
-     Note [order of updating decl jkinds]. *)
-  let jkind_update_order = jkind_update_order new_env to_check decls in
->>>>>>> origin/main
   (* Now that we've ruled out ill-formed types, we can perform the delayed
      jkind checks *)
   List.iter (fun (checks,loc) ->
@@ -6027,38 +5867,13 @@ let report_error ~loc = function
     Location.errorf ~loc
       "Atomic record fields must have layout value."
   | Layout_poly_unsupported ->
-<<<<<<< HEAD
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-||||||| 083478d04f
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
-  | Missing_flatten_floats ->
-    fprintf ppf
-      "@[This record type mixes boxed and unboxed float fields,@ \
-       which causes the flat float record optimization.@ \
-       You must annotate it with %a.@]"
-      Style.inline_code "[@@flatten_floats]"
-=======
-    fprintf ppf
-      "@[Layout polymorphism is unsupported in this context.@]"
->>>>>>> origin/main
   | Misplaced_flatten_floats ->
-<<<<<<< HEAD
     Location.errorf ~loc
       "The %a attribute is only allowed on records with one or more@ \
        non-atomic %a fields, one or more %a fields, and all other fields@ \
        void."
-||||||| 083478d04f
-    fprintf ppf
-      "@[The %a attribute is only allowed on record types@ \
-       that mix boxed %a and unboxed %a fields.@]"
-=======
-    fprintf ppf
-      "@[The %a attribute is only allowed on records with one or more@ \
-       non-atomic %a fields, one or more %a fields, and all other fields@ \
-       void.@]"
->>>>>>> origin/main
       Style.inline_code "[@@flatten_floats]"
       Style.inline_code "float"
       Style.inline_code "float#"

@@ -165,7 +165,6 @@ module type Sort = sig
     val for_type_extension : t
 
     val for_class : t
-<<<<<<< HEAD
 
     val for_effect : t
 
@@ -176,15 +175,6 @@ module type Sort = sig
         (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
         doesn't allocate a fresh [Some] block. *)
     val some : t -> t option
-||||||| 083478d04f
-=======
-
-    (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
-        base sort. Use this when constructing [_sort : Const.t option] fields
-        (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
-        doesn't allocate a fresh [Some] block. *)
-    val some : t -> t option
->>>>>>> origin/main
   end
 
   module Var : sig

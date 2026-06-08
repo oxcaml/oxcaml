@@ -680,19 +680,9 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
         prefix x Style.inline_code (Ident.name cd_id) first decl
   | Insert { insert = { cd_id }, _ } ->
       Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
-<<<<<<< HEAD
         prefix x Style.inline_code (Ident.name cd_id) first decl
   | Change Type {got = got, _; expected = expected, _; reason} ->
     Printtyp.Doc.wrap_printing_env ~error:true env (fun () ->
-||||||| 083478d04f
-        prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
-  | Change Type {got; expected; reason} ->
-    Printtyp.wrap_printing_env ~error:true env (fun () ->
-=======
-        prefix x Style.inline_code (Ident.name cd_id) first decl
-  | Change Type {got = got, _; expected = expected, _; reason} ->
-    Printtyp.wrap_printing_env ~error:true env (fun () ->
->>>>>>> origin/main
       Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
          %a@ is not the same as:\

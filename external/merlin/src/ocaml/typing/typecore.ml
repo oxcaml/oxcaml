@@ -2000,58 +2000,6 @@ and build_as_type_aux (env : Env.t) p ~mode =
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
-<<<<<<< HEAD
-let is_variable_repres : type rep. rep record_form -> rep -> bool =
-  fun form rep ->
-    match form, rep with
-    | Legacy, Record_variable -> true
-    | Unboxed_product, Record_unboxed_product_variable -> true
-    | _ -> false
-
-(* Returns [None] when the representation cannot be determined from the
-   declaration alone (i.e. [Record_variable] /
-   [Record_unboxed_product_variable]); otherwise [Some rep]. *)
-let determined_lbl_repres (type rep) (form : rep record_form)
-      (rep : rep) : rep option =
-  if is_variable_repres form rep then None else Some rep
-
-let update_labels (type rep) env (form : rep record_form) ~representative_label
-      ~why ~loc ~containing_type
-    : record_sorts * rep =
-  (* Might be good to short-circuit this. Possible we could do so by noticing
-     that [containing_type] has no arguments (or only variables as
-     arguments). *)
-  let vars_and_ty_args, ty_res =
-    Ctype.instance_labels ~fixed:false representative_label.lbl_all
-  in
-  unify_exp_types loc env containing_type ty_res;
-  let sorts, rep =
-    match determined_lbl_repres form representative_label.lbl_repres with
-    | Some rep -> Fixed, rep
-    | None ->
-      let lbls_and_ty_args =
-        Array.map2
-          (fun lbl (_vars, ty_arg) ->
-             (lbl |> Data_types.label_declaration_of_label_description),
-             ty_arg)
-          representative_label.lbl_all
-          vars_and_ty_args
-      in
-      match
-        Typedecl.update_record_representation ~why env loc form
-          (lbls_and_ty_args |> Array.to_list)
-      with
-      | Ok (sorts, rep) ->
-          let sorts = sorts |> Array.of_list in
-          Variable sorts, rep
-      | Error (Unrepresentable_field name) ->
-          raise (Error (loc, env,
-                        Indeterminate_record_layout(containing_type, name)))
-  in
-  sorts, rep
-
-||||||| 083478d04f
-=======
 let is_variable_repres : type rep. rep record_form -> rep -> bool =
   fun form rep ->
     match form, rep with
@@ -2084,7 +2032,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
       let lbls_and_ty_args =
         Array.map2
           (fun lbl (_vars, ty_arg) ->
-             (lbl |> Types.label_declaration_of_label_description),
+             (lbl |> Data_types.label_declaration_of_label_description),
              ty_arg)
           representative_label.lbl_all
           vars_and_ty_args
@@ -2102,7 +2050,6 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
   in
   sorts, rep
 
->>>>>>> origin/main
 (* Constraint solving during typing of patterns *)
 
 let solve_Ppat_alias ~mode env pat =
@@ -3465,68 +3412,6 @@ and type_pat_aux
   let rp = crp
   and rvp x = crp (pure category x)
   and rcp x = crp (only_impure category x) in
-<<<<<<< HEAD
-||||||| 083478d04f
-  let type_pat_array mutability spl pat_attributes =
-    (* Sharing the code between the two array cases means we're guaranteed to
-       keep them in sync, at the cost of a worse diff with upstream; it
-       shouldn't be too bad.  We can inline this when we upstream this code and
-       combine the two array pattern constructors. *)
-    let ty_elt, arg_sort =
-      solve_Ppat_array ~refine:false loc penv mutability expected_ty
-    in
-    let modalities = Typemode.mutable_modalities mutability in
-    check_project_mutability ~loc ~env:!!penv Array_elements mutability
-      alloc_mode.mode;
-    let is_contained_by : Mode.Hint.is_contained_by =
-      {containing = Array Modality; container = (loc, Pattern)}
-    in
-    let alloc_mode =
-      apply_is_contained_by is_contained_by ~modalities alloc_mode.mode
-    in
-    let alloc_mode = simple_pat_mode alloc_mode in
-    let pl =
-      List.map (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
-    in
-    rvp {
-      pat_desc = Tpat_array (mutability, arg_sort, pl);
-      pat_loc = loc; pat_extra=[];
-      pat_type = instance expected_ty;
-      pat_attributes;
-      pat_env = !!penv;
-      pat_unique_barrier = Unique_barrier.not_computed () }
-  in
-=======
-  let type_pat_array mutability spl pat_attributes =
-    (* Sharing the code between the two array cases means we're guaranteed to
-       keep them in sync, at the cost of a worse diff with upstream; it
-       shouldn't be too bad.  We can inline this when we upstream this code and
-       combine the two array pattern constructors. *)
-    let ty_elt, arg_sort =
-      solve_Ppat_array ~refine:false loc penv mutability expected_ty
-    in
-    let modalities = Typemode.mutable_modalities mutability in
-    check_project_mutability ~loc ~env:!!penv Array_elements mutability
-      alloc_mode.mode;
-    let is_contained_by : Mode.Hint.is_contained_by =
-      {containing = Array Modality; container = (loc, Pattern)}
-    in
-    let alloc_mode =
-      apply_left_is_contained_by is_contained_by ~modalities alloc_mode.mode
-    in
-    let alloc_mode = simple_pat_mode alloc_mode in
-    let pl =
-      List.map (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
-    in
-    rvp {
-      pat_desc = Tpat_array (mutability, arg_sort, pl);
-      pat_loc = loc; pat_extra=[];
-      pat_type = instance expected_ty;
-      pat_attributes;
-      pat_env = !!penv;
-      pat_unique_barrier = Unique_barrier.not_computed () }
-  in
->>>>>>> origin/main
   let type_tuple_pat spl closed =
     (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
        when we allow non-values in boxed tuples. *)
@@ -4639,26 +4524,12 @@ let rec check_counter_example_pat
           check_rec p t (fun p -> k (l, p, sort)))
         tpl_ann
         (fun pl ->
-<<<<<<< HEAD
            let pat_type =
              newty (Tunboxed_tuple
                       (List.map (fun (l,p,_) -> (l,p.pat_type)) pl))
            in
            mkp k (Tpat_unboxed_tuple pl) ~pat_type)
   | Tpat_construct(cstr_lid, constr, repr, targs, _) ->
-||||||| 083478d04f
-           mkp k (Tpat_unboxed_tuple pl)
-             ~pat_type:(newty (Tunboxed_tuple
-                                 (List.map (fun (l,p,_) -> (l,p.pat_type))
-                                    pl))))
-  | Tpat_construct(cstr_lid, constr, targs, _) ->
-=======
-           mkp k (Tpat_unboxed_tuple pl)
-             ~pat_type:(newty (Tunboxed_tuple
-                                 (List.map (fun (l,p,_) -> (l,p.pat_type))
-                                    pl))))
-  | Tpat_construct(cstr_lid, constr, repr, targs, _) ->
->>>>>>> origin/main
       if constr.cstr_generalized && must_backtrack_on_gadt then
         raise Need_backtrack;
       let (ty_args, existential_ctyp) =
@@ -4683,7 +4554,6 @@ let rec check_counter_example_pat
           Some p, [ty] -> check_rec p ty (fun p -> k (Some p))
         | _            -> k None
       end
-<<<<<<< HEAD
   | Tpat_record(fields, sorts, repr, closed) ->
       type_label_pats fields sorts repr closed Legacy
   | Tpat_record_unboxed_product(fields, sorts, repr, closed) ->
@@ -4697,20 +4567,6 @@ let rec check_counter_example_pat
       let ty_elt, arg_sort, _ =
         solve_Ppat_array loc penv mut expected_ty
       in
-||||||| 083478d04f
-  | Tpat_record(fields, closed) -> type_label_pats fields closed Legacy
-  | Tpat_record_unboxed_product(fields, closed) ->
-      type_label_pats fields closed Unboxed_product
-  | Tpat_array (mut, original_arg_sort, tpl) ->
-      let ty_elt, arg_sort = solve_Ppat_array ~refine loc penv mut expected_ty in
-=======
-  | Tpat_record(fields, sorts, repr, closed) ->
-      type_label_pats fields sorts repr closed Legacy
-  | Tpat_record_unboxed_product(fields, sorts, repr, closed) ->
-      type_label_pats fields sorts repr closed Unboxed_product
-  | Tpat_array (mut, original_arg_sort, tpl) ->
-      let ty_elt, arg_sort = solve_Ppat_array ~refine loc penv mut expected_ty in
->>>>>>> origin/main
       assert (Jkind.Sort.equate original_arg_sort arg_sort);
       map_fold_cont (fun p -> check_rec p ty_elt) tpl
         (fun pl -> mkp k (Tpat_array (mutability, arg_sort, pl)))
@@ -7119,7 +6975,6 @@ and type_expect_
         let (_, { lbl_all; lbl_repres; _ }, _) = List.hd lbl_exp_list in
         lbl_all, lbl_repres
       in
-<<<<<<< HEAD
       let representation =
         match determined_lbl_repres record_form representation with
         | Some rep -> rep
@@ -7152,41 +7007,6 @@ and type_expect_
                     Printtyp.type_expr ty_expected
             end
       in
-||||||| 083478d04f
-=======
-      let representation =
-        match determined_lbl_repres record_form representation with
-        | Some rep -> rep
-        | None ->
-            let labels_with_updated_types =
-              Array.map2
-                (fun ld (arg, _jkind, _sort, _def) ->
-                   Types.label_declaration_of_label_description ld, arg)
-                label_descriptions label_definitions
-              |> Array.to_list
-            in
-            let why : Jkind.History.concrete_creation_reason =
-              if opt_sexp = None
-              then Field_assignment
-              else Field_functional_update
-            in
-            begin match
-              (* XXX This is redundantly going to get the sort and jkind for
-                 each label all over again. Possibly we're doing things in the
-                 wrong order. *)
-              Typedecl.update_record_representation ~why env
-                sexp.pexp_loc record_form labels_with_updated_types
-            with
-            | Ok (_, rep) -> rep
-            | Error _ ->
-                (* This should be impossible since we already ran everything
-                   through [jkind_and_sort_for_label_definition] *)
-                Misc.fatal_errorf
-                  "No representation for record whose fields have sorts: %a"
-                    (Format_doc.compat Printtyp.type_expr) ty_expected
-            end
-      in
->>>>>>> origin/main
       let fields =
         Array.map2 (fun descr (_arg, _jkind, sort, def) -> descr, sort, def)
           label_descriptions label_definitions
@@ -7956,23 +7776,12 @@ and type_expect_
           (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
             :: record.exp_extra }
       in
-<<<<<<< HEAD
       unify_exp ~sexp env record ty_record;
       let record_sorts, record_repres =
         update_labels env Legacy ~representative_label:label ~loc
           ~why:Field_assignment
           ~containing_type:ty_record
       in
-||||||| 083478d04f
-      unify_exp env record ty_record;
-=======
-      unify_exp env record ty_record;
-      let record_sorts, record_repres =
-        update_labels env Legacy ~representative_label:label ~loc
-          ~why:Field_assignment
-          ~containing_type:ty_record
-      in
->>>>>>> origin/main
       rue {
         exp_desc = Texp_setfield {
           record;
@@ -8098,16 +7907,8 @@ and type_expect_
       | Baccess_block (Mutable, _) ->
         true
       | Baccess_field
-<<<<<<< HEAD
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
         raise (error(loc, env, Block_index_atomic_unsupported))
-||||||| 083478d04f
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
-=======
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
->>>>>>> origin/main
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -10120,7 +9921,6 @@ and type_label_access
     (record, record_sort, Mode.Value.disallow_right mode,
      make_fake_label record_form, expected_type, Unambiguous)
 
-<<<<<<< HEAD
 and solve_Pexp_field
   : 'rep . label_usage:_ -> _ -> _ -> _ -> 'rep record_form -> _ ->
     _ * _ * _ * 'rep gen_label_description * _ * _ =
@@ -10177,46 +9977,6 @@ and type_label_projection
    Mode.Value.disallow_right mode, label, expected_type,
    ambiguity, ty_arg, record_repres)
 
-||||||| 083478d04f
-=======
-and type_label_projection
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep
-  = fun record_form loc env srecord lid ->
-  let record, record_sort, mode, label, expected_type, ambiguity =
-    type_label_access record_form env srecord Env.Projection lid
-  in
-  let ty_arg, record_sorts, record_repres =
-    (* XXX Not clear to me why this can't be done in [type_label_access] so that
-       the [Texp_setfield] case wouldn't have to have its own call to
-       [update_label], but doing it that way causes principality issues.
-       Notably, this call to [update_label] happens inside a local level and the
-       [Texp_setfield] call does not. *)
-    with_local_level_if_principal begin fun () ->
-      (* [ty_arg] is the type of field, [ty_res] is the type of record, they
-         could share type variables, which are now instantiated *)
-      let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
-      (* we now link the two record types *)
-      unify_exp env record ty_res;
-      let record_sorts, record_repres =
-        (* This redundantly calculates the sort again. But calling
-           [type_sort] above let us infer that the type is representable,
-           and it also gives a nicer error message *)
-        (* XXX Not entirely sure why it's necessary to do this in the inner
-           level, but weird errors happen if we don't, and it's also
-           necessary to do it in _this_ inner level so that the correct type
-           hits a [generalize_structure] *)
-        update_labels env record_form ~representative_label:label ~loc
-          ~why:Field_projection ~containing_type:record.exp_type
-      in
-      ty_arg, record_sorts, record_repres
-    end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
-  in
-  (record, record_sort, record_sorts,
-   Mode.Value.disallow_right mode, label, expected_type,
-   ambiguity, ty_arg, record_repres)
-
->>>>>>> origin/main
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.
    (Handling of * modifiers contributed by Thorsten Ohl.) *)
@@ -11161,16 +10921,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
           in
           let texp =
             re {
-<<<<<<< HEAD
             exp_desc = Texp_construct(lid, constr, dummy_repres, [], None);
             exp_loc = sexp.pexp_loc;
-||||||| 083478d04f
-            exp_desc = Texp_construct(lid, constr, [], None);
-            exp_loc = loc;
-=======
-            exp_desc = Texp_construct(lid, constr, dummy_repres, [], None);
-            exp_loc = loc;
->>>>>>> origin/main
             exp_extra = [
               Texp_inspected_type (Label_disambiguation ambiguity),
               sexp.pexp_loc,
@@ -11278,7 +11030,6 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     | Variant_with_null -> assert false
       (* [Variant_with_null] can't be made private due to [or_null_reexport]. *)
     end;
-<<<<<<< HEAD
   let shape, sorts =
     let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
     match
@@ -11291,20 +11042,6 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
         raise (Error (loc, env, Constructor_arg_value_not_rep(ty, err)))
   in
   let args = List.combine sorts args in
-||||||| 083478d04f
-=======
-  let shape, sorts =
-    let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
-    match
-      representation_for_tuple_constructor env constr ty_args ~loc ~types
-        ~containing_type:ty_res ~why:Constructor_arg_assignment
-    with
-    | Ok (shape, sorts) -> shape, sorts
-    | Error (Unrepresentable_arg (loc, ty, err)) ->
-        raise (Error (loc, env, Constructor_arg_value_not_rep(ty, err)))
-  in
-  let args = List.combine sorts args in
->>>>>>> origin/main
   (* NOTE: shouldn't we call "re" on this final expression? -- AF *)
   { texp with
     exp_desc = Texp_construct(lid, constr, shape, args, alloc_mode) }

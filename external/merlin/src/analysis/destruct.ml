@@ -474,16 +474,8 @@ let rec qualify_constructors ~unmangling_tables f pat =
   let open Typedtree in
   let qualify_constructors = qualify_constructors ~unmangling_tables in
   let qualify_in_record (type rep)
-<<<<<<< HEAD
       (labels : (_ * rep Data_types.gen_label_description * _) list) lable_table
-      closed (record_form : rep Data_types.record_form) =
-||||||| 083478d04f
-      (labels : (_ * rep Types.gen_label_description * _) list) lable_table
-      closed (record_form : rep Types.record_form) =
-=======
-      (labels : (_ * rep Types.gen_label_description * _) list) lable_table
-      closed (record_form : rep Types.record_form) ~sorts ~(repr : rep) =
->>>>>>> origin/main
+      closed (record_form : rep Data_types.record_form) ~sorts ~(repr : rep) =
     let labels =
       let open Longident in
       List.map labels ~f:(fun ((Location.{ txt; _ } as lid), lbl_des, pat) ->

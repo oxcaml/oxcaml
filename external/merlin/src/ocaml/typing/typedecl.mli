@@ -95,7 +95,6 @@ val check_coherence:
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
 
-<<<<<<< HEAD
 type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
@@ -120,34 +119,6 @@ val update_record_representation:
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
-||||||| 083478d04f
-val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
-=======
-type unrepresentable_constructor =
-  | Unrepresentable_argument of int
-  | Unrepresentable_argument_field of string
-
-(* Update the representation of a constructor whose representation at
-   declaration time was [None] because it has an argument of kind [any]. *)
-val update_constructor_representation:
-    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
-    loc:Location.t -> is_extension_constructor:bool ->
-    (Types.constructor_representation, unrepresentable_constructor) Result.t
-
-type unrepresentable_record =
-  | Unrepresentable_field of string
-
-(* Update the representation of a record whose representation at declaration
-   time was [None] because it has a field of kind [any]. *)
-val update_record_representation:
-    why:Jkind_intf.History.concrete_creation_reason ->
-    Env.t -> Location.t -> 'rep Types.record_form ->
-    (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
-
-val mixed_block_element :
-    Env.t -> type_expr -> _ jkind -> mixed_block_element option
->>>>>>> origin/main
 
 type native_repr_kind = Unboxed | Untagged | Unpacked
 
