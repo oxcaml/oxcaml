@@ -645,7 +645,20 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               let ty_args =
                 List.map2
                   (fun { ca_sort } ty_arg ->
-                      (ty_arg, print_sort_option ca_sort)
+                     let sort =
+                       match ca_sort with
+                       | Some sort -> Some sort
+                       | None ->
+                           (match
+                              Ctype.type_sort env ty_arg ~fixed:true
+                                ~why:Constructor_arg_projection
+                            with
+                            | Ok sort ->
+                                Some
+                                  (Jkind.Sort.default_for_transl_and_get sort)
+                            | Error _ -> None)
+                     in
+                     (ty_arg, print_sort_option sort)
                   ) l ty_args
               in
               tree_of_constr_with_args (tree_of_constr env path)
@@ -691,6 +704,26 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match check_depth depth obj ty with
         | Some x -> x
         | None ->
+            let rep =
+              match rep with
+              | Record_variable ->
+                  let label_params_and_types, record_params =
+                    Ctype.instance_label_declarations ~fixed:false
+                      (lbl_list |> Array.of_list) ~params:type_params
+                  in
+                  List.iter2 (Ctype.unify env) record_params ty_list;
+                  let lds_and_types =
+                    List.map2 (fun lbl (_params, ty) -> lbl, ty)
+                      lbl_list (label_params_and_types |> Array.to_list)
+                  in
+                  (match
+                     Typedecl.update_record_representation env Location.none
+                       Legacy lds_and_types ~why:Field_projection
+                   with
+                   | Ok (_sorts, rep) -> rep
+                   | Error _ -> Misc.fatal_error "unrepresentable record")
+              | rep -> rep
+            in
             let pos =
               match rep with
               | Record_inlined (_, _, Variant_extensible) -> 1
