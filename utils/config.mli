@@ -290,14 +290,9 @@ val with_codegen_invariants : bool
 (** Whether the invariant checks for native code generation are enabled. *)
 
 val reserved_header_bits : int
-(** How many bits of a block's header are reserved. This is correct
-   regardless of whether we're in runtime 4 or runtime 5.
-
-   In runtime 5, this corresponds to the HEADER_RESERVED_BITS C preprocessor
-   macro. In runtime 4, this corresponds to the PROFINFO_WIDTH C preprocessor
-   macro. Both of these are unconditionally set to a constant by the configure
-   script in order to enable mixed block support.
- *)
+(** How many bits of a block's header are reserved. This corresponds to the
+   HEADER_RESERVED_BITS C preprocessor macro, which is unconditionally set to a
+   constant by the configure script in order to enable mixed block support. *)
 
 val custom_ops_struct_size : int
 (** Size in bytes of the custom operations structure. *)

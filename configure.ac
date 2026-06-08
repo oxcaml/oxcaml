@@ -236,8 +236,6 @@ ostype="Unix"
 SO="so"
 toolchain="cc"
 reserved_header_bits=8
-profinfo=true
-profinfo_width=8
 custom_ops_struct_size=64
 instrumented_runtime=false
 instrumented_runtime_libs=""
@@ -433,8 +431,6 @@ AC_SUBST([install_bytecode_programs])
 AC_SUBST([install_source_artifacts])
 AC_SUBST([install_ocamlnat])
 AC_SUBST([reserved_header_bits])
-AC_SUBST([profinfo])
-AC_SUBST([profinfo_width])
 AC_SUBST([custom_ops_struct_size])
 AC_SUBST([no_partial_inlining_cflags])
 AC_SUBST([frame_pointers])
@@ -3114,11 +3110,9 @@ AS_CASE([$name_mangling_scheme],
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES
 
-# Unconditionally reserve 8 header bits in both runtime 4 and
-# runtime 5, which is required for mixed block support.
+# Unconditionally reserve 8 header bits, which is required for mixed block
+# support.
 AC_DEFINE_UNQUOTED([HEADER_RESERVED_BITS], [$reserved_header_bits])
-AC_DEFINE_UNQUOTED([PROFINFO_WIDTH], [$profinfo_width])
-AS_IF([$profinfo], [AC_DEFINE([WITH_PROFINFO])])
 
 # Only gcc supports -fno-partial-inlining
 AS_CASE([$ocaml_cc_vendor],
