@@ -937,7 +937,7 @@ module type S = sig
     module Const : sig
       (** A modality that acts on [Value] axes. Conceptually it is a record
           where individual fields can be [set] or [proj]. *)
-      type t = Mode_modality_const.t
+      type t = Mode_const_repr.t
 
       (** The identity modality. *)
       val id : t

@@ -417,11 +417,11 @@ module Lattices = struct
   end
   [@@inline]
 
-  type locality = Mode_modality_const.Locality.t =
+  type locality = Mode_const_repr.Locality.t =
     | Global
     | Local
 
-  type regionality = Mode_modality_const.Regionality.t =
+  type regionality = Mode_const_repr.Regionality.t =
     | Global
     | Regional
     | Local
@@ -508,7 +508,7 @@ module Lattices = struct
   end
 
   module Uniqueness = struct
-    type t = Mode_modality_const.Uniqueness.t =
+    type t = Mode_const_repr.Uniqueness.t =
       | Unique
       | Aliased
 
@@ -532,7 +532,7 @@ module Lattices = struct
   end
 
   module Linearity = struct
-    type t = Mode_modality_const.Linearity.t =
+    type t = Mode_const_repr.Linearity.t =
       | Many
       | Once
 
@@ -557,7 +557,7 @@ module Lattices = struct
 
   module Portability = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t = Mode_modality_const.Portability.t =
+    type t = Mode_const_repr.Portability.t =
       | Portable (* 0b00 *)
       | Shareable (* 0b01 *)
       | Corruptible (* 0b10 *)
@@ -588,7 +588,7 @@ module Lattices = struct
 
   module Contention = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t = Mode_modality_const.Contention.t =
+    type t = Mode_const_repr.Contention.t =
       | Uncontended (* 0b00 *)
       | Corrupted (* 0b01 *)
       | Shared (* 0b10 *)
@@ -618,7 +618,7 @@ module Lattices = struct
   end
 
   module Forkable = struct
-    type t = Mode_modality_const.Forkable.t =
+    type t = Mode_const_repr.Forkable.t =
       | Forkable
       | Unforkable
 
@@ -642,7 +642,7 @@ module Lattices = struct
   end
 
   module Yielding = struct
-    type t = Mode_modality_const.Yielding.t =
+    type t = Mode_const_repr.Yielding.t =
       | Unyielding
       | Yielding
 
@@ -667,7 +667,7 @@ module Lattices = struct
 
   module Statefulness = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t = Mode_modality_const.Statefulness.t =
+    type t = Mode_const_repr.Statefulness.t =
       | Stateless (* 0b00 *)
       | Writing (* 0b01 *)
       | Reading (* 0b10 *)
@@ -698,7 +698,7 @@ module Lattices = struct
 
   module Visibility = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
-    type t = Mode_modality_const.Visibility.t =
+    type t = Mode_const_repr.Visibility.t =
       | Read_write (* 0b00 *)
       | Read (* 0b01 *)
       | Write (* 0b10 *)
@@ -728,7 +728,7 @@ module Lattices = struct
   end
 
   module Staticity = struct
-    type t = Mode_modality_const.Staticity.t =
+    type t = Mode_const_repr.Staticity.t =
       | Static
       | Dynamic
 
@@ -751,7 +751,7 @@ module Lattices = struct
       | Static -> Fmt.fprintf ppf "static"
   end
 
-  type monadic = Mode_modality_const.monadic =
+  type monadic = Mode_const_repr.monadic =
     { uniqueness : Uniqueness.t;
       contention : Contention.t;
       visibility : Visibility.t;
@@ -895,7 +895,7 @@ module Lattices = struct
         Staticity.print m.staticity
   end
 
-  type 'areality comonadic_with = 'areality Mode_modality_const.comonadic_with =
+  type 'areality comonadic_with = 'areality Mode_const_repr.comonadic_with =
     { areality : 'areality;
       linearity : Linearity.t;
       portability : Portability.t;
@@ -4783,86 +4783,73 @@ module Report = struct
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 
-  type diagnostic_modality_axis =
-    | Areality
-    | Uniqueness
-    | Linearity
-    | Portability
-    | Contention
-    | Forkable
-    | Yielding
-    | Statefulness
-    | Visibility
-    | Staticity
+  type _ modality_axis =
+    | Monadic_axis : (C.Monadic_op.t, 'a) Axis.t -> 'a modality_axis
+    | Comonadic_axis :
+        (C.Comonadic_with_regionality.t, 'a) Axis.t
+        -> 'a modality_axis
 
-  module MMC = Mode_modality_const.Modality
+  module MMC = Mode_const_repr.Modality
 
-  let modality_axes_of_obj : type a. a C.obj -> diagnostic_modality_axis list =
-    function
-    | Locality | Regionality -> [Areality]
-    | Uniqueness_op -> [Uniqueness]
-    | Linearity -> [Linearity]
-    | Portability -> [Portability]
-    | Forkable -> [Forkable]
-    | Yielding -> [Yielding]
-    | Statefulness -> [Statefulness]
-    | Contention_op -> [Contention]
-    | Visibility_op -> [Visibility]
-    | Staticity_op -> [Staticity]
-    | Monadic_op -> [Uniqueness; Contention; Visibility; Staticity]
+  type modality_atom = Atom : 'a modality_axis * 'a -> modality_atom
+
+  let monadic_axis ax = Atom (Monadic_axis ax, Axis.proj ax C.Monadic_op.max)
+
+  let comonadic_axis ax =
+    Atom (Comonadic_axis ax, Axis.proj ax C.Comonadic_with_regionality.max)
+
+  let modality_axes_of_obj : type a. a C.obj -> modality_atom list = function
+    | Locality | Regionality -> [comonadic_axis Areality]
+    | Uniqueness_op -> [monadic_axis Uniqueness]
+    | Linearity -> [comonadic_axis Linearity]
+    | Portability -> [comonadic_axis Portability]
+    | Forkable -> [comonadic_axis Forkable]
+    | Yielding -> [comonadic_axis Yielding]
+    | Statefulness -> [comonadic_axis Statefulness]
+    | Contention_op -> [monadic_axis Contention]
+    | Visibility_op -> [monadic_axis Visibility]
+    | Staticity_op -> [monadic_axis Staticity]
+    | Monadic_op ->
+      [ monadic_axis Uniqueness;
+        monadic_axis Contention;
+        monadic_axis Visibility;
+        monadic_axis Staticity ]
     | Comonadic_with_locality | Comonadic_with_regionality ->
-      [Areality; Linearity; Portability; Forkable; Yielding; Statefulness]
+      [ comonadic_axis Areality;
+        comonadic_axis Linearity;
+        comonadic_axis Portability;
+        comonadic_axis Forkable;
+        comonadic_axis Yielding;
+        comonadic_axis Statefulness ]
 
-  let modality_id : Mode_modality_const.t =
-    { monadic = MMC.Monadic.Join_const C.Monadic_op.max;
-      comonadic = MMC.Comonadic.Meet_const C.Comonadic_with_regionality.max
-    }
+  let modality_axis_obj : type a. a modality_axis -> a C.obj = function
+    | Monadic_axis ax -> C.proj_obj ax C.Monadic_op
+    | Comonadic_axis ax -> C.proj_obj ax C.Comonadic_with_regionality
 
-  let modality_is_id_on axis (modality : Mode_modality_const.t) =
-    let { monadic = MMC.Monadic.Join_const monadic;
-          comonadic = MMC.Comonadic.Meet_const comonadic
-        } =
-      modality
-    in
-    let { monadic = MMC.Monadic.Join_const id_monadic;
-          comonadic = MMC.Comonadic.Meet_const id_comonadic
-        } =
-      modality_id
-    in
-    match axis with
-    | Areality -> comonadic.areality = id_comonadic.areality
-    | Uniqueness -> monadic.uniqueness = id_monadic.uniqueness
-    | Linearity -> comonadic.linearity = id_comonadic.linearity
-    | Portability -> comonadic.portability = id_comonadic.portability
-    | Contention -> monadic.contention = id_monadic.contention
-    | Forkable -> comonadic.forkable = id_comonadic.forkable
-    | Yielding -> comonadic.yielding = id_comonadic.yielding
-    | Statefulness -> comonadic.statefulness = id_comonadic.statefulness
-    | Visibility -> monadic.visibility = id_monadic.visibility
-    | Staticity -> monadic.staticity = id_monadic.staticity
-
-  let print_modality_on axis ppf (modality : Mode_modality_const.t) =
+  let modality_axis_proj : type a. a modality_axis -> Mode_const_repr.t -> a =
+   fun axis modality ->
     let { monadic = MMC.Monadic.Join_const monadic;
           comonadic = MMC.Comonadic.Meet_const comonadic
         } =
       modality
     in
     match axis with
-    | Areality -> C.Regionality.print ppf comonadic.areality
-    | Uniqueness -> C.Uniqueness.print ppf monadic.uniqueness
-    | Linearity -> C.Linearity.print ppf comonadic.linearity
-    | Portability -> C.Portability.print ppf comonadic.portability
-    | Contention -> C.Contention.print ppf monadic.contention
-    | Forkable -> C.Forkable.print ppf comonadic.forkable
-    | Yielding -> C.Yielding.print ppf comonadic.yielding
-    | Statefulness -> C.Statefulness.print ppf comonadic.statefulness
-    | Visibility -> C.Visibility.print ppf monadic.visibility
-    | Staticity -> C.Staticity.print ppf monadic.staticity
+    | Monadic_axis ax -> Axis.proj ax monadic
+    | Comonadic_axis ax -> Axis.proj ax comonadic
 
-  let print_modality_axis axis ppf modality =
+  let modality_atom_if_not_id modality (Atom (axis, id)) =
+    let value = modality_axis_proj axis modality in
+    let obj = modality_axis_obj axis in
+    if C.equal obj value id then None else Some (Atom (axis, value))
+
+  let print_modality_atom_value ppf (Atom (axis, value)) =
+    let obj = modality_axis_obj axis in
+    C.print obj ppf value
+
+  let print_modality_atom ppf atom =
     Fmt.fprintf ppf " (with modality %a in effect)"
-      (Misc.Style.as_inline_code (print_modality_on axis))
-      modality
+      (Misc.Style.as_inline_code print_modality_atom_value)
+      atom
 
   let modality_if_relevant : type a.
       fixpoint:bool -> a C.obj -> modality -> pinpoint -> _ =
@@ -4878,22 +4865,21 @@ module Report = struct
          modality explanation. Either way, the modality is the best local
          explanation, so we omit the remaining chain. *)
       match modality with
-      | Modality_const modality ->
+      | Known_modality modality ->
         let axes =
-          List.filter
-            (fun axis -> not (modality_is_id_on axis modality))
-            (modality_axes_of_obj obj)
+          modality_axes_of_obj obj
+          |> List.filter_map (modality_atom_if_not_id modality)
         in
         begin match axes with
         | [] -> (fun _ppf _ -> ()), pp
-        | [axis] ->
-          ( (fun ppf _ -> print_modality_axis axis ppf modality),
+        | [atom] ->
+          ( (fun ppf _ -> print_modality_atom ppf atom),
             (Location.none, Unknown : pinpoint) )
         | _ :: _ :: _ ->
           ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality in effect)"),
             (Location.none, Unknown : pinpoint) )
         end
-      | Modality ->
+      | Unknown_modality ->
         ( (fun ppf _ -> Fmt.fprintf ppf " (with some modality in effect)"),
           (Location.none, Unknown : pinpoint) )
 
@@ -7054,8 +7040,7 @@ module Modality = struct
     type error = Error : 'a axis * 'a Atom.t simple_error -> error
 
     module Const = struct
-      type t = Mode_modality_const.Modality.Monadic.t =
-        | Join_const of Mode.Const.t
+      type t = Mode_const_repr.Modality.Monadic.t = Join_const of Mode.Const.t
       [@@unboxed]
 
       let id = Join_const Mode.Const.min
@@ -7234,7 +7219,7 @@ module Modality = struct
     type error = Error : 'a axis * 'a Atom.t simple_error -> error
 
     module Const = struct
-      type t = Mode_modality_const.Modality.Comonadic.t =
+      type t = Mode_const_repr.Modality.Comonadic.t =
         | Meet_const of Mode.Const.t
       [@@unboxed]
 
@@ -7481,13 +7466,13 @@ module Modality = struct
     module Monadic = Monadic.Const
     module Comonadic = Comonadic.Const
 
-    type t = Mode_modality_const.t =
+    type t = Mode_const_repr.t =
       { monadic : Monadic.t;
         comonadic : Comonadic.t
       }
 
     let add_modality_hint t ({ Hint.containing; _ } as is_contained_by) =
-      let modality = Hint.Modality_const t in
+      let modality = Hint.Known_modality t in
       let containing =
         match containing with
         | Tuple -> Hint.Tuple
