@@ -363,7 +363,6 @@ ocaml/primitives.new
 /tools/make_opcodes
 /tools/make_opcodes.ml
 /tools/ocamltex
-/tools/eventlog_metadata
 /tools/debug_printers
 /tools/lintapidiff.opt
 /tools/sync_dynlink.opt
