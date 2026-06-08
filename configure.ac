@@ -489,18 +489,10 @@ AC_CONFIG_FILES([otherlibs/dynlink/dynlink_config.ml])
 AC_CONFIG_FILES([utils/config.common.ml])
 AC_CONFIG_FILES([utils/config.generated.ml])
 AC_CONFIG_FILES([tools/eventlog_metadata])
-AS_IF([test "x$enable_runtime5" = "xyes"],
-  [ AC_CONFIG_HEADERS([runtime/caml/m.h])
-    AC_CONFIG_HEADERS([runtime/caml/s.h])
-    AC_CONFIG_HEADERS([runtime/caml/exec.h])
-    AC_CONFIG_HEADERS([runtime/caml/version.h])
-  ],
-  [ AC_CONFIG_HEADERS([runtime4/caml/m.h])
-    AC_CONFIG_HEADERS([runtime4/caml/s.h])
-    AC_CONFIG_HEADERS([runtime4/caml/exec.h])
-    AC_CONFIG_HEADERS([runtime4/caml/version.h])
-  ]
-)
+AC_CONFIG_HEADERS([runtime/caml/m.h])
+AC_CONFIG_HEADERS([runtime/caml/s.h])
+AC_CONFIG_HEADERS([runtime/caml/exec.h])
+AC_CONFIG_HEADERS([runtime/caml/version.h])
 AC_CONFIG_FILES([compilerlibs/META])
 AC_CONFIG_FILES([otherlibs/stdlib_upstream_compatible/META])
 AC_CONFIG_FILES([otherlibs/stdlib_stable/META])
@@ -1119,23 +1111,18 @@ AS_CASE([$target],
   ocamltest_libunix="Some true"
   ocamlyacc_wstr_module=""])
 
-otherlibraries="dynlink"
-otherlibs=""
+otherlibraries="dynlink runtime_events"
+otherlibs="runtime_events"
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 
 lib_dynlink=true
+lib_runtime_events=true
 dldir=otherlibs/dynlink
 AC_CONFIG_LINKS([
   $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
   $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
   $dldir/dynlink_platform_intf.mli:$dldir/dynlink_platform_intf.ml
 ])
-
-AS_IF([test x"$enable_runtime5" = xyes],
-  [otherlibraries="$otherlibraries runtime_events"
-  otherlibs="$otherlibs runtime_events"
-  lib_runtime_events=true],
-  [lib_runtime_events=false])
 
 AS_IF([test x"$enable_unix_lib" != "xno"],
   [enable_unix_lib=yes
@@ -3322,8 +3309,7 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
 # Multidomain is permitted without stack checks, you'll just get large
 # non-resizeable fiber stacks.
 AS_IF([test x"$enable_multidomain" = "xyes"],
-  [AS_IF([test x"$enable_runtime5" = "xyes" &&
-          test x"$enable_poll_insertion" = "xyes"],
+  [AS_IF([test x"$enable_poll_insertion" = "xyes"],
     [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=yes],
     [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
 poll insertion enabled.])])], [])
