@@ -9550,31 +9550,7 @@ and type_label_projection
          could share type variables, which are now instantiated *)
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
-<<<<<<< HEAD
       unify_exp ~sexp:srecord env record ty_res;
-      (* CR-soon rtjoa: merge this type of check with
-         [Typedecl.check_representable]. It should also be done within
-         [update_labels] - this will allow sort variables to be created for
-         other places that use [update_labels], such as for block indices *)
-      begin match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-      | Ok _ -> ()
-      | Error err ->
-          raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
-      end;
-||||||| 5bddb2acb0
-      unify_exp env record ty_res;
-      (* CR-soon rtjoa: merge this type of check with
-         [Typedecl.check_representable]. It should also be done within
-         [update_labels] - this will allow sort variables to be created for
-         other places that use [update_labels], such as for block indices *)
-      begin match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-      | Ok _ -> ()
-      | Error err ->
-          raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
-      end;
-=======
-      unify_exp env record ty_res;
->>>>>>> refs/rewritten/5-2-0minus-40
       let record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,

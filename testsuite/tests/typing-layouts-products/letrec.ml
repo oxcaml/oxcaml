@@ -78,9 +78,8 @@ let unboxed_cycle =
 [%%expect{|
 type unboxed = #{ b : boxed option; name : string; }
 and boxed = { mutable a : unboxed; }
->> Fatal error: variable record representation
-Uncaught exception: Misc.Fatal_error
-
+val unboxed_cycle : unboxed =
+  #{b = Some {a = #{b = <cycle>; name = "t"}}; name = "t"}
 |}]
 
 (* The below is adapted from [testsuite/tests/letrec-check/unboxed.ml]. *)

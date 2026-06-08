@@ -2388,7 +2388,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
   sorts, rep
 
 let update_record_representation
-      (type rep) ~why env loc (form : rep Types.record_form) lbls_and_types =
+      (type rep) ~why env loc (form : rep record_form) lbls_and_types =
   let kloc : jkind_sort_loc =
     match form with
     | Legacy -> Record { unboxed = false }
@@ -3666,7 +3666,6 @@ let transl_type_decl env rec_flag sdecl_list =
       (Path.Pident id)
       decl to_check)
     decls;
-<<<<<<< HEAD
   (* Update temporary definitions (for well-founded recursive types) *)
   let delayed_jkind_checks =
     match rec_flag with
@@ -3678,12 +3677,9 @@ let transl_type_decl env rec_flag sdecl_list =
            sdecl.ptype_loc)
         ids_list sdecl_list
   in
-||||||| 5bddb2acb0
-=======
   (* Cycles through unboxed types are now ruled out, so this order exists. See
      Note [order of updating decl jkinds]. *)
   let jkind_update_order = jkind_update_order new_env to_check decls in
->>>>>>> refs/rewritten/5-2-0minus-40
   (* Now that we've ruled out ill-formed types, we can perform the delayed
      jkind checks *)
   List.iter (fun (checks,loc) ->

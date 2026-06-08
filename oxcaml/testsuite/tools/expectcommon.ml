@@ -95,43 +95,6 @@ let match_expect_extension (ext : Parsetree.extension) =
     in
     let ident (e : Parsetree.expression) =
       match e.pexp_desc with
-<<<<<<< HEAD
-      | Pexp_constant {pconst_desc = Pconst_string _; _} ->
-        (* Bare string constant - no filter *)
-        (None, string_constant e)
-      | Pexp_construct ({ txt = Lident name; }, Some arg) -> (
-        (* Filter{|content|} - filter with string content *)
-        match filter_of_string name with
-        | Some filter -> (Some filter, string_constant arg)
-        | None ->
-          invalid_payload
-            ~msg:(Printf.sprintf "unexpected filter \"%s\"" name)
-            ~loc:e.pexp_loc
-            ())
-      | _ ->
-        invalid_payload
-        ~loc:e.pexp_loc
-        ~msg:("expected {|...|} or Filter{|...|}")
-        ()
-||||||| 5bddb2acb0
-      | Pexp_constant (Pconst_string _) ->
-        (* Bare string constant - no filter *)
-        (None, string_constant e)
-      | Pexp_construct ({ txt = Lident name; }, Some arg) -> (
-        (* Filter{|content|} - filter with string content *)
-        match filter_of_string name with
-        | Some filter -> (Some filter, string_constant arg)
-        | None ->
-          invalid_payload
-            ~msg:(Printf.sprintf "unexpected filter \"%s\"" name)
-            ~loc:e.pexp_loc
-            ())
-      | _ ->
-        invalid_payload
-        ~loc:e.pexp_loc
-        ~msg:("expected {|...|} or Filter{|...|}")
-        ()
-=======
       | Pexp_construct ({ txt = Lident txt; }, None) -> txt
       | Pexp_ident {txt = Lident txt; } -> txt
       | _ -> invalid_payload ~loc:e.pexp_loc ()
@@ -140,7 +103,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     let parse_element (e : Parsetree.expression) =
       let filters, txt =
         match e.pexp_desc with
-        | Pexp_constant (Pconst_string _) ->
+        | Pexp_constant {pconst_desc = Pconst_string _; _} ->
             (* Bare string constant - no filter *)
             ([], string_constant e)
         | Pexp_construct ({txt = Lident filter; }, Some txt) ->
@@ -173,7 +136,6 @@ let match_expect_extension (ext : Parsetree.extension) =
           filters
       in
       (filters, txt)
->>>>>>> refs/rewritten/5-2-0minus-40
     in
     let is_arch_filter = function
       | X86_64 -> true
@@ -410,7 +372,6 @@ function
   | (Ptop_dir _  | Ptop_def []) :: l -> min_line_number l
   | Ptop_def (st :: _) :: _ -> Some st.pstr_loc.loc_start.pos_lnum
 
-<<<<<<< HEAD
 
 let visible_inline_code () =
   let open Misc.Style in
@@ -418,12 +379,7 @@ let visible_inline_code () =
   let inline_code = { ansi = []; text_open = {|"|}; text_close={|"|} } in
   set_styles { default with inline_code }
 
-let eval_expect_file _fname ~file_contents ~execute_phrase =
-||||||| 5bddb2acb0
-let eval_expect_file _fname ~file_contents ~execute_phrase =
-=======
 let eval_expect_file fname ~file_contents ~execute_phrase =
->>>>>>> refs/rewritten/5-2-0minus-40
   Warnings.reset_fatal ();
   let chunks, trailing_code =
     parse_contents ~fname:"" file_contents |> split_chunks

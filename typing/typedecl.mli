@@ -112,14 +112,8 @@ type unrepresentable_record =
 (* Update the representation of a record whose representation at declaration
    time was [None] because it has a field of kind [any]. *)
 val update_record_representation:
-<<<<<<< HEAD
-    Env.t -> Location.t -> 'rep Data_types.record_form ->
-||||||| 5bddb2acb0
-    Env.t -> Location.t -> 'rep Types.record_form ->
-=======
     why:Jkind_intf.History.concrete_creation_reason ->
-    Env.t -> Location.t -> 'rep Types.record_form ->
->>>>>>> refs/rewritten/5-2-0minus-40
+    Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
     (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
 
