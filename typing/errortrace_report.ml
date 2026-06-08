@@ -415,6 +415,7 @@ let explanation (type variety) intro prev env
     Some (doc_printf "@ because their kinds are different.\
                       @ @[<v>%t@;%t@]"
             (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Mode_mismatch _ -> None
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

@@ -6304,19 +6304,36 @@ let submode_with_cross env ~is_ret ty l r =
   in
   Alloc.submode l r'
 
-let moregen_alloc_mode env ~is_ret ty v a1 a2 =
+let label_name = function
+  | Nolabel -> None
+  | Position _ -> None
+  | Labelled label | Optional label -> Some label
+
+let argument_mode_mismatch_context label =
+  match label_name label with
+  | None -> "the argument"
+  | Some label -> "argument " ^ label
+
+let moregen_alloc_mode env ~label ~is_ret ty v a1 a2 =
+  let context =
+    if is_ret then "the return" else argument_mode_mismatch_context label
+  in
+  let submode left_pos a1 a2 =
+    match submode_with_cross env ~is_ret ty a1 a2 with
+    | Ok () -> Ok ()
+    | Error error -> Error Errortrace.{ context; left_pos; error }
+  in
   match
     match v with
     | Invariant ->
-        Result.bind (submode_with_cross env ~is_ret ty a1 a2)
-          (fun _ -> submode_with_cross env ~is_ret ty a2 a1)
-        |> Result.map_error ignore
-    | Covariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a1 a2)
-    | Contravariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a2 a1)
+        Result.bind (submode First a1 a2) (fun _ -> submode Second a2 a1)
+    | Covariant -> submode First a1 a2
+    | Contravariant -> submode Second a2 a1
     | Bivariant -> Ok ()
   with
   | Ok () -> ()
-  | Error _  -> raise_unexplained_for Moregen
+  | Error mode_mismatch ->
+    raise_trace_for Moregen [Mode_mismatch mode_mismatch]
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
@@ -6365,8 +6382,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                  [typing-modes/crossing.ml]. *)
               (* CR zqian: should use the meet of [t1] and [t2] for mode
               crossing. Similar for [u1] and [u2]. *)
-              moregen_alloc_mode env t2 ~is_ret:false (neg_variance variance) a1 a2;
-              moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
+              moregen_alloc_mode env t2 ~label:l2
+                ~is_ret:false (neg_variance variance) a1 a2;
+              moregen_alloc_mode env u2 ~label:l2
+                ~is_ret:true variance r1 r2
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
