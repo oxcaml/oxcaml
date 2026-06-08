@@ -75,9 +75,9 @@ type ('d0, 'd1) polarity =
 [@@warning "-62"]
 
 type modality =
-  | Modality
+  | Unknown_modality
       (** The modality is not known in a form that can be printed precisely. *)
-  | Modality_const of Mode_modality_const.t
+  | Known_modality of Mode_const_repr.t
 
 type containing =
   | Tuple

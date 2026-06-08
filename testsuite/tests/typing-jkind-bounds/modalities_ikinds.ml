@@ -25,6 +25,11 @@ type 'a both = { both : 'a @@ aliased contended }
 type 'a both = { both : 'a @@ aliased contended; }
 |}]
 
+type 'a plain = { plain : 'a }
+[%%expect{|
+type 'a plain = { plain : 'a; }
+|}]
+
 type t_test = int t require_contended
 type t_test = int ref t require_contended
 [%%expect{|
@@ -55,6 +60,17 @@ Line 1, characters 57-63:
                                                              ^^^^^^
 Error: This value is "contended"
          because it is the field "both" (with modality "contended" in effect) of the record at line 1, characters 57-58.
+       However, the highlighted expression is expected to be "uncontended".
+|}]
+
+let foo (t : int ref plain @ contended) = use_uncontended t.plain
+[%%expect{|
+Line 1, characters 58-65:
+1 | let foo (t : int ref plain @ contended) = use_uncontended t.plain
+                                                              ^^^^^^^
+Error: This value is "contended"
+         because it is the field "plain" of the record at line 1, characters 58-59
+         which is "contended".
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
