@@ -272,7 +272,6 @@ AC_ARG_ENABLE([stack_checks],
 
 ## Output variables
 
-AC_SUBST([enable_runtime5], [yes])
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])

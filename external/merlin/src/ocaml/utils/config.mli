@@ -43,7 +43,6 @@ val max_tag: int
 val flat_float_array: bool
 
 val reserved_header_bits : int
-val runtime5 : bool
 val syntax_quotations : bool
 
 (** Access to configuration values *)
