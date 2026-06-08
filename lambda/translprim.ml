@@ -147,7 +147,6 @@ type prim =
   | Poke of Lambda.peek_or_poke option
     (* For [Peek] and [Poke] the [option] is [None] until the primitive
        specialization code (below) has been run. *)
-  | Unsupported of Lambda.primitive
 
 let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
@@ -591,7 +590,6 @@ let array_vec_primitives =
    then specialize the array kind based on the context.
 *)
 let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
-  let runtime5 = Config.runtime5 in
   let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
     List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
@@ -1143,23 +1141,14 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
-    | "%with_stack" ->
-      if runtime5 then Primitive (Pwith_stack, 5) else Unsupported Pwith_stack
-    | "%with_stack_bind" ->
-      if runtime5 then Primitive (Pwith_stack_bind, 7)
-      else Unsupported Pwith_stack_bind
-    | "%with_stack_preemptible" ->
-      if runtime5 then Primitive (Pwith_stack_preemptible, 6)
-      else Unsupported Pwith_stack_preemptible
+    | "%with_stack" -> Primitive (Pwith_stack, 5)
+    | "%with_stack_bind" -> Primitive (Pwith_stack_bind, 7)
+    | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
     | "%with_stack_bind_preemptible" ->
-      if runtime5 then Primitive (Pwith_stack_bind_preemptible, 8)
-      else Unsupported Pwith_stack_bind_preemptible
-    | "%reperform" ->
-      if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
-    | "%perform" ->
-      if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
-    | "%resume" ->
-      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
+      Primitive (Pwith_stack_bind_preemptible, 8)
+    | "%reperform" -> Primitive (Preperform, 3)
+    | "%perform" -> Primitive (Pperform, 1)
+    | "%resume" -> Primitive (Presume, 3)
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
@@ -2298,21 +2287,6 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (Ppeek layout, [ptr], loc)
   | Poke (Some layout), [ptr; new_value] ->
       Lprim (Ppoke layout, [ptr; new_value], loc)
-  | Unsupported prim, _ ->
-      let exn =
-        transl_extension_path loc (Lazy.force Env.initial)
-          Predef.path_invalid_argument
-      in
-      let msg =
-        Format.asprintf "Unsupported primitive %a" Printlambda.primitive prim
-      in
-      Lprim (
-        Praise Raise_regular,
-        [Lprim (
-          Pmakeblock (0, Immutable, All_value, alloc_heap),
-          [exn; Lconst (Const_immstring msg)],
-          loc)],
-        loc)
   | Atomic (op, kind, imm_or_ptr), args ->
       lambda_of_atomic prim_name loc op kind imm_or_ptr args
   | (Raise _ | Raise_with_backtrace
@@ -2354,7 +2328,6 @@ let check_primitive_arity loc p =
     | Identity | Peek _ -> p.prim_arity = 1
     | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
     | Atomic (op, kind, _) -> p.prim_arity = atomic_arity op kind
-    | Unsupported _ -> true
   in
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
 
@@ -2605,7 +2578,7 @@ let primitive_needs_event_after = function
   | Lazy_force _ | Send _ | Send_self _ | Send_cache _
   | Apply _ | Revapply _ -> true
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
-  | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
+  | Peek _ | Poke _ | Atomic _ -> false
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =

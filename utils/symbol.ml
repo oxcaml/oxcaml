@@ -65,7 +65,7 @@ let separator () =
     Misc.fatal_error "Didn't expect utils/symbol.ml to be used in ocamlc";
   (* CR Keryan : There is some hardcoded symbols expecting runtime4
      separators *)
-  if Config.runtime5 && false then
+  if false then
     Printf.sprintf "%c" upstream_runtime5_symbol_separator
   else
     "__"
