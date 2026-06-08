@@ -677,7 +677,7 @@ void * caml_init_signal_stack(size_t* signal_stack_size)
     stk.ss_size = max_size_t(
       SIGSTKSZ, 4 * max_size_t(MINSIGSTKSZ, at_minsigstksz));
 #else
-  /* Preserve existing runtime5 behaviour for now. */
+  /* Preserve existing behaviour for now. */
   stk.ss_size = SIGSTKSZ;
 #endif
 

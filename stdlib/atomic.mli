@@ -40,9 +40,7 @@ external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) = "%makemutable"
     modifying these disjoint memory regions simultaneously becomes impossible,
     which can create a bottleneck. Hence, as a general guideline, if an atomic
     reference is experiencing contention, assigning it its own cache line may
-    enhance performance.
-
-    CR ocaml 5 all-runtime5: does not support runtime4 *)
+    enhance performance. *)
 external make_contended
   : ('a : value_or_null).
   'a -> ('a t[@local_opt])
