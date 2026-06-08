@@ -2,7 +2,6 @@
  {
    include runtime_events;
    flags = "-runtime-variant=i";
-   runtime5;
    instrumented-runtime;
    native;
  }

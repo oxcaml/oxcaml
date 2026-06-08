@@ -46,8 +46,6 @@ let _ =
  include systhreads;
  hassysthreads;
  {
-   runtime5;
-   reference = "${test_source_directory}/uncaught_exception_handler.r5.reference";
    {
      bytecode;
    }{

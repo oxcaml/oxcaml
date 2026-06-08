@@ -1,6 +1,5 @@
 (* TEST
  readonly_files = "fail_config.ml fail_a.ml fail_b.ml fail_c.ml fail_d.ml sticky_failure_test.ml driver.c";
- runtime5;
  {
    setup-ocamlopt.byte-build-env;
 

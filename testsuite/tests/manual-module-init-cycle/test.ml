@@ -1,6 +1,5 @@
 (* TEST
  readonly_files = "cycle_module.ml cycle_stubs.c driver.c";
- runtime5;
  {
    setup-ocamlopt.byte-build-env;
 

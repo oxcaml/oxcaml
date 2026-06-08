@@ -1,6 +1,5 @@
 (* TEST
  readonly_files = "base.ml dep_a.ml dep_b.ml diamond.ml gc_test.ml closures.ml gc_compact_test.ml reentrant_a.ml reentrant_b.ml reentrant_c.ml reentrant_stubs.c ocaml_init.ml raises.ml driver.c";
- runtime5;
  {
    setup-ocamlopt.byte-build-env;
 

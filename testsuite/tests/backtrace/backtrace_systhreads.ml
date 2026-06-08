@@ -45,8 +45,6 @@ let () =
  include systhreads;
  hassysthreads;
  {
-   runtime5;
-   reference = "${test_source_directory}/backtrace_systhreads.r5.reference";
    {
      bytecode;
    }{
