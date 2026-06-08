@@ -38,10 +38,13 @@ open Lambda
 let create_dynamic sval_runtime =
   SLhalves { sval_comptime = SLmissing; sval_runtime }
 
-(** Fracture a lambda constant, currently no constants have a compile time part
-    so does nothing. *)
-let fracture_const lambda _const =
-  SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
+let fracture_const lambda = function
+  | Const_block _ | Const_mixed_block _
+  (* There's currently no way to get layouts into a block so we don't need to
+     fracture these. *)
+  | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
+  | Const_null ->
+    SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
 
 let rec fracture_lam lambda : slambda =
   match lambda with
@@ -328,6 +331,130 @@ let rec fracture_lam lambda : slambda =
     (* [Lsplice] can't exist because we're matching on tlambda (and producing
        slambda) and Lsplice only exists in slambda. *)
     fatal_error_invalid_constructor lambda
+  | Lkindtemplate
+      { ktmpl_params;
+        ktmpl_return;
+        ktmpl_body;
+        ktmpl_mode;
+        ktmpl_env;
+        ktmpl_loc
+      } ->
+    let env = Ident.Map.to_list ktmpl_env in
+    let free_vars_shape_locality_mode =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
+    in
+    let free_vars_shape_unit =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
+    in
+    let get_free_var_prim =
+      match Lambda.is_uniform_block_shape (Shape free_vars_shape_unit) with
+      | true -> fun i -> Pfield (i, Pointer, Reads_agree)
+      | false ->
+        fun i -> Pmixedfield ([i], free_vars_shape_locality_mode, Reads_agree)
+    in
+    let templated_function_body =
+      slet_local "body" ktmpl_body (fun body_c body_r ->
+          let closure_id = Ident.create_local "closure" in
+          let closure_param =
+            { name = closure_id;
+              debug_uid = debug_uid_none;
+              layout = layout_block;
+              attributes = default_param_attribute;
+              mode = ktmpl_mode
+            }
+          in
+          let _, body =
+            List.fold_left
+              (fun (i, lam) (ident, (_, layout)) ->
+                ( i + 1,
+                  Llet
+                    ( Alias,
+                      layout,
+                      ident,
+                      debug_uid_none,
+                      Lprim (get_free_var_prim i, [Lvar closure_id], ktmpl_loc),
+                      lam ) ))
+              (0, body_r) env
+          in
+          (* This relies on all templates currently being generated from
+             [let poly_] which means all arguments are erased, this will need to
+             be improved for functors where the arguments aren't erased. *)
+          SLhalves
+            { sval_comptime = body_c;
+              sval_runtime =
+                lfunction
+                  ~kind:
+                    (Curried
+                       { nlocal =
+                           (match ktmpl_mode with
+                           | Alloc_heap -> 0
+                           | Alloc_local -> 1)
+                       })
+                  ~params:[closure_param] ~return:ktmpl_return ~body
+                  ~attr:default_function_attribute ~loc:ktmpl_loc
+                  ~mode:ktmpl_mode ~ret_mode:ktmpl_mode
+            })
+    in
+    let free_var_capture =
+      List.map
+        (fun (id, _) -> Lsplice (ktmpl_loc, SLvar (Slambdaident.of_ident id)))
+        env
+    in
+    let kind_function =
+      SLhalves
+        { sval_comptime =
+            SLtemplate
+              { sfun_params = ktmpl_params |> Array.of_list;
+                sfun_body = templated_function_body
+              };
+          sval_runtime =
+            Lprim
+              ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, ktmpl_mode),
+                free_var_capture,
+                ktmpl_loc )
+        }
+    in
+    List.fold_left
+      (fun slam (id, (lam, _)) ->
+        SLlet
+          { slet_name = Slambdaident.of_ident id;
+            slet_value = fracture_lam lam;
+            slet_body = slam
+          })
+      kind_function env
+  | Lkindinstantiate
+      { kinst_func; kinst_args; kinst_result_layout; kinst_mode; kinst_loc } ->
+    slet_local "fun" kinst_func (fun fun_c fun_r ->
+        let app_id = Slambdaident.create_local "app" in
+        let app_var = SLvar app_id in
+        let sapp_args =
+          Misc.Stdlib.Array.of_list_map (fun arg -> SLlayout arg) kinst_args
+        in
+        SLlet
+          { slet_name = app_id;
+            slet_value = SLinstantiate { sapp_func = fun_c; sapp_args };
+            slet_body =
+              SLhalves
+                { sval_comptime = SLproj_comptime app_var;
+                  sval_runtime =
+                    Lapply
+                      { ap_func = Lsplice (kinst_loc, app_var);
+                        ap_args = [fun_r];
+                        ap_result_layout = kinst_result_layout;
+                        ap_region_close = Rc_normal;
+                        ap_mode = kinst_mode;
+                        ap_loc = kinst_loc;
+                        ap_tailcall = Default_tailcall;
+                        ap_inlined = Default_inlined;
+                        ap_specialised = Default_specialise;
+                        ap_probe = None
+                      }
+                }
+          })
 
 (** Fracture an [lfun]. Currently, functions only have a dynamic part so this
     can always return an [lfun]. *)

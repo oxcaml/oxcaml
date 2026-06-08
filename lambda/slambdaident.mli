@@ -34,3 +34,8 @@ val create_local : string -> t
 
 (** "Lifts" an [Ident.t], equal [Ident.t]s will produce equal values. *)
 val of_ident : Ident.t -> t
+
+(** "Lifts" a [Jkind_types.Sort.var], equal [Jkind_types.Sort.var]s will produce
+    equal values. This function relies on the var being passed through to be
+    normalised such that its contents is none and will never be mutated. *)
+val of_sort_var : Jkind_types.Sort.var -> t

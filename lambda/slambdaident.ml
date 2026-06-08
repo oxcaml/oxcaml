@@ -33,6 +33,7 @@ type t =
         stamp : int
       }
   | Ident of Ident.t
+  | Sort_var of Jkind_types.Sort.Var.id
 
 let currentstamp = s_ref 0
 
@@ -42,15 +43,19 @@ let create_local name =
 
 let of_ident ident = Ident ident
 
+let of_sort_var var = Sort_var (Jkind_types.Sort.Var.get_id var)
+
 let equal i1 i2 =
   match i1, i2 with
   | Local { stamp = s1; _ }, Local { stamp = s2; _ } -> s1 = s2
   | Ident i1, Ident i2 -> Ident.equal i1 i2
+  | Sort_var var1, Sort_var var2 -> var1 = var2
   | _ -> false
 
 let hash = function
   | Local { stamp = s; _ } -> Hashtbl.hash (0, s)
   | Ident i -> Hashtbl.hash (1, Ident.hash i)
+  | Sort_var var -> Hashtbl.hash (2, var)
 
 let compare i1 i2 =
   match i1, i2 with
@@ -58,6 +63,9 @@ let compare i1 i2 =
   | Local _, _ -> 1
   | _, Local _ -> -1
   | Ident i1, Ident i2 -> Ident.compare i1 i2
+  | Ident _, _ -> 1
+  | _, Ident _ -> -1
+  | Sort_var var1, Sort_var var2 -> Int.compare (var1 :> int) (var2 :> int)
 
 let output oc =
   let open Format in
@@ -66,6 +74,9 @@ let output oc =
   | Ident ident ->
     output_string oc "l_";
     Ident.output oc ident
+  | Sort_var var ->
+    output_string oc "s_";
+    output_binary_int oc (var :> int)
 
 let print ppf =
   let open Format in
@@ -74,6 +85,7 @@ let print ppf =
     fprintf ppf "#%s%s" name
       (if !Clflags.unique_ids then sprintf "/%i" stamp else "")
   | Ident ident -> fprintf ppf "%a" Ident.print ident
+  | Sort_var var -> fprintf ppf "layout_%i" (var :> int)
 
 include Identifiable.Make (struct
   type nonrec t = t
