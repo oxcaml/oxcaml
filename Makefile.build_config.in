@@ -84,7 +84,7 @@ OC_NATIVE_CFLAGS = @oc_native_cflags@
 
 # The submodules should be searched *before* any other external -I paths
 OC_INCLUDES = $(addprefix -I $(ROOTDIR)/, \
-  $(RUNTIME_DIR) @flexdll_source_dir@ @winpthreads_source_include_dir@)
+  runtime @flexdll_source_dir@ @winpthreads_source_include_dir@)
 OC_CPPFLAGS = $(OC_INCLUDES) @oc_cppflags@
 
 OC_BYTECODE_CPPFLAGS = $(OC_INCLUDES) @oc_bytecode_cppflags@
@@ -183,7 +183,7 @@ BUILD_TRIPLET = @build@
 LN = @ln@
 
 # Platform-dependent assembler files to use to build the runtime
-runtime_ASM_OBJECTS = $(addprefix $(RUNTIME_DIR)/,@runtime_asm_objects@)
+runtime_ASM_OBJECTS = $(addprefix runtime/,@runtime_asm_objects@)
 
 # Platform-dependent module for ocamlyacc
 ocamlyacc_WSTR_MODULE = @ocamlyacc_wstr_module@
