@@ -77,6 +77,14 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
+(* Forward reference to [Typedecl.update_constructor_representation], filled in
+   by [Typecore].  Recomputes, for the given instantiated arguments, the
+   representation of a constructor whose declaration-time representation was
+   variable (an [any] argument), or [None] if it cannot be determined. *)
+val constructor_representation_for_value_kind :
+  (Env.t -> loc:Location.t -> Types.constructor_arguments ->
+   Types.constructor_representation option) ref
+
 val transl_mixed_block_element :
   Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
   -> unit Lambda.mixed_block_element
