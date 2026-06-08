@@ -70,10 +70,7 @@ let is_long n =
   if n > 0x3FFF_FFFF then raise (Error (Stack_frame_way_too_large n));
   n >= !Oxcaml_flags.long_frames_threshold
 
-let is_long_stack_index n =
-  let is_reg n = n land 1 = 1 in
-  (* allows negative reg offsets in runtime4 *)
-  if is_reg n && not Config.runtime5 then false else is_long n
+let is_long_stack_index n = is_long n
 
 let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
   assert (frame_size land 3 = 0);
@@ -124,7 +121,8 @@ let emit_frames a =
     let n = Numbers.Int8.of_int_exn n in
     a.efa_i8 n
   in
-  let emit_i16 n =
+  let[@warning "-26"] emit_i16 n =
+    (* unused, but here for completeness *)
     let n = Numbers.Int16.of_int_exn n in
     a.efa_i16 n
   in
@@ -190,16 +188,9 @@ let emit_frames a =
     then (
       emit_u16 Oxcaml_flags.max_long_frames_threshold;
       a.efa_align 4);
-    let emit_signed_16_or_32 = if fd.fd_long then emit_i32 else emit_i16 in
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
-    let emit_live_offset n =
-      (* On runtime 4, the live offsets can be negative. As such, we emit them
-         as signed integers (and truncate the upper bound to 0x7f...ff); on
-         runtime 5 they are always unsigned. *)
-      if Config.runtime5
-      then emit_unsigned_16_or_32 n
-      else emit_signed_16_or_32 n
-    in
+    (* The live offsets are always unsigned. *)
+    let emit_live_offset n = emit_unsigned_16_or_32 n in
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
