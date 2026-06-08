@@ -453,6 +453,143 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     begin match check_depth depth obj ty with
                       Some x -> x
                     | None ->
+<<<<<<< HEAD
+||||||| 5bddb2acb0
+                        let rep =
+                          match rep with
+                          | Record_variable ->
+                              let label_params_and_types, record_params =
+                                Ctype.instance_label_declarations
+                                  ~fixed:false
+                                  (lbl_list |> Array.of_list)
+                                  ~params:type_params
+                              in
+                              List.iter2 (Ctype.unify env)
+                                record_params ty_list;
+                              let lds_and_types =
+                                List.map2 (fun lbl (_params, ty) -> lbl, ty)
+                                  lbl_list
+                                  (label_params_and_types |> Array.to_list)
+                              in
+                              (match
+                                Typedecl.update_record_representation env
+                                  Location.none Legacy lds_and_types
+                              with
+                              | Ok (_sorts, rep) -> rep
+                              | Error _ ->
+                                  Misc.fatal_error "unrepresentable record")
+                          | rep -> rep
+                        in
+                        let pos =
+                          match rep with
+                          | Record_inlined (_, _, Variant_extensible) -> 1
+                          | _ -> 0
+                        in
+                        let rep =
+                          match rep with
+                          | Record_inlined (_, Constructor_mixed _,
+                                            Variant_unboxed) ->
+                              Misc.fatal_error
+                                "a 'mixed' unboxed record is impossible"
+                          | Record_inlined (_, Constructor_uniform_value,
+                                            Variant_unboxed)
+                          | Record_unboxed
+                              -> Outval_record_unboxed
+                          | Record_boxed | Record_float | Record_ufloat
+                          | Record_inlined (_, Constructor_uniform_value, _)
+                              -> Outval_record_boxed
+                          | Record_inlined (_, Constructor_mixed mixed, _)
+                          | Record_mixed mixed
+                              ->
+                                (* Mixed records are only represented as
+                                   mixed blocks in native code.
+                                *)
+                                if !Clflags.native_code
+                                then Outval_record_mixed_block mixed
+                                else Outval_record_boxed
+                          | Record_dummy _ ->
+                              Misc.fatal_error "dummy record representation"
+                          | Record_variable ->
+                              Misc.fatal_error "variable record representation"
+                        in
+                        tree_of_record_fields depth
+                          env path decl.type_params ty_list
+                          lbl_list pos obj rep
+                    end
+                | {type_kind = Type_record_unboxed_product (lbl_list, _, _)} ->
+                    begin match check_depth depth obj ty with
+                      Some x -> x
+                    | None ->
+                        let pos = 0 in
+=======
+                        let rep =
+                          match rep with
+                          | Record_variable ->
+                              let label_params_and_types, record_params =
+                                Ctype.instance_label_declarations
+                                  ~fixed:false
+                                  (lbl_list |> Array.of_list)
+                                  ~params:type_params
+                              in
+                              List.iter2 (Ctype.unify env)
+                                record_params ty_list;
+                              let lds_and_types =
+                                List.map2 (fun lbl (_params, ty) -> lbl, ty)
+                                  lbl_list
+                                  (label_params_and_types |> Array.to_list)
+                              in
+                              (match
+                                Typedecl.update_record_representation env
+                                  Location.none Legacy lds_and_types
+                                  ~why:Field_projection
+                              with
+                              | Ok (_sorts, rep) -> rep
+                              | Error _ ->
+                                  Misc.fatal_error "unrepresentable record")
+                          | rep -> rep
+                        in
+                        let pos =
+                          match rep with
+                          | Record_inlined (_, _, Variant_extensible) -> 1
+                          | _ -> 0
+                        in
+                        let rep =
+                          match rep with
+                          | Record_inlined (_, Constructor_mixed _,
+                                            Variant_unboxed) ->
+                              Misc.fatal_error
+                                "a 'mixed' unboxed record is impossible"
+                          | Record_inlined (_, Constructor_uniform_value,
+                                            Variant_unboxed)
+                          | Record_unboxed
+                              -> Outval_record_unboxed
+                          | Record_boxed | Record_float | Record_ufloat
+                          | Record_inlined (_, Constructor_uniform_value, _)
+                              -> Outval_record_boxed
+                          | Record_inlined (_, Constructor_mixed mixed, _)
+                          | Record_mixed mixed
+                              ->
+                                (* Mixed records are only represented as
+                                   mixed blocks in native code.
+                                *)
+                                if !Clflags.native_code
+                                then Outval_record_mixed_block mixed
+                                else Outval_record_boxed
+                          | Record_dummy _ ->
+                              Misc.fatal_error "dummy record representation"
+                          | Record_variable ->
+                              Misc.fatal_error "variable record representation"
+                        in
+                        tree_of_record_fields depth
+                          env path decl.type_params ty_list
+                          lbl_list pos obj rep
+                    end
+                | {type_kind = Type_record_unboxed_product (lbl_list, _, _)} ->
+                    begin match check_depth depth obj ty with
+                      Some x -> x
+                    | None ->
+                        let pos = 0 in
+>>>>>>> refs/rewritten/5-2-0minus-40
                         tree_of_record_unboxed_product_fields depth
                           env path type_params ty_list
                           lbl_list 0 obj

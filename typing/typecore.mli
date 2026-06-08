@@ -355,7 +355,6 @@ type error =
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
-  | Field_projection_not_rep of type_expr * Jkind.Violation.t
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t

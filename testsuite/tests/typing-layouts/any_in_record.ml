@@ -21,11 +21,11 @@ let fst (type a : any) (t : a t) = t.fst
 Line 1, characters 35-40:
 1 | let fst (type a : any) (t : a t) = t.fst
                                        ^^^^^
-Error: Fields being projected must be representable.
+Error: Record element types must have a representable layout.
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
-         because it's the type of a field being projected.
+         because it's the type of a field in a record being projected from.
 |}]
 
 let fst (t : int t) = t.fst
@@ -287,19 +287,13 @@ type ('a : any) t = { t : 'a; } [@@unboxed]
 val f : 'a t -> 'a = <fun>
 |}]
 
-(* Sort variables are not initialized well *)
-
 (* Projecting a label other than the [any] *)
 
 type ('a : any) t = { i : int ; a : 'a }
 let foo t = (.a)
 [%%expect{|
 type ('a : any) t = { i : int; a : 'a; }
-Line 2, characters 14-15:
-2 | let foo t = (.a)
-                  ^
-Error: Cannot access record with unrepresentable field.
-       The record has type 'a t, whose field a is not representable.
+val foo : 'a -> ('b t, 'b) idx_imm = <fun>
 |}]
 
 (* Matching *)
@@ -308,42 +302,134 @@ type ('a : any) t = { a : 'a }
 let foo { a } = ()
 [%%expect{|
 type ('a : any) t = { a : 'a; }
-Line 2, characters 8-13:
-2 | let foo { a } = ()
-            ^^^^^
-Error: Cannot access record with unrepresentable field.
-       The record has type 'a t, whose field a is not representable.
+val foo : 'a t -> unit = <fun>
 |}]
 
 (* Block indices *)
 
-(* CR-soon rtjoa: This should typecheck and default to value *)
 type ('a : any) r = { t : 'a }
 let f = (.t)
 [%%expect{|
 type ('a : any) r = { t : 'a; }
-Line 2, characters 10-11:
-2 | let f = (.t)
-              ^
-Error: Cannot access record with unrepresentable field.
-       The record has type 'a r, whose field t is not representable.
+val f : ('a r, 'a) idx_imm = <abstr>
 |}]
 
-(* Abstract kinds *)
+(* Any errors *)
+
+type a : any
+type t = { a : a }
+[%%expect{|
+type a : any
+type t = { a : a; }
+|}]
+
+let f { a } = ()
+[%%expect{|
+Line 1, characters 6-11:
+1 | let f { a } = ()
+          ^^^^^
+Error: Record element types must have a representable layout.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field in a record being projected from.
+|}]
+
+let i = (.a)
+[%%expect{|
+Line 1, characters 10-11:
+1 | let i = (.a)
+              ^
+Error: Record element types must have a representable layout.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field in a record type into which a
+         block index (idx_imm or idx_mut) is being created.
+|}]
+
+let f t = { t with a = assert false }
+[%%expect{|
+Line 1, characters 23-35:
+1 | let f t = { t with a = assert false }
+                           ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field involved in a functional update.
+|}]
+
+let f = { a = assert false }
+[%%expect{|
+Line 1, characters 14-26:
+1 | let f = { a = assert false }
+                  ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The layout of a is any
+         because of the definition of a at line 1, characters 0-12.
+       But the layout of a must be representable
+         because it's the type of a field being assigned a value.
+|}]
+
+(* Abstract kinds errors *)
 
 kind_ k
 type a : k
 type t = { a : a }
-let f { a } = ()
 [%%expect{|
 kind_ k
 type a : k
 type t = { a : a; }
-Line 4, characters 6-11:
-4 | let f { a } = ()
+|}]
+
+let f { a } = ()
+[%%expect{|
+Line 1, characters 6-11:
+1 | let f { a } = ()
           ^^^^^
-Error: Cannot access record with unrepresentable field.
-       The record has type t, whose field a is not representable.
+Error: Record element types must have a representable layout.
+       The kind of a is k
+         because of the definition of a at line 2, characters 0-10.
+       But the kind of a must be representable
+         because it's the type of a field in a record being projected from.
+|}]
+
+let i = (.a)
+[%%expect{|
+Line 1, characters 10-11:
+1 | let i = (.a)
+              ^
+Error: Record element types must have a representable layout.
+       The kind of a is k
+         because of the definition of a at line 2, characters 0-10.
+       But the kind of a must be representable
+         because it's the type of a field in a record type into which a
+         block index (idx_imm or idx_mut) is being created.
+|}]
+
+let f t = { t with a = assert false }
+[%%expect{|
+Line 1, characters 23-35:
+1 | let f t = { t with a = assert false }
+                           ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The kind of a is k
+         because of the definition of a at line 2, characters 0-10.
+       But the kind of a must be representable
+         because it's the type of a field involved in a functional update.
+|}]
+
+let f = { a = assert false }
+[%%expect{|
+Line 1, characters 14-26:
+1 | let f = { a = assert false }
+                  ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The kind of a is k
+         because of the definition of a at line 2, characters 0-10.
+       But the kind of a must be representable
+         because it's the type of a field being assigned a value.
 |}]
 
 (* CR-soon rtjoa: The below two programs should work *)
@@ -425,4 +511,71 @@ Error: Signature mismatch:
        The first has a fixed representation and the second doesn't.
        Hint: Is there a type that has a representable layout in the first
          but has layout any in the second?
+|}]
+
+(* [@@flatten_floats] *)
+
+type ('a : any) t = { a : 'a }
+[@@flatten_floats]
+[%%expect{|
+Lines 1-2, characters 0-18:
+1 | type ('a : any) t = { a : 'a }
+2 | [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}]
+
+type ('a : any) t = { a : 'a; f : float }
+[@@flatten_floats]
+[%%expect{|
+Lines 1-2, characters 0-18:
+1 | type ('a : any) t = { a : 'a; f : float }
+2 | [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}]
+
+type ('a : any) t = { a : 'a; f : float# }
+[@@flatten_floats]
+[%%expect{|
+Lines 1-2, characters 0-18:
+1 | type ('a : any) t = { a : 'a; f : float# }
+2 | [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}]
+
+(* Projecting / setting / pattern-matching a representable field of a record
+   that has an [any] field. Each operation must create a sort variable for the
+   non-projected [any]-kinded field so the record's representation can be
+   computed. *)
+
+type ('a : any) t2 = { i : int; mutable j : int; a : 'a }
+[%%expect {|
+type ('a : any) t2 = { i : int; mutable j : int; a : 'a; }
+|}]
+
+let project_int (t : _ t2) = t.i
+[%%expect {|
+val project_int : 'a t2 -> int = <fun>
+|}]
+
+let set_int (t : _ t2) = t.j <- 0
+[%%expect {|
+val set_int : 'a t2 -> unit = <fun>
+|}]
+
+let pat_int (t : _ t2) = match t with { i; _ } -> i
+[%%expect {|
+val pat_int : 'a t2 -> int = <fun>
+|}]
+
+let project_int_via_index (t : _ t2) =
+  let idx = ((.i) : (('a : any) t2, int) idx_imm) in
+  Idx_imm.get t idx
+[%%expect {|
+val project_int_via_index : 'a t2 -> int = <fun>
 |}]

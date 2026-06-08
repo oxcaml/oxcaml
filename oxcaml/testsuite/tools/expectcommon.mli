@@ -44,6 +44,11 @@ end
     set by expectnat.ml. *)
 val register_assembly_callback : ((string -> unit) -> unit) option ref
 
+(** Hook to capture phrase compilation unit for [%%expect_fexpr]. This
+    function should be set by expectnat.ml. *)
+val register_compilation_unit_callback :
+  ((Compilation_unit.t -> unit) -> unit) option ref
+
 val read_anonymous_arg : object_extensions:string list -> string -> unit
 
 val run

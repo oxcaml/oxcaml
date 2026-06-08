@@ -473,3 +473,31 @@ Error: The "[@@flatten_floats]" attribute is only allowed on records with one or
        non-atomic "float" fields, one or more "float#" fields, and all other fields
        void.
 |}];;
+
+(* void accepted *)
+type t =
+  { a : float#;
+    b : float;
+    u : unit#;
+  } [@@flatten_floats]
+[%%expect{|
+type t = { a : float#; b : float; u : unit#; }
+|}];;
+
+(* product of voids not counted as void *)
+type bad =
+  { a : float#;
+    b : float;
+    u : #(unit# * unit#);
+  } [@@flatten_floats]
+[%%expect{|
+Lines 1-5, characters 0-22:
+1 | type bad =
+2 |   { a : float#;
+3 |     b : float;
+4 |     u : #(unit# * unit#);
+5 |   } [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
