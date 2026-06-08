@@ -617,8 +617,6 @@
 
 (copy_files ../../typing/solver_intf.mli)
 
-(copy_files ../../typing/mode_const_repr.mli)
-
 (copy_files ../../typing/mode_hint.mli)
 
 (copy_files ../../typing/mode_intf.mli)
