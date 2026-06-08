@@ -2913,13 +2913,26 @@ and tree_of_signature_rec ?abbrev ?max_items env' sg =
 and trees_of_recursive_sigitem_group ?abbrev env
     (syntactic_group: Signature_group.rec_group) =
   let display (x:Signature_group.sig_item) = x.src, tree_of_sigitem ?abbrev x.src in
+  (* [Hidden] items (e.g. shadowed bindings, or the alias added by [-alias])
+     are not part of the printed interface. They stay in the environment so
+     that references to them still resolve, but are not displayed. *)
+  let is_hidden (x : Signature_group.sig_item) =
+    match x.Signature_group.src with
+    | Sig_value (_, _, Hidden) | Sig_type (_, _, _, Hidden)
+    | Sig_typext (_, _, _, Hidden) | Sig_module (_, _, _, _, Hidden)
+    | Sig_modtype (_, _, Hidden) | Sig_class (_, _, _, Hidden)
+    | Sig_class_type (_, _, _, Hidden) | Sig_jkind (_, _, Hidden) -> true
+    | _ -> false
+  in
+  let display_visible x = if is_hidden x then [] else [display x] in
   let env = Env.add_signature syntactic_group.pre_ghosts env in
   match syntactic_group.group with
-  | Not_rec x -> add_sigitem env x, [display x]
+  | Not_rec x -> add_sigitem env x, display_visible x
   | Rec_group items ->
       let ids = List.map (fun x -> ident_sigitem x.Signature_group.src) items in
       List.fold_left add_sigitem env items,
-      with_hidden_items ids (fun () -> List.map display items)
+      with_hidden_items ids
+        (fun () -> List.concat_map display_visible items)
 
 and tree_of_sigitem ?abbrev = function
   | Sig_value(id, decl, _) ->

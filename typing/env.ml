@@ -2245,9 +2245,29 @@ let prefix_idents root prefixing_sub sg =
         rem
     | Sig_module(id, pres, md, rs, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
+      (* A [Hidden] module alias (a [-alias] declaration, possibly inherited
+         through an [include]) is redirected to its target rather than to
+         [root.name]: references to it then record the target path, so the
+         alias name is never needed and it claims no component-table slot (see
+         [add_comp]). The target is always a *persistent* module (see
+         [module_aliases_sig_and_env]) -- never another local alias of this
+         same signature -- so a single substitution suffices; there is no local
+         alias chain to chase down transitively. *)
+      let sub =
+        match vis, md.md_type with
+        | Hidden, Mty_alias target ->
+          (match target with
+           | Pident tid when Ident.is_global tid -> ()
+           | _ ->
+             Misc.fatal_error
+               "Env.prefix_idents: hidden module alias target is not \
+                persistent");
+          Subst.add_module id target prefixing_sub
+        | _ -> Subst.add_module id p prefixing_sub
+      in
       prefix_idents root
         ((Sig_module(id, pres, md, rs, vis), p) :: items_and_paths)
-        (Subst.add_module id p prefixing_sub)
+        sub
         rem
     | Sig_modtype(id, mtd, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
@@ -2355,7 +2375,25 @@ let rec components_of_module_maker
         incr pos;
         Lazy_backtrack.create addr
       in
+      (* Register a component under its name. [Hidden] components (e.g.
+         [-alias] declarations) take no name-keyed slot at all -- they are not
+         reachable by qualified access ([M.Foo]) nor by [open]. Internal
+         references to a hidden alias are redirected to its target by
+         [prefix_idents] (see the [Sig_module] case there), so they need no
+         name-keyed slot. *)
+      let add_comp add (vis : visibility) name data tbl =
+        match vis with
+        | Exported -> add name data tbl
+        | Hidden -> tbl
+      in
       List.iter (fun ((item : Subst.Lazy.signature_item), path) ->
+        let vis =
+          match item with
+          | Sig_value (_, _, vis) | Sig_type (_, _, _, vis)
+          | Sig_typext (_, _, _, vis) | Sig_module (_, _, _, _, vis)
+          | Sig_modtype (_, _, vis) | Sig_class (_, _, _, vis)
+          | Sig_class_type (_, _, _, vis) | Sig_jkind (_, _, vis) -> vis
+        in
         match item with
           Sig_value(id, decl, _) ->
             let decl' = Subst.Lazy.value_description sub decl in
@@ -2373,7 +2411,8 @@ let rec components_of_module_maker
               { vda_description = decl'; vda_address = addr;
                 vda_mode = cm_mode; vda_shape }
             in
-            c.comp_values <- NameMap.add (Ident.name id) vda c.comp_values;
+            c.comp_values <-
+              add_comp NameMap.add vis (Ident.name id) vda c.comp_values;
         | Sig_type(id, decl, _, _) ->
             let final_decl = Subst.type_declaration sub decl in
             Btype.set_static_row_name final_decl
@@ -2394,7 +2433,8 @@ let rec components_of_module_maker
                         cda_shape }
                       in
                       c.comp_constrs <-
-                        add_to_tbl descr.cstr_name cda c.comp_constrs
+                        add_comp add_to_tbl vis descr.cstr_name cda
+                          c.comp_constrs
                     ) cstrs;
                  Type_variant (cstrs, repr, umc)
               | Type_record (_, repr, umc) ->
@@ -2404,7 +2444,8 @@ let rec components_of_module_maker
                   List.iter
                     (fun descr ->
                       c.comp_labels <-
-                        add_to_tbl descr.lbl_name descr c.comp_labels)
+                        add_comp add_to_tbl vis descr.lbl_name descr
+                          c.comp_labels)
                     lbls;
                   Type_record (lbls, repr, umc)
               | Type_record_unboxed_product (_, repr, umc) ->
@@ -2414,7 +2455,8 @@ let rec components_of_module_maker
                   List.iter
                     (fun descr ->
                       c.comp_unboxed_labels <-
-                        add_to_tbl descr.lbl_name descr c.comp_unboxed_labels)
+                        add_comp add_to_tbl vis descr.lbl_name descr
+                          c.comp_unboxed_labels)
                     lbls;
                   Type_record_unboxed_product (lbls, repr, umc)
               | Type_abstract r -> Type_abstract r
@@ -2432,7 +2474,8 @@ let rec components_of_module_maker
                 tda_shape = shape;
                 tda_unboxed_version_descriptions = unboxed_descrs }
             in
-            c.comp_types <- NameMap.add (Ident.name id) tda c.comp_types;
+            c.comp_types <-
+              add_comp NameMap.add vis (Ident.name id) tda c.comp_types;
             env := store_type_infos ~tda_shape:shape id decl !env
         | Sig_typext(id, ext, _, _) ->
             let ext' = Subst.extension_constructor sub ext in
@@ -2447,7 +2490,8 @@ let rec components_of_module_maker
             let cda =
               { cda_description = descr; cda_address = Some addr; cda_shape }
             in
-            c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
+            c.comp_constrs <-
+              add_comp add_to_tbl vis (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
             let md, mode = Normalize_mode.md Normalize_exn md cm_mode in
             let md' =
@@ -2482,7 +2526,7 @@ let rec components_of_module_maker
                 mda_shape = shape; }
             in
             c.comp_modules <-
-              NameMap.add (Ident.name id) mda c.comp_modules;
+              add_comp NameMap.add vis (Ident.name id) mda c.comp_modules;
             env :=
               store_module ~update_summary:false ~check:None
                 id addr pres md mode shape locks_empty !env
@@ -2499,7 +2543,7 @@ let rec components_of_module_maker
                 mtda_shape = shape; }
             in
             c.comp_modtypes <-
-              NameMap.add (Ident.name id) mtda c.comp_modtypes;
+              add_comp NameMap.add vis (Ident.name id) mtda c.comp_modtypes;
             env := store_modtype ~update_summary:false id decl shape !env
         | Sig_class(id, decl, _, _) ->
             let decl' = Subst.class_declaration sub decl in
@@ -2510,18 +2554,20 @@ let rec components_of_module_maker
                 clda_address = addr;
                 clda_shape = shape; }
             in
-            c.comp_classes <- NameMap.add (Ident.name id) clda c.comp_classes
+            c.comp_classes <-
+              add_comp NameMap.add vis (Ident.name id) clda c.comp_classes
         | Sig_class_type(id, decl, _, _) ->
             let decl' = Subst.cltype_declaration sub decl in
             let shape = Shape.proj cm_shape (Shape.Item.class_type id) in
             let cltda = { cltda_declaration = decl'; cltda_shape = shape } in
             c.comp_cltypes <-
-              NameMap.add (Ident.name id) cltda c.comp_cltypes
+              add_comp NameMap.add vis (Ident.name id) cltda c.comp_cltypes
         | Sig_jkind(id, decl, _) ->
             let decl' = Subst.jkind_declaration sub decl in
             let shape = Shape.proj cm_shape (Shape.Item.jkind id) in
             let jkda = { jkda_declaration = decl'; jkda_shape = shape } in
-            c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
+            c.comp_jkinds <-
+              add_comp NameMap.add vis (Ident.name id) jkda c.comp_jkinds
       )
         items_and_paths;
         Ok (Structure_comps c)

@@ -81,6 +81,16 @@ let mk_cmi_file f =
   "-cmi-file", Arg.String f,
     "<file>  Use the <file> interface file to type-check"
 
+let mk_alias f =
+  let from = ref "" in
+  "-alias",
+    Arg.Tuple [
+      Arg.String (fun s -> from := s);
+      Arg.String (fun s -> f !from s);
+    ],
+    "<from> <to>  Add a hidden alias module <from> = <to> to the unit\n\
+    \     (may be given multiple times)"
+
 let mk_compact f =
   "-compact", Arg.Unit f, " Optimize code size rather than speed"
 
@@ -1201,6 +1211,7 @@ module type Compiler_options = sig
   val _cclib : string -> unit
   val _ccopt : string -> unit
   val _cmi_file : string -> unit
+  val _alias : string -> string -> unit
   val _config : unit -> unit
   val _config_var : string -> unit
   val _for_pack : string -> unit
@@ -1453,6 +1464,7 @@ struct
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
     mk_cmi_file F._cmi_file;
+    mk_alias F._alias;
     mk_color F._color;
     mk_error_style F._error_style;
     mk_compat_32 F._compat_32;
@@ -1709,6 +1721,7 @@ struct
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
     mk_cmi_file F._cmi_file;
+    mk_alias F._alias;
     mk_clambda_checks F._clambda_checks;
     mk_classic_inlining F._classic_inlining;
     mk_color F._color;
@@ -2051,6 +2064,7 @@ struct
     mk_ccopt F._ccopt;
     mk_classic_inlining F._classic_inlining;
     mk_cmi_file F._cmi_file;
+    mk_alias F._alias;
     mk_color F._color;
     mk_error_style F._error_style;
     mk_config F._config;
@@ -2513,6 +2527,8 @@ module Default = struct
     let _cclib s = Compenv.defer (ProcessObjects (Misc.rev_split_words s))
     let _ccopt s = Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
     let _cmi_file s = cmi_file := (Some s)
+    let _alias from to_ =
+      module_aliases := (!module_aliases @ [from, to_])
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
     let _dprofile () = profile_columns := Profile.all_columns

@@ -111,6 +111,7 @@ module type Compiler_options = sig
   val _cclib : string -> unit
   val _ccopt : string -> unit
   val _cmi_file : string -> unit
+  val _alias : string -> string -> unit
   val _config : unit -> unit
   val _config_var : string -> unit
   val _for_pack : string -> unit
