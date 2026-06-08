@@ -163,22 +163,16 @@ let str_int64L s pos v =
   str_int32L s pos v;
   str_int32L s (pos + 4) (Int64.shift_right_logical v 32)
 
-(* When a jump has to be generated, we compare the offset between the
-   source instruction and the target instruction, in number of
-   instructions.
-
-   If the offset is less than [short_jump_threshold] instructions,
-   we generate a short jump during the first pass. 16 is a "safe"
-   value, as most instructions are shorter than 8 bytes: [REX] +
-   [OPCODE] + [MODRM] + [SIB] + [IMM32] *)
+(* Forward local jumps are sized by fixed-point iteration. We first emit the
+   short form for code size. During relocation resolution, any jump whose 8-bit
+   displacement does not fit is recorded in [forced_long_jumps], and the
+   section is reassembled with that jump in long form. *)
 
 let local_relocs = ref []
 
 let local_labels = String.Tbl.create 100
 
 let forced_long_jumps = ref IntSet.empty
-
-let instr_size = ref 4
 
 let new_buffer sec =
   {
@@ -1144,23 +1138,15 @@ let emit_reloc_jump near_opcodes far_opcodes b loc symbol =
           (Int64.sub togo (Int64.of_int (4 + List.length far_opcodes)))))
     else
       (* forward *)
-      (* Is the target too far forward (in term of instruction count)
-         or have we detected previously that this jump instruction needs
-         to be a long one?
+      (* Have we detected previously that this jump instruction needs
+         to be a long one?  If not, optimistically emit a short jump and
+         let the retry mechanism upgrade it on a later pass if the actual
+         offset turns out to exceed the 8-bit range.
 
-         The str_size constant (see below) is chosen to avoid a second
-         pass most oftenm while not being overly pessimistic. *)
-
-      (*
-      if Int64.of_int ((target_loc - loc) * !instr_size) >= 120L then
-        Printf.printf "%s/%i: probably too far (%i)\n%!" symbol loc target_loc
-      else if IntSet.mem loc !forced_long_jumps then
-        Printf.printf "%s/%i: forced long jump\n%!" symbol loc
-      else
-        Printf.printf "%s/%i: short\n%!" symbol loc;
-*)
+         If the range is more than 127 instructions, we know it has to
+         become a long jump, since every instruction is at least one byte. *)
       let force_far =
-        Int64.compare (Int64.of_int ((target_loc - loc) * !instr_size)) 120L >= 0
+        (target_loc - loc > 127)
         || IntSet.mem loc !forced_long_jumps
       in
       if force_far then (
@@ -1677,8 +1663,7 @@ let rec assemble_section arch section =
     X86_gas.generate_asm Out_channel.stderr dll;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
-and assemble_section0 arch section =
-  (match arch with X86 -> instr_size := 5 | X64 -> instr_size := 6);
+and assemble_section0 _arch section =
   forced_long_jumps := IntSet.empty;
   String.Tbl.clear local_labels;
 
