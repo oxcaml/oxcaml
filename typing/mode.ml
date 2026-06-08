@@ -2843,6 +2843,47 @@ module Lattices_mono = struct
     | Visibility, Monadic_op -> Visibility_op
     | Staticity, Monadic_op -> Staticity_op
 
+  module Modality_axis = struct
+    type _ t =
+      | Monadic : (Monadic_op.t, 'a) Axis.t -> 'a t
+      | Comonadic : (Comonadic_with_regionality.t, 'a) Axis.t -> 'a t
+
+    type atom = Atom : 'a t * 'a -> atom
+
+    let monadic ax = Atom (Monadic ax, Axis.proj ax Monadic_op.max)
+
+    let comonadic ax =
+      Atom (Comonadic ax, Axis.proj ax Comonadic_with_regionality.max)
+
+    let axes_of_obj : type a. a obj -> atom list = function
+      | Locality | Regionality -> [comonadic Areality]
+      | Uniqueness_op -> [monadic Uniqueness]
+      | Linearity -> [comonadic Linearity]
+      | Portability -> [comonadic Portability]
+      | Forkable -> [comonadic Forkable]
+      | Yielding -> [comonadic Yielding]
+      | Statefulness -> [comonadic Statefulness]
+      | Contention_op -> [monadic Contention]
+      | Visibility_op -> [monadic Visibility]
+      | Staticity_op -> [monadic Staticity]
+      | Monadic_op ->
+        [ monadic Uniqueness;
+          monadic Contention;
+          monadic Visibility;
+          monadic Staticity ]
+      | Comonadic_with_locality | Comonadic_with_regionality ->
+        [ comonadic Areality;
+          comonadic Linearity;
+          comonadic Portability;
+          comonadic Forkable;
+          comonadic Yielding;
+          comonadic Statefulness ]
+
+    let obj : type a. a t -> a obj = function
+      | Monadic ax -> proj_obj ax Monadic_op
+      | Comonadic ax -> proj_obj ax Comonadic_with_regionality
+  end
+
   let min_with dst ax a = Axis.set ax a (min dst)
 
   let max_with dst ax a = Axis.set ax a (max dst)
@@ -4783,50 +4824,10 @@ module Report = struct
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 
-  type _ modality_axis =
-    | Monadic_axis : (C.Monadic_op.t, 'a) Axis.t -> 'a modality_axis
-    | Comonadic_axis :
-        (C.Comonadic_with_regionality.t, 'a) Axis.t
-        -> 'a modality_axis
-
   module MMC = Mode_const_repr.Modality
 
-  type modality_atom = Atom : 'a modality_axis * 'a -> modality_atom
-
-  let monadic_axis ax = Atom (Monadic_axis ax, Axis.proj ax C.Monadic_op.max)
-
-  let comonadic_axis ax =
-    Atom (Comonadic_axis ax, Axis.proj ax C.Comonadic_with_regionality.max)
-
-  let modality_axes_of_obj : type a. a C.obj -> modality_atom list = function
-    | Locality | Regionality -> [comonadic_axis Areality]
-    | Uniqueness_op -> [monadic_axis Uniqueness]
-    | Linearity -> [comonadic_axis Linearity]
-    | Portability -> [comonadic_axis Portability]
-    | Forkable -> [comonadic_axis Forkable]
-    | Yielding -> [comonadic_axis Yielding]
-    | Statefulness -> [comonadic_axis Statefulness]
-    | Contention_op -> [monadic_axis Contention]
-    | Visibility_op -> [monadic_axis Visibility]
-    | Staticity_op -> [monadic_axis Staticity]
-    | Monadic_op ->
-      [ monadic_axis Uniqueness;
-        monadic_axis Contention;
-        monadic_axis Visibility;
-        monadic_axis Staticity ]
-    | Comonadic_with_locality | Comonadic_with_regionality ->
-      [ comonadic_axis Areality;
-        comonadic_axis Linearity;
-        comonadic_axis Portability;
-        comonadic_axis Forkable;
-        comonadic_axis Yielding;
-        comonadic_axis Statefulness ]
-
-  let modality_axis_obj : type a. a modality_axis -> a C.obj = function
-    | Monadic_axis ax -> C.proj_obj ax C.Monadic_op
-    | Comonadic_axis ax -> C.proj_obj ax C.Comonadic_with_regionality
-
-  let modality_axis_proj : type a. a modality_axis -> Mode_const_repr.t -> a =
+  let modality_axis_proj : type a. a C.Modality_axis.t -> Mode_const_repr.t -> a
+      =
    fun axis modality ->
     let { monadic = MMC.Monadic.Join_const monadic;
           comonadic = MMC.Comonadic.Meet_const comonadic
@@ -4834,16 +4835,18 @@ module Report = struct
       modality
     in
     match axis with
-    | Monadic_axis ax -> Axis.proj ax monadic
-    | Comonadic_axis ax -> Axis.proj ax comonadic
+    | Monadic ax -> Axis.proj ax monadic
+    | Comonadic ax -> Axis.proj ax comonadic
 
-  let modality_atom_if_not_id modality (Atom (axis, id)) =
+  let modality_atom_if_not_id modality (C.Modality_axis.Atom (axis, id)) =
     let value = modality_axis_proj axis modality in
-    let obj = modality_axis_obj axis in
-    if C.equal obj value id then None else Some (Atom (axis, value))
+    let obj = C.Modality_axis.obj axis in
+    if C.equal obj value id
+    then None
+    else Some (C.Modality_axis.Atom (axis, value))
 
-  let print_modality_atom_value ppf (Atom (axis, value)) =
-    let obj = modality_axis_obj axis in
+  let print_modality_atom_value ppf (C.Modality_axis.Atom (axis, value)) =
+    let obj = C.Modality_axis.obj axis in
     C.print obj ppf value
 
   let print_modality_atom ppf atom =
@@ -4867,7 +4870,7 @@ module Report = struct
       match modality with
       | Known_modality modality ->
         let axes =
-          modality_axes_of_obj obj
+          C.Modality_axis.axes_of_obj obj
           |> List.filter_map (modality_atom_if_not_id modality)
         in
         begin match axes with
