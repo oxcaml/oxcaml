@@ -2740,7 +2740,23 @@ let update_decls_jkind env order decls =
              end;
              update_decl_jkind env (Pident id) decl, allow_any_crossing)
          in
+<<<<<<< janestreet/merlin-jst:liam-minus-40-retag
          let env = add_type ~long_path:true ~check:false id new_decl env in
+||||||| oxcaml/oxcaml:9cfe2002ce39e1657f374e6c9146af63205f1d3d
+         let env = add_type ~check:false id new_decl env in
+=======
+         (* In the temporary env that gets updated jkinds, we should reflect
+            the overriden kind from [@@unsafe_allow_any_mode_crossing] *)
+         let env_decl =
+           if allow_any_crossing then
+             { new_decl with
+               type_jkind =
+                 Jkind.unsafely_set_bounds env ~from:decl.type_jkind
+                   new_decl.type_jkind }
+           else new_decl
+         in
+         let env = add_type ~check:false id env_decl env in
+>>>>>>> oxcaml/oxcaml:083478d04f754234ed2e90d32bcbf79266739c0f
          env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
       (env, Ident.Map.empty) order
   in
