@@ -1,9 +1,0 @@
-File "non_value_optional_args.ml", line 25, characters 15-31:
-25 | let print_i8 ?(i : int8# option) () =
-                    ^^^^^^^^^^^^^^^^
-Error: This pattern matches values of type "int8# option"
-       but a pattern was expected which matches values of type "'a option"
-       The layout of int8# is bits8
-         because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a value layout
-         because it's the type of an optional argument.

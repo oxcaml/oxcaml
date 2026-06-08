@@ -911,9 +911,3 @@ let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns
 
 let builtin_idents = List.rev !builtin_idents
-
-(* Externally, this is the jkind of an optional argument, as opposed to the
-   jkind of the argument to the [option] type. *)
-(* CR-soon lmaurer: Remove this when these are once again the same. *)
-let option_argument_jkind =
-  Jkind.Builtin.value_or_null ~why:Optional_argument
