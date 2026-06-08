@@ -301,6 +301,7 @@ module Sort = struct
     let for_type_extension = scannable
 
     let for_class = scannable
+<<<<<<< HEAD
 
     let for_effect = scannable
 
@@ -354,6 +355,58 @@ module Sort = struct
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
       | (Product _ | Univar _ | Genvar _) as t -> Some t
+||||||| 083478d04f
+=======
+
+    (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
+       once at module initialization and shared by [some] /
+       [some_of_base] to avoid allocating a fresh [Some] block per
+       call. Not exposed: callers go through [some]. *)
+    let some_scannable = Some scannable
+
+    let some_void = Some void
+
+    let some_untagged_immediate = Some untagged_immediate
+
+    let some_float64 = Some float64
+
+    let some_float32 = Some float32
+
+    let some_word = Some word
+
+    let some_bits8 = Some bits8
+
+    let some_bits16 = Some bits16
+
+    let some_bits32 = Some bits32
+
+    let some_bits64 = Some bits64
+
+    let some_vec128 = Some vec128
+
+    let some_vec256 = Some vec256
+
+    let some_vec512 = Some vec512
+
+    let[@inline] some_of_base = function
+      | Scannable -> some_scannable
+      | Void -> some_void
+      | Untagged_immediate -> some_untagged_immediate
+      | Float64 -> some_float64
+      | Float32 -> some_float32
+      | Word -> some_word
+      | Bits8 -> some_bits8
+      | Bits16 -> some_bits16
+      | Bits32 -> some_bits32
+      | Bits64 -> some_bits64
+      | Vec128 -> some_vec128
+      | Vec256 -> some_vec256
+      | Vec512 -> some_vec512
+
+    let[@inline] some : t -> t option = function
+      | Base b -> some_of_base b
+      | (Product _ | Univar _ | Genvar _) as t -> Some t
+>>>>>>> origin/main
   end
 
   module Var = struct

@@ -5493,6 +5493,7 @@ let report_lookup_error_doc loc env = function
            env ppf v)
         err
   | No_unboxed_version (lid, decl) ->
+<<<<<<< HEAD
       let has_atomic_field lbls =
         List.exists
           (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
@@ -5526,6 +5527,53 @@ let report_lookup_error_doc loc env = function
       Location.errorf ~loc ~sub
         "The type %a has no unboxed version."
         quoted_longident lid
+||||||| 083478d04f
+      fprintf ppf "@[The type %a has no unboxed version.@]"
+        quoted_longident lid;
+      begin match decl.type_kind with
+      | Type_record (_, Record_unboxed, _) ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             [%@%@unboxed] records don't get unboxed versions.@]"
+      | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
+      | Type_record_unboxed_product _ ->
+          fprintf ppf "@.@[@{<hint>Hint@}: It is already an unboxed record.@]";
+      | _ -> ()
+      end
+=======
+      fprintf ppf "@[The type %a has no unboxed version.@]"
+        quoted_longident lid;
+      let has_atomic_field lbls =
+        List.exists
+          (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
+          lbls
+      in
+      begin match decl.type_kind with
+      | Type_record (_, Record_unboxed, _) ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             [%@%@unboxed] records don't get unboxed versions.@]"
+      | Type_record (lbls, _, _) when has_atomic_field lbls ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             Records with [%@atomic] fields don't get unboxed versions.@]"
+      | Type_record (_, (Record_float | Record_ufloat), _) ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
+      | Type_record (_, Record_mixed _, _) ->
+          (* A [Record_mixed] only lacks an unboxed version when its shape
+             contains a [Float_boxed] element, which only happens via
+             [@@flatten_floats]. *)
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Records with [%@%@flatten_floats] don't get \
+             unboxed versions.@]";
+      | Type_record_unboxed_product _ ->
+          fprintf ppf "@.@[@{<hint>Hint@}: It is already an unboxed record.@]";
+      | _ -> ()
+      end
+>>>>>>> origin/main
   | Error_from_persistent_env err ->
       Location.error_of_printer ~loc Persistent_env.report_error_doc err
   | Mutable_value_used_in_closure ctx ->

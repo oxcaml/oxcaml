@@ -215,9 +215,18 @@ and 'k pattern_desc =
       (string option * value general_pattern * Jkind.sort) list ->
       value pattern_desc
   | Tpat_construct :
+<<<<<<< HEAD
       Longident.t loc * constructor_description *
         Types.constructor_representation *
         (Jkind.sort * value general_pattern) list *
+||||||| 083478d04f
+      Longident.t loc * Types.constructor_description *
+        value general_pattern list *
+=======
+      Longident.t loc * Types.constructor_description *
+        Types.constructor_representation *
+        (Jkind.sort * value general_pattern) list *
+>>>>>>> origin/main
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
       value pattern_desc
@@ -311,23 +320,39 @@ and expression_desc =
       (Jkind.sort * expression) list * alloc_mode option
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
+<<<<<<< HEAD
       fields :
         ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
+||||||| 083478d04f
+      fields : ( Types.label_description * record_label_definition ) array;
+=======
+      fields :
+        ( Types.label_description * Jkind.sort * record_label_definition )
+          array;
+>>>>>>> origin/main
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
     }
   | Texp_record_unboxed_product of {
       fields :
+<<<<<<< HEAD
         ( unboxed_label_description * Jkind.sort *
           record_label_definition ) array;
+||||||| 083478d04f
+        ( Types.unboxed_label_description * record_label_definition ) array;
+=======
+        ( Types.unboxed_label_description * Jkind.sort *
+          record_label_definition ) array;
+>>>>>>> origin/main
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * label_description *
       alloc_mode
+<<<<<<< HEAD
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
@@ -355,6 +380,44 @@ and expression_desc =
       label : Data_types.label_description;
       newval : expression;
     }
+||||||| 083478d04f
+  | Texp_field of
+      expression * Jkind.sort * Longident.t loc * label_description *
+        texp_field_boxing * Unique_barrier.t
+  | Texp_unboxed_field of
+      expression * Jkind.sort * Longident.t loc * unboxed_label_description *
+        unique_use
+  | Texp_setfield of
+      expression * Mode.Locality.l * Longident.t loc * label_description * expression
+=======
+  | Texp_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+  | Texp_unboxed_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_sorts : record_sorts;
+      record_repres : Types.record_unboxed_product_representation;
+      lid : Longident.t loc;
+      label : unboxed_label_description;
+      unique_use : unique_use;
+    }
+  | Texp_setfield of {
+      record : expression;
+      record_repres : Types.record_representation;
+      record_sorts : record_sorts;
+      modality : Mode.Locality.l;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      newval : expression;
+    }
+>>>>>>> origin/main
   | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
@@ -425,13 +488,27 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
+<<<<<<< HEAD
   | Baccess_field of
       Longident.t loc * label_description * Types.record_representation
+||||||| 083478d04f
+  | Baccess_field of Longident.t loc * Types.label_description
+=======
+  | Baccess_field of
+      Longident.t loc * Types.label_description * Types.record_representation
+>>>>>>> origin/main
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
+<<<<<<< HEAD
   | Uaccess_unboxed_field of
       Longident.t loc * unboxed_label_description * record_sorts
+||||||| 083478d04f
+  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
+=======
+  | Uaccess_unboxed_field of
+      Longident.t loc * Types.unboxed_label_description * record_sorts
+>>>>>>> origin/main
 
 and comprehension =
   {
@@ -1471,9 +1548,81 @@ let split_pattern pat =
   in
   split_pattern pat
 
+<<<<<<< HEAD
 let map_apply_arg f = function
   | Arg arg -> Arg (f arg)
   | Omitted _ as arg -> arg
+||||||| 083478d04f
+(* Expressions are considered nominal if they can be used as the subject of a
+   sentence or action. In practice, we consider that an expression is nominal
+   if they satisfy one of:
+   - Similar to an identifier: words separated by '.' or '#'.
+   - Do not contain spaces when printed.
+  *)
+let nominal_exp_doc lid t =
+  let open Format_doc.Doc in
+  let longident l = Format_doc.doc_printer lid l.Location.txt in
+  let rec nominal_exp_doc doc exp =
+    match exp.exp_desc with
+    | _ when exp.exp_attributes <> [] -> None
+    | Texp_ident { lid; _ } ->
+        Some (longident lid doc)
+    | Texp_instvar (_,_,s) ->
+        Some (string s.Location.txt doc)
+    | Texp_constant _ -> assert false
+    | Texp_variant (lbl, None) ->
+        Some (printf "`%s" lbl doc)
+    | Texp_construct (l, _, [], _) -> Some (longident l doc)
+    | Texp_field (parent, _, lbl, _, _, _) ->
+        Option.map
+          (printf ".%t" (longident lbl))
+          (nominal_exp_doc doc parent)
+    | Texp_send (parent, meth, _) ->
+        let name = match meth with
+          | Tmeth_name name -> name
+          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
+        Option.map
+          (printf "#%s" name)
+          (nominal_exp_doc doc parent)
+    | _ -> None
+  in
+  nominal_exp_doc empty t
+=======
+(* Expressions are considered nominal if they can be used as the subject of a
+   sentence or action. In practice, we consider that an expression is nominal
+   if they satisfy one of:
+   - Similar to an identifier: words separated by '.' or '#'.
+   - Do not contain spaces when printed.
+  *)
+let nominal_exp_doc lid t =
+  let open Format_doc.Doc in
+  let longident l = Format_doc.doc_printer lid l.Location.txt in
+  let rec nominal_exp_doc doc exp =
+    match exp.exp_desc with
+    | _ when exp.exp_attributes <> [] -> None
+    | Texp_ident { lid; _ } ->
+        Some (longident lid doc)
+    | Texp_instvar (_,_,s) ->
+        Some (string s.Location.txt doc)
+    | Texp_constant _ -> assert false
+    | Texp_variant (lbl, None) ->
+        Some (printf "`%s" lbl doc)
+    | Texp_construct (l, _, _, [], _) -> Some (longident l doc)
+    | Texp_field { record = parent; lid = lbl; _ } ->
+        Option.map
+          (printf ".%t" (longident lbl))
+          (nominal_exp_doc doc parent)
+    | Texp_send (parent, meth, _) ->
+        let name = match meth with
+          | Tmeth_name name -> name
+          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
+        Option.map
+          (printf "#%s" name)
+          (nominal_exp_doc doc parent)
+    | _ -> None
+  in
+  nominal_exp_doc empty t
+>>>>>>> origin/main
 
 let loc_of_decl ~uid =
   let of_option { txt; loc } =
@@ -1687,6 +1836,7 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
+<<<<<<< HEAD
 
 let label_sort (type rep)
       (record_form : rep record_form)
@@ -1733,3 +1883,28 @@ let unpack_functor_mty mty =
   match mty.mty_desc with
   | Tmty_functor (fp, mty, _) -> fp, mty
   | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"
+||||||| 083478d04f
+=======
+
+let label_sort (type rep)
+      (record_form : rep record_form)
+      (label : rep gen_label_description) record_sorts =
+  match record_form, label.lbl_repres with
+  | Legacy, Record_unboxed -> `Same_as_record_sort
+  | _ ->
+    begin match record_sorts, label.lbl_sort with
+    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
+    | Fixed, Some sort -> `Sort sort
+    | Fixed, None ->
+      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
+        label.lbl_name
+    end
+
+let unboxed_label_sort label record_sorts =
+  match label_sort Unboxed_product label record_sorts with
+  | `Same_as_record_sort -> assert false
+  | `Sort s -> s
+
+let unboxed_label_all_sorts label record_sorts =
+  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all
+>>>>>>> origin/main

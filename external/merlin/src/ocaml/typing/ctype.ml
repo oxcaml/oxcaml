@@ -1960,15 +1960,27 @@ let instance_label' copy_scope ~fixed lbl =
   (vars, ty_arg, ty_res)
 
 let instance_label ~fixed lbl =
+<<<<<<< HEAD
   For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
 
 let instance_labels ~fixed lbls =
+||||||| 083478d04f
+=======
+  For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
+
+let instance_labels ~fixed ~representative lbls =
+  (* Merlin-only: Merlin sometimes calls this function with an empty lbls (since lbl_all
+     is empty for dummy labels). In the compiler, this function assumes the array is
+     non-empty to get the result type. But in Merlin, we explicitly pass representative to
+     avoid an index-out-of-bounds exception. *)
+>>>>>>> origin/main
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
       Array.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
+<<<<<<< HEAD
     let ty_res = copy copy_scope lbls.(0).lbl_res in
     (vars_and_ty_args, ty_res)
   )
@@ -1982,6 +1994,25 @@ let instance_label_declarations ~fixed lds ~params =
     in
     let params = List.map (copy copy_scope) params in
     (vars_and_ty_args, params)
+||||||| 083478d04f
+    (* call [copy] after [instance_poly] to avoid introducing [Tsubst] *)
+    let ty_res = copy copy_scope lbl.lbl_res in
+    (vars, ty_arg, ty_res)
+=======
+    let ty_res = copy copy_scope representative.lbl_res in
+    (vars_and_ty_args, ty_res)
+  )
+
+let instance_label_declarations ~fixed lds ~params =
+  For_copy.with_scope (fun copy_scope ->
+    let vars_and_ty_args =
+      Array.map
+        (fun ld -> instance_label_type' copy_scope ~fixed ld.ld_type)
+        lds
+    in
+    let params = List.map (copy copy_scope) params in
+    (vars_and_ty_args, params)
+>>>>>>> origin/main
   )
 
 (* CR dkalinichenko: we must vary yieldingness together with locality to get

@@ -187,6 +187,22 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_record _ ->
         Static
 
+<<<<<<< HEAD
+||||||| 083478d04f
+    | Texp_record_unboxed_product { representation = Record_unboxed_product;
+                                    fields = [| _, Overridden (_,e) |] } ->
+        classify_expression env e
+    | Texp_record_unboxed_product _ ->
+        Dynamic
+
+=======
+    | Texp_record_unboxed_product { representation = Record_unboxed_product;
+                                    fields = [| _, _, Overridden (_,e) |] } ->
+        classify_expression env e
+    | Texp_record_unboxed_product _ ->
+        Dynamic
+
+>>>>>>> origin/main
     | Texp_variant _
     | Texp_tuple _
     | Texp_atomic_loc _
@@ -833,7 +849,13 @@ let rec expression : Typedtree.expression -> term_judg =
             Misc.fatal_error
               "value_rec_check: unexpected unknown representation"
         in
+<<<<<<< HEAD
         let field ((label : Data_types.label_description), _sort, field_def) =
+||||||| 083478d04f
+        let field (label, field_def) =
+=======
+        let field (label, _sort, field_def) =
+>>>>>>> origin/main
           let env =
             match field_def with
             | Kept _ -> empty

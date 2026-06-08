@@ -755,7 +755,11 @@ let ocaml_ignored_flags =
     "-no-unbox-free-vars-of-closures";
     "-verify-binary-emitter";
     "-ikinds-debug";
-    "-thunkify-compilation-unit-initialization"
+    "-thunkify-compilation-unit-initialization";
+    "-flambda2-match-in-match";
+    "-no-flambda2-match-in-match";
+    "-frametables-in-rodata";
+    "-no-frametables-in-rodata"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -821,7 +825,7 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-inline-small-functor-size";
     "-flambda2-inline-large-functor-size";
     "-flambda2-join-algorithm";
-    "-flambda2-expert-cont-specialization-budget";
+    "-flambda2-expert-cont-specialization-threshold";
     "-regalloc";
     "-regalloc-linscan-threshold";
     "-regalloc-param";

@@ -79,7 +79,7 @@ let from_nodes ~lsp_compat ~pos ~path =
         | _ -> ret (Alloc_mode alloc_mode))
       | Texp_array (_, _, _, alloc_mode) -> ret (Alloc_mode alloc_mode)
       | Texp_construct
-          ({ loc; txt = _lident }, { cstr_repr; _ }, args, maybe_alloc_mode)
+          ({ loc; txt = _lident }, { cstr_repr; _ }, _, args, maybe_alloc_mode)
         -> (
         let loc =
           (* The location of the "allocation" here is the entire expression, but the LSP
@@ -104,10 +104,26 @@ let from_nodes ~lsp_compat ~pos ~path =
         | _, Record_inlined _ -> None
         | Some alloc_mode, _ -> ret_alloc alloc_mode
         | None, Record_unboxed -> ret_no_alloc "unboxed record"
+<<<<<<< HEAD
         | None, (Record_boxed | Record_float | Record_ufloat | Record_mixed _)
         | None, Record_dummy _ -> ret Unexpected_no_alloc)
       | Texp_field (_, _, _, _, boxed_or_unboxed, _) -> (
         match boxed_or_unboxed with
+||||||| 083478d04f
+        | None, (Record_boxed | Record_float | Record_ufloat | Record_mixed _)
+          -> ret Unexpected_no_alloc)
+      | Texp_field (_, _, _, _, boxed_or_unboxed, _) -> (
+        match boxed_or_unboxed with
+=======
+        | ( None,
+            ( Record_boxed
+            | Record_float
+            | Record_ufloat
+            | Record_mixed _
+            | Record_variable ) ) -> ret Unexpected_no_alloc)
+      | Texp_field { boxing; _ } -> (
+        match boxing with
+>>>>>>> origin/main
         | Boxing (alloc_mode, _) -> ret_alloc alloc_mode
         | Non_boxing _ -> None)
       | Texp_variant (_, maybe_exp_and_alloc_mode) ->
