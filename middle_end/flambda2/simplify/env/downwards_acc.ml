@@ -36,7 +36,6 @@ type t =
     lifted_continuations : (DE.t * Original_handlers.t) list;
     (* head of the list is the innermost continuation being lifted *)
     continuation_lifting_budget : int;
-    continuation_specialization_budget : int;
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
        into the map below as the keys of the map *)
@@ -53,7 +52,7 @@ let [@ocamlformat "disable"] print ppf
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
-        continuation_specialization_budget; continuations_to_specialize; specialization_map; } =
+        continuations_to_specialize; specialization_map; } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
       @[<hov 1>(continuation_uses_env@ %a)@]@ \
@@ -70,7 +69,6 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(are_lifting_conts@ %a)@]@ \
       @[<hov 1>(lifted_continuations@ %a)@]@ \
       @[<hov 1>(continuation_lifting_budget %d)@]@ \
-      @[<hov 1>(continuation_specialization_budget %d)@]@ \
       @[<hov 1>(continuations_to_specialize %a)@]@ \
       @[<hov 1>(specialization_map %a)@]\
       )@]"
@@ -90,7 +88,6 @@ let [@ocamlformat "disable"] print ppf
     (Format.pp_print_list ~pp_sep:Format.pp_print_space
        print_lifted_cont) lifted_continuations
     continuation_lifting_budget
-    continuation_specialization_budget
     Continuation.Set.print continuations_to_specialize
     (Continuation.Map.print (Apply_cont_rewrite_id.Map.print Continuation.print)) specialization_map
 
@@ -107,11 +104,9 @@ let create denv slot_offsets continuation_uses_env =
     code_ids_to_never_delete = Code_id.Set.empty;
     code_ids_never_simplified = Code_id.Set.empty;
     debuginfo_rewrites = Simple.Map.empty;
-    are_lifting_conts = Are_lifting_conts.no_lifting;
+    are_lifting_conts = Are_lifting_conts.no_lifting At_toplevel;
     lifted_continuations = [];
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
-    continuation_specialization_budget =
-      Flambda_features.Expert.cont_spec_budget ();
     continuations_to_specialize = Continuation.Set.empty;
     specialization_map = Continuation.Map.empty
   }
@@ -311,25 +306,6 @@ let decrease_continuation_lifting_budget t cost =
     with_continuation_lifting_budget t
       (max 0 (t.continuation_lifting_budget - cost))
 
-(* CR gbury: remove this code and use a proper heuristic for specialization *)
-let get_continuation_specialization_budget t =
-  let budget = t.continuation_specialization_budget in
-  if budget < 0 then max_int else budget
-
-let with_continuation_specialization_budget t budget =
-  { t with continuation_specialization_budget = budget }
-
-let reset_continuation_specialization_budget t =
-  with_continuation_specialization_budget t
-    (Flambda_features.Expert.cont_spec_budget ())
-
-let decrease_continuation_specialization_budget t cost =
-  if t.continuation_specialization_budget < 0
-  then t
-  else
-    let budget = max 0 (t.continuation_specialization_budget - cost) in
-    with_continuation_specialization_budget t budget
-
 let prepare_for_speculative_inlining dacc =
   let dacc =
     map_denv
@@ -338,7 +314,8 @@ let prepare_for_speculative_inlining dacc =
           Speculative_inlining)
       dacc
   in
-  with_are_lifting_conts dacc Are_lifting_conts.no_lifting
+  with_are_lifting_conts dacc
+    (Are_lifting_conts.no_lifting In_speculative_inlining)
 
 let continuations_to_specialize t = t.continuations_to_specialize
 

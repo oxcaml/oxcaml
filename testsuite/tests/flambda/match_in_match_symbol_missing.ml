@@ -1,6 +1,6 @@
 (* TEST
  flambda;
- ocamlopt_flags = "-w -20 -O3 -flambda2-expert-cont-lifting-budget 20 -flambda2-expert-cont-specialization-budget 200";
+ ocamlopt_flags = "-w -20 -O3 -flambda2-match-in-match -flambda2-expert-cont-specialization-threshold 200";
  native;
 *)
 

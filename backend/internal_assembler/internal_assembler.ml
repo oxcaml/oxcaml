@@ -141,9 +141,10 @@ let parse_flags flags =
   in
   inner 0L (String.to_seq flags ())
 
-let make_custom_section sections name raw_section sh_string_table =
+let make_custom_section sections name raw_section ~align sh_string_table =
   let flags = parse_flags (X86_proc.Section_name.flags name) in
-  let align = X86_proc.Section_name.alignment name in
+  let args_align = X86_proc.Section_name.alignment name in
+  let align = Int64.max args_align align in
   make_section sections name
     ~size:(Int64.of_int (X86_binary_emitter.size raw_section))
     ~align ~flags
@@ -211,11 +212,12 @@ let make_compiler_sections section_table compiler_sections symbol_table
           sh_string_table
       else if Section_name.is_note_like name
       then
-        make_custom_section section_table name raw_section ~sh_type:7
-          (* SHT_NOTE *) sh_string_table
+        make_custom_section section_table name raw_section
+          ~align:(Int64.of_int align) ~sh_type:7 (* SHT_NOTE *) sh_string_table
       else
-        make_custom_section section_table name raw_section ~sh_type:1
-          (* SHT_PROGBITS *) sh_string_table;
+        make_custom_section section_table name raw_section
+          ~align:(Int64.of_int align) ~sh_type:1 (* SHT_PROGBITS *)
+          sh_string_table;
       Section_name.Tbl.add section_symbols name
         (Symbol_table.make_section_symbol symbol_table
            (Section_table.num_sections section_table - 1)

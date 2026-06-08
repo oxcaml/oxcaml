@@ -114,13 +114,15 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation () =
-  let m, _ =
-    Value.(newvar_below (of_const
+let register_allocation () : Alloc.lr * Value.lr =
+  let upper_bound =
+    Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
-      { Const.max with areality = Global }))
+      { Alloc.Const.max with areality = Global }
   in
-  value_to_alloc_r2g m, m
+  let alloc_mode, _ = Alloc.newvar_below upper_bound in
+  let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
+  alloc_mode, closed_over_mode
 
 open Typedtree
 
@@ -143,7 +145,7 @@ let apply_is_contained_by ~loc_md item ?modalities mode =
     { containing = Structure (item, Modality);
       container = (loc_md, Structure) }
   in
-  Ctype.apply_is_contained_by is_contained_by ?modalities mode
+  Ctype.apply_right_is_contained_by is_contained_by ?modalities mode
 
 (** Given a value whose location in the source code is described by [pp] and at
 [mode], infer the modalities on the value when it's placed as an [item] in a
@@ -190,11 +192,7 @@ let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
     { containing = Structure (item, Modality);
       container = (loc, Structure)}
   in
-  let hint =
-    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
-      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
-  in
-  let mode = Modality.apply ~hint modalities mode in
+  let mode = Modality.apply_left ~is_contained_by modalities mode in
   infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
@@ -3197,9 +3195,13 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
       in
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
-      let alloc_mode, mode = register_allocation () in
+      let alloc_mode, closed_over_mode =
+        register_allocation ()
+      in
       let newenv =
-        Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
+        Env.add_closure_lock
+          (smod.pmod_loc, Functor)
+          closed_over_mode.comonadic env
       in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
@@ -3252,7 +3254,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
        | _ -> ());
       { mod_desc = Tmod_functor(t_arg, body);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
-        mod_mode = Value.disallow_right mode, None;
+        mod_mode = Value.disallow_right closed_over_mode, None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
