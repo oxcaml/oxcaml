@@ -128,9 +128,7 @@ external box_int64 : int64# -> int64 = "%box_int64"
 (* Test that typing and genprintval work when the actual type has kind value *)
 let test_block_with_values = { fst = 1; snd = 2 } |> Sys.opaque_identity
 [%%expect {|
->> Fatal error: variable record representation
-Uncaught exception: Misc.Fatal_error
-
+val test_block_with_values : int t = {fst = 1; snd = 2}
 |}]
 
 let make_test_block () = { fst = #1L; snd = #2L } |> Sys.opaque_identity
@@ -140,9 +138,7 @@ val make_test_block : unit -> int64# t = <fun>
 
 let test_block = make_test_block ()
 [%%expect {|
->> Fatal error: variable record representation
-Uncaught exception: Misc.Fatal_error
-
+val test_block : int64# t = {fst = <abstr>; snd = <abstr>}
 |}]
 
 let test_direct =
@@ -150,10 +146,7 @@ let test_direct =
      of all previous fields in the block *)
   test_block.snd |> box_int64
 [%%expect{|
-Line 4, characters 2-12:
-4 |   test_block.snd |> box_int64
-      ^^^^^^^^^^
-Error: Unbound value "test_block"
+val test_direct : int64 = 2L
 |}]
 
 let test_via_index =
@@ -161,10 +154,7 @@ let test_via_index =
   let idx = ((.snd) : (('a : bits64) t, 'a) idx_mut) |> Sys.opaque_identity in
   Idx_mut.get test_block idx |> box_int64
 [%%expect {|
-Line 4, characters 14-24:
-4 |   Idx_mut.get test_block idx |> box_int64
-                  ^^^^^^^^^^
-Error: Unbound value "test_block"
+val test_via_index : int64 = 2L
 |}]
 
 let test_set_direct =
@@ -188,36 +178,29 @@ let test_unboxed_pair_block : #(int64# * int64#) t =
   { fst = #(#1L, #2L); snd = #(#3L, #4L) }
 |> Sys.opaque_identity
 [%%expect {|
->> Fatal error: variable record representation
-Uncaught exception: Misc.Fatal_error
-
+val test_unboxed_pair_block : #(int64# * int64#) t =
+  {fst = #(<abstr>, <abstr>); snd = #(<abstr>, <abstr>)}
 |}]
 
 let test_unboxed_pair_direct =
   let #(_fst, snd) = test_unboxed_pair_block.snd in snd |> box_int64
 [%%expect{|
-Line 2, characters 21-44:
-2 |   let #(_fst, snd) = test_unboxed_pair_block.snd in snd |> box_int64
-                         ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unbound value "test_unboxed_pair_block"
+val test_unboxed_pair_direct : int64 = 4L
 |}]
 
 let test_nested_block : int64# t# t =
   { fst = #{ fst = #1L; snd = #2L }; snd = #{ fst = #3L; snd = #4L } }
 |> Sys.opaque_identity
 [%%expect {|
->> Fatal error: variable record representation
-Uncaught exception: Misc.Fatal_error
-
+val test_nested_block : int64# t# t =
+  {fst = #{fst = <unknown>; snd = <unknown>};
+   snd = #{fst = <unknown>; snd = <unknown>}}
 |}]
 
 let test_nested_direct =
   test_nested_block.snd.#snd |> box_int64
 [%%expect{|
-Line 2, characters 2-19:
-2 |   test_nested_block.snd.#snd |> box_int64
-      ^^^^^^^^^^^^^^^^^
-Error: Unbound value "test_nested_block"
+val test_nested_direct : int64 = 4L
 |}]
 
 let test_nested_via_index =
@@ -227,10 +210,7 @@ let test_nested_via_index =
   in
   Idx_mut.get test_nested_block idx |> box_int64
 [%%expect{|
-Line 6, characters 14-31:
-6 |   Idx_mut.get test_nested_block idx |> box_int64
-                  ^^^^^^^^^^^^^^^^^
-Error: Unbound value "test_nested_block"
+val test_nested_via_index : int64 = 4L
 |}]
 
 (* Test that a record with [any] is never a flat float block *)

@@ -109,12 +109,12 @@ val yeah : ('a : bits64). 'a -> 'a t = <fun>
 (* Test that typing and genprintval work when the actual type has kind value *)
 let test_block_with_value = Yeah 1
 [%%expect {|
-val test_block_with_value : int t = Yeah <unknown>
+val test_block_with_value : int t = Yeah 1
 |}]
 
 let test_block = Yeah #1L
 [%%expect {|
-val test_block : int64# t = Yeah <unknown>
+val test_block : int64# t = Yeah <abstr>
 |}]
 
 type ('a : any) any_list = [] | (::) of 'a * 'a any_list
@@ -143,7 +143,7 @@ val map_unboxed_pair :
   <fun>
 val box_all : #('a * 'b) any_list -> ('a * 'b) any_list = <fun>
 val test : (int * int) any_list =
-  (::) (<unknown>, (::) (<unknown>, (::) (<unknown>, [])))
+  (::) ((2, 4), (::) ((4, 6), (::) ((6, 8), [])))
 |}]
 
 module All_void_in_module = struct
