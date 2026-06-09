@@ -16,10 +16,6 @@ module type S0 = sig val f : ('elt : bits64). 'elt -> 'elt array end
 
 (* Implicit kinds in structures. *)
 
-(* This doesn't raise an unused attribute warning because expect tests
-   are run at toplevel.
-
-   See [implicit_kinds_unused.ml] for the unused attribute test. *)
 module M = struct
   [@@@implicit_kind: ('elt : bits64)]
 
@@ -33,6 +29,8 @@ module M : sig val f : ('elt : bits64). 'elt -> 'elt array end
 (* File-level structure attributes affect later declarations only. *)
 
 let file_before (x : 'file_before) = x
+let file_before_after_name (x : 'file_after) = x
+external file_before_ext : 'file_ext -> unit = "%ignore"
 
 [@@@implicit_kind: ('file_after : bits64) * ('file_ext : word)]
 
@@ -41,6 +39,8 @@ external file_ignore : 'file_ext -> unit = "%ignore"
 
 [%%expect{|
 val file_before : 'file_before -> 'file_before = <fun>
+val file_before_after_name : 'file_after -> 'file_after = <fun>
+external file_before_ext : 'file_ext -> unit = "%ignore"
 val file_after : ('file_after : bits64). 'file_after -> 'file_after array =
   <fun>
 external file_ignore : ('file_ext : word). 'file_ext -> unit = "%ignore"
@@ -50,8 +50,11 @@ external file_ignore : ('file_ext : word). 'file_ext -> unit = "%ignore"
 
 module Structure_order = struct
   let before (x : 'before) = x
+  let before_after_name (x : 'after) = x
   type 'box before_box
+  type 'box before_later_box
   external before_ignore : 'ext -> unit = "%ignore"
+  external before_later_ignore : 'ext -> unit = "%ignore"
 
   [@@@implicit_kind: ('after : bits64) * ('box : word) * ('ext : word)]
 
@@ -64,8 +67,11 @@ end
 module Structure_order :
   sig
     val before : 'before -> 'before
+    val before_after_name : 'after -> 'after
     type 'box before_box
+    type 'box before_later_box
     external before_ignore : 'ext -> unit = "%ignore"
+    external before_later_ignore : 'ext -> unit = "%ignore"
     val after : ('after : bits64). 'after -> 'after array
     type ('box : word) after_box
     external after_ignore : ('ext : word). 'ext -> unit = "%ignore"
@@ -131,6 +137,150 @@ end
 module Mto_struct :
   sig
     module type T = sig val id : ('mto : word). 'mto -> 'mto @@ stateless end
+  end
+|}]
+
+(* Signature implicit kinds do not affect an ascribed structure's environment. *)
+
+module Sig_default_used_by_struct : sig
+  [@@@implicit_kind: ('from_sig : bits64)]
+
+  module type T = sig
+    val pack : 'from_sig -> 'from_sig array
+  end
+end = struct
+  module type T = module type of struct
+    let pack (x : 'from_sig) = [| x |]
+  end
+end
+
+[%%expect{|
+Lines 7-11, characters 6-3:
+ 7 | ......struct
+ 8 |   module type T = module type of struct
+ 9 |     let pack (x : 'from_sig) = [| x |]
+10 |   end
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module type T =
+             sig
+               val pack :
+                 ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array
+                 @@ stateless
+             end
+         end
+       is not included in
+         sig
+           module type T =
+             sig
+               val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+             end
+         end
+       Module type declarations do not match:
+         module type T =
+           sig
+             val pack :
+               ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array
+               @@ stateless
+           end
+       does not match
+         module type T =
+           sig
+             val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+           end
+       At position "module type T = <here>"
+       Module types do not match:
+         sig
+           val pack :
+             ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
+             stateless
+         end
+       is not equal to
+         sig
+           val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+         end
+       At position "module type T = <here>"
+       Values do not match:
+         val pack :
+           ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
+           stateless
+       is not included in
+         val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+       The type "'a -> 'a array" is not compatible with the type "'b -> 'b array"
+       The layout of 'a is bits64
+         because of the definition of pack at line 5, characters 4-43.
+       But the layout of 'a must be a value layout
+         because of the definition of pack at line 9, characters 13-38.
+|}]
+
+(* Signature implicit kinds affect structures defined in that signature. *)
+
+module type Sig_default_defines_struct = sig
+  [@@@implicit_kind: ('from_defined_sig : bits64)]
+
+  module type T = module type of struct
+    let pack (x : 'from_defined_sig) = [| x |]
+  end
+end
+
+[%%expect{|
+module type Sig_default_defines_struct =
+  sig
+    module type T =
+      sig
+        val pack :
+          ('from_defined_sig : bits64).
+            'from_defined_sig -> 'from_defined_sig array
+          @@ stateless
+      end
+  end
+|}]
+
+(* Structure implicit kinds can be used by a signature. *)
+
+module Struct_default_used_by_sig = struct
+  [@@@implicit_kind: ('from_struct : bits64)]
+
+  module type S = sig
+    val pack : 'from_struct -> 'from_struct array
+  end
+end
+
+[%%expect{|
+module Struct_default_used_by_sig :
+  sig
+    module type S =
+      sig
+        val pack :
+          ('from_struct : bits64). 'from_struct -> 'from_struct array
+      end
+  end
+|}]
+
+(* Local modules inherit the surrounding implicit-kind environment. *)
+
+module Local_module = struct
+  [@@@implicit_kind: ('local : word)]
+
+  module type S = sig
+    val id : 'local -> 'local
+  end
+
+  let f () =
+    let module M = struct
+      let id (x : 'local) = x
+    end
+    in
+    (module M : S)
+end
+
+[%%expect{|
+module Local_module :
+  sig
+    module type S = sig val id : ('local : word). 'local -> 'local end
+    val f : unit -> (module S)
   end
 |}]
 
