@@ -19,7 +19,7 @@ let code loopify(never) size(20) newer_version_of(stuff_1)
       stuff_1_1 (env)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val ] =
+        : val =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
   (let try_region = %begin_try_region (`region`) in
@@ -29,7 +29,7 @@ let code loopify(never) size(20) newer_version_of(stuff_1)
        let r_281_unboxed0 = 0 in
        let Popaque = %opaque ($camlData_flow_exception_bug__do_stuff_2) in
        (apply Popaque (env) -> k4 * k3
-          where k4 (return_val0 : [ 0 | 0 of val ]) =
+          where k4 (return_val0 : val) =
             cont k2 pop(k3) (return_val0))
      where k3 exn (`exn` : val) =
        let r_281_unboxed0 = 0 in
@@ -37,7 +37,7 @@ let code loopify(never) size(20) newer_version_of(stuff_1)
        let unit_1 = %end_try_ghost_region (try_ghost_region) in
        let Popaque = %opaque (r_281_unboxed0) in
        cont k2 (Popaque))
-    where k2 (region_return : [ 0 | 0 of val ]) =
+    where k2 (region_return : val) =
       let `unit` = %end_region (`region`) in
       let unit_1 = %end_ghost_region (ghost_region) in
       cont k (region_return)
