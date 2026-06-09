@@ -18,8 +18,14 @@
 let
   inherit (pkgs) lib fetchpatch;
 
-  # Select stdenv based on whether asan is enabled
-  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  # Select stdenv based on whether asan is enabled.
+  #
+  # ASan uses clang. OxCaml's hand-rolled ASan codegen targets an older
+  # compiler-rt (its CI uses LLVM 14); clang 21 (the nixpkgs 26.05 default)
+  # produces ASan-instrumented OCaml binaries that segfault on startup. Pin to
+  # clang 19, the version the previously-used nixpkgs provided and which oxcaml's
+  # ASan support is known to work with.
+  stdenv = if addressSanitizer then pkgs.llvmPackages_19.stdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -59,6 +65,11 @@ let
       minor_version = "4";
       patch_version = "0";
       sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
+      # Under ASan the boot compiler is built with clang, whose handling of the
+      # non-ASCII object filenames in OCaml's `tests/unicode` testsuite fails the
+      # build. The boot compiler is only a build tool here, so skip its test run
+      # in that configuration (the gcc/non-asan path still runs it).
+      doCheck = !addressSanitizer;
     }) {
       inherit stdenv;
     }).overrideAttrs {
@@ -114,6 +125,10 @@ let
           menhirLib
           menhirSdk
         ];
+        # The nixpkgs patch targets `base/Installation.ml`, which only exists in
+        # newer menhir releases; menhir 20231231 has no such file. The postInstall
+        # symlink below provides menhirLib's location instead, so drop the patch.
+        patches = [ ];
         postInstall = ''
           ln -s ${menhirLib}/lib/ocaml/*/site-lib/menhirLib $out/lib/
         '';
@@ -213,6 +228,13 @@ stdenv.mkDerivation {
 
   OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
+
+  # GCC 15 (nixpkgs 26.05) defaults to C23, where an empty parameter list `()`
+  # means `(void)`. OCaml's runtime still uses K&R-style declarations such as
+  # `extern value caml_get_public_method();`, which then conflict with their real
+  # prototypes. configure assumes the compiler defaults to gnu11/gnu17, so pin
+  # that standard explicitly. (The core build is C-only, so this is safe.)
+  NIX_CFLAGS_COMPILE = "-std=gnu17";
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
