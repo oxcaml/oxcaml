@@ -1966,11 +1966,6 @@ let assert_mixed_product_support =
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
 
-(* Records and variants with a field or constructor argument of kind [any] get a
-   variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
-let assert_any_args_support loc =
-  Language_extension.assert_enabled ~loc Layouts Language_extension.Beta
-
 (* [Element_repr] is used to classify whether something is a "mixed product"
    (a mixed record or mixed variant constructor), meaning that some of the
    fields are unboxed in a way that isnt encoded in the usual short numeric tag.
@@ -2368,7 +2363,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
          [any]. This works because the representation doesn't include a sort,
          since it's not actually needed in order to produce code (the
          in-memory representation is always exactly the underlying value). *)
-      if Option.is_none sort then assert_any_args_support loc;
       Record_unboxed
     in
     [ld_sort], rep, jkind
@@ -2441,7 +2435,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       match rep with
       | Ok rep -> rep
       | Error (Unrepresentable_field _) ->
-        assert_any_args_support loc;
         (match form with
          | Legacy -> Record_undetermined
          | Unboxed_product -> Record_unboxed_product_undetermined)
@@ -2672,7 +2665,6 @@ let rec update_decl_jkind env dpath decl =
             let ca_sort =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
-            if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -2683,7 +2675,6 @@ let rec update_decl_jkind env dpath decl =
             let ld_sort =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
-            if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -2719,9 +2710,7 @@ let rec update_decl_jkind env dpath decl =
                 cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
             | Ok _, None ->
                 Misc.fatal_error "Representation but no arg sorts?"
-            | _, _ ->
-                assert_any_args_support loc;
-                cstr_layouts.(idx) <- Cstr_layout_undetermined
+            | _, _ -> cstr_layouts.(idx) <- Cstr_layout_undetermined
           in
           let cstr = { cstr with Types.cd_args } in
           cstr
