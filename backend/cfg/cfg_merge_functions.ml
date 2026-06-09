@@ -56,9 +56,13 @@ let buckets : repr list Int.Tbl.t = Int.Tbl.create 64
 
 let reset_unit_info () = Int.Tbl.reset buckets
 
+(* See the note on [same_loc] in [Cfg_equiv]: comparing locations only up to
+   register/stack class conflates [Val] (a GC root) with [Int]/[Addr], so we
+   additionally require the machtype components to be equal. *)
 let same_loc r1 r2 =
   Reg.same_loc_fatal_on_unknown
     ~fatal_message:"Cfg_merge_functions: unknown register location." r1 r2
+  && Cmm.equal_machtype_component r1.Reg.typ r2.Reg.typ
 
 let equal_fun_args left right = Misc.Stdlib.Array.equal same_loc left right
 
