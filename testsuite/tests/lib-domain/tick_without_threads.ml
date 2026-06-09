@@ -1,6 +1,5 @@
 (* TEST
    modules = "tick_stubs.c";
-   runtime5;
    { native; }
 *)
 

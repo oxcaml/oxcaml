@@ -28,16 +28,13 @@ let runtime_variant() =
   else if use_runtime="i" then Instrumented
   else Normal
 
-let runtime_suffix = if Config.runtime5 then "" else "4"
-
 let ocamlrun =
   let runtime = match runtime_variant () with
     | Normal -> "ocamlrun"
     | Debug -> "ocamlrund"
     | Instrumented -> "ocamlruni" in
   let ocamlrunfile = Filename.mkexe runtime in
-  Filename.make_path [Ocaml_directories.srcdir; "runtime" ^ runtime_suffix;
-    ocamlrunfile]
+  Filename.make_path [Ocaml_directories.srcdir; "runtime"; ocamlrunfile]
 
 let ocamlc =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlc"]
@@ -85,8 +82,7 @@ let ocamldoc =
 
 let ocamldebug =
   Filename.make_path
-    [Ocaml_directories.srcdir; "debugger" ^ runtime_suffix;
-     Filename.mkexe "ocamldebug"]
+    [Ocaml_directories.srcdir; "debugger"; Filename.mkexe "ocamldebug"]
 
 let ocamlobjinfo =
   Filename.make_path

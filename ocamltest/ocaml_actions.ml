@@ -1260,9 +1260,7 @@ let config_variables _log env =
       Ocamltest_config.ocamlopt_default_flags;
     Ocaml_variables.ocamlrunparam, Sys.safe_getenv "OCAMLRUNPARAM";
     Ocaml_variables.ocamlsrcdir, Ocaml_directories.srcdir;
-    Ocaml_variables.os_type, Sys.os_type;
-    Ocaml_variables.runtime_dir,
-      if Config.runtime5 then "runtime" else "runtime4"
+    Ocaml_variables.os_type, Sys.os_type
   ] env
 
 let flat_float_array = Actions.make
@@ -1445,22 +1443,6 @@ let no_stack_checks = Actions.make
     "Stack checks disabled"
     "Stack checks enabled")
 
-let runtime4 = Actions.make
-  ~name:"runtime4"
-  ~description:"Passes if the OCaml 4.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate (not Config.runtime5)
-    "4.x runtime being used"
-    "5.x runtime being used")
-
-let runtime5 = Actions.make
-  ~name:"runtime5"
-  ~description:"Passes if the OCaml 5.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate Config.runtime5
-    "5.x runtime being used"
-    "4.x runtime being used")
-
 (* CR ttebbi: We should also protect against non-default register allocation
     options. *)
 let only_default_codegen = Actions.make
@@ -1470,7 +1452,6 @@ let only_default_codegen = Actions.make
   ~does_something:false
   (Actions_helpers.predicate
     (Config.no_stack_checks
-      && Config.runtime5
       && not Config.poll_insertion
       && not Config.with_address_sanitizer
       && not Config.with_frame_pointers)
@@ -1697,7 +1678,5 @@ let init () =
     ocamlobjinfo;
     stack_checks;
     no_stack_checks;
-    runtime4;
-    runtime5;
     only_default_codegen
   ]

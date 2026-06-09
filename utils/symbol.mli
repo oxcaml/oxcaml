@@ -52,6 +52,3 @@ val linkage_name_for_ocamlobjinfo : t -> string
 include Identifiable.S with type t := t
 
 val is_predef_exn : t -> bool
-
-(* Temporary means to identify that the program running is ocamlc. *)
-val this_is_ocamlc : unit -> unit

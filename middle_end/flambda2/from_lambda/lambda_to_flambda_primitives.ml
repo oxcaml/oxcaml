@@ -2839,7 +2839,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)
-      | Runtime5 -> [Simple (Simple.const_bool machine_width Config.runtime5)]))
+      | Runtime5 -> [Simple (Simple.const_bool machine_width true)]))
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)

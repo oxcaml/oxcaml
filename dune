@@ -39,8 +39,6 @@
     -warn-error
     +A))))
 
-(include dune.runtime_selection)
-
 (copy_files# utils/*.ml{,i})
 
 (copy_files# parsing/*.ml{,i})

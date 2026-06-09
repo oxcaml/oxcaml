@@ -1746,7 +1746,7 @@ static bool should_compact_from_stw_single(int compaction_mode)
   }
   CAMLassert (compaction_mode == Compaction_auto);
 
-  /* runtime 4 algorithm, as close as possible.
+  /* OCaml 4 algorithm, as close as possible.
    * TODO: revisit this in future. */
   uintnat max_percent_free = caml_max_percent_free; /* atomic load */
   if (max_percent_free >= 1000 * 1000) {
