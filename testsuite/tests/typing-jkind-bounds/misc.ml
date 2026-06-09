@@ -14,6 +14,13 @@ type ('a : immutable_data) t
 type ('a : value) u = 'a t
 [%%expect {|
 type ('a : immutable_data) t
+Line 2, characters 6-16:
+2 | type ('a : value) u = 'a t
+          ^^^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immutable_data'.
+
 type ('a : immutable_data) u = 'a t
 |}]
 

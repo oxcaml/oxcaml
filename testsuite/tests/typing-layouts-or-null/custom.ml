@@ -460,6 +460,13 @@ type ('a : any) widened_bad_jkind =
   | B of 'a
 [@@or_null]
 [%%expect{|
+Line 1, characters 6-14:
+1 | type ('a : any) widened_bad_jkind =
+          ^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `value_maybe_separable'.
+
 type ('a : value_maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
 |}]
 
@@ -469,6 +476,13 @@ type ('a : value_or_null) widened_bad_jkind =
 [@@or_null]
 
 [%%expect{|
+Line 1, characters 6-24:
+1 | type ('a : value_or_null) widened_bad_jkind =
+          ^^^^^^^^^^^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value_maybe_separable'.
+
 type ('a : value_maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
 |}]
 
@@ -478,6 +492,13 @@ type ('a : any) widened_any : value_or_null =
 [@@or_null]
 
 [%%expect{|
+Line 1, characters 6-14:
+1 | type ('a : any) widened_any : value_or_null =
+          ^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `value_maybe_separable'.
+
 type ('a : value_maybe_separable) widened_any = A | B of 'a [@@or_null]
 |}]
 
@@ -487,6 +508,13 @@ type ('a : value_or_null) widened_nullable : value_or_null =
 [@@or_null]
 
 [%%expect{|
+Line 1, characters 6-24:
+1 | type ('a : value_or_null) widened_nullable : value_or_null =
+          ^^^^^^^^^^^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value_maybe_separable'.
+
 type ('a : value_maybe_separable) widened_nullable = A | B of 'a [@@or_null]
 |}]
 
@@ -505,6 +533,13 @@ type ('a : immediate_or_null) widened_immediate_or_null : value_or_null =
 [@@or_null]
 
 [%%expect{|
+Line 1, characters 6-28:
+1 | type ('a : immediate_or_null) widened_immediate_or_null : value_or_null =
+          ^^^^^^^^^^^^^^^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `immediate_or_null'
+but was inferred to have kind `immediate'.
+
 type ('a : immediate) widened_immediate_or_null = A | B of 'a [@@or_null]
 |}]
 

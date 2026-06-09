@@ -14,6 +14,13 @@ end
 (* Ideally the above would simply fail. Test that at least we don't actually
    allow ['a] to have kind [any] *)
 [%%expect {|
+Line 2, characters 8-16:
+2 |   type ('a : any) t : value_or_null = 'a or_null [@@or_null_reexport]
+            ^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `value_maybe_separable'.
+
 module Test_with_any :
   sig
     type ('a : value_maybe_separable) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
