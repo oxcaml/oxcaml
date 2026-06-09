@@ -119,7 +119,7 @@ Line 1, characters 53-54:
                                                          ^
 Error: This value is "unforkable"
        but is expected to be "forkable"
-         because it is contained (via constructor "Mk0") (with some modality) in the value at line 1, characters 49-54.
+         because it is contained (via constructor "Mk0") (with modality "forkable" in effect) in the value at line 1, characters 49-54.
 |}]
 
 (* [global unforkable] works: *)
@@ -138,7 +138,7 @@ Line 1, characters 54-55:
                                                           ^
 Error: This value is "unforkable"
        but is expected to be "forkable"
-         because it is contained (via constructor "Mk11") (with some modality) in the value at line 1, characters 49-55.
+         because it is contained (via constructor "Mk11") (with modality "forkable" in effect) in the value at line 1, characters 49-55.
 |}]
 
 let _ = with_global_unforkable (fun k -> let _ = Mk12 k in ())

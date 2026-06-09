@@ -791,7 +791,7 @@ Line 1, characters 24-25:
 1 | let f { shared = x } = (x : @ uncontended)
                             ^
 Error: This value is "shared"
-         because it is the field "shared" (with some modality) of the record at line 1, characters 6-20.
+         because it is the field "shared" (with modality "shared" in effect) of the record at line 1, characters 6-20.
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
@@ -808,7 +808,7 @@ Line 1, characters 24-25:
 1 | let f { shared = x } = (x : @ corrupted)
                             ^
 Error: This value is "shared"
-         because it is the field "shared" (with some modality) of the record at line 1, characters 6-20.
+         because it is the field "shared" (with modality "shared" in effect) of the record at line 1, characters 6-20.
        However, the highlighted expression is expected to be "corrupted" or "uncontended".
 |}]
 
@@ -825,7 +825,7 @@ Line 1, characters 27-28:
 1 | let f { corrupted = x } = (x : @ uncontended)
                                ^
 Error: This value is "corrupted"
-         because it is the field "corrupted" (with some modality) of the record at line 1, characters 6-23.
+         because it is the field "corrupted" (with modality "corrupted" in effect) of the record at line 1, characters 6-23.
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
@@ -836,7 +836,7 @@ Line 1, characters 27-28:
 1 | let f { corrupted = x } = (x : @ shared)
                                ^
 Error: This value is "corrupted"
-         because it is the field "corrupted" (with some modality) of the record at line 1, characters 6-23.
+         because it is the field "corrupted" (with modality "corrupted" in effect) of the record at line 1, characters 6-23.
        However, the highlighted expression is expected to be "shared" or "uncontended".
 |}]
 
@@ -859,7 +859,7 @@ Line 1, characters 27-28:
 1 | let f { contended = x } = (x : @ uncontended)
                                ^
 Error: This value is "contended"
-         because it is the field "contended" (with some modality) of the record at line 1, characters 6-23.
+         because it is the field "contended" (with modality "contended" in effect) of the record at line 1, characters 6-23.
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
@@ -870,7 +870,7 @@ Line 1, characters 27-28:
 1 | let f { contended = x } = (x : @ shared)
                                ^
 Error: This value is "contended"
-         because it is the field "contended" (with some modality) of the record at line 1, characters 6-23.
+         because it is the field "contended" (with modality "contended" in effect) of the record at line 1, characters 6-23.
        However, the highlighted expression is expected to be "shared" or "uncontended".
 |}]
 
@@ -881,7 +881,7 @@ Line 1, characters 27-28:
 1 | let f { contended = x } = (x : @ corrupted)
                                ^
 Error: This value is "contended"
-         because it is the field "contended" (with some modality) of the record at line 1, characters 6-23.
+         because it is the field "contended" (with modality "contended" in effect) of the record at line 1, characters 6-23.
        However, the highlighted expression is expected to be "corrupted" or "uncontended".
 |}]
 
@@ -937,7 +937,7 @@ Line 1, characters 40-41:
                                             ^
 Error: This value is "nonportable"
        but is expected to be "shareable"
-         because it is the field "shareable" (with some modality) of the record at line 1, characters 26-43.
+         because it is the field "shareable" (with modality "shareable" in effect) of the record at line 1, characters 26-43.
 |}]
 
 let f (x @ shareable) = { shareable = x }
@@ -954,7 +954,7 @@ Line 1, characters 40-41:
                                             ^
 Error: This value is "corruptible"
        but is expected to be "shareable"
-         because it is the field "shareable" (with some modality) of the record at line 1, characters 26-43.
+         because it is the field "shareable" (with modality "shareable" in effect) of the record at line 1, characters 26-43.
 |}]
 
 let f (x @ portable) = { shareable = x }
@@ -971,7 +971,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "nonportable"
        but is expected to be "corruptible"
-         because it is the field "corruptible" (with some modality) of the record at line 1, characters 26-45.
+         because it is the field "corruptible" (with modality "corruptible" in effect) of the record at line 1, characters 26-45.
 |}]
 
 let f (x @ shareable) = { corruptible = x }
@@ -982,7 +982,7 @@ Line 1, characters 40-41:
                                             ^
 Error: This value is "shareable"
        but is expected to be "corruptible"
-         because it is the field "corruptible" (with some modality) of the record at line 1, characters 24-43.
+         because it is the field "corruptible" (with modality "corruptible" in effect) of the record at line 1, characters 24-43.
 |}]
 
 let f (x @ corruptible) = { corruptible = x }
@@ -1005,7 +1005,7 @@ Line 1, characters 39-40:
                                            ^
 Error: This value is "nonportable"
        but is expected to be "portable"
-         because it is the field "portable" (with some modality) of the record at line 1, characters 26-42.
+         because it is the field "portable" (with modality "portable" in effect) of the record at line 1, characters 26-42.
 |}]
 
 let f (x @ shareable) = { portable = x }
@@ -1016,7 +1016,7 @@ Line 1, characters 37-38:
                                          ^
 Error: This value is "shareable"
        but is expected to be "portable"
-         because it is the field "portable" (with some modality) of the record at line 1, characters 24-40.
+         because it is the field "portable" (with modality "portable" in effect) of the record at line 1, characters 24-40.
 |}]
 
 let f (x @ corruptible) = { portable = x }
@@ -1027,7 +1027,7 @@ Line 1, characters 39-40:
                                            ^
 Error: This value is "corruptible"
        but is expected to be "portable"
-         because it is the field "portable" (with some modality) of the record at line 1, characters 26-42.
+         because it is the field "portable" (with modality "portable" in effect) of the record at line 1, characters 26-42.
 |}]
 
 let f (x @ portable) = { portable = x }
