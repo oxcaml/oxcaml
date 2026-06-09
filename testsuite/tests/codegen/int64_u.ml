@@ -105,7 +105,6 @@ unsigned_div:
   jge   .L1
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
-  movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
   cmpq  %rcx, %rdi
   jge   .L0
@@ -539,7 +538,6 @@ unsigned_compare:
   movq  %rax, %rdi
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rbx
-  movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
