@@ -518,6 +518,14 @@ let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
   String.equal left_sym_name right_sym_name
   && equal_is_global left_sym_global right_sym_global
 
+module Symbol_tbl = Hashtbl.Make (struct
+  type t = symbol
+
+  let equal = equal_symbol
+
+  let hash { sym_name; sym_global = _ } = String.hash sym_name
+end)
+
 type operation =
   | Capply of
       { result_type : machtype;

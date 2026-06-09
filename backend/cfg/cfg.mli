@@ -228,6 +228,8 @@ val is_alloc : basic instruction -> bool
 
 val is_poll : basic instruction -> bool
 
+val is_name_for_debugger : basic instruction -> bool
+
 val is_end_region : basic -> bool
 
 val set_stack_offset : 'a instruction -> int -> unit
