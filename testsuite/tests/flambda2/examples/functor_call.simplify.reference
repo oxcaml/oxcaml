@@ -15,15 +15,15 @@ let code loopify(done) size(16) newer_version_of(foo_1_1)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  cont self (x)
-    where rec self (x_1 : imm tagged) =
+  cont `self` (x)
+    where rec `self` (x_1 : imm tagged) =
       let prim = %int_comp.gt (x_1, 0) in
       (switch prim
          | 0 -> k2
          | 1 -> k (x_1)
          where k2 =
            let int_add = %int_barith.add (x_1, 1) in
-           cont self (int_add))
+           cont `self` (int_add))
 in
 let $camlFunctor_call__foo_5 =
   closure foo_1 @foo
