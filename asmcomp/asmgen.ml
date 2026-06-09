@@ -485,6 +485,8 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   match !Oxcaml_flags.cfg_merge_functions with
   | false -> cfg_with_layout
   | true ->
+    (* CR xclerc: we should maybe guard the feature with
+       `-gdwarf-may-alter-codegen`. *)
     Profile.record ~accumulate:true "cfg_merge_functions"
       (Cfg_merge_functions.run fd_cmm.fun_name)
       cfg_with_layout)
