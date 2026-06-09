@@ -290,7 +290,6 @@ and expression_desc =
       { params : function_param list;
         body : function_body;
         ret_mode : Mode.Alloc.l modes;
-        ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         zero_alloc : Zero_alloc.t;
       }

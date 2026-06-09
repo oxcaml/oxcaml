@@ -380,7 +380,7 @@ let array_kind_of_elt env loc ty =
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
 
-let array_type_kind ~elt_ty env loc ty =
+let array_type_kind_raw ~elt_ty env loc ty =
   match scrape_poly env ty with
   | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
                               || Path.same p Predef.path_iarray ->
@@ -420,6 +420,12 @@ let array_type_kind ~elt_ty env loc ty =
           elt_kinding_failure = None;
         }))
     end
+
+let array_type_kind ~elt_ty env loc ty =
+  let snap = Btype.snapshot () in
+  let kind = array_type_kind_raw ~elt_ty env loc ty in
+  Btype.backtrack snap;
+  kind
 
 let array_type_mut env ty =
   match scrape_poly env ty with
@@ -1201,6 +1207,46 @@ let layout env loc sort ty =
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
+
+let layout_of_type env loc ty =
+  let jkind = Ctype.type_jkind_purely env ty in
+  match Jkind.get_layout_defaulting_to_scannable env jkind with
+  | None ->
+      Lambda.Ptop
+  | Some layout_const ->
+  match Jkind.Layout.Const.get_sort layout_const with
+  | Some sort ->
+      layout_of_const_sort_generic sort
+        ~value_kind:(lazy (value_kind env loc ty))
+        ~error:(function
+          | Base Scannable -> assert false
+          | Base Void as const ->
+            raise
+              (Error
+                 (loc,
+                  Sort_without_extension
+                    (Jkind.Sort.of_const const, Alpha, Some ty)))
+          | Base Float32 as const ->
+            raise (Error (loc, Small_number_sort_without_extension
+                                 (Jkind.Sort.of_const const, Some ty)))
+          | Base (Vec128 | Vec256 | Vec512) as const ->
+            raise (Error (loc, Simd_sort_without_extension
+                                 (Jkind.Sort.of_const const, Some ty)))
+          | (Base
+              (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32
+              | Bits64)
+            | Product _)
+            as const ->
+            raise
+              (Error
+                 (loc,
+                  Sort_without_extension
+                    (Jkind.Sort.of_const const, Stable, Some ty)))
+          | Univar _ -> assert false
+          | Genvar _ -> assert false
+        )
+  | None ->
+      Lambda.Ptop
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

@@ -52,6 +52,9 @@ val bigarray_specialize_kind_and_layout :
 val layout :
   Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
 
+val layout_of_type :
+  Env.t -> Location.t -> Types.type_expr -> Lambda.layout
+
 (* These translate a type system sort to a lambda layout.  The function [layout]
    gives a more precise result---this should only be used when the kind is
    needed for compilation but the precise Lambda.layout isn't needed for

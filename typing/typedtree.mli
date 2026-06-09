@@ -485,7 +485,6 @@ and expression_desc =
         ret_mode : Mode.Alloc.l modes;
         (* Mode where the function allocates, ie local for a function of
            type 'a -> local_ 'b, and heap for a function of type 'a -> 'b *)
-        ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         (* Mode at which the closure is allocated *)
         zero_alloc : Zero_alloc.t;
