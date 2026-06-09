@@ -21,6 +21,24 @@ module I_or_f = K.Standard_int_or_float
 module L = Lambda
 module P = Flambda_primitive
 
+(* Symbol identifying the module block at [path] within the current compilation
+   unit. For the toplevel module (a [Pident] whose name matches the current
+   compilation unit) we return the same symbol that [Closure_conversion] uses
+   for the actual module block. *)
+let module_block_symbol_for_path path =
+  let cu = Compilation_unit.get_current_exn () in
+  let current_unit_name =
+    Compilation_unit.Name.to_string (Compilation_unit.name cu)
+  in
+  match[@warning "-fragile-match"] path with
+  | Path.Pident id when String.equal (Ident.name id) current_unit_name ->
+    Symbol.create_wrapped (Flambda2_import.Symbol.for_compilation_unit cu)
+  | _ ->
+    let mangled =
+      String.map (function '.' -> '_' | c -> c) (Path.name path)
+    in
+    Symbol.create cu (Linkage_name.of_string ("caml_module_block_" ^ mangled))
+
 let needs_64_bit_target prim dbg =
   if not (Target_system.is_64_bit ())
   then
@@ -1786,7 +1804,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
+  | ( ( Pmakeblock (tag, mutability, shape, mode)
+      | Pinit_module_block (tag, mutability, shape, mode, _) ),
+      _ ) -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
@@ -3346,16 +3366,69 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
 module Acc = Closure_conversion_aux.Acc
 module Expr_with_acc = Closure_conversion_aux.Expr_with_acc
 
+(* [Pinit_module_block (tag, _, _, _, path)] is translated directly into a
+   [Let_with_acc] binding the module's symbol to a [Static_const.block]. The
+   "result" handed to [cont] is [Simple.symbol module_symbol] so the calling
+   code sees the symbol as the value produced by the primitive. This replaces
+   the previous translation, which created a runtime block via [Make_block] and
+   required [wrap_final_module_block] to rebind it as a let-symbol. *)
+let emit_init_module_block_let_symbol acc (path : Path.t) (tag : int)
+    ~(args : Simple.t list list)
+    (cont : Acc.t -> Flambda.Named.t list -> Expr_with_acc.t) : Expr_with_acc.t
+    =
+  let symbol = module_block_symbol_for_path path in
+  let field_simples =
+    List.flatten args
+    |> List.map (fun simple ->
+        Simple.With_debuginfo.create simple Debuginfo.none)
+  in
+  let static_const =
+    Static_const.block
+      (Tag.Scannable.create_exn tag)
+      Immutable Value_only field_simples
+  in
+  let approxs =
+    args |> List.flatten
+    |> List.map (fun _simple -> Value_approximation.Unknown Flambda_kind.value)
+    |> Array.of_list
+  in
+  let approx : _ Value_approximation.t =
+    Block_approximation
+      ( Tag.Scannable.create_exn tag,
+        Flambda_kind.Scannable_block_shape.Value_only,
+        approxs,
+        Alloc_mode.For_allocations.as_type Alloc_mode.For_allocations.heap )
+  in
+  let acc = Acc.add_symbol_approximation acc symbol approx in
+  let bound_static =
+    Bound_static.singleton (Bound_static.Pattern.block_like symbol)
+  in
+  let named =
+    Flambda.Named.create_static_consts
+      (Flambda.Static_const_group.create
+         [Flambda.Static_const_or_code.create_static_const static_const])
+  in
+  let acc, body_expr =
+    cont acc [Flambda.Named.create_simple (Simple.symbol symbol)]
+  in
+  Closure_conversion_aux.Let_with_acc.create acc
+    (Bound_pattern.static bound_static)
+    named ~body:body_expr
+
 let convert_and_bind acc ~big_endian exn_cont ~register_const0
     (prim : L.primitive) ~(args : Simple.t list list) (dbg : Debuginfo.t)
     ~current_region ~current_ghost_region
     (cont : Acc.t -> Flambda.Named.t list -> Expr_with_acc.t) : Expr_with_acc.t
     =
-  let machine_width = Acc.machine_width acc in
-  let exprs =
-    convert_lprim ~machine_width ~big_endian prim args dbg ~current_region
-      ~current_ghost_region
-  in
-  H.bind_recs acc exn_cont ~register_const0
-    (H.maybe_create_unboxed_product exprs)
-    dbg cont
+  match[@warning "-fragile-match"] prim with
+  | Pinit_module_block (tag, _mut, _shape, _mode, path) ->
+    emit_init_module_block_let_symbol acc path tag ~args cont
+  | _ ->
+    let machine_width = Acc.machine_width acc in
+    let exprs =
+      convert_lprim ~machine_width ~big_endian prim args dbg ~current_region
+        ~current_ghost_region
+    in
+    H.bind_recs acc exn_cont ~register_const0
+      (H.maybe_create_unboxed_product exprs)
+      dbg cont

@@ -268,7 +268,8 @@ let compute_static_size lam =
             Misc.fatal_error
               "size_of_primitive: unexpected variable representation"
         end
-    | Pmakeblock (_, _, shape, _) ->
+    | Pmakeblock (_, _, shape, _)
+    | Pinit_module_block (_, _, shape, _, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
