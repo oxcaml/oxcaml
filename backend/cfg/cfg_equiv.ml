@@ -358,9 +358,19 @@ let equiv_terminator subst (left : Cfg.terminator) (right : Cfg.terminator) =
       _ ) ->
     false
 
+(* [same_loc] alone is not enough: it compares locations only up to register or
+   stack class, which conflates machtype components that share a class (e.g.
+   [Val], [Int], and [Addr] all map to the integer stack class). That
+   distinction matters here because [Val] denotes a GC root recorded in the
+   frame descriptor at call sites, whereas [Int] does not. Two bodies that are
+   instruction-identical at the location level but disagree on whether a live
+   value is a pointer have different frame tables; merging them and keeping only
+   one body would drop a GC root, so we additionally require the machtype
+   components to be equal. *)
 let same_loc r1 r2 =
   Reg.same_loc_fatal_on_unknown
     ~fatal_message:"Cfg_equiv: unknown register location." r1 r2
+  && Cmm.equal_machtype_component r1.Reg.typ r2.Reg.typ
 
 let equiv_instruction : type a.
     equiv_desc:(Cfg_equiv_subst.t -> a -> a -> bool) ->

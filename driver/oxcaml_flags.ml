@@ -47,6 +47,8 @@ let cfg_prologue_shrink_wrap_threshold = ref 16384
 
 let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
+let cfg_merge_functions = ref false     (* -[no]-cfg-merge-functions *)
+
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)

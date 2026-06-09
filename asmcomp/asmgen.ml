@@ -99,6 +99,7 @@ let (pass_to_cfg : Cfg_format.cfg_unit_info Compiler_pass_map.t) =
 
 let reset () =
   Zero_alloc_checker.reset_unit_info ();
+  Cfg_merge_functions.reset_unit_info ();
   start_from_emit := false;
   Compiler_pass_map.iter
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
@@ -480,6 +481,15 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
           ~stack_slots:(fun x ->
             (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
           ~f:Cfg_available_regs.run)
+  ++ (fun cfg_with_layout ->
+  match !Oxcaml_flags.cfg_merge_functions with
+  | false -> cfg_with_layout
+  | true ->
+    (* CR xclerc: we should maybe guard the feature with
+       `-gdwarf-may-alter-codegen`. *)
+    Profile.record ~accumulate:true "cfg_merge_functions"
+      (Cfg_merge_functions.run fd_cmm.fun_name)
+      cfg_with_layout)
   ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
 let compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout =

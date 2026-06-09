@@ -87,6 +87,8 @@ type codegen_option =
         custom_error_msg : string option
       }
 
+val equal_codegen_option : codegen_option -> codegen_option -> bool
+
 val of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list
 
 (* CR-someday xclerc: we should probably make `t` abstract and make each and

@@ -662,6 +662,8 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-shrink-wrap";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
+    "-cfg-merge-functions";
+    "-no-cfg-merge-functions";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";

@@ -21,6 +21,15 @@ val basic : Cfg.basic -> int
 
 val terminator : Cfg.terminator -> int
 
-val basic_instruction_list : Cfg.basic Cfg.instruction DLL.t -> int
+(** When [ignore_name_for_debugger] is [true], [Op (Name_for_debugger _)] cells
+    are skipped: they do not contribute to the hash and do not shift later cells
+    out of the bounded walk window. Callers that compare with [Cfg_equiv]'s
+    [~ignore_name_for_debugger:true] should pass the same value here, otherwise
+    functions equivalent up to [Name_for_debugger] placement can land in
+    different buckets and be missed. *)
+val basic_instruction_list :
+  ignore_name_for_debugger:bool -> Cfg.basic Cfg.instruction DLL.t -> int
 
-val basic_block : Cfg.basic_block -> int
+val basic_block : ignore_name_for_debugger:bool -> Cfg.basic_block -> int
+
+val cfg_with_layout : ignore_name_for_debugger:bool -> Cfg_with_layout.t -> int

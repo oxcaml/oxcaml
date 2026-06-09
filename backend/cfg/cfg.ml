@@ -65,6 +65,51 @@ type codegen_option =
         custom_error_msg : string option
       }
 
+(* The destructuring style intentionally matches [Cfg_equiv_specific]: each
+   constructor is named explicitly so that a new variant of [codegen_option]
+   causes a compile error rather than being silently treated as equal. *)
+let equal_codegen_option (l : codegen_option) (r : codegen_option) =
+  let equal_location (l : Location.t) (r : Location.t) =
+    Int.equal (Location.compare l r) 0
+  in
+  match l, r with
+  | Reduce_code_size, Reduce_code_size
+  | No_CSE, No_CSE
+  | Use_linscan_regalloc, Use_linscan_regalloc
+  | Cold, Cold ->
+    true
+  | Use_regalloc l_ra, Use_regalloc r_ra ->
+    Clflags.Register_allocator.equal l_ra r_ra
+  | Use_regalloc_param l_params, Use_regalloc_param r_params ->
+    List.equal String.equal l_params r_params
+  | ( Assume_zero_alloc
+        { strict = l_strict;
+          never_returns_normally = l_nrn;
+          never_raises = l_nr;
+          loc = l_loc
+        },
+      Assume_zero_alloc
+        { strict = r_strict;
+          never_returns_normally = r_nrn;
+          never_raises = r_nr;
+          loc = r_loc
+        } ) ->
+    Bool.equal l_strict r_strict
+    && Bool.equal l_nrn r_nrn && Bool.equal l_nr r_nr
+    && equal_location l_loc r_loc
+  | ( Check_zero_alloc
+        { strict = l_strict; loc = l_loc; custom_error_msg = l_msg },
+      Check_zero_alloc
+        { strict = r_strict; loc = r_loc; custom_error_msg = r_msg } ) ->
+    Bool.equal l_strict r_strict
+    && equal_location l_loc r_loc
+    && Option.equal String.equal l_msg r_msg
+  | ( ( Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
+      | Use_regalloc_param _ | Cold | Assume_zero_alloc _ | Check_zero_alloc _
+        ),
+      _ ) ->
+    false
+
 let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
  fun cmm_options ->
   match cmm_options with
