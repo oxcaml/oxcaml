@@ -1119,7 +1119,8 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->
   match block_access_kind with Any_value -> Pointer | Immediate -> Immediate
 
-let unary_primitive env res dbg f arg =
+let unary_primitive env res dbg f (_arg_simple : Simple.t option)
+    (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
@@ -1253,7 +1254,42 @@ let unary_primitive env res dbg f arg =
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
-let binary_primitive env dbg f x y =
+(* CR mshinwell: Apply the logic in address_for_offset_prim to normal array
+   access *)
+
+(* Compute the address used by [Read_offset] / [Write_offset]: [x] is the base
+   address (constant zero indicates an out-of-heap pointer; anything else
+   produces a derived heap pointer) and [y] is the byte offset. [y_simple] is
+   the original [Simple.t] from which [y] was translated, when known; it is used
+   to look through pure delayed let-bindings in [env] to expose any additive
+   structure in [y]. We then try to reassociate [x + (x' + ...) --> (x + x') +
+   ...], so the backend CSE can factor out an addition that is likely to be the
+   same across repeated [Read_offset]/[Write_offset]s. *)
+let address_for_offset_prim env dbg (x : Cmm.expression) (y : Cmm.expression)
+    (y_simple : Simple.t option) =
+  let ptr_out_of_heap =
+    match[@ocaml.warning "-fragile-match"] x with
+    | Cconst_int (0, _) | Cconst_natint (0n, _) -> true
+    | _ -> false
+  in
+  let addition_fn =
+    (* This will permit more CSE if out of heap. *)
+    if ptr_out_of_heap then C.add_int else C.add_int_addr
+  in
+  let y =
+    match Option.bind y_simple Simple.must_be_var with
+    | Some (y_var, _coercion) -> (
+      match Env.find_pure_bound_cmm_expr env y_var with
+      | Some cmm -> cmm
+      | None -> y)
+    | None -> y
+  in
+  match[@ocaml.warning "-fragile-match"] y with
+  | Cop (Caddi, [x'; y'], dbg) -> addition_fn (addition_fn x x' dbg) y' dbg
+  | _ -> addition_fn x y dbg
+
+let binary_primitive env dbg f _x_simple (y_simple : Simple.t option)
+    (x : Cmm.expression) (y : Cmm.expression) =
   match (f : P.binary_primitive) with
   | Block_set { kind; init; field } ->
     block_set ~dbg kind init ~field ~block:x ~new_value:y
@@ -1286,11 +1322,12 @@ let binary_primitive env dbg f x y =
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
   | Read_offset (kind, mut) ->
-    let addr = C.add_int x y dbg in
+    let addr = address_for_offset_prim env dbg x y y_simple in
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
-let ternary_primitive _env dbg f x y z =
+let ternary_primitive env dbg f _x_simple (y_simple : Simple.t option) _z_simple
+    (x : Cmm.expression) (y : Cmm.expression) z =
   match (f : P.ternary_primitive) with
   | Array_set (array_kind, array_set_kind) ->
     array_set ~dbg array_kind array_set_kind ~arr:x ~index:y ~new_value:z
@@ -1343,12 +1380,15 @@ let ternary_primitive _env dbg f x y z =
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
       else
-        let addr = C.add_int x y dbg in
+        let addr = address_for_offset_prim env dbg x y y_simple in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
 
-let quaternary_primitive _env dbg f x y z w =
+let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (_z_simple : Simple.t option)
+    (_w_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression)
+    (z : Cmm.expression) (w : Cmm.expression) =
   match (f : P.quaternary_primitive) with
   | Atomic_compare_and_set_field block_access_kind ->
     C.atomic_compare_and_set_field ~dbg
@@ -1399,18 +1439,20 @@ let arg_list' ?consider_inlining_effectful_expressions ~dbg env res l =
 
 let trans_prim : To_cmm_env.t To_cmm_env.trans_prim =
   { nullary = nullary_primitive;
-    unary = unary_primitive;
+    unary = (fun env res dbg prim x -> unary_primitive env res dbg prim None x);
     binary =
       (fun env res dbg prim x y ->
-        let cmm = binary_primitive env dbg prim x y in
+        let cmm = binary_primitive env dbg prim None None x y in
         None, res, cmm);
     ternary =
       (fun env res dbg prim x y z ->
-        let cmm = ternary_primitive env dbg prim x y z in
+        let cmm = ternary_primitive env dbg prim None None None x y z in
         None, res, cmm);
     quaternary =
       (fun env res dbg prim x y z w ->
-        let cmm = quaternary_primitive env dbg prim x y z w in
+        let cmm =
+          quaternary_primitive env dbg prim None None None None x y z w
+        in
         None, res, cmm);
     variadic =
       (fun env res dbg prim args ->
@@ -1466,43 +1508,49 @@ let prim_simple env res dbg p =
     let extra, res, expr = nullary_primitive env res dbg prim in
     Env.simple expr free_vars, extra, env, res, Ece.pure
   | Unary (unary, x) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let extra, res, expr = unary_primitive env res dbg unary x.cmm in
-    Env.simple expr x.free_vars, extra, env, res, x.effs
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let extra, res, expr = unary_primitive env res dbg unary (Some x) x'.cmm in
+    Env.simple expr x'.free_vars, extra, env, res, x'.effs
   | Binary (binary, x, y) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let free_vars = Backend_var.Set.union x.free_vars y.free_vars in
-    let effs = Ece.join x.effs y.effs in
-    let expr = binary_primitive env dbg binary x.cmm y.cmm in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let free_vars = Backend_var.Set.union x'.free_vars y'.free_vars in
+    let effs = Ece.join x'.effs y'.effs in
+    let expr =
+      binary_primitive env dbg binary (Some x) (Some y) x'.cmm y'.cmm
+    in
     Env.simple expr free_vars, None, env, res, effs
   | Ternary (ternary, x, y, z) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let To_cmm_env.{ env; res; expr = z } = arg env res z in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let To_cmm_env.{ env; res; expr = z' } = arg env res z in
     let free_vars =
       Backend_var.Set.union
-        (Backend_var.Set.union x.free_vars y.free_vars)
-        z.free_vars
+        (Backend_var.Set.union x'.free_vars y'.free_vars)
+        z'.free_vars
     in
-    let effs = Ece.join (Ece.join x.effs y.effs) z.effs in
-    let expr = ternary_primitive env dbg ternary x.cmm y.cmm z.cmm in
+    let effs = Ece.join (Ece.join x'.effs y'.effs) z'.effs in
+    let expr =
+      ternary_primitive env dbg ternary (Some x) (Some y) (Some z) x'.cmm y'.cmm
+        z'.cmm
+    in
     Env.simple expr free_vars, None, env, res, effs
   | Quaternary (quaternary, x, y, z, w) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let To_cmm_env.{ env; res; expr = z } = arg env res z in
-    let To_cmm_env.{ env; res; expr = w } = arg env res w in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let To_cmm_env.{ env; res; expr = z' } = arg env res z in
+    let To_cmm_env.{ env; res; expr = w' } = arg env res w in
     let free_vars =
       Backend_var.Set.union
         (Backend_var.Set.union
-           (Backend_var.Set.union x.free_vars y.free_vars)
-           z.free_vars)
-        w.free_vars
+           (Backend_var.Set.union x'.free_vars y'.free_vars)
+           z'.free_vars)
+        w'.free_vars
     in
-    let effs = Ece.join (Ece.join (Ece.join x.effs y.effs) z.effs) w.effs in
+    let effs = Ece.join (Ece.join (Ece.join x'.effs y'.effs) z'.effs) w'.effs in
     let expr =
-      quaternary_primitive env dbg quaternary x.cmm y.cmm z.cmm w.cmm
+      quaternary_primitive env dbg quaternary (Some x) (Some y) (Some z)
+        (Some w) x'.cmm y'.cmm z'.cmm w'.cmm
     in
     Env.simple expr free_vars, None, env, res, effs
   | Variadic (variadic, l) ->
