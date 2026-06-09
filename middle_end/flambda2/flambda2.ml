@@ -66,7 +66,8 @@ let dump_fexpr_annot ~prefixname suffix unit =
       (prefixname ^ "." ^ suffix ^ ".fl")
       (fun out ->
         let ppf = Format.formatter_of_out_channel out in
-        pp_flambda_as_fexpr ppf unit;
+        Flambda_colours.without_colours ~f:(fun () ->
+            pp_flambda_as_fexpr ppf unit);
         Format.pp_print_flush ppf ())
 
 let print_rawflambda ppf unit =
