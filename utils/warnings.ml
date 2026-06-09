@@ -151,7 +151,6 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
-  | Useless_lpoly                           (* 217 *)
   | Lpoly_in_letrec                         (* 218 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
@@ -251,7 +250,6 @@ let number = function
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
-  | Useless_lpoly -> 217
   | Lpoly_in_letrec -> 218
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
@@ -1374,9 +1372,6 @@ let message = function
       implied implying
   | Use_during_borrowing ->
       "This value is used while being borrowed."
-  | Useless_lpoly ->
-      "This binding has no layout variables, so \"poly_\" has no effect. \
-       Consider using a regular \"let\" instead."
   | Lpoly_in_letrec ->
       "\"poly_\" has no effect in recursive bindings, which do not support \
        layout polymorphism. Consider using a regular \"let rec\" instead."
