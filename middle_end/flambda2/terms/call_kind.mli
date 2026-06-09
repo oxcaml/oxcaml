@@ -29,7 +29,7 @@ module Function_call : sig
 end
 
 module Method_kind : sig
-  type t = private
+  type t =
     | Self
     | Public
     | Cached
