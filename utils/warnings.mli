@@ -156,6 +156,7 @@ type t =
   | Use_during_borrowing                    (* 216 *)
   | Useless_lpoly                           (* 217 *)
   | Lpoly_in_letrec                         (* 218 *)
+  | Useless_valpoly                         (* 219 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

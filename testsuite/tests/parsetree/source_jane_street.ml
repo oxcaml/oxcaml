@@ -1721,13 +1721,22 @@ Uncaught exception: Misc.Fatal_error
 
 module type S_poly = sig
   val poly_ f : 'a. 'a -> 'a
-  val poly_ g : 'a 'b. 'a -> 'b -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+  val poly_ h : 'a -> 'b -> 'a
 end
 [%%expect{|
-Line 2, characters 2-28:
+Line 2, characters 16-28:
 2 |   val poly_ f : 'a. 'a -> 'a
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "val poly_" annotation is not yet implemented.
+                    ^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables, so
+"poly_" has no effect. Consider using a regular "val" instead.
+
+module type S_poly =
+  sig
+    val f : 'a -> 'a
+    val g : layout_ l. 'a 'b ('c : l). 'a -> 'b -> 'c -> 'a
+    val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+  end
 |}]
 
 let poly_ f : 'a. 'a -> 'a = fun x -> x
