@@ -1861,6 +1861,7 @@ and tree_of_typfields rest = function
       (field :: fields, rest)
 
 and tree_of_package mode {pack_path; pack_cstrs} =
+  let pack_path = best_module_type_path pack_path in
   { opack_path = tree_of_path (Some Module_type) pack_path;
     opack_cstrs =
       List.map
@@ -2622,28 +2623,10 @@ let tree_of_jkind_declaration id decl =
 (* Print a module type *)
 
 let wrap_env fenv ftree arg =
-  (* We save the current value of the short-path cache *)
-  (* From keys *)
   let env = !printing_env in
-  let old_pers = !printing_pers in
-  (* to data *)
-  let old_map = !printing_map in
-  let old_depth = !printing_depth in
-  let old_cont = !printing_cont in
-  set_printing_env (fenv env);
+  let env' = Env.update_short_paths (fenv env) in
+  set_printing_env env';
   let tree = ftree arg in
-  if !Clflags.real_paths
-     || same_printing_env env then ()
-   (* our cached key is still live in the cache, and we want to keep all
-      progress made on the computation of the [printing_map] *)
-  else begin
-    (* we restore the snapshotted cache before calling set_printing_env *)
-    printing_old := env;
-    printing_pers := old_pers;
-    printing_depth := old_depth;
-    printing_cont := old_cont;
-    printing_map := old_map
-  end;
   set_printing_env env;
   tree
 
@@ -2685,17 +2668,14 @@ let hide ids env =
   let hide_id id env =
     (* Global idents cannot be renamed *)
     if id.hide && not (Ident.is_global_or_predef id.ident) then
-      Env.add_type ~check:false (Ident.rename id.ident) dummy env
+      Env.add_type ~check:false (Ident.rename_no_exn id.ident) dummy env
     else env
   in
   List.fold_right hide_id ids env
 
 let with_hidden_items ids f =
   let with_hidden_in_printing_env ids f =
-    wrap_env
-      (fun env -> Env.update_short_paths (hide ids env))
-      (Ident_names.with_hidden ids)
-      f
+    wrap_env (hide ids) (Ident_names.with_hidden ids) f
   in
   if not !Clflags.real_paths then
     with_hidden_in_printing_env ids f
@@ -2766,6 +2746,7 @@ end
 
 let rec tree_of_modtype ?abbrev = function
   | Mty_ident p ->
+      let p = best_module_type_path p in
       Omty_ident (tree_of_path (Some Module_type) p)
   | Mty_signature sg ->
       Omty_signature (tree_of_signature ?abbrev sg)
@@ -2778,9 +2759,9 @@ let rec tree_of_modtype ?abbrev = function
       let mres = m_res |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
       Omty_functor (param, res, mres))
   | Mty_alias p ->
+      let p = best_module_path p in
       Omty_alias (tree_of_path (Some Module) p)
-  | Mty_for_hole ->
-      Omty_hole
+  | Mty_for_hole -> Omty_hole
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
       | Mty_strengthen (mty,p,a) ->
