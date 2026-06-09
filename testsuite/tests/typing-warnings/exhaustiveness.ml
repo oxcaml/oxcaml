@@ -309,7 +309,7 @@ Error: This match case could not be refuted.
 
 let f x = match x with _ -> () | None -> .;; (* do not warn *)
 [%%expect {|
-val f : 'a option -> unit = <fun>
+val f : ('a : any). 'a option -> unit = <fun>
 |}]
 
 (* #7059, all clauses guarded *)
