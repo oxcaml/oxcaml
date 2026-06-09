@@ -1893,10 +1893,19 @@ end = struct
 
   let check_sig_item ?info names loc (item:Signature_group.rec_group) =
     let check ?info names loc item =
-      let all = List.map classify (Signature_group.flatten item) in
+      let items = Signature_group.flatten item in
+      let all = List.map classify items in
       let group = List.map snd all in
-      List.iter (fun (kind,id) -> check_item ?info names loc kind id group)
-        all
+      List.iter2 (fun sig_item (kind,id) ->
+          match info, Types.item_visibility sig_item with
+          | None, Hidden ->
+              (* A [Hidden] item (e.g. a [-alias] declaration carried in an
+                 included module's signature) is identified only by ident, never
+                 by name, so it takes no part in the (name-based) uniqueness
+                 check: leave it to coexist with any same-named component. *)
+              ()
+          | _ -> check_item ?info names loc kind id group)
+        items all
     in
     (* we can ignore x.pre_ghosts: they are eliminated by strengthening, and
        thus never appear in includes *)
@@ -4393,6 +4402,38 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
+(* [-alias <from> <to>] adds a [module from = to] alias to the unit being
+   compiled: the source may refer to [from] as the persistent module [to]. The
+   alias is added both to [env] (so the rest of the structure/signature type-
+   checks) and, as a [Hidden] item, to the outcome signature (so it is recorded
+   in the .cmi for consumers but omitted from the printed interface). It has no
+   runtime presence ([Mp_absent]). Returns the [Hidden] items (in reverse
+   order, ready to [List.rev_append] onto the inferred signature) and the
+   augmented environment. *)
+let module_aliases_sig_and_env env =
+  List.fold_left
+    (fun (items, env) (from_, to_) ->
+       let id = Ident.create_local from_ in
+       let to_name = Global_module.Name.create_no_args to_ in
+       (* Record [to_] among the unit's globals so references redirected to it
+          (see [Env.prefix_idents]) resolve in a consumer's [cmi_globals]. *)
+       Env.register_alias_target to_name;
+       let to_path = Pident (Ident.create_global to_name) in
+       let md =
+         { md_type = Mty_alias to_path;
+           md_modalities = Mode.Modality.(Const.id |> of_const);
+           md_attributes = [];
+           md_loc = Location.none;
+           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+         }
+       in
+       let env =
+         Env.add_module_declaration ~check:false id Mp_absent md
+           ~mode:Value.legacy env
+       in
+       (Sig_module (id, Mp_absent, md, Trec_not, Hidden) :: items, env))
+    ([], env) !Clflags.module_aliases
+
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
   let error e =
@@ -4419,9 +4460,13 @@ let type_implementation target modulename initial_env ast =
         ignore @@ Warnings.parse_options false "-32-34-37-38-60-191";
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
-      let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
+      let alias_sig_items, alias_env =
+        module_aliases_sig_and_env initial_env
       in
+      let (str, sg, mode, names, shape, finalenv) =
+        Profile.record_call "infer" (fun () -> type_structure alias_env ast)
+      in
+      let sg = List.rev_append alias_sig_items sg in
       Value.submode_err (Location.in_file sourcefile, Structure)
         mode (Env.mode_unit ~staticity:Staticity.Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
@@ -4639,7 +4684,11 @@ let type_interface ~sourcefile modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
-  let sg = transl_signature env ast in
+  let alias_sig_items, alias_env = module_aliases_sig_and_env env in
+  let sg = transl_signature alias_env ast in
+  let sg =
+    { sg with sig_type = List.rev_append alias_sig_items sg.sig_type }
+  in
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string

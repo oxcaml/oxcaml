@@ -79,6 +79,7 @@ val objfiles : string list ref
 val ccobjs : string list ref
 val dllibs : string list ref
 val cmi_file : string option ref
+val module_aliases : (string * string) list ref
 val compile_only : bool ref
 val output_name : string option ref
 val include_dirs : visible_include list ref

@@ -491,6 +491,17 @@ let pair_components subst sig1_comps sig2 =
   let rec pair subst paired unpaired = function
     | [] ->
       paired, unpaired, subst
+  | item2 :: rem when item_visibility item2 = Hidden ->
+      (* A [Hidden] item is identified only by ident, never by name, so it
+         takes no part in the (name-based) inclusion pairing. The [-alias]
+         declarations that produce such items are non-runtime ([Mp_absent]); a
+         runtime [Hidden] item would occupy a coercion slot we'd need to
+         preserve, which isn't handled here -- it shouldn't reach this point
+         (target signatures are post-[simplify]), so fail loudly if it does. *)
+      if is_runtime_component item2 then
+        Misc.fatal_error
+          "Includemod.pair_components: unexpected runtime hidden component";
+      pair subst paired unpaired rem
   | item2 :: rem ->
       let (id2, _loc, name2) = item_ident_name item2 in
       let name2, report =
@@ -878,7 +889,12 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
   let sig1 = force_signature_once sig1 in
   let sig2 = force_signature_once sig2 in
   let new_env =
-    Env.add_signature_lazy sig1 (Env.in_signature true env) in
+    (* [sig2]'s [Hidden] items (e.g. [-alias] declarations) take no part in the
+       name-based pairing, but [sig2]'s visible components may still mention
+       them by ident (e.g. [val w : Foo.t] where [Foo] is hidden). Add them to
+       the environment so such references resolve. *)
+    let hidden_sig2 = List.filter (fun i -> item_visibility i = Hidden) sig2 in
+    Env.add_signature_lazy (sig1 @ hidden_sig2) (Env.in_signature true env) in
   (* Keep ids for module aliases *)
   let (id_pos_list,_) =
     List.fold_left

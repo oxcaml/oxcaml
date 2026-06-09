@@ -1,0 +1,4 @@
+File "use_foo.ml", line 2, characters 8-13:
+2 | let y = Foo.x
+            ^^^^^
+Error: Unbound module "Foo"
