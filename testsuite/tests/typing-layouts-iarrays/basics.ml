@@ -130,7 +130,7 @@ let d (x : 'a iarray) = get x 0
 [%%expect{|
 external get : ('a : any separable). 'a iarray -> int -> float
   = "%floatarray_safe_get"
-val d : ('a : value_maybe_null). 'a iarray -> float = <fun>
+val d : ('a : any separable). 'a iarray -> float = <fun>
 |}];;
 
 external get : int32# iarray -> int -> float = "%floatarray_safe_get"
