@@ -103,6 +103,41 @@ let equivalent ~(fun_symbol : Cmm.symbol) ~(cfg_with_layout : Cfg_with_layout.t)
     (* Seed self-recursion: a `Direct fun_symbol` in the incoming body must be
        considered equivalent to a `Direct repr.fun_symbol` in [repr]'s body. *)
     Cfg_equiv_subst.add_symbol subst fun_symbol repr.fun_symbol;
+    (* CR xclerc: we could also seed [subst] with the mappings of every function
+       already merged in this unit (each merged function's symbol -> its
+       representative's symbol). That would let us merge two functions that are
+       identical except that one calls [g2] where the other calls [g1], when
+       [g2] has itself already been merged into [g1]. The quick hash ignores
+       symbol identity (it hashes constructor tags only), so such pairs do land
+       in the same bucket and would get here.
+
+       It is *not* done today because it would be unsound as [subst] is
+       currently consumed. [Cfg_equiv] applies [subst_symbol] in two kinds of
+       position with the same map:
+       - call positions ([Direct]/[Indirect], [Tailcall_func], [Call]): mapping
+         a merged symbol to its representative is sound, because the merged
+         function is now a thunk that tail-jumps to the representative, so
+         calling either runs the same code;
+       - value/address positions ([Const_symbol], and [Ibased] addressing
+         modes -- e.g. a code pointer embedded in a closure): unsound. The whole
+         point of the tail-call-thunk strategy (over a symbol alias) is to keep
+         distinct addresses for the merged function and its representative, so
+         [&g2] and [&g1] must not be treated as equal. Anything comparing
+         closures/code pointers by physical equality would otherwise observe the
+         wrong identity.
+
+       To do it safely, [Cfg_equiv_subst] would need to split the symbol map
+       into a call-position map and a value-position map; [Cfg_equiv] would
+       consult the call map only from the call/tailcall cases and the
+       (identity-only) value map from [Const_symbol]/[Ibased]; and the merged
+       mappings -- and arguably the self-recursion seed above, which has the
+       same latent value-position issue if a function embeds its own code symbol
+       -- would go into the call-position map only. Two further caveats: the
+       mapping is one-directional (it only helps when the incoming function
+       references the merged symbol and the representative references the
+       representative symbol), and it assumes a representative never itself
+       later becomes a thunk (true today: representatives are never
+       reprocessed). *)
     (* CR xclerc: [ignore_dbg]/[ignore_name_for_debugger] default to [true]:
        debug information must not prevent merging. Worth revisiting once we care
        about debugger fidelity for merged functions. *)
