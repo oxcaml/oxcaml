@@ -1816,6 +1816,12 @@ module Instruction_name = struct
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
         t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | UMAX_vector :
         ( triple,
           [ `Reg of
@@ -2079,6 +2085,7 @@ module Instruction_name = struct
         | TST -> "tst"
         | UADDLP_vector -> "uaddlp"
         | UBFM -> "ubfm"
+        | UDIV -> "udiv"
         | UMAX_vector -> "umax"
         | UMIN_vector -> "umin"
         | UMOV _ -> "umov"
@@ -2573,6 +2580,9 @@ module Instruction_name = struct
       | UBFM ->
         let (Quad (rd, rn, immr, imms)) = ops in
         [| o rd; o rn; o immr; o imms |]
+      | UDIV ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | UMAX_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
@@ -2681,14 +2691,15 @@ module Instruction = struct
     | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
     | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
     | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
-    | SCVTF | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _
-    | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector
-    | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR | STRB | STRH
-    | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register | SUB_immediate
-    | SUB_shifted_register | SUB_vector | SXTL _ | TST | UADDLP_vector | UBFM
-    | UMAX_vector | UMIN_vector | UMOV _ | UMULH | UMULL2_vector _
-    | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _ | UQXTN2 _
-    | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1 | ZIP2 ->
+    | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector | SMIN_vector
+    | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector
+    | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR
+    | STRB | STRH | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register
+    | SUB_immediate | SUB_shifted_register | SUB_vector | SXTL _ | TST
+    | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _ | UMULH
+    | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _
+    | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1
+    | ZIP2 ->
       None
 end
 

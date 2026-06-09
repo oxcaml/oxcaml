@@ -79,3 +79,63 @@ to_int:
   leaq  1(%rax,%rax), %rax
   ret
 |}]
+
+let unsigned_div x y = Int32_u.unsigned_div x y
+[%%expect_asm X86_64{|
+unsigned_div:
+  testq %rbx, %rbx
+  je    .L0
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %eax, %rax
+  ret
+.L0:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+let unsigned_rem x y = Int32_u.unsigned_rem x y
+[%%expect_asm X86_64{|
+unsigned_rem:
+  testq %rbx, %rbx
+  je    .L0
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %edx, %rax
+  ret
+.L0:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+let unsafe_unsigned_div x y = Int32_u.unsafe_unsigned_div x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_div:
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %eax, %rax
+  ret
+|}]
+
+let unsafe_unsigned_rem x y = Int32_u.unsafe_unsigned_rem x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_rem:
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %edx, %rax
+  ret
+|}]
