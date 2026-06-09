@@ -459,6 +459,15 @@ Error: Don't know how to untag this type. Only "int" and
        other immediate types can be untagged.
 |}];;
 
+external f10_11 : (int32#[@unsafe_unextended]) -> unit
+  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 19-25:
+1 | external f10_11 : (int32#[@unsafe_unextended]) -> unit
+                       ^^^^^^
+Error: Only types with layout bits8 or bits16 can be marked "unsafe_unextended".
+|}];;
+
 (*************************************************)
 (* Test 11: bits32 banned in extensible variants *)
 
