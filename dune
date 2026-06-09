@@ -744,7 +744,8 @@
   arm64_ast
   dwarf_low
   dwarf_high
-  binary_emitter_intf))
+  binary_emitter_intf
+  jit_symfile))
 
 (library
  (name oxcaml_common)

@@ -206,6 +206,127 @@ let jit_run entry_points =
       | Ok x -> Result x
       | Err s -> failwithf "Jit.run: %s" s)
 
+let elf_mach_for_arch () =
+  match Target_system.architecture () with
+  | X86_64 -> 0x3E (* EM_X86_64 *)
+  | AArch64 -> 0xB7 (* EM_AARCH64 *)
+  | _ -> 0
+
+(* Lazily initialise the perf jitdump writer the first time we have a JIT
+   phrase to record. The result (including failure) is cached so we don't
+   retry on every phrase. *)
+let perf_handle () =
+  match !Globals.perf_jitdump with
+  | Some h -> h
+  | None ->
+    let h = Perf_jitdump.init ~elf_mach:(elf_mach_for_arch ()) in
+    Globals.perf_jitdump := Some h;
+    h
+
+let is_local_label name =
+  String.length name >= 2
+  && Char.equal name.[0] '.'
+  && Char.equal name.[1] 'L'
+
+(** Append [JIT_CODE_LOAD] records to the perf jitdump for each user-visible
+    symbol in the just-loaded text section. Each record covers the bytes
+    from one symbol's offset to the next symbol's offset (or the end of the
+    assembled section for the last one); this gives [perf report]
+    per-function attribution rather than collapsing the whole phrase under
+    one name.
+
+    The dump file is the cue [perf inject --jit] uses to symbolicate samples
+    after the fact. On non-Linux this is a no-op (the writer's [init] returns
+    [None]). *)
+let register_with_perf (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r) ~text =
+  match perf_handle () with
+  | None -> ()
+  | Some h ->
+    let raw = Jit_text_section.binary_section text.value in
+    let assembled_size = E.Assembled_section.size raw in
+    let contents = E.Assembled_section.contents raw in
+    let base_addr = Address.to_int64 text.address in
+    (* Collect non-label symbols. *)
+    let symbols = ref [] in
+    E.Assembled_section.iter_labels_and_symbols raw
+      ~f:(fun target ~offset ->
+        let name =
+          match target with
+          | Binary_emitter_intf.Symbol s -> Asm_targets.Asm_symbol.encode s
+          | Binary_emitter_intf.Label l -> Asm_targets.Asm_label.encode l
+        in
+        if not (is_local_label name)
+        then symbols := (offset, name) :: !symbols);
+    (* Sort by offset so we can compute end-of-function as the next entry's
+       offset. *)
+    let sorted =
+      List.sort (fun (a, _) (b, _) -> compare a b) !symbols
+    in
+    let rec emit = function
+      | [] -> ()
+      | [ (off, name) ] ->
+        let size = assembled_size - off in
+        if size > 0
+        then
+          Perf_jitdump.emit_code_load h ~name
+            ~code_addr:(Int64.add base_addr (Int64.of_int off))
+            ~code_size:size
+            ~code:(String.sub contents off size)
+      | (off, name) :: ((next_off, _) :: _ as rest) ->
+        let size = next_off - off in
+        if size > 0
+        then
+          Perf_jitdump.emit_code_load h ~name
+            ~code_addr:(Int64.add base_addr (Int64.of_int off))
+            ~code_size:size
+            ~code:(String.sub contents off size);
+        emit rest
+    in
+    emit sorted
+
+(** Build an in-memory ELF symfile describing the just-loaded JIT'd code and
+    register it with GDB via the JIT-Interface protocol. On architectures
+    where the emitter does not implement [Gdb_jit_symfile.build] (currently
+    arm64), this is a no-op.
+
+    The [.text] entry's [sh_size] is set to [Jit_text_section.in_memory_size],
+    which covers the assembled text plus the GOT and PLT tables that follow
+    in memory. The trailing bytes in the symfile are zero-padded; GDB reads
+    actual instructions from inferior memory, not the symfile. *)
+let register_with_gdb (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r) ~text ~sections =
+  let address_table = Hashtbl.create 16 in
+  let runtime_size_table = Hashtbl.create 16 in
+  Hashtbl.add address_table Jit_text_section.name
+    (Address.to_int64 text.address);
+  Hashtbl.add runtime_size_table Jit_text_section.name
+    (Jit_text_section.in_memory_size (module E) text.value);
+  String.Map.iter sections ~f:(fun ~key:name ~data:{ address; value = _ } ->
+      Hashtbl.add address_table name (Address.to_int64 address));
+  let section_address name = Hashtbl.find_opt address_table name in
+  let section_runtime_size name = Hashtbl.find_opt runtime_size_table name in
+  let sections_list =
+    let init =
+      [ Jit_text_section.name, Jit_text_section.binary_section text.value ]
+    in
+    String.Map.fold sections ~init
+      ~f:(fun ~key:name ~data:{ address = _; value } acc ->
+        (name, value) :: acc)
+  in
+  match
+    E.Gdb_jit_symfile.build ~sections:sections_list ~section_address
+      ~section_runtime_size
+  with
+  | None -> ()
+  | Some symfile ->
+    let handle = Gdb_jit.register symfile in
+    Globals.gdb_jit_handles := handle :: !Globals.gdb_jit_handles
+
 (** Load and run assembled binary sections. This is the main generic JIT entry
     point that works with any architecture. *)
 let jit_load (type a r)
@@ -260,6 +381,8 @@ let jit_load (type a r)
   Debug.save_text_section (module E) ~phrase_name relocated_text;
   load_text (module E) relocated_text;
   load_sections (module E) addressed_sections;
+  register_with_gdb (module E) ~text:relocated_text ~sections:addressed_sections;
+  register_with_perf (module E) ~text:relocated_text;
   let entry_points = entry_points ~phrase_name symbols in
   let result = jit_run entry_points in
   outcome_ref := Some result

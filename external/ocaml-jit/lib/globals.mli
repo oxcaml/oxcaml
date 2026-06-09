@@ -19,3 +19,7 @@ open! Import
 val symbols : Symbols.t ref
 
 val debug : bool ref
+
+val gdb_jit_handles : Gdb_jit.handle list ref
+
+val perf_jitdump : Perf_jitdump.handle option option ref
