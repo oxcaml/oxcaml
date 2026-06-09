@@ -1,3 +1,9 @@
+File "c_inter.ml", line 2, characters 6-15:
+2 | type ('a : B.k3) s = 'a t
+          ^^^^^^^^^
+Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `value mod portable'.
 File "c_sub1.ml", line 13, characters 0-32:
 13 | type s2 : value mod portable = t
      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
