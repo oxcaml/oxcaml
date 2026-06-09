@@ -867,10 +867,7 @@ let offset ~loc ~idx ~index_kind n =
 let make_boxed_vec256 ~loc ~mode args =
   L.Lprim
     ( Preinterpret_tuple_as_boxed_vector Boxed_vec256,
-      [ Lprim
-          ( Pmakeblock (0, Immutable, [| Vec128; Vec128 |], mode),
-            args,
-            loc ) ],
+      [Lprim (Pmakeblock (0, Immutable, [| Vec128; Vec128 |], mode), args, loc)],
       loc )
 
 let boxed_vec256_to_mixed ~loc arg =
@@ -1017,8 +1014,8 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | Psetfield (_, _, _), [L.Lprim (Pgetglobal _, [], _); _] ->
     Misc.fatal_error
       "[Psetfield (Pgetglobal ...)] is forbidden upon entry to the middle end"
-  | Pfield (indexes, _, _), _
-    when List.exists (fun index -> index < 0) indexes ->
+  | Pfield (indexes, _, _), _ when List.exists (fun index -> index < 0) indexes
+    ->
     Misc.fatal_error "Pfield with negative field index"
   | Pfloatfield (i, _, _), _ when i < 0 ->
     Misc.fatal_error "Pfloatfield with negative field index"

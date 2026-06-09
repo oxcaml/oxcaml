@@ -1041,7 +1041,8 @@ let required_globals ~flambda body =
 let add_arg_block_to_module_representation (shape, shape_for_read) =
   (* NB: this assumes [arg_block] has layout value *)
   ( Array.append shape [| block_element_for_module |],
-    Array.append shape_for_read  [| block_element_with_locality_mode_for_module |]
+    Array.append shape_for_read
+      [| block_element_with_locality_mode_for_module |]
   )
 
 let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =

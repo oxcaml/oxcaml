@@ -119,8 +119,8 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
     Misc.fatal_error "[Root_initialization] should not appear in Flambda input"
 
 let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
-  (* This function is only called for uniform block shapes. We flatten
-     products of values into individual value fields. *)
+  (* This function is only called for uniform block shapes. We flatten products
+     of values into individual value fields. *)
   let rec collect_value_fields acc (elem : unit L.block_element) =
     match elem with
     | L.Value vk ->
@@ -1791,7 +1791,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
+  | Pmakeblock (tag, mutability, shape, mode), _ ->
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
@@ -1845,7 +1845,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           Misc.fatal_error
             "Pmakeblock: non-uniform block shape produced Value_only"
       in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and
@@ -1894,14 +1894,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
               num_bytes)) ]
   | Pmake_idx_field (shape, pos, path), [] ->
     needs_64_bit_target prim dbg;
-      let module W = Mixed_product_bytes.Wrt_path in
-      let { W.offset_bytes; gap_bytes } =
-        match W.offset_and_gap (W.count_shape shape pos path) with
-        | Some { offset_bytes; gap_bytes } -> { W.offset_bytes; gap_bytes }
-        | None ->
-          Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
-            Debuginfo.print_compact dbg
-      in
+    let module W = Mixed_product_bytes.Wrt_path in
+    let { W.offset_bytes; gap_bytes } =
+      match W.offset_and_gap (W.count_shape shape pos path) with
+      | Some { offset_bytes; gap_bytes } -> { W.offset_bytes; gap_bytes }
+      | None ->
+        Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
+          Debuginfo.print_compact dbg
+    in
     let idx_raw_value =
       Int64.add
         (Int64.shift_left
@@ -2094,8 +2094,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_float | Record_ufloat ->
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
-      | Record_inlined
-          (Ordinary { runtime_tag; _ }, shape, Variant_boxed _)
+      | Record_inlined (Ordinary { runtime_tag; _ }, shape, Variant_boxed _)
         when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
@@ -2104,7 +2103,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined (_, shape, _)
         when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
         Mixed
-      | Record_inlined ( Ordinary { runtime_tag; _ }, _, Variant_boxed _ ) ->
+      | Record_inlined (Ordinary { runtime_tag; _ }, _, Variant_boxed _) ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
@@ -2112,8 +2111,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined (Extension _, _, Variant_extensible) ->
         Values
           { tag = Tag.Scannable.zero;
-            (* The "+1" is because there is an extra field containing the
-                hashed constructor. *)
+            (* The "+1" is because there is an extra field containing the hashed
+               constructor. *)
             length = Target_ocaml_int.of_int machine_width (num_fields + 1)
           }
       | Record_inlined (Extension _, _, _)
@@ -2629,8 +2628,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     if List.length field_path < 1
     then Misc.fatal_error "Psetfield: field_path must be non-empty";
     let shape =
-      Mixed_block_shape.of_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      Mixed_block_shape.of_block_elements shape ~print_locality:(fun ppf () ->
+          Format.fprintf ppf "()")
     in
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
@@ -3194,8 +3193,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _
-      | Preinterpret_unboxed_int64_as_tagged_int63
+      | Patomic_load_field _ | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
@@ -3213,14 +3211,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
       | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
       | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
-      | Psetfloatfield _ | Psetufloatfield _
-      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-      | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-      | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-      | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+      | Psetfloatfield _ | Psetufloatfield _ | Pbigstring_load_i8 _
+      | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+      | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+      | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+      | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _

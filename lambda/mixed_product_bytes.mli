@@ -93,9 +93,9 @@ module Wrt_path : sig
       subelement *)
   val count : unit Lambda.block_element -> int list -> t
 
-  (** Similar to the above, except for a [block_shape] (which corresponds
-      to a boxed record, while a [unit block_element] corresponds to an
-      unboxed record (within an array or boxed record). *)
+  (** Similar to the above, except for a [block_shape] (which corresponds to a
+      boxed record, while a [unit block_element] corresponds to an unboxed
+      record (within an array or boxed record). *)
   val count_shape : Lambda.block_shape -> int -> int list -> t
 
   val all : t -> mpb

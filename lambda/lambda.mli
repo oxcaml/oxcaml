@@ -1182,8 +1182,7 @@ val layout_top : layout
 val layout_bottom : layout
 
 val block_element_for_module : unit block_element
-val block_element_with_locality_mode_for_module :
-  locality_mode block_element
+val block_element_with_locality_mode_for_module : locality_mode block_element
 
 
 (** [dummy_constant] produces a placeholder value with a recognizable

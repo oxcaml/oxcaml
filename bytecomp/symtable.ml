@@ -228,6 +228,13 @@ let rec transl_const = function
   | Const_base(Const_nativeint i)
   | Const_base(Const_unboxed_nativeint i) -> Obj.repr i
   | Const_immstring s -> Obj.repr s
+  | Const_block(_, shape, _) when not (Lambda.is_uniform_block_shape shape) ->
+      (* CR layouts v5.9: Support constant mixed blocks in bytecode, either by
+        dynamically allocating them once at top-level, or by supporting
+        marshaling into the cmo format for mixed blocks in bytecode.
+      *)
+      Misc.fatal_error
+        "[Const_block] with mixed block shape not supported in bytecode."
   | Const_block(tag, _shape, fields) ->
       let block = Obj.new_block tag (List.length fields) in
       let transl_field pos cst =

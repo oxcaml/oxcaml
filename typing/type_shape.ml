@@ -387,9 +387,9 @@ module Type_decl_shape = struct
     | Types.Scannable _ | Types.Void -> true
     | Types.Product elts -> Array.for_all mixed_block_element_is_all_value elts
     | Types.Float_boxed | Types.Float64 | Types.Float32 | Types.Bits8
-    | Types.Bits16 | Types.Bits32 | Types.Bits64
-    | Types.Untagged_immediate | Types.Vec128 | Types.Vec256
-    | Types.Vec512 | Types.Word -> false
+    | Types.Bits16 | Types.Bits32 | Types.Bits64 | Types.Untagged_immediate
+    | Types.Vec128 | Types.Vec256 | Types.Vec512 | Types.Word ->
+      false
 
   let mixed_block_shape_is_all_value shape =
     Array.for_all mixed_block_element_is_all_value shape
@@ -421,8 +421,8 @@ module Type_decl_shape = struct
 
   let of_complex_constructor type_subst name
       (cstr_args : Types.constructor_declaration)
-      ((constructor_shape, _) : Types.mixed_product_shape * _)
-      shape_for_constr =
+      ((constructor_shape, _) : Types.mixed_product_shape * _) shape_for_constr
+      =
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
@@ -459,10 +459,11 @@ module Type_decl_shape = struct
             then
               Misc.fatal_errorf_doc
                 "Type_shape: variant constructor with mismatched layout, has \
-                  %a but expected %a"
+                 %a but expected %a"
                 Layout.format ly Layout.format ly2
             else ())
-        (Array.to_list constructor_shape) args;
+        (Array.to_list constructor_shape)
+        args;
       Array.map mixed_block_shape_to_layout constructor_shape
     in
     { Shape.name;

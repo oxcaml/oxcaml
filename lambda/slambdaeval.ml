@@ -326,11 +326,9 @@ and eval_structured_const env const =
 
 and eval_block_shape :
     'a. Env.t -> 'a block_element array -> 'a block_element array =
- fun env shape ->
-  Misc.Stdlib.Array.map_sharing (eval_block_element env) shape
+ fun env shape -> Misc.Stdlib.Array.map_sharing (eval_block_element env) shape
 
-and eval_block_element :
-    'a. Env.t -> 'a block_element -> 'a block_element =
+and eval_block_element : 'a. Env.t -> 'a block_element -> 'a block_element =
  fun env element ->
   match element with
   | Splice_variable id ->
@@ -413,9 +411,7 @@ and eval_prim env prim =
     else Punboxed_product_field (i, new_layouts)
   | Pmake_idx_field (old_shape, i, path) ->
     let new_shape = eval_block_shape env old_shape in
-    if new_shape == old_shape
-    then prim
-    else Pmake_idx_field (new_shape, i, path)
+    if new_shape == old_shape then prim else Pmake_idx_field (new_shape, i, path)
   | Pmake_idx_array (kind, index_kind, old_element, path) ->
     let new_element = eval_block_element env old_element in
     if new_element == old_element
@@ -444,31 +440,31 @@ and eval_prim env prim =
     if new_layout == old_layout then prim else Pset_ptr (new_layout, mode)
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
-  | Pfield_computed _ | Psetfield_computed _ | Pfloatfield _
-  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
-  | Parray_element_size_in_bytes _ | Pwith_stack
-  | Pwith_stack_bind | Pperform | Presume | Preperform | Pccall _ | Praise _
-  | Psequand | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _
-  | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
-  | Pbytessetu | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _
-  | Pduparray _ | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _
-  | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _
-  | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _
-  | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-  | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_i8 _
-  | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-  | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
-  | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-  | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-  | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
-  | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
-  | Pbigstring_set_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-  | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-  | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-  | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-  | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfield_computed _ | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _
+  | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
+  | Parray_element_size_in_bytes _ | Pwith_stack | Pwith_stack_bind | Pperform
+  | Presume | Preperform | Pccall _ | Praise _ | Psequand | Psequor | Pnot
+  | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength | Pstringrefu
+  | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs
+  | Pbytessets | Pmakearray _ | Pmakearray_dynamic _ | Pduparray _
+  | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _
+  | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _
+  | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+  | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
+  | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_i8 _
+  | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+  | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+  | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+  | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+  | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+  | Pfloat_array_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
@@ -525,8 +521,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Psetfield (_, shape, _)
   | Pmake_idx_field (shape, _, _) ->
     assert_block_shape_contains_no_splices shape
-  | Pfield (_, shape, _) ->
-    assert_block_shape_contains_no_splices shape
+  | Pfield (_, shape, _) -> assert_block_shape_contains_no_splices shape
   | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
     assert_block_element_contains_no_splices element
   | _ -> ()

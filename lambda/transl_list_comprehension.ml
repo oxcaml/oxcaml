@@ -114,9 +114,9 @@ let ( rev_list_to_list,
     documentation for [CamlinternalComprehension.rev_list] for more details. *)
 let rev_list_snoc_local ~loc ~init ~last =
   Lprim
-    (Pmakeblock
-      (0, Immutable, block_shape_of_generic_values 2, alloc_local),
-     [init; last], loc)
+    ( Pmakeblock (0, Immutable, block_shape_of_generic_values 2, alloc_local),
+      [init; last],
+      loc )
 
 (** The [CamlinternalComprehension.Nil] constructor, for building the
     intermediate restults of list comprehensions; see the documentation for

@@ -1028,11 +1028,10 @@ module With_subkind = struct
                         |> List.map (function
                           | Lambda.Value value_kind -> value_kind
                           | Lambda.Product _ | Lambda.Float_boxed _
-                          | Lambda.Float64 | Lambda.Float32
-                          | Lambda.Bits8 | Lambda.Bits16 | Lambda.Bits32
-                          | Lambda.Bits64 | Lambda.Vec128 | Lambda.Vec256
-                          | Lambda.Vec512 | Lambda.Word
-                          | Lambda.Untagged_immediate
+                          | Lambda.Float64 | Lambda.Float32 | Lambda.Bits8
+                          | Lambda.Bits16 | Lambda.Bits32 | Lambda.Bits64
+                          | Lambda.Vec128 | Lambda.Vec256 | Lambda.Vec512
+                          | Lambda.Word | Lambda.Untagged_immediate
                           | Lambda.Splice_variable _ ->
                             Misc.fatal_error
                               "unexpected non-value in uniform block shape")

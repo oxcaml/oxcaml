@@ -586,7 +586,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 Some (Const_block(runtime_tag, shape, constants))
               else
                 (* CR layouts v5.9: Structured constants for mixed blocks should
-                    be supported in bytecode. See symtable.ml for the difficulty.
+                  be supported in bytecode. See symtable.ml for the difficulty.
                 *)
                 None)
           in
@@ -2281,7 +2281,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_inlined (_, _, Variant_extensible) ->
                      (* CR layouts v5.9: support this *)
                      fatal_error
-                       "Mixed inlined records not supported for extensible variants"
+                       "Mixed inlined records not supported for extensible \
+                        variants"
                  | Record_float ->
                     (* This allocation is always deleted,
                        so it's simpler to leave it Alloc_heap *)

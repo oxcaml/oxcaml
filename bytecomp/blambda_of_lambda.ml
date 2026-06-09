@@ -570,10 +570,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       in
       Const
         (Const_block
-           (0,
-            Lambda.block_shape_of_generic_values
-              (List.length path_consts),
-            path_consts))
+           ( 0,
+             Lambda.block_shape_of_generic_values (List.length path_consts),
+             path_consts ))
     | Pmake_idx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)

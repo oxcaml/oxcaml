@@ -251,8 +251,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_unboxed_nativeint _ )
-      | Const_block _ | Const_float_array _
-      | Const_immstring _ | Const_float_block _ | Const_null ->
+      | Const_block _ | Const_float_array _ | Const_immstring _
+      | Const_float_block _ | Const_null ->
         Misc.fatal_errorf
           "In constant mixed block, a field of kind\n\
           \       Float_boxed contained the  constant %a"
@@ -260,8 +260,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     in
     (* CR mshinwell: factor out, this is also in the Pmakemixedblock case. Or
        even better, add support for lifting mixed blocks, then remove this
-       special handling for Const_block and use that
-       (mshinwell has a partial patch for this). *)
+       special handling for Const_block and use that (mshinwell has a partial
+       patch for this). *)
     let args =
       let new_indexes_to_old_indexes =
         Mixed_block_shape.new_indexes_to_old_indexes shape
@@ -288,8 +288,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       match K.Scannable_block_shape.from_mixed_block_shape shape with
       | Value_only ->
         (* See Note [Constant all-value mixed records] in translcore.ml *)
-        Misc.fatal_error
-          "Const_block: from_block_shape returned Value_only"
+        Misc.fatal_error "Const_block: from_block_shape returned Value_only"
       | Mixed_record _ as block_shape -> block_shape
     in
     let acc, fields =
@@ -1250,17 +1249,17 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
       | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
-      | Psequor | Pnot | Poffsetref _
-      | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
-      | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
-      | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
-      | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
-      | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
-      | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
-      | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
-      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
-      | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+      | Psequor | Pnot | Poffsetref _ | Pstringlength | Pstringrefu
+      | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs
+      | Pbytessets | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
+      | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisout
+      | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _
+      | Pstring_load_i16 _ | Pstring_load_16 _ | Pstring_load_32 _
+      | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
+      | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
+      | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
+      | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _
+      | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
       | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
@@ -1282,9 +1281,9 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
       | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pperform | Presume
-      | Preperform | Pmake_idx_field _
-      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
-      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+      | Preperform | Pmake_idx_field _ | Pmake_idx_array _ | Pidx_deepen _
+      | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
+      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
       | Patomic_compare_set_field _ | Patomic_fetch_add_field
       | Patomic_add_field | Patomic_sub_field | Patomic_land_field
       | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get
@@ -3882,9 +3881,9 @@ let final_module_block_representation acc
         match elt with
         | Value _ -> acc + 1
         | Product elts -> Array.fold_left count_fields acc elts
-        | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
-        | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-        | Splice_variable _ ->
+        | Float_boxed ()
+        | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+        | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
           Misc.fatal_error
             "final_module_block_representation: non-uniform shape"
       in
@@ -3995,8 +3994,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
           let named =
             Named.create_prim
               (Unary
-                 ( Block_load
-                     { kind = block_access pos; mut = Immutable; field },
+                 ( Block_load { kind = block_access pos; mut = Immutable; field },
                    block ))
               Debuginfo.none
           in

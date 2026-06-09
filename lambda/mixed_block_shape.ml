@@ -152,28 +152,27 @@ let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
     if index < 0 || index >= Array.length forest
     then original_path
     else
-    let tree = forest.(index) in
-    let rec lookup_path' path tree =
-      match path, tree with
-      | [], Leaf { new_index; _ } -> [new_index]
-      | index :: path, Node { children; _ } ->
-        if index < 0 || index >= Array.length children
-        then original_path
-        else lookup_path' path children.(index)
-      | [], Node { children } -> flatten_tree_array children
-      | _ :: _, Leaf _ ->
-        Misc.fatal_errorf "Invalid path:@ %a@ shape: %a"
-          (Format.pp_print_list Format.pp_print_int)
-          original_path print t
-    in
-    lookup_path' path tree
+      let tree = forest.(index) in
+      let rec lookup_path' path tree =
+        match path, tree with
+        | [], Leaf { new_index; _ } -> [new_index]
+        | index :: path, Node { children; _ } ->
+          if index < 0 || index >= Array.length children
+          then original_path
+          else lookup_path' path children.(index)
+        | [], Node { children } -> flatten_tree_array children
+        | _ :: _, Leaf _ ->
+          Misc.fatal_errorf "Invalid path:@ %a@ shape: %a"
+            (Format.pp_print_list Format.pp_print_int)
+            original_path print t
+      in
+      lookup_path' path tree
 
 type ('a, 'b) singleton_or_product =
   | Singleton of 'a
   | Product of 'b
 
-let singleton_or_product_of_block_element
-    (elt : _ Lambda.block_element) :
+let singleton_or_product_of_block_element (elt : _ Lambda.block_element) :
     (_ Singleton_mixed_block_element.t, _) singleton_or_product =
   match elt with
   | Value vk -> Singleton (Value vk)
@@ -194,13 +193,11 @@ let singleton_or_product_of_block_element
   | Untagged_immediate -> Singleton Untagged_immediate
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
-    Misc.fatal_error
-      "singleton_or_product_of_block_element: Splice_variable"
+    Misc.fatal_error "singleton_or_product_of_block_element: Splice_variable"
 
 (* CR-soon xclerc for xclerc: it is probably quite inefficient to map/concat
    repeatedly. *)
-let rec flatten_one :
-    int -> 'a Lambda.block_element -> 'a shape_with_paths =
+let rec flatten_one : int -> 'a Lambda.block_element -> 'a shape_with_paths =
  fun index element ->
   match singleton_or_product_of_block_element element with
   | Singleton element -> [| element, [index] |]
@@ -213,11 +210,7 @@ and flatten_list : 'a Lambda.block_element array -> 'a shape_with_paths =
   Array.mapi flatten_one sub_elements |> Misc.Stdlib.Array.concat_arrays
 
 let rec build_tree_one :
-    (path, int) Hashtbl.t ->
-    path ->
-    int ->
-    'a Lambda.block_element ->
-    'a tree =
+    (path, int) Hashtbl.t -> path -> int -> 'a Lambda.block_element -> 'a tree =
  fun old_path_to_new_index path index element ->
   match singleton_or_product_of_block_element element with
   | Singleton element -> (

@@ -157,11 +157,11 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int list * block_shape_with_locality_mode * field_read_semantics
   (* CR-someday xclerc: the first argument of `Pfield` and
      `Psetfield` (the path / list of indices) should probably be
      abstracted so that we do not check in multiple places that its length is
      correct. *)
+  | Pfield of int list * block_shape_with_locality_mode * field_read_semantics
   | Pfield_computed of field_read_semantics
   | Psetfield of int list * block_shape * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
@@ -668,7 +668,7 @@ and equal_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_block_element Unit.equal) shape1 shape2
 
 let block_shape_of_value_kinds vks =
-  Array.of_list (List.map (fun vk -> Value vk) vks)
+  Misc.Stdlib.Array.of_list_map (fun vk -> Value vk) vks
 
 let block_shape_of_generic_values n =
   Array.init n (fun _ -> Value generic_value)
@@ -1134,8 +1134,7 @@ type main_module_block_format =
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
   | Mb_instantiating_functor _ ->
-    block_shape_of_generic_values 1,
-    block_shape_of_generic_values 1
+    block_shape_of_generic_values 1, block_shape_of_generic_values 1
 
 type program =
   { compilation_unit : Compilation_unit.t;
@@ -1789,11 +1788,6 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   ) shape
 
 let mod_field ?(read_semantics=Reads_agree) pos (_, shape_for_read) =
-  let shape_for_read =
-    if pos < Array.length shape_for_read
-    then shape_for_read
-    else block_shape_of_generic_values (pos + 1)
-  in
   Pfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
@@ -2278,10 +2272,10 @@ let find_exact_application kind ~arity args =
           if arity <> List.length tupled_args
           then None
           else Some tupled_args
-      | [Lconst(Const_block (_, _shape, const_args))] ->
-          if arity <> List.length const_args
-          then None
-          else Some (List.map (fun cst -> Lconst cst) const_args)
+      | [Lconst(Const_block (_, shape, const_args))] ->
+          if arity = List.length const_args && is_uniform_block_shape shape
+          then Some (List.map (fun cst -> Lconst cst) const_args)
+          else None
       | _ -> None
       end
 
@@ -2309,8 +2303,7 @@ let locality_mode_of_primitive_description (p : external_call_description) =
       if p.prim_alloc then Some alloc_heap else None
 
 let project_from_block_shape
-    : 'a. 'a block_element array -> path:int list
-          -> 'a block_element
+    : 'a. 'a block_element array -> path:int list -> 'a block_element
     = fun shape ~path ->
   match path with
   | [] ->
@@ -2318,11 +2311,13 @@ let project_from_block_shape
   | field :: path ->
     (* Perform the initial projection to identify which boxed field is
        requested. *)
-    let element =
-      if field < 0 || field >= Array.length shape
-      then Value generic_value
-      else shape.(field)
-    in
+    if field < 0 || field >= Array.length shape
+    then
+      Misc.fatal_errorf
+        "project_from_block_shape: field index %d out of bounds for \
+         shape of %d elements"
+        field (Array.length shape);
+    let element = shape.(field) in
     (* Now follow the path through any unboxed product nodes. *)
     let rec project_from_block_element_by_path element path =
       match path with
@@ -2334,12 +2329,13 @@ let project_from_block_shape
            Extract the relevant projection and continue. *)
         match element with
         | Product shape ->
-          let element =
-            if field < 0 || field >= Array.length shape
-            then Value generic_value
-            else shape.(field)
-          in
-          project_from_block_element_by_path element path
+          if field < 0 || field >= Array.length shape
+          then
+            Misc.fatal_errorf
+              "project_from_block_element: field index %d out of bounds \
+               for (nested) shape of %d elements"
+              field (Array.length shape);
+          project_from_block_element_by_path shape.(field) path
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word

@@ -905,7 +905,8 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         let field_to_type { Types.ca_type } = ca_type in
         let num_nodes_visited, fields =
           value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-            ~shape:cstr_shape (List.map (fun f -> Some (field_to_type f)) fields)
+            ~shape:cstr_shape (List.map (fun f -> Some (field_to_type f))
+            fields)
         in
         (false, num_nodes_visited), fields
       | Cstr_record labels ->

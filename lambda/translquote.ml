@@ -73,9 +73,9 @@ let none = Lconst (Const_base (Const_int 0))
 
 let some ~loc x =
   Lprim
-    (Pmakeblock
-      (0, Immutable, block_shape_of_generic_values 1, alloc_heap),
-     [x], loc)
+    ( Pmakeblock (0, Immutable, block_shape_of_generic_values 1, alloc_heap),
+      [x],
+      loc )
 
 let option ~loc opt = match opt with None -> none | Some x -> some ~loc x
 
@@ -87,32 +87,30 @@ let nil = Lconst (Const_base (Const_int 0))
 
 let cons ~loc hd tl =
   Lprim
-    (Pmakeblock
-      (0, Immutable, block_shape_of_generic_values 2, alloc_heap),
-     [hd; tl], loc)
+    ( Pmakeblock (0, Immutable, block_shape_of_generic_values 2, alloc_heap),
+      [hd; tl],
+      loc )
 
 let hd ~loc l =
-  Lprim
-    (Pfield ([0], block_shape_of_generic_values 2, Reads_agree), [l], loc)
+  Lprim (Pfield ([0], block_shape_of_generic_values 2, Reads_agree), [l], loc)
 
 let tl ~loc l =
-  Lprim
-    (Pfield ([1], block_shape_of_generic_values 2, Reads_agree), [l], loc)
+  Lprim (Pfield ([1], block_shape_of_generic_values 2, Reads_agree), [l], loc)
 
 let rec mk_list ~loc list =
   match list with [] -> nil | hd :: tl -> cons ~loc hd (mk_list ~loc tl)
 
 let pair ~loc (x, y) =
   Lprim
-    (Pmakeblock
-      (0, Immutable, block_shape_of_generic_values 2, alloc_heap),
-     [x; y], loc)
+    ( Pmakeblock (0, Immutable, block_shape_of_generic_values 2, alloc_heap),
+      [x; y],
+      loc )
 
 let triple ~loc (x, y, z) =
   Lprim
-    (Pmakeblock
-      (0, Immutable, block_shape_of_generic_values 3, alloc_heap),
-     [x; y; z], loc)
+    ( Pmakeblock (0, Immutable, block_shape_of_generic_values 3, alloc_heap),
+      [x; y; z],
+      loc )
 
 (* Let-expressions *)
 

@@ -1393,30 +1393,20 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     match[@warning "-fragile-match"] layout with
     | Pvalue
         { nullable = Non_nullable;
-          raw_kind =
-            Pvariant
-              { consts = [];
-                non_consts = [(0, field_kinds)]
-              }
+          raw_kind = Pvariant { consts = []; non_consts = [(0, field_kinds)] }
         } ->
       Some
         (Fields_of_block_with_tag_zero
            (Array.to_list field_kinds
-            |> List.map (function
-              | Lambda.Value field_kind ->
-                Flambda_kind.With_subkind.from_lambda_value_kind
-                  ~machine_width:(Env.machine_width env)
-                  field_kind
-              | _ ->
-                Misc.fatal_error
-                  "unexpected non-value field in unboxing kind")))
+           |> List.map (function
+             | Lambda.Value field_kind ->
+               Flambda_kind.With_subkind.from_lambda_value_kind
+                 ~machine_width:(Env.machine_width env) field_kind
+             | _ ->
+               Misc.fatal_error "unexpected non-value field in unboxing kind")))
     | Pvalue
         { nullable = Non_nullable;
-          raw_kind =
-            Pvariant
-              { consts = [];
-                non_consts = [(tag, field_kinds)]
-              }
+          raw_kind = Pvariant { consts = []; non_consts = [(tag, field_kinds)] }
         }
       when tag = Obj.double_array_tag ->
       assert (
