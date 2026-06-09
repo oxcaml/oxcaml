@@ -145,6 +145,11 @@ type t =
   (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
   | Probe_name_too_long of string           (* 190 *)
   | Unused_kind_declaration of string       (* 191 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 219 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
@@ -250,6 +255,7 @@ let number = function
   | Unerasable_position_argument -> 188 (* 189 is now upstream as 75 *)
   | Probe_name_too_long _ -> 190
   | Unused_kind_declaration _ -> 191
+  | Imprecise_kind_annotation _ -> 219
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
@@ -688,6 +694,10 @@ let descriptions = [
     names = ["use-during-borrowing"];
     description = "Use of a value during an active borrow.";
     since = since 5 3 };
+  { number = 219;
+    names = ["imprecise-kind-annotation"];
+    description = "A kind annotation is less precise than the inferred kind.";
+    since = since 5 2 };
 ]
 
 let name_to_number =
@@ -1456,6 +1466,12 @@ let message = function
         Style.inline_code name
   | Unused_kind_declaration s ->
       msg "unused kind %a." Style.inline_code s
+  | Imprecise_kind_annotation { name; annotated; inferred } ->
+      msg
+        "The type variable `%s'@ \
+         was annotated with kind `%s'@ \
+         but was inferred to have kind `%s'."
+        name annotated inferred
   | Zero_alloc_all_hidden_arrow s ->
       msg "The type of this item is an@ alias of a function type,@ \
            but the %a attribute for@ this signature does not apply to it@ \
