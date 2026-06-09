@@ -103,8 +103,6 @@ module Type_structure : sig
 
   val flattens_floats : t -> bool
 
-  val is_mixed_float_float64_record : t -> bool
-
   (** [None] if block indices to arrays of [nested_unboxed_record t] are not
       supported *)
   val array_element : t Tree.t -> t option

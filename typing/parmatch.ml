@@ -987,7 +987,7 @@ let fake_cstr_repr : constructor_representation =
   Constructor_mixed [| Float32 |]
 
 let fake_record_repr : record_representation =
-  Record_dummy { represent_as_float_array = false }
+  Record_dummy { represent_as_float_array = false; flatten_floats = false }
 
 let fake_unboxed_record_repr : record_unboxed_product_representation =
   Record_unboxed_product

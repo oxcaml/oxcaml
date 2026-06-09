@@ -203,7 +203,7 @@ logic.
   -flambda2-expert-can-inline-recursive-functions
   -flambda2-expert-cmm-safe-subst
   -flambda2-expert-cont-lifting-budget
-  -flambda2-expert-cont-specialization-budget
+  -flambda2-expert-cont-specialization-threshold
   -flambda2-expert-fallback-inlining-heuristic
   -flambda2-expert-inline-effects-in-cmm
   -flambda2-expert-max-block-size-for-projections
@@ -216,21 +216,25 @@ logic.
   -flambda2-inline-call-cost
   -flambda2-inline-indirect-cost
   -flambda2-inline-large-function-size
+  -flambda2-inline-large-functor-size
   -flambda2-inline-max-depth
   -flambda2-inline-max-rec-depth
   -flambda2-inline-poly-compare-cost
   -flambda2-inline-prim-cost
   -flambda2-inline-small-function-size
+  -flambda2-inline-small-functor-size
   -flambda2-inline-threshold
   -flambda2-inlining-report-bin
   -flambda2-join-algorithm
   -flambda2-join-depth
   -flambda2-join-points
   -flambda2-kind-checks
+  -flambda2-match-in-match
   -flambda2-reaper
   -flambda2-result-types-all-functions
   -flambda2-result-types-functors-only
   -flambda2-speculative-inlining-only-if-arguments-useful
+  -flambda2-speculative-inlining-track-lifted-constants
   -flambda2-unbox-along-intra-function-control-flow
   -flambda2-unicode
   -flzcnt
@@ -256,6 +260,7 @@ logic.
   -fpopcnt
   -fprefetchw
   -fprefetchwt1
+  -frametables-in-rodata
   -fsse3
   -fsse41
   -fsse42
@@ -290,7 +295,6 @@ logic.
   -heap-reduction-threshold
   -help
   -i
-  -ikinds
   -ikinds-debug
   -impl
   -inline
@@ -329,6 +333,7 @@ logic.
   -match-context-rows
   -modern
   -module-entry-functions-section
+  -name-mangling-scheme
   -no-absname
   -no-alias-deps
   -no-app-funct
@@ -356,12 +361,16 @@ logic.
   -no-flambda2-expert-phantom-lets
   -no-flambda2-expert-shorten-symbol-names
   -no-flambda2-join-points
+  -no-flambda2-match-in-match
   -no-flambda2-reaper
   -no-flambda2-result-types
   -no-flambda2-speculative-inlining-only-if-arguments-useful
+  -no-flambda2-speculative-inlining-track-lifted-constants
   -no-flambda2-unbox-along-intra-function-control-flow
   -no-float-const-prop
+  -no-frametables-in-rodata
   -no-g
+  -no-ikinds
   -no-insn-sched
   -no-keep-docs
   -no-keep-locs

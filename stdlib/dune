@@ -25,6 +25,7 @@
    -absname
    -bin-annot
    -extension runtime_metaprogramming
+   -extension layouts_beta
    -nostdlib
    -safe-string
    -strict-formats))

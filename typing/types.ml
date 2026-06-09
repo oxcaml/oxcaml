@@ -508,7 +508,7 @@ and record_representation =
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
-  | Record_dummy of { represent_as_float_array : bool }
+  | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   | Record_variable
 
 and record_unboxed_product_representation =
@@ -989,9 +989,9 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       true
   | Record_mixed mx1, Record_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | Record_dummy { represent_as_float_array = a },
-    Record_dummy { represent_as_float_array = b } ->
-      Bool.equal a b
+  | Record_dummy { represent_as_float_array = a1; flatten_floats = b1 },
+    Record_dummy { represent_as_float_array = a2; flatten_floats = b2 } ->
+      Bool.equal a1 a2 && Bool.equal b1 b2
   | Record_variable, Record_variable -> true
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
     | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable), _ ->

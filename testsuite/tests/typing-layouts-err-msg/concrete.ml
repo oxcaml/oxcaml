@@ -78,11 +78,11 @@ type t = { a : t_any; }
 Line 2, characters 15-18:
 2 | let f (t: t) = t.a
                    ^^^
-Error: Fields being projected must be representable.
+Error: Record element types must have a representable layout.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable
-         because it's the type of a field being projected.
+         because it's the type of a field in a record being projected from.
 |}]
 
 (* Record_assignment *)

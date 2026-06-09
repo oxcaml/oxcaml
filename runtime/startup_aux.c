@@ -199,13 +199,16 @@ static void parse_ocamlrunparam(char_os* opt)
     }
   }
 
+  /* TODO: Better general OCAMLRUNPARAM validation. */
   /* Validate */
   if (params.max_domains < 1) {
     caml_fatal_error("OCAMLRUNPARAM: max_domains(d) must be at least 1");
   }
   if (params.max_domains > Max_domains_max) {
-    caml_fatal_error("OCAMLRUNPARAM: max_domains(d) is too large. "
-                     "The maximum value is %d.", Max_domains_max);
+    /* Silently clamp to the maximum. Don't fatal error: we don't want
+       to kill executables built with a --disable-multidomain compiler
+       if they happen to be passed an otherwise-reasonable value. */
+    params.max_domains = Max_domains_max;
   }
 }
 
