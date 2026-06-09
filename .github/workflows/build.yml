@@ -82,7 +82,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
 
 
           - name: runtime4 O3 metrics (x86_64-linux)
@@ -91,14 +91,14 @@ jobs:
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
 
           - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml testsuite/tests/tool-ocamlfilt/e2e_[ios]*.ml'
 
           - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
@@ -235,7 +235,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml'
             sysdeps: gdb
 
           - name: runtime5 reaper with local value slots
@@ -243,7 +243,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
             sysdeps: gdb
 
           # Same as for the reaper, some tests rely on being able to enable or disable
