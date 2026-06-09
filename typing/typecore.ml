@@ -292,7 +292,6 @@ type error =
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
-  | Field_projection_not_rep of type_expr * Jkind.Violation.t
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
@@ -567,12 +566,12 @@ let mode_morph f expected_mode =
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode
-  |> apply_is_contained_by is_contained_by ?modalities
+  |> apply_right_is_contained_by is_contained_by ?modalities
   |> mode_default
 
 let mode_modality modality expected_mode =
   as_single_mode expected_mode
-  |> Modality.Const.apply modality
+  |> Modality.Const.apply_right modality
   |> mode_default
 
 (* used when entering a function;
@@ -763,6 +762,22 @@ let register_allocation_value_mode ~loc
       (Mode.Value.disallow_left mode)
   in
   alloc_mode, mode
+
+(* Unlike most allocations, which can be the highest mode allowed by
+   [expected_mode], functions have more constraints. For example, a two
+   parameter function needs to be made global if its partial application
+   to one argument must be global. As a result, a function gets an
+   [Alloc.lr] allocation mode that can be further constrained. *)
+let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
+  let hint = Hint.Allocation_r {loc; txt = Unknown} in
+  let (alloc_mode : Alloc.lr), _ =
+    Alloc.newvar_below (value_to_alloc_r2g ~hint mode)
+  in
+  register_allocation_mode (Alloc.disallow_left alloc_mode);
+  let closed_over_mode =
+    alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)
+  in
+  alloc_mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
@@ -1733,7 +1748,7 @@ let determined_lbl_repres (type rep) (form : rep record_form)
   if is_variable_repres form rep then None else Some rep
 
 let update_labels (type rep) env (form : rep record_form) ~representative_label
-      ~loc ~containing_type
+      ~why ~loc ~containing_type
     : record_sorts * rep =
   (* Might be good to short-circuit this. Possible we could do so by noticing
      that [containing_type] has no arguments (or only variables as
@@ -1755,7 +1770,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
           vars_and_ty_args
       in
       match
-        Typedecl.update_record_representation env loc form
+        Typedecl.update_record_representation ~why env loc form
           (lbls_and_ty_args |> Array.to_list)
       with
       | Ok (sorts, rep) ->
@@ -1839,7 +1854,7 @@ let solve_Ppat_tuple ~refine ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = (loc, Pattern) }
       in
-      let mode = apply_is_contained_by is_contained_by alloc_mode.mode in
+      let mode = apply_left_is_contained_by is_contained_by alloc_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -1870,7 +1885,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = (loc, Pattern) }
       in
-      let mode = apply_is_contained_by is_contained_by alloc_mode.mode in
+      let mode = apply_left_is_contained_by is_contained_by alloc_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -3066,7 +3081,7 @@ and type_pat_aux
       {containing = Array Modality; container = (loc, Pattern)}
     in
     let alloc_mode =
-      apply_is_contained_by is_contained_by ~modalities alloc_mode.mode
+      apply_left_is_contained_by is_contained_by ~modalities alloc_mode.mode
     in
     let alloc_mode = simple_pat_mode alloc_mode in
     let pl =
@@ -3186,8 +3201,8 @@ and type_pat_aux
             container = (loc, Pattern) }
         in
         let mode =
-          apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-            alloc_mode.mode
+          apply_left_is_contained_by is_contained_by
+            ~modalities:label.lbl_modalities alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
         let ty_sort =
@@ -3233,6 +3248,7 @@ and type_pat_aux
       in
       let sorts, rep =
         update_labels !!penv record_form ~representative_label ~loc
+          ~why:Field_projection
           ~containing_type:(instance record_ty)
       in
       let lbl_a_list = List.map (type_label_pat sorts) lbl_a_list in
@@ -3495,29 +3511,53 @@ and type_pat_aux
         { containing = Constructor (constr.cstr_name, Modality);
           container = (loc, Pattern) }
       in
-      let ctor_args =
+      let ctor_args, jkinds_to_check =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
-              apply_is_contained_by is_contained_by
+              apply_left_is_contained_by is_contained_by
                 ~modalities:arg.ca_modalities alloc_mode.mode
              in
              let alloc_mode =
               Mode.Value.join [ alloc_mode; constructor_mode ]
              in
              let alloc_mode = simple_pat_mode alloc_mode in
-             let sort =
+             (* We need a sort for [type_pat], but it's not available in
+                [ca_sort] for constructors containing [any]. In that case, we
+                create a new sort var, and store it in [jkind_to_check] to make
+                sure it actually lines up with the type. See the comment
+                starting with "Tie the knot" just below. *)
+             let sort, jkind_to_check =
                match arg.ca_sort with
-               | Some sort -> Jkind.Sort.of_const sort
                | None ->
-                   Jkind.Sort.new_var ~level:(get_current_level ())
-                   |> Jkind.Sort.of_var
+                 let jkind, sort =
+                   Jkind.of_new_sort_var ~why:Constructor_arg_projection
+                     ~level:(get_current_level ())
+                 in
+                 sort, Some jkind
+               | Some s ->
+                 Jkind.Sort.of_const s, None
              in
-             type_pat ~alloc_mode tps Value p arg.ca_type sort)
+             type_pat ~alloc_mode tps Value p arg.ca_type sort, jkind_to_check)
           sargs args
+        |> List.split
       in
       let repr, sorts =
         let types = List.map (fun arg -> arg.pat_type, arg.pat_loc) ctor_args in
+        (* Tie the knot: make sure the type matches the sort variable we created
+           above, for args whose [ca_sort] is [None] *)
+        List.iter2 (fun arg jkind_to_check ->
+          Option.iter (fun jkind ->
+            match constrain_type_jkind !!penv arg.pat_type jkind with
+            | Ok () -> ()
+            | Error e ->
+              raise (Error (arg.pat_loc, !!penv,
+                (Constructor_arg_projection_not_rep (arg.pat_type, e)))))
+            jkind_to_check)
+          ctor_args jkinds_to_check;
+        (* CR rtjoa: The enforcement above that the constructor argument is
+           representable, and the call to [representation_for_tuple_constructor]
+           below, are quite redundant. We should refactor. *)
         match
           representation_for_tuple_constructor !!penv constr args ~loc ~types
             ~containing_type:expected_ty ~why:Constructor_arg_projection
@@ -5894,15 +5934,8 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
-  let alloc_mode, mode =
-      (* Unlike most allocations which can be the highest mode allowed by
-         [expected_mode] and their [alloc_mode] identical to [expected_mode] ,
-         functions have more constraints. For example, an outer function needs
-         to be made global if its inner function is global. As a result, a
-         function deserves a separate allocation mode.
-      *)
-      let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
-      register_allocation_value_mode ~loc mode
+  let alloc_mode, closed_over_mode =
+    register_closure_allocation ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
@@ -5945,7 +5978,7 @@ let split_function_ty
         let env =
           Env.add_closure_lock
             (loc, Function)
-            mode.comonadic
+            closed_over_mode.comonadic
             env
         in
         Env.add_region_lock env
@@ -6357,7 +6390,7 @@ and type_expect_
           (fun loc ty mode -> (* only change mode here, see type_label_exp *)
              List.map (fun (_, label, _) ->
                let mode =
-                apply_is_contained_by
+                apply_left_is_contained_by
                   { containing = Record (label.lbl_name, Modality);
                     container = (loc, Expression) }
                   ~modalities:label.lbl_modalities mode
@@ -6405,7 +6438,7 @@ and type_expect_
                   container = (extended_expr_loc, Expression) }
               in
               let mode =
-                apply_is_contained_by is_contained_by
+                apply_left_is_contained_by is_contained_by
                   ~modalities:lbl.lbl_modalities mode
               in
               let mode = cross_left env lbl.lbl_arg mode in
@@ -6528,11 +6561,16 @@ and type_expect_
                 label_descriptions label_definitions
               |> Array.to_list
             in
+            let why : Jkind.History.concrete_creation_reason =
+              if opt_sexp = None
+              then Field_assignment
+              else Field_functional_update
+            in
             begin match
               (* XXX This is redundantly going to get the sort and jkind for
                  each label all over again. Possibly we're doing things in the
                  wrong order. *)
-              Typedecl.update_record_representation env
+              Typedecl.update_record_representation ~why env
                 sexp.pexp_loc record_form labels_with_updated_types
             with
             | Ok (_, rep) -> rep
@@ -6598,7 +6636,7 @@ and type_expect_
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
-              let mode = Modality.Const.apply modalities actual_mode in
+              let mode = Modality.Const.apply_left modalities actual_mode in
               submode ~loc ~env mode expected_mode;
               Texp_mutvar {loc = lid.loc; txt = id}
             | _ ->
@@ -7110,8 +7148,8 @@ and type_expect_
           container = (record.exp_loc, Expression) }
       in
       let mode =
-        apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-          rmode
+        apply_left_is_contained_by is_contained_by
+          ~modalities:label.lbl_modalities rmode
       in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -7178,8 +7216,8 @@ and type_expect_
           container = (record.exp_loc, Expression) }
       in
       let mode =
-        apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-          rmode
+        apply_left_is_contained_by is_contained_by
+          ~modalities:label.lbl_modalities rmode
       in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
@@ -7230,6 +7268,7 @@ and type_expect_
       unify_exp env record ty_record;
       let record_sorts, record_repres =
         update_labels env Legacy ~representative_label:label ~loc
+          ~why:Field_assignment
           ~containing_type:ty_record
       in
       rue {
@@ -7238,8 +7277,9 @@ and type_expect_
           record_repres;
           record_sorts;
           modality =
-            Locality.disallow_right (regional_to_local
-              (Value.proj_comonadic Areality rmode));
+            Locality.disallow_right
+              (Alloc.proj_comonadic Areality
+               (value_to_alloc_r2l rmode));
           lid = label_loc;
           label;
           newval;
@@ -8301,6 +8341,7 @@ and type_block_access env expected_base_ty principal
     if mut then Env.mark_label_used Mutation label.lbl_uid;
     let _sorts, rep =
       update_labels env Legacy ~representative_label:label ~loc:lid.loc
+        ~why:Field_in_indexed_record
         ~containing_type:expected_base_ty
     in
     let ba = Baccess_field (lid, label, rep) in
@@ -8330,7 +8371,8 @@ and type_block_access env expected_base_ty principal
     let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
     let el_ty =
       newvar
-        (Jkind.of_new_sort ~why:Idx_element ~level:(Ctype.get_current_level ()))
+        (Jkind.of_new_sort ~why:Idx_element
+           ~level:(Ctype.get_current_level ()))
     in
     let idx_type_expected =
       match mut with
@@ -8374,6 +8416,7 @@ and type_unboxed_access env loc el_ty ua =
     end;
     let sorts, _rep =
       update_labels env Unboxed_product ~representative_label:label ~loc:lid.loc
+        ~why:Field_in_indexed_record
         ~containing_type:el_ty
     in
     (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, sorts)
@@ -9089,15 +9132,6 @@ and type_label_projection
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
       unify_exp env record ty_res;
-      (* CR-soon rtjoa: merge this type of check with
-         [Typedecl.check_representable]. It should also be done within
-         [update_labels] - this will allow sort variables to be created for
-         other places that use [update_labels], such as for block indices *)
-      begin match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-      | Ok _ -> ()
-      | Error err ->
-          raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
-      end;
       let record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
@@ -9107,7 +9141,7 @@ and type_label_projection
            necessary to do it in _this_ inner level so that the correct type
            hits a [generalize_structure] *)
         update_labels env record_form ~representative_label:label ~loc
-          ~containing_type:record.exp_type
+          ~why:Field_projection ~containing_type:record.exp_type
       in
       ty_arg, record_sorts, record_repres
     end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
@@ -9636,16 +9670,13 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
          cases, look toward the end of
          typing-layouts-missing-cmi/function_arg.ml *)
       let func texp =
-        let ret_mode = alloc_as_value mret in
         let e =
           {texp with exp_type = ty_res; exp_desc =
            Texp_apply
              (texp,
-              args @ [Nolabel, Arg (eta_var, arg_sort)], Nontail,
-              ret_mode
-              |> Value.proj_comonadic Areality
-              |> regional_to_global
-              |> Locality.disallow_right,
+              args @ [Nolabel, Arg (eta_var, arg_sort)],
+              Nontail,
+              Alloc.proj_comonadic Areality (Alloc.disallow_right mret),
               None)}
         in
         let e = {texp with exp_type = ty_res; exp_desc = Texp_exclave e} in
@@ -9880,7 +9911,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   in
   let argument_mode =
     value_mode
-    |> apply_is_contained_by
+    |> apply_right_is_contained_by
       {containing = Tuple; container = (loc, Expression)}
   in
   (* CR layouts v5: non-values in tuples *)
@@ -9949,7 +9980,8 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     (Misc.repeated_label sexpl);
   let argument_mode =
     expected_mode.mode
-    |> apply_is_contained_by {containing = Tuple; container = (loc, Expression)}
+    |> apply_right_is_contained_by
+      {containing = Tuple; container = (loc, Expression)}
   in
   (* elements must be representable *)
   let labels_types_and_sorts =
@@ -10135,7 +10167,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          let ty_args, _, _ = unify_as_construct ty in
          List.map (fun ty_arg ->
            let mode =
-            apply_is_contained_by
+            apply_left_is_contained_by
               { containing = Constructor (constr.cstr_name, Modality);
                 container = (loc, Expression) }
               ~modalities:ty_arg.Types.ca_modalities mode
@@ -12800,12 +12832,6 @@ let report_error ~loc env =
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           env) violation
-  | Field_projection_not_rep (ty, violation) ->
-      Location.errorf ~loc
-        "@[Fields being projected must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation

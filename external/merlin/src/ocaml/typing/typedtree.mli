@@ -165,6 +165,17 @@ and _ poly_param =
   (** [Method (m, t)] is used when applying a polymorphic method [m]
       with type scheme [t] *)
 
+(** Sort information for all fields in a record, at the point where the record
+    is being matched against or projected from. Depending on whether the record
+    type has a field of kind `any`, this may differ from value to value. *)
+type record_sorts =
+  | Fixed
+  (** The sorts of this record's fields were determined when the type was
+      declared. Invariant: Every description in [lbl_all] for any field has a
+      [lbl_sort] that's [Some]. *)
+  | Variable of Jkind.Sort.Const.t array
+  (** This value has the specified sorts for its fields. *)
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -232,14 +243,40 @@ and 'k pattern_desc =
       name: string loc;
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
+      (** the sort of the layout function body *)
       mode: Mode.Value.l;
+      (** the mode of the layout function body *)
       lpoly: Types.Lpoly.t;
+      (** The sort variables abstracted over by this compile-time function, and
+      the allocation mode of the captured environment. [pending] during
+      type-checking; guaranteed [determined] of (potentially empty) generic sort
+      variables after [type_let] returns. *)
+      env_alloc_mode: alloc_mode;
+      (** The allocation mode of the environment captured by the layout
+      function.
+
+      Imagine we defined [let poly_ f = .. x ..] in a structure [M], where [.. x
+      ..] is some expression (not necessarily a function) that refers to [x]. It
+      translates to runtime:
+
+      [let f__float = fun env -> let {x; ..} = env in .. x ..
+       let f_env = {x = x; ..}]
+
+      where [f__float] is the instantiated function and [f_env] is the captured
+      environment (containing the example variable [x]) and is passed to
+      [f__float]. Only [f_env] is stored within the structure [M]; [f__float]
+      is a top-level symbol.
+
+      Observe the following constraint:
+      - For comonadic axes, [f_env <= M] and [x <= f_env].
+      - The monadic axes of [f_env] don't matter. In particular, note that
+        nothing closes over [f_env]. Also note that we don't perform on [f_env]
+        operations warranted by monadic modes such as [unique] or [uncontended].
+        *)
     } -> value pattern_desc
-        (** x with layout polymorphism, used in let poly_ bindings.
-            [lpoly] is [pending] during type-checking and guaranteed
-            [determined] after [type_let] returns. It may be determined with
-            an empty list of sort vars if no layout poly is actually inferred
-            (in which case a [Useless_lpoly] warning is emitted). *)
+        (** [let poly_ f = exp] creates a compile-time function [f] abstracted
+        over the layouts in [lpoly], and returns [exp] at [ret_sort] and
+        [ret_mode]. Note that [exp] is not necessarily a function. *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
@@ -264,7 +301,8 @@ and 'k pattern_desc =
          *)
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
-        value general_pattern list *
+        Types.constructor_representation *
+        (Jkind.sort * value general_pattern) list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
       value pattern_desc
@@ -288,7 +326,7 @@ and 'k pattern_desc =
          *)
   | Tpat_record :
       (Longident.t loc * Types.label_description * value general_pattern) list *
-        closed_flag ->
+        record_sorts * Types.record_representation * closed_flag ->
       value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -296,7 +334,9 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
-      (Longident.t loc * Types.unboxed_label_description * value general_pattern) list *
+      (Longident.t loc * Types.unboxed_label_description *
+         value general_pattern) list *
+        record_sorts * Types.record_unboxed_product_representation *
         closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
@@ -515,7 +555,8 @@ and expression_desc =
           *)
   | Texp_construct of
       Longident.t loc * Types.constructor_description *
-      expression list * alloc_mode option
+      Types.constructor_representation * (Jkind.sort * expression) list *
+      alloc_mode option
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -530,7 +571,9 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
-      fields : ( Types.label_description * record_label_definition ) array;
+      fields :
+        ( Types.label_description * Jkind.sort * record_label_definition )
+          array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
@@ -550,7 +593,8 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record_unboxed_product of {
-      fields : ( Types.unboxed_label_description * record_label_definition ) array;
+      fields : ( Types.unboxed_label_description * Jkind.sort *
+                 record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -568,22 +612,45 @@ and expression_desc =
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * Types.label_description *
       alloc_mode
-  | Texp_field of expression * Jkind.sort * Longident.t loc *
-      Types.label_description * texp_field_boxing * Unique_barrier.t
-    (** - The sort is the sort of the whole record (which may be non-value if
-          the record is @@unboxed).
+  | Texp_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+    (** - The [record_sort] is the sort of the whole record (which may be
+          non-value if the record is @@unboxed).
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
-  | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
-        unique_use
-  | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc *
-      Types.label_description * expression
+  | Texp_unboxed_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_sorts : record_sorts;
+      record_repres : Types.record_unboxed_product_representation;
+      lid : Longident.t loc;
+      label : Types.unboxed_label_description;
+      unique_use : unique_use;
+    }
+  | Texp_setfield of {
+      record : expression;
+      record_repres : Types.record_representation;
+      record_sorts : record_sorts;
+      modality : Mode.Locality.l;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      newval : expression;
+    }
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
+  (* CR layouts-scannable: The sort here is no longer used. Instead, a layout is
+     computed, since it has scannable axes. This should either be removed
+     (perhaps alongside some other sorts being kept around) or replaced with a
+     (representable) layout. *)
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
   | Texp_ifthenelse of expression * expression * expression option
   | Texp_sequence of expression * Jkind.sort * expression
@@ -731,11 +798,13 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
-  | Baccess_field of Longident.t loc * Types.label_description
+  | Baccess_field of
+      Longident.t loc * Types.label_description * Types.record_representation
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * Types.unboxed_label_description * record_sorts
 
 and comprehension =
   {
@@ -1522,3 +1591,20 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 (** Fold over the antiquotations in an expression. This function defines the
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
+
+(** Compute the sort of a label. Returns [None] when we can't determine the sort
+    for a representable record based off of the label alone, namely for a
+    [Record_unboxed]. In that case, the label has the same sort as the whole
+    record. *)
+val label_sort:
+  'rep Types.record_form -> 'rep Types.gen_label_description -> record_sorts
+  ->
+  [ `Sort of Jkind.Sort.Const.t | `Same_as_record_sort ]
+
+(** Computes the sort of a label. Becuase the sepcial case above doesn't apply
+    to unboxed records, this doesn't return an option. *)
+val unboxed_label_sort :
+  Types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t
+
+val unboxed_label_all_sorts:
+  Types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t array

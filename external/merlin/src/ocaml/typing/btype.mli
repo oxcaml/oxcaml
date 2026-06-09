@@ -452,6 +452,10 @@ module Jkind0 : sig
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
 
+      (** Value of types of this jkind can be scanned by the GC, but no other
+          scannable axis information about them is known. *)
+      val scannable : t
+
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
 
@@ -653,6 +657,8 @@ module Jkind0 : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
+      val scannable :
+        why:Jkind_intf.History.scannable_creation_reason -> 'd Types.jkind
       val value_or_null :
         why:Jkind_intf.History.value_or_null_creation_reason -> 'd jkind
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind
@@ -671,8 +677,9 @@ module Jkind0 : sig
         (type_expr * Mode.Modality.Const.t) list ->
         Jkind_types.Sort.t Jkind_types.Layout.t list ->
         jkind_l
-      val product_of_sorts :
-        why:Jkind_intf.History.product_creation_reason -> level:int -> int ->
+      val product_of_any :
+        why:Jkind_intf.History.product_creation_reason ->
+        int ->
         jkind_l
     end
 
@@ -685,6 +692,11 @@ module Jkind0 : sig
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
     val for_boxed_record : label_declaration list -> jkind_l
+
+    val for_boxed_record_with_updates :
+      (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
+      jkind_l
+
     (* Shared type-level implementation of Steps B1-B4 from
        Note [With-bounds for GADTs].  Callers choose the projection target via
        [projected_params]: declaration parameters for boxed GADTs, or the
@@ -695,6 +707,7 @@ module Jkind0 : sig
       payload_tys:Types.type_expr list ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
+
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->

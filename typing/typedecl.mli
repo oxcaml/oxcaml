@@ -112,6 +112,7 @@ type unrepresentable_record =
 (* Update the representation of a record whose representation at declaration
    time was [None] because it has a field of kind [any]. *)
 val update_record_representation:
+    why:Jkind_intf.History.concrete_creation_reason ->
     Env.t -> Location.t -> 'rep Types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
     (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
@@ -244,7 +245,6 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute

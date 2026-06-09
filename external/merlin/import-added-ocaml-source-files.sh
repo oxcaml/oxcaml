@@ -60,9 +60,12 @@ function files_new_at_fetch_head() {
 }
 
 function directories_from_previous_import() {
+  # We exclude the lambda/ because we almost never want to import new files from that
+  # directory.
   comm -12 \
     <(cd "${subtree_prefix}src/ocaml"; ls -d */) \
     <(cd "${subtree_prefix}upstream/ocaml_flambda"; ls -d */) \
+  | grep -v '^lambda/$' \
   | xargs -n 1 printf "^%s\n"
 }
 

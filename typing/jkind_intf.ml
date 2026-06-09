@@ -340,6 +340,7 @@ module History = struct
     | Peek_or_poke
     | Array_element
     | Idx_element
+    | Field_in_indexed_record
     | Structure_item
     | Signature_item
     | Layout_poly

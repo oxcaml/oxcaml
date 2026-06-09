@@ -708,6 +708,15 @@ CAMLprim value caml_local_stack_offset(value blk)
 #endif
 }
 
+caml_region_t caml_region_begin(void)
+{
+  return Caml_state->local_sp;
+}
+
+void caml_region_end(caml_region_t r)
+{
+  Caml_state->local_sp = r;
+}
 
 Caml_inline value alloc_shr(mlsize_t wosize, tag_t tag, reserved_t reserved,
                             int noexc)
