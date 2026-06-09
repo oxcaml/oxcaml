@@ -1295,6 +1295,15 @@ let find_pers_mod ~allow_hidden name ~allow_excess_args =
 let check_pers_mod ~allow_hidden ~loc name =
   Persistent_env.check ~allow_hidden !persistent_env read_sign_of_cmi ~loc name
 
+(* Register the target of a [-alias] declaration among this unit's globals.
+   References to the alias are redirected to this target (see [prefix_idents]),
+   so the target must be recorded (in [cmi_globals]/imports) for a consumer to
+   resolve and substitute it. This records an import and an approximate global
+   without loading the target's cmi -- the target may not exist yet (e.g. a
+   self-reference, or a sibling built later). *)
+let register_alias_target name =
+  check_pers_mod ~allow_hidden:true ~loc:Location.none name
+
 let crc_of_unit name =
   Persistent_env.crc_of_unit !persistent_env name
 

@@ -642,6 +642,12 @@ val is_imported_opaque: Compilation_unit.Name.t -> bool
 (* [register_import_as_opaque md] registers [md] as an opaque imported module *)
 val register_import_as_opaque: Compilation_unit.Name.t -> unit
 
+(* [register_alias_target name] records the target of a [-alias] declaration
+   among this unit's globals (imports and [cmi_globals]) so that references
+   redirected to it resolve and substitute correctly in a consumer. The
+   target's cmi is not loaded, so the target need not exist yet. *)
+val register_alias_target: Global_module.Name.t -> unit
+
 (* [is_parameter_unit md] returns true if [md] was compiled with
    -as-parameter *)
 val is_parameter_unit: Global_module.Name.t -> bool

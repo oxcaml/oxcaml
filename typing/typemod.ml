@@ -4414,9 +4414,11 @@ let module_aliases_sig_and_env env =
   List.fold_left
     (fun (items, env) (from_, to_) ->
        let id = Ident.create_local from_ in
-       let to_path =
-         Pident (Ident.create_global (Global_module.Name.create_no_args to_))
-       in
+       let to_name = Global_module.Name.create_no_args to_ in
+       (* Record [to_] among the unit's globals so references redirected to it
+          (see [Env.prefix_idents]) resolve in a consumer's [cmi_globals]. *)
+       Env.register_alias_target to_name;
+       let to_path = Pident (Ident.create_global to_name) in
        let md =
          { md_type = Mty_alias to_path;
            md_modalities = Mode.Modality.(Const.id |> of_const);
