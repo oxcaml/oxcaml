@@ -637,8 +637,13 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
   if !Oxcaml_flags.verify_binary_emitter
   then
     let binary_sections_dir = output_prefix ^ ".binary-sections" in
+    let comparison_mode : Binary_emitter_verify.comparison_mode =
+      match Target_system.architecture () with
+      | X86_64 -> Disassembly
+      | _ -> Exact
+    in
     match
-      Binary_emitter_verify.compare unix ~obj_file:obj_filename
+      Binary_emitter_verify.compare ~comparison_mode unix ~obj_file:obj_filename
         ~binary_sections_dir
     with
     | Match { text_size; data_size } ->
@@ -653,7 +658,7 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
       then
         Format.eprintf
           "Binary emitter verification skipped (no binary sections)@."
-    | (Mismatch _ | Object_file_error _) as result ->
+    | (Mismatch _ | Object_file_error _ | Error _) as result ->
       Binary_emitter_verify.print_result Format.err_formatter result;
       Format.eprintf "Binary sections saved to: %s@." binary_sections_dir;
       raise (Error (Binary_emitter_mismatch obj_filename))
