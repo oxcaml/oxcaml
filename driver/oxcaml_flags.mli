@@ -66,6 +66,11 @@ val disable_zero_alloc_checker : bool ref
 val disable_precise_zero_alloc_checker : bool ref
 val davail : bool ref
 val dranges : bool ref
+val dloading : bool ref
+  (** [-dloading]: emit strace-like output showing attempts to stat,
+      open, read and close build artifacts (e.g. [.cmi] and [.cmx] files),
+      together with informational messages from Flambda 2 (such as
+      "opening to find code ID ..."). *)
 
 type zero_alloc_checker_details_cutoff =
   | Keep_all

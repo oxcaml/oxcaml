@@ -25,6 +25,7 @@ module type Oxcaml_options = sig
   val dump_inlining_paths : unit -> unit
   val davail : unit -> unit
   val dranges : unit -> unit
+  val dloading : unit -> unit
   val ddebug_invariants : unit -> unit
   val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit

@@ -529,6 +529,11 @@ let find_code_exn t id =
        references it. However we force loading of the corresponding .cmx to make
        sure that we will have access to the actual code (assuming the .cmx isn't
        missing). *)
+    Misc.dloading_log
+      "Flambda 2: opening compilation unit %a to find code ID %a"
+      (Format_doc.compat Compilation_unit.print)
+      (Code_id.get_compilation_unit id)
+      Code_id.print id;
     let (_ : TE.Serializable.t option) =
       TE.resolver t.typing_env (Code_id.get_compilation_unit id)
     in

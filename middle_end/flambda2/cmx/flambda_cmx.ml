@@ -36,14 +36,25 @@ let load_cmx_file_contents loader comp_unit =
   match Imported_unit_map.find cmx_file loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
   | exception Not_found -> (
+    Misc.dloading_log
+      "Flambda 2: requesting .cmx contents for compilation unit %a"
+      (Format_doc.compat Compilation_unit.print)
+      accessible_comp_unit;
     match loader.get_module_info accessible_comp_unit with
     | None ->
+      Misc.dloading_log "Flambda 2: .cmx for compilation unit %a is unavailable"
+        (Format_doc.compat Compilation_unit.print)
+        accessible_comp_unit;
       (* To make things easier to think about, we never retry after a .cmx load
          fails. *)
       loader.imported_units
         <- Imported_unit_map.add cmx_file None loader.imported_units;
       None
     | Some cmx ->
+      Misc.dloading_log
+        "Flambda 2: importing typing env and code from .cmx for %a"
+        (Format_doc.compat Compilation_unit.print)
+        accessible_comp_unit;
       Profile.record_call ~accumulate:true "load_cmx" (fun () ->
           let typing_env, all_code =
             Flambda_cmx_format.import_typing_env_and_code cmx

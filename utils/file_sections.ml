@@ -23,9 +23,13 @@ module File_lru_cache = Lru.Make (struct
 
   type uncached = string
 
-  let load = open_in_bin
+  let load file =
+    Misc.dloading_log "reopen %s (cmx, section access)" file;
+    open_in_bin file
 
-  let unload _ ic = close_in ic
+  let unload file ic =
+    Misc.dloading_log "close %s (cmx, evicted from cache)" file;
+    close_in ic
 end)
 
 let file_lru = File_lru_cache.create ~capacity:128
@@ -34,7 +38,8 @@ let () = at_exit (fun () -> File_lru_cache.unload_all file_lru)
 
 type t =
   | From_file of
-      { channel : File_lru_cache.slot;
+      { filename : string;
+        channel : File_lru_cache.slot;
         sections : section array
       }
   | In_memory of Obj.t array
@@ -44,6 +49,7 @@ type t =
 let create section_toc file channel ~first_section_offset =
   if Array.length section_toc = 0
   then (
+    Misc.dloading_log "close %s (cmx, no sections)" file;
     close_in channel;
     In_memory [||])
   else
@@ -54,7 +60,7 @@ let create section_toc file channel ~first_section_offset =
           Pending { byte_offset_in_file = offset + first_section_offset })
         section_toc
     in
-    From_file { channel; sections }
+    From_file { filename = file; channel; sections }
 
 let empty = In_memory [||]
 
@@ -63,10 +69,12 @@ let length = function
   | In_memory sections -> Array.length sections
   | Cat (length, _, _) -> length
 
-let read_section sections channel index =
+let read_section ~filename sections channel index =
   match sections.(index) with
   | Loaded section_contents -> section_contents
   | Pending { byte_offset_in_file } ->
+    Misc.dloading_log "read section %d of %s (cmx) at offset %d" index filename
+      byte_offset_in_file;
     let channel = File_lru_cache.load_slot channel file_lru in
     seek_in channel byte_offset_in_file;
     let section_contents : Obj.t = input_value channel in
@@ -75,7 +83,8 @@ let read_section sections channel index =
 
 let rec unsafe_get t index =
   match t with
-  | From_file { sections; channel } -> read_section sections channel index
+  | From_file { filename; sections; channel } ->
+    read_section ~filename sections channel index
   | In_memory sections -> sections.(index)
   | Cat (_, t1, t2) ->
     let n = length t1 in
@@ -92,9 +101,9 @@ let get t index =
 
 let rec unsafe_blit_to_array t dest start_index =
   match t with
-  | From_file { sections; channel } ->
+  | From_file { filename; sections; channel } ->
     for i = 0 to Array.length sections - 1 do
-      dest.(start_index + i) <- read_section sections channel i
+      dest.(start_index + i) <- read_section ~filename sections channel i
     done
   | In_memory sections ->
     Array.blit sections 0 dest start_index (Array.length sections)
