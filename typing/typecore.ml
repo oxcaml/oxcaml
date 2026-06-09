@@ -5856,7 +5856,6 @@ type split_function_ty =
     *)
     filtered_arrow: filtered_arrow;
     arg_sort : Jkind.sort;
-    ret_sort : Jkind.sort;
     (* An instance of [a_i], unless [x_i] is annotated as polymorphic,
        in which case it's just [a_i] (not an instance).
     *)
@@ -5980,9 +5979,9 @@ let split_function_ty
     | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
   in
   let arg_sort = type_sort ~why:Function_argument ty_arg in
-  let ret_sort = type_sort ~why:Function_result ty_ret in
+  let _ret_sort = type_sort ~why:Function_result ty_ret in
   env,
-  { filtered_arrow; arg_sort; ret_sort;
+  { filtered_arrow; arg_sort;
     alloc_mode; ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
     really_poly
@@ -6022,8 +6021,6 @@ type type_function_result =
 and type_function_ret_info =
   { (* The mode the function returns at. *)
     ret_mode: Mode.Alloc.l modes;
-    (* The sort returned by the function. *)
-    ret_sort: Jkind.sort;
   }
 
 (* Generalize expressions *)
@@ -8729,7 +8726,7 @@ and type_function
       in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
-            arg_sort; ret_sort;
+            arg_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
             alloc_mode; really_poly
           } =
@@ -8918,7 +8915,7 @@ and type_function
           let ret_mode =
             {ret_mode_annots with mode_modes = Alloc.disallow_right ret_mode }
           in
-          Some { ret_sort ; ret_mode }
+          Some { ret_mode }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
@@ -9629,7 +9626,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
           raise(Error(sarg.pexp_loc, env, Function_type_not_rep (ty, err)))
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
-      let ret_sort = type_sort ~why:Function_result ty_res in
+      let _ret_sort = type_sort ~why:Function_result ty_res in
       let eta_pat, eta_var = var_pair ~mode:eta_mode "eta" ty_arg arg_sort in
       (* CR layouts v10: When we add abstract jkinds, the eta expansion here
          becomes impossible in some cases - we'll need better errors.  For test
@@ -9666,7 +9663,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                   };
               ret_mode =
                 { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
-              ret_sort;
               alloc_mode;
               zero_alloc = Zero_alloc.default
             }
@@ -10637,7 +10633,7 @@ and type_function_cases_expect
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
-          arg_sort; ret_sort;
+          arg_sort;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
@@ -10672,8 +10668,7 @@ and type_function_cases_expect
       }
     in
     cases, ty_fun, alloc_mode,
-      { ret_sort;
-        ret_mode =
+      { ret_mode =
           {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} }
   end
 
@@ -11237,7 +11232,7 @@ and type_n_ary_function
       type_function env expected_mode ty_expected params constraint_ body
         ~in_function ~first:true
     in
-    let fun_alloc_mode, { ret_mode; ret_sort } =
+    let fun_alloc_mode, { ret_mode } =
       match fun_alloc_mode, ret_info with
       | Some x, Some y -> x, y
       | None, _ ->
@@ -11338,7 +11333,7 @@ and type_n_ary_function
     re
       { exp_desc =
           Texp_function
-            { params; body; ret_sort;
+            { params; body;
               alloc_mode; ret_mode;
               zero_alloc
             };

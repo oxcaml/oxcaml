@@ -46,6 +46,16 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+let layout_of_function_body body =
+  let env, loc, ty =
+    match body with
+    | Tfunction_body { exp_env; exp_loc; exp_type } ->
+      exp_env, exp_loc, exp_type
+    | Tfunction_cases { fc_ret_type; fc_loc; fc_env } ->
+      fc_env, fc_loc, fc_ret_type
+  in
+  Typeopt.layout_of_type env loc ty
+
 let field_offset_for_label lbl repres =
   match repres with
   | Record_boxed
@@ -245,7 +255,7 @@ let assert_failed loc ~scopes exp =
 type fusable_function =
   { params : function_param list
   ; body : function_body
-  ; return_sort : Jkind.Sort.Const.t
+  ; return_layout : Lambda.layout
   ; return_mode : locality_mode
   ; region : bool
   }
@@ -265,7 +275,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
   | { params = [ self_param ];
       return_mode = Alloc_heap;
       body =
-        Tfunction_body { exp_desc = Texp_function method_; exp_extra; }
+        Tfunction_body { exp_desc = Texp_function method_; exp_extra; _ }
     }
     when
       List.exists
@@ -287,11 +297,11 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
               Mode.Alloc.disallow_right Mode.Alloc.legacy }
         }
       in
-      let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
+      let return_layout = layout_of_function_body method_.body in
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
-        return_sort;
+        return_layout;
         region = true;
       }
   | _ -> parent
@@ -385,7 +395,7 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
-and transl_exp0 ~in_new_scope ~scopes layout e =
+and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
@@ -406,11 +416,11 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
   | Texp_letmutable(pat_expr, body) ->
       transl_letmutable ~scopes ~return_layout:layout pat_expr
         (event_before ~scopes body (transl_exp ~scopes layout body))
-  | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
+  | Texp_function { params; body; ret_mode; alloc_mode;
                     zero_alloc } ->
-      let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
+      let ret_layout = layout_of_function_body body in
       transl_function ~in_new_scope ~scopes e params body
-        ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~alloc_mode ~ret_mode ~ret_layout ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
                                         kind = Id_prim (pmode, psort); _ };
@@ -1653,15 +1663,7 @@ and transl_apply ~scopes
    [trans_curried_function]).
 *)
 and transl_function_without_attributes
-    ~scopes ~return_sort ~return_mode ~mode ~region loc repr params body =
-  let return_layout =
-    match body with
-    | Tfunction_body exp ->
-        layout_exp return_sort exp
-    | Tfunction_cases cases ->
-        layout cases.fc_env cases.fc_loc return_sort cases.fc_ret_type
-
-  in
+    ~scopes ~return_layout ~return_mode ~mode ~region loc repr params body =
   match
     transl_tupled_function ~scopes loc params body
       ~return_mode ~return_layout ~mode ~region
@@ -1984,8 +1986,8 @@ and transl_curried_function ~scopes loc repr params body
     ((Curried { nlocal }, params, return_layout, region, return_mode ), body)
 
 and transl_function ~in_new_scope ~scopes e params body
-      ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc =
+      ~alloc_mode ~ret_mode:sreturn_mode ~ret_layout:sreturn_layout
+      ~region:sregion ~zero_alloc =
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2002,10 +2004,10 @@ and transl_function ~in_new_scope ~scopes e params body
     else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
   let sreturn_mode = transl_alloc_mode_l sreturn_mode.mode_modes in
-  let { params; body; return_sort; return_mode; region } =
+  let { params; body; return_layout; return_mode; region } =
     fuse_method_arity
       { params; body;
-        return_sort = sreturn_sort;
+        return_layout = sreturn_layout;
         return_mode = sreturn_mode;
         region = sregion;
       }
@@ -2019,7 +2021,7 @@ and transl_function ~in_new_scope ~scopes e params body
     event_function ~scopes e
       (function repr ->
          transl_function_without_attributes
-           ~mode ~return_sort ~return_mode
+           ~mode ~return_layout ~return_mode
            ~scopes e.exp_loc repr ~region params body)
   in
   let zero_alloc : Lambda.zero_alloc_attribute =
@@ -2753,17 +2755,21 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         (function repr ->
            let loc = case.c_rhs.exp_loc in
            let ghost_loc = { loc with loc_ghost = true } in
-           transl_function_without_attributes ~scopes ~region:true
-             ~return_sort:case_sort ~mode:alloc_heap ~return_mode
-             loc repr []
-             (Tfunction_cases
-                { fc_cases = [case]; fc_param = param;
+           let fc_cases = { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
                   fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode = Mode.Alloc.disallow_right Mode.Alloc.legacy;
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;
-                }))
+                } in
+           let return_layout =
+             layout fc_cases.fc_env fc_cases.fc_loc case_sort
+               fc_cases.fc_ret_type
+           in
+           transl_function_without_attributes ~scopes ~region:true
+             ~return_layout ~mode:alloc_heap ~return_mode
+             loc repr []
+             (Tfunction_cases fc_cases))
     in
     let attr = function_attribute_disallowing_arity_fusion in
     let loc = of_location ~scopes case.c_rhs.exp_loc in

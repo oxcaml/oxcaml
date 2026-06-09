@@ -147,7 +147,6 @@ type texp_function =
 
 type texp_function_identifier =
   { alloc_mode : alloc_mode;
-    ret_sort : Jkind.sort;
     ret_mode : Alloc.l;
     zero_alloc : Zero_alloc.t
   }
@@ -170,7 +169,6 @@ let texp_function_param_identifier_defaults =
 
 let texp_function_defaults =
   { alloc_mode = dummy_alloc_mode;
-    ret_sort = Jkind.Sort.scannable;
     ret_mode = Alloc.disallow_right Alloc.legacy;
     zero_alloc = Zero_alloc.default
   }
@@ -223,7 +221,6 @@ let mkTexp_function ?(id = texp_function_defaults)
               fc_loc = Location.none
             });
       alloc_mode = id.alloc_mode;
-      ret_sort = id.ret_sort;
       ret_mode = { mode_modes = id.ret_mode; mode_desc = [] };
       zero_alloc = id.zero_alloc
     }
@@ -292,8 +289,7 @@ let view_texp (e : expression_desc) =
   | Texp_tuple (args, mode) ->
     let labels, args = List.split args in
     Texp_tuple (args, (labels, mode))
-  | Texp_function { params; body; alloc_mode; ret_sort; ret_mode; zero_alloc }
-    ->
+  | Texp_function { params; body; alloc_mode; ret_mode; zero_alloc } ->
     let params =
       List.map
         (fun param ->
@@ -337,7 +333,7 @@ let view_texp (e : expression_desc) =
     in
     Texp_function
       ( { params; body },
-        { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc } )
+        { alloc_mode; ret_mode = ret_mode.mode_modes; zero_alloc } )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e
