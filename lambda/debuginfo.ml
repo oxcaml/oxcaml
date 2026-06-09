@@ -464,8 +464,8 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg
-    : Compilation_unit.t Structured_mangling.path =
+let to_structured_mangling_path ~name dbg :
+    Compilation_unit.t Structured_mangling.path =
   (* We ensure the path ends with [name] to preserve all stamps that the name
      includes. To do so, we drop the suffix of partial applications if there is
      any and, additionally, the last function or anonymous function if there is
@@ -478,6 +478,20 @@ let to_structured_mangling_path ~name dbg
     | Anonymous_function _ :: path -> path
     | path -> path
   in
+  (* When anonymous functions and modules appear in (direct) succession in a
+     path, the innermost one is bringing all the required location information,
+     so drop the other ones. The following function assumes the input path is in
+     reverse order. *)
+  let rec rev_drop_successive_anonymous acc
+      (path : Compilation_unit.t Structured_mangling.path) =
+    match path with
+    | [] -> acc
+    | ((Anonymous_function _ | Anonymous_module _) as a)
+      :: (Anonymous_function _ | Anonymous_module _)
+      :: path ->
+      rev_drop_successive_anonymous acc (a :: path)
+    | pi :: path -> rev_drop_successive_anonymous (pi :: acc) path
+  in
   let path_from_debug =
     match to_items dbg with
     | [] -> []
@@ -488,6 +502,6 @@ let to_structured_mangling_path ~name dbg
          the function. See #5099. *)
       path_of_debug_info_scopes [] item.dinfo_scopes
   in
-  Structured_mangling.Function name
-  :: drop_partials_and_last_function (List.rev path_from_debug)
-  |> List.rev
+  rev_drop_successive_anonymous
+    [Structured_mangling.Function name]
+    (drop_partials_and_last_function (List.rev path_from_debug))
