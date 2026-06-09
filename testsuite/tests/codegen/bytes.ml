@@ -38,6 +38,33 @@ bytes_set_uint8:
   ret
 |}]
 
+(* Storing an unsigned 8-bit value (e.g. [U8.t] in [lib/ox/kernel], whose
+   [to_int] is [Int8_u.to_int y land 0xff]) into a byte buffer goes through
+   tag (lsl 1 + 1), mask (land 0x1ff at the Cmm level) and untag (asr 1)
+   before reaching the byte store.  The [cmm_helpers] peephole collapses
+   the whole chain to a plain [movb]; the leftover [land 0xff] is absorbed
+   by [low_bits ~bits:8] on the store side. *)
+let bytes_set_uint8_from_u8 (buf : bytes) (y : int8#) =
+  Bytes.unsafe_set buf 0 (Int8_u.to_int y land 0xff)
+[%%expect_asm X86_64{|
+bytes_set_uint8_from_u8:
+  movb  %bl, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* Same chain without the explicit [land 0xff]: a tag followed by an untag
+   into a byte store.  The byte store only sees the low 8 bits, so this
+   should emit the same code as [bytes_set_uint8_from_u8] above. *)
+let bytes_set_uint8_from_int8u_no_mask (buf : bytes) (y : int8#) =
+  Bytes.unsafe_set buf 0 (Int8_u.to_int y)
+[%%expect_asm X86_64{|
+bytes_set_uint8_from_int8u_no_mask:
+  movb  %bl, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
 
 let bytes_get_int8 (buf : bytes) (i : int) =
   Bytes.unsafe_get_int8 buf i
@@ -202,7 +229,7 @@ bytes_safe_get_int32:
   movslq (%rax,%rbx), %rax
   ret
 .L0:
-  movq  camlTOP18__block602@GOTPCREL(%rip), %rax
+  movq  camlTOP20__block685@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
