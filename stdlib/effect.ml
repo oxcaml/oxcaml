@@ -68,38 +68,25 @@ external with_stack :
   'd ->
   'b = "%with_stack"
 
-type tick_outcome =
-  | Preempt
-  | Continue
-
-external with_stack_preemptible :
-  ('x -> 'b) ->
-  (exn -> 'b) ->
-  ('a . ('a,'x,'b) effc) ->
-  (unit -> tick_outcome) ->
-  ('d -> 'x) ->
-  'd ->
-  'b = "%with_stack_preemptible"
-
 external update_cont_handler_noexc :
   ('a, 'x, _) cont ->
   ('x -> 'b) ->
   (exn -> 'b) ->
   ('a2 . ('a2, 'x, 'b) effc) ->
-  (unit -> tick_outcome) or_null ->
   ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
 
 (* Retrieve the stack from a [cont]inuation, update its handlers, and run
    [f x] using it. *)
-let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) tickc f x =
+let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) f x =
   resume
     (* FIXME: There's a race condition here - if multiple threads call
        [with_handler] on the same continuation at once, they could be
        interleaved, causing a segfault rather
        than an exception. *)
-    (update_cont_handler_noexc cont valuec exnc effc tickc) f x
+    (update_cont_handler_noexc cont valuec exnc effc) f x
 
 module Deep = struct
+
   type ('a,'b) continuation =
     | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
 
@@ -140,35 +127,6 @@ module Deep = struct
       | None -> reperform eff k last_fiber
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
-
-  module Preemptible = struct
-    type ('a,'b) handler =
-      { retc: 'a -> 'b;
-        exnc: exn -> 'b;
-        effc: 'c.'c t -> (('c,'b) continuation -> 'b) option;
-        tickc: unit -> tick_outcome }
-
-    let match_with comp arg handler =
-      let effc eff k last_fiber =
-        match handler.effc eff with
-        | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
-        | None -> reperform eff k last_fiber
-      in
-      with_stack_preemptible
-        handler.retc handler.exnc effc handler.tickc
-        comp arg
-
-    let try_with ~on_tick comp arg (handler : _ effect_handler) =
-      match_with comp arg
-        { retc = Fun.id
-        ; exnc = raise
-        ; effc = handler.effc
-        ; tickc = on_tick
-        };
-    ;;
-  end
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
@@ -217,7 +175,7 @@ module Shallow = struct
           f (Cont k)
       | None -> reperform eff k last_fiber
     in
-    with_handler k handler.retc handler.exnc effc Null resume_fun v
+    with_handler k handler.retc handler.exnc effc resume_fun v
 
   let continue_with k v handler =
     continue_gen k (fun x -> x) v handler
@@ -227,34 +185,6 @@ module Shallow = struct
 
   let discontinue_with_backtrace k v bt handler =
     continue_gen k (fun e -> Printexc.raise_with_backtrace e bt) v handler
-
-  module Preemptible = struct
-    type ('a,'b) handler =
-        { retc: 'a -> 'b;
-          exnc: exn -> 'b;
-          effc: 'c.'c t -> (('c,'a) continuation -> 'b) option;
-          tickc: unit -> tick_outcome }
-
-    let continue_gen (Cont k) resume_fun v handler =
-      let effc eff k last_fiber =
-        match handler.effc eff with
-        | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
-        | None -> reperform eff k last_fiber
-      in
-      with_handler k handler.retc handler.exnc effc (This handler.tickc)
-        resume_fun v
-
-    let continue_with k v handler =
-      continue_gen k (fun x -> x) v handler
-
-    let discontinue_with k v handler =
-      continue_gen k (fun e -> raise e) v handler
-
-    let discontinue_with_backtrace k v bt handler =
-      continue_gen k (fun e -> Printexc.raise_with_backtrace e bt) v handler
-  end
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =

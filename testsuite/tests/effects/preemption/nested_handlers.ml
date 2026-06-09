@@ -1,4 +1,7 @@
 (* TEST
+   modules = "preemption_util.ml";
+   include unix;
+   hasunix;
    runtime5;
    poll_insertion;
    flags += "-alert -unsafe_multidomain -w -21";
@@ -7,6 +10,7 @@
 
 open Effect
 open Effect.Deep
+open Preemption_util
 
 type _ Effect.t += Nested : int -> int Effect.t
 
@@ -20,9 +24,8 @@ let () =
     obj
   in
 
-  let result = Domain.Tick.with_ ~interval_usec:100_000 (fun _ ->
-    Preemptible.try_with
-      ~on_tick:(fun () -> Preempt)
+  let result = with_preemption_setup (fun () ->
+    try_with
       (fun () ->
          let obj = make_finalizable 42 in
          try_with

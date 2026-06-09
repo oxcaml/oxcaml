@@ -605,11 +605,6 @@ module Tick = struct
 
     val acquire : interval_usec:int -> t @ unique
     val release : t @ unique -> unit
-    val with_
-      : ('r : value_or_null).
-          interval_usec:int
-      -> (t @ local -> 'r) @ local once
-      -> 'r
   end
 
   module Runtime4 = struct
@@ -620,7 +615,6 @@ module Tick = struct
 
     let acquire ~interval_usec:_ = fail ()
     let release = function | (_ : t) -> .
-    let with_ ~interval_usec:_ _f = fail ()
   end
 
   module Runtime5 = struct
@@ -755,17 +749,6 @@ module Tick = struct
         match Registry.remove registry interval_usec with
         | Null -> set_tick_interval_usec 0
         | This interval -> set_tick_interval_usec interval)
-
-    let with_ ~interval_usec f =
-      let t = acquire ~interval_usec in
-      match f (borrow_ t) with
-      | res ->
-        release t;
-        res
-      | exception exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        release t;
-        Printexc.raise_with_backtrace exn bt
   end
 
   let impl =

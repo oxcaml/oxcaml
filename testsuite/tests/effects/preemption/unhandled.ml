@@ -1,12 +1,14 @@
 (* TEST
+   modules = "preemption_util.ml";
+   include unix;
+   hasunix;
    runtime5;
    poll_insertion;
    flags += "-alert -unsafe_multidomain -w -21";
    { native; }
 *)
 
-open Effect
-open Effect.Deep
+open Preemption_util
 
 let _ = Sys.opaque_identity (Effect.Preemption : unit Effect.t)
 
@@ -24,20 +26,15 @@ let alloc () =
 ;;
 
 let () =
-  Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
-    Preemptible.try_with
-      ~on_tick:(fun () -> Preempt)
-      (fun () ->
-        let accu = ref [] in
-        for i = 1 to 100_000 do
-          let r = alloc () in
-          accu := r :: !accu;
-          List.iter (fun r ->
-            let (s1, s2, r2) = !r in
-            if not (s1 = "this is a string") then failwith ("s1 = " ^ s1);
-            assert (s2 = "this is another string");
-            assert (!r2 = 42);
-          ) !accu;
-        done)
-      ()
-      { effc = (fun (type a) (_eff : a Effect.t) -> None) })
+  with_preemption_setup ~interval:0.001 ~repeating:true (fun () ->
+    let accu = ref [] in
+    for i = 1 to 100_000 do
+      let r = alloc () in
+      accu := r :: !accu;
+      List.iter (fun r ->
+        let (s1, s2, r2) = !r in
+        if not (s1 = "this is a string") then failwith ("s1 = " ^ s1);
+        assert (s2 = "this is another string");
+        assert (!r2 = 42);
+      ) !accu;
+    done)

@@ -220,8 +220,8 @@ G(name):
 #define Handler_value(reg)      [reg]
 #define Handler_exception(reg)  [reg, #8]
 #define Handler_effect(reg)     [reg, #16]
-#define Handler_parent(reg)     [reg, #32]
-#define Handler_parent_offset   32
+#define Handler_parent(reg)     [reg, #24]
+#define Handler_parent_offset   24
 
 /* Continuation values
  *

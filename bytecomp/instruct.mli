@@ -161,8 +161,6 @@ type instruction =
   | Kreperformterm of int
   | Kwith_stack
   | Kwith_stack_bind
-  | Kwith_stack_preemptible
-  | Kwith_stack_bind_preemptible
   | Kstop
 
 val immed_min: int
