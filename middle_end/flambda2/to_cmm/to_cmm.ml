@@ -72,7 +72,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
      return the unit value). *)
   let env =
     Env.create offsets all_code ~return_continuation:dummy_k
-      ~return_continuation_arity:[] ~trans_prim:To_cmm_primitive.trans_prim
+      ~return_continuation_arity:(Or_unknown.Known [])
+      ~trans_prim:To_cmm_primitive.trans_prim
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
   let ret_var = Variable.create "*ret*" Flambda_kind.value in
@@ -140,7 +141,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       else Cmm.No_CSE :: fun_codegen
     in
     C.cfunction
-      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
+      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll
+         (Cmm.Known Cmm.typ_val))
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in

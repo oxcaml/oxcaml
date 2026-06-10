@@ -425,6 +425,20 @@ module Extended_machtype : sig
   val change_tagged_int_to_val : t -> machtype
 end
 
+module Extended_result_type : sig
+  type t =
+    | Known of Extended_machtype.t
+    | Unknown
+
+  val of_machtype : machtype -> t
+
+  val of_generic_result_type : Cmx_format.generic_result_type -> t
+
+  val to_result_type : t -> result_type
+
+  val to_generic_result_type : t -> Cmx_format.generic_result_type
+end
+
 (** Allocations *)
 
 (** Allocate a block of regular values with the given tag *)
@@ -482,7 +496,7 @@ val machtype_identifier : machtype -> string
 (** Get the symbol for the generic currying or tuplifying wrapper with [n]
     arguments, and ensure its presence in the set of defined symbols. *)
 val curry_function_sym :
-  Lambda.function_kind -> machtype list -> machtype -> Cmm.symbol
+  Lambda.function_kind -> machtype list -> Extended_result_type.t -> Cmm.symbol
 
 val fail_if_called_indirectly_sym : Cmm.symbol
 
@@ -1079,7 +1093,7 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
-  machtype ->
+  result_type ->
   Lambda.region_close ->
   symbol ->
   expression list ->
@@ -1088,7 +1102,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
-  Extended_machtype.t ->
+  Extended_result_type.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->
   expression ->
@@ -1100,7 +1114,7 @@ val indirect_call :
     application (since this enables a few optimisations). *)
 val indirect_full_call :
   dbg:Debuginfo.t ->
-  Extended_machtype.t ->
+  Extended_result_type.t ->
   Lambda.region_close ->
   expression ->
   callees:symbol list option ->
@@ -1175,7 +1189,7 @@ val fundecl :
   codegen_option list ->
   Debuginfo.t ->
   Lambda.poll_attribute ->
-  machtype ->
+  fun_ret_type ->
   fundecl
 
 (** Create a cmm phrase for a function declaration. *)
@@ -1218,13 +1232,15 @@ val tuple_field :
 
 (* Generated functions *)
 val curry_function :
-  Lambda.function_kind * Cmm.machtype list * Cmm.machtype -> Cmm.phrase list
+  Lambda.function_kind * Cmm.machtype list * Cmx_format.generic_result_type ->
+  Cmm.phrase list
 
 val send_function :
   Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val apply_function :
-  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
+  Cmm.machtype list * Cmx_format.generic_result_type * Cmx_format.return_mode ->
+  Cmm.phrase
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 

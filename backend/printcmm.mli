@@ -27,6 +27,8 @@ val machtype_component : formatter -> Cmm.machtype_component -> unit
 
 val machtype : formatter -> Cmm.machtype -> unit
 
+val fun_ret_type : formatter -> Cmm.fun_ret_type -> unit
+
 val exttype : formatter -> Cmm.exttype -> unit
 
 val extcall_signature :

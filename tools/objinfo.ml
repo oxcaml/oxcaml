@@ -335,8 +335,12 @@ let return_arity_identifier t =
   | [|Cmm.Val|] -> ""
   | _ -> "_R" ^ Cmm_helpers.machtype_identifier t
 
+let generic_return_arity_identifier = function
+  | Cmx_format.Known result -> return_arity_identifier result
+  | Cmx_format.Unknown -> "_Runknown"
+
 let print_generic_fns gfns =
-  let pr_afuns _ fns =
+  let pr_funs return_arity_identifier _ fns =
     let mode = function
       | Cmx_format.Not_alloc_stack -> ""
       | Cmx_format.Maybe_alloc_stack -> "L"
@@ -351,15 +355,16 @@ let print_generic_fns gfns =
         | (Lambda.Curried {nlocal}, arity, result) ->
             printf " %s%sL%d"
               (unique_arity_identifier arity)
-              (return_arity_identifier result)
+              (generic_return_arity_identifier result)
               nlocal
         | (Lambda.Tupled, arity, result) ->
             printf " -%s%s"
               (unique_arity_identifier arity)
-              (return_arity_identifier result)) fns in
+              (generic_return_arity_identifier result)) fns in
   printf "Currying functions:%a\n" pr_cfuns gfns.curry_fun;
-  printf "Apply functions:%a\n" pr_afuns gfns.apply_fun;
-  printf "Send functions:%a\n" pr_afuns gfns.send_fun
+  printf "Apply functions:%a\n" (pr_funs generic_return_arity_identifier)
+    gfns.apply_fun;
+  printf "Send functions:%a\n" (pr_funs return_arity_identifier) gfns.send_fun
 
 let print_cmx_infos (uir, sections, crc) =
   print_general_infos Compilation_unit.output uir.uir_unit crc uir.uir_defines

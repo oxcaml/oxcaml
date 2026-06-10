@@ -169,6 +169,18 @@ end = struct
   let count_regs_in_locs locs =
     Array.fold_left (fun acc r -> acc + Array.length r) 0 locs
 
+  let check_return_locations t label actual expected =
+    if Int.equal (Array.length actual) (Array.length expected)
+    then
+      Array.iter2
+        (fun actual expected ->
+          if not (Reg.same_loc actual expected)
+          then
+            report t
+              "%a: Return argument %a is not in expected return location %a@."
+              Label.print label Printreg.reg actual Printreg.reg expected)
+        actual expected
+
   let check_tailrec_position t =
     (* tailrec entry point is either the entry block or the only successor of
        the entry block. *)
@@ -233,17 +245,25 @@ end = struct
       let expected_args = if Option.is_some imm then [1] else [2] in
       check ~expected_args ~expected_res:[0]
     | Switch _ -> check ~expected_args:[1] ~expected_res:[0]
-    | Return ->
+    | Return -> (
       (* Return carries the registers holding the function result in calling
          convention order. Some generated helpers (e.g. curry wrappers) may have
          a declared return type with more components than they actually return;
          those are identified by the [caml_curry] prefix and are exempted. *)
-      let expected_args =
+      let expected_locs =
         if String.starts_with t.cfg.fun_name ~prefix:"caml_curry"
-        then []
-        else [Proc.loc_results_return t.cfg.fun_ret_type |> Array.length]
+        then None
+        else
+          match t.cfg.fun_ret_type with
+          | Cmm.Known fun_ret_type ->
+            Some (Proc.loc_results_return fun_ret_type)
+          | Cmm.Unknown -> Some (Proc.loc_results_return (Reg.typv args))
       in
-      check ~expected_args ~expected_res:[0]
+      match expected_locs with
+      | None -> check ~expected_args:[] ~expected_res:[0]
+      | Some expected_locs ->
+        check ~expected_args:[Array.length expected_locs] ~expected_res:[0];
+        check_return_locations t label args expected_locs)
     | Raise _ -> check ~expected_args:[1] ~expected_res:[0]
     | Tailcall_self _ ->
       (* Self tailcalls reuse the current function's parameter passing

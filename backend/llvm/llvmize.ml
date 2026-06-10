@@ -261,6 +261,40 @@ let filter_ds_and_make_ret_type ret_machtype =
   let actual_ret_types = reg_list_for_call cc_regs |> List.map T.of_reg in
   make_ret_type actual_ret_types
 
+let unknown_fun_ret_type cfg =
+  let actual_ret_types =
+    Cfg.fold_blocks cfg ~init:None ~f:(fun _ block actual_ret_types ->
+        match block.terminator.desc with
+        | Return -> (
+          let this_ret_types =
+            reg_list_for_call block.terminator.arg |> List.map T.of_reg
+          in
+          match actual_ret_types with
+          | None -> Some this_ret_types
+          | Some actual_ret_types ->
+            if List.equal T.equal actual_ret_types this_ret_types
+            then Some actual_ret_types
+            else
+              Misc.fatal_error
+                "LLVM backend does not support unknown Cmm function return \
+                 types with multiple concrete return conventions")
+        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+        | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
+        | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+          actual_ret_types)
+  in
+  match actual_ret_types with
+  | Some actual_ret_types -> make_ret_type actual_ret_types
+  | None ->
+    Misc.fatal_error
+      "LLVM backend does not support unknown Cmm function return types without \
+       a concrete return convention"
+
+let llvm_fun_ret_type cfg (fun_ret_type : Cmm.fun_ret_type) =
+  match fun_ret_type with
+  | Cmm.Known machtype -> filter_ds_and_make_ret_type machtype
+  | Cmm.Unknown -> unknown_fun_ret_type cfg
+
 let make_arg_types arg_types =
   List.map (fun _ -> T.i64) runtime_regs @ arg_types
 
@@ -1513,7 +1547,7 @@ let prepare_fun_info t (cfg : Cfg.t) =
     Array.to_list fun_args |> List.filter reg_listed_in_signature
   in
   let arg_types = List.map T.of_reg arg_regs |> make_arg_types in
-  let res_type = filter_ds_and_make_ret_type fun_ret_type in
+  let res_type = llvm_fun_ret_type cfg fun_ret_type in
   let attrs = fun_attrs ~has_try fun_codegen_options in
   let emitter =
     E.create ~name:fun_name ~args:arg_types ~res:(Some res_type) ~cc:Oxcaml

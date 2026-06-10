@@ -57,6 +57,12 @@ tracked by the GC:
 
 type machtype = machtype_component array
 
+type result_type =
+  | Known of machtype
+  | Unknown
+
+type fun_ret_type = result_type
+
 val equal_machtype : machtype -> machtype -> bool
 
 val typ_void : machtype
@@ -80,6 +86,10 @@ val typ_vec512 : machtype
 val typ_mask : machtype
 
 val typ_int128 : machtype
+
+val result_type_to_machtype_exn : result_type -> machtype
+
+val result_type_for_tail_call : result_type -> machtype
 
 (** Least upper bound of two [machtype_component]s. *)
 val lub_component :
@@ -426,7 +436,7 @@ val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
 
 type operation =
   | Capply of
-      { result_type : machtype;
+      { result_type : result_type;
         region : Lambda.region_close;
         callees : symbol list option
             (* List of possible callees, or [None] if not known. The actual
@@ -616,7 +626,7 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
-    fun_ret_type : machtype
+    fun_ret_type : fun_ret_type
   }
 
 (** When data items that are less than 64 bits wide occur in blocks, whose

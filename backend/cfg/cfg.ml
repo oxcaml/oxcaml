@@ -97,7 +97,7 @@ type t =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
-    fun_ret_type : Cmm.machtype;
+    fun_ret_type : Cmm.fun_ret_type;
     mutable allowed_to_be_irreducible : bool;
     mutable register_locations_are_set : bool
   }

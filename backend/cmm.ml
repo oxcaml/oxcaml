@@ -31,6 +31,12 @@ type machtype_component = Cmx_format.machtype_component =
 
 type machtype = machtype_component array
 
+type result_type =
+  | Known of machtype
+  | Unknown
+
+type fun_ret_type = result_type
+
 (* Note: To_cmm_expr.translate_apply0 relies on non-void [machtype_component]s
    being singleton arrays. *)
 (* CR mshinwell/xclerc: Maybe this should be a variant type instead, or an
@@ -69,6 +75,16 @@ let string_of_machtype_component (comp : machtype_component) =
   | Mask -> "Mask"
   | Float32 -> "Float32"
   | Valx2 -> "Valx2"
+
+let result_type_to_machtype_exn = function
+  | Known machtype -> machtype
+  | Unknown ->
+    Misc.fatal_error "Unknown Cmm result type has no concrete machtype"
+
+let result_type_for_tail_call = function
+  | Known machtype -> machtype
+  | Unknown -> typ_void
+
 
 (** [machtype_component]s are partially ordered as follows:
 
@@ -554,7 +570,7 @@ let equal_alloc_dbginfo left right =
 
 type operation =
   | Capply of
-      { result_type : machtype;
+      { result_type : result_type;
         region : Lambda.region_close;
         callees : symbol list option
       }
@@ -733,7 +749,7 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
-    fun_ret_type : machtype
+    fun_ret_type : fun_ret_type
   }
 
 type data_item =

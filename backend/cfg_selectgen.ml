@@ -825,9 +825,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
-    | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
-      ->
-      emit_tail_apply env sub_cfg ty op args dbg
+    | Cop ((Capply { result_type; region = Rc_normal; _ } as op), args, dbg) ->
+      emit_tail_apply env sub_cfg result_type op args dbg ~tailcall_allowed:true
+        ~traps:(SU.pop_all_traps env)
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
@@ -904,6 +904,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     Never_returns
 
   and emit_expr_op env sub_cfg bound_name op args dbg : _ Or_never_returns.t =
+    (match (op : Cmm.operation) with
+    | Capply { result_type = Unknown; _ } ->
+      Misc.fatal_error "Unknown-result call was not emitted in tail position"
+    | _ -> ());
     match emit_parts_list env sub_cfg args with
     | Never_returns -> Never_returns
     | Ok (simple_args, env) -> (
@@ -1260,23 +1264,53 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   and emit_return env sub_cfg exp traps =
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-    insert_return env sub_cfg (emit_expr env sub_cfg exp ~bound_name:None) traps
+    match exp with
+    | Cmm.Cop
+        ((Cmm.Capply { result_type = Cmm.Unknown; region; _ } as op), args, dbg)
+      ->
+      let tailcall_allowed =
+        match region with
+        | Lambda.Rc_normal -> true
+        | Lambda.Rc_close_at_apply | Lambda.Rc_nontail -> false
+      in
+      emit_tail_apply env sub_cfg Cmm.Unknown op args dbg ~tailcall_allowed
+        ~traps
+    | _ ->
+      insert_return env sub_cfg
+        (emit_expr env sub_cfg exp ~bound_name:None)
+        traps
 
-  and emit_tail_apply env sub_cfg ty op args dbg =
+  and emit_tail_apply env sub_cfg result_type op args dbg ~tailcall_allowed
+      ~traps =
     match emit_parts_list env sub_cfg args with
     | Never_returns -> ()
     | Ok (simple_args, env) -> (
+      let fallback_result_locations rd =
+        match (result_type : Cmm.result_type) with
+        | Unknown -> [||], 0
+        | Known _ -> Proc.loc_results_call (Reg.typv rd)
+      in
+      let can_tailcall =
+        tailcall_allowed && List.is_empty traps && SU.trap_stack_is_empty env
+      in
+      let reject_unknown_result_fallback call_kind =
+        match (result_type : Cmm.result_type) with
+        | Known _ -> ()
+        | Unknown ->
+          Misc.fatal_errorf
+            "Cannot compile unknown-result %s call as a non-tail call" call_kind
+      in
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
       | Terminator (Call { op = Indirect callees; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv rarg) in
-        let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
+        let rd = Reg.createv (Cmm.result_type_for_tail_call result_type) in
+        let loc_res, stack_ofs_res = fallback_result_locations rd in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
-        if stack_ofs = 0 && SU.trap_stack_is_empty env
+        if stack_ofs = 0 && can_tailcall
         then (
           let call = Cfg.Tailcall_func (Indirect callees) in
           SU.insert_moves env sub_cfg rarg loc_arg;
@@ -1284,6 +1318,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             (Array.append [| r1.(0) |] loc_arg)
             [||])
         else (
+          reject_unknown_result_fallback "indirect";
           SU.insert_move_args env sub_cfg rarg loc_arg stack_ofs;
           SU.insert_debug' env sub_cfg term dbg
             (Array.append [| r1.(0) |] loc_arg)
@@ -1291,36 +1326,40 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
-          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
+          insert_return env sub_cfg (Ok rd) traps)
       | Terminator (Call { op = Direct func; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
-        let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
+        let rd = Reg.createv (Cmm.result_type_for_tail_call result_type) in
+        let loc_res, stack_ofs_res = fallback_result_locations rd in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
-        if
-          String.equal func.sym_name !SU.current_function_name
-          && SU.trap_stack_is_empty env
+        if can_tailcall && String.equal func.sym_name !SU.current_function_name
         then (
           let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
           let loc_arg' =
             assert (stack_ofs >= 0);
+            (* Tailcall_self jumps to this function's internal tailrec block,
+               whose inputs are the function's parameter locations. Stack-passed
+               arguments are therefore safe here once moved to loc_parameters,
+               unlike Tailcall_func, which must use outgoing argument locations
+               and cannot fall back for Unknown results. *)
             if stack_ofs = 0 then loc_arg else Proc.loc_parameters (Reg.typv r1)
           in
           SU.insert_moves env sub_cfg r1 loc_arg';
           SU.insert_debug' env sub_cfg call dbg loc_arg' [||])
-        else if stack_ofs = 0 && SU.trap_stack_is_empty env
+        else if stack_ofs = 0 && can_tailcall
         then (
           let call = Cfg.Tailcall_func (Direct func) in
           SU.insert_moves env sub_cfg r1 loc_arg;
           SU.insert_debug' env sub_cfg call dbg loc_arg [||])
         else (
+          reject_unknown_result_fallback "direct";
           SU.insert_move_args env sub_cfg r1 loc_arg stack_ofs;
           SU.insert_debug' env sub_cfg term dbg loc_arg loc_res;
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
-          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
+          insert_return env sub_cfg (Ok rd) traps)
       | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
