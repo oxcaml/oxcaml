@@ -223,18 +223,11 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   in
   let my_closure_duid = Flambda_debug_uid.none in
   let my_depth_duid = Flambda_debug_uid.none in
-  let return_arity =
-    match Code.result_arity code with
-    | Ok arity -> arity
-    | Unknown | Bottom ->
-      Misc.fatal_errorf
-        "Cannot simplify the body of %a, whose result arity is %a:@ %a"
-        Code_id.print (Code.code_id code) Result_arity.print
-        (Code.result_arity code) Code.print code
-  in
   match
     C.simplify_function_body context dacc body ~return_continuation
-      ~exn_continuation ~return_arity
+      ~exn_continuation
+      ~return_arity:
+        (Result_arity.to_arity_with_placeholder (Code.result_arity code))
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
@@ -469,9 +462,14 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   let is_a_functor = Code.is_a_functor code in
   let is_opaque = Code.is_opaque code in
   let result_types =
-    compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
-      ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
-      ~lifted_consts_this_function ~params
+    (* [return_cont_params] for an unknown result arity is the placeholder, not
+       the function's actual result, so no result types may be inferred. *)
+    match (result_arity : Result_arity.t) with
+    | Unknown -> Or_unknown_or_bottom.Unknown
+    | Ok _ | Bottom ->
+      compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
+        ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
+        ~lifted_consts_this_function ~params
   in
   let outer_dacc =
     (* This is the complicated part about slot offsets. We just traversed the

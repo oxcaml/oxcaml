@@ -308,11 +308,18 @@ let split_direct_over_application apply ~callee's_code_id
         ~free_names_of_handler:(Known perform_over_application_free_names)
         ~is_exn_handler:false ~is_cold:false
   in
+  let full_apply_return : Apply.Return.t =
+    match Code_metadata.result_arity callee's_code_metadata with
+    | Ok _ | Unknown ->
+      Returns_to
+        { cont = after_full_application; arity = full_apply_result_arity }
+    | Bottom ->
+      (* [after_full_application] is still bound below, but is unreferenced: it
+         is dropped as dead code. *)
+      Never_returns { arity = Bottom }
+  in
   let full_apply =
-    Apply.create ~callee:(Apply.callee apply)
-      ~return:
-        (Apply.Return.create (Return after_full_application)
-           (Code_metadata.result_arity callee's_code_metadata))
+    Apply.create ~callee:(Apply.callee apply) ~return:full_apply_return
       (Apply.exn_continuation apply)
       ~args:first_args ~args_arity:callee's_params_arity
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
