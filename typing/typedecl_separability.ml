@@ -391,10 +391,9 @@ let worst_case ty =
     such that [ty] is separable at mode [m] in [gamma], under
     the signature [sigma]. *)
 let check_type
-<<<<<<< HEAD
   : upstream_compatible:bool -> Env.t -> type_expr -> mode -> context
   = fun ~upstream_compatible env ty m ->
-  let rec check_type hyps ty m =
+  let rec check_type env hyps ty m =
     (* If the jkind of [ty] says it is [Non_float], then [ty]
        is separable with no constraints on its free variables. However, this
        only suffices for [Sep] mode, not [Deepsep]: a type like ['b list]
@@ -409,15 +408,6 @@ let check_type
       && m <> Deepsep
       && Ctype.check_type_separability env ty Non_float
     then empty else
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  : Env.t -> type_expr -> mode -> context
-  = fun env ty m ->
-  let rec check_type hyps ty m =
-=======
-  : Env.t -> type_expr -> mode -> context
-  = fun env ty m ->
-  let rec check_type env hyps ty m =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     if Hyps.safe ty m hyps then empty
     else if Hyps.unsafe ty m hyps then worst_case ty
     else
@@ -439,18 +429,12 @@ let check_type
     | (Tvariant(_)        , Sep    )
     | (Tobject(_,_)       , Sep    )
     | ((Tnil | Tfield _)  , Sep    )
-<<<<<<< HEAD
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
     | (Tquote_eval(_)     , Sep    )
+    | (Tfunctor _         , Sep    )
     | (Tpackage _         , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    | (Tpackage _         , Sep    ) -> empty
-=======
-    | (Tfunctor _         , Sep    )
-    | (Tpackage _         , Sep    ) -> empty
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     (* "Deeply separable" case for these same constructors. *)
     | (Tarrow _           , Deepsep)
     | (Ttuple _           , Deepsep)
@@ -474,7 +458,7 @@ let check_type
         in
         let on_subtype context ty =
           context ++ check_type env (Hyps.guard hyps) ty Deepsep in
-        List.fold_left on_subtype empty (List.map snd pack.pack_constraints)
+        List.fold_left on_subtype empty (List.map snd pack.pack_cstrs)
           ++ check_type env' (Hyps.guard hyps) ty Deepsep;
     (* Polymorphic type, and corresponding polymorphic variable.
 
@@ -497,15 +481,9 @@ let check_type
        a scope violation), so they could be ignored if they occur
        under a separating type constructor. *)
     | (Tpoly(pty,_)       , m      ) ->
-<<<<<<< HEAD
-        check_type hyps pty m
+        check_type env hyps pty m
     | (Trepr(_pty,_)       , _m    ) ->
         assert false
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        check_type hyps pty m
-=======
-        check_type env hyps pty m
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     | (Tunivar(_)         , _      ) -> empty
     | (Tof_kind(_)         , _      ) -> empty
     (* Type constructor case. *)

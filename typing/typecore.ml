@@ -4528,14 +4528,21 @@ let check_curried_application_complete ~env ~app_loc args =
           | Unknown_arg { mode_fun; _ }
           | Eliminated_optional_arg { mode_fun; _ })
     | Omitted { mode_fun; _ } -> mode_fun
+    (* Module-dependent function arguments are legacy. *)
+    | Arg (Typed_arg _) -> Alloc.legacy
   in
   let rec loop has_commuted = function
     | [] | [_] -> ()
-    | (lbl, ( Arg ( Known_arg { mode_fun; mode_arg; _ }
-                  | Unknown_arg { mode_fun; mode_arg; _ }
-                  | Eliminated_optional_arg { mode_fun; mode_arg; _ })
-            | Omitted { mode_fun; mode_arg; _ } as arg))
-      :: ((next :: _) as rest) ->
+    | (lbl, arg) :: ((next :: _) as rest) ->
+      let mode_fun, mode_arg =
+        match arg with
+        | Arg ( Known_arg { mode_fun; mode_arg; _ }
+              | Unknown_arg { mode_fun; mode_arg; _ }
+              | Eliminated_optional_arg { mode_fun; mode_arg; _ })
+        | Omitted { mode_fun; mode_arg; _ } -> mode_fun, mode_arg
+        (* Module-dependent function arguments are legacy. *)
+        | Arg (Typed_arg _) -> Alloc.legacy, Alloc.legacy
+      in
       let mode_ret = arg_mode_fun next in
       let has_commuted =
         has_commuted ||
@@ -4549,6 +4556,8 @@ let check_curried_application_complete ~env ~app_loc args =
         | Error e ->
           let loc, loc_kind =
             match arg with
+            | Arg (Typed_arg {targ; _}) ->
+              targ.exp_loc, `Single_arg
             | Arg (Known_arg {sarg; _} | Unknown_arg {sarg; _}) ->
               if has_commuted then
                 sarg.pexp_loc, `Single_arg
@@ -4699,7 +4708,7 @@ let dependent_app_error env err ~rev_args ~funct ~sarg pack pack0 =
   match (err : filter_arrow_failure) with
   | Unification_error trace ->
     raise (Error(loc, env, Cannot_unify_tfunctor_to_tarrow trace))
-  | Label_mismatch _ | Not_a_function -> assert false
+  | Label_mismatch _ | Not_a_function | Jkind_error _ -> assert false
 
 let dependent_labeled_app_error env err ~rev_args ~funct me_opt ty_fun
   id_us pack pack0
@@ -9552,9 +9561,10 @@ and type_moddep_fun ~env ~expected_mode:_ ~name ~pack_param ~rest
       ~typ:(newty (Tpackage pack)) pack.pack_cstrs;
   let mty = Ctype.modtype_of_package env pparam_loc pack in
   let pv_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
-  let arg_md = {
+  let arg_md : Types.module_declaration = {
     md_type = mty;
     md_attributes = [];
+    md_modalities = Mode.Modality.undefined;
     md_loc = pparam_loc;
     md_uid = pv_uid;
   } in
@@ -9604,7 +9614,7 @@ and type_moddep_fun ~env ~expected_mode:_ ~name ~pack_param ~rest
   let module_sort = Jkind.Sort.(of_const Const.for_module) in
   let pat_desc =
     Tpat_var { id = s_ident; name; uid = pv_uid; sort = module_sort;
-               mode = Mode.Value.legacy }
+               mode = Mode.Value.(disallow_right legacy) }
   in
   let pack_param =
     match cpack with

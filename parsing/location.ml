@@ -143,8 +143,6 @@ let get_loc { loc } = loc
 let map f { txt; loc} = {txt = f txt; loc}
 let compare_txt f { txt=t1 } { txt=t2 } = f t1 t2
 
-let map f x = { x with txt = f x.txt }
-
 (******************************************************************************)
 (* Input info *)
 

@@ -484,7 +484,7 @@ module Solver = struct
         else
           (* All-constant (immediate) polymorphic variant. *)
           Ldd.const Axis_lattice.immediate
-      | Types.Tpackage _ ->
+      | Types.Tpackage _ | Types.Tfunctor _ ->
         (* Like open polymorphic variants, model first-class modules as boxed
            values intersected with an unknown so they behave as not-best. *)
         let unknown =

@@ -56,7 +56,14 @@ let simple_longident id =
   in
   if not (is_simple id.txt) then complex_id id.loc
 
-<<<<<<< HEAD
+let not_optional_label loc l =
+  let is_optional =
+    match l with
+    | Optional _ -> true
+    | _ -> false
+  in
+  if is_optional then optional_label_on_functor loc
+
 let check_empty_constraint ~loc ty mode =
   match ty, mode with
   | None, [] -> empty_constraint loc
@@ -68,17 +75,6 @@ let pat_is_var = function
 | Ppat_constraint ({ ppat_desc = Ppat_var _; _}, _, _) -> true
 | _ -> false
 
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-let not_optional_label loc l =
-  let is_optional =
-    match l with
-    | Optional _ -> true
-    | _ -> false
-  in
-  if is_optional then optional_label_on_functor loc
-
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 let iterator =
   let super = Ast_iterator.default_iterator in
   let type_declaration self td =
@@ -94,17 +90,11 @@ let iterator =
     match ty.ptyp_desc with
     | Ptyp_tuple ([] | [_]) -> invalid_tuple loc
     | Ptyp_package ptyp ->
-<<<<<<< HEAD
       List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_cstrs
-    | Ptyp_alias (_, None, None) -> invalid_alias loc
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_constraints
-=======
-      List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_constraints
     | Ptyp_functor  (l, _, ptyp, _) ->
       not_optional_label loc l;
-      List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_cstrs
+    | Ptyp_alias (_, None, None) -> invalid_alias loc
     | Ptyp_poly([],_) -> empty_poly_binder loc
     | _ -> ()
   in

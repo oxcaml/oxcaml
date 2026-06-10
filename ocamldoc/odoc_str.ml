@@ -51,13 +51,8 @@ let rec is_arrow_type t =
 
 let rec need_parent t =
   match Types.get_desc t with
-<<<<<<< HEAD
-    Types.Tarrow _ | Types.Ttuple _ | Tunboxed_tuple _ -> true
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    Types.Tarrow _ | Types.Ttuple _ -> true
-=======
-    Types.Tarrow _ | Types.Ttuple _ | Types.Tfunctor _ -> true
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    Types.Tarrow _ | Types.Ttuple _ | Tunboxed_tuple _
+  | Types.Tfunctor _ -> true
   | Types.Tlink t2 -> need_parent t2
   | Types.Tconstr _
   | Types.Tvar _ | Types.Tunivar _ | Types.Tobject _ | Types.Tpoly _

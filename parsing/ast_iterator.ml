@@ -176,7 +176,7 @@ module T = struct
     | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
     | Ptyp_functor (_lab, s, ptyp, t2) ->
-      iter_loc iter_string sub s;
+      iter_loc sub s;
       sub.package_type sub ptyp;
       sub.typ sub t2
 

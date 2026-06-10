@@ -110,11 +110,6 @@ type t =
 and global = Global_module.Name.t = private
   { head: string; args: Global_module.Name.argument list }
 
-(* A stamp of 0 denotes a persistent identifier *)
-
-let currentstamp = s_ref 0
-let predefstamp = s_ref 0
-
 let create_scoped ~scope s =
   incr currentstamp;
   Scoped { name = s; stamp = !currentstamp; scope }

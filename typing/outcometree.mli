@@ -148,29 +148,18 @@ and out_type =
   | Otyp_newlayout of out_sort_genvar list * out_type
   | Otyp_module of out_package
   | Otyp_attribute of out_type * out_attribute
-<<<<<<< HEAD
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
   | Otyp_of_kind of out_jkind
   | Otyp_ret of out_ret_mode * out_type
   (** INVARIANT: See [out_ret_mode]. *)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  | Otyp_external of string
+  | Otyp_functor of arg_label * out_ident * out_package * out_type
 
 and out_row =
   | Orow_closed
   | Orow_open_anonymous
   | Orow_open of out_type
-=======
-  | Otyp_external of string
-  | Otyp_functor of Asttypes.arg_label * out_ident * out_package * out_type
-
-and out_row =
-  | Orow_closed
-  | Orow_open_anonymous
-  | Orow_open of out_type
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 and out_label = {
   olab_name: string;

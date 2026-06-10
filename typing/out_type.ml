@@ -1477,7 +1477,6 @@ let rec tree_of_modal_typexp mode modal ty =
                   tree_of_typexp mode arg_mode ty
               | _ -> Otyp_stuff "<hidden>"
             else Otyp_stuff "<hidden>"
-<<<<<<< HEAD
           else
             tree_of_typexp mode arg_mode ty1
         in
@@ -1485,35 +1484,30 @@ let rec tree_of_modal_typexp mode modal ty =
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
         Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
-    | Ttuple labeled_tyl ->
-        Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
-    | Tunboxed_tuple labeled_tyl ->
-        Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          else tree_of_typexp mode ty1 in
-        Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
-    | Ttuple tyl ->
-        Otyp_tuple (tree_of_labeled_typlist mode tyl)
-=======
-          else tree_of_typexp mode ty1 in
-        Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
     | Tfunctor (l, id, pack, ty) ->
         let lab =
-          if !print_labels || is_optional l then l else Nolabel
+          if !print_labels || is_omittable l then outcome_label l
+          else Outcometree.Nolabel
         in
         let fenv env =
           (* We compute an approximation of the signature. *)
           let mty = Mty_ident pack.pack_path in
-          Env.add_module ~noalias:true (Ident.of_unscoped id) Mp_present mty env
+          Env.add_module (Ident.of_unscoped id) Mp_present mty env
+          |> Env.add_functor_arg (Ident.of_unscoped id)
         in
         let ty =
-          wrap_env ~keep_short_paths:true fenv (tree_of_typexp mode) ty
+          (* Module-dependent functions are legacy. *)
+          wrap_env ~keep_short_paths:true fenv
+            (tree_of_typexp mode Alloc.Const.legacy) ty
         in
-        Otyp_functor (lab, Oide_ident { printed_name = Ident.Unscoped.name id },
+        Otyp_functor (lab,
+                      Oide_ident ({ printed_name = Ident.Unscoped.name id }
+                                  : out_name),
                       tree_of_package mode pack, ty)
-    | Ttuple tyl ->
-        Otyp_tuple (tree_of_labeled_typlist mode tyl)
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    | Ttuple labeled_tyl ->
+        Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
+    | Tunboxed_tuple labeled_tyl ->
+        Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tconstr(p, tyl, _abbrev) ->
         let p', s = best_type_path p in
         let tyl' = apply_subst s tyl in

@@ -1334,6 +1334,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tquote _
         | Tsplice _
         | Tquote_eval _
+        | Tfunctor _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

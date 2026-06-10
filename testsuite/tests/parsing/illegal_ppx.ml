@@ -36,16 +36,10 @@ let missing_rhs loc =
 
 let empty_let loc = H.Str.value ~loc Asttypes.Nonrecursive []
 let empty_type loc = H.Str.type_ ~loc Asttypes.Nonrecursive []
-<<<<<<< HEAD
 let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc None))
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc ()))
-=======
-let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc ()))
 let tfunctor_opt_arg loc =
   H.Typ.(functor_ ~loc (Optional "lbl") (Location.mkloc "M" loc)
-    (package_type (Location.mkloc (Longident.Lident "S") loc) []) (any ()))
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    (package_type (Location.mkloc (Longident.Lident "S") loc) []) (any None))
 let functor_id loc = Location.mkloc (Longident.(
   Lapply (Location.mknoloc (Lident "F"),  Location.mknoloc (Lident "X")))) loc
 let complex_record loc =

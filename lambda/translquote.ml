@@ -2868,7 +2868,7 @@ let type_for_annotation ~env ~loc typ =
               tpt_type = { pack_path; pack_cstrs };
               tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
-        | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
+        | Tlink _ | Tsubst _ | Tfield _ | Tnil | Tfunctor _ ->
           fatal_errorf
             "Translquote [at %a]:@ Unexpected type expression@ in a quoted \
              higher-rank function type"
@@ -3189,6 +3189,9 @@ and quote_core_type ~scopes ty =
     fatal_errorf "Translquote [at %a]: Ttyp_of_kind not implemented."
       Location.print_loc (to_location loc)
   | Ttyp_call_pos -> Type.wrap Type.call_pos
+  | Ttyp_functor _ ->
+    fatal_errorf "Translquote [at %a]: Ttyp_functor not implemented."
+      Location.print_loc (to_location loc)
 
 type case_binding =
   | Non_binding of Pat.t * Exp.t

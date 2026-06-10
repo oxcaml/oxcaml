@@ -66,16 +66,8 @@ let compute_variance env visited vari ty =
     let vari' = get_variance ty visited in
     if Variance.subset vari vari' then () else
     let vari = Variance.union vari vari' in
-<<<<<<< HEAD
     visited := TypeMap.add ty (env, vari) !visited;
     let compute_same = compute_variance_rec env vari in
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    visited := TypeMap.add ty vari !visited;
-    let compute_same = compute_variance_rec vari in
-=======
-    visited := TypeMap.add ty vari !visited;
-    let compute_same = compute_variance_rec env vari in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     match get_desc ty with
       Tarrow (_, ty1, ty2, _) ->
         compute_variance_rec env (Variance.conjugate vari) ty1;
@@ -133,13 +125,7 @@ let compute_variance env visited vari ty =
     | Tpackage pack ->
         let v = Variance.(compose vari full) in
         List.iter
-<<<<<<< HEAD
           (fun (_, ty) -> compute_variance_rec env v ty) pack.pack_cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          (fun (_, ty) -> compute_variance_rec v ty) pack.pack_constraints
-=======
-          (fun (_, ty) -> compute_variance_rec env v ty) pack.pack_constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   in
   compute_variance_rec env vari ty
 

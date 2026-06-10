@@ -129,7 +129,8 @@ let classify env ty : classification =
              causing some .cmi files to be unavailable.
              Maybe we should emit a warning. *)
           Any)
-    | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ -> Addr
+    | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
+    | Tfunctor _ -> Addr
     | Tlink _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tlink"))
     | Tsubst _ ->
@@ -284,7 +285,7 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote_eval"))
   | Trepr _ ->
     raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
-  | Tpackage _ -> Block None
+  | Tpackage _ | Tfunctor _ -> Block None
 
 and value_kind_variant env subst ~visited ~depth
     (cstrs : Types.constructor_declaration list) rep =

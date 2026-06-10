@@ -226,7 +226,7 @@ module T = struct
         newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
     | Ptyp_functor (lab, s, ptyp, t) ->
-        functor_ ~loc ~attrs lab (map_loc map_string sub s)
+        functor_ ~loc ~attrs lab (map_loc sub s)
           (sub.package_type sub ptyp) (sub.typ sub t)
 
   let map_type_declaration sub

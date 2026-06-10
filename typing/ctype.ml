@@ -2107,7 +2107,8 @@ let () = Ikind.instance_poly_for_jkind' := instance_poly_for_jkind
 let instance_funct_opt ~id_in ~p_out ~fixed sch =
   let visited = TypeHash.create 17 in
   For_copy.with_scope (fun copy_scope ->
-    copy_sep ~copy_scope ~fixed ~visited ~id_map:[(id_in, p_out)] sch
+    copy_sep ~copy_scope ~fixed ~partial:false
+      ~bound_univars:TypeSet.empty ~visited ~id_map:[(id_in, p_out)] sch
   )
 
 let instance_funct ~id_in ~p_out ~fixed sch =
@@ -2675,6 +2676,7 @@ let rec try_reduce_once env t =
                      pack_cstrs }
     (* It is safe not to expand [Tof_kind], and we do not need to currently *)
     | Tof_kind _ -> raise Cannot_expand
+    | Tfunctor _ -> raise Cannot_expand
     | Tlink _ | Tsubst _ -> assert false
     end |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
@@ -2709,7 +2711,7 @@ let rec try_reduce env ty =
    so we special-case its abbreviation expansion there. *)
 let expand_eval_abbrev env ty =
   match get_desc ty with
-  | Tconstr (path, [_], _) when Path.same path Predef.path_eval ->
+  | Tconstr (path, [_], _) when Path.same_unsafe path Predef.path_eval ->
     try_expand_once env ty
   | _ -> raise Cannot_expand
 
@@ -2938,7 +2940,7 @@ let contained_without_boxing env ty =
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
-  | Tquote _ | Tsplice _ | Tquote_eval _ -> []
+  | Tquote _ | Tsplice _ | Tquote_eval _ | Tfunctor _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -3077,6 +3079,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
+  | Tfunctor _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
     let rec compute_ty_modality_layout unwrapped_ty =
@@ -4454,9 +4457,9 @@ let rec is_aliasable_ty env ty =
 
 let compatible_paths p1 p2 =
   let open Predef in
-  Path.same p1 p2 ||
-  Path.same p1 path_bytes && Path.same p2 path_string ||
-  Path.same p1 path_string && Path.same p2 path_bytes
+  Path.same_unsafe p1 p2 ||
+  Path.same_unsafe p1 path_bytes && Path.same_unsafe p2 path_string ||
+  Path.same_unsafe p1 path_string && Path.same_unsafe p2 path_bytes
 
 let equivalent_with_nolabels l1 l2 =
   l1 = l2 || (match l1, l2 with
@@ -4892,9 +4895,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
-               set_env uenv
-                 (Env.add_local_constraint ~stage:(Env.stage env) p
-                    refined_decl env)
+               add_local_constraint uenv p refined_decl
             | _ -> ()
           with
             Not_found -> ()
@@ -4931,8 +4932,6 @@ let add_gadt_equation uenv source destination =
     in
     add_jkind_equation ~reason:(Gadt_equation source)
       uenv destination jkind;
-    (* Adding a jkind equation may change the uenv. *)
-    let env = get_env uenv in
     let decl =
       new_local_type
         ~manifest_and_scope:(destination, expansion_scope)
@@ -5311,8 +5310,12 @@ and unify3 uenv t1 t1' t2 t2' =
             let mty2 = modtype_of_package env Location.none pack2 in
             enter_functor_for_unify uenv id1 (newty d1) id2 t2' mty2
                             (fun uenv -> unify uenv ty1 ty2)
-      | (Tfunctor (l1, id1, pack1, u1), Tarrow (l2, t2, u2, c2)) ->
+      | (Tfunctor (l1, id1, pack1, u1),
+         Tarrow ((l2, a2, r2), t2, u2, c2)) ->
             eq_labels Unify ~in_pattern_mode:(in_pattern_mode uenv) l1 l2;
+            (* Module-dependent functions are legacy. *)
+            unify_alloc_mode_for Unify a2 Alloc.legacy;
+            unify_alloc_mode_for Unify r2 Alloc.legacy;
             unify uenv (newmono_package pack1) t2;
             let env = get_env uenv in
             let mty1 = modtype_of_package env Location.none pack1 in
@@ -5321,8 +5324,12 @@ and unify3 uenv t1 t1' t2 t2' =
                 [id1] u1;
             unify uenv u1 u2;
             if not (is_commu_ok c2) then set_commu_ok c2
-      | (Tarrow (l1, t1, u1, c1), Tfunctor (l2, id2, pack2, u2)) ->
+      | (Tarrow ((l1, a1, r1), t1, u1, c1),
+         Tfunctor (l2, id2, pack2, u2)) ->
             eq_labels Unify ~in_pattern_mode:(in_pattern_mode uenv) l1 l2;
+            (* Module-dependent functions are legacy. *)
+            unify_alloc_mode_for Unify a1 Alloc.legacy;
+            unify_alloc_mode_for Unify r1 Alloc.legacy;
             unify uenv t1 (newmono_package pack2);
             let env = get_env uenv in
             let mty2 = modtype_of_package env Location.none pack2 in
@@ -8374,7 +8381,8 @@ let rec subtype_rec env trace t1 t2 cstrs =
           let pairs = List.combine sort_vars1 sort_vars2 in
           Jkind_types.Sort.enter_repr pairs
             (fun () -> subtype_rec env trace u1 u2 cstrs)
-        with Invalid_argument _ -> (trace, t1, t2, !univar_pairs)::cstrs)
+        with Invalid_argument _ ->
+          (env, trace, t1, t2, !univar_pairs)::cstrs)
     | (Tpackage pack1, Tpackage pack2) ->
         subtype_package env trace (get_level t1) pack1
           (get_level t2) pack2 cstrs
@@ -9344,7 +9352,7 @@ let check_constructor_crossing ~default_mode ~for_extensible_variant
   | Ordinary _ | Null -> Ok default_mode
   | Extension _ ->
       match get_desc (expand_head env res) with
-      | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
+      | Tconstr (p, _, _) when Path.same_unsafe Predef.path_exn p ->
           (* Currently, only [exn] is treated specially. *)
           let (mode_crossing, min_bound, max_bound) =
             exn_constructor_crossing env lid ~args held_locks

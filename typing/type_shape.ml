@@ -325,6 +325,7 @@ module Type_shape = struct
                 | Tpoly (_, _)
                 | Trepr (_, _)
                 | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+                | Tfunctor _
                   ->
                   assert false
               in
@@ -368,6 +369,7 @@ module Type_shape = struct
           | Tof_kind _ -> unknown_shape_any
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
+          | Tfunctor _ -> unknown_shape_value
         in
         Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
           rec_binder type_shape

@@ -669,6 +669,11 @@ module Digraph = struct
     snd @@ List.fold_left
       (labeled_edge params id0)
       (0,gh) l
+  and package_constraint params id0 gh (l, ty) =
+    let l = labelr "%a =" Pp.longident (Option.get @@ Longident.unflatten l) in
+    edge params id0 l ty gh
+  and package_constraints params id0 l gh =
+    List.fold_left (package_constraint params id0) gh l
   and node params color ~lvl id tynode desc dg =
     let add_tynode l = add_node l color ~lvl id tynode dg in
     let mk fmt = labelk (fun l -> add_tynode (Decoration.make l)) fmt in
@@ -679,11 +684,11 @@ module Digraph = struct
     | Types.Tvar { name; _ } -> mk "%a" Pp.pretty_var name
     | Types.Tarrow ((l,_,_),t1,t2,_) ->
        mk "→%a" Pp.exponent_of_label l |> numbered [t1; t2]
-    | Types.Tfunctor(l,us,{pack_path; pack_constraints},t2) ->
+    | Types.Tfunctor(l,us,{pack_path; pack_cstrs},t2) ->
         mk "→%a (%s : %a)" Pp.exponent_of_label l
                     (Ident.Unscoped.name us)
                     pp_path pack_path
-          |> package_constraints params id pack_constraints
+          |> package_constraints params id pack_cstrs
           |> numbered [t2]
     | Types.Ttuple tl ->
         mk "*" |> labeled_edges params id tl

@@ -182,7 +182,6 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-<<<<<<< HEAD
   | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
   | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
   | Jkind_mismatch_due_to_bad_inference of
@@ -197,12 +196,7 @@ type error =
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  | Immediacy of Typedecl_immediacy.error
-=======
   | Type_cannot_be_external of type_expr
-  | Immediacy of Typedecl_immediacy.error
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
   | Poly_not_yet_implemented

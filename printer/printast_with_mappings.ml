@@ -245,6 +245,12 @@ let rec core_type i ppf x =
   | Ptyp_package { ppt_path; ppt_cstrs } ->
       line i ppf "Ptyp_package %a\n" fmt_longident_loc ppt_path;
       list i package_with ppf ppt_cstrs;
+  | Ptyp_functor (label, name, ptyp, ct2) ->
+      line i ppf "Ptyp_functor\n";
+      arg_label i ppf label;
+      line i ppf "\"%s\"\n" name.txt;
+      package_type i ppf ptyp;
+      core_type i ppf ct2
   | Ptyp_open (mod_ident, t) ->
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
       core_type i ppf t

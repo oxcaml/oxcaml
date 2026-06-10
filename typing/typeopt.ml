@@ -264,8 +264,8 @@ let classify ~classify_product env ty layout : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-<<<<<<< HEAD
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _
+  | Tfunctor _ ->
       Addr
   (* Quotes are not representable, but it's safe to say they are [Any].
      Unreduced splices and evals might stand for anything. *)
@@ -273,15 +273,6 @@ let classify ~classify_product env ty layout : _ classification =
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
   | Trepr _ ->
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ ->
-      Addr
-  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ ->
-=======
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _
-  | Tnil | Tvariant _ | Tfunctor _ -> Addr
-  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ ->
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       assert false
   end
   | Base (Float64, _) -> Unboxed_float Unboxed_float64
@@ -862,7 +853,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+        | Tfunctor _ -> unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
         end
     in
