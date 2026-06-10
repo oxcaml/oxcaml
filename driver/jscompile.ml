@@ -59,8 +59,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          let arg_descr =
            make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
              ~main_repr:
-               (Lambda.main_module_representation
-                  program.main_module_block_format)
+               (Lambda.arg_descr_representation program.main_module_block_format)
          in
          lambda |> fun code ->
          Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit

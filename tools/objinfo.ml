@@ -120,9 +120,19 @@ let print_required_compunit id =
   printf "\t%a\n" Compilation_unit.output id
 
 let print_arg_descr arg_descr =
-  let ({ arg_param; arg_block_idx = _ } : Lambda.arg_descr) = arg_descr in
+  let ({ arg_param; arg_block_idx; main_repr } : Lambda.arg_descr) =
+    arg_descr
+  in
   printf "Parameter implemented: %a\n"
-    Global_module.Parameter_name.output arg_param
+    Global_module.Parameter_name.output arg_param;
+  let main_repr_descr =
+    match (main_repr : Lambda.module_representation) with
+    | Module_value_only { field_count } ->
+      Printf.sprintf "value-only block with %d field(s)" field_count
+    | Module_mixed (shape, _) ->
+      Printf.sprintf "mixed block with %d field(s)" (Array.length shape)
+  in
+  printf "Argument block index: %d (of %s)\n" arg_block_idx main_repr_descr
 
 let print_cmo_infos cu =
   printf "Unit name: %a\n" Compilation_unit.output cu.cu_name;

@@ -125,7 +125,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             make_arg_descr ~param:as_arg_for
               ~arg_block_idx:program.arg_block_idx
               ~main_repr:
-                (Lambda.main_module_representation
+                (Lambda.arg_descr_representation
                    program.main_module_block_format)
           in
           Compilenv.save_unit_info

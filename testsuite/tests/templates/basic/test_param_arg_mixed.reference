@@ -1,0 +1,6 @@
+Test: parameterised argument module with mixed block
+Expected: 8 6.0 ab
+Actual:   8 6.0 ab
+
+Expected: 16 81.0 xxxx
+Actual:   16 81.0 xxxx

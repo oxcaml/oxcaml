@@ -1,0 +1,44 @@
+File mixed_monoid_of_monoid.cmx
+Name: Mixed_monoid_of_monoid
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Mixed_monoid_of_monoid
+Parameter implemented: Unboxed_product_monoid
+Argument block index: 3 (of mixed block with 4 field(s))
+Interfaces imported:
+	00000000000000000000000000000000	Unboxed_product_monoid
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Monoid
+	00000000000000000000000000000000	Mixed_monoid_of_monoid
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+Interfaces used in quotations:
+Implementations used in quotations:
+Runtime parameters:
+	Monoid
+Flambda 2 unit with export information
+Currying functions: IFV_IFV_RIFVL0
+Apply functions: 2
+Send functions:
+Force link: no
+File mixed_monoid_of_monoid-String_monoid.cmx
+Name: Mixed_monoid_of_monoid[Monoid:String_monoid]
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Mixed_monoid_of_monoid[Monoid:String_monoid]
+Parameter implemented: Unboxed_product_monoid
+Argument block index: 3 (of mixed block with 4 field(s))
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	String_monoid
+	00000000000000000000000000000000	Mixed_monoid_of_monoid
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 unit with export information
+Currying functions: IFV_IFV_RIFVL0
+Apply functions:
+Send functions:
+Force link: no

@@ -1172,6 +1172,10 @@ let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
   | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
 
+let arg_descr_representation = function
+  | Mb_struct { mb_repr } -> mb_repr
+  | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
+
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;

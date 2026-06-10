@@ -1089,6 +1089,13 @@ type main_module_block_format =
 val main_module_representation :
   main_module_block_format -> module_representation
 
+(* Representation of the block that [arg_block_idx] (see [arg_descr] and
+   [program]) indexes into: the main module block for [Mb_struct], or the
+   block returned by the instantiating functor for
+   [Mb_instantiating_functor]. *)
+val arg_descr_representation :
+  main_module_block_format -> module_representation
+
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
