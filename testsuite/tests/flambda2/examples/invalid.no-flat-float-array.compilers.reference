@@ -1,0 +1,67 @@
+(data global "camlInvalid__gc_roots": int 0)
+(data
+ int 3840
+ global "camlInvalid":
+ addr G:"camlInvalid__check_3"
+ addr G:"camlInvalid__bar_4"
+ addr G:"camlInvalid__foo_5")
+(data
+ int 3063
+ global "camlInvalid__foo_5":
+ addr G:"camlInvalid__foo_2_5_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlInvalid__bar_4":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlInvalid__bar_1_4_code")
+(data
+ int 4087
+ global "camlInvalid__check_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlInvalid__check_0_3_code")
+(data
+ int 2816
+ "camlInvalid__Pmakeblock69":
+ addr G:"caml_exn_Failure"
+ addr L:"camlInvalid__immstring17")
+(data int 2045 "camlInvalid__float43": double 1.)
+(data int 768 "camlInvalid__empty_array40":)
+(data int 2044 "camlInvalid__immstring17": string "lengths" skip 0 byte 0)
+(function{invalid.ml:24,25-96} camlInvalid__check_0_3_code
+     (t1/360: val t2/361: val) : int
+ (if
+   (!= (or (>>u (<< (load_mut int (+a t1/360 -8)) 8) 17) 1)
+     (or (>>u (<< (load_mut int (+a t2/361 -8)) 8) 17) 1))
+   (raise_notrace{invalid.ml:25,45-63;stdlib.ml:39,17-33}
+     L:"camlInvalid__Pmakeblock69")
+   1) )
+
+(function{invalid.ml:27,17-68} camlInvalid__bar_1_4_code
+     (t1/365: val t2/366: val) : int
+ (let
+   param/367
+     (app{invalid.ml:28,2-13} G:"camlInvalid__check_0_3_code" t1/365 t2/366
+       int)
+   (+ (<< (==f (load float64 (load_mut val t2/366)) 0.) 1) 1)) )
+
+(function{invalid.ml:31,8-30} camlInvalid__foo_2_5_code
+     (param/372: int) : int
+ (let
+   (Pmakearray/373 (alloc{invalid.ml:31,17-25} 1024 L:"camlInvalid__float43")
+    param/374
+      (app{invalid.ml:31,13-30;invalid.ml:28,2-13}
+        G:"camlInvalid__check_0_3_code" Pmakearray/373
+        L:"camlInvalid__empty_array40" int))
+   (+
+     (<<
+       (==f (load float64 (load_mut val L:"camlInvalid__empty_array40")) 0.)
+       1)
+     1)) )
+
+(function no_cse reduce_code_size linscan camlInvalid__entry () : val
+ (catch (exit 2 G:"camlInvalid") with(2 *ret*/358: val) 1) )
+
+(data)

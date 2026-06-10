@@ -1301,18 +1301,8 @@ type ('a, 'b) s = ('a, 'b) t
 type packed = T : ('a, 'b) s# -> packed [@@unboxed]
 |}]
 
-(* This one is rejected, but it should be *)
-type 'a t = { i : 'a }
-and bad = P : 'a t# -> bad [@@unboxed]
-[%%expect{|
-Line 2, characters 0-38:
-2 | and bad = P : 'a t# -> bad [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of the existential variable "'a".
-       You should annotate it with "[@@ocaml.boxed]".
-|}]
+(* See hash_types-no-flat-float-array.ml for the [@@unboxed] existential test that is
+   rejected only when the flat float array optimization is enabled. *)
 
 type ('a, 'b) t = { a : 'a }
 type ('a, 'b) s = ('a, 'b) t

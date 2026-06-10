@@ -6,6 +6,7 @@
  ocamlopt.opt;
 
  only-default-codegen;
+ no-flat-float-array;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
  flags += " -x86-peephole-optimize";
@@ -123,23 +124,7 @@ let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 poly_unsafe_get:
-  movq  %rax, %rdi
-  movzbq -8(%rdi), %rax
-  cmpq  $254, %rax
-  jne   .L1
-  subq  $8, %rsp
-  subq  $16, %r15
-  cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
-.L0:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovsd -4(%rdi,%rbx,4), %xmm0
-  vmovsd %xmm0, (%rax)
-  addq  $8, %rsp
-  ret
-.L1:
-  movq  -4(%rdi,%rbx,4), %rax
+  movq  -4(%rax,%rbx,4), %rax
   ret
 |}]
 
@@ -147,16 +132,8 @@ let poly_unsafe_set (a : 'a array) (i : int) (v : 'a) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 poly_unsafe_set:
-  movq  %rdi, %rsi
-  movzbq -8(%rax), %rdi
-  cmpq  $254, %rdi
-  jne   .L0
-  vmovsd (%rsi), %xmm0
-  vmovsd %xmm0, -4(%rax,%rbx,4)
-  movl  $1, %eax
-  ret
-.L0:
   subq  $8, %rsp
+  movq  %rdi, %rsi
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
@@ -219,7 +196,8 @@ let float_unsafe_get_plain (a : float array) (i : int) =
   Float_u.of_float (Array.unsafe_get a i)
 [%%expect_asm X86_64{|
 float_unsafe_get_plain:
-  vmovsd -4(%rax,%rbx,4), %xmm0
+  movq  -4(%rax,%rbx,4), %rax
+  vmovsd (%rax), %xmm0
   ret
 |}]
 
@@ -227,8 +205,18 @@ let float_unsafe_set_plain (a : float array) (i : int) (v : float#) =
   Array.unsafe_set a i (Float_u.to_float v)
 [%%expect_asm X86_64{|
 float_unsafe_set_plain:
-  vmovsd %xmm0, -4(%rax,%rbx,4)
+  subq  $8, %rsp
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rsi
+  movq  $1277, -8(%rsi)
+  vmovsd %xmm0, (%rsi)
+  leaq  -4(%rax,%rbx,4), %rdi
+  call  caml_modify@PLT
   movl  $1, %eax
+  addq  $8, %rsp
   ret
 |}]
 
@@ -434,7 +422,7 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
-  movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
+  movq  camlTOP38__block1113@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -458,7 +446,7 @@ ref_safe_set:
   addq  $8, %rsp
   ret
 .L0:
-  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
+  movq  camlTOP39__block1155@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -473,32 +461,15 @@ let poly_safe_get (a : 'a array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 poly_safe_get:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
-  jae   .L2
-  movzbq -8(%rdi), %rax
-  cmpq  $254, %rax
-  jne   .L1
-  subq  $8, %rsp
-  subq  $16, %r15
-  cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
+  jae   .L0
+  movq  -4(%rax,%rbx,4), %rax
+  ret
 .L0:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovsd -4(%rdi,%rbx,4), %xmm0
-  vmovsd %xmm0, (%rax)
-  addq  $8, %rsp
-  ret
-.L1:
-  movq  -4(%rdi,%rbx,4), %rax
-  ret
-.L2:
-  subq  $8, %rsp
-  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
+  movq  camlTOP40__block1198@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -509,29 +480,20 @@ let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
   Array.set a i v
 [%%expect_asm X86_64{|
 poly_safe_set:
+  subq  $8, %rsp
   movq  %rdi, %rsi
   movq  -8(%rax), %rdi
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jae   .L1
-  movzbq -8(%rax), %rdi
-  cmpq  $254, %rdi
-  jne   .L0
-  vmovsd (%rsi), %xmm0
-  vmovsd %xmm0, -4(%rax,%rbx,4)
-  movl  $1, %eax
-  ret
-.L0:
-  subq  $8, %rsp
+  jae   .L0
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L1:
-  subq  $8, %rsp
-  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
+.L0:
+  movq  camlTOP41__block1240@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -552,7 +514,7 @@ int64_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
-  movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
+  movq  camlTOP42__block1283@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -571,7 +533,7 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
-  movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
+  movq  camlTOP43__block1324@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -587,10 +549,11 @@ float_safe_get_plain:
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
-  vmovsd -4(%rax,%rbx,4), %xmm0
+  movq  -4(%rax,%rbx,4), %rax
+  vmovsd (%rax), %xmm0
   ret
 .L0:
-  movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
+  movq  camlTOP44__block1365@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -614,7 +577,7 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L0:
-  movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
+  movq  camlTOP45__block1409@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

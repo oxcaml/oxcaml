@@ -49,6 +49,11 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
 
+          - name: runtime5 no-flat-float-array (x86_64-linux)
+            config: --enable-runtime5 --disable-flat-float-array
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
           - name: runtime4 dev (x86_64-linux)
             config: --disable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
