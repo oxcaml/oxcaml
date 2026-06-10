@@ -983,7 +983,7 @@ let module_expr (sub : mapper) mexpr =
         sub.module_expr sub m
     | _ ->
         let desc = match mexpr.mod_desc with
-            Tmod_ident (_p, lid) -> Pmod_ident (map_loc sub lid)
+            Tmod_ident (_p, lid, _) -> Pmod_ident (map_loc sub lid)
           | Tmod_structure st -> Pmod_structure (sub.structure sub st)
           | Tmod_functor (arg, mexpr) ->
               Pmod_functor

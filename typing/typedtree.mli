@@ -974,7 +974,10 @@ and functor_parameter =
              Mode.Alloc.Const.t modes
 
 and module_expr_desc =
-    Tmod_ident of Path.t * Longident.t loc
+    Tmod_ident of Path.t * Longident.t loc * unique_use
+    (** The [unique_use] records the demand placed on this use of the module
+        by its consumer, for the uniqueness analysis; it plays the same role
+        as the [unique_use] on [Texp_ident]. *)
   | Tmod_structure of structure
   | Tmod_functor of functor_parameter * module_expr
   | Tmod_apply of module_expr * module_expr * module_coercion

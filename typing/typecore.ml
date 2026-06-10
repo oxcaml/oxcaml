@@ -11758,7 +11758,8 @@ let maybe_check_uniqueness_value_bindings vbl =
 
 (* Typing of toplevel bindings *)
 
-let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
+let type_binding env mutable_flag rec_flag ?(check_uniqueness = true)
+    ?force_toplevel spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
       ~check:(fun s _ -> Warnings.Unused_value_declaration s)
@@ -11767,7 +11768,8 @@ let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
-  maybe_check_uniqueness_value_bindings pat_exp_list;
+  if check_uniqueness then
+    maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
 let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
@@ -11780,7 +11782,7 @@ let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
 
 (* Typing of toplevel expressions *)
 
-let type_expression env jkind sexp =
+let type_expression env ?(check_uniqueness = true) jkind sexp =
   let exp =
     with_local_level begin fun () ->
       Typetexp.TyVarEnv.reset ();
@@ -11800,17 +11802,19 @@ let type_expression env jkind sexp =
         {exp with exp_type = desc.val_type}
     | _ -> exp
   in
-  maybe_check_uniqueness_exp exp; exp
+  if check_uniqueness then maybe_check_uniqueness_exp exp;
+  exp
 
-let type_representable_expression ~why env sexp =
+let type_representable_expression ~why ?check_uniqueness env sexp =
   let jkind, sort =
     Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
   in
-  let exp = type_expression env jkind sexp in
+  let exp = type_expression env ?check_uniqueness jkind sexp in
   exp, sort
 
-let type_expression env sexp =
-  type_expression env (Jkind.Builtin.any ~why:Type_expression_call) sexp
+let type_expression env ?check_uniqueness sexp =
+  type_expression env ?check_uniqueness
+    (Jkind.Builtin.any ~why:Type_expression_call) sexp
 
 (* Error report *)
 
@@ -12955,10 +12959,11 @@ let type_expect env ?mode e ty =
   let exp = type_expect env expected_mode e ty in
   maybe_check_uniqueness_exp exp; exp
 
-let type_exp env ?mode e =
+let type_exp env ?mode ?(check_uniqueness = true) e =
   let expected_mode = mode_default_opt mode in
   let exp = type_exp env expected_mode e in
-  maybe_check_uniqueness_exp exp; exp
+  if check_uniqueness then maybe_check_uniqueness_exp exp;
+  exp
 
 let type_argument env e t1 t2 =
   let exp = type_argument ~overwrite:No_overwrite env mode_legacy e t1 t2 in

@@ -215,6 +215,27 @@ let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
     | item -> item
     ) sg
 
+(** Mirrors [Typecore.unique_use]: the [unique_use] recorded on a module
+    identifier for the uniqueness analysis. [mode_l] is the mode of the module
+    declaration and [mode_r] is the per-use variable constrained by the
+    consumer of this use. *)
+let module_unique_use pp mode_l mode_r =
+  if not (Language_extension.is_at_least Unique
+            Language_extension.maturity_of_unique_for_drf) then begin
+    (* If the unique extension is not enabled, we will not run the uniqueness
+       analysis; instead, we force all uses to be aliased and many. This is
+       equivalent to running an analysis which forces everything. *)
+    Value.submode_err pp
+      Value.(of_const {Const.min with uniqueness = Aliased}) mode_r;
+    Value.submode_err pp mode_l
+      Value.(of_const {Const.max with linearity = Many});
+    (Uniqueness.disallow_left Uniqueness.aliased,
+     Linearity.disallow_right Linearity.many)
+  end
+  else
+    (Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r),
+     Linearity.disallow_right (Value.proj_comonadic Linearity mode_l))
+
 (* Extract a signature from a module type *)
 
 let extract_sig env loc mty =
@@ -251,6 +272,12 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
         | _ -> raise (Error (loc,env,Signature_parameter_expected mty_func))
       in
       let mm_param = mm_param |> alloc_as_value in
+      (* The implicit argument of [include functor] consists of the preceding
+         items of the enclosing structure, which remain accessible afterwards;
+         hence the functor may not consume them uniquely. *)
+      Value.submode_err (loc, Module)
+        Value.(of_const { Const.min with uniqueness = Aliased })
+        mm_param;
       let input_coercion =
         try
           Includemod.include_functor_signatures ~mark:true env
@@ -2722,7 +2749,7 @@ exception Not_a_path
 
 let rec path_of_module mexp =
   match mexp.mod_desc with
-  | Tmod_ident (p,_) -> p
+  | Tmod_ident (p,_,_) -> p
   | Tmod_apply(funct, arg, _coercion) when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
@@ -3250,9 +3277,12 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   | Pmod_unpack sexp ->
       let mode = Value.newvar () in
       let exp =
+        (* Uniqueness of the unpacked expression is checked as part of the
+           analysis of whichever structure or expression contains this
+           [Tmod_unpack]. *)
         Ctype.with_local_level_if_principal
           (fun () -> Typecore.type_exp env sexp
-            ~mode:(Value.disallow_left mode))
+            ~mode:(Value.disallow_left mode) ~check_uniqueness:false)
           ~post:Typecore.generalize_structure_exp
       in
       let mty =
@@ -3304,7 +3334,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
 
 and type_module_path_aux ~alias ~hold_locks sttn env path
   (mode, locks) (lid : _ loc) smod =
-  let mod_mode =
+  let mode, held_locks =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
     else
       let vmode =
@@ -3312,7 +3342,15 @@ and type_module_path_aux ~alias ~hold_locks sttn env path
       in
       vmode, None
   in
-  let md = { mod_desc = Tmod_ident (path, lid);
+  (* A fresh variable sits between the module's declared mode and whatever the
+     consumer of this use demands, so that the uniqueness analysis can force
+     this single use to aliased without affecting other uses of the same
+     module. *)
+  let use_mode = Value.newvar () in
+  Value.submode_err (lid.loc, Module) mode use_mode;
+  let unique_use = module_unique_use (lid.loc, Module) mode use_mode in
+  let mod_mode = Value.disallow_right use_mode, held_locks in
+  let md = { mod_desc = Tmod_ident (path, lid, unique_use);
              mod_type = Mty_alias path;
              mod_mode;
              mod_env = env;
@@ -3553,7 +3591,9 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let path, (mode, locks), newenv =
       type_open_ ?used_slot ?toplevel od.popen_override env loc lid
     in
-    let md = { mod_desc = Tmod_ident (path, lid);
+    (* Opening a module path projects its components but does not consume the
+       module itself, so no uniqueness demand is recorded for this use. *)
+    let md = { mod_desc = Tmod_ident (path, lid, Typedtree.aliased_many_use);
                mod_type = Mty_alias path;
                mod_mode = mode, Some (locks, lid.txt, lid.loc);
                mod_env = env;
@@ -3610,7 +3650,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) funct_body anchor env sstr =
+and type_structure ?(toplevel = None) ?uniqueness_state funct_body anchor env
+    sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
@@ -3675,14 +3716,19 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         let expr, sort =
           (* We could consider allowing [any] here when not in the toplevel,
              though for now the sort is used in the void safety check. *)
+          (* Uniqueness is checked by the structure-level analysis (see
+             [Uniqueness_analysis.check_structure_item]), not per item. *)
           Builtin_attributes.warning_scope attrs
             (fun () -> Typecore.type_representable_expression
-                         ~why:Structure_item_expression env sexpr)
+                         ~why:Structure_item_expression
+                         ~check_uniqueness:false env sexpr)
         in
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
         let (defs, newenv) =
-          Typecore.type_binding env Immutable rec_flag ~force_toplevel sdefs in
+          (* Uniqueness is checked by the structure-level analysis. *)
+          Typecore.type_binding env Immutable rec_flag ~force_toplevel
+            ~check_uniqueness:false sdefs in
         let defs = match rec_flag with
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs
@@ -4071,6 +4117,13 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           type_str_item env shape_map pstr sig_acc_include_functor
         in
         let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
+        (* Uniqueness is checked item by item, threading usage across the
+           items of the structure. Only the outermost drivers (implementation
+           and toplevel phrases) provide a state; the analysis recurses into
+           nested module expressions by itself. *)
+        Option.iter
+          (fun state -> Uniqueness_analysis.check_structure_item state str)
+          uniqueness_state;
         Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
                                     :: previous_saved_types);
         type_struct new_env shape_map srem (str :: str_acc)
@@ -4107,8 +4160,13 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
+  let uniqueness_state = Uniqueness_analysis.new_structure_state () in
   let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) false None env s in
+    type_structure ~toplevel:(Some sig_acc) ~uniqueness_state false None env s
+  in
+  (* Everything bound by a toplevel phrase is accessible to later phrases, so
+     it may not be consumed uniquely. *)
+  Uniqueness_analysis.mark_all_exported uniqueness_state;
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4121,7 +4179,8 @@ let type_module_alias env smod =
 
 let type_module = type_module true false None
 let type_module_maybe_hold_locks = type_module_maybe_hold_locks true false None
-let type_structure = type_structure false None
+let type_structure ?uniqueness_state env sstr =
+  type_structure ?uniqueness_state false None env sstr
 
 (* Normalize types in a signature *)
 
@@ -4149,7 +4208,9 @@ let type_module_type_of env smod =
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
         in
-          { mod_desc = Tmod_ident (path, lid);
+          (* [module type of] is type-level only; this is not a runtime use of
+             the module, so no uniqueness demand is recorded. *)
+          { mod_desc = Tmod_ident (path, lid, Typedtree.aliased_many_use);
             mod_type = md.md_type;
             mod_mode = mode, Some (locks, lid.txt, lid.loc);
             mod_env = env;
@@ -4157,6 +4218,9 @@ let type_module_type_of env smod =
             mod_loc = smod.pmod_loc }
     | _ ->
         let me, _shape = type_module env smod in
+        (* The module expression is never evaluated, but we still check it for
+           uniqueness, like any other code. No driver covers it otherwise. *)
+        Uniqueness_analysis.check_uniqueness_module_expr me;
         me
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
@@ -4229,9 +4293,9 @@ let type_package env m p fl =
     | fl ->
       let type_path, env =
         match modl.mod_desc with
-        | Tmod_ident (mp,_)
+        | Tmod_ident (mp,_,_)
         | Tmod_constraint
-            ({mod_desc=Tmod_ident (mp,_)}, _, Tmodtype_implicit, _) ->
+            ({mod_desc=Tmod_ident (mp,_,_)}, _, Tmodtype_implicit, _) ->
           (* We special case these because interactions between
              strengthening of module types and packages can cause
              spurious escape errors. See examples from PR#6982 in the
@@ -4419,8 +4483,10 @@ let type_implementation target modulename initial_env ast =
         ignore @@ Warnings.parse_options false "-32-34-37-38-60-191";
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
+      let uniqueness_state = Uniqueness_analysis.new_structure_state () in
       let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
+        Profile.record_call "infer"
+          (fun () -> type_structure ~uniqueness_state initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
         mode (Env.mode_unit ~staticity:Staticity.Dynamic);
@@ -4440,6 +4506,7 @@ let type_implementation target modulename initial_env ast =
           remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
             simple_sg
         in
+        Uniqueness_analysis.mark_exported uniqueness_state simple_sg;
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
         Typecore.optimise_allocations ();
@@ -4521,6 +4588,11 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf
               ~actual_staticity:staticity dclsig arg_type
           in
+          (* Components exported by the [.mli] are accessible to other
+             compilation units, so the defining unit may not consume them
+             uniquely. Components hidden by the [.mli] remain usable
+             uniquely within the unit. *)
+          Uniqueness_analysis.mark_exported uniqueness_state dclsig;
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -4568,6 +4640,8 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env sourcefile
               ~actual_staticity:Staticity.Dynamic simple_sg arg_type
           in
+          (* Without an [.mli], every component is exported. *)
+          Uniqueness_analysis.mark_exported uniqueness_state simple_sg;
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();

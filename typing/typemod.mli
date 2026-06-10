@@ -36,6 +36,7 @@ by inspecting the returned mode. *)
 val type_module:
   Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
 val type_structure:
+  ?uniqueness_state:Uniqueness_analysis.structure_state ->
   Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
   Shape.t * Env.t
