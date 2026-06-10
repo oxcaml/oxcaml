@@ -28,8 +28,18 @@ module V = Backend_var
 
 type proto_dies_for_var =
   { value_die_lvalue : Proto_die.reference;
-    type_die : Proto_die.reference
+    type_die : Proto_die.reference;
+    mutable emitted : bool
+        (* Whether the DIE corresponding to [value_die_lvalue] has been created.
+           Variable DIEs are created either under the DIE for an inlined frame,
+           or (for everything left over, including variables without provenance)
+           under the DIE of the function itself. This flag ensures each
+           variable's DIE is created exactly once, which is essential since the
+           (pre-created) references in this table may be used in the location
+           descriptions of phantom variables. *)
   }
+
+type proto_dies_for_vars = proto_dies_for_var Backend_var.Tbl.t
 
 let arch_size_addr = Targetint.of_int_exn Arch.size_addr
 
@@ -137,19 +147,22 @@ let rec phantom_var_location_description state
     if need_rvalue
     then rvalue (SLDL.Rvalue.read_symbol_field symbol ~field)
     else lvalue (SLDL.Lvalue.in_symbol_field symbol ~field)
-  | Lphantom_var var ->
-    (* The original encoding wraps the [location_from_another_die] reference
-       in a single-piece composite location description ([DW_OP_piece]). This
-       prevents GDB from producing a stack-underflow error when the referenced
-       variable becomes unavailable at certain program points. LLVM-based
-       debuggers do not currently support [DW_OP_piece] in this position, so
-       the simple (non-composite) form is used by default; flip
-       [use_dw_op_piece] below to restore the original encoding. *)
-    if use_dw_op_piece
+  | Lphantom_var var -> (
+    if
+      (* The original encoding wraps the [location_from_another_die] reference
+         in a single-piece composite location description ([DW_OP_piece]). This
+         prevents GDB from producing a stack-underflow error when the referenced
+         variable becomes unavailable at certain program points. LLVM-based
+         debuggers do not currently support [DW_OP_piece] in this position, so
+         the simple (non-composite) form is used by default; flip
+         [use_dw_op_piece] below to restore the original encoding. *)
+      use_dw_op_piece
     then
       if need_rvalue
-      then (
-        match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
+      then
+        match
+          die_location_of_variable_rvalue state var ~proto_dies_for_vars
+        with
         | None -> None
         | Some rvalue ->
           let location = SLDL.compile (SLDL.of_rvalue rvalue) in
@@ -158,9 +171,11 @@ let rec phantom_var_location_description state
             .pieces_of_simple_location_descriptions
               [location, arch_size_addr]
           in
-          Some (Composite composite))
-      else (
-        match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+          Some (Composite composite)
+      else
+        match
+          die_location_of_variable_lvalue state var ~proto_dies_for_vars
+        with
         | None -> None
         | Some lvalue ->
           let location = SLDL.compile (SLDL.of_lvalue lvalue) in
@@ -169,13 +184,13 @@ let rec phantom_var_location_description state
             .pieces_of_simple_location_descriptions
               [location, arch_size_addr]
           in
-          Some (Composite composite))
+          Some (Composite composite)
     else if need_rvalue
-    then (
+    then
       match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
       | None -> None
-      | Some r -> rvalue r)
-    else (
+      | Some r -> rvalue r
+    else
       match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
       | None -> None
       | Some l -> lvalue l)
@@ -442,45 +457,48 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       (* Ensure that parameters appear in the correct order in the debugger. *)
       Some index
   in
-  (* Even when [hidden] is set (the variable has no provenance and so should
-     not be visible to the user in the debugger) we still emit a DIE for the
+  (* Even when [hidden] is set (the variable has no provenance and so should not
+     be visible to the user in the debugger) we still emit a DIE for the
      variable, because phantom variables may reference it via their
-     [Lphantom_var] location description. Without a target DIE, those
-     references would resolve to an empty location list. We mark such DIEs
-     as [DW_AT_artificial] and omit the name. *)
+     [Lphantom_var] location description. Without a target DIE, those references
+     would resolve to an empty location list. We mark such DIEs as
+     [DW_AT_artificial] and omit the name. *)
   let attribute_values =
     if hidden
     then DAH.create_artificial () :: location_attribute_value
     else type_and_name_attributes @ location_attribute_value
   in
+  (match proto_dies_for_variable var ~proto_dies_for_vars with
+  | None -> ()
+  | Some proto_dies -> proto_dies.emitted <- true);
   Proto_die.create_ignore ?reference ?sort_priority
     ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
     ~attribute_values ()
 
-(* A variable belongs to a particular frame DIE iff its provenance location
-   identifies the same inlining context as the frame's [scope_key] (the full
-   inlining path from the function down to and including the frame itself).
+(* A variable belongs to a particular inlined frame DIE iff its provenance
+   location identifies the same inlining context as the frame's [frame_path]
+   (the full inlining path from the function down to and including the frame
+   itself, as per the keys of [Inlined_frame_ranges]).
 
-   For an inlined-subroutine DIE, [scope_key] is the inlining stack of the
-   frame. A variable bound inside that inlined region has its [bound_var.dbg]
-   passed through [Inlined_debuginfo.rewrite] when the enclosing function is
-   inlined; this prepends each enclosing apply's debuginfo and stamps the
-   variable's own [dbg] with the inlined function's [function_symbol] and the
-   inlining [uid]. Two locations identify the same inlining context iff each
-   pair of corresponding items agrees on those tags. We deliberately ignore
-   the line/column of items, because a variable's [dbg] (set in
-   [closure_conversion] to the function's declaration loc) and an
-   instruction's [dbg] (some op location inside the inlined body) will share
-   [uid] and [function_symbol] but not their line numbers.
+   A variable bound inside an inlined region has its [bound_var.dbg] passed
+   through [Inlined_debuginfo.rewrite] when the enclosing function is inlined;
+   this prepends each enclosing apply's debuginfo and stamps the variable's own
+   [dbg] with the inlined function's [function_symbol] and the inlining [uid].
+   Two locations identify the same inlining context iff each pair of
+   corresponding items agrees on those tags. We deliberately ignore the
+   line/column of items, matching the comparison used for the keys of
+   [Inlined_frame_ranges]: a variable's [dbg] (set in [closure_conversion] to
+   the function's declaration location, for parameters) and an instruction's
+   [dbg] (some location inside the inlined body) will share [uid] and
+   [function_symbol] but not their line numbers.
 
-   For the function's main subprogram, [scope_key] is [Debuginfo.none]. A
-   variable belongs at the function level iff its location has no inlining
-   tags, i.e. none of its items name an inlined function. This admits both
-   the legacy convention ([bound_var.dbg = none] gives an empty location) and
-   the convention introduced by [closure_conversion] for parameters
-   ([bound_var.dbg = function loc] gives a single item with no inlining
-   tags, since [Inlined_debuginfo.rewrite] only stamps items that came from
-   inside an inlined body). *)
+   Any variable not claimed by an inlined frame is attached to the function's
+   own DIE (see [All_remaining_vars] below). This includes variables whose
+   locations have no inlining tags; variables without provenance (e.g.
+   [my_closure], hidden from the user but potentially referenced by phantom
+   variables); and any leftovers whose inlined frame DIE was (for whatever
+   reason) never created. The last case is important to guarantee that the
+   pre-created DIE references in [proto_dies_for_vars] never dangle. *)
 let inlining_contexts_match (loc1 : Debuginfo.t) (loc2 : Debuginfo.t) =
   let items1 = Debuginfo.to_items loc1 in
   let items2 = Debuginfo.to_items loc2 in
@@ -496,43 +514,48 @@ let inlining_contexts_match (loc1 : Debuginfo.t) (loc2 : Debuginfo.t) =
   in
   loop items1 items2
 
-let location_has_no_inlining_tags (loc : Debuginfo.t) =
-  List.for_all
-    (fun (item : Debuginfo.item) ->
-      Option.is_none item.dinfo_function_symbol
-      && Option.is_none item.dinfo_uid)
-    (Debuginfo.to_items loc)
+type which_vars =
+  | Vars_for_inlined_frame of Debuginfo.t
+  | All_remaining_vars
 
-let matches_frame_path ~frame_path range =
-  let range_info = ARAV.Range.info range in
-  match ARAV.Range_info.provenance range_info with
-  | None ->
-    (* These ones are further filtered - see above. *)
-    true
-  | Some provenance ->
-    let location = Backend_var.Provenance.location provenance in
-    if Debuginfo.is_none frame_path
-    then location_has_no_inlining_tags location
-    else inlining_contexts_match location frame_path
+let build_proto_dies_for_vars available_ranges_all_vars =
+  let proto_dies_for_vars : proto_dies_for_vars = Backend_var.Tbl.create 42 in
+  ARAV.iter available_ranges_all_vars ~f:(fun var _range ->
+      let value_die_lvalue = Proto_die.create_reference () in
+      let type_die = Proto_die.create_reference () in
+      assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
+      Backend_var.Tbl.add proto_dies_for_vars var
+        { value_die_lvalue; type_die; emitted = false });
+  proto_dies_for_vars
 
-let iterate_over_variable_like_things _state ~available_ranges_all_vars
-    ~frame_path ~f =
+let var_should_be_emitted ~proto_dies_for_vars ~which_vars var range =
+  match (which_vars : which_vars) with
+  | Vars_for_inlined_frame frame_path -> (
+    let range_info = ARAV.Range.info range in
+    match ARAV.Range_info.provenance range_info with
+    | None ->
+      (* Variables without provenance are attached to the function's own DIE. *)
+      false
+    | Some provenance ->
+      let location = Backend_var.Provenance.location provenance in
+      inlining_contexts_match location frame_path)
+  | All_remaining_vars -> (
+    match proto_dies_for_variable var ~proto_dies_for_vars with
+    | None -> true
+    | Some { emitted; _ } -> not emitted)
+
+let iterate_over_variable_like_things ~available_ranges_all_vars
+    ~proto_dies_for_vars ~which_vars ~f =
   ARAV.iter available_ranges_all_vars ~f:(fun var range ->
-      if matches_frame_path ~frame_path range
+      if var_should_be_emitted ~proto_dies_for_vars ~which_vars var range
       then
         let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
         f var ~ident_for_type ~range)
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
-    ~frame_path available_ranges_all_vars =
-  let proto_dies_for_vars = Backend_var.Tbl.create 42 in
-  iterate_over_variable_like_things state ~available_ranges_all_vars ~frame_path
-    ~f:(fun var ~ident_for_type:_ ~range:_ ->
-      let value_die_lvalue = Proto_die.create_reference () in
-      let type_die = Proto_die.create_reference () in
-      assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
-      Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
-  iterate_over_variable_like_things state ~available_ranges_all_vars ~frame_path
+    ~proto_dies_for_vars ~which_vars available_ranges_all_vars =
+  iterate_over_variable_like_things ~available_ranges_all_vars
+    ~proto_dies_for_vars ~which_vars
     ~f:
       (dwarf_for_variable state ~value_type_proto_die ~function_symbol
          ~function_proto_die ~proto_dies_for_vars)

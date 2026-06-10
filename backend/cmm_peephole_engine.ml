@@ -366,8 +366,7 @@ module Cmm_comparator = struct
         | Cvar _
         | Clet (_, _, _)
         | Cphantom_let (_, _, _)
-        | Cname_for_debugger _
-        | Ctuple _
+        | Cname_for_debugger _ | Ctuple _
         | Cop (_, _, _)
         | Csequence (_, _)
         | Cifthenelse (_, _, _, _, _, _)

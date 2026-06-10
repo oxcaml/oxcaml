@@ -740,8 +740,8 @@ let ctrywith (body, lbl, id, extra_args, handler, dbg) =
 let reset () = Label.reset ()
 
 let iter_shallow_tail f = function
-  | Clet (_, _, body) | Cphantom_let (_, _, body)
-  | Cname_for_debugger (_, body) ->
+  | Clet (_, _, body) | Cphantom_let (_, _, body) | Cname_for_debugger (_, body)
+    ->
     f body;
     true
   | Cifthenelse (_cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->

@@ -148,10 +148,66 @@ module Phantom_vars = struct
         t.is_parameter
   end
 
-  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
+  let item_inlining_tags_equal (item1 : Debuginfo.item) (item2 : Debuginfo.item)
+      =
+    Option.equal String.equal item1.dinfo_uid item2.dinfo_uid
+    && Option.equal String.equal item1.dinfo_function_symbol
+         item2.dinfo_function_symbol
+
+  (* Tests whether [insn_dbg] identifies a program point within the inlined
+     frame given by [location] (or within some frame inlined inside it). Items
+     are compared solely on their inlining tags (uid and function symbol), as
+     for [Inlined_frame_ranges.Key.compare]: the lines/columns of corresponding
+     items will typically differ (e.g. [location] may carry the declaration site
+     of an inlined function's parameter whereas [insn_dbg] carries some location
+     within the inlined body). *)
+  let dbg_lies_within_inlining_context ~(location : Debuginfo.t)
+      ~(insn_dbg : Debuginfo.t) =
+    let rec loop (location : Debuginfo.item list)
+        (insn_dbg : Debuginfo.item list) =
+      match location, insn_dbg with
+      | [], _ -> true
+      | _ :: _, [] -> false
+      | loc_item :: location, dbg_item :: insn_dbg ->
+        item_inlining_tags_equal loc_item dbg_item && loop location insn_dbg
+    in
+    loop (Debuginfo.to_items location) (Debuginfo.to_items insn_dbg)
+
+  let location_has_inlining_tags (location : Debuginfo.t) =
+    List.exists
+      (fun (item : Debuginfo.item) ->
+        Option.is_some item.dinfo_uid
+        || Option.is_some item.dinfo_function_symbol)
+      (Debuginfo.to_items location)
+
+  (* A phantom variable bound inside an inlined frame is only made available
+     across the instructions of that frame (as determined by the [Debuginfo.t]
+     values on the instructions), even though the variable's lexical scope
+     extends to the end of the enclosing function's body. This keeps the
+     variable's range inside the PC ranges of the corresponding
+     DW_TAG_inlined_subroutine DIE, which are likewise derived only from the
+     instructions' [Debuginfo.t] values (see [Inlined_frame_ranges]); the
+     debugger can only show the variable when such a frame is selected, so
+     nothing visible is lost. Phantom variables not bound inside any inlined
+     frame remain available throughout their scopes. *)
+  let var_in_scope (fundecl : L.fundecl) (insn : L.instruction) var =
+    match V.Map.find var fundecl.fun_phantom_lets with
+    | exception Not_found ->
+      (* This will cause a fatal error in [Range_info.create]. *)
+      true
+    | None, _defining_expr -> true
+    | Some provenance, _defining_expr ->
+      let location = V.Provenance.location provenance in
+      (not (location_has_inlining_tags location))
+      || dbg_lies_within_inlining_context ~location ~insn_dbg:insn.dbg
+
+  let available_before (fundecl : L.fundecl) (insn : L.instruction) =
     match insn.phantom_available_before with
     | None -> None
-    | Some set -> Some (Key.Set.of_list (V.Set.elements set))
+    | Some set ->
+      Some
+        (Key.Set.of_list
+           (List.filter (var_in_scope fundecl insn) (V.Set.elements set)))
 
   let available_across fundecl insn =
     (* Phantom variable availability never changes during the execution of a

@@ -440,12 +440,29 @@ module Inlining = struct
     in
     let bind_params ~params ~args ~body:(acc, body) =
       let acc = Acc.with_free_names free_names_of_body acc in
+      (* When the callee is known, [Inlining_helpers.make_inlined_body] prepends
+         [my_closure] to [params]. It must be treated as an implicit parameter
+         and not numbered amongst the real parameters. *)
+      let index_offset =
+        match params with
+        | (param, _, _) :: _ when Variable.equal param my_closure -> 1
+        | _ -> 0
+      in
       let (_ : int), result =
         List.fold_left2
-          (fun (index, (acc, body)) (param, param_duid) arg ->
+          (fun (index, (acc, body)) (param, param_duid, param_dbg) arg ->
+            (* [param_dbg] is not rewritten to reflect the inlining stack here;
+               that happens when these [Let]s are traversed by the simplifier,
+               which will be inside the scope of the [Enter_inlined_apply]
+               primitive added below. *)
+            let is_parameter =
+              if Variable.equal param my_closure
+              then VB.Is_parameter.implicit_parameter
+              else VB.Is_parameter.parameter ~index:(index - index_offset)
+            in
             let bound_var =
-              VB.create param param_duid Name_mode.normal ~dbg:Debuginfo.none
-                ~is_parameter:(VB.Is_parameter.parameter ~index)
+              VB.create param param_duid Name_mode.normal ~dbg:param_dbg
+                ~is_parameter
             in
             let acc, body =
               Let_with_acc.create acc
@@ -478,7 +495,7 @@ module Inlining = struct
     let acc, body =
       Inlining_helpers.make_inlined_body ~callee ~called_code_id
         ~region_inlined_into ~params ~args
-        ~my_closure:(my_closure, my_closure_duid)
+        ~my_closure:(my_closure, my_closure_duid, Debuginfo.none)
         ~my_alloc_mode ~my_depth ~rec_info ~body:(acc, body) ~exn_continuation
         ~return_continuation ~apply_exn_continuation ~apply_return_continuation
         ~bind_params ~bind_depth ~apply_renaming
@@ -554,7 +571,7 @@ module Inlining = struct
         let make_inlined_body =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
             ~region_inlined_into
-            ~params:(Bound_parameters.vars_and_uids params)
+            ~params:(Bound_parameters.vars_and_uids_and_debuginfo params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
             ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
         in

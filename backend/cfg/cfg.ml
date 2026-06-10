@@ -474,14 +474,14 @@ let print_basic ppf i = print_basic' ppf i
 
 let print_terminator' ?print_reg ppf (ti : terminator instruction) =
   (if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
-  then
-    match ti.phantom_available_before with
-    | None -> ()
-    | Some phantom_vars ->
-      if not (Backend_var.Set.is_empty phantom_vars)
-      then
-        Format.fprintf ppf "@[<1>PAB={%a}@]@," Backend_var.Set.print
-          phantom_vars);
+   then
+     match ti.phantom_available_before with
+     | None -> ()
+     | Some phantom_vars ->
+       if not (Backend_var.Set.is_empty phantom_vars)
+       then
+         Format.fprintf ppf "@[<1>PAB={%a}@]@," Backend_var.Set.print
+           phantom_vars);
   Format.fprintf ppf "%t%a%t" Cfg_colours.terminator
     (dump_terminator' ?print_reg ~res:ti.res ~args:ti.arg ~sep:"")
     ti.desc Cfg_colours.pop
