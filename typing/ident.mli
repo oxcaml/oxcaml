@@ -68,12 +68,8 @@ val compare: t -> t -> int
 val is_global: t -> bool
 val is_global_or_predef: t -> bool
 val is_predef: t -> bool
-<<<<<<< HEAD
 val is_instance: t -> bool
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
 val is_unscoped: t -> bool
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 val stamp: t -> int
 val scope: t -> int
@@ -81,14 +77,9 @@ val scope: t -> int
 val lowest_scope : int
 val highest_scope: int
 
-<<<<<<< HEAD
 val to_global: t -> Global_module.Name.t option
 val to_global_exn: t -> Global_module.Name.t
 
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 val reinit: unit -> unit
 
 (**

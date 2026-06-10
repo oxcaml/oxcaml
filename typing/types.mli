@@ -265,7 +265,9 @@ and type_desc =
   | Tpackage of package
   (** Type of a first-class module (a.k.a package). *)
 
-<<<<<<< HEAD
+  | Tfunctor of arg_label * Ident.Unscoped.t * package * type_expr
+  (** Type of a dependent arrow *)
+
   | Tof_kind of jkind_lr
   (** [Tof_kind jkind] ==> [(type : jkind)]
 
@@ -287,12 +289,6 @@ and arg_label =
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
 
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-  | Tfunctor of arg_label * Ident.Unscoped.t * package * type_expr
-  (** Type of a dependent arrow *)
-
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 (** [package] corresponds to the type of a first-class module *)
 and package =
   { pack_path : Path.t;

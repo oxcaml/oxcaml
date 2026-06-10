@@ -104,9 +104,9 @@ type t =
   | Predef of { name: string; stamp: int }
       (* the stamp is here only for fast comparison, but the name of
          predefined identifiers is always unique. *)
-<<<<<<< HEAD
   | Global_with_args of global
       (* must have non-empty [args] *)
+  | Unscoped of Unscoped.t
 and global = Global_module.Name.t = private
   { head: string; args: Global_module.Name.argument list }
 
@@ -114,15 +114,6 @@ and global = Global_module.Name.t = private
 
 let currentstamp = s_ref 0
 let predefstamp = s_ref 0
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-
-(* A stamp of 0 denotes a persistent identifier *)
-
-let currentstamp = s_ref 0
-let predefstamp = s_ref 0
-=======
-  | Unscoped of Unscoped.t
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let create_scoped ~scope s =
   incr currentstamp;
@@ -164,12 +155,8 @@ let name = function
   | Scoped { name; _ }
   | Global name
   | Predef { name; _ } -> name
-<<<<<<< HEAD
   | Global_with_args g -> global_name g
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
   | Unscoped us -> Unscoped.name us
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let rename = function
   | Local { name; stamp = _ }
@@ -258,14 +245,8 @@ let compare_stamp id1 id2 =
 let scope = function
   | Scoped { scope; _ } -> scope
   | Local _ -> highest_scope
-<<<<<<< HEAD
   | Global _ | Predef _ | Global_with_args _ -> lowest_scope
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  | Global _ | Predef _ -> lowest_scope
-=======
-  | Global _ | Predef _ -> lowest_scope
   | Unscoped _ -> lowest_scope
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let reinit_level = ref (-1)
 
@@ -291,9 +272,12 @@ let is_predef = function
   | Predef _ -> true
   | _ -> false
 
-<<<<<<< HEAD
 let is_instance = function
   | Global_with_args _ -> true
+  | _ -> false
+
+let is_unscoped = function
+  | Unscoped _ -> true
   | _ -> false
 
 let to_global = function
@@ -301,13 +285,6 @@ let to_global = function
   | Global_with_args g -> Some g
   | _ -> None
 
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-let is_unscoped = function
-  | Unscoped _ -> true
-  | _ -> false
-
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 let canonical_stamps = s_table Hashtbl.create 0
 let next_canonical_stamp = s_table Hashtbl.create 0
 

@@ -55,17 +55,9 @@ let rec same_aux ident_cmp p1 p2 =
       let same_extra = match t1, t2 with
         | (Pcstr_ty s1, Pcstr_ty s2) -> s1 = s2
         | (Pext_ty, Pext_ty) -> true
-<<<<<<< HEAD
         | (Punboxed_ty, Punboxed_ty) -> true
         | ((Pcstr_ty _ | Pext_ty | Punboxed_ty), _) -> false
-      in same_extra && same p1 p2
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        | ((Pcstr_ty _ | Pext_ty), _) -> false
-      in same_extra && same p1 p2
-=======
-        | ((Pcstr_ty _ | Pext_ty), _) -> false
       in same_extra && same_aux p1 p2
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   | (_, _) -> false
 
 let same p1 p2 = same_aux Ident.same p1 p2
