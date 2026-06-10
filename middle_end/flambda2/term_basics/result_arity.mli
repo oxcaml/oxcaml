@@ -29,7 +29,11 @@
       on [Unknown] and [Bottom].
 
     - Bookkeeping paths that cannot introduce concrete result variables (e.g.
-      the reaper) use [unarized_components_or_empty]. *)
+      the reaper) use [unarized_components_or_empty].
+
+    - Bookkeeping that requires some fixed arity but never materializes result
+      values (e.g. data-flow recording, continuation-rewrite shortcuts) may use
+      [to_arity_with_placeholder]. *)
 type t = [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t
 
 val ok : [`Unarized] Flambda_arity.t -> t
@@ -41,5 +45,16 @@ val equal_exact : t -> t -> bool
 val equal_ignoring_subkinds : t -> t -> bool
 
 val to_arity_exn : ?message:string -> t -> [`Unarized] Flambda_arity.t
+
+(** A fixed arity standing in for an [Unknown] or [Bottom] result arity: a
+    single value of kind [any_value]. Unknown- and bottom-result applies only
+    occur in tail position, returning to a function return continuation, and
+    their results are never materialized; bookkeeping that nevertheless requires
+    a fixed arity may use this placeholder. *)
+val any_value_placeholder : [`Unarized] Flambda_arity.t
+
+(** [Ok] arities are returned unchanged; [Unknown] and [Bottom] become
+    [any_value_placeholder]. *)
+val to_arity_with_placeholder : t -> [`Unarized] Flambda_arity.t
 
 val unarized_components_or_empty : t -> Flambda_kind.With_subkind.t list

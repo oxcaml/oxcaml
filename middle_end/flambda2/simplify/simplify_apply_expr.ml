@@ -218,16 +218,10 @@ type inlining_decision =
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
    [callee's_code_metadata] to prevent using the wrong one by mistake *)
 let simplify_direct_full_application ~simplify_expr dacc apply function_type
-    ~params_arity ~result_arity:result_arity_wrapped
-    ~(result_types : _ Or_unknown_or_bottom.t) ~down_to_up ~coming_from_indirect
-    ~callee's_code_metadata =
-  let result_arity =
-    (* Unknown-result full applications go through
-       [simplify_direct_full_application_with_unknown_result] instead. *)
-    Result_arity.to_arity_exn result_arity_wrapped
-      ~message:
-        "Cannot simplify full application with unknown- or bottom-result arity"
-  in
+    ~params_arity ~result_arity ~(result_types : _ Or_unknown_or_bottom.t)
+    ~down_to_up ~coming_from_indirect ~callee's_code_metadata =
+  (* Unknown-result full applications go through
+     [simplify_direct_full_application_with_unknown_result] instead. *)
   let inlined =
     match function_type with
     | None ->
@@ -1000,7 +994,8 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
 let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_metadata_from_type
     ~callee's_code_ids_from_call_kind ~callee's_function_slot
-    ~coming_from_indirect ~result_arity:result_arity_from_code ~result_types
+    ~coming_from_indirect
+    ~result_arity:(result_arity_from_code : Result_arity.t) ~result_types
     ~recursive ~must_be_detupled ~closure_alloc_mode_from_type function_decl
     ~down_to_up ~call =
   (match Apply.probe apply, Apply.inlined apply with
@@ -1082,76 +1077,65 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       if provided_num_args = num_params
       then
         let result_arity_for_call =
-          match result_arity_from_code with
-          | Or_unknown_or_bottom.Ok result_arity -> Some result_arity
-          | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> (
-            match result_arity_of_application with
-            | Or_unknown_or_bottom.Ok result_arity -> Some result_arity
-            | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> None
-            )
+          (* The result arity from the callee's code takes precedence when
+             known. The application's arity may be concrete when the code's is
+             not, e.g. when [simplify_apply_shared] upgraded it via
+             [find_specialized_return_arity]. *)
+          match result_arity_from_code, result_arity_of_application with
+          | Ok result_arity, _ | (Unknown | Bottom), Ok result_arity ->
+            result_arity
+          | (Unknown | Bottom), (Unknown | Bottom) ->
+            Result_arity.any_value_placeholder
         in
-        if
-          (* This check can only be performed for exact applications:
+        (* This check can only be performed for exact applications:
 
-             - In the partial application case, the type checker should have
-             specified kind Value as the return kind of the application
-             (propagated through Lambda to this point), and it would be wrong to
-             compare against the return arity of the fully-applied function.
+           - In the partial application case, the type checker should have
+           specified kind Value as the return kind of the application
+           (propagated through Lambda to this point), and it would be wrong to
+           compare against the return arity of the fully-applied function.
 
-             - In the overapplication case, the correct return arity is only
-             present on the application expression, so all we can do is check
-             that the function being overapplied returns kind Value. *)
-          not
-            (match result_arity_from_code, result_arity_of_application with
-            | ( Or_unknown_or_bottom.Ok result_arity,
-                Or_unknown_or_bottom.Ok arity ) ->
-              Flambda_arity.equal_ignoring_subkinds result_arity arity
-            | (Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom), _ ->
-              true
-            | Or_unknown_or_bottom.Ok _, Or_unknown_or_bottom.Unknown -> true
-            | Or_unknown_or_bottom.Ok _, Or_unknown_or_bottom.Bottom -> true)
-        then
+           - In the overapplication case, the correct return arity is only
+           present on the application expression, so all we can do is check that
+           the function being overapplied returns kind Value. *)
+        let mismatched_arities =
+          match result_arity_from_code, result_arity_of_application with
+          | Ok code_arity, Ok application_arity ->
+            if
+              Flambda_arity.equal_ignoring_subkinds code_arity application_arity
+            then None
+            else Some (code_arity, application_arity)
+          | (Unknown | Bottom), _ | Ok _, (Unknown | Bottom) -> None
+        in
+        match mismatched_arities with
+        | Some (code_arity, application_arity) ->
           if Flambda_features.kind_checks ()
           then
             Misc.fatal_errorf
               "Wrong return arity for direct OCaml function call@ (expected \
                %a, found %a):@ %a"
-              (Or_unknown_or_bottom.print Flambda_arity.print)
-              result_arity_from_code
-              (Or_unknown_or_bottom.print Flambda_arity.print)
-              result_arity_of_application Apply.print apply
+              Flambda_arity.print code_arity Flambda_arity.print
+              application_arity Apply.print apply
           else
             replace_apply_by_invalid dacc ~down_to_up
-              (Application_result_kind_mismatch
-                 ( Flambda_arity.create_singletons
-                     [Flambda_kind.With_subkind.any_value],
-                   apply ))
-        else
+              (Application_result_kind_mismatch (code_arity, apply))
+        | None -> (
           match result_arity_from_code, result_arity_of_application with
-          | Or_unknown_or_bottom.Ok _, Or_unknown_or_bottom.Unknown ->
+          | Ok _, Unknown ->
             simplify_direct_full_application_with_unknown_result dacc apply
               ~down_to_up ~coming_from_indirect ~callee's_code_metadata
-          | ( Or_unknown_or_bottom.Ok _,
-              (Or_unknown_or_bottom.Ok _ | Or_unknown_or_bottom.Bottom) )
-          | ( (Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom),
-              ( Or_unknown_or_bottom.Ok _ | Or_unknown_or_bottom.Unknown
-              | Or_unknown_or_bottom.Bottom ) ) -> (
-            match result_arity_for_call with
-            | Some result_arity ->
-              simplify_direct_full_application ~simplify_expr dacc apply
-                (Some function_decl) ~params_arity
-                ~result_arity:(Or_unknown_or_bottom.Ok result_arity)
-                ~result_types ~down_to_up ~coming_from_indirect
-                ~callee's_code_metadata
-            | None ->
-              simplify_direct_full_application ~simplify_expr dacc apply
-                (Some function_decl) ~params_arity
-                ~result_arity:
-                  (Or_unknown_or_bottom.Ok
-                     (Flambda_arity.create_singletons
-                        [Flambda_kind.With_subkind.any_value]))
-                ~result_types ~down_to_up ~coming_from_indirect
-                ~callee's_code_metadata)
+          | Ok _, (Ok _ | Bottom) | (Unknown | Bottom), _ ->
+            (* CR dkalinichenko: when both the application and the callee's code
+               have [Unknown] result arity, this takes the fixed-arity path with
+               a placeholder result arity rather than
+               [simplify_direct_full_application_with_unknown_result]. That is
+               harmless when rebuilding (the return continuation's arity is
+               tracked as unknown, so no rewrite is applied), but unlike the
+               dedicated path it allows inlining decisions. Check whether that
+               pairing should take the dedicated path instead. *)
+            simplify_direct_full_application ~simplify_expr dacc apply
+              (Some function_decl) ~params_arity
+              ~result_arity:result_arity_for_call ~result_types ~down_to_up
+              ~coming_from_indirect ~callee's_code_metadata)
       else if provided_num_args > num_params
       then (
         (* See comment above. *)
@@ -1159,10 +1143,9 @@ let simplify_direct_function_call ~simplify_expr dacc apply
           Flambda_features.kind_checks ()
           && not
                (match result_arity_from_code with
-               | Or_unknown_or_bottom.Ok result_arity ->
+               | Ok result_arity ->
                  Flambda_arity.is_one_param_of_kind_value result_arity
-               | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
-                 true)
+               | Unknown | Bottom -> true)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for overapplied OCaml function:@ \
@@ -1179,11 +1162,10 @@ let simplify_direct_function_call ~simplify_expr dacc apply
           Flambda_features.kind_checks ()
           && not
                (match result_arity_of_application with
-               | Or_unknown_or_bottom.Ok result_arity_of_application ->
+               | Ok result_arity_of_application ->
                  Flambda_arity.is_one_param_of_kind_value
                    result_arity_of_application
-               | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
-                 false)
+               | Unknown | Bottom -> false)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for partially-applied OCaml \
@@ -1257,17 +1239,23 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
           ( Apply.return_arity apply,
             Code_metadata.result_arity callee's_code_metadata )
         with
-        | Or_unknown_or_bottom.Unknown, Or_unknown_or_bottom.Ok _ ->
+        | Unknown, Ok _ ->
           simplify_direct_full_application_with_unknown_result dacc apply
             ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata
-        | ( (Or_unknown_or_bottom.Ok _ | Or_unknown_or_bottom.Bottom),
-            ( Or_unknown_or_bottom.Ok _ | Or_unknown_or_bottom.Unknown
-            | Or_unknown_or_bottom.Bottom ) )
-        | ( Or_unknown_or_bottom.Unknown,
-            (Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom) ) ->
+        | (Ok _ | Bottom), _ | Unknown, (Unknown | Bottom) ->
+          (* CR dkalinichenko: an apply with [Unknown] result arity whose
+             callee's code also has [Unknown] result arity fatal-errors in
+             [to_arity_exn] below; only the [Ok]-code pairing takes the
+             unknown-result path above. Check whether this pairing can occur
+             here once unknown result arities are produced. *)
           simplify_direct_full_application ~simplify_expr dacc apply None
             ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
-            ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
+            ~result_arity:
+              (Result_arity.to_arity_exn
+                 (Code_metadata.result_arity callee's_code_metadata)
+                 ~message:
+                   "Cannot simplify full application with unknown- or \
+                    bottom-result arity")
             ~result_types:(Code_metadata.result_types callee's_code_metadata)
             ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata))
     | Indirect_known_arity _ | Indirect_unknown_arity ->

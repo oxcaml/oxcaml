@@ -32,6 +32,12 @@ let to_arity_exn ?message t =
   in
   Or_unknown_or_bottom.ok_exn t ~message
 
+let any_value_placeholder =
+  Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+
+let to_arity_with_placeholder (t : t) =
+  match t with Ok arity -> arity | Unknown | Bottom -> any_value_placeholder
+
 let unarized_components_or_empty t =
   Or_unknown_or_bottom.value_map t ~unknown:[] ~bottom:[]
     ~f:Flambda_arity.unarized_components

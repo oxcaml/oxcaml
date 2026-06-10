@@ -235,10 +235,11 @@ let add_used_in_current_handler name_occurrences t =
 
 let add_apply_conts ~result_cont ~exn_cont ~result_arity t =
   let result_arity =
-    match result_arity with
-    | Or_unknown_or_bottom.Ok result_arity -> result_arity
-    | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
-      Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+    (* Only the number of components is used below, to mark data-flow entries as
+       function results. Unknown- and bottom-result applies return to
+       continuations for which no rewrite is ever computed, so the placeholder
+       count is never observed in terms. *)
+    Result_arity.to_arity_with_placeholder result_arity
   in
   update_top_of_stack ~t ~f:(fun elt ->
       let add_func_result cont rewrite_id ~result_arity ~extra_args

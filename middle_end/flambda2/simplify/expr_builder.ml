@@ -773,15 +773,12 @@ let rewrite_fixed_arity_apply uacc ~use_id arity apply =
       Apply.print apply
   | Some use_id, Return cont ->
     let arity =
-      match arity with
-      | Or_unknown_or_bottom.Ok arity -> arity
-      | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
-        (* Unknown- and bottom-result applies return to continuations whose
-           arity is tracked as unknown, for which no nontrivial
-           [Apply_cont_rewrite] is ever registered. This placeholder arity is
-           therefore only used to take the no-rewrite shortcut in
-           [rewrite_fixed_arity_continuation]; it never appears in terms. *)
-        Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+      (* Unknown- and bottom-result applies only occur in tail position,
+         returning to a function return continuation. No nontrivial
+         [Apply_cont_rewrite] is ever registered for such continuations, so the
+         placeholder arity is only used to take the no-rewrite shortcut in
+         [rewrite_fixed_arity_continuation]; it never appears in terms. *)
+      Result_arity.to_arity_with_placeholder arity
     in
     rewrite_fixed_arity_continuation uacc cont ~use_id arity
       ~around:(fun uacc return_cont ->

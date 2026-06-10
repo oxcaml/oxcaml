@@ -56,6 +56,10 @@ val get_use_ids : t -> Apply_cont_rewrite_id.Set.t
 
 val number_of_uses : t -> int
 
+(** Fatal-errors if the continuation's arity is tracked as unknown (see
+    [create_unknown_arity]). [get_arg_types_by_use_id] and
+    [get_arg_types_by_use_id_for_invariant_params] have the same precondition.
+*)
 val arity : t -> [`Unarized] Flambda_arity.t
 
 val get_typing_env_no_more_than_one_use :

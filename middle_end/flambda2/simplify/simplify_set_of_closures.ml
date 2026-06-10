@@ -408,7 +408,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     | Or_unknown_or_bottom.Ok arity -> Or_unknown.Known arity
     | Or_unknown_or_bottom.Unknown -> Or_unknown.Unknown
     | Or_unknown_or_bottom.Bottom ->
-      Or_unknown.Known (Flambda_arity.create_singletons [KS.any_value])
+      (* The body never returns normally, so its return continuation gets no
+         uses; any concrete arity will do for simplifying the body. *)
+      Or_unknown.Known Result_arity.any_value_placeholder
   in
   let return_cont_params =
     match result_arity_for_body with
