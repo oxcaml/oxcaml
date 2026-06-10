@@ -62,6 +62,9 @@ let keyword_table =
     "inline", KWD_INLINE;
     "inlined", KWD_INLINED;
     "inlining_state", KWD_INLINING_STATE;
+    "int", KWD_INT;
+    "int8", KWD_INT8;
+    "int16", KWD_INT16;
     "int32", KWD_INT32;
     "int64", KWD_INT64;
     "invalid", KWD_INVALID;
@@ -77,6 +80,7 @@ let keyword_table =
     "null", KWD_NULL;
     "of", KWD_OF;
     "pop", KWD_POP;
+    "product", KWD_PRODUCT;
     "push", KWD_PUSH;
     "rec", KWD_REC;
     "rec_info", KWD_REC_INFO;
@@ -96,6 +100,9 @@ let keyword_table =
     "unreachable", KWD_UNREACHABLE;
     "unroll", KWD_UNROLL;
     "val", KWD_VAL;
+    "vec128", KWD_VEC128;
+    "vec256", KWD_VEC256;
+    "vec512", KWD_VEC512;
     "where", KWD_WHERE;
     "with", KWD_WITH;
 
@@ -110,6 +117,9 @@ let keyword_table =
     "Nativeint_array", STATIC_CONST_NATIVEINT_ARRAY;
     "Float_array", STATIC_CONST_FLOAT_ARRAY;
     "Float32_array", STATIC_CONST_FLOAT32_ARRAY;
+    "Vec128_array", STATIC_CONST_VEC128_ARRAY;
+    "Vec256_array", STATIC_CONST_VEC256_ARRAY;
+    "Vec512_array", STATIC_CONST_VEC512_ARRAY;
     "Float_block", STATIC_CONST_FLOAT_BLOCK;
     "Empty_array", STATIC_CONST_EMPTY_ARRAY;
 ]

@@ -25,7 +25,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                | 0 -> k4
                | 1 -> k5
                where k5 =
-                 let prim_6 = %num_conv.[tagged_imm].[int8] (c) in
+                 let prim_6 = %num_conv.[tagged_imm].[`int8`] (c) in
                  let prim_7 =
                    %num_conv.[tagged_imm].[`nativeint`] (n_289_unboxed0)
                  in

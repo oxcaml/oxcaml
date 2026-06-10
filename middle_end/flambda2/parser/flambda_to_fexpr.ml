@@ -115,12 +115,17 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Value_array -> Value_array
   | Generic_array -> Generic_array
   | Float_block { num_fields } -> Float_block { num_fields }
-  | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
-  | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
-  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_product_array ->
-    Misc.fatal_error
-      "fexpr support for arrays of unboxed elements not yet implemented"
+  | Unboxed_float32_array -> Unboxed_float32_array
+  | Untagged_int_array -> Untagged_int_array
+  | Untagged_int8_array -> Untagged_int8_array
+  | Untagged_int16_array -> Untagged_int16_array
+  | Unboxed_int32_array -> Unboxed_int32_array
+  | Unboxed_int64_array -> Unboxed_int64_array
+  | Unboxed_nativeint_array -> Unboxed_nativeint_array
+  | Unboxed_vec128_array -> Unboxed_vec128_array
+  | Unboxed_vec256_array -> Unboxed_vec256_array
+  | Unboxed_vec512_array -> Unboxed_vec512_array
+  | Unboxed_product_array -> Unboxed_product_array
 
 and variant_subkind consts non_consts : Fexpr.subkind =
   let consts =
