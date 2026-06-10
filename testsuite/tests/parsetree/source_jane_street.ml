@@ -388,7 +388,7 @@ let f ?(local_ x = 42)
 Line 5, characters 8-53:
 5 |       ?(local_ x : ('a : any) 'b . 'a @ once portable = assert false)
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Error: The optional parameter "x" cannot have a polymorphic type.
 |}]
 
 (* bindings, in the order specified by [let_binding_body_no_punning] in [parser.mly] *)

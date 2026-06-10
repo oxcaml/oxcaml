@@ -430,7 +430,7 @@ let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
 Line 1, characters 10-49:
 1 | let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Error: The optional parameter "x" cannot have a polymorphic type.
 |}]
 
 let foo ?x:(local_ (x,y) @ unique once = (42, 42)) () = ()
@@ -448,7 +448,7 @@ let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
 Line 1, characters 12-52:
 1 | let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Error: The optional parameter "x" cannot have a polymorphic type.
 |}]
 
 (* let-bound function *)
