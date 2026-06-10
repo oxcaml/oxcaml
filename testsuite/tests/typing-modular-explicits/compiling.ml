@@ -1,4 +1,6 @@
-(* TEST *)
+(* TEST
+ flags = "-extension modular_explicits";
+*)
 
 module type Print = sig
   type t

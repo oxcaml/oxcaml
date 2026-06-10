@@ -9573,8 +9573,10 @@ and type_moddep_fun ~env ~expected_mode:_ ~name ~pack_param ~rest
       let s_ident =
         Ident.create_scoped ~scope:(Ctype.get_current_level()) name.txt
       in
-      let new_env = Env.add_module_declaration ~check:true s_ident
-                          Mp_present arg_md env in
+      let new_env =
+        Env.add_module_declaration ~check:true s_ident Mp_present arg_md
+          ~mode:Mode.Value.(disallow_right legacy) env
+      in
       let expected_res = match id_expected_typ_opt with
         | Some (id, ety) ->
           with_local_level_generalize_structure_if_principal

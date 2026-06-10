@@ -1737,7 +1737,7 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
     reverting them. *)
 and tree_of_ret_typ_mutating acc_mode m ty=
   match get_desc ty with
-  | Tarrow _ -> begin
+  | Tarrow _ | Tfunctor _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
       match Alloc.equate (Alloc.of_const acc_mode) m with

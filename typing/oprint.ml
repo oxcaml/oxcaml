@@ -417,7 +417,7 @@ and print_out_arg am ppf ty =
 
 and print_out_ret ppf =
   function
-  | Otyp_ret (rm, (Otyp_arrow _ as ty)) ->
+  | Otyp_ret (rm, ((Otyp_arrow _ | Otyp_functor _) as ty)) ->
     begin match rm with
     | Orm_no_parens ->
       print_out_type_1 ppf ty

@@ -1,4 +1,5 @@
 (* TEST
+   flags = "-extension modular_explicits";
    expect;
 *)
 
@@ -43,9 +44,9 @@ type _ t2 =
 [%%expect{|
 type _ t2 =
     A : (int -> int) t2
-  | B : ((module M : T) -> M.t -> M.t) t2
-  | C : ((module M : T2) -> M.t -> M.t) t2
-  | D : ((module M : Add) -> M.t -> M.t) t2
+  | B : ((module M : T) -> M/1.t -> M/1.t) t2
+  | C : ((module M : T2) -> M/2.t -> M/2.t) t2
+  | D : ((module M : Add) -> M/3.t -> M/3.t) t2
 |}]
 
 (* matching specification *)

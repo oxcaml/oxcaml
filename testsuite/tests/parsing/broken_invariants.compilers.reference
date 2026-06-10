@@ -46,6 +46,10 @@ Line 2, characters 13-29:
 2 | let f (x : [%tfunctor_opt_arg]) = ();;
                  ^^^^^^^^^^^^^^^^
 Error: broken invariant in parsetree: Optional argument for a module dependent function.
+Line 2, characters 13-29:
+2 | let f (x : [%tfunctor_opt_arg]) = ();;
+                 ^^^^^^^^^^^^^^^^
+Error: broken invariant in parsetree: Optional argument for a module dependent function.
 Line 2, characters 9-29:
 2 | let f ([%empty_open_tuple_pat]) = ();;
              ^^^^^^^^^^^^^^^^^^^^

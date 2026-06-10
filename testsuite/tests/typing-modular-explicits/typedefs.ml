@@ -1,4 +1,5 @@
 (* TEST
+  flags = "-extension modular_explicits";
   expect;
 *)
 
@@ -58,8 +59,10 @@ type t8 =
 type t9 = C of ((module T : T) -> T.t -> T.t)
 type t10 =
   t8 =
-    A of ((module T : T) -> (module Add with type t = T.t) -> T.t -> T.t)
-  | B of ((module T : T) -> (module Add with type t = T.t) -> T.t -> T.t)
+    A of
+      ((module T : T) -> (module Add with type t = T/1.t) -> T/1.t -> T/1.t)
+  | B of
+      ((module T : T) -> (module Add with type t = T/2.t) -> T/2.t -> T/2.t)
 |}]
 
 (** Test constraint check, one success and the next one is a fail  *)
@@ -89,6 +92,8 @@ Line 1, characters 58-67:
                                                               ^^^^^^^^^
 Error: This type "'a" should be an instance of type "M.t"
        The type constructor "M.t" would escape its scope
+       Type "M.t" is abstract because no corresponding cmi file was found
+       in path.
 |}]
 
 type 'a t6_fail = (module M : T) -> (M.t as 'a)
@@ -99,6 +104,8 @@ Line 1, characters 37-46:
                                          ^^^^^^^^^
 Error: This type "'a" should be an instance of type "M.t"
        The type constructor "M.t" would escape its scope
+       Type "M.t" is abstract because no corresponding cmi file was found
+       in path.
 |}]
 
 (** Tests about invalid types definitions *)
@@ -189,7 +196,7 @@ type +'a t_pneg = (module X : V) -> 'a X.n -> unit
 [%%expect{|
 module type V = sig type +'a p type -'a n type !'a i end
 module type F =
-  (X : V) ->
+  functor (X : V) ->
     sig
       type 'a t_pos = unit -> 'a X.p
       type 'a t_neg = unit -> 'a X.n
