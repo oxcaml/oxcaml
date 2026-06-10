@@ -754,6 +754,7 @@ let tuple_pat_mode mode tuple_modes =
   { mode; tuple_modes }
 
 let effect_handler_modes loc pinpoint env expected_mode =
+  Env.walk_locks_for_legacy_construct ~env (loc, pinpoint);
   let env =
     Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
   in
