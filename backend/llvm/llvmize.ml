@@ -261,6 +261,9 @@ let filter_ds_and_make_ret_type ret_machtype =
   let actual_ret_types = reg_list_for_call cc_regs |> List.map T.of_reg in
   make_ret_type actual_ret_types
 
+(* CR dkalinichenko: a function whose exits are all tail calls has no [Return]
+   blocks and is rejected below, yet such functions are the usual shape for
+   unknown return types. Support them by choosing an arbitrary return type? *)
 let unknown_fun_ret_type cfg =
   let actual_ret_types =
     Cfg.fold_blocks cfg ~init:None ~f:(fun _ block actual_ret_types ->

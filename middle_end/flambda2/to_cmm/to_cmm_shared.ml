@@ -567,6 +567,25 @@ let extended_machtype_of_return_arity arity =
     (* Functions returning multiple values *)
     List.map extended_machtype_of_kind arity |> Array.concat
 
+let extended_result_type_of_result_arity (result_arity : Result_arity.t) :
+    Extended_result_type.t =
+  match result_arity with
+  | Ok arity -> Known (extended_machtype_of_return_arity arity)
+  | Unknown -> Unknown
+  | Bottom -> Known Extended_machtype.typ_void
+
+let fun_ret_type_of_result_arity result_arity =
+  extended_result_type_of_result_arity result_arity
+  |> Extended_result_type.to_result_type
+
+let return_continuation_arity_of_result_arity (result_arity : Result_arity.t) :
+    Cmm.machtype list Or_unknown.t =
+  match result_arity with
+  | Ok arity ->
+    Known (List.map machtype_of_kind (Flambda_arity.unarized_components arity))
+  | Unknown -> Unknown
+  | Bottom -> Known []
+
 let alloc_mode_for_applications_to_cmx t =
   match t with
   | Alloc_mode.For_applications.Maybe_alloc_stack _ ->

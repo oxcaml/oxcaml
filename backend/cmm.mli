@@ -57,6 +57,14 @@ tracked by the GC:
 
 type machtype = machtype_component array
 
+(** The type of the result of a function or of an application. [Unknown] means
+    that the number and layout of the returned values are not statically
+    determined (e.g. a function whose OCaml return type has layout [any]).
+    Unknown results are never materialized: an [Unknown]-result application is
+    only valid where it is compiled as a genuine tail call, forwarding the
+    callee's result registers directly to the caller, and a function declared
+    with an [Unknown] return type must return via such tail calls. This is
+    enforced during instruction selection. *)
 type result_type =
   | Known of machtype
   | Unknown
@@ -87,8 +95,13 @@ val typ_mask : machtype
 
 val typ_int128 : machtype
 
+(** The machtype of a [Known] result type; fatal-errors on [Unknown]. For use in
+    contexts where an unknown-result call or function would be invalid. *)
 val result_type_to_machtype_exn : result_type -> machtype
 
+(** The machtype used to create the result registers of a tail call. [Unknown]
+    maps to [typ_void], which is sound only because the result registers of a
+    genuine tail call are never read. *)
 val result_type_for_tail_call : result_type -> machtype
 
 (** Least upper bound of two [machtype_component]s. *)

@@ -169,6 +169,8 @@ end = struct
   let count_regs_in_locs locs =
     Array.fold_left (fun acc r -> acc + Array.length r) 0 locs
 
+  (* A length mismatch between [actual] and [expected] is not reported here;
+     the arity check in [check_terminator_arity] is responsible for that. *)
   let check_return_locations t label actual expected =
     if Int.equal (Array.length actual) (Array.length expected)
     then

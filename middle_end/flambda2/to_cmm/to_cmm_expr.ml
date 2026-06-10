@@ -91,19 +91,33 @@ let concrete_return_arity_exn apply =
       "Missing concrete return arity when translating apply to Cmm:@ %a"
       Apply.print apply
 
-let apply_has_unknown_return_arity apply =
+let apply_has_no_concrete_return_arity apply =
   match Apply.return_arity apply with
   | Or_unknown_or_bottom.Ok _ -> false
   | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> true
 
-let extended_result_type_of_apply apply ~unknown_return_result_type =
+let extended_result_type_of_apply env apply : C.Extended_result_type.t =
   match Apply.return_arity apply with
-  | Or_unknown_or_bottom.Ok arity ->
-    C.Extended_result_type.Known (C.extended_machtype_of_return_arity arity)
-  | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom -> (
+  | (Or_unknown_or_bottom.Ok _ | Or_unknown_or_bottom.Bottom) as return_arity ->
+    C.extended_result_type_of_result_arity return_arity
+  | Or_unknown_or_bottom.Unknown -> (
     match Apply.continuation apply with
-    | Never_returns -> C.Extended_result_type.Known C.Extended_machtype.typ_void
-    | Return _ -> unknown_return_result_type)
+    | Never_returns ->
+      (* The call never returns, so the most restrictive type can be used. *)
+      Known C.Extended_machtype.typ_void
+    | Return k -> (
+      match Env.get_continuation env k with
+      | Return _ | Jump _ -> Unknown
+      | Inline { handler_params; _ } ->
+        (* The handler of an inlined continuation receiving the results of an
+           unknown-result call forwards its parameters directly to the
+           function's return continuation (see
+           [Layout_any_return_specialization]). The call will be emitted in the
+           handler's place, in tail position (see [apply_expr] below), so it can
+           be compiled with the handler's concrete parameter types. *)
+        Known
+          (C.extended_machtype_of_return_arity
+             (Bound_parameters.arity handler_params))))
 
 let concrete_return_ty_exn apply =
   concrete_return_arity_exn apply |> C.extended_machtype_of_return_arity
@@ -252,8 +266,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   in
   cmm, free_vars, env, res, Ece.all
 
-let translate_apply0 ~dbg_with_inlined:dbg env res apply
-    ~unknown_return_result_type =
+let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
   let args = Apply.args apply in
   (* CR mshinwell: When we fix the problem that [prim_effects] and
@@ -287,9 +300,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply
   let args_arity =
     Apply.args_arity apply |> Flambda_arity.unarize_per_parameter
   in
-  let extended_result_type =
-    extended_result_type_of_apply apply ~unknown_return_result_type
-  in
+  let extended_result_type = extended_result_type_of_apply env apply in
   let result_type =
     C.Extended_result_type.to_result_type extended_result_type
   in
@@ -404,19 +415,20 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply
         res,
         Ece.all )
   | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
-    if apply_has_unknown_return_arity apply
+    if apply_has_no_concrete_return_arity apply
     then
       Misc.fatal_errorf
-        "Cannot compile unknown-result external call to Cmm:@ %a" Apply.print
-        apply;
+        "Cannot compile unknown- or bottom-result external call to Cmm:@ %a"
+        Apply.print apply;
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity:(concrete_return_arity_exn apply)
       ~return_ty:(concrete_return_ty_exn apply)
       dbg ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects
   | Method { kind; obj } ->
-    if apply_has_unknown_return_arity apply
+    if apply_has_no_concrete_return_arity apply
     then
-      Misc.fatal_errorf "Cannot compile unknown-result method call to Cmm:@ %a"
+      Misc.fatal_errorf
+        "Cannot compile unknown- or bottom-result method call to Cmm:@ %a"
         Apply.print apply;
     fail_if_probe apply;
     let callee =
@@ -447,11 +459,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply
       res,
       Ece.all )
   | Effect op -> (
-    if apply_has_unknown_return_arity apply
+    if apply_has_no_concrete_return_arity apply
     then
       Misc.fatal_errorf
-        "Cannot compile unknown-result effect operation to Cmm:@ %a" Apply.print
-        apply;
+        "Cannot compile unknown- or bottom-result effect operation to Cmm:@ %a"
+        Apply.print apply;
     let module BV = Backend_var in
     let open To_cmm_env in
     let[@inline] simple s = C.simple ~dbg s in
@@ -564,21 +576,21 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply
         res,
         Ece.all ))
 
-let translate_apply env res apply ~unknown_return_result_type =
+let translate_apply env res apply =
   let dbg = Env.add_inlined_debuginfo env (Apply.dbg apply) in
   warn_if_unused_inlined_attribute apply ~dbg_with_inlined:dbg;
   let call, free_vars, env, res, effs =
     translate_apply0 ~dbg_with_inlined:dbg env res apply
-      ~unknown_return_result_type
   in
   let k_exn = Apply.exn_continuation apply in
   let extra_args = Exn_continuation.extra_args k_exn in
   if Misc.Stdlib.List.is_empty extra_args
   then call, free_vars, env, res, effs
-  else if apply_has_unknown_return_arity apply
+  else if apply_has_no_concrete_return_arity apply
   then
     Misc.fatal_errorf
-      "Cannot compile unknown-result call with extra exception arguments:@ %a"
+      "Cannot compile unknown- or bottom-result call with extra exception \
+       arguments:@ %a"
       Apply.print apply
   else
     (* If there are extra args, create a wrapper continuation, as we do when
@@ -1111,23 +1123,7 @@ and continuation_handler env res handler =
       vars, arity, expr, free_vars_of_handler, symbol_inits, res)
 
 and apply_expr env res apply =
-  let unknown_return_result_type =
-    match Apply.return_arity apply, Apply.continuation apply with
-    | Or_unknown_or_bottom.Ok _, _
-    | Or_unknown_or_bottom.Bottom, _
-    | Or_unknown_or_bottom.Unknown, Never_returns ->
-      C.Extended_result_type.Known C.Extended_machtype.typ_void
-    | Or_unknown_or_bottom.Unknown, Return k -> (
-      match Env.get_continuation env k with
-      | Inline { handler_params; _ } ->
-        C.Extended_result_type.Known
-          (C.extended_machtype_of_return_arity
-             (Bound_parameters.arity handler_params))
-      | Return _ | Jump _ -> C.Extended_result_type.Unknown)
-  in
-  let call, free_vars, env, res, effs =
-    translate_apply env res apply ~unknown_return_result_type
-  in
+  let call, free_vars, env, res, effs = translate_apply env res apply in
   (* With respect to flushing the environment we have three cases:
 
      1. The call never returns or jumps to another function
@@ -1188,11 +1184,11 @@ and apply_expr env res apply =
                 Printcmm.machtype))
           param_types Apply.print apply
     | Jump { param_types = _; cont } ->
-      if apply_has_unknown_return_arity apply
+      if apply_has_no_concrete_return_arity apply
       then
         Misc.fatal_errorf
-          "Unknown-result call must return directly from the current \
-           function:@ %a"
+          "Unknown- or bottom-result call must return directly from the \
+           current function:@ %a"
           Apply.print apply;
       (* Case 2 *)
       let wrap, _, res =
@@ -1208,8 +1204,16 @@ and apply_expr env res apply =
           handler_params_occurrences;
           handler_body_inlined_debuginfo
         } -> (
-      if apply_has_unknown_return_arity apply
+      if apply_has_no_concrete_return_arity apply
       then
+        (* The handler cannot be inlined as usual, since there are no concrete
+           result values to bind to its parameters. Emit the call alone, in the
+           handler's place: for a bottom-result call the handler is unreachable,
+           and the handler of an unknown-result call forwards its parameters
+           directly to the function's return continuation (see
+           [extended_result_type_of_apply] above), so in both cases dropping the
+           handler preserves semantics. This also puts the call in tail
+           position, as required for unknown-result calls. *)
         let wrap, _, res =
           Env.flush_delayed_lets ~mode:Flush_everything env res
         in

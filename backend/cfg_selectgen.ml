@@ -1287,6 +1287,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok (simple_args, env) -> (
       let fallback_result_locations rd =
         match (result_type : Cmm.result_type) with
+        (* Result locations are only used on the non-tail fallback path, which
+           rejects unknown-result calls. *)
         | Unknown -> [||], 0
         | Known _ -> Proc.loc_results_call (Reg.typv rd)
       in

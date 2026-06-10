@@ -39,30 +39,6 @@ type closure_code_pointers =
   | Full_application_only
   | Full_and_partial_application
 
-let extended_result_type_of_result_arity
-    (result_arity : [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t) =
-  match result_arity with
-  | Or_unknown_or_bottom.Ok arity ->
-    C.Extended_result_type.Known (C.extended_machtype_of_return_arity arity)
-  | Or_unknown_or_bottom.Unknown -> C.Extended_result_type.Unknown
-  | Or_unknown_or_bottom.Bottom ->
-    C.Extended_result_type.Known C.Extended_machtype.typ_void
-
-let fun_ret_type_of_result_arity
-    (result_arity : [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t) =
-  extended_result_type_of_result_arity result_arity
-  |> C.Extended_result_type.to_result_type
-
-let return_continuation_arity_of_result_arity
-    (result_arity : [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t) =
-  match result_arity with
-  | Or_unknown_or_bottom.Ok arity ->
-    List.map To_cmm_shared.machtype_of_kind
-      (Flambda_arity.unarized_components arity)
-    |> fun arity -> Or_unknown.Known arity
-  | Or_unknown_or_bottom.Unknown -> Or_unknown.Unknown
-  | Or_unknown_or_bottom.Bottom -> Or_unknown.Known []
-
 let get_func_decl_params_arity t code_id =
   let info = Env.get_code_metadata t code_id in
   (* Avoid generation of excessive amounts of caml_curry functions that only
@@ -80,7 +56,7 @@ let get_func_decl_params_arity t code_id =
       (Flambda_arity.unarize_per_parameter (Code_metadata.params_arity info))
   in
   let result_ty =
-    extended_result_type_of_result_arity (Code_metadata.result_arity info)
+    C.extended_result_type_of_result_arity (Code_metadata.result_arity info)
   in
   let kind : Lambda.function_kind =
     if Code_metadata.is_tupled info
@@ -511,7 +487,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   (* Init the env and create a jump id for the return continuation in case a
      trap action is attached to one of its calls *)
   let return_continuation_arity =
-    return_continuation_arity_of_result_arity result_arity
+    C.return_continuation_arity_of_result_arity result_arity
   in
   let env =
     Env.enter_function_body env ~return_continuation ~return_continuation_arity
@@ -592,7 +568,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
   in
   let fun_ret_type =
-    fun_ret_type_of_result_arity
+    C.fun_ret_type_of_result_arity
       (Env.get_code_metadata env code_id |> Code_metadata.result_arity)
   in
   ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,

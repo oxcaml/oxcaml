@@ -197,6 +197,19 @@ val check_arity : _ Flambda_arity.t -> _ list -> bool
 val extended_machtype_of_return_arity :
   [`Unarized] Flambda_arity.t -> Cmm_helpers.Extended_machtype.t
 
+(** Lower a Flambda result arity to a Cmm result type: [Ok] arities become
+    [Known] machtypes, [Unknown] stays [Unknown], and [Bottom] (the function or
+    application never returns) becomes [Known] [typ_void]. *)
+val extended_result_type_of_result_arity :
+  Result_arity.t -> Cmm_helpers.Extended_result_type.t
+
+val fun_ret_type_of_result_arity : Result_arity.t -> Cmm.fun_ret_type
+
+(** The Cmm types of the parameters of a function's return continuation:
+    [Unknown] for an unknown result arity, no parameters for [Bottom]. *)
+val return_continuation_arity_of_result_arity :
+  Result_arity.t -> Cmm.machtype list Or_unknown.t
+
 val alloc_mode_for_applications_to_cmx :
   Alloc_mode.For_applications.t -> Cmx_format.return_mode
 

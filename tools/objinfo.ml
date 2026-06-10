@@ -340,7 +340,7 @@ let generic_return_arity_identifier = function
   | Cmx_format.Unknown -> "_Runknown"
 
 let print_generic_fns gfns =
-  let pr_funs return_arity_identifier _ fns =
+  let pr_funs result_identifier _ fns =
     let mode = function
       | Cmx_format.Not_alloc_stack -> ""
       | Cmx_format.Maybe_alloc_stack -> "L"
@@ -348,7 +348,7 @@ let print_generic_fns gfns =
     List.iter (fun (arity,result,m) ->
         printf " %s%s%s"
           (unique_arity_identifier arity)
-          (return_arity_identifier result)
+          (result_identifier result)
           (mode m)) fns in
   let pr_cfuns _ fns =
     List.iter (function
