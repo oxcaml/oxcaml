@@ -116,6 +116,10 @@ and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
 and requires_metaprogramming = ref false    (* -requires-metaprogramming *)
 and uses_metaprogramming = ref false    (* -uses-metaprogramming *)
+and unit_is_unloadable = ref false
+  (* Internal flag: this CU's compiled output should be eligible for
+     unloading when no live reference remains. Not exposed as a CLI option;
+     set programmatically by [Eval.eval] and [expectnat] for now. *)
 and custom_runtime = ref false          (* -custom *)
 and no_check_prims = ref false          (* -no-check-prims *)
 and bytecode_compatible_32 = ref false  (* -compat-32 *)

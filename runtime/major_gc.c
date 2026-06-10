@@ -41,6 +41,9 @@
 #include "caml/weak.h"
 #include "caml/custom.h"
 #include "caml/minor_gc.h"
+#ifdef NATIVE_CODE
+#include "caml/unloadable.h"
+#endif
 
 /* NB the MARK_STACK_INIT_SIZE must be larger than the number of objects
    that can be in a pool, see POOL_WSIZE */
@@ -931,10 +934,23 @@ static intnat mark_stack_push_block(struct mark_stack* stk, value block)
   if (Tag_val(block) == Closure_tag) {
     /* Skip the code pointers and integers at beginning of closure;
        start scanning at the first word of the environment part. */
-    offset = Start_env_closinfo(Closinfo_val(block));
+    value closinfo = Closinfo_val(block);
+    offset = Start_env_closinfo(closinfo);
 
     CAMLassert(offset <= Wosize_val(block)
-      && offset >= Start_env_closinfo(Closinfo_val(block)));
+      && offset >= Start_env_closinfo(closinfo));
+
+    /* F.1: for each function slot in the closure prefix whose closinfo
+       has the unloadable bit set, darken the corresponding [Code_block]
+       via the back-pointer at [entry - 1]. Standard mark scan then
+       recursively darkens the Code_block's dep code- and data-blocks.
+       Native-code only: closures with unloadable code only exist in the
+       native runtime. */
+#ifdef NATIVE_CODE
+    /* The walker fast-exits when no unloadable units are registered (a
+       relaxed atomic load on [caml_unloadable_units_live_count]). */
+    caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
+#endif
   }
 
   CAMLassert(Has_status_val(block, caml_global_heap_state.MARKED));
@@ -1130,9 +1146,15 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
       }
 
       if (Tag_hd(hd) == Closure_tag) {
-        uintnat env_offset = Start_env_closinfo(Closinfo_val(block));
+        value closinfo = Closinfo_val(block);
+        uintnat env_offset = Start_env_closinfo(closinfo);
         budget -= env_offset;
         me.start += env_offset;
+        /* F.1: see [mark_stack_push_block] for the same injection. */
+#ifdef NATIVE_CODE
+        /* See [mark_stack_push_block]: walker fast-exits on no-units. */
+        caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
+#endif
       }
     }
     else if (budget <= 0 || stk->count == 0) {
@@ -1610,6 +1632,17 @@ static void cycle_major_heap_from_stw_single(
   caml_domain_state* domain,
   uintnat num_domains_in_stw)
 {
+#ifdef NATIVE_CODE
+  /* G: end-of-cycle unloadable-unit pass. Runs BEFORE the heap-state
+     rotation so the per-block MARKED bits still reflect cycle-N's
+     interpretation. Walks all registered unloadable units; unreachable
+     units are unlinked (and their loader callback invoked) and surviving
+     units have their blocks normalized so the rotation leaves them as
+     UNMARKED for cycle N+1. Native-code only: unloadable units are a
+     native-only concept (JIT-emitted code; bytecode is interpreted). */
+  caml_unloadable_check_and_unload_dead();
+#endif
+
   /* Cycle major heap colours */
   /* FIXME: delete caml_cycle_heap_from_stw_single
      and have per-domain copies of the data? */
@@ -1742,7 +1775,27 @@ static void stw_cycle_all_domains(
   caml_cycle_heap(domain->shared_heap);
 
   if (compacting) {
+#ifdef NATIVE_CODE
+    /* Robustness against the compactor mistaking a JIT static block for
+     * an evacuated heap block. The compactor's [compact_update_value]
+     * treats any block whose status equals [caml_global_heap_state.MARKED]
+     * as having been evacuated and reads [Field(v, 0)] as a forwarding
+     * pointer. Today our static blocks are UNMARKED at this point (the
+     * end-of-cycle pass writes them MARKED pre-rotation, then rotation
+     * relabels MARKED -> UNMARKED), so the check misses them — but the
+     * invariant is fragile. Flip every registered unloadable block to
+     * NOT_MARKABLE so the compactor takes its earlier early-out path
+     * unconditionally; restore to UNMARKED below. */
+    Caml_global_barrier_if_final(participating_count) {
+      caml_unloadable_pre_compact();
+    }
+#endif
     caml_compact_heap(domain, participating_count, participating);
+#ifdef NATIVE_CODE
+    Caml_global_barrier_if_final(participating_count) {
+      caml_unloadable_post_compact();
+    }
+#endif
   }
 
   /* Update GC stats (these could have significantly changed e.g. due

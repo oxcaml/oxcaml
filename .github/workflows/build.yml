@@ -225,6 +225,12 @@ jobs:
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
             cc: musl-gcc
+            # JIT unloading is disabled under musl (Eval.eval allocates the
+            # JIT buffer out of a static [.bss] arena that can't be passed
+            # to [free]; see [jit_supports_unloading]). The tests below
+            # explicitly assert that unloading happens, which it doesn't on
+            # musl, so skip them here.
+            disable_testcases: 'testsuite/tests/quotation/eval/unloading/*.ml'
             sysdeps: musl musl-tools
 
           # Here and below, we put 'reaper=1,_' instead of '_,reaper=1', as

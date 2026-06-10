@@ -496,5 +496,6 @@ let run cfg_with_layout =
     fun_num_stack_slots;
     fun_frame_required;
     fun_prologue_required;
+    fun_unloadable = List.mem Cfg.Unloadable cfg.fun_codegen_options;
     fun_section_name
   }

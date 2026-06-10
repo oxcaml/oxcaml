@@ -1,0 +1,11 @@
+start: registered=0 unloaded=0 live=0
+last_only 3 = 9
+last_only 6 = 15
+middle_only 0 = 107
+middle_only 4 = 111
+after populate: registered=2 unloaded=0 live=2
+stable: last 3 = 9, middle 0 = 107
+after 3x Gc.compact (both held): registered=2 unloaded=0 live=2
+middle still: 111
+after release last_only: registered=2 unloaded=1 live=1
+after release middle_only: registered=2 unloaded=2 live=0
