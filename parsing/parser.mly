@@ -2738,10 +2738,6 @@ simple_param_pattern:
       { (Labelled $1, None, $2) }
   | simple_pattern_extend_modes_or_poly
       { (Nolabel, None, $1) }
-  | LABEL LPAREN poly_pattern RPAREN
-      { (Labelled $1, None, $3) }
-  | LPAREN poly_pattern RPAREN
-      { (Nolabel, None, $2) }
 ;
 
 pattern_var:
@@ -2791,15 +2787,6 @@ let_pattern:
       mkpat_with_modes ~loc ~pat ~cty ~modes
     }
 ;
-%inline poly_pattern:
-    mkpat(
-      pat = pattern
-      COLON
-      cty = poly_type
-        { Ppat_constraint(pat, cty) })
-      { $1 }
-;
-
 (* simple_pattern extended with poly_type and modes *)
 simple_pattern_extend_modes_or_poly:
     simple_pattern { $1 }
@@ -4558,7 +4545,7 @@ possibly_poly(X):
     { $1 }
 ;
 %inline poly_type:
-  mktyp(poly(core_type))
+  possibly_poly(core_type)
     { $1 }
 ;
 %inline possibly_poly_type:
@@ -4818,21 +4805,8 @@ optional_atat_modalities_expr:
   | stack(expr) { $1 }
 
 %inline param_type:
-  | mktyp(
-    LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
-      { Ptyp_poly (bound_vars, inner_type) }
-    )
-    { $1 }
-  | mktyp(
-    LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
-      { Ptyp_repr (bound_vars, inner_type) }
-    )
-    { $1 }
-  | mktyp(
-    LPAREN LAYOUT bound_vars = newlayouts DOT inner_type = core_type RPAREN
-      { Ptyp_newlayout (bound_vars, inner_type) }
-    )
-    { $1 }
+  | LPAREN ty = strictly_poly_type RPAREN
+    { reloc_typ ~loc:$sloc ty }
   | ty = tuple_type
     { ty }
 ;

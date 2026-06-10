@@ -1441,7 +1441,7 @@ let rec tree_of_modal_typexp mode modal ty =
             if tpoly_is_mono ty1 then
               match
                 get_desc
-                  (Ctype.expand_head \!printing_env (tpoly_get_mono ty1))
+                  (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
               with
               | Tconstr(path, [ty], _)
                 when Path.same path Predef.path_option ->
