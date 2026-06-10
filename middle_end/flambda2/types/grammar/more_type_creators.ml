@@ -628,3 +628,16 @@ let unknown_types_from_arity ?alloc_mode ~machine_width arity =
   List.map
     (unknown_with_subkind ?alloc_mode ~machine_width)
     (Flambda_arity.unarized_components arity)
+
+let unknown_types_from_result_arity ?alloc_mode ~machine_width
+    (arity : _ Or_unknown_or_bottom.t) =
+  match arity with
+  | Ok arity -> unknown_types_from_arity ?alloc_mode ~machine_width arity
+  | Unknown | Bottom ->
+    (* Placeholder for recording uses of return continuations whose arity is
+       unknown. Such continuations are registered as having unknown arity in the
+       simplifier (see [Continuation_uses]), which skips arity checks on their
+       uses and fatal-errors if the arity is ever demanded, so this type is
+       never consumed. *)
+    [ unknown_with_subkind ?alloc_mode:None ~machine_width
+        Flambda_kind.With_subkind.any_value ]

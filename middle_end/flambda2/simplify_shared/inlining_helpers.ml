@@ -100,15 +100,21 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
           ~apply_return_continuation:(RC.Return pop_wrapper_cont)
       in
       let kinded_params =
-        List.map
-          (fun k ->
-            let wrapper_return =
-              Variable.create "wrapper_return"
-                (Flambda_kind.With_subkind.kind k)
-            in
-            let wrapper_return_duid = Flambda_debug_uid.none in
-            Bound_parameter.create wrapper_return k wrapper_return_duid)
-          (Flambda_arity.unarized_components result_arity)
+        match result_arity with
+        | Or_unknown_or_bottom.Ok result_arity ->
+          List.map
+            (fun k ->
+              let wrapper_return =
+                Variable.create "wrapper_return"
+                  (Flambda_kind.With_subkind.kind k)
+              in
+              let wrapper_return_duid = Flambda_debug_uid.none in
+              Bound_parameter.create wrapper_return k wrapper_return_duid)
+            (Flambda_arity.unarized_components result_arity)
+        | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+          Misc.fatal_error
+            "Cannot inline unknown- or bottom-result function whose inlined \
+             body returns with exception extra arguments"
       in
       let trap_action =
         Trap_action.Pop { exn_handler = wrapper; raise_kind = None }

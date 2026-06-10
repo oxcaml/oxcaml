@@ -234,6 +234,12 @@ let add_used_in_current_handler name_occurrences t =
       { elt with used_in_handler })
 
 let add_apply_conts ~result_cont ~exn_cont ~result_arity t =
+  let result_arity =
+    match result_arity with
+    | Or_unknown_or_bottom.Ok result_arity -> result_arity
+    | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+      Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+  in
   update_top_of_stack ~t ~f:(fun elt ->
       let add_func_result cont rewrite_id ~result_arity ~extra_args
           apply_cont_args =

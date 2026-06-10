@@ -108,15 +108,16 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
           UE.add_function_return_or_exn_continuation
             (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
             (Exn_continuation.exn_handler exn_continuation)
-            (Flambda_arity.create_singletons
-               [Flambda_kind.With_subkind.any_value])
+            (Or_unknown.Known
+               (Flambda_arity.create_singletons
+                  [Flambda_kind.With_subkind.any_value]))
         in
         let uenv =
           match Apply.continuation apply with
           | Never_returns -> uenv
           | Return return_continuation ->
             UE.add_function_return_or_exn_continuation uenv return_continuation
-              return_arity
+              (Or_unknown.Known return_arity)
         in
         let uacc =
           UA.create ~flow_result ~compute_slot_offsets:false uenv dacc

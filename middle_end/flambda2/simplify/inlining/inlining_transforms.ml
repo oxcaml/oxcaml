@@ -176,7 +176,13 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
           | extra_args ->
             wrap_inlined_body_for_exn_extra_args ~extra_args
               ~apply_exn_continuation ~apply_return_continuation
-              ~result_arity:(Code.result_arity_exn code)
+              ~result_arity:
+                (match Code.result_arity code with
+                | Or_unknown_or_bottom.Ok arity -> Or_unknown_or_bottom.Ok arity
+                | Or_unknown_or_bottom.Unknown | Or_unknown_or_bottom.Bottom ->
+                  Misc.fatal_error
+                    "Cannot inline unknown- or bottom-result function with \
+                     exception extra arguments")
               ~make_inlined_body
         in
         DA.with_denv dacc denv, expr)

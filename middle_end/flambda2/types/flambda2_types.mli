@@ -655,6 +655,17 @@ val unknown_types_from_arity :
   [`Unarized] Flambda_arity.t ->
   t list
 
+(** Like [unknown_types_from_arity], but for a possibly-unknown result arity.
+    For [Unknown] and [Bottom], returns a single unknown value type, which is
+    only suitable for recording uses of return continuations whose arity is
+    tracked as unknown (such uses skip arity checks and the types are never
+    consumed). *)
+val unknown_types_from_result_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t ->
+  t list
+
 (** Whether the given type says that a term of that type can never be
     constructed (in other words, it is [Invalid]). *)
 val is_bottom : Typing_env.t -> t -> bool

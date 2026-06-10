@@ -41,7 +41,7 @@ type simplify_function_body =
   Downwards_acc.t ->
   Expr.t ->
   return_continuation:Continuation.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Unarized] Flambda_arity.t Or_unknown.t ->
   exn_continuation:Continuation.t ->
   loopify_state:Loopify_state.t ->
   params:Bound_parameters.t ->
@@ -199,7 +199,14 @@ let split_direct_over_application apply ~callee's_code_id
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Apply.return_arity_unarized_components_or_empty apply)
+          (* Unknown- and bottom-result applications are restricted to tail
+             position, so they can never need the local-region wrapper built
+             here. *)
+          (Flambda_arity.unarized_components
+             (Result_arity.to_arity_exn (Apply.return_arity apply)
+                ~message:
+                  "Cannot wrap unknown- or bottom-result over-application with \
+                   a local result"))
       in
       let call_return_continuation, call_return_continuation_free_names =
         match Apply.continuation apply with

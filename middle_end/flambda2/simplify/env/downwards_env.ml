@@ -69,6 +69,7 @@ type t =
     get_imported_code : unit -> Exported_code.t;
     all_code : Code.t Code_id.Map.t;
     inlining_history_tracker : Inlining_history.Tracker.t;
+    specialized_return_arities : [`Unarized] Flambda_arity.t Continuation.Map.t;
     loopify_state : Loopify_state.t;
     replay_history : Replay_history.t;
         (* Replay history for the current continuation handler (or toplevel) *)
@@ -113,7 +114,8 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 are_rebuilding_terms; closure_info;
                 unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
                 get_imported_code = _; inlining_history_tracker = _;
-                loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
+                specialized_return_arities; loopify_state; replay_history;
+                specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
                 has_seen_a_non_liftable_continuation; join_analysis;
               } =
@@ -136,6 +138,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(are_rebuilding_terms@ %a)@]@ \
       @[<hov 1>(closure_info@ %a)@]@ \
       @[<hov 1>(all_code@ %a)@]@ \
+      @[<hov 1>(specialized_return_arities@ %a)@]@ \
       @[<hov 1>(loopify_state@ %a)@]@ \
       @[<hov 1>(binding_histories@ %a)@]@ \
       @[<hov 1>(specialization_cost@ %a)@]@ \
@@ -162,6 +165,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     Are_rebuilding_terms.print are_rebuilding_terms
     Closure_info.print closure_info
     (Code_id.Map.print Code.print) all_code
+    (Continuation.Map.print Flambda_arity.print) specialized_return_arities
     Loopify_state.print loopify_state
     Replay_history.print replay_history
     Specialization_cost.print specialization_cost
@@ -248,6 +252,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       get_imported_code;
       inlining_history_tracker =
         Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
+      specialized_return_arities = Continuation.Map.empty;
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
       specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
@@ -349,6 +354,7 @@ let enter_set_of_closures
       get_imported_code;
       all_code;
       inlining_history_tracker;
+      specialized_return_arities = _;
       loopify_state = _;
       replay_history = _;
       specialization_cost = _;
@@ -378,6 +384,7 @@ let enter_set_of_closures
     get_imported_code;
     all_code;
     inlining_history_tracker;
+    specialized_return_arities = Continuation.Map.empty;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
     specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
@@ -683,9 +690,17 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
   in
+  let specialized_return_arities =
+    match Apply.continuation apply, Apply.return_arity apply with
+    | Return cont, Or_unknown_or_bottom.Ok return_arity ->
+      Continuation.Map.add cont return_arity t.specialized_return_arities
+    | Never_returns, (Ok _ | Unknown | Bottom) | Return _, (Unknown | Bottom) ->
+      t.specialized_return_arities
+  in
   { t with
     inlined_debuginfo;
     inlining_state;
+    specialized_return_arities;
     inlining_history_tracker =
       Inlining_history.Tracker.enter_inlined_apply
         ~callee:(Code.absolute_history called_code)
@@ -693,6 +708,9 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
         ~apply_relative_history:(Apply.relative_history apply)
         t.inlining_history_tracker
   }
+
+let find_specialized_return_arity t cont =
+  Continuation.Map.find_opt cont t.specialized_return_arities
 
 let generate_phantom_lets t =
   Flambda_features.debug ()
@@ -803,6 +821,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
       denv.disable_partial_application_stub_generation;
     inlining_state = denv.inlining_state;
     inlining_history_tracker = denv.inlining_history_tracker;
+    specialized_return_arities = denv.specialized_return_arities;
     (* denv_for_join *)
     all_code = denv_for_join.all_code;
     typing_env = denv_for_join.typing_env;

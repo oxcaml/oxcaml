@@ -24,7 +24,7 @@ type t =
   | Non_inlinable_zero_arity of { handler : Rebuilt_expr.t Or_unknown.t }
   | Non_inlinable_non_zero_arity of { arity : [`Unarized] Flambda_arity.t }
   | Toplevel_or_function_return_or_exn_continuation of
-      { arity : [`Unarized] Flambda_arity.t }
+      { arity : [`Unarized] Flambda_arity.t Or_unknown.t }
   | Invalid of { arity : [`Unarized] Flambda_arity.t }
 
 let [@ocamlformat "disable"] print are_rebuilding_terms ppf t =
@@ -56,7 +56,7 @@ let [@ocamlformat "disable"] print are_rebuilding_terms ppf t =
       "@[<hov 1>(Toplevel_or_function_return_or_exn_continuation@ \
         @[<hov 1>(arity@ %a)@]\
         )@]"
-      Flambda_arity.print arity
+      (Or_unknown.print Flambda_arity.print) arity
   | Invalid { arity } ->
     Format.fprintf ppf "@[<hov 1>(Invalid@ \
         @[<hov 1>(arity@ %a)@]\
@@ -73,7 +73,11 @@ let arity t =
       } ->
     Bound_parameters.arity params
   | Non_inlinable_zero_arity _ -> Flambda_arity.nullary
-  | Non_inlinable_non_zero_arity { arity }
-  | Toplevel_or_function_return_or_exn_continuation { arity }
-  | Invalid { arity } ->
-    arity
+  | Non_inlinable_non_zero_arity { arity } | Invalid { arity } -> arity
+  | Toplevel_or_function_return_or_exn_continuation { arity } -> (
+    match arity with
+    | Or_unknown.Known arity -> arity
+    | Or_unknown.Unknown ->
+      Misc.fatal_error
+        "Unknown-arity function return continuation cannot be used where a \
+         fixed arity is required")

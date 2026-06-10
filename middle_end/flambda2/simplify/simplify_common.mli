@@ -85,7 +85,7 @@ type simplify_function_body =
   Downwards_acc.t ->
   Expr.t ->
   return_continuation:Continuation.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Unarized] Flambda_arity.t Or_unknown.t ->
   exn_continuation:Continuation.t ->
   loopify_state:Loopify_state.t ->
   params:Bound_parameters.t ->

@@ -186,8 +186,9 @@ type simplify_function_body_result =
 
 let simplify_function_body context ~outer_dacc function_slot_opt
     ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
-    code_id code ~return_continuation ~exn_continuation params ~body ~my_closure
-    ~is_my_closure_used:_ ~my_alloc_mode ~my_depth ~free_names_of_body:_ =
+    code_id code ~result_arity_for_body ~return_continuation ~exn_continuation
+    params ~body ~my_closure ~is_my_closure_used:_ ~my_alloc_mode ~my_depth
+    ~free_names_of_body:_ =
   let loopify_state =
     if Loopify_attribute.should_loopify (Code.loopify code)
     then Loopify_state.loopify (Continuation.create ~name:"self" ())
@@ -225,8 +226,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_depth_duid = Flambda_debug_uid.none in
   match
     C.simplify_function_body context dacc body ~return_continuation
-      ~exn_continuation
-      ~return_arity:(Code.result_arity_exn code)
+      ~exn_continuation ~return_arity:result_arity_for_body
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
@@ -307,59 +307,64 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       my_closure Expr.print body DA.print dacc;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
-let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
-    ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
-    ~lifted_consts_this_function ~params : _ Or_unknown_or_bottom.t =
-  match
-    ( is_opaque,
-      Flambda_features.function_result_types ~is_a_functor,
-      return_cont_uses )
-  with
-  | true, _, _ -> Unknown
-  | false, _, None -> Bottom
-  | false, false, Some _ -> Unknown
-  | false, true, Some uses ->
-    let env_at_fork =
-      (* We use [C.dacc_inside_functions] not [C.dacc_prior_to_sets] to ensure
-         that the environment contains bindings for any symbols being defined by
-         the set of closures. *)
-      DA.denv dacc_at_function_entry
-    in
-    let join =
-      Join_points.compute_handler_env
-        ~cut_after:(Scope.prev (DE.get_continuation_scope env_at_fork))
-        (Continuation_uses.get_uses uses)
-        ~is_recursive:false ~params:return_cont_params ~env_at_fork
-        ~consts_lifted_after_fork:lifted_consts_this_function
-        ~previous_extra_params_and_args:EPA.empty
-    in
-    let bound_params_and_results =
-      Bound_parameters.append params return_cont_params
-    in
-    let params_and_results =
-      Bound_parameters.var_set bound_params_and_results
-    in
-    let typing_env = DE.typing_env join.handler_env in
-    let typing_env =
-      TE.with_code_age_relation typing_env
-        (TE.code_age_relation (DA.typing_env dacc_after_body))
-    in
-    let results_and_types =
-      List.map
-        (fun result_or_param ->
-          let name = BP.name result_or_param in
-          let kind = K.With_subkind.kind (BP.kind result_or_param) in
-          let ty = TE.find typing_env name (Some kind) in
-          name, ty)
-        (Bound_parameters.to_list bound_params_and_results)
-    in
-    let env_extension =
-      (* This call is important for compilation time performance, to cut down
-         the size of the return types. *)
-      T.make_suitable_for_environment typing_env
-        (All_variables_except params_and_results) results_and_types
-    in
-    Ok (Result_types.create ~params ~results:return_cont_params env_extension)
+let compute_result_types ~is_a_functor ~is_opaque ~result_arity
+    ~return_cont_uses ~dacc_after_body ~dacc_at_function_entry
+    ~return_cont_params ~lifted_consts_this_function ~params :
+    _ Or_unknown_or_bottom.t =
+  match result_arity with
+  | Or_unknown_or_bottom.Unknown -> Or_unknown_or_bottom.Unknown
+  | Or_unknown_or_bottom.Ok _ | Or_unknown_or_bottom.Bottom -> (
+    match
+      ( is_opaque,
+        Flambda_features.function_result_types ~is_a_functor,
+        return_cont_uses )
+    with
+    | true, _, _ -> Or_unknown_or_bottom.Unknown
+    | false, _, None -> Or_unknown_or_bottom.Bottom
+    | false, false, Some _ -> Or_unknown_or_bottom.Unknown
+    | false, true, Some uses ->
+      let env_at_fork =
+        (* We use [C.dacc_inside_functions] not [C.dacc_prior_to_sets] to ensure
+           that the environment contains bindings for any symbols being defined
+           by the set of closures. *)
+        DA.denv dacc_at_function_entry
+      in
+      let join =
+        Join_points.compute_handler_env
+          ~cut_after:(Scope.prev (DE.get_continuation_scope env_at_fork))
+          (Continuation_uses.get_uses uses)
+          ~is_recursive:false ~params:return_cont_params ~env_at_fork
+          ~consts_lifted_after_fork:lifted_consts_this_function
+          ~previous_extra_params_and_args:EPA.empty
+      in
+      let bound_params_and_results =
+        Bound_parameters.append params return_cont_params
+      in
+      let params_and_results =
+        Bound_parameters.var_set bound_params_and_results
+      in
+      let typing_env = DE.typing_env join.handler_env in
+      let typing_env =
+        TE.with_code_age_relation typing_env
+          (TE.code_age_relation (DA.typing_env dacc_after_body))
+      in
+      let results_and_types =
+        List.map
+          (fun result_or_param ->
+            let name = BP.name result_or_param in
+            let kind = K.With_subkind.kind (BP.kind result_or_param) in
+            let ty = TE.find typing_env name (Some kind) in
+            name, ty)
+          (Bound_parameters.to_list bound_params_and_results)
+      in
+      let env_extension =
+        (* This call is important for compilation time performance, to cut down
+           the size of the return types. *)
+        T.make_suitable_for_environment typing_env
+          (All_variables_except params_and_results) results_and_types
+      in
+      Or_unknown_or_bottom.Ok
+        (Result_types.create ~params ~results:return_cont_params env_extension))
 
 type rebuilt_code =
   | Rebuilding of Code.t
@@ -398,18 +403,28 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~from_metadata:(Code.inlining_arguments code)
   in
   let result_arity = Code.result_arity code in
+  let result_arity_for_body =
+    match result_arity with
+    | Or_unknown_or_bottom.Ok arity -> Or_unknown.Known arity
+    | Or_unknown_or_bottom.Unknown -> Or_unknown.Unknown
+    | Or_unknown_or_bottom.Bottom ->
+      Or_unknown.Known (Flambda_arity.create_singletons [KS.any_value])
+  in
   let return_cont_params =
-    List.mapi
-      (fun i kind_with_subkind ->
-        let result_var =
-          Variable.create
-            ("result" ^ string_of_int i)
-            (KS.kind kind_with_subkind)
-        in
-        let result_var_duid = Flambda_debug_uid.none in
-        BP.create result_var kind_with_subkind result_var_duid)
-      (Result_arity.unarized_components_or_empty result_arity)
-    |> Bound_parameters.create
+    match result_arity_for_body with
+    | Or_unknown.Known result_arity_for_body ->
+      List.mapi
+        (fun i kind_with_subkind ->
+          let result_var =
+            Variable.create
+              ("result" ^ string_of_int i)
+              (KS.kind kind_with_subkind)
+          in
+          let result_var_duid = Flambda_debug_uid.none in
+          BP.create result_var kind_with_subkind result_var_duid)
+        (Flambda_arity.unarized_components result_arity_for_body)
+      |> Bound_parameters.create
+    | Or_unknown.Unknown -> Bound_parameters.empty
   in
   let { params;
         params_and_body;
@@ -426,7 +441,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~f:
         (simplify_function_body context ~outer_dacc function_slot_opt
            ~closure_bound_names_inside_function ~inlining_arguments
-           ~absolute_history code_id code)
+           ~absolute_history code_id code ~result_arity_for_body)
   in
   let should_resimplify = UA.resimplify uacc_after_upwards_traversal in
   let outer_dacc, lifted_consts_this_function =
@@ -458,9 +473,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   let is_a_functor = Code.is_a_functor code in
   let is_opaque = Code.is_opaque code in
   let result_types =
-    compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
-      ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
-      ~lifted_consts_this_function ~params
+    compute_result_types ~is_a_functor ~is_opaque ~result_arity
+      ~return_cont_uses ~dacc_after_body ~dacc_at_function_entry
+      ~return_cont_params ~lifted_consts_this_function ~params
   in
   let outer_dacc =
     (* This is the complicated part about slot offsets. We just traversed the

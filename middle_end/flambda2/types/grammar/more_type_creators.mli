@@ -222,3 +222,14 @@ val unknown_types_from_arity :
   machine_width:Target_system.Machine_width.t ->
   [`Unarized] Flambda_arity.t ->
   Type_grammar.t list
+
+(** Like [unknown_types_from_arity], but for a possibly-unknown result arity.
+    For [Unknown] and [Bottom], returns a single unknown value type, which is
+    only suitable for recording uses of return continuations whose arity is
+    tracked as unknown (such uses skip arity checks and the types are never
+    consumed). *)
+val unknown_types_from_result_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  [`Unarized] Flambda_arity.t Or_unknown_or_bottom.t ->
+  Type_grammar.t list

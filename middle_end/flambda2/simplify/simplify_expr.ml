@@ -30,6 +30,12 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
          (Flow.Acc.init_toplevel ~dummy_toplevel_cont
             (Bound_parameters.append params implicit_params))
   in
+  let dacc =
+    match return_arity with
+    | Or_unknown.Known _ -> dacc
+    | Or_unknown.Unknown ->
+      DA.add_unknown_arity_continuation dacc return_continuation
+  in
   let expr, uacc =
     simplify dacc ~down_to_up:(fun dacc ~rebuild ->
         let dacc =
@@ -72,7 +78,8 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
         in
         let uenv =
           UE.add_function_return_or_exn_continuation uenv exn_continuation
-            (Flambda_arity.create_singletons [K.With_subkind.any_value])
+            (Or_unknown.Known
+               (Flambda_arity.create_singletons [K.With_subkind.any_value]))
         in
         let uacc =
           UA.create ~flow_result ~compute_slot_offsets:true uenv dacc
@@ -165,5 +172,5 @@ let simplify_toplevel dacc expr ~return_continuation ~return_arity
   let implicit_params = Bound_parameters.empty in
   simplify_toplevel_common dacc
     (fun dacc -> simplify_expr dacc expr)
-    ~params ~implicit_params ~return_continuation ~return_arity
-    ~exn_continuation
+    ~params ~implicit_params ~return_continuation
+    ~return_arity:(Or_unknown.Known return_arity) ~exn_continuation

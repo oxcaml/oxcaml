@@ -50,6 +50,8 @@ val continuation_uses_env : t -> Continuation_uses_env.t
 
 val with_continuation_uses_env : t -> cont_uses_env:Continuation_uses_env.t -> t
 
+val add_unknown_arity_continuation : t -> Continuation.t -> t
+
 (** Mark that an exception handler continuation should be converted to a normal
     continuation. This is used when turning local exceptions into jumps. *)
 val demote_exn_handler : t -> Continuation.t -> t

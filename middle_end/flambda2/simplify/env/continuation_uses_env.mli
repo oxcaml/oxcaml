@@ -20,6 +20,8 @@ val print : Format.formatter -> t -> unit
 
 val empty : t
 
+val add_unknown_arity_continuation : t -> Continuation.t -> t
+
 include Continuation_uses_env_intf.S with type t := t
 
 val get_continuation_uses : t -> Continuation.t -> Continuation_uses.t option

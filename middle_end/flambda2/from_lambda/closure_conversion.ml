@@ -557,8 +557,7 @@ module Inlining = struct
         | extra_args ->
           wrap_inlined_body_for_exn_extra_args acc ~extra_args
             ~apply_exn_continuation ~apply_return_continuation
-            ~result_arity:(Code.result_arity_exn code)
-            ~make_inlined_body)
+            ~result_arity:(Code.result_arity code) ~make_inlined_body)
 end
 
 type unarized_extern_repr =

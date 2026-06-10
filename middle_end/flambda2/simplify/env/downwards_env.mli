@@ -217,6 +217,9 @@ val set_inlining_arguments : Inlining_arguments.t -> t -> t
 val enter_inlined_apply :
   called_code:Code.t -> apply:Apply.t -> was_inline_always:bool -> t -> t
 
+val find_specialized_return_arity :
+  t -> Continuation.t -> [`Unarized] Flambda_arity.t option
+
 val generate_phantom_lets : t -> bool
 
 val inlining_history_tracker : t -> Inlining_history.Tracker.t

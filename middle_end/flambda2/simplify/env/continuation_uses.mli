@@ -23,6 +23,10 @@ type t
 
 val create : Continuation.t -> [`Unarized] Flambda_arity.t -> t
 
+val create_unknown_arity : Continuation.t -> t
+
+val with_unknown_arity : t -> t
+
 val print : Format.formatter -> t -> unit
 
 val add_use : t -> One_continuation_use.t -> t

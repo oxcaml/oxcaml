@@ -56,7 +56,7 @@ val add_linearly_used_inlinable_continuation :
   t
 
 val add_function_return_or_exn_continuation :
-  t -> Continuation.t -> [`Unarized] Flambda_arity.t -> t
+  t -> Continuation.t -> [`Unarized] Flambda_arity.t Or_unknown.t -> t
 
 val find_continuation : t -> Continuation.t -> Continuation_in_env.t
 
