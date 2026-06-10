@@ -289,9 +289,9 @@ val add_alias :
 val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
 
 (** Add a phantom let binding to the environment. This creates a backend
-    variable with proper provenance and registers it in the environment
-    so it can be referenced later. Returns the updated environment and
-    the created backend variable. *)
+    variable with proper provenance and registers it in the environment so it
+    can be referenced later. Returns the updated environment and the created
+    backend variable. *)
 val add_phantom_let_binding :
   t ->
   Variable.t ->

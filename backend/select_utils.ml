@@ -707,9 +707,9 @@ let insert_move_results env sub_cfg loc res stacksize =
 let maybe_emit_naming_op env sub_cfg ~bound_name regs =
   match bound_name with
   | None -> ()
-  | Some bound_name ->
+  | Some bound_name -> (
     let provenance = Backend_var.With_provenance.provenance bound_name in
-    (match provenance with
+    match provenance with
     | None -> ()
     | Some provenance_inner ->
       let which_parameter =

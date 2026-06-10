@@ -22,8 +22,7 @@ module VB = Bound_var
 
 let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
-    ~return_continuation ~apply_exn_continuation ~apply_return_continuation
-    ~inlined_debuginfo =
+    ~return_continuation ~apply_exn_continuation ~apply_return_continuation =
   let callee, rec_info =
     match callee with
     | None ->
@@ -52,6 +51,7 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
       my_closure_duid ~dbg:Debuginfo.none
   in
+  let my_closure_var = Bound_parameter.var my_closure in
   let bind_params ~params ~args ~body =
     if List.compare_lengths params args <> 0
     then
@@ -59,16 +59,33 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
         Bound_parameters.print
         (Bound_parameters.create params)
         Simple.List.print args;
+    (* When the callee is known, [Inlining_helpers.make_inlined_body] prepends
+       [my_closure] to [params]. It must be treated as an implicit parameter and
+       not numbered amongst the real parameters. *)
+    let index_offset =
+      match params with
+      | param :: _ when Variable.equal (BP.var param) my_closure_var -> 1
+      | _ -> 0
+    in
     let params_with_index = List.mapi (fun i p -> i, p) params in
     ListLabels.fold_left2 (List.rev params_with_index)
       (List.rev args) ~init:body ~f:(fun expr (index, param) arg ->
         let param_var, param_uid, param_dbg =
           BP.var_and_uid_and_debuginfo param
         in
-        let dbg = Inlined_debuginfo.rewrite inlined_debuginfo param_dbg in
+        (* [param_dbg] is not rewritten to reflect the inlining stack here: that
+           happens during the subsequent traversal of these [Let]s by the
+           simplifier (see [Simplify_let_expr]), which stamps the bound
+           variables of every [Let] exactly once. Rewriting here as well would
+           apply the inlining stack twice. *)
+        let is_parameter =
+          if Variable.equal param_var my_closure_var
+          then Bound_var.Is_parameter.implicit_parameter
+          else Bound_var.Is_parameter.parameter ~index:(index - index_offset)
+        in
         let var =
-          Bound_var.create param_var param_uid Name_mode.normal ~dbg
-            ~is_parameter:(Bound_var.Is_parameter.parameter ~index)
+          Bound_var.create param_var param_uid Name_mode.normal ~dbg:param_dbg
+            ~is_parameter
         in
         Let.create
           (Bound_pattern.singleton var)
@@ -174,7 +191,6 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
             ~params:(Bound_parameters.to_list params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
             ~exn_continuation ~return_continuation
-            ~inlined_debuginfo:(DE.inlined_debuginfo denv)
         in
         let expr =
           match Exn_continuation.extra_args apply_exn_continuation with

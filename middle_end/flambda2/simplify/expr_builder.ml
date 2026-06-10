@@ -23,7 +23,6 @@ module RE = Rebuilt_expr
 module UA = Upwards_acc
 module UE = Upwards_env
 module DA = Downwards_acc
-module DE = Downwards_env
 module VB = Bound_var
 
 type binding_to_place =
@@ -99,11 +98,13 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
     then uacc
     else add_set_of_closures_offsets ~is_phantom defining_expr uacc
   in
-  let bound_vars =
-    let dacc = UA.creation_dacc uacc in
-    let inlined_debuginfo = DE.inlined_debuginfo (DA.denv dacc) in
-    Bound_pattern.add_inlined_debuginfo bound_vars inlined_debuginfo
-  in
+  (* Note that any rewriting of the [Debuginfo.t] values in [bound_vars], to
+     reflect inlined frames, has already been done: such rewriting happens
+     during the downwards traversal (see [Simplify_let_expr]). The
+     [inlined_debuginfo] in the [creation_dacc]'s environment must not be used
+     for this purpose: it is the value at the point where the upwards
+     accumulator was created, which bears no relation to the inlining context of
+     any particular [Let]. *)
   ( RE.create_let
       (UA.are_rebuilding_terms uacc)
       bound_vars defining_expr ~body ~free_names_of_body,
@@ -259,11 +260,6 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
     let defining_expr = Rebuilt_static_const.Group.to_named static_consts in
     let uacc =
       add_set_of_closures_offsets ~is_phantom:false defining_expr uacc
-    in
-    let bindable =
-      let dacc = UA.creation_dacc uacc in
-      let inlined_debuginfo = DE.inlined_debuginfo (DA.denv dacc) in
-      Bound_pattern.add_inlined_debuginfo bindable inlined_debuginfo
     in
     ( RE.create_let
         (UA.are_rebuilding_terms uacc)

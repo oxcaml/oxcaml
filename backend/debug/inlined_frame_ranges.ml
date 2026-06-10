@@ -176,49 +176,29 @@ module Inlined_frames = struct
       in
       dbg :: parents items
 
-  let available_before (fundecl : L.fundecl) (insn : L.instruction) =
-    (* Inlined-frame keys are derived from two sources:
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
+    (* Inlined-frame keys are derived solely from the instruction's own [dbg]
+       (and all of its parents): an instruction physically located inside an
+       inlined frame keeps that frame alive. Since each instruction identifies
+       exactly one frame at each inlining depth, the ranges of sibling frames
+       may interleave but can never overlap, as required by the DWARF
+       specification for DW_TAG_inlined_subroutine DIEs.
 
-       1. The instruction's own [dbg] (and all its parents): an instruction
-       physically located inside an inlined frame keeps that frame alive.
-
-       2. Each phantom variable in [phantom_available_before]: its provenance
-       location is the inlining context at which the variable was bound, so it
-       keeps the corresponding inlined frame alive even when no instruction
-       physically resides in that frame (which can happen if the inlined body
-       was completely fused into surrounding code by the optimizer).
-
-       There is no separate "phantom available across" field on instructions;
-       phantom availability does not change during a single instruction, so the
-       contribution to [available_across] is identical. *)
-    let dbg_keys =
-      match Debuginfo.to_items insn.dbg with
-      | [] -> []
-      | _ :: _ -> dbg_and_parents insn.dbg
-    in
-    let phantom_keys =
-      match insn.phantom_available_before with
-      | None -> []
-      | Some vars ->
-        Backend_var.Set.fold
-          (fun var acc ->
-            match Backend_var.Map.find var fundecl.fun_phantom_lets with
-            | exception Not_found -> acc
-            | None, _defining_expr -> acc
-            | Some provenance, _defining_expr ->
-              let location = Backend_var.Provenance.location provenance in
-              if Debuginfo.is_none location
-              then acc
-              else List.rev_append (dbg_and_parents location) acc)
-          vars []
-    in
-    match dbg_keys, phantom_keys with
-    | [], [] -> None
-    | _ -> Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_keys @ phantom_keys)))
+       In particular, the ranges are _not_ extended to cover the scopes of
+       phantom variables bound in inlined frames: such scopes extend to the end
+       of the enclosing function's body and would cause sibling frames' ranges
+       to overlap. (The consequence is that a fully optimized-out inlined
+       function, none of whose instructions remain, gets no
+       DW_TAG_inlined_subroutine DIE; the phantom lets corresponding to its
+       parameters are correspondingly restricted -- see
+       [Available_ranges_phantom_vars].) *)
+    match Debuginfo.to_items insn.dbg with
+    | [] -> None
+    | _ :: _ ->
+      Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_and_parents insn.dbg)))
 
   let available_across fundecl insn =
-    (* A single [Linear] instruction never spans inlined frames; phantom
-       availability also does not change across an instruction. *)
+    (* A single [Linear] instruction never spans inlined frames. *)
     available_before fundecl insn
 
   let must_restart_ranges_upon_any_change () = false

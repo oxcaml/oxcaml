@@ -30,8 +30,7 @@
     subranges, rather than normal (non-phantom) variables.
 
     Phantom variables correspond to variables that once bound computations that
-    have now been optimised out.
-*)
+    have now been optimised out. *)
 
 module Key : Compute_ranges_intf.S_key with type t = Backend_var.t
 

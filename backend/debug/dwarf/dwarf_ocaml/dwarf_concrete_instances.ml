@@ -86,13 +86,22 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let concrete_instance_proto_die =
     Proto_die.create ~parent:(Some parent) ~tag:Subprogram ~attribute_values ()
   in
+  (* The table assigning DIE references to variables must be shared between the
+     DIEs for the inlined frames and the DIE for the function itself: the
+     location descriptions of phantom variables may reference the DIEs of
+     variables in other frames. The inlined frames claim their variables first;
+     everything left over is then attached to the function's own DIE. *)
+  let proto_dies_for_vars =
+    Dwarf_variables_and_parameters.build_proto_dies_for_vars
+      available_ranges_all_vars
+  in
   let _inlined_frame_proto_dies =
     Profile.record "dwarf_inlined_frames"
       (fun () ->
         Dwarf_inlined_frames.dwarf state fundecl inlined_frame_ranges
           ~value_type_proto_die ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die
-          ~available_ranges_all_vars)
+          ~available_ranges_all_vars ~proto_dies_for_vars)
       ~accumulate:true ()
   in
   (match value_type_proto_die with
@@ -103,8 +112,9 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
           ~function_symbol:start_sym
-          ~function_proto_die:concrete_instance_proto_die
-          ~frame_path:Debuginfo.none available_ranges_all_vars)
+          ~function_proto_die:concrete_instance_proto_die ~proto_dies_for_vars
+          ~which_vars:Dwarf_variables_and_parameters.All_remaining_vars
+          available_ranges_all_vars)
       ~accumulate:true ());
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we
      need to be careful about symbol table size. let name = Printf.sprintf

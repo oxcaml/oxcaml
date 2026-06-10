@@ -884,7 +884,17 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       Let.print let_expr
 
 and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
-  let make_phantom_let env res bound_var defining_expr ~body =
+  (* In the cases below that can produce a phantom let, the delayed bindings are
+     flushed _before_ translating the phantom defining expression: any variable
+     referenced by such an expression must be bound to an actual backend
+     variable by a [Clet]. (A delayed binding would instead be substituted out
+     at its use site(s), leaving nothing for the phantom defining expression to
+     reference; the lookup below would return the defining expression of the
+     delayed binding rather than a [Cvar].) [make_phantom_let] needs to flush in
+     any case, so this does not introduce additional flushing on the paths that
+     emit a phantom let. *)
+  let make_phantom_let env res ~wrap bound_var defining_expr
+      ~free_vars_of_defining_expr ~body =
     let var = Bound_var.var bound_var in
     let debug_uid = Bound_var.debug_uid bound_var in
     let dbg = Bound_var.dbg bound_var in
@@ -893,101 +903,129 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
       To_cmm_env.add_phantom_let_binding env var ~debug_uid ~dbg
         ~bv_is_parameter
     in
-    let wrap, env, res =
-      Env.flush_delayed_lets ~mode:Flush_everything env res
-    in
     let body_cmm, free_vars, symbol_inits, res = expr env res body in
     let cmm =
-      C.make_phantom_let backend_var_with_prov defining_expr body_cmm
+      C.make_phantom_let backend_var_with_prov (Some defining_expr) body_cmm
+    in
+    (* The free variables passed to [wrap] must include those referenced by the
+       phantom defining expression, to prevent the (just-flushed) bindings of
+       such variables from being deleted as dead code. *)
+    let free_vars =
+      Backend_var.Set.union free_vars free_vars_of_defining_expr
     in
     let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+    cmm, free_vars, symbol_inits, res
+  in
+  (* For use after flushing only (at which point no delayed bindings remain, so
+     the environment and result returned by the lookup are unchanged). *)
+  let backend_var_for env res var =
+    let To_cmm_env.{ expr = { cmm; _ }; _ } =
+      C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+    in
+    match[@warning "-4"] cmm with
+    | Cmm.Cvar backend_var -> Some backend_var
+    | _ -> None
+  in
+  (* If the defining expression turns out not to be expressible as a phantom
+     defining expression, the flush must still be honoured, by wrapping the
+     translated body. *)
+  let drop_phantom_let env res ~wrap ~body =
+    let body_cmm, free_vars, symbol_inits, res = expr env res body in
+    let cmm, free_vars, symbol_inits = wrap body_cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
   in
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton bound_var, Simple simple ->
     Simple.pattern_match' simple
       ~var:(fun var ~coercion:_ ->
-        let To_cmm_env.{ expr = { cmm; _ }; _ } =
-          C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+        let wrap, env, res =
+          Env.flush_delayed_lets ~mode:Flush_everything env res
         in
-        match cmm with
-        | Cvar backend_var ->
-          make_phantom_let env res bound_var
-            (Some (Cmm.Cphantom_var backend_var))
+        match backend_var_for env res var with
+        | Some backend_var ->
+          make_phantom_let env res ~wrap bound_var
+            (Cmm.Cphantom_var backend_var)
+            ~free_vars_of_defining_expr:(Backend_var.Set.singleton backend_var)
             ~body
-        | _ -> expr env res body)
+        | None -> drop_phantom_let env res ~wrap ~body)
       ~symbol:(fun sym ~coercion:_ ->
+        let wrap, env, res =
+          Env.flush_delayed_lets ~mode:Flush_everything env res
+        in
         let sym_name = Symbol.linkage_name_as_string sym in
-        make_phantom_let env res bound_var
-          (Some (Cmm.Cphantom_const_symbol sym_name))
-          ~body)
+        make_phantom_let env res ~wrap bound_var
+          (Cmm.Cphantom_const_symbol sym_name)
+          ~free_vars_of_defining_expr:Backend_var.Set.empty ~body)
       ~const:(fun const ->
         match Reg_width_const.descr const with
         | Tagged_immediate i ->
+          let wrap, env, res =
+            Env.flush_delayed_lets ~mode:Flush_everything env res
+          in
           let machine_width = Target_system.Machine_width.Sixty_four in
           let targetint_32_64 = Target_ocaml_int.to_targetint machine_width i in
           let targetint =
             Targetint.of_int64 (Targetint_32_64.to_int64 targetint_32_64)
           in
-          make_phantom_let env res bound_var
-            (Some (Cmm.Cphantom_const_int targetint))
-            ~body
+          make_phantom_let env res ~wrap bound_var
+            (Cmm.Cphantom_const_int targetint)
+            ~free_vars_of_defining_expr:Backend_var.Set.empty ~body
         | _ -> expr env res body)
   | ( Singleton bound_var,
       Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) )
-    ->
+    -> (
     let tag_opt =
       match (block_kind : P.Block_kind.t) with
       | Values (tag, _) -> Some (Tag.Scannable.to_int tag)
       | Naked_floats -> Some (Tag.to_int Tag.double_array_tag)
       | Mixed (tag, _) -> Some (Tag.Scannable.to_int tag)
     in
-    (match tag_opt with
+    match tag_opt with
     | None -> expr env res body
-    | Some tag ->
+    | Some tag -> (
+      let wrap, env, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
+      in
       let rec translate_args args =
         match args with
         | [] -> Some []
         | arg :: rest -> (
           match Simple.must_be_var arg with
           | Some (var, _coercion) -> (
-            let To_cmm_env.{ expr = { cmm; _ }; _ } =
-              C.simple ~dbg:Debuginfo.none env res (Simple.var var)
-            in
-            match cmm with
-            | Cvar backend_var -> (
+            match backend_var_for env res var with
+            | Some backend_var -> (
               match translate_args rest with
               | Some rest_vars -> Some (backend_var :: rest_vars)
               | None -> None)
-            | _ -> None)
+            | None -> None)
           | None -> None)
       in
       match translate_args args with
       | Some fields ->
-        make_phantom_let env res bound_var
-          (Some (Cmm.Cphantom_block { tag; fields }))
+        make_phantom_let env res ~wrap bound_var
+          (Cmm.Cphantom_block { tag; fields })
+          ~free_vars_of_defining_expr:(Backend_var.Set.of_list fields)
           ~body
-      | None -> expr env res body)
+      | None -> drop_phantom_let env res ~wrap ~body))
   | ( Singleton bound_var,
       Prim (Unary (Block_load { kind = _; mut = _; field }, arg), _dbg) ) -> (
     match Simple.must_be_var arg with
-    | Some (var, _coercion) ->
-      let To_cmm_env.{ expr = { cmm; _ }; _ } =
-        C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+    | Some (var, _coercion) -> (
+      let wrap, env, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
       in
-      (match cmm with
-      | Cvar backend_var ->
+      match backend_var_for env res var with
+      | Some backend_var ->
         let field_int =
-          Targetint_32_64.to_int_checked
-            (Target_system.Machine_width.Sixty_four)
+          Targetint_32_64.to_int_checked Target_system.Machine_width.Sixty_four
             (Target_ocaml_int.to_targetint
-               (Target_system.Machine_width.Sixty_four)
-               field)
+               Target_system.Machine_width.Sixty_four field)
         in
-        make_phantom_let env res bound_var
-          (Some (Cmm.Cphantom_read_field { var = backend_var; field = field_int }))
+        make_phantom_let env res ~wrap bound_var
+          (Cmm.Cphantom_read_field { var = backend_var; field = field_int })
+          ~free_vars_of_defining_expr:(Backend_var.Set.singleton backend_var)
           ~body
-      | _ -> expr env res body)
+      | None -> drop_phantom_let env res ~wrap ~body)
     | None -> expr env res body)
   | _ -> expr env res body
 

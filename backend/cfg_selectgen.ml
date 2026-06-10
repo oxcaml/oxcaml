@@ -488,26 +488,21 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let phantom_available_before = SU.phantom_vars_from_env env in
     Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-  (* When a [Cphantom_let] aliases other backend variables (e.g.
-     [Cphantom_var v]), the alias is rendered in DWARF as a reference to [v]'s
-     own DIE. That DIE is only created if [v] appears in the variable
-     availability ranges, which in turn requires a [Name_for_debugger]
-     instruction tagging [v]'s register(s). For ordinary user-visible vars
-     this happens automatically (via the wrap in [To_cmm_env.bind_variable]),
-     but compiler-generated bindings such as [apply_result] do not get such a
-     wrap. Emit a synthetic naming op here so the alias resolves to a
-     non-empty location. *)
+  (* When a [Cphantom_let] aliases other backend variables (e.g. [Cphantom_var
+     v]), the alias is rendered in DWARF as a reference to [v]'s own DIE. That
+     DIE is only created if [v] appears in the variable availability ranges,
+     which in turn requires a [Name_for_debugger] instruction tagging [v]'s
+     register(s). For ordinary user-visible vars this happens automatically (via
+     the wrap in [To_cmm_env.bind_variable]), but compiler-generated bindings
+     such as [apply_result] do not get such a wrap. Emit a synthetic naming op
+     here so the alias resolves to a non-empty location. *)
   let ensure_var_named env sub_cfg (referenced_var : Backend_var.t) =
     match V.Map.find referenced_var env.SU.vars with
     | exception Not_found -> ()
     | regs, provenance, _mut ->
       let naming_op =
         Operation.Name_for_debugger
-          { ident = referenced_var;
-            provenance;
-            which_parameter = None;
-            regs
-          }
+          { ident = referenced_var; provenance; which_parameter = None; regs }
       in
       insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
 
@@ -842,14 +837,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok regs ->
         let provenance = VP.provenance var in
-        if Option.is_some provenance
-        then (
-          let ident = VP.var var in
-          let naming_op =
-            Operation.Name_for_debugger
-              { ident; provenance; which_parameter = None; regs }
-          in
-          insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        (if Option.is_some provenance
+         then
+           let ident = VP.var var in
+           let naming_op =
+             Operation.Name_for_debugger
+               { ident; provenance; which_parameter = None; regs }
+           in
+           insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
         Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
@@ -905,8 +900,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       ensure_referenced_vars_named env sub_cfg defining_expr;
       let env = SU.env_add_phantom_let var env in
       emit_tail env sub_cfg body
-    | Cname_for_debugger (_, body) ->
-      emit_tail env sub_cfg body
+    | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
       ->
       emit_tail_apply env sub_cfg ty op args dbg

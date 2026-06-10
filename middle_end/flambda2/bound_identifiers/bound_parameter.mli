@@ -19,12 +19,12 @@ type t
 
 (** The [Debuginfo.t] is intended to be used for:
 
-    - naming variables in the debugger based on source location, in the
-    case where disambiguation is required between multiple variables with
-    the same name;
+    - naming variables in the debugger based on source location, in the case
+      where disambiguation is required between multiple variables with the same
+      name;
 
-    - working out which DWARF DIE to attach the corresponding variable DIE
-    to, in the presence of inlined frames.
+    - working out which DWARF DIE to attach the corresponding variable DIE to,
+      in the presence of inlined frames.
 
     By contrast the [Flambda_debug_uid.t] is used to convey information about
     the type shape of the variable. *)

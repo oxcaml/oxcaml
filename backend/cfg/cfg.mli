@@ -163,7 +163,6 @@ val create :
   fun_phantom_lets:
     (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t ->
   allowed_to_be_irreducible:bool ->
-
   t
 
 val fun_name : t -> string
