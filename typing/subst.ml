@@ -504,29 +504,21 @@ let apply_type_function params args body =
           in
           Transient_expr.set_stub_desc t desc';
           t
-<<<<<<< HEAD
-      | desc ->
+      | Tfunctor (l, id, {pack_path; pack_cstrs}, t2) ->
           let t = newgenstub ~scope:(get_scope ty)
             (Jkind.Builtin.any ~why:Dummy_jkind) in
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | desc ->
-          let t = newgenstub ~scope:(get_scope ty) in
-=======
-      | Tfunctor (l, id, {pack_path; pack_constraints}, t2) ->
-          let t = newgenstub ~scope:(get_scope ty) in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
           let pack' = {
             pack_path;
-            pack_constraints =
-              List.map (fun (l, t) -> (l, copy t)) pack_constraints
+            pack_cstrs =
+              List.map (fun (l, t) -> (l, copy t)) pack_cstrs
           } in
           let desc' = Tfunctor (l, id, pack', copy t2) in
           Transient_expr.set_stub_desc t desc';
           t
-      | (Tvar _ | Tarrow _ | Ttuple _ | Tfield _ | Tnil | Tlink _ | Tunivar _
-            | Tpoly _ | Tconstr _ | Tobject _ | Tpackage _) as desc ->
-          let t = newgenstub ~scope:(get_scope ty) in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      | desc ->
+          let t = newgenstub ~scope:(get_scope ty)
+            (Jkind.Builtin.any ~why:Dummy_jkind) in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
           let desc' = copy_type_desc copy desc in
           Transient_expr.set_stub_desc t desc';
@@ -697,22 +689,6 @@ let rec typexp copy_scope s ty =
          | Type_function { params; body } ->
             Tlink (apply_type_function params args body)
          end
-<<<<<<< HEAD
-      | Tpackage {pack_path; pack_cstrs} ->
-          Tpackage {
-            pack_path = modtype_path s pack_path;
-            pack_cstrs =
-              List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
-          }
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | Tpackage {pack_path; pack_constraints} ->
-          Tpackage {
-            pack_path = modtype_path s pack_path;
-            pack_constraints =
-              List.map
-                (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_constraints;
-          }
-=======
       | Tpackage pack ->
           Tpackage (package copy_scope s pack)
       | Tfunctor(lbl, us, pack, ty) ->
@@ -720,7 +696,6 @@ let rec typexp copy_scope s ty =
           let s' = add_module (Ident.of_unscoped us)
                               (Pident (Ident.of_unscoped us')) s in
           Tfunctor(lbl, us', package copy_scope s pack, typexp copy_scope s' ty)
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       | Tobject (t1, name) ->
           let t1' = typexp copy_scope s t1 in
           let name' =
@@ -778,7 +753,6 @@ let rec typexp copy_scope s ty =
           end
       | Tfield(_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
           Tlink (typexp copy_scope s t2)
-<<<<<<< HEAD
       | Tarrow ((label, marg, mret), arg, ret, comm) ->
           let marg, mret =
             match s.additional_action with
@@ -791,21 +765,14 @@ let rec typexp copy_scope s ty =
           let comm = copy_commu comm in
           Tarrow ((label, marg, mret), arg, ret, comm)
       | _ -> copy_type_desc (typexp copy_scope s) desc
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | _ -> copy_type_desc (typexp copy_scope s) desc
-=======
-      | Tvar _ | Tarrow _ | Ttuple _ | Tfield _ | Tnil | Tlink _
-      | Tunivar _ | Tpoly _ | Tsubst _ ->
-          copy_type_desc (typexp copy_scope s) desc
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
-and package copy_scope s {pack_path; pack_constraints} =
+and package copy_scope s {pack_path; pack_cstrs} =
   {
     pack_path = modtype_path s pack_path;
-    pack_constraints =
-      List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_constraints;
+    pack_cstrs =
+      List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
   }
 
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
