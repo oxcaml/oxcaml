@@ -206,6 +206,17 @@ let rec subkind ppf (k : subkind) =
   | Immediate_array -> str "imm array"
   | Value_array -> str "val array"
   | Generic_array -> str "any array"
+  | Untagged_int_array -> str "int array"
+  | Untagged_int8_array -> str "int8 array"
+  | Untagged_int16_array -> str "int16 array"
+  | Unboxed_int32_array -> str "int32 array"
+  | Unboxed_int64_array -> str "int64 array"
+  | Unboxed_nativeint_array -> str "nativeint array"
+  | Unboxed_float32_array -> str "float32 array"
+  | Unboxed_vec128_array -> str "vec128 array"
+  | Unboxed_vec256_array -> str "vec256 array"
+  | Unboxed_vec512_array -> str "vec512 array"
+  | Unboxed_product_array -> str "product array"
 
 and variant_subkind ppf consts non_consts =
   match consts, non_consts with
@@ -357,7 +368,7 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
     | Naked_vec128s -> Some "vec128"
     | Naked_vec256s -> Some "vec256"
     | Naked_vec512s -> Some "vec512"
-    | Unboxed_products -> Some "unboxed_product"
+    | Unboxed_products -> Some "product"
   in
   pp_option ~space Format.pp_print_string ppf str
 
