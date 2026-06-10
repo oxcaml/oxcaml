@@ -123,7 +123,7 @@ let register_allocation loc : Alloc.lr * Value.lr =
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
   let closed_over_mode =
-    alloc_as_value ~hint:(Allocation {loc; txt = Unknown}) alloc_mode
+    alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
   in
   alloc_mode, closed_over_mode
 

@@ -6831,9 +6831,10 @@ let alloc_as_value_unhint m =
   in
   { comonadic; monadic }
 
-let alloc_as_value ?hint m =
+let alloc_as_value ?allocation m =
+  let comonadic = Option.map (fun a -> Hint.Allocation a) allocation in
   m |> Alloc.unhint |> alloc_as_value_unhint
-  |> Value.hint ~monadic:Skip ?comonadic:hint
+  |> Value.hint ~monadic:Skip ?comonadic
 
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
@@ -6855,9 +6856,10 @@ let value_to_alloc_r2g_unhint m =
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2g ?hint m =
+let value_to_alloc_r2g ?allocation m =
+  let comonadic = Option.map (fun a -> Hint.Allocation_r a) allocation in
   m |> Value.disallow_left |> Value.unhint |> value_to_alloc_r2g_unhint
-  |> Alloc.hint ~monadic:Skip ?comonadic:hint
+  |> Alloc.hint ~monadic:Skip ?comonadic
 
 let value_r2g ?hint m =
   Value.wrap ~monadic:Skip ?comonadic:hint

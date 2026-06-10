@@ -793,10 +793,10 @@ let register_allocation_value_mode ~loc
   (* We must apply each morphism separately so that their hints correspond to
      the correct morphism *)
   let mode =
-    value_to_alloc_r2g ~hint:(Allocation_r {loc; txt = desc})
+    value_to_alloc_r2g ~allocation:({loc; txt = desc})
       (Mode.Value.disallow_left mode)
   in
-  let mode = alloc_as_value ~hint:(Allocation {loc; txt = desc}) mode in
+  let mode = alloc_as_value ~allocation:({loc; txt = desc}) mode in
   alloc_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by
@@ -805,13 +805,13 @@ let register_allocation_value_mode ~loc
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
-  let hint = Hint.Allocation_r {loc; txt = Unknown} in
+  let allocation : Hint.allocation = {loc; txt = Unknown} in
   let (alloc_mode : Alloc.lr), _ =
-    Alloc.newvar_below (value_to_alloc_r2g ~hint mode)
+    Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
   in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
   let closed_over_mode =
-    alloc_as_value ~hint:(Allocation {loc; txt = Unknown})
+    alloc_as_value ~allocation:({loc; txt = Unknown})
       (Alloc.disallow_left alloc_mode)
   in
   alloc_mode, closed_over_mode
