@@ -547,7 +547,14 @@ let (match_in_portable_function @ portable) () =
   | () -> ()
   | effect Need_unit, _ -> ()
 [%%expect {|
-val match_in_portable_function : unit -> unit = <fun>
+Lines 2-4, characters 2-29:
+2 | ..match () with
+3 |   | () -> ()
+4 |   | effect Need_unit, _ -> ()
+Error: The pattern match with effect cases is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-4, characters 44-29
+         which is expected to be "portable".
 |}]
 
 (* A [try] with effect cases forces the enclosing function to be
@@ -556,7 +563,13 @@ let (try_in_portable_function @ portable) () =
   try () with
   | effect Need_unit, _ -> ()
 [%%expect {|
-val try_in_portable_function : unit -> unit = <fun>
+Lines 2-3, characters 2-29:
+2 | ..try () with
+3 |   | effect Need_unit, _ -> ()
+Error: The try-with with effect cases is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-3, characters 42-29
+         which is expected to be "portable".
 |}]
 
 (* The constraint applies across all enclosing closures: a handler nested in
@@ -569,7 +582,14 @@ let (nested_match_in_portable_function @ portable) () =
   in
   g ()
 [%%expect {|
-val nested_match_in_portable_function : unit -> unit = <fun>
+Lines 3-5, characters 4-31:
+3 | ....match () with
+4 |     | () -> ()
+5 |     | effect Need_unit, _ -> ()
+Error: The pattern match with effect cases is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-7, characters 51-6
+         which is expected to be "portable".
 |}]
 
 (* The constraint also applies when the function's portability is an
@@ -581,6 +601,14 @@ let () =
        | () -> ()
        | effect Need_unit, _ -> ())
 [%%expect {|
+Lines 4-6, characters 7-34:
+4 | .......match () with
+5 |        | () -> ()
+6 |        | effect Need_unit, _ -> ().
+Error: The pattern match with effect cases is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 3-6, characters 4-35
+         which is expected to be "portable".
 |}]
 
 (* A [match] with effect cases is allowed in an ordinary, nonportable
@@ -600,7 +628,14 @@ let (match_in_stateless_function @ stateless) () =
   | () -> ()
   | effect Need_unit, _ -> ()
 [%%expect {|
-val match_in_stateless_function : unit -> unit = <fun>
+Lines 2-4, characters 2-29:
+2 | ..match () with
+3 |   | () -> ()
+4 |   | effect Need_unit, _ -> ()
+Error: The pattern match with effect cases is "stateful"
+       but is expected to be "stateless"
+         because it is used inside the function at lines 1-4, characters 46-29
+         which is expected to be "stateless".
 |}]
 
 (* A [try] with effect cases forces the enclosing function to be stateful. *)
@@ -608,7 +643,13 @@ let (try_in_stateless_function @ stateless) () =
   try () with
   | effect Need_unit, _ -> ()
 [%%expect {|
-val try_in_stateless_function : unit -> unit = <fun>
+Lines 2-3, characters 2-29:
+2 | ..try () with
+3 |   | effect Need_unit, _ -> ()
+Error: The try-with with effect cases is "stateful"
+       but is expected to be "stateless"
+         because it is used inside the function at lines 1-3, characters 44-29
+         which is expected to be "stateless".
 |}]
 
 (* An effect continuation is stateful, not stateless. *)
