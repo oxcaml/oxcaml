@@ -1184,7 +1184,7 @@ and modexp : Typedtree.module_expr -> term_judg =
       structure s
     | Tmod_functor (_, e) ->
       modexp e << Delay
-    | Tmod_apply (f, p, _) ->
+    | Tmod_apply (f, p, _, _) ->
       join [
         modexp f << Dereference;
         modexp p << Dereference;

@@ -166,6 +166,13 @@ type 'd morph =
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
+  | Application_of_functor : pinpoint -> ('l * disallowed) neg morph
+      (** The identity morphism from a functor's mode to the mode of its
+          application. Carries the functor's pinpoint. The left adjoint of
+          [Functor_is_applied_at]. *)
+  | Functor_is_applied_at : pinpoint -> (disallowed * 'r) neg morph
+      (** The right adjoint of [Application_of_functor]. Carries the pinpoint of
+          the application. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph

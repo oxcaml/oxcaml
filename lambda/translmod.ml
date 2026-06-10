@@ -633,7 +633,7 @@ and transl_module ~scopes cc rootpath mexp =
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
-  | Tmod_apply(funct, arg, ccarg) ->
+  | Tmod_apply(funct, arg, ccarg, _) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
       transl_apply ~scopes ~loc ~cc mexp.mod_env funct translated_arg
   | Tmod_apply_unit funct ->

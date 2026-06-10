@@ -48,6 +48,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Captured_by_partial_application ->
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
+      | Application_of_functor funct_pp -> funct_pp, Functor_is_applied_at pp
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
@@ -71,6 +72,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Adj_captured_by_partial_application ->
         (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
+      | Functor_is_applied_at app_pp -> app_pp, Application_of_functor pp
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
@@ -95,6 +97,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
+        | Functor_is_applied_at p -> Functor_is_applied_at p
         | Allocation_l loc -> Allocation_l loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
@@ -110,6 +113,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Captured_by_partial_application -> Captured_by_partial_application
         | Crossing -> Crossing
+        | Application_of_functor p -> Application_of_functor p
         | Allocation_r loc -> Allocation_r loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
@@ -129,6 +133,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
+        | Application_of_functor p -> Application_of_functor p
+        | Functor_is_applied_at p -> Functor_is_applied_at p
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
@@ -151,6 +157,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
+        | Application_of_functor p -> Application_of_functor p
+        | Functor_is_applied_at p -> Functor_is_applied_at p
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -4942,6 +4950,18 @@ module Report = struct
         ( Fmt.dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
     | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
+    | Application_of_functor funct_pp ->
+      print_pinpoint funct_pp
+      |> Option.map (fun print_pp ->
+          ( Fmt.dprintf "is an application of %t"
+              (print_pp ~definite:true ~capitalize:false),
+            funct_pp ))
+    | Functor_is_applied_at app_pp ->
+      print_pinpoint app_pp
+      |> Option.map (fun print_pp ->
+          ( Fmt.dprintf "is applied at %t"
+              (print_pp ~definite:true ~capitalize:false),
+            app_pp ))
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains ~fixpoint contains
@@ -5004,7 +5024,8 @@ module Report = struct
     | Unknown -> true
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Contains_l _ | Contains_r _ | Is_contained_by _
-    | Adj_captured_by_partial_application ->
+    | Adj_captured_by_partial_application | Application_of_functor _
+    | Functor_is_applied_at _ ->
       true
     | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
 

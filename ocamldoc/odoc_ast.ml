@@ -1750,10 +1750,12 @@ module Analyser =
            { m_base with m_kind = Module_functor (param, kind) }
 
       | (Parsetree.Pmod_apply (p_module_expr1, p_module_expr2),
-         Typedtree.Tmod_apply (tt_module_expr1, tt_module_expr2, _))
+         Typedtree.Tmod_apply (tt_module_expr1, tt_module_expr2, _, _))
       | (Parsetree.Pmod_apply (p_module_expr1, p_module_expr2),
          Typedtree.Tmod_constraint
-           ({ Typedtree.mod_desc = Typedtree.Tmod_apply (tt_module_expr1, tt_module_expr2, _)}, _,
+           ({ Typedtree.mod_desc =
+                Typedtree.Tmod_apply
+                  (tt_module_expr1, tt_module_expr2, _, _)}, _,
             _, _)
         ) ->
           let m1 = analyse_module
