@@ -5012,16 +5012,6 @@ module Report = struct
       | `Expected -> Fmt.pp_print_string ppf "is expected to be ");
     print_mode side obj ppf a
 
-  (** Some morph hints are said to be "non-rigid", because they should be
-      printed only when they change modes. *)
-  let is_rigid : type l r. (l * r) morph -> bool = function
-    | Unknown -> true
-    | Close_over _ | Is_closed_by _ | Captured_by_partial_application
-    | Contains_l _ | Contains_r _ | Is_contained_by _
-    | Adj_captured_by_partial_application ->
-      true
-    | Allocation_r _ | Allocation_l _ | Allocation _ | Skip | Crossing -> false
-
   let check_locality_morph : type lsrc ldst d a b.
       (lsrc, ldst, d) C.Locality_morph.t -> a C.obj -> b C.obj -> a -> b -> unit
       =
@@ -5083,41 +5073,51 @@ module Report = struct
       | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
       | Misc.Is_not_eq -> false)
 
+  let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
+   fun a_obj b_obj a b ->
+    match C.equal_obj a_obj b_obj with
+    | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+    | Misc.Is_not_eq -> false
+
   (** The [Allocation], [Allocation_l] and [Allocation_r] hints are special, and
       have slightly different skip conditions. An [Allocation] hint should
       always be skipped, while [Allocation_l] and [Allocation_r] hints are
       skipped when they change a regionality mode to a different locality mode.
       In each case, we assert that the hint was applied to their expected
       associated morphism. *)
-  let is_allocation_skip : type l r a b.
-      (l * r) morph -> src:a C.obj -> obj:b C.obj -> a -> b -> bool =
+  let should_skip : type l r a b.
+      (l * r) morph ->
+      src:a C.obj ->
+      obj:b C.obj ->
+      a ->
+      b ->
+      (is_skip:bool * fixpoint:bool) =
    fun hint ~src ~obj a b ->
+    let fixpoint = equal_mode src obj a b in
     match hint with
     | Unknown | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Contains_l _ | Contains_r _ | Is_contained_by _
-    | Adj_captured_by_partial_application | Skip | Crossing ->
-      false
+    | Adj_captured_by_partial_application ->
+      (* These morphisms should never be skipped *)
+      ~is_skip:false, ~fixpoint
+    | Skip | Crossing ->
+      (* We only skip when the morphism changes the mode *)
+      ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
       (* We assert that the morphism is value_to_alloc_r2g *)
       check_locality_morph Regional_to_global src obj a b;
-      (* We only skip when the morphism changes the mode *)
-      equal_mode_regionality_to_locality src obj a b
+      (* We only skip when the morphism changes the mode, but allow for axis changes *)
+      ~is_skip:(equal_mode_regionality_to_locality src obj a b), ~fixpoint
     | Allocation_l _ ->
       (* We assert that the morphism is value_to_alloc_r2l *)
       check_locality_morph Regional_to_local src obj a b;
-      (* We only skip when the morphism changes the mode *)
-      equal_mode_regionality_to_locality src obj a b
+      (* We only skip when the morphism changes the mode, but allow for axis changes *)
+      ~is_skip:(equal_mode_regionality_to_locality src obj a b), ~fixpoint
     | Allocation _ ->
       (* We always want to skip an Allocation hint. All we need is to assert that the
          hint was indeed applied to an alloc_as_value morphism *)
       check_locality_morph Locality_as_regionality src obj a b;
-      true
-
-  let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
-   fun a_obj b_obj a b ->
-    match C.equal_obj a_obj b_obj with
-    | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Misc.Is_not_eq -> false
+      ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -5130,11 +5130,10 @@ module Report = struct
    fun ?(sub = false) side pp (obj : a C.obj) ppf (a, hint) ->
     match hint with
     | Apply (morph_hint, src, ahint) ->
-      let fixpoint = equal_mode obj src a (fst ahint) in
-      let is_alloc_skip =
-        is_allocation_skip morph_hint ~src ~obj (fst ahint) a
+      let ~is_skip, ~fixpoint =
+        should_skip morph_hint ~src ~obj (fst ahint) a
       in
-      if ((not (is_rigid morph_hint)) && fixpoint) || is_alloc_skip
+      if is_skip
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;
