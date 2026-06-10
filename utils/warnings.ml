@@ -136,6 +136,11 @@ type t =
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
@@ -145,11 +150,6 @@ type t =
   (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
   | Probe_name_too_long of string           (* 190 *)
   | Unused_kind_declaration of string       (* 191 *)
-  | Imprecise_kind_annotation of {
-      name : string;
-      annotated : string;
-      inferred : string;
-    }                                       (* 221 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
@@ -244,6 +244,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Imprecise_kind_annotation _ -> 181
   | Untagged_external_small_int_return -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
@@ -254,7 +255,6 @@ let number = function
   | Unerasable_position_argument -> 188 (* 189 is now upstream as 75 *)
   | Probe_name_too_long _ -> 190
   | Unused_kind_declaration _ -> 191
-  | Imprecise_kind_annotation _ -> 221
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
@@ -620,6 +620,10 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
+  { number = 181;
+    names = ["imprecise-kind-annotation"];
+    description = "A kind annotation is less precise than the inferred kind.";
+    since = since 5 2 };
   { number = 182;
     names = ["untagged-external-small-int-return"];
     description = "An external declaration returns an (int8[@untagged]) or \
@@ -696,10 +700,6 @@ let descriptions = [
   { number = 220;
     names = ["redundant-modality"];
     description = "Modality is redundant with the default.";
-    since = since 5 2 };
-  { number = 221;
-    names = ["imprecise-kind-annotation"];
-    description = "A kind annotation is less precise than the inferred kind.";
     since = since 5 2 };
 ]
 

@@ -1,6 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
- flags = "-w +219";
+ flags = "-w +181";
  expect;
 *)
 
@@ -20,7 +20,7 @@ end
 Line 3, characters 8-18:
 3 |   type ('a : value) t = 'a imm_t
             ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -37,7 +37,7 @@ end
 Line 3, characters 8-16:
 3 |   type ('a : any) t = 'a list_t
             ^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `any'
 but was inferred to have kind `value'.
 
@@ -85,7 +85,7 @@ end
 Line 2, characters 10-22:
 2 |   val f : ('a : value) -> ('a : immediate) -> unit
               ^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -100,7 +100,7 @@ end
 Line 2, characters 10-20:
 2 |   val f : ('a : any) -> ('a : value) -> unit
               ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `any'
 but was inferred to have kind `value'.
 
@@ -118,7 +118,7 @@ end
 Line 2, characters 10-30:
 2 |   val f : ('a : value_or_null) -> 'a list
               ^^^^^^^^^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value_or_null'
 but was inferred to have kind `value'.
 
@@ -156,7 +156,7 @@ type ('a : immediate) imm_t = 'a
 Line 2, characters 6-16:
 2 | type ('a : value) t6 = 'a imm_t
           ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -169,7 +169,7 @@ type ('a : any) t6b = 'a list
 Line 1, characters 6-14:
 1 | type ('a : any) t6b = 'a list
           ^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `any'
 but was inferred to have kind `value_or_null'.
 
@@ -189,7 +189,7 @@ type ('a : immediate) imm_list = 'a list
 Line 4, characters 9-21:
 4 | let f7 : ('a : value) -> 'a imm_list = fun x -> [x]
              ^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -208,7 +208,7 @@ let f7c : ('a : value) -> ('a : immediate) -> unit = fun _ _ -> ()
 Line 1, characters 10-22:
 1 | let f7c : ('a : value) -> ('a : immediate) -> unit = fun _ _ -> ()
               ^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -252,7 +252,7 @@ end
 Line 3, characters 8-18:
 3 |   type ('a : value) t = 'a imm_t
             ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -271,14 +271,14 @@ end
 Line 6, characters 8-18:
 6 |   type ('a : value) t = 'a imm_t
             ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
 Line 3, characters 8-18:
 3 |   type ('a : value) t = 'a imm_t
             ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -296,7 +296,7 @@ let _ =
 Line 2, characters 10-22:
 2 |   let x : ('a : value) -> 'a imm_list = fun y -> [y] in
               ^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -328,7 +328,7 @@ type ('a : any) variant10 = A of 'a list | B
 Line 1, characters 6-14:
 1 | type ('a : any) variant10 = A of 'a list | B
           ^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `any'
 but was inferred to have kind `value_or_null'.
 
@@ -362,7 +362,7 @@ end
 Line 2, characters 10-21:
 2 |   val f : (_ : value) imm_list -> unit
               ^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `_'
+Warning 181 [imprecise-kind-annotation]: The type variable `_'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -381,7 +381,7 @@ end
 Line 2, characters 10-35:
 2 |   val f : ('a : value mod portable) -> ('a : value mod contended) -> unit
               ^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value mod portable'
 but was inferred to have kind `value mod portable contended'.
 
@@ -399,7 +399,7 @@ end
 Line 2, characters 8-18:
 2 |   type ('a : value, 'b : immediate) t constraint 'a = 'b
             ^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 was annotated with kind `value'
 but was inferred to have kind `immediate'.
 
@@ -440,4 +440,82 @@ type ('a : immediate) imm16
 type 'a t16 =
     Value : 'a value16 -> 'a t16
   | Imm : ('a : immediate). 'a imm16 -> 'a t16
+|}]
+
+(*********************************************************)
+(* Test 17: Use-site annotations on univars *)
+
+(* The binder is precise, but the use-site annotation is weaker. *)
+type t17 = { x : ('a : immediate). ('a : value) -> 'a }
+[%%expect{|
+Line 1, characters 35-47:
+1 | type t17 = { x : ('a : immediate). ('a : value) -> 'a }
+                                       ^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
+type t17 = { x : ('a : immediate). 'a -> 'a; }
+|}]
+
+module type S17 = sig
+  val f : ('a : immediate). ('a : value) -> 'a
+end
+[%%expect{|
+Line 2, characters 28-40:
+2 |   val f : ('a : immediate). ('a : value) -> 'a
+                                ^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
+module type S17 = sig val f : ('a : immediate). 'a -> 'a end
+|}]
+
+(* An unannotated binder defaults to [value]; the use-site annotation
+   is weaker than the default. *)
+module type S17b = sig
+  val f : 'a. ('a : value_or_null) -> 'a list
+end
+[%%expect{|
+Line 2, characters 14-34:
+2 |   val f : 'a. ('a : value_or_null) -> 'a list
+                  ^^^^^^^^^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value'.
+
+module type S17b = sig val f : 'a -> 'a list end
+|}]
+
+(* Both use-site annotations are imprecise; each warns separately. *)
+module type S17c = sig
+  val f : ('a : immediate). ('a : value) -> ('a : value_or_null) -> 'a
+end
+[%%expect{|
+Line 2, characters 28-40:
+2 |   val f : ('a : immediate). ('a : value) -> ('a : value_or_null) -> 'a
+                                ^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
+Line 2, characters 44-64:
+2 |   val f : ('a : immediate). ('a : value) -> ('a : value_or_null) -> 'a
+                                                ^^^^^^^^^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `immediate'.
+
+module type S17c = sig val f : ('a : immediate). 'a -> 'a -> 'a end
+|}]
+
+(* Precise use-site annotations on univars do not warn. *)
+module type S17d = sig
+  val f : ('a : immediate). ('a : immediate) -> 'a
+  val g : 'a. ('a : value) -> 'a list
+end
+[%%expect{|
+module type S17d =
+  sig val f : ('a : immediate). 'a -> 'a val g : 'a -> 'a list end
 |}]

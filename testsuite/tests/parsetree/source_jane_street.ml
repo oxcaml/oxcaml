@@ -1,5 +1,5 @@
 (* TEST
-   flags = "-extension-universe alpha -w -220";
+   flags = "-extension-universe alpha -w -181-220";
    include stdlib_upstream_compatible;
    include stdlib_stable;
    expect;
@@ -172,20 +172,6 @@ type t17b : value & value
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global aliased)
 [%%expect{|
-Line 2, characters 2-43:
-2 |   ('a : value mod immutable global aliased)
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `value mod global immutable'
-but was inferred to have kind `value mod everything non_float'.
-
-Line 1, characters 6-66:
-1 | type ('a : value mod external_ stateless many unyielding non_float) t18 =
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `value non_float mod unyielding many stateless external_'
-but was inferred to have kind `value mod everything non_float'.
-
 type ('a : value mod everything non_float) t18 = 'a
 |}]
 
