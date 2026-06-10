@@ -33,14 +33,18 @@
     PC-relative call/jump instructions from the code in a partition. Each entry
     contains a jump instruction through the corresponding IGOT entry.
 
-    Each PLT entry is 8 bytes:
-
+    On x86-64, each PLT entry is 8 bytes:
     - ff 25 XX XX XX XX : jmp [rip + displacement] (6 bytes)
+    - 90 90 : 2-byte nop padding
+    - One R_X86_64_PC32 relocation at offset +2
 
-    - 90 90 : 2-byte nop padding (two single-byte nops)
-
-    The 4-byte displacement at offset +2 is filled by a PC32 relocation pointing
-    to the corresponding IGOT entry. *)
+    On AArch64, each PLT entry is 16 bytes:
+    - adrp x16, \#0 : load page of IGOT entry (4 bytes)
+    - ldr x17, [x16, \#0] : load address from IGOT (4 bytes)
+    - br x17 : branch to target (4 bytes)
+    - nop : padding (4 bytes)
+    - Two relocations: R_AARCH64_ADR_PREL_PG_HI21 at +0 and
+      R_AARCH64_LDST64_ABS_LO12_NC at +4 *)
 
 (** Size of each IPLT entry in bytes. *)
 val entry_size : int
@@ -100,17 +104,21 @@ val iplt_symbol_name : prefix:string -> symbol:string -> string
 module Relocation : sig
   type t
 
-  (** Returns the offset within the IPLT section (entry_offset + 2). *)
+  (** Returns the offset within the IPLT section. *)
   val offset : t -> int
 
   (** Returns the IGOT symbol to relocate to. *)
   val symbol : t -> string
 
-  (** Returns the relocation addend (-4 to account for RIP pointing past
-      displacement). *)
+  (** Returns the relocation type. *)
+  val reloc_type : t -> Compiler_owee.Owee_elf_relocation.Reloc_type.t
+
+  (** Returns the relocation addend. *)
   val addend : t -> int64
 end
 
-(** [relocations t] returns the list of R_X86_64_PC32 relocations needed to fill
-    the IPLT entries with displacements to their IGOT entries. *)
+(** [relocations t] returns the list of relocations needed to fill the IPLT
+    entries with references to their IGOT entries. On x86-64 this is one
+    R_X86_64_PC32 per entry; on AArch64 it is two per entry
+    (R_AARCH64_ADR_PREL_PG_HI21 and R_AARCH64_LDST64_ABS_LO12_NC). *)
 val relocations : t -> Relocation.t list

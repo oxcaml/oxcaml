@@ -126,7 +126,8 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (fun r ->
       write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
         ~r_offset:(Igot.Relocation.offset r) ~symbol:(Igot.Relocation.symbol r)
-        ~r_type:Rela.Reloc_type.r64 ~r_addend:(Igot.Relocation.addend r))
+        ~r_type:(Igot.Relocation.reloc_type r)
+        ~r_addend:(Igot.Relocation.addend r))
     (Igot.relocations igot);
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset iplt_layout)))
@@ -139,7 +140,8 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (fun r ->
       write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
         ~r_offset:(Iplt.Relocation.offset r) ~symbol:(Iplt.Relocation.symbol r)
-        ~r_type:Rela.Reloc_type.pc32 ~r_addend:(Iplt.Relocation.addend r))
+        ~r_type:(Iplt.Relocation.reloc_type r)
+        ~r_addend:(Iplt.Relocation.addend r))
     (Iplt.relocations iplt);
   let cursor =
     Buf.cursor output_buf ~at:(int64_to_int (SL.offset symtab_layout))
