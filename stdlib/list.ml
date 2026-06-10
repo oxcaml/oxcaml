@@ -19,7 +19,7 @@ open! Stdlib
 [@@@ocaml.flambda_o3]
 
 (* An alias for the type of lists. *)
-type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list
+type ('a : any) t = 'a list = [] | (::) of 'a * 'a list
 
 (* List operations *)
 
@@ -547,7 +547,7 @@ let rec compare_length_with l n =
 
 let is_empty = function
   | [] -> true
-  | _ :: _ -> false
+  | _ -> false
 
 (** {1 Comparison} *)
 

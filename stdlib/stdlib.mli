@@ -1226,7 +1226,7 @@ module LargeFile :
 
 (** {1 References} *)
 
-type ('a : value_or_null) ref = { mutable contents : 'a }
+type ('a : any) ref = { mutable contents : 'a }
 (** The type of references (mutable indirection cells) containing
    a value of type ['a]. *)
 
@@ -1256,7 +1256,7 @@ external decr : (int ref[@local_opt]) -> unit = "%decr"
 (** {1 Result type} *)
 
 (** @since 4.03 *)
-type ('a : value_or_null, 'b : value_or_null) result = Ok of 'a | Error of 'b
+type ('a : any, 'b : any) result = Ok of 'a | Error of 'b
 
 (** {1 Operations on format strings} *)
 
