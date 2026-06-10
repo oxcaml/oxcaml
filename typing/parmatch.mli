@@ -89,6 +89,11 @@ val complete_constrs :
     constructor_description list ->
     constructor_description list
 
+(** The constructors of the variant type [ty]; fatal error if [ty] is not a
+    variant type. *)
+val get_variant_constructors :
+    Env.t -> type_expr -> constructor_description list
+
 (** [pats_of_type] builds a list of patterns from a given expected type,
     for explosion of wildcard patterns in Typecore.type_pat.
 

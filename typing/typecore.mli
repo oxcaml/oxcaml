@@ -345,6 +345,12 @@ type error =
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
   | Indeterminate_record_layout of type_expr * string
   | Indeterminate_constructor_layout of type_expr * string * int
+  | Constructor_representation_indeterminate of
+      { cstr_name : string;
+        containing_type : type_expr;
+        arg_cstr_name : string;
+        arg_type : type_expr;
+        violation : Jkind.Violation.t }
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Unsupported_stack_allocation of unsupported_stack_allocation

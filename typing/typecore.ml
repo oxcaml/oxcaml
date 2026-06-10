@@ -297,6 +297,12 @@ type error =
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
   | Indeterminate_record_layout of type_expr * string
   | Indeterminate_constructor_layout of type_expr * string * int
+  | Constructor_representation_indeterminate of
+      { cstr_name : string;
+        containing_type : type_expr;
+        arg_cstr_name : string;
+        arg_type : type_expr;
+        violation : Jkind.Violation.t }
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Unsupported_stack_allocation of unsupported_stack_allocation
@@ -2842,8 +2848,54 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
+let require_constructor_instance_representable env constr ~loc ~why
+      ~containing_type =
+  let check_sibling (sibling : Types.constructor_description) =
+    match sibling.cstr_shape with
+    | Some _ -> ()
+    | None ->
+      let (ty_args, ty_res, _) =
+        instance_constructor Keep_existentials_flexible sibling
+      in
+      let snap = Btype.snapshot () in
+      (* Refine the instance by the use-site instantiation when the two are
+         compatible. A GADT constructor whose result type does not match
+         cannot occur at this instantiation, but its arguments are checked
+         at its own result type all the same. *)
+      begin match unify env ty_res containing_type with
+      | () -> ()
+      | exception Unify _ -> Btype.backtrack snap
+      end;
+      List.iter
+        (fun (ca : Types.constructor_argument) ->
+           match type_sort ~why ~fixed:false env ca.ca_type with
+           | Ok _ -> ()
+           | Error violation ->
+             raise (Error (loc, env,
+               Constructor_representation_indeterminate
+                 { cstr_name = constr.cstr_name;
+                   containing_type;
+                   arg_cstr_name = sibling.cstr_name;
+                   arg_type = ca.ca_type;
+                   violation })))
+        ty_args
+  in
+  match constr.cstr_repr with
+  | Variant_boxed layouts
+    when Array.exists
+           (function
+             | Cstr_layout_variable -> true
+             | Cstr_layout_known _ -> false)
+           layouts ->
+    List.iter check_sibling
+      (Parmatch.get_variant_constructors env containing_type)
+  | Variant_boxed _ | Variant_unboxed | Variant_with_null
+  | Variant_extensible -> ()
+
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
+  require_constructor_instance_representable env constr ~loc ~why
+    ~containing_type;
   match constr.cstr_shape with
   | Some shape ->
       begin match
@@ -12867,6 +12919,29 @@ let report_error ~loc env =
         Printtyp.type_expr ty
         cstr_name
         i
+  | Constructor_representation_indeterminate
+      { cstr_name; containing_type; arg_cstr_name; arg_type; violation } ->
+      let report =
+        Jkind.Violation.report_with_offender
+          ~offender:(fun ppf -> Printtyp.type_expr ppf arg_type) env
+      in
+      if String.equal cstr_name arg_cstr_name then
+        Location.errorf ~loc
+          "@[The representation of the constructor %a@ depends on the \
+           layout of its argument,@ which this instantiation of the type \
+           %a does not determine.@]@ %a"
+          Style.inline_code cstr_name
+          Printtyp.type_expr containing_type
+          report violation
+      else
+        Location.errorf ~loc
+          "@[The representation of the constructor %a@ depends on the \
+           layout of the argument of constructor %a,@ which this \
+           instantiation of the type %a does not determine.@]@ %a"
+          Style.inline_code cstr_name
+          Style.inline_code arg_cstr_name
+          Printtyp.type_expr containing_type
+          report violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
