@@ -9406,8 +9406,25 @@ and type_option_some env expected_mode sarg ty ty0 =
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
-  let sort = Jkind.Sort.scannable in
-  let repres = Types.Constructor_uniform_value in
+  let jkind, sort =
+    (* XXX Check that this shouldn't be ty0' *)
+    match
+      Ctype.type_jkind_and_sort env ty' ~fixed:false ~why:Constructor_arg_assignment
+    with
+    | Ok jkind_and_sort -> jkind_and_sort
+    | Error _ ->
+      (* Should be impossible after [type_argument] *)
+      Misc.fatal_error "Unexpected unrepresentable argument"
+  in
+  let repres =
+    match
+      Typedecl.update_constructor_representation env
+        (Cstr_tuple csome.cstr_args) [jkind]
+        ~loc:Location.none ~is_extension_constructor:false
+    with
+    | Ok repres -> repres
+    | Error _ -> Misc.fatal_error "Unexpected unrepresentable type"
+  in
   mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
                         Some alloc_mode))
     (type_option arg.exp_type) arg.exp_loc arg.exp_env

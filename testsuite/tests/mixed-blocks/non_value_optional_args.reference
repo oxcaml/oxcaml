@@ -1,0 +1,29 @@
+--- Printing i8 ---
+1
+1
+10
+11
+
+--- Printing i16 ---
+2
+2
+20
+21
+
+--- Printing unboxed pair ---
+#(3, "three")
+#(3, "three")
+#(30, "thirty")
+#(31, "thirty-one")
+
+--- Printing multiple ---
+(4, 4., 5., false)
+(4, 4., 5., false)
+(40, 40., 5., true)
+(40, 40., 5., true)
+(4, 41., 50., false)
+(40, 41., 50., true)
+(40, 40., 5., true)
+(40, 40., 5., true)
+(4, 41., 50., false)
+(40, 41., 50., true)

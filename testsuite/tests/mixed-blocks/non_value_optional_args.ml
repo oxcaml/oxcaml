@@ -1,15 +1,7 @@
 (* TEST
  include stdlib_stable;
  include stdlib_upstream_compatible;
- flags = "-extension small_numbers -dlambda";
- (* Soon this file is expected to compile and run. At that point the remainder
-    of this test spec can simply be deleted. *)
- {
-   setup-ocamlc.byte-build-env;
-   ocamlc_byte_exit_status = "2";
-   ocamlc.byte;
-   check-ocamlc.byte-output;
- }
+ flags = "-extension small_numbers";
 *)
 
 module Int8_u = Stdlib_stable.Int8_u

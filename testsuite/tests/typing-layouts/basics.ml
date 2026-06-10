@@ -1555,15 +1555,7 @@ let f (x : t_float64) =
   ()
 
 [%%expect{|
-Line 2, characters 16-17:
-2 |   let _g ?(x2 = x) () = () in
-                    ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of an optional argument.
+val f : t_float64 -> unit = <fun>
 |}]
 
 (*********************************************************)

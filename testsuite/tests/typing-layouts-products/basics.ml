@@ -2001,32 +2001,15 @@ Error: Type "coerce_record" is not a subtype of "coerce_int_record"
 
 let f_optional_utuple ?(x = #(1,2)) () = x
 [%%expect{|
-Line 1, characters 28-34:
-1 | let f_optional_utuple ?(x = #(1,2)) () = x
-                                ^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_19 & '_representable_layout_20
-         because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
-         because it's the type of an optional argument.
+val f_optional_utuple : ?x:#(int * int) -> unit -> #(int * int) = <fun>
 |}]
 
 type optional_record = #{ i1 : int; i2 : int }
 let f_optional_urecord ?(x = #{ i1 = 1; i2 = 2 }) () = x
 [%%expect{|
 type optional_record = #{ i1 : int; i2 : int; }
-Line 2, characters 29-48:
-2 | let f_optional_urecord ?(x = #{ i1 = 1; i2 = 2 }) () = x
-                                 ^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "optional_record"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of optional_record is value non_pointer & value non_pointer
-         because of the definition of optional_record at line 1, characters 0-46.
-       But the layout of optional_record must be a value layout
-         because it's the type of an optional argument.
-       Note: The layout of immediate is value non_pointer.
+val f_optional_urecord : ?x:optional_record -> unit -> optional_record =
+  <fun>
 |}]
 
 (******************************)
@@ -2192,7 +2175,7 @@ Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: This expression has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 separable & value)"
+         "('a : '_representable_layout_19 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable

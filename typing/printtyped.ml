@@ -272,6 +272,13 @@ let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product_variable ->
     line i ppf "Record_unboxed_product_variable\n"
 
+let constructor_representation i ppf = let open Types in function
+  | Constructor_uniform_value ->
+    line i ppf "Constructor_uniform_value\n"
+  | Constructor_mixed shape ->
+    line i ppf "Constructor_mixed\n";
+    array (i+1) mixed_block_element ppf shape
+
 let attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.Parsetree.attr_name.txt;
   Printast.payload i ppf a.Parsetree.attr_payload
@@ -716,8 +723,9 @@ and expression i ppf x =
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
-  | Texp_construct (li, _, _, eo, am) ->
+  | Texp_construct (li, _, repres, eo, am) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
+      constructor_representation i ppf repres;
       alloc_mode_option i ppf am;
       list i expression ppf (List.map snd eo);
   | Texp_variant (l, eo) ->

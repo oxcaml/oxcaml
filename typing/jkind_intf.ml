@@ -400,7 +400,6 @@ module History = struct
     | Array_comprehension_element
     | Array_comprehension_iterator_element
     | Idx_base
-    | Optional_argument
 
   type value_creation_reason =
     | Class_let_binding
