@@ -783,6 +783,11 @@ let mk_parameter f =
   "<module name> Compile the module with <module name> as a parameter."
 ;;
 
+let mk_nondep f =
+  "-nondep", Arg.String f,
+  "<module>  Remove all references to <module> from the generated .cmi"
+;;
+
 let mk_as_parameter f =
   "-as-parameter", Arg.Unit f,
   " Compile the interface as a parameter module."
@@ -1264,6 +1269,7 @@ module type Compiler_options = sig
   val _output_complete_obj : unit -> unit
   val _pack : unit -> unit
   val _parameter : string -> unit
+  val _nondep : string -> unit
   val _plugin : string -> unit
   val _pp : string -> unit
   val _principal : unit -> unit
@@ -1558,6 +1564,7 @@ struct
     mk_output_complete_exe F._output_complete_exe;
     mk_pack_byt F._pack;
     mk_parameter F._parameter;
+    mk_nondep F._nondep;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_plugin F._plugin;
@@ -1848,6 +1855,7 @@ struct
     mk_p F._p;
     mk_pack_opt F._pack;
     mk_parameter F._parameter;
+    mk_nondep F._nondep;
     mk_plugin F._plugin;
     mk_pp F._pp;
     mk_ppx F._ppx;
@@ -2170,6 +2178,7 @@ struct
     mk_output_obj F._output_obj;
     mk_pack_byt F._pack;
     mk_parameter F._parameter;
+    mk_nondep F._nondep;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_plugin F._plugin;
@@ -2624,6 +2633,7 @@ module Default = struct
     let _opaque = set opaque
     let _pack = set make_package
     let _parameter s = parameters := !parameters @ [ s ]
+    let _nondep s = nondep_globals := !nondep_globals @ [ s ]
     let _plugin _p = plugin := true
     let _pp s = preprocessor := (Some s)
     let _runtime_variant s = runtime_variant := s
