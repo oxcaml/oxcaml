@@ -348,7 +348,6 @@ type error =
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
   | Optional_poly_param of string
-<<<<<<< HEAD
   | Exclave_in_nontail_position
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
@@ -367,14 +366,11 @@ type error =
   | Let_poly_not_yet_implemented
   | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Cannot_unify_tfunctor_to_tarrow of Errortrace.unification_error
+  | Cannot_omit_tfunctor_argument of Ident.Unscoped.t * type_expr
 
 and invalid_layout_poly_inst_context =
   | Binding_op
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-  | Cannot_unify_tfunctor_to_tarrow of Errortrace.unification_error
-  | Cannot_omit_tfunctor_argument of Ident.Unscoped.t * type_expr
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
