@@ -231,6 +231,8 @@ let equiv id_pairs i1 i2 =
   | Unscoped us1, Unscoped us2 -> Unscoped.equiv id_pairs us1 us2
   | Global name1, Global name2 ->
       name1 = name2
+  | Global_with_args g1, Global_with_args g2 ->
+      Global_module.Name.equal g1 g2
   | _ ->
       false
 

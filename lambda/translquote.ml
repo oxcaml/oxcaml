@@ -2902,7 +2902,23 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
       (quote_core_type ~scopes ty)
       (quote_modes loc ms)
     |> Pat.wrap
-  | Tpat_unpack _ -> pat_lam (* handled elsewhere *)
+  | Tpat_unpack None -> pat_lam (* handled elsewhere *)
+  | Tpat_unpack (Some package) ->
+    (* Print the module parameter with its package type, as the
+       pre-#14149 [Ppat_constraint] encoding did. *)
+    let { tpt_path; tpt_cstrs; tpt_txt = _; _ } = package in
+    let mod_type = module_type_for_path loc env tpt_path
+    and with_types =
+      List.map
+        (fun (lid, ty) ->
+          ( quote_modtype_path_of_lid
+              (of_location ~scopes Asttypes.(lid.loc))
+              lid.txt,
+            quote_core_type ~scopes ty ))
+        tpt_cstrs
+    in
+    let typ = Type.package loc mod_type with_types |> Type.wrap in
+    Pat.constraint_ loc pat_lam typ (Modes.wrap Modes.legacy) |> Pat.wrap
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
       Location.print_loc (to_location loc)

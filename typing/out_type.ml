@@ -386,12 +386,26 @@ let env_ident namespace name =
   | _ -> None
   | exception Not_found -> None
 
+(* Unscoped module identifiers (module-dependent function parameters) are
+   bound by the type expression being printed; following upstream, we
+   disambiguate them by their shadowing depth in the printing environment
+   rather than through the session-wide conflict tables. *)
+let unscoped_ident_name id =
+  let index =
+    match in_printing_env (Env.find_module_index id) with
+    | Some n -> n
+    | None -> 0
+  in
+  if index = 0 then Out_name.create (Ident.name id)
+  else Out_name.create (human_unique (index + 1) id)
+
 (** Associate a name to the identifier [id] within [namespace] *)
 let ident_name_simple namespace id =
   match namespace, !enabled with
   | None, _ | _, false -> Out_name.create (Ident.name id)
   | Some namespace, true ->
     if fuzzy_id namespace id then Out_name.create (Ident.name id)
+    else if Ident.is_unscoped id then unscoped_ident_name id
     else
       let name = Ident.name id in
       match M.find name (get namespace) with

@@ -9584,9 +9584,34 @@ and type_moddep_fun ~env ~expected_mode:_ ~name ~pack_param ~rest
                             ~p_out:(Pident s_ident) ~fixed:false ety)
         | None -> newvar (Jkind.Builtin.any ~why:Dummy_jkind)
       in
-      type_function new_env mode_legacy expected_res rest body_constraint
-        body ~first:false ~in_function,
-      s_ident
+      let result =
+        type_function new_env mode_legacy expected_res rest body_constraint
+          body ~first:false ~in_function
+      in
+      (* Compute the fallback return sort while the module parameter is
+         still scoped and present in the environment. *)
+      let result =
+        match result.ret_info with
+        | Some _ -> result
+        | None ->
+          let { function_ = res_ty, _, _; _ } = result in
+          let ret_sort =
+            match
+              type_sort ~why:Function_result ~fixed:false new_env res_ty
+            with
+            | Ok s -> s
+            | Error err ->
+              raise (Error(loc_fun, new_env,
+                           Function_type_not_rep (res_ty, err)))
+          in
+          { result with
+            ret_info =
+              Some { ret_sort;
+                     ret_mode =
+                       { mode_modes = Alloc.disallow_right Alloc.legacy;
+                         mode_desc = [] } } }
+      in
+      result, s_ident
   end
   in
   let { function_ = res_ty, params, body;
@@ -9665,22 +9690,7 @@ and type_moddep_fun ~env ~expected_mode:_ ~name ~pack_param ~rest
       fp_loc = pparam_loc;
     }
   in
-  let ret_info =
-    match ret_info with
-    | Some _ as x -> x
-    | None ->
-      let ret_sort =
-        match
-          type_sort ~why:Function_result ~fixed:false env res_ty
-        with
-        | Ok s -> s
-        | Error err ->
-          raise (Error(loc_fun, env, Function_type_not_rep (res_ty, err)))
-      in
-      Some { ret_sort;
-             ret_mode = { mode_modes = Alloc.disallow_right Alloc.legacy;
-                          mode_desc = [] } }
-  in
+
   { function_ = exp_type, { has_poly = false; param } :: params, body;
     newtypes = []; params_contain_gadt = contains_gadt;
     ret_info; fun_alloc_mode = Some Alloc.legacy;

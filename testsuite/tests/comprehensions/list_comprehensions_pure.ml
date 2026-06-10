@@ -323,9 +323,9 @@ val t : (module S) = <module>
 
 [ M.x for (module M : S) in [ t ] ];;
 [%%expect {|
-Line 1, characters 18-19:
+Line 1, characters 10-24:
 1 | [ M.x for (module M : S) in [ t ] ];;
-                      ^
+              ^^^^^^^^^^^^^^
 Error: Modules are not allowed in this pattern.
 |}];;
 
@@ -338,9 +338,9 @@ Error: Modules are not allowed in this pattern.
   ]
 ];;
 [%%expect {|
-Line 2, characters 14-15:
+Line 2, characters 6-20:
 2 |   for (module M : S) in
-                  ^
+          ^^^^^^^^^^^^^^
 Error: Modules are not allowed in this pattern.
 |}];;
 
@@ -351,9 +351,9 @@ Error: Modules are not allowed in this pattern.
   ]
 ];;
 [%%expect {|
-Line 2, characters 14-15:
+Line 2, characters 6-20:
 2 |   for (module M : S) in
-                  ^
+          ^^^^^^^^^^^^^^
 Error: Modules are not allowed in this pattern.
 |}];;
 

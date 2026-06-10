@@ -59,10 +59,8 @@ type t8 =
 type t9 = C of ((module T : T) -> T.t -> T.t)
 type t10 =
   t8 =
-    A of
-      ((module T : T) -> (module Add with type t = T/1.t) -> T/1.t -> T/1.t)
-  | B of
-      ((module T : T) -> (module Add with type t = T/2.t) -> T/2.t -> T/2.t)
+    A of ((module T : T) -> (module Add with type t = T.t) -> T.t -> T.t)
+  | B of ((module T : T) -> (module Add with type t = T.t) -> T.t -> T.t)
 |}]
 
 (** Test constraint check, one success and the next one is a fail  *)

@@ -1212,6 +1212,11 @@ module Merge = struct
           let tdecl =
             { tdecl with
               type_manifest = None;
+              (* The dummy jkind of [transl_package_constraint] must not
+                 leak now that the resulting signature can be added to the
+                 typing environment (module-dependent functions); behave
+                 like the original abstract declaration. *)
+              type_jkind = sig_decl.type_jkind;
               type_ikind = Types.ikinds_todo reason
             }
           in

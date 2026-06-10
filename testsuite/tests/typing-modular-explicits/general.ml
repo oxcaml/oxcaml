@@ -63,7 +63,7 @@ let apply_weird (module M : Typ) (f : (module M : Typ) -> _) (x : M.t) : M.t =
 
 [%%expect{|
 val apply_weird :
-  (module M : Typ) -> ((module M : Typ) -> M/2.t -> M/2.t) -> M/2.t -> M/2.t =
+  (module M : Typ) -> ((module M : Typ) -> M/2.t -> M/2.t) -> M.t -> M.t =
   <fun>
 |}]
 
@@ -506,13 +506,10 @@ let try_coerce4 (f : (module A : Add) -> A.t -> A.t) =
 Line 2, characters 5-6:
 2 |     (f : (module A : Add2) -> A.t -> A.t)
          ^
-Error: The value "f" has type "(module A : Add) -> A/1.t -> A/1.t"
-       but an expression was expected of type
-         "(module A : Add2) -> A/2.t -> A/2.t"
+Error: The value "f" has type "(module A : Add) -> A.t -> A.t"
+       but an expression was expected of type "(module A : Add2) -> A.t -> A.t"
        Modules do not match: Add is not included in Add2
        The type "a" is required but not provided
-       File "_none_", line 1:
-         Definition of module "A/2"
 |}]
 
 (* But we can add type fields with ground coercion *)
@@ -528,14 +525,13 @@ let try_coerce7 (f : (module A : Add2) -> A.t -> A.t) =
 
 [%%expect{|
 val coerce5 :
-  ((module A : Add) -> A/1.t -> A/1.t) -> (module A : Add2) -> A/2.t -> A/2.t =
-  <fun>
+  ((module A : Add) -> A.t -> A.t) -> (module A : Add2) -> A.t -> A.t = <fun>
 val try_coerce6 :
-  ((module A : Add2) -> A/1.t -> A/1.t) ->
-  (module A : Add3) -> A/2.t -> A/2.t = <fun>
+  ((module A : Add2) -> A.t -> A.t) -> (module A : Add3) -> A.t -> A.t =
+  <fun>
 val try_coerce7 :
-  ((module A : Add2) -> A/1.t -> A/1.t) ->
-  (module A : Add4) -> A/2.t -> A/2.t = <fun>
+  ((module A : Add2) -> A.t -> A.t) -> (module A : Add4) -> A.t -> A.t =
+  <fun>
 |}]
 
 (* We cannot decrease the signature *)
@@ -546,12 +542,10 @@ let try_coerce8 (f : (module A : Add2) -> A.t -> A.t) =
 Line 2, characters 2-39:
 2 |   (f :> (module A : Add) -> A.t -> A.t)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "(module A : Add2) -> A/1.t -> A/1.t" is not a subtype of
-         "(module A : Add) -> A/2.t -> A/2.t"
+Error: Type "(module A : Add2) -> A.t -> A.t" is not a subtype of
+         "(module A : Add) -> A.t -> A.t"
        Modules do not match: Add is not included in Add2
        The type "a" is required but not provided
-       File "_none_", line 1:
-         Definition of module "A/2"
 |}]
 
 (* Test coercions with additionnal infos *)
@@ -570,8 +564,8 @@ let restrict_signature_to_add_dep (x : (module Typ) -> int -> int) =
 
 [%%expect{|
 val restrict_signature1 :
-  ((module T : Typ) -> T/1.t -> T/1.t) ->
-  (module T : Typ with type t = int) -> T/2.t -> T/2.t = <fun>
+  ((module T : Typ) -> T.t -> T.t) ->
+  (module T : Typ with type t = int) -> T.t -> T.t = <fun>
 val restrict_signature2 :
   ((module T : Typ) -> T.t -> T.t) ->
   (module T : Typ with type t = int) -> int -> int = <fun>
@@ -640,8 +634,8 @@ let test_build_subtype x =
 [%%expect{|
 class type ct = object  end
 val test_build_subtype :
-  ((module T : Typ) -> int -> T/1.t -> < m : int >) ->
-  (module T : Typ) -> int -> T/2.t -> ct = <fun>
+  ((module T : Typ) -> int -> T.t -> < m : int >) ->
+  (module T : Typ) -> int -> T.t -> ct = <fun>
 |}]
 
 (* Test moregen *)
@@ -749,8 +743,7 @@ let apply_with_annot f (module T : Typ) (x : T.t) : T.t =
 
 [%%expect{|
 val apply_with_annot :
-  ((module T : Typ) -> T/1.t -> T/1.t) -> (module T : Typ) -> T/2.t -> T/2.t =
-  <fun>
+  ((module T : Typ) -> T.t -> T.t) -> (module T : Typ) -> T.t -> T.t = <fun>
 |}, Principal{|
 Line 3, characters 2-3:
 3 |   f (module T) x
@@ -758,8 +751,7 @@ Line 3, characters 2-3:
 Warning 18 [not-principal]: applying a dependent function is not principal.
 
 val apply_with_annot :
-  ((module T : Typ) -> T/1.t -> T/1.t) -> (module T : Typ) -> T/2.t -> T/2.t =
-  <fun>
+  ((module T : Typ) -> T.t -> T.t) -> (module T : Typ) -> T.t -> T.t = <fun>
 |}]
 
 (* Used to propagate type annotations  *)
@@ -787,9 +779,8 @@ let apply_small_annot2 (f : (module T : Typ) -> T.t -> T.t) g (module T : Typ) x
 
 [%%expect{|
 val apply_small_annot2 :
-  ((module T : Typ) -> T/1.t -> T/1.t) ->
-  ((module T : Typ) -> T/2.t -> T/2.t) -> (module T : Typ) -> T/3.t -> T/3.t =
-  <fun>
+  ((module T : Typ) -> T.t -> T.t) ->
+  ((module T : Typ) -> T.t -> T.t) -> (module T : Typ) -> T.t -> T.t = <fun>
 |}, Principal{|
 Line 3, characters 2-3:
 3 |   g (module T) x
@@ -797,9 +788,8 @@ Line 3, characters 2-3:
 Warning 18 [not-principal]: applying a dependent function is not principal.
 
 val apply_small_annot2 :
-  ((module T : Typ) -> T/1.t -> T/1.t) ->
-  ((module T : Typ) -> T/2.t -> T/2.t) -> (module T : Typ) -> T/3.t -> T/3.t =
-  <fun>
+  ((module T : Typ) -> T.t -> T.t) ->
+  ((module T : Typ) -> T.t -> T.t) -> (module T : Typ) -> T.t -> T.t = <fun>
 |}]
 
 
@@ -961,16 +951,7 @@ let st' (s : [>`A] s) : [`A] t =
     (fun (module N) -> (f (module N) : [`A] M.t N.t :> [> `A] M.t N.t))
 
 [%%expect{|
-Line 4, characters 4-71:
-4 |     (fun (module N) -> (f (module N) : [`A] M.t N.t :> [> `A] M.t N.t))
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Function arguments and returns must be representable.
-       The layout of [> `A ] M.t N.t is any
-         because the .cmi file for N.t is missing.
-       But the layout of [> `A ] M.t N.t must be representable
-         because we must know concretely how to return a function result.
-       No .cmi file found containing N.t.
-       Hint: Adding "n" to your dependencies might help.
+val st' : [> `A ] s -> [ `A ] t = <fun>
 |}]
 
 (** Recursive and mutually recursive definitions *)
@@ -1056,8 +1037,7 @@ let id' (f : (module T : Typ) -> T.t -> T.t) = f
 let typing_order1 f = (f (module Int) 3, id' f)
 
 [%%expect{|
-val id' :
-  ((module T : Typ) -> T/1.t -> T/1.t) -> (module T : Typ) -> T/2.t -> T/2.t =
+val id' : ((module T : Typ) -> T.t -> T.t) -> (module T : Typ) -> T.t -> T.t =
   <fun>
 Line 5, characters 25-37:
 5 | let typing_order1 f = (f (module Int) 3, id' f)
@@ -1069,8 +1049,8 @@ let typing_order2 f = (id' f, f (module Int) 3)
 
 [%%expect{|
 val typing_order2 :
-  ((module T : Typ) -> T/1.t -> T/1.t) ->
-  ((module T : Typ) -> T/2.t -> T/2.t) * Int.t = <fun>
+  ((module T : Typ) -> T.t -> T.t) ->
+  ((module T : Typ) -> T.t -> T.t) * Int.t = <fun>
 |}, Principal{|
 Line 1, characters 30-31:
 1 | let typing_order2 f = (id' f, f (module Int) 3)
@@ -1078,8 +1058,8 @@ Line 1, characters 30-31:
 Warning 18 [not-principal]: applying a dependent function is not principal.
 
 val typing_order2 :
-  ((module T : Typ) -> T/1.t -> T/1.t) ->
-  ((module T : Typ) -> T/2.t -> T/2.t) * Int.t = <fun>
+  ((module T : Typ) -> T.t -> T.t) ->
+  ((module T : Typ) -> T.t -> T.t) * Int.t = <fun>
 |}]
 
 (** The following test check that tests at module unpacking still happen with
@@ -1207,26 +1187,16 @@ let f_contra () (module M : Contravariant) : 'a M.t = assert false
 [%%expect{|
 module type Covariant = sig type +'a t end
 module type Contravariant = sig type -'a t end
-Line 9, characters 12-61:
-9 | let f_covar () (module M : Covariant) : 'a M.t = assert false
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Function arguments and returns must be representable.
-       The layout of 'a M.t is any
-         because the .cmi file for M.t is missing.
-       But the layout of 'a M.t must be representable
-         because we must know concretely how to return a function result.
-       No .cmi file found containing M.t.
-       Hint: Adding "m" to your dependencies might help.
+val f_covar : unit -> (module M : Covariant) -> 'a M.t = <fun>
+val f_contra : unit -> (module M : Contravariant) -> 'a M.t = <fun>
 |}]
 
 let f_covar_applied = f_covar ()
 let f_contra_applied = f_contra ()
 
 [%%expect{|
-Line 1, characters 22-29:
-1 | let f_covar_applied = f_covar ()
-                          ^^^^^^^
-Error: Unbound value "f_covar"
+val f_covar_applied : (module M : Covariant) -> 'a M.t = <fun>
+val f_contra_applied : (module M : Contravariant) -> '_weak3 M.t = <fun>
 |}]
 
 module type M_arrow1 = sig
@@ -1239,16 +1209,8 @@ let fa1_applied = fa1 ()
 
 [%%expect{|
 module type M_arrow1 = sig type 'a t = int -> 'a end
-Line 5, characters 8-56:
-5 | let fa1 () (module M : M_arrow1) : 'a M.t = assert false
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Function arguments and returns must be representable.
-       The layout of 'a M.t is any
-         because the .cmi file for M.t is missing.
-       But the layout of 'a M.t must be representable
-         because we must know concretely how to return a function result.
-       No .cmi file found containing M.t.
-       Hint: Adding "m" to your dependencies might help.
+val fa1 : unit -> (module M : M_arrow1) -> 'a M.t = <fun>
+val fa1_applied : (module M : M_arrow1) -> 'a M.t = <fun>
 |}]
 
 module type M_arrow2 = sig
@@ -1261,16 +1223,8 @@ let fa2_applied = fa2 ()
 
 [%%expect{|
 module type M_arrow2 = sig type 'a t = 'a -> int end
-Line 5, characters 8-56:
-5 | let fa2 () (module M : M_arrow2) : 'a M.t = assert false
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Function arguments and returns must be representable.
-       The layout of 'a M.t is any
-         because the .cmi file for M.t is missing.
-       But the layout of 'a M.t must be representable
-         because we must know concretely how to return a function result.
-       No .cmi file found containing M.t.
-       Hint: Adding "m" to your dependencies might help.
+val fa2 : unit -> (module M : M_arrow2) -> 'a M.t = <fun>
+val fa2_applied : (module M : M_arrow2) -> '_weak4 M.t = <fun>
 |}]
 
 module type Typ2 = sig
@@ -1306,16 +1260,18 @@ module type Typ2 =
     type !'a tb
     type 'a t
   end
-Line 10, characters 9-55:
-10 | let ftp  () (module M : Typ2) : 'a M.tp  = assert false
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Function arguments and returns must be representable.
-       The layout of 'a M.tp is any
-         because the .cmi file for M.tp is missing.
-       But the layout of 'a M.tp must be representable
-         because we must know concretely how to return a function result.
-       No .cmi file found containing M.tp.
-       Hint: Adding "m" to your dependencies might help.
+val ftp : unit -> (module M : Typ2) -> 'a M.tp = <fun>
+val ftm : unit -> (module M : Typ2) -> 'a M.tm = <fun>
+val ftpb : unit -> (module M : Typ2) -> 'a M.tpb = <fun>
+val ftmb : unit -> (module M : Typ2) -> 'a M.tmb = <fun>
+val ftb : unit -> (module M : Typ2) -> 'a M.tb = <fun>
+val ft : unit -> (module M : Typ2) -> 'a M.t = <fun>
+val ftp_applied : (module M : Typ2) -> 'a M.tp = <fun>
+val ftm_applied : (module M : Typ2) -> '_weak5 M.tm = <fun>
+val ftpb_applied : (module M : Typ2) -> 'a M.tpb = <fun>
+val ftmb_applied : (module M : Typ2) -> '_weak6 M.tmb = <fun>
+val ftb_applied : (module M : Typ2) -> '_weak7 M.tb = <fun>
+val ft_applied : (module M : Typ2) -> '_weak8 M.t = <fun>
 |}]
 
 
@@ -1326,7 +1282,7 @@ let f3_applied = f3 ()
 
 [%%expect{|
 val f3 : unit -> (module Typ with type t = 'a) -> unit = <fun>
-val f3_applied : (module Typ with type t = '_weak3) -> unit = <fun>
+val f3_applied : (module Typ with type t = '_weak9) -> unit = <fun>
 |}]
 
 (* Ensure that subst handles module dependent functions *)
@@ -1465,27 +1421,23 @@ let u f  = (f: (module M : T) -> ([> M.v ] as 'a) -> 'a :> (module T) -> _ -> _)
 [%%expect{|
 module type T = sig type a = int type v = [ `A of a ] end
 module M : sig type a = int type v = [ `A of a ] end
-val f : (module M : T) -> ([> M/2.v ] as 'a) -> 'a = <fun>
+val f : (module M : T) -> ([> M.v ] as 'a) -> 'a = <fun>
 Line 1:
 Error: Values do not match:
          val u :
-           ((module M : T) -> ([> M/2.v ] as 'a) -> 'a) ->
+           ((module M : T) -> ([> M.v ] as 'a) -> 'a) ->
            (module T) -> 'a -> 'a
        is not included in
          val u :
-           ((module M : T) -> ([> M/1.v ] as 'a) -> 'a) ->
+           ((module M : T) -> ([> M.v ] as 'a) -> 'a) ->
            (module T) -> 'a -> 'a
        The type
          "((module M : T) -> ([> `A of int ] as 'a) -> 'a) ->
          (module T) -> 'a -> 'a"
        is not compatible with the type
-         "((module M : T) -> ([> M/2.v ] as 'a0) -> 'a0) ->
+         "((module M : T) -> ([> M.v ] as 'a0) -> 'a0) ->
          (module T) -> 'a0 -> 'a0"
        Type "[> `A of int ]" is not compatible with type
-         "[> M/2.v ]" = "[> `A of M/2.a ]"
+         "[> M.v ]" = "[> `A of M.a ]"
        Types for tag "`A" are incompatible
-       File "_none_", line 1:
-         Definition of module "M/1"
-       Line 5, characters 0-54:
-         Definition of module "M/3"
 |}]
