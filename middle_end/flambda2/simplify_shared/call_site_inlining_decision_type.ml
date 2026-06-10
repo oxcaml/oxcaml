@@ -34,6 +34,7 @@ type t =
   | Max_inlining_depth_exceeded
   | Recursion_depth_exceeded
   | Never_inlined_attribute
+  | Incompatible_return_convention
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
@@ -71,6 +72,8 @@ let [@ocamlformat "disable"] rec print ppf t =
     Format.fprintf ppf "Recursion_depth_exceeded"
   | Never_inlined_attribute ->
     Format.fprintf ppf "Never_inlined_attribute"
+  | Incompatible_return_convention ->
+    Format.fprintf ppf "Incompatible_return_convention"
   | Attribute_always ->
     Format.fprintf ppf "Attribute_always"
   | Replay_history_says_must_inline t' ->
@@ -135,6 +138,8 @@ let rec can_inline (t : t) : can_inline =
   | Never_inlined_attribute ->
     (* If there's an [@inlined] attribute on this, something's gone wrong *)
     Do_not_inline { erase_attribute_if_ignored = false }
+  | Incompatible_return_convention ->
+    Do_not_inline { erase_attribute_if_ignored = false }
   | Unrolling_depth_exceeded ->
     (* If there's an [@unrolled] attribute on this, then we'll ignore the
        attribute when we stop unrolling, which is fine *)
@@ -169,6 +174,10 @@ let rec report_reason fmt t =
     Format.fprintf fmt
       "this@ function@ was@ deemed@ at@ the@ point@ of@ its@ definition@ to@ \
        never@ be@ inlinable"
+  | Incompatible_return_convention ->
+    Format.fprintf fmt
+      "the@ call@ forwards@ an@ unknown@ result@ but@ the@ callee@ has@ a@ \
+       concrete@ return@ convention"
   | In_a_stub ->
     Format.fprintf fmt
       "this@ function@ is@ being@ called@ inside@ of@ a@ stub;@ inlining@ is@ \

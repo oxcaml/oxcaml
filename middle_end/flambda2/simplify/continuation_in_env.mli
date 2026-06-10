@@ -32,7 +32,9 @@ type t =
       }
   | Non_inlinable_non_zero_arity of { arity : [`Unarized] Flambda_arity.t }
   | Toplevel_or_function_return_or_exn_continuation of
-      { arity : [`Unarized] Flambda_arity.t }
+      { arity : [`Unarized] Flambda_arity.t;
+        has_unknown_arity : bool
+      }
   | Invalid of { arity : [`Unarized] Flambda_arity.t }
       (** [Invalid] means that the code of the continuation handler is invalid,
           not that the continuation has zero uses. *)

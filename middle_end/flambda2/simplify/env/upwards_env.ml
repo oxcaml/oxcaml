@@ -118,7 +118,18 @@ let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
     | Some alias_for ->
       let arity = Bound_parameters.arity params in
       let alias_for_arity = continuation_arity t alias_for in
-      if not (Flambda_arity.equal_ignoring_subkinds arity alias_for_arity)
+      let has_unknown_arity =
+        match find_continuation t alias_for with
+        | Toplevel_or_function_return_or_exn_continuation
+            { has_unknown_arity; arity = _ } ->
+          has_unknown_arity
+        | Linearly_used_and_inlinable _ | Non_inlinable_zero_arity _
+        | Non_inlinable_non_zero_arity _ | Invalid _ ->
+          false
+      in
+      if
+        (not has_unknown_arity)
+        && not (Flambda_arity.equal_ignoring_subkinds arity alias_for_arity)
       then
         Misc.fatal_errorf
           "%a (arity %a) cannot be an alias for %a (arity %a) since the two \
@@ -137,9 +148,11 @@ let add_linearly_used_inlinable_continuation t cont ~params ~handler
     (Linearly_used_and_inlinable
        { handler; free_names_of_handler; params; cost_metrics_of_handler })
 
-let add_function_return_or_exn_continuation t cont arity =
+let add_function_return_or_exn_continuation ?(has_unknown_arity = false) t cont
+    arity =
   add_continuation0 t cont
-    (Toplevel_or_function_return_or_exn_continuation { arity })
+    (Toplevel_or_function_return_or_exn_continuation
+       { arity; has_unknown_arity })
 
 let add_apply_cont_rewrite t cont rewrite =
   if Continuation.Map.mem cont t.apply_cont_rewrites

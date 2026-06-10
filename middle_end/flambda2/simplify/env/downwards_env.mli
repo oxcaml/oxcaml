@@ -218,6 +218,22 @@ val set_inlining_arguments : Inlining_arguments.t -> t -> t
 val enter_inlined_apply :
   called_code:Code.t -> apply:Apply.t -> was_inline_always:bool -> t -> t
 
+(** The concrete arity that [Tail_forwards_to_caller] applications in the
+    current code deliver, if that code is the inlined body of an unknown-result
+    function applied at a call site whose result arity is known. Every such
+    application forwards the inlined function's result, so all of them may be
+    upgraded to return that arity to their destination. *)
+val forwarded_result_arity : t -> [`Unarized] Flambda_arity.t option
+
+val add_return_continuation : t -> Continuation.t -> Result_arity.t -> t
+
+val return_continuation_arity : t -> Continuation.t -> Result_arity.t option
+
+val return_continuation_has_unknown_arity : t -> Continuation.t -> bool
+
+val return_arity_is_compatible :
+  t -> Continuation.t -> arity:[`Unarized] Flambda_arity.t -> bool
+
 val generate_phantom_lets : t -> bool
 
 val inlining_history_tracker : t -> Inlining_history.Tracker.t

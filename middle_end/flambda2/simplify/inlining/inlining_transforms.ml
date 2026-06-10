@@ -86,16 +86,19 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
 let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
     ~apply_return ~make_inlined_body =
   let apply_cont_create () ~trap_action cont ~args ~dbg =
-    Apply_cont.create ~trap_action cont ~args ~dbg |> Expr.create_apply_cont
+    Apply_cont.create ~trap_action cont ~args ~dbg |> Expr.create_apply_cont, ()
   in
   let let_cont_create () cont ~handler_params ~handler ~body ~is_exn_handler
       ~is_cold =
+    let handler, () = handler () in
+    let body, () = body () in
     let handler =
-      Continuation_handler.create handler_params ~handler:(handler ())
+      Continuation_handler.create handler_params ~handler
         ~free_names_of_handler:Unknown ~is_exn_handler ~is_cold
     in
-    Let_cont.create_non_recursive cont handler ~body:(body ())
-      ~free_names_of_body:Unknown
+    ( Let_cont.create_non_recursive cont handler ~body
+        ~free_names_of_body:Unknown,
+      () )
   in
   Inlining_helpers.wrap_inlined_body_for_exn_extra_args () ~extra_args
     ~apply_exn_continuation ~apply_return ~make_inlined_body ~apply_cont_create
@@ -146,6 +149,12 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in
+    let denv =
+      match Code.result_arity code, apply_return_continuation with
+      | Unknown, Return cont ->
+        DE.add_return_continuation denv cont (Apply.return_arity apply)
+      | (Ok _ | Bottom), _ | Unknown, Never_returns -> denv
+    in
     let params_and_body = Code.params_and_body code in
     Function_params_and_body.pattern_match params_and_body
       ~f:(fun
@@ -159,14 +168,17 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
           ~my_depth
           ~free_names_of_body:_
         ->
-        let make_inlined_body () =
-          make_inlined_body ~callee ~called_code_id:(Code.code_id code)
-            ~region_inlined_into ~unroll_to
-            ~params:(Bound_parameters.to_list params)
-            ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
-            ~exn_continuation ~return_continuation
+        let make_inlined_body () ~apply_exn_continuation
+            ~(apply_return_continuation : Apply.Result_continuation.t) =
+          ( make_inlined_body ~callee ~called_code_id:(Code.code_id code)
+              ~region_inlined_into ~unroll_to
+              ~params:(Bound_parameters.to_list params)
+              ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
+              ~exn_continuation ~return_continuation ~apply_exn_continuation
+              ~apply_return_continuation,
+            () )
         in
-        let expr =
+        let expr, () =
           match Exn_continuation.extra_args apply_exn_continuation with
           | [] ->
             make_inlined_body ()

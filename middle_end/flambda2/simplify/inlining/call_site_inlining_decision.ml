@@ -115,8 +115,11 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
           match Apply.continuation apply with
           | Never_returns -> uenv
           | Return return_continuation ->
-            UE.add_function_return_or_exn_continuation uenv return_continuation
-              return_arity
+            UE.add_function_return_or_exn_continuation
+              ~has_unknown_arity:
+                (DE.return_continuation_has_unknown_arity (DA.denv dacc)
+                   return_continuation)
+              uenv return_continuation return_arity
         in
         let uacc =
           UA.create ~flow_result ~compute_slot_offsets:false uenv dacc
@@ -269,10 +272,10 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         | Missing_code | Definition_says_not_to_inline | In_a_stub
         | Doing_speculative_inlining | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-        | Never_inlined_attribute | Attribute_always
-        | Replay_history_says_must_inline _ | Begin_unrolling _
-        | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
-          ->
+        | Never_inlined_attribute | Incompatible_return_convention
+        | Attribute_always | Replay_history_says_must_inline _
+        | Begin_unrolling _ | Continue_unrolling | Definition_says_inline _
+        | Jsir_inlining_disabled ->
           (* These can't be returned by the speculative inlining cases below. *)
           if Flambda_features.check_light_invariants ()
           then

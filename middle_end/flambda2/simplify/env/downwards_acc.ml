@@ -127,6 +127,13 @@ let with_continuation_uses_env t ~cont_uses_env =
   { t with continuation_uses_env = cont_uses_env }
 
 let record_continuation_use t cont use_kind ~env_at_use ~arg_types =
+  let arg_types =
+    if DE.return_continuation_has_unknown_arity env_at_use cont
+    then
+      Flambda2_types.unknown_types_from_arity Result_arity.any_value_placeholder
+        ~machine_width:(DE.machine_width env_at_use)
+    else arg_types
+  in
   let cont_uses_env, id =
     CUE.record_continuation_use t.continuation_uses_env cont use_kind
       ~env_at_use ~arg_types

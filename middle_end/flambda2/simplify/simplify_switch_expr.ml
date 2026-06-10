@@ -154,7 +154,9 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
           in
           new_let_conts, arms, Mergeable { cont; args }
         | Mergeable { cont; args } ->
-          if not (Continuation.equal cont (Apply_cont.continuation action))
+          if
+            (not (Continuation.equal cont (Apply_cont.continuation action)))
+            || List.compare_lengths args (Apply_cont.args action) <> 0
           then new_let_conts, arms, Not_mergeable
           else
             let args =
@@ -821,28 +823,34 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
     let { S.simples = args; simple_tys = arg_types } =
       S.simplify_simples (DA.with_denv dacc denv_at_use) args
     in
-    let dacc, rewrite_id =
-      DA.record_continuation_use dacc (AC.continuation action) use_kind
-        ~env_at_use:denv_at_use ~arg_types
-    in
     let arity =
       arg_types
       |> List.map (fun ty -> K.With_subkind.anything (T.kind ty))
       |> Flambda_arity.create_singletons
     in
-    let action = Apply_cont.update_args action ~args in
-    let dbg = AC.debuginfo action in
-    let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-    let action = AC.with_debuginfo action ~dbg in
-    let dacc =
-      DA.map_flow_acc dacc
-        ~f:
-          (Flow.Acc.add_apply_cont_args ~rewrite_id
-             (Apply_cont.continuation action)
-             args)
-    in
-    let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
-    arms, dacc
+    if
+      not
+        (DE.return_arity_is_compatible denv_at_use (AC.continuation action)
+           ~arity)
+    then arms, dacc
+    else
+      let dacc, rewrite_id =
+        DA.record_continuation_use dacc (AC.continuation action) use_kind
+          ~env_at_use:denv_at_use ~arg_types
+      in
+      let action = Apply_cont.update_args action ~args in
+      let dbg = AC.debuginfo action in
+      let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
+      let action = AC.with_debuginfo action ~dbg in
+      let dacc =
+        DA.map_flow_acc dacc
+          ~f:
+            (Flow.Acc.add_apply_cont_args ~rewrite_id
+               (Apply_cont.continuation action)
+               args)
+      in
+      let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
+      arms, dacc
 
 let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
   match DA.are_lifting_conts dacc with
