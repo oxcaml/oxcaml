@@ -624,7 +624,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
 and transl_module ~scopes cc rootpath mexp =
   let loc = of_location ~scopes mexp.mod_loc in
   match mexp.mod_desc with
-  | Tmod_ident (path,_) ->
+  | Tmod_ident (path,_,_) ->
       apply_coercion loc Strict cc
         (transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->

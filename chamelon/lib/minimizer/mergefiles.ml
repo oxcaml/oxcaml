@@ -55,7 +55,7 @@ let remove_open n1 =
                       match str_it.str_desc with
                       | Tstr_open decl -> (
                         match decl.open_expr.mod_desc with
-                        | Tmod_ident (Pident _, { txt = Lident n_txt; _ }) ->
+                        | Tmod_ident (Pident _, { txt = Lident n_txt; _ }, _) ->
                           (* Format.printf "INMERGE : %s AND %s" n1 n_txt ; *)
                           if n1 = n_txt then l else str_it :: l
                         | _ -> str_it :: l)
@@ -74,7 +74,7 @@ let replace_open n1 n2 =
         match str_it.str_desc with
         | Tstr_open decl -> (
           match decl.open_expr.mod_desc with
-          | Tmod_ident (Pident _, ({ txt = Lident n_txt; _ } as li)) ->
+          | Tmod_ident (Pident _, ({ txt = Lident n_txt; _ } as li), use) ->
             if n1 = n_txt
             then
               { str_it with
@@ -86,7 +86,8 @@ let replace_open n1 n2 =
                           mod_desc =
                             Tmod_ident
                               ( Pident (create_local n2),
-                                { li with txt = Lident n2 } )
+                                { li with txt = Lident n2 },
+                                use )
                         }
                     }
               }

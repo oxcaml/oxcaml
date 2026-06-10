@@ -876,7 +876,7 @@ let module_expr sub x =
   let mod_env = sub.env sub x.mod_env in
   let mod_desc =
     match x.mod_desc with
-    | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc sub lid)
+    | Tmod_ident (path, lid, use) -> Tmod_ident (path, map_loc sub lid, use)
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
     | Tmod_functor (arg, mexpr) ->
         Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)
