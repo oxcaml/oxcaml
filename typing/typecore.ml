@@ -2907,7 +2907,6 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
 
 let disambiguate_integer_literal ~loc env ty_expected i =
-  (* Terrible hack for integer literals *)
   let ty_exp = expand_head env (protect_expansion env ty_expected) in
   match get_desc ty_exp with
   | Tconstr (path, _, _) ->
