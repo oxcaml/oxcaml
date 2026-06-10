@@ -251,6 +251,11 @@ module TyVarEnv : sig
        translation of its jkind annotation, so that imprecise annotations
        on it can be detected. *)
 
+  val remember_univar_use : string -> jkind_lr -> Location.t -> unit
+    (* Remember a use-site kind annotation on an in-scope univar, so that
+       imprecise annotations on it can be detected in [check_poly_univars].
+       Does nothing if the name does not refer to an in-scope univar. *)
+
   val globalize_used_variables : policy -> Env.t -> unit -> unit
   (* after finishing with a type signature, used variables are unified to the
      corresponding global type variables if they exist. Otherwise, in function
@@ -366,7 +371,10 @@ end = struct
     mutable associated: type_expr option ref list;
      (** associated references to row variables that we want to generalize
        if possible *)
-    jkind_info : jkind_info (** the original kind *)
+    jkind_info : jkind_info (** the original kind *);
+    mutable annotated_uses : (jkind_lr * Location.t) list
+     (** use-site kind annotations on this univar, for the
+       imprecise-annotation check in [check_poly_univars] *)
   }
 
   type poly_univars = (string * pending_univar * Env.stage) list
@@ -397,7 +405,8 @@ end = struct
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =
-    { univar = newvar ~name jkind; associated = []; jkind_info }
+    { univar = newvar ~name jkind; associated = []; jkind_info;
+      annotated_uses = [] }
 
   let mk_poly_univars_tuple_with_jkind env ~context var jkind_annot stage =
     let { txt = name; loc } = var in
@@ -471,6 +480,29 @@ end = struct
       raise (Error (loc, env, reason))
     | _ -> ()
 
+  let check_imprecise_annotation env loc name ty annotated_jkind =
+    match get_desc ty with
+    | Tvar { jkind; _ } | Tunivar { jkind; _ }
+      (* This can be called multiple times (with different variable ids
+         for different levels) for the same location (see internal ticket
+         6461). Therefore, we track the locations instead of using
+         [Jkind.History.has_warned]. *)
+      when not (LocSet.mem loc !warned_imprecise_locs) ->
+      if not (Jkind.equate env jkind annotated_jkind) then begin
+        warned_imprecise_locs := LocSet.add loc !warned_imprecise_locs;
+        let format_jkind jkind =
+          Format_doc.asprintf "%a" !Oprint.out_jkind
+            (Out_type.out_jkind_of_jkind env jkind)
+        in
+        Location.prerr_warning loc
+          (Warnings.Imprecise_kind_annotation {
+            name;
+            annotated = format_jkind annotated_jkind;
+            inferred = format_jkind jkind;
+          })
+      end
+    | _ -> ()
+
   let quantify env loc name v =
     let cant_quantify reason =
       raise (Error (loc, env, Cannot_quantify(name, reason)))
@@ -490,9 +522,16 @@ end = struct
   let check_poly_univars env loc vars =
     vars |> List.iter (fun (_, p, _) -> generalize p.univar);
     let univars =
-      vars |> List.map (fun (name, {univar=ty1; jkind_info; _ }, _) ->
+      vars |> List.map (fun (name, {univar=ty1; jkind_info; annotated_uses;
+                                     _ }, _) ->
         let v = Btype.proxy ty1 in
         check_jkind env loc name v jkind_info;
+        List.iter
+          (fun (annotated_jkind, use_loc) ->
+            check_imprecise_annotation env use_loc
+              (Pprintast.tyvar_of_name name) v annotated_jkind)
+          (* Uses are consed on, so reverse to warn in source order. *)
+          (List.rev annotated_uses);
         quantify env loc name v)
     in
     (* Since we are promoting variables to univars in
@@ -539,6 +578,12 @@ end = struct
       (* This call to instance might be redundant; all variables
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
+
+  let remember_univar_use name annotated_jkind loc =
+    match find_poly_univars name !univars with
+    | p, _stage ->
+      p.annotated_uses <- (annotated_jkind, loc) :: p.annotated_uses
+    | exception Not_found -> ()
 
   let remember_used ?check ~rigid ~annotated_jkind name v loc stage =
     assert (not_generic v);
@@ -623,29 +668,6 @@ end = struct
     | { unbound_variable_policy = Closed_for_upstream_compatibility; _ } ->
       raise(Error(loc, env, No_type_wildcards (Some Upstream_compatibility)))
     | policy -> new_var jkind policy
-
-  let check_imprecise_annotation env loc name ty annotated_jkind =
-    match get_desc ty with
-    | Tvar { jkind; _ }
-      (* This can be called multiple times (with different variable ids
-         for different levels) for the same location (see internal ticket
-         6461). Therefore, we track the locations instead of using
-         [Jkind.History.has_warned]. *)
-      when not (LocSet.mem loc !warned_imprecise_locs) ->
-      if not (Jkind.equate env jkind annotated_jkind) then begin
-        warned_imprecise_locs := LocSet.add loc !warned_imprecise_locs;
-        let format_jkind jkind =
-          Format_doc.asprintf "%a" !Oprint.out_jkind
-            (Out_type.out_jkind_of_jkind env jkind)
-        in
-        Location.prerr_warning loc
-          (Warnings.Imprecise_kind_annotation {
-            name;
-            annotated = format_jkind annotated_jkind;
-            inferred = format_jkind jkind;
-          })
-      end
-    | _ -> ()
 
   let globalize_used_variables
       { flavor; unbound_variable_policy; _ } env =
@@ -1336,6 +1358,9 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
               Invalid_variable_stage {name = print_name;
                                       intro_stage = stage;
                                       usage_stage = Env.stage env}));
+  Option.iter
+    (fun jkind -> TyVarEnv.remember_univar_use name jkind loc)
+    annotated_jkind;
   let jkind_annot =
     match annotated with
     | None -> None

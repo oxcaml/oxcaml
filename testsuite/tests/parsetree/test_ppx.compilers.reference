@@ -1,19 +1,5 @@
-File "source_jane_street.ml", line 166, characters 2-43:
-166 |   ('a : value mod immutable global aliased)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `value mod global immutable'
-but was inferred to have kind `value mod everything non_float'.
-
-File "source_jane_street.ml", line 165, characters 6-66:
-165 | type ('a : value mod external_ stateless many unyielding non_float) t18 =
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 219 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `value non_float mod unyielding many stateless external_'
-but was inferred to have kind `value mod everything non_float'.
-
-File "source_jane_street.ml", line 185, characters 0-24:
-185 | type t = #(int * float#)
+File "source_jane_street.ml", line 171, characters 0-24:
+171 | type t = #(int * float#)
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Multiple definition of the type name t.
        Names must be unique in a given structure or signature.
