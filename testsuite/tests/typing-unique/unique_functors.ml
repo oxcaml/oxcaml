@@ -43,7 +43,14 @@ let apply_unique_twice () =
   let module B = F(M) in
   ()
 [%%expect{|
-val apply_unique_twice : unit -> unit = <fun>
+Line 5, characters 19-20:
+5 |   let module B = F(M) in
+                       ^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 19-20:
+4 |   let module A = F(M) in
+                       ^
+
 |}]
 
 (* The argument's components cannot be consumed uniquely after the argument
@@ -57,8 +64,12 @@ let arg_used_after_apply () =
 Line 5, characters 12-15:
 5 |   unique_id M.x
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 4, characters 19-20:
+4 |   let module A = F(M) in
+                       ^
+
 |}]
 
 (* The components of a module returned by a (generative) functor are fresh
@@ -68,11 +79,7 @@ let functor_returns_unique () =
   let module A = F () in
   unique_id A.x
 [%%expect{|
-Line 4, characters 12-15:
-4 |   unique_id A.x
-                ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+val functor_returns_unique : unit -> unit = <fun>
 |}]
 
 (* But not twice. *)
@@ -82,11 +89,14 @@ let functor_returns_unique_twice () =
   unique_id A.x;
   unique_id A.x
 [%%expect{|
+Line 5, characters 12-15:
+5 |   unique_id A.x
+                ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 12-15:
 4 |   unique_id A.x;
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* Components included from an application of a functor with an aliased
@@ -111,11 +121,7 @@ let functor_body_unique () =
   let module A = F () in
   ()
 [%%expect{|
-Line 3, characters 45-46:
-3 |   let module F () = struct let y = unique_id x end in
-                                                 ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val functor_body_unique : unit -> unit = <fun>
 |}]
 
 (* But not twice, since each application would consume the free variable. *)
@@ -126,9 +132,13 @@ let functor_body_unique_twice () =
   let module B = F () in
   ()
 [%%expect{|
-Line 3, characters 45-46:
-3 |   let module F () = struct let y = unique_id x end in
-                                                 ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+Line 5, characters 17-18:
+5 |   let module B = F () in
+                     ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 4, characters 17-18:
+4 |   let module A = F () in
+                     ^
+
 |}]
