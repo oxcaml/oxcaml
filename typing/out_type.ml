@@ -1438,14 +1438,16 @@ let rec tree_of_modal_typexp mode modal ty =
         let arg_mode = Alloc.zap_to_legacy marg in
         let t1 =
           if is_optional l then
-<<<<<<< HEAD
-            match
-              get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
-            with
-            | Tconstr(path, [ty], _)
-              when Path.same path Predef.path_option ->
-                tree_of_typexp mode arg_mode ty
-            | _ -> Otyp_stuff "<hidden>"
+            if tpoly_is_mono ty1 then
+              match
+                get_desc
+                  (Ctype.expand_head \!printing_env (tpoly_get_mono ty1))
+              with
+              | Tconstr(path, [ty], _)
+                when Path.same path Predef.path_option ->
+                  tree_of_typexp mode arg_mode ty
+              | _ -> Otyp_stuff "<hidden>"
+            else Otyp_stuff "<hidden>"
           else
             tree_of_typexp mode arg_mode ty1
         in
@@ -1457,29 +1459,6 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
         Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-            match get_desc ty1 with
-            | Tconstr(path, [ty], _)
-              when Path.same path Predef.path_option ->
-                tree_of_typexp mode ty
-            | _ -> Otyp_stuff "<hidden>"
-          else tree_of_typexp mode ty1 in
-        Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
-    | Ttuple tyl ->
-        Otyp_tuple (tree_of_labeled_typlist mode tyl)
-=======
-            if tpoly_is_mono ty1 then
-              match get_desc (tpoly_get_mono ty1) with
-              | Tconstr(path, [ty], _)
-                when Path.same path Predef.path_option ->
-                  tree_of_typexp mode ty
-              | _ -> Otyp_stuff "<hidden>"
-            else Otyp_stuff "<hidden>"
-          else tree_of_typexp mode ty1 in
-        Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
-    | Ttuple tyl ->
-        Otyp_tuple (tree_of_labeled_typlist mode tyl)
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     | Tconstr(p, tyl, _abbrev) ->
         let p', s = best_type_path p in
         let tyl' = apply_subst s tyl in

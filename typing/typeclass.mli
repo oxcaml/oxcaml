@@ -123,15 +123,10 @@ type error =
   | No_overriding of string * string
   | Duplicate of string * string
   | Closing_self_type of class_signature
-<<<<<<< HEAD
   | Polymorphic_class_parameter
   | Non_value_binding of string * Jkind.Violation.t
   | Non_value_let_binding of string * Jkind.sort
   | Nonoptional_call_pos_label of string
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-  | Polymorphic_class_parameter
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
