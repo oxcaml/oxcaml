@@ -12,6 +12,16 @@ let use_portable : 'a @ portable -> unit = fun _ -> ()
 
 let use_portable_function : (unit -> unit) @ portable -> unit = fun _ -> ()
 
+let use_stateless : 'a @ stateless -> unit = fun _ -> ()
+
+let use_contended : 'a @ contended -> unit = fun _ -> ()
+
+let use_uncontended : 'a @ uncontended -> unit = fun _ -> ()
+
+let use_immutable : 'a @ immutable -> unit = fun _ -> ()
+
+let use_read_write : 'a @ read_write -> unit = fun _ -> ()
+
 type record = { a : int }
 
 type _ eff += Need_ref : int ref eff
@@ -23,6 +33,11 @@ type _ eff += Payload : int ref -> unit eff
 val use_unique : 'a @ unique -> unit = <fun>
 val use_portable : 'a @ portable -> unit = <fun>
 val use_portable_function : (unit -> unit) @ portable -> unit = <fun>
+val use_stateless : 'a @ stateless -> unit = <fun>
+val use_contended : 'a @ contended -> unit = <fun>
+val use_uncontended : 'a -> unit = <fun>
+val use_immutable : 'a @ immutable -> unit = <fun>
+val use_read_write : 'a -> unit = <fun>
 type record = { a : int; }
 type _ eff += Need_ref : int ref eff
 type _ eff += Need_unit : unit eff
@@ -523,4 +538,166 @@ let try_handler_global_capture () =
       continue k ()
 [%%expect {|
 val try_handler_global_capture : unit -> int = <fun>
+|}]
+
+(* A [match] with effect cases forces the enclosing function to be
+   nonportable, even when the result mode-crosses. *)
+let (match_in_portable_function @ portable) () =
+  match () with
+  | () -> ()
+  | effect Need_unit, _ -> ()
+[%%expect {|
+val match_in_portable_function : unit -> unit = <fun>
+|}]
+
+(* A [try] with effect cases forces the enclosing function to be
+   nonportable. *)
+let (try_in_portable_function @ portable) () =
+  try () with
+  | effect Need_unit, _ -> ()
+[%%expect {|
+val try_in_portable_function : unit -> unit = <fun>
+|}]
+
+(* The constraint applies across all enclosing closures: a handler nested in
+   an inner closure makes an outer portable function nonportable. *)
+let (nested_match_in_portable_function @ portable) () =
+  let g () =
+    match () with
+    | () -> ()
+    | effect Need_unit, _ -> ()
+  in
+  g ()
+[%%expect {|
+val nested_match_in_portable_function : unit -> unit = <fun>
+|}]
+
+(* The constraint also applies when the function's portability is an
+   expectation from the context. *)
+let () =
+  use_portable_function
+    (fun () ->
+       match () with
+       | () -> ()
+       | effect Need_unit, _ -> ())
+[%%expect {|
+|}]
+
+(* A [match] with effect cases is allowed in an ordinary, nonportable
+   function. *)
+let match_in_nonportable_function () =
+  match () with
+  | () -> ()
+  | effect Need_unit, _ -> ()
+[%%expect {|
+val match_in_nonportable_function : unit -> unit = <fun>
+|}]
+
+(* A [match] with effect cases forces the enclosing function to be
+   stateful. *)
+let (match_in_stateless_function @ stateless) () =
+  match () with
+  | () -> ()
+  | effect Need_unit, _ -> ()
+[%%expect {|
+val match_in_stateless_function : unit -> unit = <fun>
+|}]
+
+(* A [try] with effect cases forces the enclosing function to be stateful. *)
+let (try_in_stateless_function @ stateless) () =
+  try () with
+  | effect Need_unit, _ -> ()
+[%%expect {|
+val try_in_stateless_function : unit -> unit = <fun>
+|}]
+
+(* An effect continuation is stateful, not stateless. *)
+let () =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k -> use_stateless k
+[%%expect {|
+Line 4, characters 41-42:
+4 |   | effect Need_unit, k -> use_stateless k
+                                             ^
+Error: This value is "stateful" but is expected to be "stateless".
+|}]
+
+(* An effect payload passed to [perform] must be uncontended. *)
+let contended_payload_to_perform (r @ contended) = perform (Payload r)
+[%%expect {|
+Line 1, characters 68-69:
+1 | let contended_payload_to_perform (r @ contended) = perform (Payload r)
+                                                                        ^
+Error: This value is "contended"
+       but is expected to be "uncontended"
+         because it is contained (via constructor "Payload") in the value at line 1, characters 59-70
+         which is expected to be "uncontended".
+|}]
+
+(* A payload captured by an effect pattern is uncontended and read-write. *)
+let write_captured_payload () =
+  match perform (Payload (ref 0)) with
+  | () -> ()
+  | effect (Payload r), k ->
+      r := 1;
+      continue k ()
+[%%expect {|
+val write_captured_payload : unit -> unit = <fun>
+|}]
+
+(* A contended value may cross the generated handler boundary. *)
+let contended_crosses_handler_boundary (r @ contended) =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k ->
+      use_contended r;
+      continue k ()
+[%%expect {|
+val contended_crosses_handler_boundary : 'a @ contended -> unit = <fun>
+|}]
+
+(* The continuation may be used as uncontended. *)
+let k_is_uncontended () =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k ->
+      use_uncontended k;
+      continue k ()
+[%%expect {|
+val k_is_uncontended : unit -> unit = <fun>
+|}]
+
+(* An effect payload passed to [perform] must be read-write. *)
+let immutable_payload_to_perform (r @ immutable) = perform (Payload r)
+[%%expect {|
+Line 1, characters 68-69:
+1 | let immutable_payload_to_perform (r @ immutable) = perform (Payload r)
+                                                                        ^
+Error: This value is "immutable"
+       but is expected to be "read_write"
+         because it is contained (via constructor "Payload") in the value at line 1, characters 59-70
+         which is expected to be "read_write".
+|}]
+
+(* An immutable value may cross the generated handler boundary. *)
+let immutable_crosses_handler_boundary (r @ immutable) =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k ->
+      use_immutable r;
+      continue k ()
+[%%expect {|
+val immutable_crosses_handler_boundary : 'a @ immutable -> unit = <fun>
+|}]
+
+(* The continuation may be used as read-write. *)
+let k_is_read_write () =
+  match perform Need_unit with
+  | () -> ()
+  | effect Need_unit, k ->
+      use_read_write k;
+      continue k ()
+[%%expect {|
+val k_is_read_write : unit -> unit = <fun>
 |}]
