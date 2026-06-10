@@ -1028,6 +1028,7 @@ and is_useful_array (known_element_kind : _ Or_unknown.t) env ~element_kind
   (* If we know the length, that's maybe useful (we could eliminate some bounds
      check). *)
   is_useful K.With_subkind.tagged_immediate env length
+  ||
   (* If the [known_element_kind] from the kind can be used as the [element_kind]
      from the types, the [element_kind] is not more precise.
 
@@ -1037,7 +1038,6 @@ and is_useful_array (known_element_kind : _ Or_unknown.t) env ~element_kind
      If the element kind from the kind is not known, but the kind from the type
      is known (including if it is bottom, in which case this must be an empty
      array), it is maybe useful. *)
-  ||
   match known_element_kind, (element_kind : _ Or_unknown_or_bottom.t) with
   | Unknown, (Ok _ | Bottom) -> true
   | Known known_element_kind, Ok element_kind
