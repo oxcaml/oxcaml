@@ -321,8 +321,8 @@ Line 1, characters 24-25:
 1 | let foo (f : p1) : p2 = f
                             ^
 Error: The value "f" has type "p1" = "('a. 'a -> 'a) -> int"
-       but an expression was expected of type "p2" = "('a 'b. 'a -> 'b) -> int"
-       The universal variables "'a" and "'b" are distinct.
+       but an expression was expected of type "('a 'b. 'a -> 'b) -> int"
+       Type "'a" is not compatible with type "'b"
 |}];;
 
 let foo f = (f : p1 :> p2)
@@ -332,7 +332,7 @@ Line 1, characters 12-26:
                 ^^^^^^^^^^^^^^
 Error: Type "p1" = "('a. 'a -> 'a) -> int" is not a subtype of
          "p2" = "('a 'b. 'a -> 'b) -> int"
-       The universal variables "'b" and "'a" are distinct.
+       Type "'b" is not a subtype of "'a"
 |}];;
 
 module Foo (X : sig val f : p1 end) : sig val f : p2 end = X
@@ -348,7 +348,7 @@ Error: Signature mismatch:
        Values do not match: val f : p1 is not included in val f : p2
        The type "p1" = "('a. 'a -> 'a) -> int" is not compatible with the type
          "p2" = "('a 'b. 'a -> 'b) -> int"
-       The universal variables "'a" and "'b" are distinct.
+       Type "'a" is not compatible with type "'b"
 |}];;
 
 let foo (f : p1) : p2 = (fun id -> f id)
@@ -411,13 +411,13 @@ Line 4, characters 24-25:
 4 | let foo (x : p1) : p2 = x
                             ^
 Error: The value "x" has type "p1" = "(bool -> bool) -> int"
-       but an expression was expected of type "p2" = "('a. 'a -> 'a) -> int"
+       but an expression was expected of type "('a. 'a -> 'a) -> int"
        Type "bool" is not compatible with type "'a"
 |}];;
 
 let foo x = (x : p1 :> p2)
 [%%expect {|
-val foo : p1 -> p2 = <fun>
+val foo : ((bool -> bool) -> int) -> p2 = <fun>
 |}];;
 
 module Foo (X : sig val f : p1 end) : sig val f : p2 end = X
