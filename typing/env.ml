@@ -3714,9 +3714,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       path, (mode, locks), a
     end
 
-let closure_mode ~loc ~item ~lid
-  {Mode.monadic; comonadic} closure_context comonadic0 =
-  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
@@ -3732,9 +3730,8 @@ let closure_mode ~loc ~item ~lid
   in
   {Mode.monadic; comonadic}
 
-let const_closure_mode ~loc ~item ~lid {Mode.monadic; comonadic}
+let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
-  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   Mode.Value.Comonadic.(submode_err pp comonadic
     (of_const ~hint:(Is_used_in closure_context) comonadic0));
   let monadic =
@@ -3782,22 +3779,45 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
     value allowed by the locks.
 
     [ty] is optional as the function works on modules and classes as well, for
-    which [ty] should be [None]. *)
-let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
+    which [ty] should be [None].
+
+    [pp] overrides the pinpoint used in closure lock errors; it defaults to the
+    identifier being looked up. *)
+let walk_locks ~errors ~env ~loc ?pp ~item ~lid mode ty locks =
+  let pp : Mode.Hint.pinpoint =
+    match pp with
+    | Some pp -> pp
+    | None -> (loc, Ident {category = item; lid})
+  in
   List.fold_left
     (fun vmode lock ->
       match lock with
       | Region_lock -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode ~loc ~item ~lid vmode closure_context comonadic
+          const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
-          closure_mode ~loc ~item ~lid vmode closure_context comonadic
+          closure_mode pp vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~loc ~item ~lid vmode
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc ~lid ty;
           vmode
     ) mode locks
+
+(** Registers a use of a construct that is at legacy comonadic modes,
+    constraining every enclosing closure lock as if a legacy value defined at
+    toplevel were used at the pinpoint's location. Used for constructs (e.g.
+    effect handlers) that force enclosing functions to be nonportable and
+    stateful. The region, exclave and unboxed locks never constrain a legacy
+    value with no type, so [lid] is never used in errors. *)
+let walk_locks_for_legacy_construct ~env pp =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  ignore
+    (walk_locks ~errors:true ~env ~loc:(fst pp) ~pp ~item:Value
+       ~lid:(Lident "") (Mode.Value.disallow_right Mode.Value.legacy) None
+       locks
+      : Mode.Value.l)
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
