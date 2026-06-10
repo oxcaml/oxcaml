@@ -82,12 +82,18 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
     let c = child_close_over_coercion_opt id c in
     begin match Mode.Modality.to_const_opt moda1 with
     | None ->
-      (* [wrap_constraint_with_shape] invokes inclusion check with
-          identical modes and inferred modalities, which we workaround *)
+      (* Inferred modalities on the expected side arise only with both sides
+          physically equal: [wrap_constraint_with_shape] invokes the inclusion
+          check with identical modes, and expanding the same module alias on
+          both sides (see [try_modtypes]) can reach here with different modes.
+          Since the modalities coincide, children's modes are related whenever
+          the parents' are; if the parents' are not, defer to the per-item
+          checks, which take modalities and mode crossing into account. *)
       assert (moda0 == moda1);
-      Mode.Value.submode_exn m0 m1;
-      (* For children, we only check modality inclusion *)
-      Ok All
+      begin match Mode.Value.submode m0 m1 with
+      | Ok () -> Ok All
+      | Error _ -> Ok (Specific ((m0, c), m1))
+      end
     | Some moda1 ->
       let m0 = Mode.Modality.apply moda0 m0 in
       let m1 = Mode.Modality.Const.apply moda1 m1 in

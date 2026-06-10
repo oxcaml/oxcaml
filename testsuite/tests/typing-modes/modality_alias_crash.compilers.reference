@@ -1,1 +1,24 @@
-Fatal error: exception Invalid_argument("submode_exn")
+File "modality_alias_reject.ml", line 1:
+Error: The implementation "modality_alias_reject.ml"
+       does not match the interface "modality_alias_reject.cmi": 
+       In module "Outer_alias":
+       Modules do not match:
+         (module Outer) @ nonportable
+       is not included in
+         (module Outer) @ portable
+       In module "Outer_alias.Inner":
+       Modules do not match:
+         (module Modality_alias_np_lib) @ nonportable
+       is not included in
+         (module Modality_alias_np_lib) @ portable
+       In module "Outer_alias.Inner":
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit (* in a structure at portable *)
+       The first is "nonportable"
+       but the second is "portable".
+       File "modality_alias_np_lib.mli", line 1, characters 0-20:
+         Expected declaration
+       File "modality_alias_np_lib.mli", line 1, characters 0-20:
+         Actual declaration
