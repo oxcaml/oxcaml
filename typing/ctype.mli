@@ -257,11 +257,6 @@ val instance_poly_fixed:
         (* Take an instance of a type scheme containing free univars for
            checking that an expression matches this scheme. *)
 
-<<<<<<< HEAD
-val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * type_expr list
-=======
 val instance_funct_opt:
         id_in:Ident.t -> p_out:Path.t -> fixed:bool ->
         type_expr -> type_expr option
@@ -278,8 +273,7 @@ val instance_funct_nondep :
 (** Tries to use the module argument actual signature to remove the depencies
     that might occur in the return type of a module-dependent function. *)
 
-val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * type_expr list
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 
 val instance_label:
   fixed:bool ->
@@ -663,7 +657,6 @@ val set_modtype_of_package :
 
 (* Raises [Incompatible] *)
 val mcomp : Env.t -> type_expr -> type_expr -> unit
-<<<<<<< HEAD
 
 (* represents a type that has been extracted from wrappers that
    do not change its runtime representation, such as [@@unboxed]
@@ -929,9 +922,6 @@ val check_constructor_crossing_destruction :
 val apply_is_contained_by : Mode.Hint.is_contained_by
   -> ?modalities:Mode.Modality.Const.t
   -> ('l * 'r) Mode.Value.t -> ('l * 'r) Mode.Value.t
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
 
 val open_tfunctor : Env.t -> loc:Location.t -> Ident.Unscoped.t -> package ->
         type_expr -> Env.t * type_expr
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)

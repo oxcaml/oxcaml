@@ -414,12 +414,6 @@ end = struct
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
-<<<<<<< HEAD
-  let set_env penv env = penv.env <- env
-  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let set_env penv env = penv.env <- env
-=======
 
   let enter_type ~scope lbl decl penv =
     let (id, new_env) = Env.enter_type ~scope lbl decl penv.env in
@@ -428,7 +422,9 @@ end = struct
     id
 
   let add_local_constraint source dest penv =
-    let new_env = Env.add_local_constraint source dest penv.env in
+    let new_env =
+      Env.add_local_constraint ~stage:(Env.stage penv.env) source dest penv.env
+    in
     penv.env <- new_env;
     penv.op_list <- (Local_constraint (source, dest)) :: penv.op_list
 
@@ -455,9 +451,8 @@ end = struct
     penv.env <- env;
     Misc.try_finally ~always:clean f
 
-  let set_env penv env =
-    penv.env <- env
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+  let set_env penv env = penv.env <- env
+  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
 end
 
 (**** unification mode ****)
@@ -1039,7 +1034,6 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
-<<<<<<< HEAD
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
@@ -1092,116 +1086,6 @@ let rec generalize stage_offset ty =
 let generalize ty =
   simple_abbrevs := Mnil;
   generalize 0 ty
-
-(*
-   Build a copy of a type in which nodes reachable through a path composed
-   only of Tarrow, Tpoly, Ttuple, Trepr, Tpackage and Tconstr, and whose level
-   was no lower than [!current_level], are at [generic_level].
-   This is different from [with_local_level_gen], which generalizes in place,
-   and only nodes with a level higher than [!current_level].
-   This is used for typing classes, to indicate which types have been
-   inferred in the first pass, and can be considered as "known" during the
-   second pass.
- *)
-
-let rec copy_spine copy_scope ty =
-  match get_desc ty with
-  | Tsubst (ty, _) -> ty
-  | Tvar _
-  | Tfield _
-  | Tnil
-  | Tvariant _
-  | Tobject _
-  | Tlink _
-  | Tunivar _
-  | Tquote _
-  | Tsplice _
-  | Tquote_eval _
-  | Tof_kind _ -> ty
-  | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
-    | Tconstr _ ) as desc ->
-      let level = get_level ty in
-      if level < !current_level || level = generic_level then ty else
-      let t =
-        newgenstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind)
-      in
-      For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
-      let copy_rec = copy_spine copy_scope in
-      let desc' = match desc with
-      | Tarrow (lbl, ty1, ty2, _) ->
-          Tarrow (lbl, copy_rec ty1, copy_rec ty2, commu_ok)
-      | Tpoly (ty', tvl) ->
-          Tpoly (copy_rec ty', tvl)
-      | Trepr (ty', sl) ->
-          Trepr (copy_rec ty', sl)
-      | Ttuple tyl ->
-          Ttuple (List.map (fun (lbl, ty) -> (lbl, copy_rec ty)) tyl)
-      | Tunboxed_tuple tyl ->
-          Tunboxed_tuple (List.map (fun (lbl, ty) -> (lbl, copy_rec ty)) tyl)
-      | Tpackage {pack_path; pack_cstrs} ->
-          let fl = List.map (fun (n, ty) -> n, copy_rec ty) pack_cstrs in
-          Tpackage {pack_path; pack_cstrs = fl}
-      | Tconstr (path, tyl, _) ->
-          Tconstr (path, List.map copy_rec tyl, ref Mnil)
-      | _ -> assert false
-      in
-      Transient_expr.set_stub_desc t desc';
-      t
-
-let copy_spine ty =
-  For_copy.with_scope (fun copy_scope -> copy_spine copy_scope ty)
-
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-
-(*
-   Build a copy of a type in which nodes reachable through a path composed
-   only of Tarrow, Tpoly, Ttuple, Tpackage and Tconstr, and whose level
-   was no lower than [!current_level], are at [generic_level].
-   This is different from [with_local_level_gen], which generalizes in place,
-   and only nodes with a level higher than [!current_level].
-   This is used for typing classes, to indicate which types have been
-   inferred in the first pass, and can be considered as "known" during the
-   second pass.
- *)
-
-let rec copy_spine copy_scope ty =
-  match get_desc ty with
-  | Tsubst (ty, _) -> ty
-  | Tvar _
-  | Tfield _
-  | Tnil
-  | Tvariant _
-  | Tobject _
-  | Tlink _
-  | Tunivar _ -> ty
-  | (Tarrow _ | Tpoly _ | Ttuple _ | Tpackage _ | Tconstr _) as desc ->
-      let level = get_level ty in
-      if level < !current_level || level = generic_level then ty else
-      let t = newgenstub ~scope:(get_scope ty) in
-      For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
-      let copy_rec = copy_spine copy_scope in
-      let desc' = match desc with
-      | Tarrow (lbl, ty1, ty2, _) ->
-          Tarrow (lbl, copy_rec ty1, copy_rec ty2, commu_ok)
-      | Tpoly (ty', tvl) ->
-          Tpoly (copy_rec ty', tvl)
-      | Ttuple tyl ->
-          Ttuple (List.map (fun (lbl, ty) -> (lbl, copy_rec ty)) tyl)
-      | Tpackage {pack_path; pack_constraints} ->
-          let fl = List.map (fun (n, ty) -> n, copy_rec ty) pack_constraints in
-          Tpackage {pack_path; pack_constraints = fl}
-      | Tconstr (path, tyl, _) ->
-          Tconstr (path, List.map copy_rec tyl, ref Mnil)
-      | _ -> assert false
-      in
-      Transient_expr.set_stub_desc t desc';
-      t
-
-let copy_spine ty =
-  For_copy.with_scope (fun copy_scope -> copy_spine copy_scope ty)
-
-=======
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 let forward_try_expand_safe = (* Forward declaration *)
   ref (fun _env _ty -> assert false)
 
@@ -1210,25 +1094,6 @@ let forward_try_expand_safe = (* Forward declaration *)
    [generic_level]).
 *)
 
-<<<<<<< HEAD
-let rec normalize_package_path env p =
-  let t =
-    try (Env.find_modtype_lazy p env).mtd_type
-    with Not_found -> None
-  in
-  match t with
-  | Some (Mty_ident p) -> normalize_package_path env p
-  | Some (Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _) | None ->
-      match p with
-        Path.Pdot (p1, s) ->
-          (* For module aliases *)
-          let p1' = Env.normalize_module_path None env p1 in
-          if Path.same p1 p1' then p else
-          normalize_package_path env (Path.Pdot (p1', s))
-      | _ -> p
-
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
 let modtype_of_package = ref (fun _ _ _ -> assert false)
 
 let set_modtype_of_package f =
@@ -1241,8 +1106,6 @@ let normalize_or_raise_escape env p =
   match Env.try_normalize_modtype_path env p with
   | None -> raise_escape_exn (Module_type p)
   | Some p -> p
-
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 let rec check_scope_escape mark env level ty =
   let orig_level = get_level ty in
   if try_mark_node mark ty then begin
@@ -1257,15 +1120,7 @@ let rec check_scope_escape mark env level ty =
             raise_escape_exn (Constructor p)
         end
     | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
-<<<<<<< HEAD
-        let p' = normalize_package_path env p in
-        if Path.same p p' then raise_escape_exn (Module_type p);
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        let p' = Env.normalize_modtype_path env p in
-        if Path.same p p' then raise_escape_exn (Module_type p);
-=======
         let p' = normalize_or_raise_escape env p in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
         check_scope_escape mark env level
           (newty2 ~level:orig_level
             (Tpackage {pack with pack_path = p'}))
@@ -1277,7 +1132,7 @@ let rec check_scope_escape mark env level ty =
             (Tfunctor (lbl, id, {pack with pack_path = p'}, t)))
     | Tfunctor (_, id, pack, t) ->
         List.iter (fun (_, t) -> check_scope_escape mark env level t)
-          pack.pack_constraints;
+          pack.pack_cstrs;
         let mty = modtype_of_package env Location.none pack in
         let env = Env.add_module (Ident.of_unscoped id) Mp_present mty env in
         check_scope_escape mark env level t
@@ -1353,21 +1208,9 @@ let rec update_level env level expand ty =
           set_level ();
           iter_type_expr (update_level env level expand) ty
         end
-<<<<<<< HEAD
-    | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
-        let p' = normalize_package_path env p in
-        if Path.same p p' then raise_escape_exn (Module_type p);
-        set_type_desc ty (Tpackage {pack with pack_path = p'});
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
-        let p' = Env.normalize_modtype_path env p in
-        if Path.same p p' then raise_escape_exn (Module_type p);
-        set_type_desc ty (Tpackage {pack with pack_path = p'});
-=======
     | Tpackage pack when level < Path.scope pack.pack_path ->
         let pack_path = normalize_or_raise_escape env pack.pack_path in
         set_type_desc ty (Tpackage {pack with pack_path});
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
         update_level env level expand ty
     | Tobject (_, ({contents=Some(p, _tl)} as nm))
       when level < Path.scope p ->
@@ -1387,7 +1230,7 @@ let rec update_level env level expand ty =
         update_level env level expand ty
     | Tfunctor (_, id, pack, t) ->
         List.iter (fun (_, t) -> update_level env level expand t)
-          pack.pack_constraints;
+          pack.pack_cstrs;
         let mty = modtype_of_package env Location.none pack in
         let env = Env.add_module (Ident.of_unscoped id) Mp_present mty env in
         set_level ();
@@ -1460,18 +1303,12 @@ let rec lower_contravariant env var_level visited contra ty =
             | exception Cannot_expand -> not_expanded ()
           else not_expanded ()
     | Tpackage p ->
-<<<<<<< HEAD
         List.iter (fun (_n, ty) -> lower_rec true ty) p.pack_cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        List.iter (fun (_n, ty) -> lower_rec true ty) p.pack_constraints
-=======
-        List.iter (fun (_n, ty) -> lower_rec true ty) p.pack_constraints
     | Tfunctor (_, id, pack, t2) ->
-        List.iter (fun (_n, ty) -> lower_rec true ty) pack.pack_constraints;
+        List.iter (fun (_n, ty) -> lower_rec true ty) pack.pack_cstrs;
         let mty = modtype_of_package env Location.none pack in
         let env = Env.add_module (Ident.of_unscoped id) Mp_present mty env in
         lower_contravariant env var_level visited contra t2
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     | Tarrow (_, t1, t2, _) ->
         lower_rec true t1;
         lower_rec contra t2
@@ -1691,19 +1528,11 @@ let compute_new_closed us us' id_map ty =
 
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
-<<<<<<< HEAD
-let rec copy ?partial ?keep_names copy_scope ty =
-  let copy = copy ?partial ?keep_names copy_scope in
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-let rec copy ?partial ?keep_names ?scope copy_scope ty =
-  let copy = copy ?partial ?keep_names ?scope copy_scope in
-=======
-let rec copy ?partial ?keep_names ?scope ?(unscoped = empty_unscoped_mapping)
+let rec copy ?partial ?keep_names ?(unscoped = empty_unscoped_mapping)
     copy_scope ty =
   let copy' unscoped =
-      copy ?partial ?keep_names ?scope ~unscoped copy_scope in
+      copy ?partial ?keep_names ~unscoped copy_scope in
   let copy = copy' unscoped in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   match get_desc ty with
     Tsubst (ty, _) -> ty
   | desc ->
@@ -1952,25 +1781,9 @@ let instance_constructor existential_treatment cstr =
             let name = existential_name name_counter existential in
             let env = penv.env in
             let fresh_constr_scope = penv.equations_scope in
-<<<<<<< HEAD
-            let (id, new_env) =
-              Env.enter_type (get_new_abstract_name env name) decl env
-                ~scope:fresh_constr_scope in
-            Pattern_env.set_env penv new_env;
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-            let decl = new_local_type (Existential cstr.cstr_name) in
-            let name = existential_name name_counter existential in
-            let (id, new_env) =
-              Env.enter_type (get_new_abstract_name env name) decl env
-                ~scope:fresh_constr_scope in
-            Pattern_env.set_env penv new_env;
-=======
-            let decl = new_local_type (Existential cstr.cstr_name) in
-            let name = existential_name name_counter existential in
             let id = Pattern_env.enter_type
                       (get_new_abstract_name env name) decl penv
                       ~scope:fresh_constr_scope in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
             let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
             let tv = copy copy_scope existential in
             assert (is_Tvar tv);
@@ -2092,15 +1905,6 @@ let instance_class params cty =
    I.e., the universal type variable ['a] is both instantiated as a fresh
    type variable ['c] when outside of its binder, and kept as universal
    when under its binder.
-<<<<<<< HEAD
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-   Assumption: in the first call to [copy_sep], all the free univars should
-   be bound by the same [Tpoly] node. This guarantees that they are only
-   bound when under this [Tpoly] node, which has no free univars, and as
-   such is not part of the separate copy. In turn, this allows the separate
-   copy to keep the sharing of the original type without breaking its
-   binding structure.
-=======
    Assumption: in the first call to [copy_sep], all the free univars should
    be bound by the same [Tpoly] node. This guarantees that they are only
    bound when under this [Tpoly] node, which has no free univars, and as
@@ -2115,16 +1919,9 @@ let instance_class params cty =
    The argument [id_map] corresponds to the mapping of the identifiers.
 
    Returns [None] if the output would have been the input.
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
  *)
-<<<<<<< HEAD
 let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
-    ~(visited : type_expr TypeHash.t) sch =
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
-=======
-let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) ~id_map sch =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    ~(visited : type_expr TypeHash.t) ~id_map sch =
   let free = compute_univars sch in
   let delayed_copies = ref [] in
   let add_delayed_copy unscoped t ty =
@@ -2133,37 +1930,23 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) ~id_map sch =
                   (Tlink (copy ~unscoped copy_scope ty)))
       :: !delayed_copies
   in
-<<<<<<< HEAD
-  let rec copy_rec ~bound_univars ~may_share (ty : type_expr) =
+  let rec copy_rec ~bound_univars ~may_share ~unscoped (ty : type_expr) =
     let bound_univars =
       match get_desc ty with
       | Tpoly (_, tl) -> List.fold_right TypeSet.add tl bound_univars
       | _ -> bound_univars
     in
     let copy_rec = copy_rec ~bound_univars in
-    let univars = TypeSet.inter (free ty) bound_univars in
-    if is_Tvar ty || may_share && TypeSet.is_empty univars then
-      if partial || get_level ty <> generic_level then ty else
-      (* jkind not consulted during copy_sep, so Any is safe *)
-      let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
-      add_delayed_copy t ty;
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let rec copy_rec ~may_share (ty : type_expr) =
-    let univars = free ty in
-    if is_Tvar ty || may_share && TypeSet.is_empty univars then
-      if get_level ty <> generic_level then ty else
-      let t = newstub ~scope:(get_scope ty) in
-      add_delayed_copy t ty;
-=======
-  let rec copy_rec ~may_share ~unscoped (ty : type_expr) =
     let copy_shared = copy_rec ~may_share:true ~unscoped in
-    let univars = free ty in
+    let univars = TypeSet.inter (free ty) bound_univars in
     if is_Tvar ty || may_share && TypeSet.is_empty univars && unscoped.closed ty
     then
-      if get_level ty <> generic_level then ty else
-      let t = newstub ~scope:(get_scope ty) in
+      if partial || get_level ty <> generic_level then ty else
+      (* jkind not consulted during copy_sep, so Any is safe *)
+      let t =
+        newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind)
+      in
       add_delayed_copy unscoped t ty;
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       t
     else try
       TypeHash.find visited ty
@@ -2180,20 +1963,12 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) ~id_map sch =
             in
             (* In that case we should keep the original, but we still
                call copy to correct the levels *)
-<<<<<<< HEAD
             if keep then
-              (add_delayed_copy t ty;
+              (add_delayed_copy unscoped t ty;
                Tvar { name = None;
                       jkind = Jkind.for_non_float ~why:Polymorphic_variant })
             else
-            let more' = copy_rec ~may_share:false more in
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-            if keep then (add_delayed_copy t ty; Tvar None) else
-            let more' = copy_rec ~may_share:false more in
-=======
-            if keep then (add_delayed_copy unscoped t ty; Tvar None) else
             let more' = copy_rec ~may_share:false ~unscoped more in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
             let fixed' = fixed && (is_Tvar more || is_Tunivar more) in
             let row = copy_row copy_shared fixed' row keep more' in
             Tvariant (subst_row_name_path unscoped.map row)
@@ -2225,15 +2000,6 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) ~id_map sch =
       t
     end
   in
-<<<<<<< HEAD
-  let ty = copy_rec ~bound_univars ~may_share:true sch in
-  List.iter (fun force -> force ()) !delayed_copies;
-  ty
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let ty = copy_rec ~may_share:true sch in
-  List.iter (fun force -> force ()) !delayed_copies;
-  ty
-=======
   let tyset =
     type_subexpressions_with_free_occurrences (List.map fst id_map) sch
   in
@@ -2241,10 +2007,12 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) ~id_map sch =
   if TypeSet.is_empty (free sch) && closed sch && get_level sch <> generic_level
   then None
   else
-    let ty = copy_rec ~may_share:true ~unscoped:{ map = id_map; closed } sch in
+    let ty =
+      copy_rec ~bound_univars ~may_share:true
+        ~unscoped:{ map = id_map; closed } sch
+    in
     let () = List.iter (fun force -> force ()) !delayed_copies in
     Some ty
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let instance_poly' copy_scope
     ~keep_names ~fixed ~partial ~copy_var univars sch =
@@ -2261,15 +2029,12 @@ let instance_poly' copy_scope
   let vars = List.map copy_var univars in
   let visited = TypeHash.create 17 in
   List.iter2 (TypeHash.add visited) univars vars;
-<<<<<<< HEAD
   let bound_univars = List.fold_right TypeSet.add univars TypeSet.empty in
-  let ty = copy_sep ~copy_scope ~fixed ~partial ~bound_univars ~visited sch in
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let ty = copy_sep ~copy_scope ~fixed ~visited sch in
-=======
-  let ty = Option.value ~default:sch
-                        (copy_sep ~copy_scope ~fixed ~visited ~id_map:[] sch) in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+  let ty =
+    Option.value ~default:sch
+      (copy_sep ~copy_scope ~fixed ~partial ~bound_univars ~visited
+         ~id_map:[] sch)
+  in
   vars, ty
 
 let instance_poly_fixed ?(keep_names=false) univars sch =
@@ -2284,7 +2049,6 @@ let instance_poly ?(keep_names=false) univars sch =
       ~keep_names ~fixed:false ~partial:false ~copy_var:None univars sch)
   )
 
-<<<<<<< HEAD
 let maybe_instance_poly ty =
   match get_desc ty with
   | Tpoly (ty', tyvars) ->
@@ -2339,8 +2103,6 @@ let instance_poly_for_jkind univars sch =
 
 let () = Ikind.instance_poly_for_jkind' := instance_poly_for_jkind
 
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
 (** [instance_funct_opt] returns [None] if id_in never appeared in [sch] *)
 let instance_funct_opt ~id_in ~p_out ~fixed sch =
   let visited = TypeHash.create 17 in
@@ -2359,7 +2121,6 @@ let open_tfunctor env ~loc us pack ty =
                           ~p_out:(Pident id) ~fixed:false ty in
   (env, ty)
 
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope ->
     let vars, ty_arg =
@@ -2715,23 +2476,11 @@ let expand_abbrev_gen kind find_type_expansion env ty =
       match find_type_expansion path env with
       | exception Not_found ->
           (* another way to expand is to normalize the path itself *)
-<<<<<<< HEAD
-          let path' = Env.normalize_type_path None env path in
-          if Path.same path path' then raise Cannot_expand
-          else newty2 ~level (Tconstr (path', args, abbrev))
-      | (params, body, lv) ->
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          let path' = Env.normalize_type_path None env path in
-          if Path.same path path' then raise Cannot_expand
-          else newty3 ~level ~scope (Tconstr (path', args, abbrev))
-      | (params, body, expansion_scope) ->
-=======
           begin match Env.try_normalize_type_path None env path with
           | None -> raise Cannot_expand
-          | Some path' -> newty3 ~level ~scope (Tconstr (path', args, abbrev))
+          | Some path' -> newty2 ~level (Tconstr (path', args, abbrev))
           end
-      | (params, body, expansion_scope) ->
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      | (params, body, lv) ->
           (* prerr_endline
              ("add a "^string_of_kind kind^" expansion for "^Path.name path);*)
           let ty' =
@@ -3032,20 +2781,12 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
-<<<<<<< HEAD
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ -> Has_no_typedecl
-=======
-  | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ | Tfunctor _ -> Has_no_typedecl
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+  | Tvariant _ | Tpackage _ | Tfunctor _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
   | Tlink _ | Tsubst _ -> assert false
 
@@ -4052,7 +3793,7 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
       let visited = get_id ty :: visited in
       List.iter (fun (_, ty) ->
           local_non_recursive_abbrev ~allow_rec strict visited env p ty)
-          pack.pack_constraints;
+          pack.pack_cstrs;
       let mty = modtype_of_package env Location.none pack in
       let env = Env.add_module (Ident.of_unscoped id) Mp_present mty env in
       local_non_recursive_abbrev ~allow_rec strict visited env p t
@@ -4143,36 +3884,11 @@ let unify_univar_for (type a) (tr_exn : a trace_exn) env t1 t2 jkind1 jkind2
 let occur_univar_or_unscoped ?(inj_only=false) env ty =
   let visited = ref TypeMap.empty in
   with_type_mark begin fun mark ->
-<<<<<<< HEAD
-  let rec occur_rec env bound ty =
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let rec occur_rec bound ty =
-=======
   let rec occur_rec env bound_uv bound_id ty =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     if not_marked_node mark ty then
-<<<<<<< HEAD
-      if TypeSet.is_empty bound then
-        (ignore (try_mark_node mark ty); occur_desc env bound ty)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      if TypeSet.is_empty bound then
-        (ignore (try_mark_node mark ty); occur_desc bound ty)
-=======
       if TypeSet.is_empty bound_uv && Ident.Unscoped.Set.is_empty bound_id then
         (ignore (try_mark_node mark ty); occur_desc env bound_uv bound_id ty)
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       else try
-<<<<<<< HEAD
-        let bound' = TypeMap.find ty !visited in
-        if not (TypeSet.subset bound' bound) then begin
-          visited := TypeMap.add ty (TypeSet.inter bound bound') !visited;
-          occur_desc env bound ty
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        let bound' = TypeMap.find ty !visited in
-        if not (TypeSet.subset bound' bound) then begin
-          visited := TypeMap.add ty (TypeSet.inter bound bound') !visited;
-          occur_desc bound ty
-=======
         let (bound_uv', bound_id') = TypeMap.find ty !visited in
         if not (TypeSet.subset bound_uv' bound_uv
                 && Ident.Unscoped.Set.subset bound_id' bound_id)
@@ -4181,75 +3897,21 @@ let occur_univar_or_unscoped ?(inj_only=false) env ty =
                         (TypeSet.inter bound_uv bound_uv',
                          Ident.Unscoped.Set.inter bound_id bound_id') !visited;
           occur_desc env bound_uv bound_id ty
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
         end
       with Not_found ->
-<<<<<<< HEAD
-        visited := TypeMap.add ty bound !visited;
-        occur_desc env bound ty
-  and occur_desc env bound ty =
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        visited := TypeMap.add ty bound !visited;
-        occur_desc bound ty
-  and occur_desc bound ty =
-=======
         visited := TypeMap.add ty (bound_uv, bound_id) !visited;
         occur_desc env bound_uv bound_id ty
   and occur_desc env bound_uv bound_id ty =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       match get_desc ty with
         Tunivar _ ->
           if not (TypeSet.mem ty bound_uv) then
             raise_escape_exn (Univ ty)
       | Tpoly (ty, tyl) ->
-<<<<<<< HEAD
-          let bound = List.fold_right TypeSet.add tyl bound in
-          occur_rec env bound ty
+          let bound_uv = List.fold_right TypeSet.add tyl bound_uv in
+          occur_rec env bound_uv bound_id ty
       | Trepr (ty, _sort_vars) ->
           (* Sort variables are not type expressions, so we don't add them
              to bound *)
-          occur_rec env bound ty
-      | Tconstr (_, [], _) -> ()
-      | Tconstr (p, tl, _) ->
-          begin try
-            let td = Env.find_type p env in
-            List.iter2
-              (fun t v ->
-                (* The null variance only occurs in type abbreviations and
-                   corresponds to type variables that do not occur in the
-                   definition (expansion would erase them completely).
-                   The type-checker consistently ignores type expressions
-                   in this position. Physical expansion, as done in `occur`,
-                   would be costly here, since we need to check inside
-                   object and variant types too. *)
-                if Variance.(if inj_only then mem Inj v else not (eq v null))
-                then occur_rec env bound t)
-              tl td.type_variance
-          with Not_found ->
-            if not inj_only then List.iter (occur_rec env bound) tl
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          let bound = List.fold_right TypeSet.add tyl bound in
-          occur_rec bound  ty
-      | Tconstr (_, [], _) -> ()
-      | Tconstr (p, tl, _) ->
-          begin try
-            let td = Env.find_type p env in
-            List.iter2
-              (fun t v ->
-                (* The null variance only occurs in type abbreviations and
-                   corresponds to type variables that do not occur in the
-                   definition (expansion would erase them completely).
-                   The type-checker consistently ignores type expressions
-                   in this position. Physical expansion, as done in `occur`,
-                   would be costly here, since we need to check inside
-                   object and variant types too. *)
-                if Variance.(if inj_only then mem Inj v else not (eq v null))
-                then occur_rec bound t)
-              tl td.type_variance
-          with Not_found ->
-            if not inj_only then List.iter (occur_rec bound) tl
-=======
-          let bound_uv = List.fold_right TypeSet.add tyl bound_uv in
           occur_rec env bound_uv bound_id ty
       | Tconstr (p, tl, _) -> begin
           let id_escape = Path.check_for_unbound_unscoped_idents bound_id p in
@@ -4275,13 +3937,7 @@ let occur_univar_or_unscoped ?(inj_only=false) env ty =
               if not inj_only
               then List.iter (occur_rec env bound_uv bound_id) tl
             end
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
           end
-<<<<<<< HEAD
-      | _ -> iter_type_expr_with_stages (fun env -> occur_rec env bound) env ty
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | _ -> iter_type_expr (occur_rec bound) ty
-=======
       | Tobject (_, ({contents = Some (p, _)} as nm)) ->
           occur_set_name env bound_uv bound_id ty p
             (fun () -> set_name nm None)
@@ -4292,14 +3948,14 @@ let occur_univar_or_unscoped ?(inj_only=false) env ty =
             occur_set_name env bound_uv bound_id ty p
               (fun () -> set_type_desc ty (Tvariant (set_row_name row None)))
           end
-      | Tpackage {pack_path = p; pack_constraints} ->
+      | Tpackage {pack_path = p; pack_cstrs} ->
           begin match Path.check_for_unbound_unscoped_idents bound_id p with
           | Some i ->
             occur_normalize_modtype_path env bound_uv bound_id i p
-              (fun pack_path -> Tpackage {pack_path; pack_constraints})
+              (fun pack_path -> Tpackage {pack_path; pack_cstrs})
           | None ->
               List.iter (fun (_, t) -> occur_rec env bound_uv bound_id t)
-                pack_constraints
+                pack_cstrs
           end
       | Tfunctor (l, id, pack, ty) -> begin
           let id_escape =
@@ -4311,13 +3967,15 @@ let occur_univar_or_unscoped ?(inj_only=false) env ty =
               (fun pack_path -> Tfunctor (l, id, {pack with pack_path}, ty))
           | None ->
               List.iter (fun (_, t) -> occur_rec env bound_uv bound_id t)
-                pack.pack_constraints;
+                pack.pack_cstrs;
               let mty = modtype_of_package env Location.none pack in
               let env = Env.add_module (Ident.of_unscoped id)
                                        Mp_present mty env in
               occur_rec env bound_uv (Ident.Unscoped.Set.add id bound_id) ty
           end
-      | _ -> iter_type_expr (occur_rec env bound_uv bound_id) ty
+      | _ ->
+          iter_type_expr_with_stages
+            (fun env -> occur_rec env bound_uv bound_id) env ty
     and occur_expand_safe env bound_uv bound_id us ty =
       try
         let ty' = try_expand_safe env ty in
@@ -4338,15 +3996,8 @@ let occur_univar_or_unscoped ?(inj_only=false) env ty =
       | Some p' ->
         set_type_desc ty (f p');
         occur_desc env bound_uv bound_id ty
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   in
-<<<<<<< HEAD
-  occur_rec env TypeSet.empty ty
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  occur_rec TypeSet.empty ty
-=======
   occur_rec env TypeSet.empty Ident.Unscoped.Set.empty ty
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   end
 
 let has_free_univars env ty =
@@ -4393,16 +4044,8 @@ let univars_escape env univar_pairs vl ty =
           begin try
             let td = Env.find_type p env in
             List.iter2
-<<<<<<< HEAD
-              (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur env t)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-              (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur t)
-=======
               (* see occur_univar_or_unscoped *)
-              (fun t v -> if not Variance.(eq v null) then occur t)
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+              (fun t v -> if not Variance.(eq v null) then occur env t)
               tl td.type_variance
           with Not_found ->
             List.iter (occur env) tl
@@ -4481,7 +4124,7 @@ let identifier_escape env idl ty =
               occur_normalize_modtype_path env idl pack.pack_path i
                 (fun pack_path -> Tfunctor (l, id, {pack with pack_path}, ty))
           | None ->
-              List.iter (fun (_, t) -> occur idl t) pack.pack_constraints;
+              List.iter (fun (_, t) -> occur idl t) pack.pack_cstrs;
               let idl' =
                 List.filter (fun i -> not Ident.(same i (of_unscoped id))) idl
               in
@@ -4881,25 +4524,11 @@ let rec mcomp type_pairs env t1 t2 =
     then raise Incompatible
   in
   if eq_type t1 t2 then () else
-<<<<<<< HEAD
   match (get_desc t1, get_desc t2, t1, t2) with
   | (Tvar { jkind }, _, _, other)
   | (_, Tvar { jkind }, other, _) -> check_jkinds other jkind
-  | (Tconstr (p1, [], _), Tconstr (p2, [], _), _, _) when Path.same p1 p2 ->
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  match (get_desc t1, get_desc t2) with
-  | (Tvar _, _)
-  | (_, Tvar _)  ->
-      ()
-  | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
-=======
-  match (get_desc t1, get_desc t2) with
-  | (Tvar _, _)
-  | (_, Tvar _)  ->
-      ()
-  | (Tconstr (p1, [], _), Tconstr (p2, [], _))
+  | (Tconstr (p1, [], _), Tconstr (p2, [], _), _, _)
     when Env_unscoped.path_equiv env p1 p2 ->
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       ()
   | _ ->
       let t1' = expand_head_opt env t1 in
@@ -4961,45 +4590,18 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env u1 u2;
         | (Ttuple tl1, Ttuple tl2, _, _) ->
             mcomp_labeled_list type_pairs env tl1 tl2
-<<<<<<< HEAD
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) ->
-            mcomp_type_decl type_pairs env p1 p2 tl1 tl2
-        | (Tconstr (_, [], _), _) when has_injective_univars env t2' ->
-            raise Incompatible
-        | (_, Tconstr (_, [], _)) when has_injective_univars env t1' ->
-            raise Incompatible
-        | (Tconstr (p, _, _), _) | (_, Tconstr (p, _, _)) ->
-            begin try
-              let decl = Env.find_type p env in
-              if is_datatype decl then raise Incompatible
-            with Not_found -> ()
-            end
-=======
-        | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) ->
-            mcomp_type_decl type_pairs env p1 p2 tl1 tl2
-        | (Tconstr (_, [], _), _) when has_injective_univars env t2' ->
-            raise Incompatible
-        | (_, Tconstr (_, [], _)) when has_injective_univars env t1' ->
-            raise Incompatible
-        | (Tconstr (p, _, _), _) | (_, Tconstr (p, _, _)) ->
-            begin try
-              let decl = Env.find_type p env in
-              if is_datatype decl then raise Incompatible
-            with Not_found -> ()
-            end
-        | (Tfunctor (l1, _, _, u1), Tfunctor (l2, _, _, u2))
+
+        | (Tfunctor (l1, _, _, u1), Tfunctor (l2, _, _, u2), _, _)
           when compatible_labels ~in_pattern_mode:true l1 l2 ->
             mcomp type_pairs env u1 u2
-        | (Tfunctor (l1, _, pack1, u1), Tarrow (l2, t2, u2, _))
+        | (Tfunctor (l1, _, pack1, u1), Tarrow ((l2,_,_), t2, u2, _), _, _)
           when compatible_labels ~in_pattern_mode:true l1 l2 ->
             mcomp type_pairs env (newmono_package pack1) t2;
             mcomp type_pairs env u1 u2
-        | (Tarrow (l1, t1, u1, _), Tfunctor (l2, _, pack2, u2))
+        | (Tarrow ((l1,_,_), t1, u1, _), Tfunctor (l2, _, pack2, u2), _, _)
           when compatible_labels ~in_pattern_mode:true l1 l2 ->
             mcomp type_pairs env t1 (newmono_package pack2);
             mcomp type_pairs env u1 u2
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
         (*
         | (Tpackage (p1, n1, tl1), Tpackage (p2, n2, tl2)) when n1 = n2 ->
             mcomp_list type_pairs env tl1 tl2
@@ -5129,18 +4731,13 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
   try
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
-<<<<<<< HEAD
     let check_jkinds () =
       if not (Jkind.may_have_intersection env
                 decl.type_jkind decl'.type_jkind)
       then raise Incompatible
     in
-    if compatible_paths p1 p2 then begin
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    if Path.same p1 p2 then begin
-=======
-    if Env_unscoped.path_equiv env p1 p2 then begin
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    if compatible_paths p1 p2 || Env_unscoped.path_equiv env p1 p2
+    then begin
       let inj =
         try List.map Variance.(mem Inj) (Env.find_type p1 env).type_variance
         with Not_found -> List.map (fun _ -> false) tl1
@@ -5342,30 +4939,14 @@ let add_gadt_equation uenv source destination =
         type_origin
         jkind
     in
-<<<<<<< HEAD
-    set_env uenv
-      (Env.add_local_constraint ~stage:(Env.stage env) source decl env);
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    set_env uenv (Env.add_local_constraint source decl env);
-=======
     add_local_constraint uenv source decl;
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     cleanup_abbrev ()
   end
 
 let eq_package_path env p1 p2 =
-<<<<<<< HEAD
-  Path.same p1 p2 ||
-  Path.same (normalize_package_path env p1) (normalize_package_path env p2)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  Path.same p1 p2 ||
-  Path.same (Env.normalize_modtype_path env p1)
-            (Env.normalize_modtype_path env p2)
-=======
   Env_unscoped.path_equiv env p1 p2 ||
   Env_unscoped.path_equiv env (Env.normalize_modtype_path env p1)
              (Env.normalize_modtype_path env p2)
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let nondep_type' = ref (fun _ _ _ -> assert false)
 let package_subtype = ref (fun _ _ _ -> assert false)
@@ -5483,16 +5064,10 @@ let unify1_var uenv t1 t2 =
   in
   occur_for Unify uenv t1 t2;
   let env = get_env uenv in
-<<<<<<< HEAD
   match
-    occur_univar_for Unify env t2;
+    occur_univar_or_unscoped_for Unify env t2;
     unification_jkind_check uenv t2 (Jkind.disallow_left jkind)
   with
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  match occur_univar_for Unify env t2 with
-=======
-  match occur_univar_or_unscoped_for Unify env t2 with
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   | () ->
       begin
         try
@@ -5509,7 +5084,6 @@ let unify1_var uenv t1 t2 =
 (* Called from unify3 *)
 let unify3_var uenv jkind1 t1' t2 t2' =
   occur_for Unify uenv t1' t2;
-<<<<<<< HEAD
   (* There are two possible ways forward here. Either the variable [t1']
      will succeed in unifying with [t2], in which case we're done; or
      the unification fails, in which case we want to add a GADT equation.
@@ -5519,20 +5093,14 @@ let unify3_var uenv jkind1 t1' t2 t2' =
      We thus backtrack in the GADT equation case. *)
   let snap = snapshot () in
   match
-    occur_univar_for Unify (get_env uenv) t2;
+    occur_univar_or_unscoped_for Unify (get_env uenv) t2;
     unification_jkind_check uenv t2' (Jkind.disallow_left jkind1)
   with
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  match occur_univar_for Unify (get_env uenv) t2 with
-=======
-  match occur_univar_or_unscoped_for Unify (get_env uenv) t2 with
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   | () -> link_type t1' t2
   | exception Unify_trace _ when in_pattern_mode uenv ->
       backtrack snap;
       reify uenv t1';
       reify uenv t2';
-<<<<<<< HEAD
       if can_generate_equations uenv then begin
         begin match get_desc t2' with
         | Tconstr(path,[],_)
@@ -5541,7 +5109,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
               (* This is necessary because a failed kind-check above
                  might meaningfully refine a type constructor *)
         | _ ->
-          occur_univar ~inj_only:true (get_env uenv) t2';
+          occur_univar_or_unscoped ~inj_only:true (get_env uenv) t2';
           mcomp_for Unify (get_env uenv) t1' t2'
             (* the call to [mcomp] can be skipped in the other case in this
                [match] because [add_gadt_equation] checks for jkind
@@ -5551,13 +5119,6 @@ let unify3_var uenv jkind1 t1' t2 t2' =
         end;
         record_equation uenv t1' t2'
       end
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      occur_univar ~inj_only:true (get_env uenv) t2';
-      record_equation uenv t1' t2'
-=======
-      occur_univar_or_unscoped ~inj_only:true (get_env uenv) t2';
-      record_equation uenv t1' t2'
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -5772,19 +5333,11 @@ and unify3 uenv t1 t1' t2 t2' =
             if not (is_commu_ok c1) then set_commu_ok c1
       | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
-<<<<<<< HEAD
       | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
-      | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) when Path.same p1 p2 ->
-          if not (can_generate_equations uenv) then
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) when Path.same p1 p2 ->
-          if not (in_pattern_mode uenv) then
-=======
       | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _))
         when Env_unscoped.path_equiv (get_env uenv) p1 p2 ->
-          if not (in_pattern_mode uenv) then
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+          if not (can_generate_equations uenv) then
             unify_list uenv tl1 tl2
           else if can_assume_injective uenv then
             without_assume_injective uenv (fun uenv -> unify_list uenv tl1 tl2)
@@ -6363,7 +5916,10 @@ let instance_funct_nondep env l (tfun : Types.tfunctor) mty =
   | exception Unify_trace trace ->
     let got = newty (Tfunctor (l, tfun.id_us, tfun.pack, tfun.ty)) in
     let expected =
-      newty (Tarrow (l, newmono_package tfun.pack, newvar (), commu_ok))
+      newty (Tarrow ((l, Alloc.legacy, Alloc.legacy),
+                     newmono_package tfun.pack,
+                     newvar (Jkind.Builtin.any ~why:Dummy_jkind),
+                     commu_ok))
     in
     let trace = Diff {got; expected} :: trace in
     raise (Unify (expand_to_unification_error env trace))
@@ -6392,91 +5948,46 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-<<<<<<< HEAD
-let filter_arrow env t l ~param_hole =
-  let function_type level =
-    let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
-    let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
-    let ty_param =
-      if param_hole then begin
-        assert (not (is_optional l));
-        newvar2 level k_arg
-      end else begin
-        let t1 =
-          if is_optional l then
-            newty2 ~level
-              (* CR layouts v5: Change the Jkind.Builtin.value when option can
-                 hold non-values. *)
-              (Tconstr(Predef.path_option,
-                       [newvar2 level Predef.option_argument_jkind],
-                       ref Mnil))
-          else if is_position l then
-            newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))
-          else
-            newvar2 level k_arg
-        in
-        newty2 ~level (Tpoly(t1, []))
-      end
-    in
-    let ty_ret = newvar2 level k_res in
-    let arg_mode = Alloc.newvar () in
-    let ret_mode = Alloc.newvar () in
-    let t' =
-      newty2 ~level
-        (Tarrow ((l, arg_mode, ret_mode), ty_param, ty_ret, commu_ok))
-    in
-    t', { ty_param; arg_mode; ty_ret; ret_mode }
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-let filter_arrow env t l ~param_hole =
-  let function_type level =
-    let t1 =
-      if param_hole then begin
-        assert (not (is_optional l));
-        newvar2 level
-      end else begin
-        let t1 =
-          if is_optional l then
-            newty2 ~level
-              (Tconstr(Predef.path_option,[newvar2 level], ref Mnil))
-          else
-            newvar2 level
-        in
-        newty2 ~level (Tpoly(t1, []))
-      end
-    in
-    let t2 = newvar2 level in
-    let t' = newty2 ~level (Tarrow (l, t1, t2, commu_ok)) in
-    t', t1, t2
-=======
 let function_type l ~param_hole level =
-  let t1 =
+  let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
+  let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
+  let ty_param =
     if param_hole then begin
       assert (not (is_optional l));
-      newvar2 level
+      newvar2 level k_arg
     end else begin
       let t1 =
         if is_optional l then
           newty2 ~level
-            (Tconstr(Predef.path_option,[newvar2 level], ref Mnil))
+            (* CR layouts v5: Change the Jkind.Builtin.value when option can
+               hold non-values. *)
+            (Tconstr(Predef.path_option,
+                     [newvar2 level Predef.option_argument_jkind],
+                     ref Mnil))
+        else if is_position l then
+          newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))
         else
-          newvar2 level
+          newvar2 level k_arg
       in
       newty2 ~level (Tpoly(t1, []))
     end
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   in
-  let t2 = newvar2 level in
-  let t' = newty2 ~level (Tarrow (l, t1, t2, commu_ok)) in
-  t', t1, t2
+  let ty_ret = newvar2 level k_res in
+  let arg_mode = Alloc.newvar () in
+  let ret_mode = Alloc.newvar () in
+  let t' =
+    newty2 ~level
+      (Tarrow ((l, arg_mode, ret_mode), ty_param, ty_ret, commu_ok))
+  in
+  t', { ty_param; arg_mode; ty_ret; ret_mode }
 
 let filter_arrow env ~in_apply t l ~param_hole =
   match expand_head_trace env t with
   | t ->
     begin
       match get_desc t with
-<<<<<<< HEAD
       | Tvar { jkind } ->
-          let t', arrow_desc = function_type (get_level t) in
+          let t', arrow_desc = function_type l ~param_hole (get_level t) in
           begin match
             constrain_type_jkind env t' (Jkind.disallow_left jkind)
           with
@@ -6493,25 +6004,6 @@ let filter_arrow env ~in_apply t l ~param_hole =
           if l = l' || !Clflags.classic && l = Nolabel &&
             equivalent_with_nolabels l l'
           then Ok { ty_param; arg_mode; ty_ret; ret_mode }
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | Tvar _ ->
-          let t', ty_param, ty_ret = function_type (get_level t) in
-          link_type t t';
-          Ok { ty_param; ty_ret }
-      | Tarrow(l', ty_param, ty_ret, _) ->
-          if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
-          then Ok { ty_param; ty_ret }
-=======
-      | Tvar _ ->
-          let t', ty_param, ty_ret =
-            function_type l ~param_hole (get_level t)
-          in
-          link_type t t';
-          Ok { ty_param; ty_ret }
-      | Tarrow(l', ty_param, ty_ret, _) ->
-          if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
-          then Ok { ty_param; ty_ret }
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
           else Error (Label_mismatch
                           { got = l; expected = l'; expected_type = t })
       | Tfunctor (l', id_us, pack, ty_ret) ->
@@ -6526,7 +6018,11 @@ let filter_arrow env ~in_apply t l ~param_hole =
           with
           | exception Unify_trace trace ->
             let t' =
-              newty (Tarrow (l, newmono_package pack, newvar (), commu_ok))
+              newty
+                (Tarrow ((l, Alloc.legacy, Alloc.legacy),
+                         newmono_package pack,
+                         newvar (Jkind.Builtin.any ~why:Dummy_jkind),
+                         commu_ok))
             in
             let diff =
               if in_apply then
@@ -6537,23 +6033,21 @@ let filter_arrow env ~in_apply t l ~param_hole =
             Error (Unification_error
                     (expand_to_unification_error env (diff :: trace)))
           | () ->
+            (* Module-dependent functions are legacy. *)
             let ty_param = newmono_package ~level:(get_level t) pack in
             let t' = newty2 ~level:(get_level t)
-                        (Tarrow (l, ty_param, ty_ret, commu_ok))
+                        (Tarrow ((l, Alloc.legacy, Alloc.legacy),
+                                 ty_param, ty_ret, commu_ok))
             in
             link_type t t';
-            Ok { ty_param; ty_ret }
+            Ok { ty_param; arg_mode = Alloc.legacy;
+                 ty_ret; ret_mode = Alloc.legacy }
           end
       | _ ->
           Error Not_a_function
     end
   | exception Unify_trace trace ->
-<<<<<<< HEAD
-      let t', _ = function_type (get_level t) in
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      let t', _, _ = function_type (get_level t) in
-=======
-      let t', _, _ = function_type l ~param_hole (get_level t) in
+      let t', _ = function_type l ~param_hole (get_level t) in
       let diff =
         if in_apply then
           Diff { got = t; expected = t' }
@@ -6579,8 +6073,7 @@ let filter_functor env t l =
       | _ -> Error Not_a_function
     end
   | exception Unify_trace trace ->
-      let t', _, _ = function_type l ~param_hole:false (get_level t) in
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      let t', _ = function_type l ~param_hole:false (get_level t) in
       Error (Unification_error
               (expand_to_unification_error
                   env
@@ -6970,17 +6463,23 @@ let rec copy_spine ~unscoped copy_scope ty =
   | Tvar _
   | Tnil
   | Tlink _
-  | Tunivar _ -> ty
+  | Tunivar _
+  | Tquote _
+  | Tsplice _
+  | Tquote_eval _
+  | Tof_kind _ -> ty
   | Tfield _ | Tvariant _ | Tobject _ ->
       (* We left the spine but still need to apply id_map. *)
       if unscoped.closed ty then ty
       else copy ~unscoped copy_scope ty
-  | (Tarrow _ | Tpoly _ | Ttuple _ | Tpackage _ | Tconstr _
-    | Tfunctor _) as desc ->
+  | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
+    | Tconstr _ | Tfunctor _ ) as desc ->
       let level = get_level ty in
       if unscoped.closed ty && (level < !current_level || level = generic_level)
       then ty else
-      let t = newgenstub ~scope:(get_scope ty) in
+      let t =
+        newgenstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind)
+      in
       For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
       let copy_rec = copy_spine ~unscoped copy_scope in
       let desc' = match desc with
@@ -6988,8 +6487,12 @@ let rec copy_spine ~unscoped copy_scope ty =
           Tarrow (lbl, copy_rec ty1, copy_rec ty2, commu_ok)
       | Tpoly (ty', tvl) ->
           Tpoly (copy_rec ty', tvl)
+      | Trepr (ty', sl) ->
+          Trepr (copy_rec ty', sl)
       | Ttuple tyl ->
           Ttuple (List.map (fun (lbl, ty) -> (lbl, copy_rec ty)) tyl)
+      | Tunboxed_tuple tyl ->
+          Tunboxed_tuple (List.map (fun (lbl, ty) -> (lbl, copy_rec ty)) tyl)
       | Tpackage pack ->
           Tpackage (map_pack (Path.subst unscoped.map) copy_rec pack)
       | Tconstr (path, tyl, _) ->
@@ -7254,7 +6757,6 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
               eq_labels Moregen ~in_pattern_mode:false l1 l2;
-<<<<<<< HEAD
               moregen inst_nongen (neg_variance variance) type_pairs env t1 t2;
               moregen inst_nongen variance type_pairs env u1 u2;
               (* [t2] and [u2] is the user-written interface, which we deem as
@@ -7264,52 +6766,49 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               crossing. Similar for [u1] and [u2]. *)
               moregen_alloc_mode env t2 ~is_ret:false (neg_variance variance) a1 a2;
               moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
+          | (Tfunctor (l1, id1, pack1, t1), Tfunctor (l2, id2, pack2, t2)) ->
+              eq_labels Moregen ~in_pattern_mode:false l1 l2;
+              moregen_package inst_nongen variance type_pairs env
+                (get_level t1') pack1 (get_level t2') pack2;
+              let mty1 = modtype_of_package env Location.none pack1 in
+              let mty2 = modtype_of_package env Location.none pack2 in
+              enter_functor_with_mtys_for Moregen env id1 mty1 t1' id2 mty2 t2'
+                  (fun new_env ->
+                    moregen inst_nongen variance type_pairs new_env t1 t2)
+          | Tarrow ((l1, a1, r1), t1, u1, _), Tfunctor (l2, id2, pack2, u2) ->
+                eq_labels Moregen ~in_pattern_mode:false l1 l2;
+                (* Module-dependent functions are legacy. *)
+                unify_alloc_mode_for Moregen a1 Alloc.legacy;
+                unify_alloc_mode_for Moregen r1 Alloc.legacy;
+                let t2 = newmono_package pack2 in
+                moregen inst_nongen (neg_variance variance) type_pairs env
+                  t1 t2;
+                let mty = modtype_of_package env Location.none pack2 in
+                let env' = Env.add_module (Ident.of_unscoped id2)
+                                          Mp_present mty env in
+                identifier_escape_for Moregen env' [id2] u2;
+                moregen inst_nongen variance type_pairs env u1 u2
+          | Tfunctor (l1, id1, pack1, u1), Tarrow ((l2, a2, r2), t2, u2, _) ->
+                eq_labels Moregen ~in_pattern_mode:false l1 l2;
+                (* Module-dependent functions are legacy. *)
+                unify_alloc_mode_for Moregen a2 Alloc.legacy;
+                unify_alloc_mode_for Moregen r2 Alloc.legacy;
+                let t1 = newmono_package pack1 in
+                moregen inst_nongen (neg_variance variance) type_pairs env
+                  t1 t2;
+                let mty = modtype_of_package env Location.none pack1 in
+                let env' = Env.add_module (Ident.of_unscoped id1)
+                                          Mp_present mty env in
+                identifier_escape_for Moregen env' [id1] u1;
+                moregen inst_nongen variance type_pairs env u1 u2
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
           | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-              moregen type_pairs env t1 t2;
-              moregen type_pairs env u1 u2
-          | (Ttuple tl1, Ttuple tl2) ->
-              moregen_labeled_list type_pairs env tl1 tl2
-=======
-              moregen type_pairs env t1 t2;
-              moregen type_pairs env u1 u2
-          | (Tfunctor (l1, id1, pack1, t1), Tfunctor (l2, id2, pack2, t2)) ->
-              eq_labels Moregen ~in_pattern_mode:false l1 l2;
-              moregen_package type_pairs env
-                (get_level t1') pack1 (get_level t2') pack2;
-              let mty1 = modtype_of_package env Location.none pack1 in
-              let mty2 = modtype_of_package env Location.none pack2 in
-              enter_functor_with_mtys_for Moregen env id1 mty1 t1' id2 mty2 t2'
-                  (fun new_env -> moregen type_pairs new_env t1 t2)
-          | Tarrow (l1, t1, u1, _), Tfunctor (l2, id2, pack2, u2) ->
-                eq_labels Moregen ~in_pattern_mode:false l1 l2;
-                let t2 = newmono_package pack2 in
-                moregen type_pairs env t1 t2;
-                let mty = modtype_of_package env Location.none pack2 in
-                let env' = Env.add_module (Ident.of_unscoped id2)
-                                          Mp_present mty env in
-                identifier_escape_for Moregen env' [id2] u2;
-                moregen type_pairs env u1 u2
-          | Tfunctor (l1, id1, pack1, u1), Tarrow (l2, t2, u2, _) ->
-                eq_labels Moregen ~in_pattern_mode:false l1 l2;
-                let t1 = newmono_package pack1 in
-                moregen type_pairs env t1 t2;
-                let mty = modtype_of_package env Location.none pack1 in
-                let env' = Env.add_module (Ident.of_unscoped id1)
-                                          Mp_present mty env in
-                identifier_escape_for Moregen env' [id1] u1;
-                moregen type_pairs env u1 u2
-          | (Ttuple tl1, Ttuple tl2) ->
-              moregen_labeled_list type_pairs env tl1 tl2
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
           | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _))
-<<<<<<< HEAD
-                when Path.same p1 p2 -> begin
+                when Env_unscoped.path_equiv env p1 p2 -> begin
               match variance with
               | Invariant | Bivariant ->
                   moregen_list inst_nongen variance type_pairs env tl1 tl2
@@ -7321,13 +6820,6 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 | exception Not_found ->
                     moregen_list inst_nongen Invariant type_pairs env tl1 tl2
             end
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-                when Path.same p1 p2 ->
-              moregen_list type_pairs env tl1 tl2
-=======
-                when Env_unscoped.path_equiv env p1 p2 ->
-              moregen_list type_pairs env tl1 tl2
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
           | (Tpackage pack1, Tpackage pack2) ->
               moregen_package inst_nongen variance type_pairs env
                 (get_level t1') pack1 (get_level t2') pack2
@@ -7797,20 +7289,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
   if check_phys_eq t1 t2 then () else
   try
     match (get_desc t1, get_desc t2) with
-<<<<<<< HEAD
       (Tvar { jkind = k1 }, Tvar { jkind = k2 }) when rename ->
         eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check
-    | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      (Tvar _, Tvar _) when rename ->
-        eqtype_subst type_pairs subst t1 t2
-    | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
-=======
-      (Tvar _, Tvar _) when rename ->
-        eqtype_subst type_pairs subst t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _))
       when Env_unscoped.path_equiv env p1 p2 ->
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
         ()
     | (Tof_kind k1, Tof_kind k2) ->
       if not (Jkind.equal env k1 k2)
@@ -7828,25 +7310,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
               eq_labels Equality ~in_pattern_mode:false l1 l2;
-<<<<<<< HEAD
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true;
               eqtype_alloc_mode a1 a2;
               eqtype_alloc_mode r1 r2
-          | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
-              eqtype_labeled_list rename type_pairs subst env labeled_tl1
-                labeled_tl2
-          | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
-              eqtype_labeled_list rename type_pairs subst env labeled_tl1
-                labeled_tl2
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-              eqtype rename type_pairs subst env t1 t2;
-              eqtype rename type_pairs subst env u1 u2
-          | (Ttuple tl1, Ttuple tl2) ->
-              eqtype_labeled_list rename type_pairs subst env tl1 tl2
-=======
-              eqtype rename type_pairs subst env t1 t2;
-              eqtype rename type_pairs subst env u1 u2
           | (Tfunctor (l1, id1, pack1, t1), Tfunctor (l2, id2, pack2, t2)) ->
               eq_labels Equality ~in_pattern_mode:false l1 l2;
               eqtype_package rename type_pairs subst env
@@ -7854,28 +7321,39 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
               let mty1 = modtype_of_package env Location.none pack1 in
               let mty2 = modtype_of_package env Location.none pack2 in
               enter_functor_with_mtys_for Equality env id1 mty1 t1' id2 mty2 t2'
-                  (fun new_env -> eqtype rename type_pairs subst new_env t1 t2)
-          | (Tfunctor (l1, id1, pack1, u1), Tarrow (l2, t2, u2, _)) ->
+                  (fun new_env ->
+                    eqtype rename type_pairs subst new_env t1 t2
+                      ~do_jkind_check:true)
+          | (Tfunctor (l1, id1, pack1, u1), Tarrow ((l2, a2, r2), t2, u2, _)) ->
               eq_labels Equality ~in_pattern_mode:false l1 l2;
+              (* Module-dependent functions are legacy. *)
+              unify_alloc_mode_for Equality a2 Alloc.legacy;
+              unify_alloc_mode_for Equality r2 Alloc.legacy;
               let t1 = newmono_package pack1 in
-              eqtype rename type_pairs subst env t1 t2;
+              eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               let mty = modtype_of_package env Location.none pack1 in
               let env' = Env.add_module (Ident.of_unscoped id1)
                                         Mp_present mty env in
               identifier_escape_for Equality env' [id1] u1;
-              eqtype rename type_pairs subst env u1 u2
-          | (Tarrow (l1, t1, u1, _), Tfunctor (l2, id2, pack2, u2)) ->
+              eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true
+          | (Tarrow ((l1, a1, r1), t1, u1, _), Tfunctor (l2, id2, pack2, u2)) ->
               eq_labels Equality ~in_pattern_mode:false l1 l2;
+              (* Module-dependent functions are legacy. *)
+              unify_alloc_mode_for Equality a1 Alloc.legacy;
+              unify_alloc_mode_for Equality r1 Alloc.legacy;
               let t2 = newmono_package pack2 in
-              eqtype rename type_pairs subst env t1 t2;
+              eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               let mty = modtype_of_package env Location.none pack2 in
               let env' = Env.add_module (Ident.of_unscoped id2)
                                         Mp_present mty env in
               identifier_escape_for Equality env' [id2] u2;
-              eqtype rename type_pairs subst env u1 u2
-          | (Ttuple tl1, Ttuple tl2) ->
-              eqtype_labeled_list rename type_pairs subst env tl1 tl2
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+              eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true
+          | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
+              eqtype_labeled_list rename type_pairs subst env labeled_tl1
+                labeled_tl2
+          | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
+              eqtype_labeled_list rename type_pairs subst env labeled_tl1
+                labeled_tl2
           | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _))
                 when Env_unscoped.path_equiv env p1 p2 ->
               eqtype_list_same_length rename type_pairs subst env tl1 tl2
@@ -8744,17 +8222,9 @@ let rec subtype_rec env trace t1 t2 cstrs =
     TypePairs.add subtypes (t1, t2);
     match (get_desc t1, get_desc t2) with
       (Tvar _, _) | (_, Tvar _) ->
-<<<<<<< HEAD
-        (trace, t1, t2, !univar_pairs)::cstrs
+        (env, trace, t1, t2, !univar_pairs)::cstrs
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _))
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        (trace, t1, t2, !univar_pairs)::constraints
-    | (Tarrow(l1, t1, u1, _), Tarrow(l2, t2, u2, _))
-=======
-        (env, trace, t1, t2, !univar_pairs)::constraints
-    | (Tarrow(l1, t1, u1, _), Tarrow(l2, t2, u2, _))
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
         (* the trace will be updated at the next step due to the Tpoly wrapping
            of parameter. *)
@@ -8768,84 +8238,72 @@ let rec subtype_rec env trace t1 t2 cstrs =
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)
           u1 u2
-<<<<<<< HEAD
           cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          constraints
-=======
-          constraints
     | (Tfunctor (l1, id1, pack1, u1), Tfunctor (l2, id2, pack2, u2))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
         let fcm1 = newty (Tpackage pack1) in
         let fcm2 = newty (Tpackage pack2) in
-        let constraints =
+        let cstrs =
           subtype_package env
             (Subtype.Diff {got = fcm2; expected = fcm1} :: trace)
-            (get_level t2) pack2 (get_level t1) pack1 constraints
+            (get_level t2) pack2 (get_level t1) pack1 cstrs
         in
         begin
           try enter_functor env id1 t1 id2 t2
             (fun id_pairs ->
               let new_env = Env_unscoped.with_pairs id_pairs env in
-              subtype_functor new_env trace ~id1 id2 pack2 u1 u2 constraints)
-          with Escape _ -> (env, trace, t1, t2, !univar_pairs)::constraints
+              subtype_functor new_env trace ~id1 id2 pack2 u1 u2 cstrs)
+          with Escape _ -> (env, trace, t1, t2, !univar_pairs)::cstrs
         end
-    | (Tfunctor (l1, id1, pack1, u1), Tarrow (l2, fcm2, u2, _))
+    | (Tfunctor (l1, id1, pack1, u1), Tarrow ((l2, a2, r2), fcm2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
-        let fcm1 = newmono_package pack1 in
-        let constraints =
-          (* [trace] : see [(Tarrow, Tarrow)] comment *)
-          subtype_rec env trace fcm2 fcm1 constraints
-        in
-        let fcm2 = tpoly_get_mono fcm2 in
-        begin
-          match extract_package_modulo_subtype env fcm2 with
-          | pack2 -> subtype_functor env trace id1 pack2 u1 u2 constraints
-          | exception Not_found ->
-            (env, trace, t1, t2, !univar_pairs)::constraints
+        (* Module-dependent functions are legacy; fall back to the generic
+           constraint if the arrow side cannot be legacy. *)
+        begin match Alloc.equate a2 Alloc.legacy, Alloc.equate r2 Alloc.legacy
+        with
+        | Ok (), Ok () ->
+          let fcm1 = newmono_package pack1 in
+          let cstrs =
+            (* [trace] : see [(Tarrow, Tarrow)] comment *)
+            subtype_rec env trace fcm2 fcm1 cstrs
+          in
+          let fcm2 = tpoly_get_mono fcm2 in
+          begin
+            match extract_package_modulo_subtype env fcm2 with
+            | pack2 -> subtype_functor env trace id1 pack2 u1 u2 cstrs
+            | exception Not_found ->
+              (env, trace, t1, t2, !univar_pairs)::cstrs
+          end
+        | _, _ -> (env, trace, t1, t2, !univar_pairs)::cstrs
         end
-    | (Tarrow (l1, fcm1, u1, _),  Tfunctor (l2, id2, pack2, u2))
+    | (Tarrow ((l1, a1, r1), fcm1, u1, _),  Tfunctor (l2, id2, pack2, u2))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
-        let fcm2 = newmono_package pack2 in
-        let constraints =
-          (* [trace] : see [(Tarrow, Tarrow)] comment *)
-          subtype_rec env trace fcm2 fcm1 constraints
-        in
-        subtype_functor env trace id2 pack2 u1 u2 constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+        begin match Alloc.equate a1 Alloc.legacy, Alloc.equate r1 Alloc.legacy
+        with
+        | Ok (), Ok () ->
+          let fcm2 = newmono_package pack2 in
+          let cstrs =
+            (* [trace] : see [(Tarrow, Tarrow)] comment *)
+            subtype_rec env trace fcm2 fcm1 cstrs
+          in
+          subtype_functor env trace id2 pack2 u1 u2 cstrs
+        | _, _ -> (env, trace, t1, t2, !univar_pairs)::cstrs
+        end
     | (Ttuple tl1, Ttuple tl2) ->
-<<<<<<< HEAD
         subtype_labeled_list env trace tl1 tl2 cstrs
     | (Tunboxed_tuple tl1, Tunboxed_tuple tl2) ->
         subtype_labeled_list env trace tl1 tl2 cstrs
-    | (Tconstr(p1, [], _), Tconstr(p2, [], _)) when Path.same p1 p2 ->
-        cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        subtype_labeled_list env trace tl1 tl2 constraints
-    | (Tconstr(p1, [], _), Tconstr(p2, [], _)) when Path.same p1 p2 ->
-        constraints
-=======
-        subtype_labeled_list env trace tl1 tl2 constraints
     | (Tconstr(p1, [], _), Tconstr(p2, [], _))
       when Env_unscoped.path_equiv env p1 p2 ->
-        constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+        cstrs
     | (Tconstr(p1, _tl1, _abbrev1), _)
       when generic_abbrev env p1 && safe_abbrev env t1 ->
         subtype_rec env trace (expand_abbrev env t1) t2 cstrs
     | (_, Tconstr(p2, _tl2, _abbrev2))
       when generic_abbrev env p2 && safe_abbrev env t2 ->
-<<<<<<< HEAD
         subtype_rec env trace t1 (expand_abbrev env t2) cstrs
-    | (Tconstr(p1, tl1, _), Tconstr(p2, tl2, _)) when Path.same p1 p2 ->
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        subtype_rec env trace t1 (expand_abbrev env t2) constraints
-    | (Tconstr(p1, tl1, _), Tconstr(p2, tl2, _)) when Path.same p1 p2 ->
-=======
-        subtype_rec env trace t1 (expand_abbrev env t2) constraints
     | (Tconstr(p1, tl1, _), Tconstr(p2, tl2, _))
       when Env_unscoped.path_equiv env p1 p2 ->
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
         begin try
           let decl = Env.find_type p1 env in
           List.fold_left2
@@ -8875,13 +8333,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
                 else cstrs)
             cstrs decl.type_variance (List.combine tl1 tl2)
         with Not_found ->
-<<<<<<< HEAD
-          (trace, t1, t2, !univar_pairs)::cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          (trace, t1, t2, !univar_pairs)::constraints
-=======
-          (env, trace, t1, t2, !univar_pairs)::constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+          (env, trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tconstr(p1, _, _), _)
       when generic_private_abbrev env p1 && safe_abbrev_opt env t1 ->
@@ -8891,26 +8343,14 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tobject (f1, _), Tobject (f2, _))
       when is_Tvar (object_row f1) && is_Tvar (object_row f2) ->
         (* Same row variable implies same object. *)
-<<<<<<< HEAD
-        (trace, t1, t2, !univar_pairs)::cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        (trace, t1, t2, !univar_pairs)::constraints
-=======
-        (env, trace, t1, t2, !univar_pairs)::constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+        (env, trace, t1, t2, !univar_pairs)::cstrs
     | (Tobject (f1, _), Tobject (f2, _)) ->
         subtype_fields env trace f1 f2 cstrs
     | (Tvariant row1, Tvariant row2) ->
         begin try
           subtype_row env trace row1 row2 cstrs
         with Exit ->
-<<<<<<< HEAD
-          (trace, t1, t2, !univar_pairs)::cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          (trace, t1, t2, !univar_pairs)::constraints
-=======
-          (env, trace, t1, t2, !univar_pairs)::constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+          (env, trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tpoly (u1, []), Tpoly (u2, [])) ->
         let trace = Subtype.Diff {got = u1; expected = u2} :: trace in
@@ -8925,13 +8365,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
           enter_poly env u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)
         with Escape _ ->
-<<<<<<< HEAD
-          (trace, t1, t2, !univar_pairs)::cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-          (trace, t1, t2, !univar_pairs)::constraints
-=======
-          (env, trace, t1, t2, !univar_pairs)::constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+          (env, trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Trepr (u1, sort_vars1), Trepr (u2, sort_vars2)) ->
         (* For layout-polymorphic types, establish correspondence between
@@ -8951,13 +8385,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tquote_eval t1, Tquote_eval t2) ->
          subtype_rec (incr_stage env) trace t1 t2 cstrs
     | (_, _) ->
-<<<<<<< HEAD
-        (trace, t1, t2, !univar_pairs)::cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-        (trace, t1, t2, !univar_pairs)::constraints
-=======
-        (env, trace, t1, t2, !univar_pairs)::constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+        (env, trace, t1, t2, !univar_pairs)::cstrs
   end
 
 and subtype_labeled_list env trace labeled_tl1 labeled_tl2 cstrs =
@@ -8989,37 +8417,19 @@ and subtype_package env trace lvl1 pack1 lvl2 pack2 cstrs =
     else begin
       (* need to check module subtyping *)
       let snap = Btype.snapshot () in
-<<<<<<< HEAD
-      match List.iter (fun (_, t1, t2, _) -> unify env t1 t2) cstrs' with
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      match List.iter (fun (_, t1, t2, _) -> unify env t1 t2) constraints' with
-=======
-      match List.iter (fun (env, _, t1, t2, _) -> unify env t1 t2) constraints'
+      match List.iter (fun (env, _, t1, t2, _) -> unify env t1 t2) cstrs'
       with
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       | () when Result.is_ok (!package_subtype env pack1 pack2) ->
         Btype.backtrack snap; cstrs' @ cstrs
       | () | exception Unify _ ->
         Btype.backtrack snap; raise Not_found
     end
   with Not_found ->
-<<<<<<< HEAD
-    (trace, newty (Tpackage pack1), newty (Tpackage pack2), !univar_pairs)
+    (env, trace, newty (Tpackage pack1), newty (Tpackage pack2),
+     !univar_pairs)
       ::cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-    (trace, newty (Tpackage pack1), newty (Tpackage pack2), !univar_pairs)
-      ::constraints
-=======
-    (env, trace, newty (Tpackage pack1), newty (Tpackage pack2), !univar_pairs)
-      ::constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
-<<<<<<< HEAD
-and subtype_fields env trace ty1 ty2 cstrs =
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-and subtype_fields env trace ty1 ty2 constraints =
-=======
-and subtype_functor env trace ?id1 id pack u1 u2 constraints =
+and subtype_functor env trace ?id1 id pack u1 u2 cstrs =
   let mty = modtype_of_package env Location.none pack in
   let env = match id1 with
     | Some id1 -> Env.add_module (Ident.of_unscoped id1) Mp_present mty env
@@ -9030,10 +8440,9 @@ and subtype_functor env trace ?id1 id pack u1 u2 constraints =
     env
     (Subtype.Diff {got = u1; expected = u2} :: trace)
     u1 u2
-    constraints
+    cstrs
 
-and subtype_fields env trace ty1 ty2 constraints =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+and subtype_fields env trace ty1 ty2 cstrs =
   (* Assume that either rest1 or rest2 is not Tvar *)
   let (fields1, rest1) = flatten_fields ty1 in
   let (fields2, rest2) = flatten_fields ty2 in
@@ -9047,36 +8456,16 @@ and subtype_fields env trace ty1 ty2 constraints =
         rest1 rest2
         cstrs
     else
-<<<<<<< HEAD
-      (trace, build_fields (get_level ty1) miss1 rest1, rest2,
-       !univar_pairs) :: cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      (trace, build_fields (get_level ty1) miss1 rest1, rest2,
-       !univar_pairs) :: constraints
-=======
       (env, trace,
        build_fields (get_level ty1) miss1 rest1, rest2,
-       !univar_pairs) :: constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+       !univar_pairs) :: cstrs
   in
-<<<<<<< HEAD
   let cstrs =
     if miss2 = [] then cstrs else
-    (trace, rest1, build_fields (get_level ty2) miss2
-                     (newvar (Jkind.Builtin.value ~why:Object_field)),
-     !univar_pairs) :: cstrs
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let constraints =
-    if miss2 = [] then constraints else
-    (trace, rest1, build_fields (get_level ty2) miss2 (newvar ()),
-     !univar_pairs) :: constraints
-=======
-  let constraints =
-    if miss2 = [] then constraints else
     (env, trace, rest1,
-     build_fields (get_level ty2) miss2 (newvar ()),
-     !univar_pairs) :: constraints
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+     build_fields (get_level ty2) miss2
+       (newvar (Jkind.Builtin.value ~why:Object_field)),
+     !univar_pairs) :: cstrs
   in
   List.fold_left
     (fun cstrs (_, _k1, t1, _k2, t2) ->
@@ -9411,7 +8800,6 @@ let nondep_variants = TypeHash.create 17
 let clear_hash ()   =
   TypeHash.clear nondep_hash; TypeHash.clear nondep_variants
 
-<<<<<<< HEAD
 (* The [desc_of_const] parameter lets this work on both [jkind_desc]s and
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
@@ -9440,12 +8828,7 @@ let nondep_jkind_base env ids jkind =
   let jkind_desc = nondep_jkind_desc_base env ids jkind.jkind in
   if jkind_desc == jkind.jkind then jkind else { jkind with jkind = jkind_desc }
 
-let rec nondep_type_rec ?(expand_private=false) env ids ty =
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-let rec nondep_type_rec ?(expand_private=false) env ids ty =
-=======
 let rec nondep_type_rec_aux ?(expand_private=false) env id_map ids ty =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   let try_expand env t =
     if expand_private then try_expand_safe_opt env t
     else try_expand_safe env t
@@ -9492,15 +8875,6 @@ let rec nondep_type_rec_aux ?(expand_private=false) env id_map ids ty =
                *)
             with Cannot_expand -> raise exn
           end
-<<<<<<< HEAD
-      | Tpackage pack when Path.exists_free ids pack.pack_path ->
-          let p' = normalize_package_path env pack.pack_path in
-          begin match Path.find_free_opt ids p' with
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-      | Tpackage pack when Path.exists_free ids pack.pack_path ->
-          let p' = Env.normalize_modtype_path env pack.pack_path in
-          begin match Path.find_free_opt ids p' with
-=======
       | Tpackage pack ->
           let (pack', opt) =
               if Path.exists_free ids pack.pack_path
@@ -9508,22 +8882,8 @@ let rec nondep_type_rec_aux ?(expand_private=false) env id_map ids ty =
                    ({pack with pack_path = p'}, Path.find_free_opt ids p')
               else (pack, None)
           in begin match opt with
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
           | Some id -> raise (Nondep_cannot_erase id)
           | None ->
-<<<<<<< HEAD
-            let nondep_field_rec (n, ty) = (n, nondep_type_rec env ids ty) in
-            Tpackage {
-              pack_path = p';
-              pack_cstrs = List.map nondep_field_rec pack.pack_cstrs
-            }
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-            let nondep_field_rec (n, ty) = (n, nondep_type_rec env ids ty) in
-            Tpackage {
-              pack_path = p';
-              pack_constraints = List.map nondep_field_rec pack.pack_constraints
-            }
-=======
             Tpackage (map_pack (Path.subst id_map) nondep_trec pack')
           end
       | Tfunctor (l, us, pack, t) ->
@@ -9549,7 +8909,6 @@ let rec nondep_type_rec_aux ?(expand_private=false) env id_map ids ty =
             let env' = Env.add_module id_us Mp_present mty env in
             let t' = nondep_type_rec_aux env' id_map ids t in
             Tfunctor (l, us', pack', t')
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
           end
       | Tobject (t1, name) ->
           Tobject (nondep_trec t1,
