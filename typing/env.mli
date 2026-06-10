@@ -174,17 +174,13 @@ val normalize_value_path: Location.t option -> t -> Path.t -> Path.t
 val normalize_modtype_path: t -> Path.t -> Path.t
 (* Normalize a module type path *)
 
-<<<<<<< HEAD
 val normalize_instance_names_in_module_path: Path.t -> Path.t
 (* Normalize the instance names appearing in a module path by removing
    excess arguments arising from transparent aliases *)
 
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
 val try_normalize_modtype_path: t -> Path.t -> Path.t option
 (* Normalize a module type path, returns None if the path did not change *)
 
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
 val add_required_global: Path.t -> t -> unit
