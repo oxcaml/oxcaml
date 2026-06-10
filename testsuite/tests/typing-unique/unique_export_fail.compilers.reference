@@ -1,0 +1,5 @@
+File "unique_export_fail.ml", line 19, characters 19-27:
+19 | let () = unique_id exported
+                        ^^^^^^^^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
