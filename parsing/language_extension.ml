@@ -131,8 +131,7 @@ module Exist_pair = struct
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Instances | Overwriting
-           | Let_mutable | Runtime_metaprogramming | Modular_explicits ) as
-             ext),
+           | Let_mutable | Runtime_metaprogramming | Modular_explicits ) as ext),
           _ ) ->
       to_string ext
 

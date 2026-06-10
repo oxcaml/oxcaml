@@ -130,7 +130,8 @@ let classify env ty : classification =
              Maybe we should emit a warning. *)
           Any)
     | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
-    | Tfunctor _ -> Addr
+    | Tfunctor _ ->
+      Addr
     | Tlink _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tlink"))
     | Tsubst _ ->

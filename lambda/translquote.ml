@@ -2622,8 +2622,7 @@ let quote_nonopt loc (lbl : string option) =
 
 let is_module pat =
   List.exists
-    (fun (extra, _, _) ->
-      match extra with Tpat_unpack _ -> true | _ -> false)
+    (fun (extra, _, _) -> match extra with Tpat_unpack _ -> true | _ -> false)
     pat.pat_extra
 
 let rec with_new_idents_pat pat =

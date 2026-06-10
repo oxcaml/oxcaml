@@ -325,8 +325,7 @@ module Type_shape = struct
                 | Tpoly (_, _)
                 | Trepr (_, _)
                 | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
-                | Tfunctor _
-                  ->
+                | Tfunctor _ ->
                   assert false
               in
               Misc.fatal_errorf

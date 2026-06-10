@@ -9360,7 +9360,9 @@ and type_function
                      uses the [arg_mode.comonadic] as a left mode, and
                      [arg_mode.monadic] as a right mode, hence they need to be
                      mode-crossed differently. *)
-                  let arg_mode = alloc_mode_cross_to_max_min env ty_param arg_mode in
+                  let arg_mode =
+                    alloc_mode_cross_to_max_min env ty_param arg_mode
+                  in
                   begin match
                     Alloc.submode (Alloc.close_over arg_mode) fun_alloc_mode
                   with
