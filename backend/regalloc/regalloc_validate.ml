@@ -316,6 +316,73 @@ module Instruction = struct
     }
 end
 
+(* The split pass may rematerialize a register by inserting a copy of a pure,
+   side-effect-free instruction (an immutable load, a constant, an [Intop_imm]
+   from a safe subset, ...) that originally produced its value. Such an
+   instruction is a legitimate addition during register allocation even though
+   its [desc] is not [Op (Spill | Reload | Move)]. The exact set of accepted
+   shapes is defined by [Regalloc_split_utils.is_rematerializable_shape] and
+   shared with the classification side ([Regalloc_split_utils.Uses.compute]) so
+   the two ends stay in lock-step. *)
+let is_rematerialized_shape (instr : basic Cfg.instruction) =
+  Regalloc_split_utils.is_rematerializable_shape instr.desc
+
+(* Side-table populated by [Regalloc_split] for each rematerialized basic
+   instruction it emits. The validator's equation transfer uses the pre-split
+   (description-style) abstract registers stored here so its [reg_instr] matches
+   the abstract registers used by the description-based equations in the
+   equation set; without this, the transfer would use the fresh post-split
+   stamps from the post-allocation CFG and the "0-or-2 sides" invariant of
+   [remove_result] would trip on equations keyed by the description's stamps. *)
+let rematerializations : (InstructionId.t, basic Instruction.t) Hashtbl.t =
+  Hashtbl.create 64
+
+(* Pre-split (description-style) registers whose value is rematerialized
+   somewhere in this function. Populated alongside [rematerializations] by
+   [record_rematerialization] from the result registers of each emitted
+   rematerialized instruction, then queried by [Equation_set.compatible_one] to
+   relax the "same description-stamp, different location" half of the
+   compatibility check for these registers.
+
+   Why this is needed: in a non-rematerialized split, the value flowing across a
+   destruction point lives at exactly one location at any program point — either
+   in a register or, post-spill, on a stack slot — because every downstream path
+   goes through the same spill/reload pair and the [rename_location] transitions
+   through the slot keep all paths converging on one (stamp, location) pair.
+   With rematerialization the same logical value can simultaneously sit at a
+   register location (where the rematerialized copy was just produced) AND on
+   the spill slot used by a sibling post-destruction path that reloads instead
+   of rematerializing. The resulting equation set legitimately has the same
+   description-stamp at two distinct locations.
+
+   The relaxation is targeted (only stamps recorded as remat results) so that
+   for any stamp the split pass did NOT rematerialize, the strict
+   one-location-per-stamp invariant is still enforced and any genuine regalloc
+   bug for those stamps is still caught. The complementary "two registers at one
+   location" half stays unconditional — that is the genuine aliasing-bug check.
+   Residual same-stamp/different-location equations accumulated through the
+   relaxed pass propagate backward and are eventually cleaned up either at the
+   spill that wrote the slot (via [rename_location]) or at the original
+   definition site, where the same-location check still fires for any actual
+   inconsistency. *)
+let rematerialized_res : Register.Set.t ref = ref Register.Set.empty
+
+let clear_rematerializations () =
+  Hashtbl.clear rematerializations;
+  rematerialized_res := Register.Set.empty
+
+let is_rematerialized_res (reg : Register.t) : bool =
+  Register.Set.mem reg !rematerialized_res
+
+let record_rematerialization ~id ~desc ~arg ~res =
+  let arg = Array.map Register.create arg in
+  let res = Array.map Register.create res in
+  Hashtbl.replace rematerializations id { Instruction.desc; arg; res };
+  Array.iter
+    (fun (r : Register.t) ->
+      rematerialized_res := Register.Set.add r !rematerialized_res)
+    res
+
 module Description : sig
   (** A snapshot of the [desc], [arg] and [res] fields of all instructions in
       the CFG and [fun_args] of the CFG. It is used by the validator to record
@@ -470,6 +537,9 @@ end = struct
     t
 
   let create cfg =
+    (* Discard any rematerialization records left from a previous function;
+       split will repopulate the table for this one. *)
+    clear_rematerializations ();
     match !Oxcaml_flags.regalloc_validate with
     | false -> None
     | true -> Some (do_create cfg)
@@ -511,6 +581,21 @@ end = struct
            (InstructionId.to_string id))
       ~reg_arr:old_instr.res ~loc_arr:instr.res
 
+  (* Follow the description's successor chain starting at [old_successor_id],
+     skipping ids whose corresponding description-instruction was validly
+     deleted by [Cfg_deadcode] (i.e. not present in [seen_ids] and with a pure
+     [desc]). The returned id is the first one that is either still present in
+     the post-allocation CFG, or that is not in the description at all (e.g. the
+     block's terminator). *)
+  let rec effective_successor_id ~seen_ids t old_successor_id =
+    if Hashtbl.mem seen_ids old_successor_id
+    then old_successor_id
+    else
+      match Hashtbl.find_opt t.instructions old_successor_id with
+      | Some info when Cfg.is_pure_basic info.instr.Instruction.desc ->
+        effective_successor_id ~seen_ids t info.successor_id
+      | _ -> old_successor_id
+
   let verify_basic ~seen_ids ~successor_id t instr =
     let id = instr.id in
     add_instr_id ~seen_ids
@@ -520,14 +605,17 @@ end = struct
     with
     (* The instruction was present before. *)
     | Some { instr = old_instr; successor_id = old_successor_id }, false ->
-      if not (InstructionId.equal old_successor_id successor_id)
+      let effective_old_successor_id =
+        effective_successor_id ~seen_ids t old_successor_id
+      in
+      if not (InstructionId.equal effective_old_successor_id successor_id)
       then
         Regalloc_utils.fatal
           "The instruction's no. %a successor id has changed. Before \
            allocation: %a. After allocation (ignoring instructions added by \
            allocation): %a."
-          InstructionId.format id InstructionId.format old_successor_id
-          InstructionId.format successor_id;
+          InstructionId.format id InstructionId.format
+          effective_old_successor_id InstructionId.format successor_id;
       (match instr.desc, old_instr.desc with
       | Op (Name_for_debugger _), Op (Name_for_debugger _) ->
         (* IRC uses `Reg.interf` to represent the adjacency lists for the
@@ -556,6 +644,16 @@ end = struct
       | Op Move ->
         (* A move instruction, while no regalloc-specific, can be inserted
            because of phi moves in split/rename. *)
+        successor_id
+      | _ when is_rematerialized_shape instr ->
+        (* The split pass may rematerialize a register by emitting a copy of a
+           pure source instruction (immutable load, constant, safe [Intop_imm],
+           ...; cf. [Regalloc_split.RewriteAsRematerialize]). The shape check
+           above is the same one used at classification time, so only
+           instructions the rematerialization analysis would itself emit can
+           pass it. Like [Op Move] additions, this instruction does not advance
+           the pre-allocation successor chain, so we keep [successor_id]
+           as-is. *)
         successor_id
       | _ ->
         Regalloc_utils.fatal
@@ -738,12 +836,25 @@ end = struct
         ignore (first_instruction_id : InstructionId.t))
       (Cfg_with_layout.cfg cfg).Cfg.blocks;
     Hashtbl.iter
-      (fun id _ ->
+      (fun id (info : basic_info) ->
         if not (Hashtbl.mem seen_ids id)
         then
-          Regalloc_utils.fatal
-            "Instruction no. %a was deleted by register allocator"
-            InstructionId.format id)
+          (* [Cfg_deadcode] runs at the end of the split pass and removes any
+             pure basic instruction whose result becomes dead (e.g. because a
+             rematerialization rerouted all of its uses, possibly cascading to
+             upstream pure instructions whose results were only consumed by the
+             deleted ones). We mirror its rule here: deletion is accepted iff
+             the description's [desc] is [Cfg.is_pure_basic], matching the
+             predicate [Cfg_deadcode] itself uses (cf.
+             [Cfg_deadcode.remove_deadcode]). The equation system stays
+             consistent because no surviving instruction in the post-allocation
+             CFG references the deleted instruction's result registers, so no
+             equation involving them is ever added or expected to be removed. *)
+          if not (Cfg.is_pure_basic info.instr.Instruction.desc)
+          then
+            Regalloc_utils.fatal
+              "Instruction no. %a was deleted by register allocator"
+              InstructionId.format id)
       t.instructions;
     Hashtbl.iter
       (fun id _ ->
@@ -776,7 +887,18 @@ module Equation_set : sig
   (** Calling [remove_result], [verify_destoyed_locations] and [add_argument] in
       this order corresponds to case (7) in Fig. 1 of the paper [1]. This
       implementation is also generalized for all cases not handled by
-      [rename_loc] or [rename_reg]. *)
+      [rename_loc] or [rename_reg].
+
+      The compatibility check has two halves (see [compatible_one] below for
+      details and the soundness argument): the "two registers at one location"
+      half is unconditional (it would always represent a regalloc aliasing bug);
+      the "one register at two locations" half is automatically relaxed for the
+      description-stamps that the split pass has flagged as rematerialized (cf.
+      [is_rematerialized_res] above). Rematerialization legitimately creates a
+      fresh physical copy of the value at the result location while a sibling
+      post-destruction path may still carry the same description-stamp at the
+      spill slot used by its own reload, so the equation set can legitimately
+      hold the same stamp at multiple locations at the same program point. *)
   val remove_result :
     reg_res:Register.t array ->
     loc_res:Location.t array ->
@@ -927,18 +1049,40 @@ end = struct
         let message = Format.flush_str_formatter () in
         raise (Verification_failed message))
     in
-    (* Check equations that have the location the same. *)
+    (* "Same-location" half: a second register sharing [loc] would mean two
+       distinct values live at the same physical location at the same program
+       point — always a regalloc bug (aliasing). This half is unconditional and
+       is the load-bearing soundness check even under rematerialization. *)
     (match Location.Map.find_opt loc t.for_loc with
     | None -> ()
     | Some regs ->
       let eq_loc = loc in
       Register.Set.iter (fun eq_reg -> check_equation eq_reg eq_loc) regs);
-    (* Check equations that have the register the same. *)
-    (match Register.Map.find_opt reg t.for_reg with
-    | None -> ()
-    | Some locs ->
-      let eq_reg = reg in
-      Location.Set.iter (fun eq_loc -> check_equation eq_reg eq_loc) locs);
+    (* "Same-register" half: under the original Rideau/Leroy semantics each
+       description-stamp lives at exactly one location at any program point,
+       which makes this check the symmetric companion of the same-location half.
+       That assumption is broken by the split pass when rematerialization is on
+       (cf. [rematerialized_res] above for the full argument): a stamp can
+       simultaneously be in a register (from a rematerialized copy on one path)
+       and on a spill slot (from a sibling post-destruction path that reloads).
+       Skip this half exactly for the stamps the split pass recorded as
+       rematerialization results. For every other stamp it is still enforced, so
+       a regalloc that puts a non-rematerialized value at two locations is still
+       caught here. Residual same-stamp/different-location equations from this
+       relaxation get cleaned up downstream: at the spill writing the slot,
+       [rename_location] folds the [= s[i:N]] equation back to the source
+       register; at the original definition the result equation removal does the
+       rest. If those clean-ups don't actually unify the equations (a real bug),
+       the same-location half above will fire at one of the upstream
+       instructions (or [verify_destroyed_locations] at a destroyed location)
+       once the location finally collides. *)
+    (if not (is_rematerialized_res reg)
+     then
+       match Register.Map.find_opt reg t.for_reg with
+       | None -> ()
+       | Some locs ->
+         let eq_reg = reg in
+         Location.Set.iter (fun eq_loc -> check_equation eq_reg eq_loc) locs);
     ()
 
   let remove_result ~reg_res ~loc_res t =
@@ -1212,6 +1356,35 @@ module Transfer (Desc_val : Description_value) :
       match instr.desc with
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
+      | _ when is_rematerialized_shape instr ->
+        (* Rematerialized pure source added by the split pass (immutable load,
+           constant, safe [Intop_imm], ...). Unlike [Op (Spill | Reload | Move)]
+           (which transport an existing value between locations and are handled
+           by [rename_location]), this instruction recomputes a fresh value
+           (memory read, constant materialization, or pure arithmetic). The
+           split pass calls [record_rematerialization] to register the pre-split
+           (description-style) [reg_instr] for this instruction; we look it up
+           here so the equation transfer uses the same abstract register stamps
+           as the description-based equations already in the equation set.
+           Synthesizing [reg_instr] from the post-allocation instruction's
+           [Reg.t] values directly would use the *fresh* post-split stamps from
+           [compute_substitution_tree], not the description's stamps, and
+           [remove_result]'s "0-or-2 sides" invariant would trip on equations
+           keyed by the description's stamps. The instruction's [desc] is
+           preserved verbatim by split, so [destroyed_at_basic] returns the same
+           destroyed locations as for the original. *)
+        let reg_instr =
+          match Hashtbl.find_opt rematerializations instr.id with
+          | Some reg_instr -> reg_instr
+          | None ->
+            Regalloc_utils.fatal
+              "Rematerialized instruction no. %a was not registered with \
+               [Regalloc_validate.record_rematerialization]"
+              InstructionId.format instr.id
+        in
+        append_equations t ~instr_kind:Instruction.Kind.Basic ~exn:None
+          ~reg_instr ~loc_instr:instr
+          ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       | _ -> assert false)
     | Some instr_before -> (
       match instr.desc with
