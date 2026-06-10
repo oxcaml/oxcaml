@@ -67,6 +67,12 @@ and arith_operation =
 
 val equal_specific_operation : specific_operation -> specific_operation -> bool
 
+(** If [op] computes [disp + sum_i coeff.(i) * arg.(i)] exactly from its
+    integer register arguments, return [Some (coeff, disp)] with one
+    coefficient per argument; otherwise [None]. *)
+val specific_operation_as_affine :
+  specific_operation -> (int array * int) option
+
 (* Sizes, endianness *)
 
 val big_endian : bool

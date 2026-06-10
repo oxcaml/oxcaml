@@ -88,6 +88,6 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L122(%rip), %xmm0
+  vmovsd .L134(%rip), %xmm0
   ret
 |}]
