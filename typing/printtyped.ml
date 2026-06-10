@@ -408,7 +408,12 @@ let rec core_type i ppf x =
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
-<<<<<<< HEAD
+  | Ttyp_functor (lab, id, { tpt_path = s; tpt_cstrs = l}, ct) ->
+      line i ppf "Ttyp_functor\n";
+      arg_label i ppf lab;
+      line i ppf "module \"%a\" : %a" fmt_ident id.txt fmt_path s;
+      list i package_with ppf l;
+      core_type i ppf ct
   | Ttyp_quote t ->
       line i ppf "Ttyp_quote\n";
       core_type i ppf t
@@ -426,15 +431,6 @@ let rec core_type i ppf x =
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-  | Ttyp_functor (lab, id, { tpt_path = s; tpt_constraints = l}, ct) ->
-      line i ppf "Ttyp_functor\n";
-      arg_label i ppf lab;
-      line i ppf "module \"%a\" : %a" fmt_ident id.txt fmt_path s;
-      list i package_with ppf l;
-      core_type i ppf ct
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 and labeled_core_type i ppf (l, t) =
   tuple_component_label i ppf l;

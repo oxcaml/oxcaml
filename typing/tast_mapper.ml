@@ -1060,19 +1060,15 @@ let typ sub x =
         Ttyp_package (sub.package_type sub pack)
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc_lid sub mod_ident, sub.typ sub t)
-<<<<<<< HEAD
+    | Ttyp_functor (label, id, pack, t) ->
+        Ttyp_functor (label, map_loc sub id,
+                      sub.package_type sub pack, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
     | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-    | Ttyp_functor (label, id, pack, t) ->
-        Ttyp_functor (label, map_loc sub id,
-                      sub.package_type sub pack, sub.typ sub t)
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   in
   let ctyp_attributes = sub.attributes sub x.ctyp_attributes in
   {x with ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes}

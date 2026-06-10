@@ -1216,7 +1216,7 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
-<<<<<<< HEAD
+  | Ttyp_functor of arg_label * Ident.t loc * package_type * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
@@ -1225,10 +1225,6 @@ and core_type_desc =
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
           argument ([lbl:[%call_pos] -> ...]). *)
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-=======
-  | Ttyp_functor of arg_label * Ident.t loc * package_type * core_type
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 and package_type = {
   tpt_path : Path.t;

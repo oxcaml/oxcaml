@@ -1222,7 +1222,6 @@ module Merge = struct
     let _, _, _, sg = merge ~patch ~destructive:false env sg loc lid in
     sg
 
-<<<<<<< HEAD
   (** Jkind constraint [sg with kind_ lid = pjka]. As with [merge_type], we
       use the more complicated [return_payload] (rather then [return]) because
       we want to get out the computed declaration for the purpose of building
@@ -1296,13 +1295,8 @@ module Merge = struct
     let replace = fun s _path -> s in
     post_process ~approx:true ~destructive loc lid env paths sg replace
 
-  let check_package_with_type_constraints loc env mty constraints =
-||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
-  let check_package_with_type_constraints loc env mty constraints =
-=======
   let check_package_with_type_constraints (type a) loc env mty
     (maybe : a Typetexp.maybe_compute_mty) constraints : a =
->>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     let sg = extract_sig env loc mty in
     let sg =
       List.fold_left
