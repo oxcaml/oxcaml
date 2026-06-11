@@ -344,49 +344,79 @@
               (consts (0))
                (non_consts ([0:
                              (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 1 1] [0: [0: 1 2] [0: [0: 2 1] 0]]]
+     [0:
+      [0: (shape (value<int>,value<int>)) 1 1]
+      [0:
+       [0: (shape (value<int>,value<int>)) 1 2]
+       [0: [0: (shape (value<int>,value<int>)) 2 1] 0]]]
    bool_vec =[value<
                (consts (0))
                 (non_consts ([0:
                               (?,value<
                                   (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 0 0] [0: [0: 0 1] [0: [0: 1 0] 0]]]
+     [0:
+      [0: (shape (value<int>,value<int>)) 0 0]
+      [0:
+       [0: (shape (value<int>,value<int>)) 0 1]
+       [0: [0: (shape (value<int>,value<int>)) 1 0] 0]]]
    intlike_vec =[value<
                   (consts (0))
                    (non_consts ([0:
                                  (?,value<
                                      (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 0 0] [0: [0: 0 1] [0: [0: 1 0] 0]]]
+     [0:
+      [0: (shape (value<int>,value<int>)) 0 0]
+      [0:
+       [0: (shape (value<int>,value<int>)) 0 1]
+       [0: [0: (shape (value<int>,value<int>)) 1 0] 0]]]
    float_vec =[value<
                 (consts (0))
                  (non_consts ([0:
                                (?,value<
                                    (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 1. 1.] [0: [0: 1. 2.] [0: [0: 2. 1.] 0]]]
+     [0:
+      [0: (shape (value<float>,value<float>)) 1. 1.]
+      [0:
+       [0: (shape (value<float>,value<float>)) 1. 2.]
+       [0: [0: (shape (value<float>,value<float>)) 2. 1.] 0]]]
    string_vec =[value<
                  (consts (0))
                   (non_consts ([0:
                                 (?,value<
                                     (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: "1" "1"] [0: [0: "1" "2"] [0: [0: "2" "1"] 0]]]
+     [0:
+      [0: (shape (*,*)) "1" "1"]
+      [0: [0: (shape (*,*)) "1" "2"] [0: [0: (shape (*,*)) "2" "1"] 0]]]
    int32_vec =[value<
                 (consts (0))
                  (non_consts ([0:
                                (?,value<
                                    (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 1l 1l] [0: [0: 1l 2l] [0: [0: 2l 1l] 0]]]
+     [0:
+      [0: (shape (value<int32>,value<int32>)) 1l 1l]
+      [0:
+       [0: (shape (value<int32>,value<int32>)) 1l 2l]
+       [0: [0: (shape (value<int32>,value<int32>)) 2l 1l] 0]]]
    int64_vec =[value<
                 (consts (0))
                  (non_consts ([0:
                                (?,value<
                                    (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 1L 1L] [0: [0: 1L 2L] [0: [0: 2L 1L] 0]]]
+     [0:
+      [0: (shape (value<int64>,value<int64>)) 1L 1L]
+      [0:
+       [0: (shape (value<int64>,value<int64>)) 1L 2L]
+       [0: [0: (shape (value<int64>,value<int64>)) 2L 1L] 0]]]
    nativeint_vec =[value<
                     (consts (0))
                      (non_consts ([0:
                                    (?,value<
                                        (consts (0)) (non_consts ([0: (?,*)]))>)]))>]
-     [0: [0: 1n 1n] [0: [0: 1n 2n] [0: [0: 2n 1n] 0]]]
+     [0:
+      [0: (shape (value<nativeint>,value<nativeint>)) 1n 1n]
+      [0:
+       [0: (shape (value<nativeint>,value<nativeint>)) 1n 2n]
+       [0: [0: (shape (value<nativeint>,value<nativeint>)) 2n 1n] 0]]]
    test_vec =
      (function {nlocal = 0} cmp eq ne lt gt le ge
        vec[value<
@@ -458,53 +488,12 @@
                                  (?,value<
                                      (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
                  (apply map gen vec) (apply map spec vec)))
-             (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,
-               value<
-                (consts (0))
-                 (non_consts ([0:
-                               (?,value<
-                                   (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-               (makeblock 0 (*,*) gen_eq eq)
-               (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,
-                 value<
-                  (consts (0))
-                   (non_consts ([0:
-                                 (?,value<
-                                     (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-                 (makeblock 0 (*,*) gen_ne ne)
-                 (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,
-                   value<
-                    (consts (0))
-                     (non_consts ([0:
-                                   (?,value<
-                                       (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-                   (makeblock 0 (*,*) gen_lt lt)
-                   (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,
-                     value<
-                      (consts (0))
-                       (non_consts ([0:
-                                     (?,value<
-                                         (consts (0))
-                                          (non_consts ([0: (?,*)]))>)]))>)
-                     (makeblock 0 (*,*) gen_gt gt)
-                     (makeblock 0 (value<
-                                    (consts ()) (non_consts ([0: (*,*)]))>,
-                       value<
-                        (consts (0))
-                         (non_consts ([0:
-                                       (?,value<
-                                           (consts (0))
-                                            (non_consts ([0: (?,*)]))>)]))>)
-                       (makeblock 0 (*,*) gen_le le)
-                       (makeblock 0 (value<
-                                      (consts ()) (non_consts ([0: (*,*)]))>,
-                         value<
-                          (consts (0))
-                           (non_consts ([0:
-                                         (?,value<
-                                             (consts (0))
-                                              (non_consts ([0: (?,*)]))>)]))>)
-                         (makeblock 0 (*,*) gen_ge ge) 0)))))))))))
+             (makeblock 0 (makeblock 0 (*,*) gen_eq eq)
+               (makeblock 0 (makeblock 0 (*,*) gen_ne ne)
+                 (makeblock 0 (makeblock 0 (*,*) gen_lt lt)
+                   (makeblock 0 (makeblock 0 (*,*) gen_gt gt)
+                     (makeblock 0 (makeblock 0 (*,*) gen_le le)
+                       (makeblock 0 (makeblock 0 (*,*) gen_ge ge) 0)))))))))))
   (seq
     (apply test_vec int_cmp int_eq int_ne int_lt int_gt int_le int_ge
       int_vec)
@@ -600,58 +589,12 @@
                                          (consts (0))
                                           (non_consts ([0: (?,*)]))>)]))>)
                      (apply map gen vec) (apply map spec vec)))
-                 (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,
-                   value<
-                    (consts (0))
-                     (non_consts ([0:
-                                   (?,value<
-                                       (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-                   (makeblock 0 (*,*) eta_gen_eq eq)
-                   (makeblock 0 (value<(consts ()) (non_consts ([0: (*,*)]))>,
-                     value<
-                      (consts (0))
-                       (non_consts ([0:
-                                     (?,value<
-                                         (consts (0))
-                                          (non_consts ([0: (?,*)]))>)]))>)
-                     (makeblock 0 (*,*) eta_gen_ne ne)
-                     (makeblock 0 (value<
-                                    (consts ()) (non_consts ([0: (*,*)]))>,
-                       value<
-                        (consts (0))
-                         (non_consts ([0:
-                                       (?,value<
-                                           (consts (0))
-                                            (non_consts ([0: (?,*)]))>)]))>)
-                       (makeblock 0 (*,*) eta_gen_lt lt)
-                       (makeblock 0 (value<
-                                      (consts ()) (non_consts ([0: (*,*)]))>,
-                         value<
-                          (consts (0))
-                           (non_consts ([0:
-                                         (?,value<
-                                             (consts (0))
-                                              (non_consts ([0: (?,*)]))>)]))>)
-                         (makeblock 0 (*,*) eta_gen_gt gt)
-                         (makeblock 0 (value<
-                                        (consts ()) (non_consts ([0: (*,*)]))>,
-                           value<
-                            (consts (0))
-                             (non_consts ([0:
-                                           (?,value<
-                                               (consts (0))
-                                                (non_consts ([0: (?,*)]))>)]))>)
-                           (makeblock 0 (*,*) eta_gen_le le)
-                           (makeblock 0 (value<
-                                          (consts ())
-                                           (non_consts ([0: (*,*)]))>,
-                             value<
-                              (consts (0))
-                               (non_consts ([0:
-                                             (?,value<
-                                                 (consts (0))
-                                                  (non_consts ([0: (?,*)]))>)]))>)
-                             (makeblock 0 (*,*) eta_gen_ge ge) 0)))))))))))
+                 (makeblock 0 (makeblock 0 (*,*) eta_gen_eq eq)
+                   (makeblock 0 (makeblock 0 (*,*) eta_gen_ne ne)
+                     (makeblock 0 (makeblock 0 (*,*) eta_gen_lt lt)
+                       (makeblock 0 (makeblock 0 (*,*) eta_gen_gt gt)
+                         (makeblock 0 (makeblock 0 (*,*) eta_gen_le le)
+                           (makeblock 0 (makeblock 0 (*,*) eta_gen_ge ge) 0)))))))))))
       (seq
         (apply eta_test_vec eta_int_cmp eta_int_eq eta_int_ne eta_int_lt
           eta_int_gt eta_int_le eta_int_ge int_vec)

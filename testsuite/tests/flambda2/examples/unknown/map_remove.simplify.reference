@@ -50,7 +50,7 @@ let code loopify(done) size(26) newer_version_of(min_binding_1)
               | 0 -> self (l)
               | 1 -> k2
               where k2 =
-                let Pfield = %block_load.`imm`.[`1`] (param_1) in
+                let Pfield = %block_load.[`1`] (param_1) in
                 cont k (Pfield)))
 in
 let $camlMap_remove__min_binding_6 = closure min_binding_1_1 @min_binding in
@@ -86,7 +86,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
            cont k (Pfield)
          where k2 =
            let Pfield = %block_load.[`2`] (param) in
-           let Pfield_1 = %block_load.`imm`.[`1`] (param) in
+           let Pfield_1 = %block_load.[`1`] (param) in
            (apply direct(remove_min_binding_2_1)
               ($camlMap_remove__remove_min_binding_7 ~ depth my_depth -> succ my_depth
                : _ ->
@@ -187,7 +187,7 @@ let code loopify(never) size(36) newer_version_of(remove_4)
     | 1 -> k (0)
     where k2 =
       let l = %block_load.[`0`] (param) in
-      let Pfield = %block_load.`imm`.[`1`] (param) in
+      let Pfield = %block_load.[`1`] (param) in
       let prim_1 = %int_comp.qmark (x, Pfield) in
       let int_compare = %tag_imm (prim_1) in
       let prim_2 = %phys_eq (int_compare, 0) in

@@ -170,7 +170,7 @@ let rec block_element
   fun print_mode ppf elt ->
   match elt with
   | Value vk -> value_kind ppf vk
-  | Float_boxed param -> fprintf ppf "float_boxed(%a)" print_mode param
+  | Float_boxed param -> fprintf ppf "float_boxed%a" print_mode param
   | Float64 -> fprintf ppf "float64"
   | Float32 -> fprintf ppf "float32"
   | Bits8 -> fprintf ppf "bits8"
@@ -191,7 +191,7 @@ and block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a block_element array -> _
   = fun print_mode ppf shape ->
   match Array.length shape with
-  | 0 -> ()
+  | 0 -> fprintf ppf "()"
   | 1 -> fprintf ppf "(%a)"
           (block_element print_mode) shape.(0)
   | _ -> begin
@@ -207,9 +207,7 @@ and block_shape
 and tag_and_constructor_shape ppf (tag, shape) =
   fprintf ppf "@[<hov 1>[%d:@ %a]@]"
     tag
-    (block_shape (fun ppf () -> fprintf ppf "()"))
-    shape
-
+    (block_shape (fun _ () -> ())) shape
 
 and variant_kind ppf ~consts ~non_consts =
   fprintf ppf "@[<hov 1>(consts (%a))@ (non_consts (%a))@]"
@@ -218,7 +216,6 @@ and variant_kind ppf ~consts ~non_consts =
     (Format.pp_print_list ~pp_sep:Format.pp_print_space
       tag_and_constructor_shape)
     non_consts
-
 
 and raw_value_kind ppf rk =
   match rk with
@@ -239,6 +236,12 @@ and value_kind ppf vk =
     fprintf ppf "@[<hov 1>value%a<@,%a>@]"
       or_null_suffix nullable
       raw_value_kind raw_kind
+
+let block_shape_with_locality_mode ppf shape =
+  block_shape
+    (fun ppf mode -> fprintf ppf "(%s)" (locality_mode_if_local mode)) ppf shape
+
+let block_shape ppf shape = block_shape (fun _ () -> ()) ppf shape
 
 let rec layout ppf lay_ =
   match lay_ with
@@ -285,8 +288,7 @@ let return_kind ppf (mode, kind) =
       fprintf ppf ": %s%s%s@ " smode (boxed_vector bv) or_null_suffix
     | Pvariant { consts; non_consts; } ->
       fprintf ppf ": %a@ "
-        (fun ppf () -> variant_kind ppf ~consts ~non_consts)
-        ()
+        (fun ppf () -> variant_kind ppf ~consts ~non_consts) ()
   end
   | Punboxed_float bf -> fprintf ppf ": %s@ " (unboxed_float bf)
   | Punboxed_or_untagged_integer bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
@@ -334,46 +336,17 @@ let record_rep ppf r = match r with
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
 
-let block_shape_elide_uniform ppf shape =
+let elide_uniform print_block_shape ppf shape =
   if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) shape then ()
-  else fprintf ppf " %a" (block_shape (fun _ () -> ())) shape
-
-let field_path ppf path =
-  pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int ppf path
+  else fprintf ppf " %a" print_block_shape shape
 
 let field_read_semantics ppf sem =
   match sem with
   | Reads_agree -> ()
   | Reads_vary -> fprintf ppf "_mut"
 
-let pointerness_of_printed_value_kind vk =
-  match vk.raw_kind with
-  | Pintval | Pvariant { non_consts = []; _ } -> Immediate
-  | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _
-  | Parrayval _ | Pboxedvectorval _ ->
-    Pointer
-
-let singleton_value_field path shape =
-  match path with
-  | [pos] when pos >= 0 && pos < Array.length shape -> (
-    match shape.(pos) with
-    | Value vk -> Some (pos, pointerness_of_printed_value_kind vk)
-    | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Product _
-    | Splice_variable _ ->
-      None)
-  | [] | _ :: _ -> None
-
-let rec is_value_or_void_element : 'a. 'a block_element -> bool = function
-  | Value _ -> true
-  | Product elts -> Array.for_all is_value_or_void_element elts
-  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-  | Splice_variable _ ->
-    false
-
-let is_uniform_printed_block_shape shape =
-  Array.for_all is_value_or_void_element shape
+let field_path ppf path =
+  pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int ppf path
 
 let peek_or_poke ppf (pp : peek_or_poke) =
   match pp with
@@ -413,13 +386,13 @@ let primitive ppf = function
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
-        (locality_mode_if_local mode) tag block_shape_elide_uniform shape
+        (locality_mode_if_local mode) tag (elide_uniform block_shape) shape
   | Pmakeblock(tag, Immutable_unique, shape, mode) ->
       fprintf ppf "make%sblock_unique %i%a"
-        (locality_mode_if_local mode) tag block_shape_elide_uniform shape
+        (locality_mode_if_local mode) tag (elide_uniform block_shape) shape
   | Pmakeblock(tag, Mutable, shape, mode) ->
       fprintf ppf "make%smutable %i%a"
-        (locality_mode_if_local mode) tag block_shape_elide_uniform shape
+        (locality_mode_if_local mode) tag (elide_uniform block_shape) shape
   | Pmakefloatblock (Immutable, mode) ->
       fprintf ppf "make%sfloatblock Immutable"
         (locality_mode_if_local mode)
@@ -442,33 +415,33 @@ let primitive ppf = function
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
       fprintf ppf "makeforwardblock"
-  | Pfield (path, shape, sem) -> begin
-      let uniform = is_uniform_printed_block_shape shape in
-      match singleton_value_field path shape, uniform with
-      | Some (pos, ptr), true ->
-        let instr =
-          match ptr, sem with
-          | Immediate, _ -> "field_int"
-          | Pointer, Reads_vary -> "field_mut"
-          | Pointer, Reads_agree -> "field_imm"
-        in
-        fprintf ppf "%s %i" instr pos
-      | _, false ->
-        fprintf ppf "mixedfield%a %a %a"
-          field_read_semantics sem field_path path
-          (block_shape
-            (fun ppf mode -> fprintf ppf "%s" (locality_mode_if_local mode)))
-          shape
-      | None, true ->
-      fprintf ppf "field%a %a %a"
-        field_read_semantics sem field_path path
-        (block_shape
-          (fun ppf mode -> fprintf ppf "%s" (locality_mode_if_local mode)))
-        shape
-    end
+  | Pfield (path, All_value ptr, sem) ->
+    let instr =
+      match ptr, sem with
+      | Immediate, _ -> "field_int"
+      | Pointer, Reads_vary -> "field_mut"
+      | Pointer, Reads_agree -> "field_imm"
+    in
+    fprintf ppf "%s %a" instr field_path path
+  | Pfield (path, Shape shape, sem) ->
+    let instr =
+      match sem with
+      | Reads_vary -> "field_mut"
+      | Reads_agree -> "field_imm"
+    in
+    fprintf ppf "%s %a%a"
+      instr
+      field_path path
+      (elide_uniform block_shape_with_locality_mode) shape
   | Pfield_computed sem ->
       fprintf ppf "field_computed%a" field_read_semantics sem
   | Psetfield(path, shape, init) ->
+      let instr =
+        match shape with
+        | All_value Pointer -> "_ptr"
+        | All_value Immediate -> "_imm"
+        | Shape _ -> ""
+      in
       let init =
         match init with
         | Heap_initialization -> "(heap-init)"
@@ -476,23 +449,13 @@ let primitive ppf = function
         | Assignment Modify_heap -> ""
         | Assignment Modify_maybe_stack -> "(maybe-stack)"
       in
-      begin
-      let uniform = is_uniform_printed_block_shape shape in
-      match singleton_value_field path shape, uniform with
-      | Some (pos, ptr), true ->
-        let instr =
-          match ptr with
-          | Pointer -> "ptr"
-          | Immediate -> "imm"
-        in
-        fprintf ppf "setfield_%s%s %i" instr init pos
-      | _, false ->
-        fprintf ppf "setmixedfield%s %a %a"
-          init field_path path (block_shape (fun _ _ -> ())) shape
-      | None, true ->
-      fprintf ppf "setfield%s %a %a"
-        init field_path path (block_shape (fun _ _ -> ())) shape
-      end
+      fprintf ppf "setfield%s%s %a%a"
+        instr init
+        field_path path
+        (fun ppf shape ->
+          match shape with
+          | Shape shape -> elide_uniform block_shape ppf shape
+          | All_value _ -> ()) shape
   | Psetfield_computed (ptr, init) ->
       let instr =
         match ptr with
@@ -548,8 +511,8 @@ let primitive ppf = function
   | Parray_element_size_in_bytes ak ->
       fprintf ppf "array_element_size_in_bytes (%s)" (array_kind ak)
   | Pmake_idx_field (shape, pos, path) ->
-      fprintf ppf "idx_field %a %a %a"
-        (block_shape (fun _ _ -> ())) shape
+      fprintf ppf "idx_field%a %a %a"
+        (elide_uniform block_shape) shape
         pp_print_int pos
         field_path path
   | Pmake_idx_array (ak, ik, mbe, path) ->
@@ -1237,11 +1200,11 @@ let rec struct_const ppf = function
   | Const_block(tag, _shape, []) ->
       fprintf ppf "[%i]" tag
   | Const_block(tag, shape, hd::tl) ->
-      if Lambda.is_uniform_block_shape shape
-      then fprintf ppf "@[<1>[%i:@ @[%a@]]@]" tag struct_consts (hd, tl)
-      else
-      fprintf ppf "@[<1>[%i:@ (shape@ %a)@ @[%a@]]@]" tag
-        (block_shape (fun _ _ -> ())) shape struct_consts (hd, tl)
+    fprintf ppf "@[<1>[%i:%a@ @[%a@]]@]" tag
+      (elide_uniform
+        (fun ppf shape -> fprintf ppf "(shape@ %a)" block_shape shape))
+      shape
+      struct_consts (hd, tl)
   | Const_float_block [] ->
       fprintf ppf "[|b |]"
   | Const_float_block (f1 :: fl) ->

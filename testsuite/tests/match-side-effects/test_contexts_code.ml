@@ -49,7 +49,7 @@ let example_1 () =
                  (if (seq (setfield_ptr(maybe-stack) 1 input/307 [1: 3]) 0)
                    [1: 3]
                    (let (*match*/334 =o? (field_mut 1 input/307))
-                     (makeblock 0 (value<int>) (field_imm 0 *match*/334))))
+                     (makeblock 0 (field_imm 0 *match*/334))))
                 case tag 1: [1: 2]))
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_1" example_1/305))
@@ -104,7 +104,7 @@ let example_2 () =
                    [1: 3]
                    (let
                      (*match*/355 =o? (field_mut 0 (field_imm 1 input/346)))
-                     (makeblock 0 (value<int>) (field_imm 0 *match*/355))))
+                     (makeblock 0 (field_imm 0 *match*/355))))
                 case tag 1: [1: 2]))
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_2" example_2/344))
@@ -146,14 +146,25 @@ let example_3 () =
                                                         (consts ())
                                                          (non_consts (
                                                          [1: (?)] [0: (?)]))>)]))>]
-              [0: 1 [0: 1]]
+              [0: (shape
+               (value<int>,value<
+                            (consts ()) (non_consts ([1: (?)] [0: (?)]))>))
+               1 [0: 1]]
             *match*/367 =o? *input/364)
            (if (field_imm 0 *match*/367)
              (switch* (field_imm 1 *match*/367)
               case tag 0:
-               (if (seq (assign input/364 [0: 1 [1: 3]]) 0) [1: 3]
-                 (makeblock 0 (value<int>)
-                   (field_imm 0 (field_imm 1 *match*/367))))
+               (if
+                 (seq
+                   (assign input/364
+                     [0: (shape
+                      (value<int>,value<
+                                   (consts ()) (non_consts ([1: (?)]
+                                    [0: (?)]))>))
+                      1 [1: 3]])
+                   0)
+                 [1: 3]
+                 (makeblock 0 (field_imm 0 (field_imm 1 *match*/367))))
               case tag 1: [1: 2])
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_3" example_3/362))

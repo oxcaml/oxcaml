@@ -543,7 +543,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
     | Pfield ([], _, _) -> assert false
-    | Pfield (path, shape, _sem) ->
+    | Pfield ([n], All_value _, _sem) -> unary (Getfield n)
+    | Pfield (_ :: _, All_value _, _sem) -> assert false
+    | Pfield (path, Shape shape, _sem) ->
       let read_expr =
         List.fold_left
           (fun expr idx -> Prim (Getfield idx, [expr]))
@@ -621,7 +623,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pfield_computed _sem -> binary Getvectitem
     | Psetfield ([], _, _) -> assert false
-    | Psetfield (path, shape, _init) ->
+    | Psetfield ([n], All_value _ptr, _init) -> binary (Setfield n)
+    | Psetfield (_ :: _, All_value _, _) -> assert false
+    | Psetfield (path, Shape shape, _init) ->
       let block, value =
         match args with
         | [block; value] -> comp_expr block, comp_expr value

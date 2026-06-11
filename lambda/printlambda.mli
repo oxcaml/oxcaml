@@ -29,7 +29,7 @@ val variant_kind :
   unit
 val value_kind : formatter -> value_kind -> unit
 val layout : formatter -> layout -> unit
-(* val block_shape : formatter -> block_shape -> unit *)
+val block_shape : formatter -> block_shape -> unit
 val record_rep : formatter -> Types.record_representation -> unit
 val print_bigarray :
   string -> bool -> Lambda.bigarray_kind -> formatter ->

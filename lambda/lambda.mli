@@ -134,12 +134,14 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int list * block_shape_with_locality_mode * field_read_semantics
-    (** The path to [Pfield] indexes logical elements of the shape, not
-        necessarily runtime fields. Products may be flattened and mixed block
-        fields may be reordered on entry to Flambda 2. *)
+  | Pfield of int list * locality_mode field_shape * field_read_semantics
+    (** The index to [Pfield] corresponds to an element of the shape, not
+        necessarily the index of the field at runtime, as reordering may take
+        place on entry to Flambda 2. *)
   | Pfield_computed of field_read_semantics
-  | Psetfield of int list * block_shape * initialization_or_assignment
+  | Psetfield of int list * unit field_shape * initialization_or_assignment
+    (** The same comment about the index as for [Pfield] applies to
+        [Psetfield]. *)
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
@@ -548,8 +550,7 @@ and 'a block_element =
 
 and block_shape = unit block_element array
 
-and block_shape_with_locality_mode
- = locality_mode block_element array
+and block_shape_with_locality_mode = locality_mode block_element array
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -581,6 +582,10 @@ and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+
+and 'a field_shape =
+  | All_value of immediate_or_pointer
+  | Shape of 'a block_element array
 
 and peek_or_poke =
   | Ppp_tagged_immediate
@@ -1260,8 +1265,7 @@ val pointerness_of_separability
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> block_shape
 
-val block_shape_of_value_kinds :
-  value_kind list -> 'a block_element array
+val block_shape_of_value_kinds : value_kind list -> 'a block_element array
 val block_shape_of_generic_values : int -> 'a block_element array
 
 (* Returns whether the block shape represents a block containing only values.

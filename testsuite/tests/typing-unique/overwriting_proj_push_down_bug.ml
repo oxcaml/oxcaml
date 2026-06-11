@@ -343,9 +343,10 @@ let swap_inner (t : tree) =
                                                                (non_consts (
                                                                [0:
                                                                 (*,value<int>,*)]))>)]))>)
-                       (field_imm 0 *match*/379) (field_int 1 *match*/379)
+                       (field_imm 0 (*,value_or_null<int>,?) *match*/379)
+                       (field_imm 1 (?,value<int>,?) *match*/379)
                        (field_imm 0 *match*/383))
-                     (field_int 1 t/370)
+                     (field_imm 1 (?,value<int>,?) t/370)
                      (makeblock 0 (value<
                                     (consts (0))
                                      (non_consts ([0:
@@ -374,8 +375,9 @@ let swap_inner (t : tree) =
                                                                (non_consts (
                                                                [0:
                                                                 (*,value<int>,*)]))>)]))>)
-                       (field_imm 2 *match*/379) (field_int 1 *match*/383)
-                       (field_imm 2 *match*/383)))
+                       (field_imm 2 *match*/379)
+                       (field_imm 1 (?,value<int>,?) *match*/383)
+                       (field_imm 2 (?,value_or_null<int>,*) *match*/383)))
                    (exit 19)))
                (exit 19)))
            (exit 19))

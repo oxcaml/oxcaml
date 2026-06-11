@@ -25,10 +25,6 @@ open Translmode
 
 module String = Misc.Stdlib.String
 
-let block_shape_with_locality_mode_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
 type invalid_stack_primitive =
   | Not_primitive
   | Not_allocating
@@ -664,38 +660,23 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%loc_MODULE" -> Loc Loc_MODULE
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
     | "%field0" ->
-       Primitive
-         (Pfield
-            ([0], block_shape_of_generic_values 1,
-             Reads_vary),
-          1)
+       Primitive (Pfield ([0], All_value Pointer, Reads_vary), 1)
     | "%field1" ->
-       Primitive
-         (Pfield ([1], block_shape_of_generic_values 2, Reads_vary), 1)
+       Primitive (Pfield ([1], All_value Pointer, Reads_vary), 1)
     | "%field0_immut" ->
-       Primitive
-         (Pfield ([0], block_shape_of_generic_values 1, Reads_agree), 1)
+       Primitive (Pfield ([0], All_value Pointer, Reads_agree), 1)
     | "%field1_immut" ->
-       Primitive
-         (Pfield ([1], block_shape_of_generic_values 2, Reads_agree), 1)
+       Primitive (Pfield ([1], All_value Pointer, Reads_agree), 1)
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
-       Primitive
-         (Psetfield
-            ([0], block_shape_of_generic_values 1, Assignment mode),
-          2)
+       Primitive (Psetfield ([0], All_value Pointer, Assignment mode), 2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
-       Primitive
-         (Psetfield
-            ([1], block_shape_of_generic_values 2, Assignment mode),
-          2);
+       Primitive (Psetfield ([1], All_value Pointer, Assignment mode), 2)
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable,
-                              block_shape_of_generic_values 0, mode)), 1)
+      Primitive ((Pmakeblock(0, Immutable, [| Value generic_value |], mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, block_shape_of_generic_values 0,
-                              mode)), 1)
+      Primitive ((Pmakeblock(0, Mutable, [| Value generic_value |], mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1699,25 +1680,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
           | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
   in
   match prim, param_tys with
-  | Primitive (Psetfield([n], shape, init), arity), [_; p2] -> begin
+  | Primitive (Psetfield([n], All_value Pointer, init), arity), [_; p2] -> begin
       match fst (maybe_pointer_type env p2) with
       | Pointer -> None
       | Immediate ->
-        let shape = Array.copy shape in
-        shape.(n) <- Value { generic_value with raw_kind = Pintval };
-        Some (Primitive (Psetfield([n], shape, init), arity))
+        Some (Primitive (Psetfield([n], All_value Immediate, init), arity))
     end
-  | Primitive (Psetfield _, _), _ -> None
-  | Primitive (Pfield ([n], shape, mut), arity), _ ->
+  | Primitive (Pfield ([n], All_value Pointer, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
       let is_int = match is_function_type env ty with
         | None -> Pointer
         | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
-      let shape = Array.copy shape in
-      shape.(n) <-
-        Value
-          { generic_value with raw_kind = value_kind_of_pointerness is_int };
-      Some (Primitive (Pfield ([n], shape, mut), arity))
+      Some (Primitive (Pfield ([n], All_value is_int, mut), arity))
   | Primitive (Pfield _, _), _ -> None
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
@@ -1826,8 +1800,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
   | Primitive (Pmakeblock(tag, mut, old_shape, mode), arity), fields
-    when Lambda.is_uniform_block_shape old_shape ->
-    begin
+    when Array.for_all (fun knd -> knd = Value Lambda.generic_value) old_shape
+    -> begin
       let shape =
         List.map (fun typ ->
           Lambda.must_be_value (Typeopt.layout env (to_location loc)
@@ -1838,11 +1812,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       if useful then
         Some (Primitive (Pmakeblock(tag, mut,
                            Lambda.block_shape_of_value_kinds shape,
-                           mode), arity))
-      else if List.length fields <> Array.length old_shape then
-        Some (Primitive (Pmakeblock(tag, mut,
-                           Lambda.block_shape_of_generic_values
-                             (List.length fields),
                            mode), arity))
       else None
     end
@@ -2093,6 +2062,18 @@ let comparison_primitive comparison comparison_kind =
   | Compare, Compare_int32s -> three_way_comparei_signed int32
   | Compare, Compare_int64s -> three_way_comparei_signed int64
 
+let shape_loc = function
+  | Loc_POS ->
+    [| Value { raw_kind = Pgenval; nullable = Non_nullable };
+       Value { raw_kind = Pintval; nullable = Non_nullable };
+       Value { raw_kind = Pintval; nullable = Non_nullable };
+       Value { raw_kind = Pintval; nullable = Non_nullable } |]
+  | Loc_LINE -> [| Value { raw_kind = Pintval; nullable = Non_nullable } |]
+  | Loc_FILE
+  | Loc_MODULE
+  | Loc_LOC
+  | Loc_FUNCTION ->  [| Value { raw_kind = Pgenval; nullable = Non_nullable } |]
+
 let lambda_of_loc kind sloc =
   let loc = to_location sloc in
   let loc_start = loc.Location.loc_start in
@@ -2106,15 +2087,12 @@ let lambda_of_loc kind sloc =
       loc_start.Lexing.pos_cnum + cnum in
   match kind with
   | Loc_POS ->
-    let fields = [
-          Const_immstring file;
-          Const_base (Const_int lnum);
-          Const_base (Const_int cnum);
-          Const_base (Const_int enum);
-        ] in
-    Lconst
-      (Const_block
-        (0, block_shape_of_generic_values (List.length fields), fields))
+    Lconst (Const_block (0, shape_loc kind, [
+      Const_immstring file;
+      Const_base (Const_int lnum);
+      Const_base (Const_int cnum);
+      Const_base (Const_int enum);
+    ]))
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
@@ -2216,22 +2194,11 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
           let varg = Ident.create_local "atomic_arg" in
           let ptr =
             Lprim
-              ( Pfield
-                  ( [0],
-                    block_shape_with_locality_mode_for_field 0 generic_value,
-                    Reads_agree ),
-                [Lvar varg],
-                loc )
+              (Pfield ([0], All_value Pointer, Reads_agree), [Lvar varg], loc)
           in
           let ofs =
             Lprim
-              ( Pfield
-                  ( [1],
-                    block_shape_with_locality_mode_for_field
-                      1 { generic_value with raw_kind = Pintval },
-                    Reads_agree ),
-                [Lvar varg],
-                loc )
+              (Pfield ([1], All_value Immediate, Reads_agree), [Lvar varg], loc)
           in
           let args = ptr :: ofs :: rest in
           Llet (
@@ -2296,8 +2263,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 2,
-                       alloc_heap),
+      Lprim(Pmakeblock(0, Immutable, shape_loc kind, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)

@@ -20,15 +20,7 @@ let[@tail_mod_cons] rec map f = function
        : (consts (0))
           (non_consts ([0: (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))
        (if param
-         (let
-           (block =
-              (makemutable 0 (?,value<
-                                 (consts (0))
-                                  (non_consts ([0:
-                                                (?,value<
-                                                    (consts (0))
-                                                     (non_consts ([0: (?,*)]))>)]))>)
-                (apply f (field_imm 0 param)) 24029))
+         (let (block = (makemutable 0 (apply f (field_imm 0 param)) 24029))
            (seq (apply map_dps block 1 f (field_imm 1 param)) block))
          0))
     map_dps
@@ -45,14 +37,7 @@ let[@tail_mod_cons] rec map f = function
         (if param
           (let
             (block0_arg0 =? (apply f (field_imm 0 param))
-             block =
-               (makemutable 0 (?,value<
-                                  (consts (0))
-                                   (non_consts ([0:
-                                                 (?,value<
-                                                     (consts (0))
-                                                      (non_consts ([0: (?,*)]))>)]))>)
-                 block0_arg0 24029))
+             block = (makemutable 0 block0_arg0 24029))
             (seq (setfield_ptr(heap-init)_computed dst offset block)
               (apply map_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
@@ -81,12 +66,7 @@ let[@tail_mod_cons] rec rec_map f = function
        : (consts (0)) (non_consts ([0: (?)]))
        (if param
          (let (*match* =a? (field_imm 0 param))
-           (makeblock 0 (value<
-                          (consts ())
-                           (non_consts ([0:
-                                         (*,value<
-                                             (consts (0))
-                                              (non_consts ([0: (?)]))>)]))>)
+           (makeblock 0
              (let
                (block =
                   (makemutable 0 (*,value<
@@ -108,13 +88,7 @@ let[@tail_mod_cons] rec rec_map f = function
                  block1_arg0 24029))
             (seq
               (setfield_ptr(heap-init)_computed dst offset
-                (makeblock 0 (value<
-                               (consts ())
-                                (non_consts ([0:
-                                              (*,value<
-                                                  (consts (0))
-                                                   (non_consts ([0: (?)]))>)]))>)
-                  block))
+                (makeblock 0 block))
               (apply rec_map_dps block 1 f (field_imm 1 *match*) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "rec_map" rec_map))
@@ -141,33 +115,11 @@ let[@tail_mod_cons] rec trip = function
           (non_consts ([0: (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))
        (if param
          (let (x =a? (field_imm 0 param))
-           (makeblock 0 (value<
-                          (consts ()) (non_consts ([0: (?,value<int>)]))>,
-             value<
-              (consts (0))
-               (non_consts ([0:
-                             (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-             (makeblock 0 (?,value<int>) x 0)
-             (makeblock 0 (value<
-                            (consts ()) (non_consts ([0: (?,value<int>)]))>,
-               value<
-                (consts (0))
-                 (non_consts ([0:
-                               (?,value<
-                                   (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-               (makeblock 0 (?,value<int>) x 1)
+           (makeblock 0 (makeblock 0 (?,value<int>) x 0)
+             (makeblock 0 (makeblock 0 (?,value<int>) x 1)
                (let
                  (block =
-                    (makemutable 0 (value<
-                                     (consts ())
-                                      (non_consts ([0: (?,value<int>)]))>,
-                      value<
-                       (consts (0))
-                        (non_consts ([0:
-                                      (?,value<
-                                          (consts (0))
-                                           (non_consts ([0: (?,*)]))>)]))>)
-                      (makeblock 0 (?,value<int>) x 2) 24029))
+                    (makemutable 0 (makeblock 0 (?,value<int>) x 2) 24029))
                  (seq (apply trip_dps block 1 (field_imm 1 param)) block)))))
          0))
     trip_dps
@@ -187,36 +139,10 @@ let[@tail_mod_cons] rec trip = function
              block0_arg0 =? (makeblock 0 (?,value<int>) x 0)
              block1_arg0 =? (makeblock 0 (?,value<int>) x 1)
              block2_arg0 =? (makeblock 0 (?,value<int>) x 2)
-             block =
-               (makemutable 0 (value<
-                                (consts ())
-                                 (non_consts ([0: (?,value<int>)]))>,
-                 value<
-                  (consts (0))
-                   (non_consts ([0:
-                                 (?,value<
-                                     (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-                 block2_arg0 24029))
+             block = (makemutable 0 block2_arg0 24029))
             (seq
               (setfield_ptr(heap-init)_computed dst offset
-                (makeblock 0 (value<
-                               (consts ()) (non_consts ([0: (?,value<int>)]))>,
-                  value<
-                   (consts (0))
-                    (non_consts ([0:
-                                  (?,value<
-                                      (consts (0)) (non_consts ([0: (?,*)]))>)]))>)
-                  block0_arg0
-                  (makeblock 0 (value<
-                                 (consts ())
-                                  (non_consts ([0: (?,value<int>)]))>,
-                    value<
-                     (consts (0))
-                      (non_consts ([0:
-                                    (?,value<
-                                        (consts (0))
-                                         (non_consts ([0: (?,*)]))>)]))>)
-                    block1_arg0 block)))
+                (makeblock 0 block0_arg0 (makeblock 0 block1_arg0 block)))
               (apply trip_dps block 1 (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "trip" trip))
@@ -243,23 +169,9 @@ let[@tail_mod_cons] rec effects f = function
           (non_consts ([0: (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))
        (if param
          (let (*match* =a? (field_imm 0 param))
-           (makeblock 0 (?,value<
-                            (consts (0))
-                             (non_consts ([0:
-                                           (?,value<
-                                               (consts (0))
-                                                (non_consts ([0: (?,*)]))>)]))>)
-             (apply f (field_imm 0 *match*))
+           (makeblock 0 (apply f (field_imm 0 *match*))
              (let
-               (block =
-                  (makemutable 0 (?,value<
-                                     (consts (0))
-                                      (non_consts ([0:
-                                                    (?,value<
-                                                        (consts (0))
-                                                         (non_consts (
-                                                         [0: (?,*)]))>)]))>)
-                    (apply f (field_imm 1 *match*)) 24029))
+               (block = (makemutable 0 (apply f (field_imm 1 *match*)) 24029))
                (seq (apply effects_dps block 1 f (field_imm 1 param)) block))))
          0))
     effects_dps
@@ -278,23 +190,10 @@ let[@tail_mod_cons] rec effects f = function
             (*match* =a? (field_imm 0 param)
              block0_arg0 =? (apply f (field_imm 0 *match*))
              block1_arg0 =? (apply f (field_imm 1 *match*))
-             block =
-               (makemutable 0 (?,value<
-                                  (consts (0))
-                                   (non_consts ([0:
-                                                 (?,value<
-                                                     (consts (0))
-                                                      (non_consts ([0: (?,*)]))>)]))>)
-                 block1_arg0 24029))
+             block = (makemutable 0 block1_arg0 24029))
             (seq
               (setfield_ptr(heap-init)_computed dst offset
-                (makeblock 0 (?,value<
-                                 (consts (0))
-                                  (non_consts ([0:
-                                                (?,value<
-                                                    (consts (0))
-                                                     (non_consts ([0: (?,*)]))>)]))>)
-                  block0_arg0 block))
+                (makeblock 0 block0_arg0 block))
               (apply effects_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "effects" effects))
@@ -322,24 +221,12 @@ let[@tail_mod_cons] rec map_stutter f xs =
        tail_mod_cons
        : (consts (0))
           (non_consts ([0: (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))
-       (makeblock 0 (?,value<
-                        (consts (0))
-                         (non_consts ([0:
-                                       (?,value<
-                                           (consts (0))
-                                            (non_consts ([0: (?,*)]))>)]))>)
-         (apply f 0)
+       (makeblock 0 (apply f 0)
          (if xs
            (let
              (block =
-                (makemutable 0 (?,value<
-                                   (consts (0))
-                                    (non_consts ([0:
-                                                  (?,value<
-                                                      (consts (0))
-                                                       (non_consts ([0:
-                                                                    (?,*)]))>)]))>)
-                  (apply f (makeblock 0 (field_imm 0 xs))) 24029))
+                (makemutable 0 (apply f (makeblock 0 (field_imm 0 xs)))
+                  24029))
              (seq (apply map_stutter_dps block 1 f (field_imm 1 xs)) block))
            0)))
     map_stutter_dps
@@ -354,27 +241,12 @@ let[@tail_mod_cons] rec map_stutter f xs =
                          (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))
         (let
           (block0_arg0 =? (apply f 0)
-           block =
-             (makemutable 0 (?,value<
-                                (consts (0))
-                                 (non_consts ([0:
-                                               (?,value<
-                                                   (consts (0))
-                                                    (non_consts ([0: (?,*)]))>)]))>)
-               block0_arg0 24029))
+           block = (makemutable 0 block0_arg0 24029))
           (seq (setfield_ptr(heap-init)_computed dst offset block)
             (if xs
               (let
                 (block0_arg0 =? (apply f (makeblock 0 (field_imm 0 xs)))
-                 block =
-                   (makemutable 0 (?,value<
-                                      (consts (0))
-                                       (non_consts ([0:
-                                                     (?,value<
-                                                         (consts (0))
-                                                          (non_consts (
-                                                          [0: (?,*)]))>)]))>)
-                     block0_arg0 24029))
+                 block = (makemutable 0 block0_arg0 24029))
                 (seq (setfield_ptr(heap-init)_computed block 1 block)
                   (apply map_stutter_dps block 1 f (field_imm 1 xs) tailcall)))
               (setfield_ptr(heap-init)_computed block 1 0))))))
@@ -406,24 +278,10 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
        : (consts (0))
           (non_consts ([0: (?,value<(consts (0)) (non_consts ([0: (?,*)]))>)]))
        (if (%eq n 0) 0
-         (makeblock 0 (?,value<
-                          (consts (0))
-                           (non_consts ([0:
-                                         (?,value<
-                                             (consts (0))
-                                              (non_consts ([0: (?,*)]))>)]))>)
-           (apply f 0)
+         (makeblock 0 (apply f 0)
            (let
-             (v =? (apply f (makeblock 0 (*) (field_imm 0 xs)))
-              block =
-                (makemutable 0 (?,value<
-                                   (consts (0))
-                                    (non_consts ([0:
-                                                  (?,value<
-                                                      (consts (0))
-                                                       (non_consts ([0:
-                                                                    (?,*)]))>)]))>)
-                  v 24029))
+             (v =? (apply f (makeblock 0 (field_imm 0 xs)))
+              block = (makemutable 0 v 24029))
              (seq
                (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
                  (%int_sub n 1))
@@ -438,24 +296,11 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
         (if (%eq n 0) (setfield_ptr(heap-init)_computed dst offset 0)
           (let
             (block0_arg0 =? (apply f 0)
-             v =? (apply f (makeblock 0 (*) (field_imm 0 xs)))
-             block =
-               (makemutable 0 (?,value<
-                                  (consts (0))
-                                   (non_consts ([0:
-                                                 (?,value<
-                                                     (consts (0))
-                                                      (non_consts ([0: (?,*)]))>)]))>)
-                 v 24029))
+             v =? (apply f (makeblock 0 (field_imm 0 xs)))
+             block = (makemutable 0 v 24029))
             (seq
               (setfield_ptr(heap-init)_computed dst offset
-                (makeblock 0 (?,value<
-                                 (consts (0))
-                                  (non_consts ([0:
-                                                (?,value<
-                                                    (consts (0))
-                                                     (non_consts ([0: (?,*)]))>)]))>)
-                  block0_arg0 block))
+                (makeblock 0 block0_arg0 block))
               (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
                 (%int_sub n 1) tailcall))))))
   (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))

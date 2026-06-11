@@ -79,7 +79,7 @@ type s = { e : t; f : t; }
           (two_u =? (apply (field_imm 0 (global Toploop!)) "two_u")
            one =? (apply (field_imm 0 (global Toploop!)) "one"))
           (region
-            (mixedfield 0 (value<int>,untagged_immediate)
+            (field_imm 0 (value<int>,untagged_immediate)
               (makelocalblock 0 (value<int>,untagged_immediate) one two_u)))) ⟫ }
 - : int = 1
 |}];;

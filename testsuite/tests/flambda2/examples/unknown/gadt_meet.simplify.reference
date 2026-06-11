@@ -13,7 +13,7 @@ let code loopify(never) size(10) newer_version_of(with_y_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : [ 0 of imm tagged ] =
-  let Pfield = %block_load.`imm`.[`0`] (b) in
+  let Pfield = %block_load.[`0`] (b) in
   let int_add = %int_barith.add (Pfield, y) in
   let Pmakeblock = %block.[`0`] (int_add) in
   cont k (Pmakeblock)

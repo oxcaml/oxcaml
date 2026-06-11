@@ -43,7 +43,7 @@ exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
-let block_shape_with_locality_mode_for_field pos value_kind =
+(*= let block_shape_with_locality_mode_for_field pos value_kind =
   Array.init (pos + 1) (fun i ->
     Value (if i = pos then value_kind else generic_value))
 
@@ -58,7 +58,8 @@ let transl_mixed_product_shape_for_exprs exprs shape =
       let expr, _sort = exprs.(i) in
       Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
         expr.exp_type elt)
-    shape
+    shape *)
+
 
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
@@ -569,10 +570,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
-          let shape =
-            transl_mixed_product_shape_for_exprs args_with_sorts
-              cstr.cstr_shape
-          in
+          (* TODO: This shape might be worse than the one derivable via typeopt
+             from Typeopt.layout or Typeopt.transl_mixed_block_element but maybe
+             it's sometimes better? *)
+          let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
           let constant =
             match List.map extract_constant ll with
             | exception Not_constant -> None
@@ -621,10 +622,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               (* CR layouts v5: once all-void records are allowed, handle
                   constructors with all-void inline records, which are stored
                   as immediates *)
-              let shape =
-                transl_mixed_product_shape_for_exprs args_with_sorts
-                  cstr.cstr_shape
-              in
+              (* TODO: This shape might also be worse *)
+              let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
               let shape =
                 (* This corresponds to the poly variant hash.  This will
                     always stay in the same place because the reordering
@@ -696,16 +695,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
           else
             Some
-              ( Pfield
-                  ( [lbl.lbl_pos],
-                    block_shape_with_locality_mode_for_field
-                      lbl.lbl_pos
-                      { Lambda.generic_value with
-                        raw_kind =
-                          Lambda.value_kind_of_pointerness immediate_or_pointer
-                      },
-                    sem ),
-                [targ] )
+              (Pfield ([lbl.lbl_pos], All_value immediate_or_pointer, sem),
+                [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
           let alloc_mode =
@@ -728,16 +719,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
           else
             Some
-              ( Pfield
-                  ( [lbl.lbl_pos + 1],
-                    block_shape_with_locality_mode_for_field
-                      (lbl.lbl_pos + 1)
-                      { Lambda.generic_value with
-                        raw_kind =
-                          Lambda.value_kind_of_pointerness immediate_or_pointer
-                      },
-                    sem ),
-                [targ] )
+              (Pfield ([lbl.lbl_pos + 1], All_value immediate_or_pointer, sem),
+                [targ])
         | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -766,7 +749,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           \ present for float field read")
               shape
           in
-          Some (Pfield ([lbl.lbl_pos], shape, sem), [targ])
+          Some (Pfield ([lbl.lbl_pos], Shape shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
       begin match prim_and_args with
@@ -815,15 +798,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Patomic_set_field { immediate_or_pointer },
             [arg_lambda; field_lambda; newval_lambda]
           else
-            Psetfield
-              ( [lbl.lbl_pos],
-                block_shape_for_field
-                  lbl.lbl_pos
-                  { Lambda.generic_value with
-                    raw_kind =
-                      Lambda.value_kind_of_pointerness immediate_or_pointer
-                  },
-                mode ),
+            Psetfield ([lbl.lbl_pos], All_value immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
@@ -839,15 +814,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Patomic_set_field { immediate_or_pointer },
             [arg_lambda; field_lambda; newval_lambda]
           else
-            Psetfield
-              ( [lbl.lbl_pos + 1],
-                block_shape_for_field
-                  (lbl.lbl_pos + 1)
-                  { Lambda.generic_value with
-                    raw_kind =
-                      Lambda.value_kind_of_pointerness immediate_or_pointer
-                  },
-                mode ),
+            Psetfield ([lbl.lbl_pos + 1], All_value immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
@@ -865,7 +832,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let shape = Lambda.transl_mixed_product_shape shape in
           (* Update the shape with details for the modified field. *)
           shape.(lbl.lbl_pos) <- field_shape;
-          Psetfield([lbl.lbl_pos], shape, mode),
+          Psetfield([lbl.lbl_pos], Shape shape, mode),
           [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
@@ -1041,8 +1008,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         ap_loc=loc;
         ap_func=
           Lprim(Pfield
-                  ([0],
-                   Lambda.block_shape_of_generic_values 1,
+                  ([0], Shape (Lambda.block_shape_of_generic_values 1),
                    Reads_vary),
               [transl_class_path loc e.exp_env cl], loc);
         ap_args=[lambda_unit];
@@ -2154,7 +2120,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 let shape = Lambda.transl_mixed_product_shape shape in
                 (* Update the shape with details for the modified field. *)
                 shape.(lbl.lbl_pos) <- field_shape;
-                Psetfield ([lbl.lbl_pos], shape, Assignment modify_heap)
+                Psetfield ([lbl.lbl_pos], Shape shape, Assignment modify_heap)
             | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                 assert false
             | Record_float ->
@@ -2166,12 +2132,17 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 let pos = lbl.lbl_pos + 1 in
                 let field_shape =
                   Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
-                    expr.exp_type shape.(pos)
+                    expr.exp_type shape.(lbl.lbl_pos)
                 in
                 let shape = Lambda.transl_mixed_product_shape shape in
+                (* Field 0 of an extension constructor block holds the
+                   extension slot; mirror the shape used for allocation. *)
+                let shape =
+                  Array.append [| Lambda.Value Lambda.generic_value |] shape
+                in
                 (* Update the shape with details for the modified field. *)
                 shape.(pos) <- field_shape;
-                Psetfield ([pos], shape, Assignment modify_heap)
+                Psetfield ([pos], Shape shape, Assignment modify_heap)
             | Record_inlined (_, _, Variant_extensible) ->
                 (* CR layouts v5.9: support this *)
                 fatal_error
@@ -2254,7 +2225,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                          Lambda.alloc_heap)
                       shape
                    in
-                   Pfield ([i], shape, sem)
+                   Pfield ([i], Shape shape, sem)
                  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                    assert false
                  | Record_inlined (_, shape, Variant_extensible)
@@ -2262,7 +2233,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    let shape =
                     Lambda.transl_mixed_product_shape_for_read
                       ~get_value_kind:(fun i ->
-                        if i <> lbl.lbl_pos + 1 then Lambda.generic_value
+                        if i <> lbl.lbl_pos then Lambda.generic_value
                         else
                           let pointerness, nullable =
                             maybe_pointer_type env typ
@@ -2277,7 +2248,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                         Lambda.alloc_heap)
                      shape
                    in
-                   Pfield ( [i + 1], shape, sem )
+                   (* Field 0 of an extension constructor block holds the
+                      extension slot; mirror the shape used for allocation. *)
+                   let shape =
+                     Array.append
+                       [| Lambda.Value Lambda.generic_value |] shape
+                   in
+                   Pfield ( [i + 1], Shape shape, sem )
                  | Record_inlined (_, _, Variant_extensible) ->
                      (* CR layouts v5.9: support this *)
                      fatal_error

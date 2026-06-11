@@ -161,9 +161,9 @@ type primitive =
      `Psetfield` (the path / list of indices) should probably be
      abstracted so that we do not check in multiple places that its length is
      correct. *)
-  | Pfield of int list * block_shape_with_locality_mode * field_read_semantics
+  | Pfield of int list * locality_mode field_shape * field_read_semantics
   | Pfield_computed of field_read_semantics
-  | Psetfield of int list * block_shape * initialization_or_assignment
+  | Psetfield of int list * unit field_shape * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
@@ -551,6 +551,10 @@ and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+
+and 'a field_shape =
+  | All_value of immediate_or_pointer
+  | Shape of 'a block_element array
 
 and peek_or_poke =
   | Ppp_tagged_immediate
@@ -1788,7 +1792,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   ) shape
 
 let mod_field ?(read_semantics=Reads_agree) pos (_, shape_for_read) =
-  Pfield([pos], shape_for_read, read_semantics)
+  Pfield([pos], Shape shape_for_read, read_semantics)
 
 let transl_module_representation repr =
   (* The shape here is potentially an underapproximation, since the scannable
@@ -2345,7 +2349,7 @@ let project_from_block_shape
     in
     project_from_block_element_by_path element path
 
-let mixed_block_projection_may_allocate shape ~path =
+let block_projection_may_allocate shape ~path =
   let rec allocates element =
     match element with
     | Float_boxed mode -> Some mode
@@ -2365,7 +2369,9 @@ let mixed_block_projection_may_allocate shape ~path =
        it's currently used by transl. *)
     | Splice_variable _ -> Some alloc_local
   in
-  allocates (project_from_block_shape shape ~path)
+  match shape with
+  | All_value _ -> None
+  | Shape shape -> allocates (project_from_block_shape shape ~path)
 
 (* Changes to this function may also require changes in Flambda 2 (e.g.
    closure_conversion.ml). *)
@@ -2385,8 +2391,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
-  | Pfield (path, shape, _) ->
-    mixed_block_projection_may_allocate shape ~path
+  | Pfield (path, shape, _) -> block_projection_may_allocate shape ~path
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
   | Pfloatfield (_, _, m) -> Some m
   | Pufloatfield _ -> None
@@ -2833,10 +2838,12 @@ let rec layout_of_block_element element =
       (Array.to_list (Array.map layout_of_block_element shape))
   | Splice_variable id -> Psplicevar id
 
-let layout_of_block_shape
-    : 'a. 'a block_element array -> path:int list -> layout
+let layout_of_field_shape
+    : 'a. 'a field_shape -> path:int list -> layout
     = fun shape ~path ->
-  layout_of_block_element (project_from_block_shape shape ~path)
+  match shape with
+  | All_value ptr -> nullable_value (value_kind_of_pointerness ptr)
+  | Shape shape -> layout_of_block_element (project_from_block_shape shape ~path)
 
 let layout_of_module_field (shape, _) pos =
   layout_of_block_element shape.(pos)
@@ -2978,7 +2985,7 @@ let primitive_result_layout (p : primitive) =
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
-  | Pfield (path, shape, _) -> layout_of_block_shape shape ~path
+  | Pfield (path, shape, _) -> layout_of_field_shape shape ~path
   | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts

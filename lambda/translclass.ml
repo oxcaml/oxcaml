@@ -36,14 +36,6 @@ let layout_table = layout_block
 let layout_meth = layout_any_value
 let layout_tables = layout_any_value
 
-let block_shape_with_locality_mode_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
-let block_shape_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
 let lfunction ?(kind=Curried {nlocal=0}) ?(ret_mode=alloc_heap) return_layout params body =
   if params = [] then body else
   match kind, body with
@@ -99,13 +91,7 @@ let lsequence l1 l2 =
   if l2 = lambda_unit then l1 else Lsequence(l1, l2)
 
 let lfield v i =
-  Lprim
-    ( Pfield
-        ( [i],
-          block_shape_with_locality_mode_for_field i generic_value,
-          Reads_vary ),
-      [Lvar v],
-      Loc_unknown )
+  Lprim (Pfield ([i], All_value Pointer, Reads_vary), [Lvar v], Loc_unknown)
 
 let transl_label l = share (Const_immstring l)
 
@@ -183,11 +169,7 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
         match envs with None -> []
         | Some envs ->
             let i = List.length inh_init + 1 in
-            [Lprim(Pfield ([i],
-                           block_shape_with_locality_mode_for_field
-                             i generic_value,
-                           Reads_vary),
-                   [Lvar envs],
+            [Lprim(Pfield ([i], All_value Pointer, Reads_vary), [Lvar envs],
                    Loc_unknown)]
       in
       let loc = of_location ~scopes cl.cl_loc in
@@ -327,8 +309,7 @@ let bind_methods tbl meths vals cl_init =
          (* CR sspies: Can we get a better debugging uid here? *)
          (fun (_lab, id) lam -> decr i; Llet(StrictOpt, layout_label, id,
                                            Lambda.debug_uid_none,
-                                           lfield ids !i,
-                                           lam))
+                                           lfield ids !i, lam))
          (methl @ vals) cl_init)
 
 let output_methods tbl methods lam =
@@ -339,8 +320,7 @@ let output_methods tbl methods lam =
   | _ ->
       let methods =
         Lprim (Pmakeblock (0, Immutable,
-                           block_shape_of_generic_values
-                            (List.length methods),
+                           block_shape_of_generic_values (List.length methods),
                            alloc_heap),
                methods, Loc_unknown)
       in
@@ -362,9 +342,7 @@ let rec index a = function
 
 let bind_id_as_val (id, _) = ("", id)
 
-let class_field i =
-  Pfield
-    ([i], block_shape_with_locality_mode_for_field i generic_value, Reads_vary)
+let class_field i = Pfield ([i], All_value Pointer, Reads_vary)
 
 let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
   match cl.cl_desc with
@@ -979,8 +957,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
             Loc_unknown)))),
       Static
   and lbody_virt lenvs =
-    Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 4,
-                     alloc_heap),
+    Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 4, alloc_heap),
           [lambda_unit; Lambda.lfunction
                           ~kind:(Curried {nlocal=0})
                           ~attr:default_function_attribute
@@ -1065,8 +1042,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                    ~ret_mode:alloc_heap
                    ~body:(def_ids cla cl_init), lam)
   and lset cached i lam =
-    Lprim(Psetfield([i], block_shape_for_field i generic_value,
-                    Assignment modify_heap),
+    Lprim(Psetfield([i], All_value Pointer, Assignment modify_heap),
           [Lvar cached; lam], Loc_unknown)
   in
   let ldirect () =

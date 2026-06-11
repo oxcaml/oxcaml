@@ -99,10 +99,6 @@ module Scoped_location = Debuginfo.Scoped_location
 
 let dbg = false
 
-let block_shape_with_locality_mode_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
 let debugf fmt =
   if dbg
   then Format.eprintf fmt
@@ -1991,7 +1987,15 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
                   constructor field")
             cstr.cstr_shape
         in
-        Pfield ([pos], shape, sem)
+        let shape =
+          match cstr.cstr_repr with
+          | Variant_extensible ->
+            (* Field 0 of an extension constructor block holds the extension
+               slot; mirror the shape used for allocation. *)
+            Array.append [| Lambda.Value Lambda.generic_value |] shape
+          | _ -> shape
+        in
+        Pfield ([pos], Shape shape, sem)
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       (Lprim (prim, [ arg ], loc), binding_kind, sort, layout)
@@ -2035,10 +2039,7 @@ let get_expr_args_variant_constant = drop_expr_arg
 
 let nonconstant_variant_field ubr index =
   let sem = add_barrier_to_read ubr Reads_agree in
-  Lambda.Pfield
-    ( [index],
-      block_shape_with_locality_mode_for_field index generic_value,
-      sem )
+  Lambda.Pfield([index], All_value Pointer, sem)
 
 let get_expr_args_variant_nonconst ~scopes head (arg, _mut, _sort, _layout)
       rem =
@@ -2164,11 +2165,7 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_probe = None;
     }
 
-let lazy_forward_field =
-  Lambda.Pfield
-    ( [0],
-      block_shape_with_locality_mode_for_field 0 generic_value,
-      Reads_vary )
+let lazy_forward_field = Lambda.Pfield ([0], All_value Pointer, Reads_vary)
 
 let inline_lazy_force_cond arg pos loc =
   let idarg = Ident.create_local "lzarg" in
@@ -2226,15 +2223,9 @@ let inline_lazy_force_switch arg pos loc =
                 sw_numconsts = 256;
                 (* PR#6033 - tag ranges from 0 to 255 *)
                 sw_consts =
-                  [ ( Runtimetags.forward_tag,
-                      Lprim
-                        ( Pfield
-                            ( [0],
-                              block_shape_with_locality_mode_for_field
-                                0 generic_value,
-                              Reads_vary ),
-                          [varg],
-                          loc ) );
+                  [ (Runtimetags.forward_tag,
+                      Lprim (Pfield ([0], All_value Pointer, Reads_vary),
+                        [varg], loc));
                     (Runtimetags.lazy_tag, call_force_lazy_block varg loc ~pos);
                     (Runtimetags.forcing_tag, call_force_lazy_block varg loc ~pos)
                   ];
@@ -2314,13 +2305,7 @@ let get_expr_args_tuple ~scopes head (arg, _mut, _sort, _layout) rem =
     if pos >= arity then
       rem
     else
-      (Lprim
-         (Pfield
-            ([pos],
-             block_shape_with_locality_mode_for_field pos generic_value,
-             sem),
-          [arg], loc),
-       str,
+      (Lprim (Pfield ([pos], All_value Pointer, sem), [arg], loc), str,
        Jkind.Sort.Const.for_tuple_element, layout_tuple_element)
         :: make_args (pos + 1)
   in
@@ -2409,16 +2394,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
         | Record_boxed shape
         | Record_inlined (_, shape, Variant_boxed _)
           when Types.mixed_product_shape_is_flat_all_value shape ->
-            Lprim
-              (Pfield
-                 ([lbl.lbl_pos],
-                  block_shape_with_locality_mode_for_field
-                    lbl.lbl_pos
-                    { generic_value with
-                      raw_kind = value_kind_of_pointerness ptr
-                    },
-                  sem),
-               [ arg ], loc),
+            Lprim (Pfield ([lbl.lbl_pos], All_value ptr, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout
         | Record_unboxed
         | Record_inlined (_, _, Variant_unboxed) -> arg, sort, layout
@@ -2433,16 +2409,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
            lbl.lbl_sort, lbl_layout
         | Record_inlined (_, shape, Variant_extensible)
           when Types.mixed_product_shape_is_flat_all_value shape ->
-            Lprim
-              (Pfield
-                 ([lbl.lbl_pos + 1],
-                  block_shape_with_locality_mode_for_field
-                    (lbl.lbl_pos + 1)
-                    { generic_value with
-                      raw_kind = value_kind_of_pointerness ptr
-                    },
-                  sem),
-               [ arg ], loc),
+            Lprim (Pfield ([lbl.lbl_pos + 1], All_value ptr, sem), [arg], loc),
             lbl.lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
@@ -2458,7 +2425,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
                   alloc_heap)
                 shape
             in
-            Lprim (Pfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
+            Lprim (Pfield ([lbl.lbl_pos], Shape shape, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
@@ -3414,13 +3381,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
               let sem = add_barrier_to_read ubr Reads_agree in
               let str = add_barrier_to_let_kind ubr Alias in
               Llet (str, Lambda.layout_block, tag, tag_duid,
-                    Lprim
-                      (Pfield
-                         ([0],
-                          block_shape_with_locality_mode_for_field
-                            0 generic_value,
-                          sem),
-                       [ arg ], loc),
+                    Lprim (Pfield ([0], All_value Pointer, sem), [ arg ], loc),
                     tests)
         in
         List.fold_right
@@ -4395,7 +4356,8 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
           (fun acc (_, pat) lam ->
              collect Jkind.Sort.Const.for_tuple_element acc pat lam)
           acc patl lams
-    | Tpat_tuple patl, Lconst (Const_block (_, _shape, scl)) ->
+    | Tpat_tuple patl, Lconst (Const_block (_, shape, scl))
+      when Lambda.is_uniform_block_shape shape ->
         opt := true;
         let collect_const acc (_, pat) sc =
           collect Jkind.Sort.Const.for_tuple_element acc pat (Lconst sc)
@@ -4583,9 +4545,7 @@ let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list pa
       |> List.map (fun (_lam, _sort, layout) -> must_be_value layout)
       |> block_shape_of_value_kinds
     in
-    Lprim
-      (Pmakeblock (0, Immutable, shape, mode),
-       param_lambda, sloc)
+    Lprim (Pmakeblock (0, Immutable, shape, mode), param_lambda, sloc)
   in
   let arg_sort = Jkind.Sort.Const.for_tuple in
   let handler =
@@ -4676,10 +4636,7 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
-           (Pfield
-              ([0],
-               block_shape_with_locality_mode_for_field 0 generic_value,
-               Reads_agree),
+           (Pfield ([0], All_value Pointer, Reads_agree),
             [ Lvar param ],
             sloc))
   in

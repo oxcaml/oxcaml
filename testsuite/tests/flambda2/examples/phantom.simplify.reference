@@ -24,8 +24,8 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4)
   cont k4 push(k2)
     where k4 =
       ((let Pfield = %block_load.[`1`] (a) in
-        let lvl = %block_load.`imm`.[`3`] (Pfield) in
-        let Pfield_1 = %block_load.`imm`.mut.[`3`] (a) in
+        let lvl = %block_load.[`3`] (Pfield) in
+        let Pfield_1 = %block_load.mut.[`3`] (a) in
         (let untagged = %untag_imm (Pfield_1) in
          switch untagged
            | 0 -> k5 (lvl)
@@ -37,7 +37,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4)
               | 1 -> k4 (lvl_1, 1i)
           where k5 (lvl_1) =
             let Pfield_2 = %block_load.[`2`] (a) in
-            let Pfield_3 = %block_load.`imm`.mut.[`3`] (Pfield_2) in
+            let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
             let untagged = %untag_imm (Pfield_3) in
             switch untagged
               | 0 -> k2 pop(reraise k2) (UndecidedLit)
@@ -70,8 +70,8 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
     %project_value_slot.[eval_level].[UndecidedLit_1] (my_closure)
   in
   let Pfield = %block_load.[`1`] (a) in
-  let lvl = %block_load.`imm`.[`3`] (Pfield) in
-  let Pfield_1 = %block_load.`imm`.mut.[`3`] (a) in
+  let lvl = %block_load.[`3`] (Pfield) in
+  let Pfield_1 = %block_load.mut.[`3`] (a) in
   (let untagged = %untag_imm (Pfield_1) in
    switch untagged
      | 0 -> k2
@@ -86,7 +86,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
            cont k (Pmakeblock))
     where k2 =
       let Pfield_2 = %block_load.[`2`] (a) in
-      let Pfield_3 = %block_load.`imm`.mut.[`3`] (Pfield_2) in
+      let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
       ((let untagged = %untag_imm (Pfield_3) in
         switch untagged
           | 0 -> k1 pop(reraise k1) (UndecidedLit)
@@ -101,7 +101,7 @@ let code inline(always) loopify(never) size(3) newer_version_of(is_false_2)
         -> k * k1
         : imm tagged =
   let Pfield = %block_load.[`2`] (a) in
-  let Pfield_1 = %block_load.`imm`.mut.[`3`] (Pfield) in
+  let Pfield_1 = %block_load.mut.[`3`] (Pfield) in
   cont k (Pfield_1)
 in
 let $camlPhantom__is_false_8 = closure is_false_2_1 @is_false in
@@ -110,7 +110,7 @@ let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pfield = %block_load.`imm`.mut.[`3`] (a) in
+  let Pfield = %block_load.mut.[`3`] (a) in
   cont k (Pfield)
 in
 let $camlPhantom__is_true_7 = closure is_true_1_1 @is_true in
@@ -159,8 +159,8 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
   cont k4 push(k2)
     where k4 =
       ((let Pfield = %block_load.[`1`] (a) in
-        let lvl = %block_load.`imm`.[`3`] (Pfield) in
-        let Pfield_1 = %block_load.`imm`.mut.[`3`] (a) in
+        let lvl = %block_load.[`3`] (Pfield) in
+        let Pfield_1 = %block_load.mut.[`3`] (a) in
         (let untagged = %untag_imm (Pfield_1) in
          switch untagged
            | 0 -> k5 (lvl)
@@ -172,7 +172,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
               | 1 -> k4 (1i, lvl_1)
           where k5 (lvl_1) =
             let Pfield_2 = %block_load.[`2`] (a) in
-            let Pfield_3 = %block_load.`imm`.mut.[`3`] (Pfield_2) in
+            let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
             let untagged = %untag_imm (Pfield_3) in
             switch untagged
               | 0 -> k2 pop(reraise k2) (UndecidedLit)
@@ -205,8 +205,8 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
     %project_value_slot.[eval_level].[UndecidedLit_1] (my_closure)
   in
   let Pfield = %block_load.[`1`] (a) in
-  let lvl = %block_load.`imm`.[`3`] (Pfield) in
-  let Pfield_1 = %block_load.`imm`.mut.[`3`] (a) in
+  let lvl = %block_load.[`3`] (Pfield) in
+  let Pfield_1 = %block_load.mut.[`3`] (a) in
   (let untagged = %untag_imm (Pfield_1) in
    switch untagged
      | 0 -> k2
@@ -221,7 +221,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
            cont k (Pmakeblock))
     where k2 =
       let Pfield_2 = %block_load.[`2`] (a) in
-      let Pfield_3 = %block_load.`imm`.mut.[`3`] (Pfield_2) in
+      let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
       ((let untagged = %untag_imm (Pfield_3) in
         switch untagged
           | 0 -> k1 pop(reraise k1) (UndecidedLit)

@@ -881,7 +881,7 @@ let unboxed_vec256_field ~loc i arg =
       loc )
 
 let boxed_vec256_field ~loc i arg =
-  L.Lprim (Pfield ([i], [| Vec128; Vec128 |], Reads_agree), [arg], loc)
+  L.Lprim (Pfield ([i], Shape [| Vec128; Vec128 |], Reads_agree), [arg], loc)
 
 let split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride ~load =
   let arr_id = Ident.create_local "arr" in

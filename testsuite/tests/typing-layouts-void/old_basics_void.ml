@@ -483,7 +483,7 @@ let _ = exnmatch5 vh
 let l = !r
 let _ = assert (List.for_all2 (=) l [3;2;1]);;
 [%%expect{|
-Uncaught exception: File "lambda/translcore.ml", line 610, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translcore.ml", line 611, characters 12-18: Assertion failed
 
 |}]
 (* CR layouts v5: This was the expected behavior before removing the handling of

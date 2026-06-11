@@ -343,6 +343,14 @@ and eval_block_element : 'a. Env.t -> 'a block_element -> 'a block_element =
   | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     element
 
+and eval_field_shape : 'a. Env.t -> 'a field_shape -> 'a field_shape =
+ fun env old_field_shape ->
+  match old_field_shape with
+  | All_value _ -> old_field_shape
+  | Shape old_shape ->
+    let new_shape = eval_block_shape env old_shape in
+    if new_shape == old_shape then old_field_shape else Shape new_shape
+
 and eval_layout env layout =
   match layout with
   | Psplicevar id ->
@@ -388,10 +396,10 @@ and eval_prim env prim =
     let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
   | Pfield (is, old_shape, sem) ->
-    let new_shape = eval_block_shape env old_shape in
+    let new_shape = eval_field_shape env old_shape in
     if new_shape == old_shape then prim else Pfield (is, new_shape, sem)
   | Psetfield (is, old_shape, init_or_assign) ->
-    let new_shape = eval_block_shape env old_shape in
+    let new_shape = eval_field_shape env old_shape in
     if new_shape == old_shape
     then prim
     else Psetfield (is, new_shape, init_or_assign)
@@ -518,10 +526,10 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
   | Pmakeblock (_, _, shape, _)
-  | Psetfield (_, shape, _)
+  | Psetfield (_, Shape shape, _)
   | Pmake_idx_field (shape, _, _) ->
     assert_block_shape_contains_no_splices shape
-  | Pfield (_, shape, _) -> assert_block_shape_contains_no_splices shape
+  | Pfield (_, Shape shape, _) -> assert_block_shape_contains_no_splices shape
   | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
     assert_block_element_contains_no_splices element
   | _ -> ()

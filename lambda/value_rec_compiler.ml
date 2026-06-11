@@ -43,17 +43,12 @@
 
 open Lambda
 
-let block_shape_with_locality_mode_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
 (** {1. Sizing} *)
 
 (* Simple blocks *)
 type block_size =
-  | Regular_block of int
+  | Shape of Lambda.block_shape
   | Float_record of int
-  | Mixed_record of Lambda.block_shape
 
 type size =
   | Unreachable
@@ -200,16 +195,6 @@ let compute_static_size lam =
               join_sizes action size (compute_expression_size env action))
             size cases)
         Unreachable all_cases
-  (* In native code, void fields are erased, so the runtime block size is the
-     number of value fields only. In bytecode, void fields are kept, so the
-     block size includes all fields. *)
-  and all_value_mixed_block_size shape =
-    if !Clflags.native_code then
-      Mixed_product_bytes.value_prefix_len
-        (Mixed_product_bytes.count (Product shape))
-    else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and size_of_primitive env p args =
     match p with
     | Pignore
@@ -248,12 +233,7 @@ let compute_static_size lam =
         begin match repres with
         | Record_boxed shape
         | Record_inlined (_, shape, (Variant_boxed _ | Variant_extensible)) ->
-            if Types.mixed_product_shape_is_flat_all_value shape
-            then
-              Block (Regular_block
-                (all_value_mixed_block_size_types shape))
-            else
-              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+            Block (Shape (Lambda.transl_mixed_product_shape shape))
         | Record_float ->
             Block (Float_record size)
         | Record_unboxed | Record_ufloat
@@ -261,16 +241,16 @@ let compute_static_size lam =
             Misc.fatal_error "size_of_primitive"
         end
     | Pmakeblock (_, _, shape, _) ->
-        if Lambda.is_uniform_block_shape shape
-        then Block (Regular_block (all_value_mixed_block_size shape))
-        else Block (Mixed_record shape)
+        (* Note that flat float arrays/records use Pmakearray, so we don't need
+           to check the tag here. *)
+        Block (Shape shape)
     | Pmakelazyblock _ ->
-        Block (Regular_block (List.length args))
+        Block (Shape (block_shape_of_generic_values (List.length args)))
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
         | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray ->
-            Block (Regular_block size)
+            Block (Shape (block_shape_of_generic_values size))
         | Pfloatarray ->
             Block (Float_record size)
         | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
@@ -515,14 +495,8 @@ let rec split_static_function lfun block_var local_idents lam :
         lfun.params
     in
     let ap_func =
-      Lprim
-        ( Pfield
-            ( [0],
-              block_shape_with_locality_mode_for_field
-                0 Lambda.generic_value,
-              lifted_block_read_sem ),
-          [Lvar block_var],
-          no_loc )
+      Lprim (Pfield ([0], All_value Pointer, lifted_block_read_sem),
+        [Lvar block_var], no_loc)
     in
     let body =
       Lapply {
@@ -562,13 +536,8 @@ let rec split_static_function lfun block_var local_idents lam :
     let free_vars_block_size, subst, block_fields_rev =
       Ident.Set.fold (fun var (i, subst, fields) ->
           let access =
-            Lprim (Pfield
-                     ( [i],
-                       block_shape_with_locality_mode_for_field
-                         i Lambda.generic_value,
-                       lifted_block_read_sem),
-                   [Lvar block_var],
-                   no_loc)
+            Lprim (Pfield ([i], All_value Pointer, lifted_block_read_sem),
+                   [Lvar block_var], no_loc)
           in
           (Stdlib.succ i, Ident.Map.add var access subst, Lvar var :: fields))
         local_free_vars (0, Ident.Map.empty, [])
@@ -854,6 +823,15 @@ let empty_bindings =
     dynamic = [];
   }
 
+(* In native code, void fields are erased, so the runtime block size is the
+    number of value fields only. In bytecode, void fields are kept, so the
+    block size includes all fields. *)
+let all_value_mixed_block_size shape =
+  if !Clflags.native_code then
+    Mixed_product_bytes.value_prefix_len
+      (Mixed_product_bytes.count (Product shape))
+  else Array.length shape
+
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
@@ -926,7 +904,8 @@ let compile_letrec input_bindings body =
                 let functions = (id, duid, lfun) :: rev_bindings.functions in
                 let static =
                   (ctx_id, ctx_id_duid,
-                    Regular_block free_vars_block_size, lam)
+                    Shape (block_shape_of_generic_values free_vars_block_size),
+                    lam)
                   :: rev_bindings.static
                 in
                 { rev_bindings with functions; static }
@@ -963,10 +942,14 @@ let compile_letrec input_bindings body =
     List.fold_left (fun body (id, duid, size, _lam) ->
         let alloc_prim, const_args =
           match size with
-          | Regular_block size -> alloc_prim, [size]
           | Float_record size -> alloc_float_record_prim, [size]
-          | Mixed_record shape ->
-            if !Clflags.native_code then
+          | Shape shape ->
+            (* CR layout poly: This is can no longer be computed before slambda
+               eval, we should use [Pmakeblock] here (or delay this until after
+               slambda eval). *)
+            if Mixed_product_bytes.shape_is_all_value shape then
+              alloc_prim, [all_value_mixed_block_size shape]
+            else if !Clflags.native_code then
               let shape =
                 Mixed_block_shape.of_block_elements
                   ~print_locality:(fun ppf () -> Format.fprintf ppf "()")

@@ -107,7 +107,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
   else
   let shape, _ = module_repr in
   let shape =
-    Mixed_block_shape.of_mixed_block_elements shape
+    Mixed_block_shape.of_block_elements shape
       ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
   in
   let new_pos =

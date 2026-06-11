@@ -149,24 +149,19 @@ let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   match path with
   | [] -> Misc.fatal_errorf "No path provided:@ %a" print t
   | index :: path ->
-    if index < 0 || index >= Array.length forest
-    then original_path
-    else
-      let tree = forest.(index) in
-      let rec lookup_path' path tree =
-        match path, tree with
-        | [], Leaf { new_index; _ } -> [new_index]
-        | index :: path, Node { children; _ } ->
-          if index < 0 || index >= Array.length children
-          then original_path
-          else lookup_path' path children.(index)
-        | [], Node { children } -> flatten_tree_array children
-        | _ :: _, Leaf _ ->
-          Misc.fatal_errorf "Invalid path:@ %a@ shape: %a"
-            (Format.pp_print_list Format.pp_print_int)
-            original_path print t
-      in
-      lookup_path' path tree
+    let tree = forest.(index) in
+    let rec lookup_path' path tree =
+      match path, tree with
+      | [], Leaf { new_index; _ } -> [new_index]
+      | index :: path, Node { children; _ } ->
+        lookup_path' path children.(index)
+      | [], Node { children } -> flatten_tree_array children
+      | _ :: _, Leaf _ ->
+        Misc.fatal_errorf "Invalid path:@ %a@ shape: %a"
+          (Format.pp_print_list Format.pp_print_int)
+          original_path print t
+    in
+    lookup_path' path tree
 
 type ('a, 'b) singleton_or_product =
   | Singleton of 'a

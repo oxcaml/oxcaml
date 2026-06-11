@@ -28,10 +28,6 @@ open Debuginfo.Scoped_location
 
 let const_int i = Lambda.const_int i
 
-let block_shape_with_locality_mode_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
 type unsafe_component =
   | Unsafe_module_binding
   | Unsafe_functor
@@ -1197,10 +1193,7 @@ let toploop_getvalue id =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield
-                    ([toploop_getvalue_pos],
-                     block_shape_with_locality_mode_for_field
-                       toploop_getvalue_pos generic_value,
-                     Reads_agree),
+                    ([toploop_getvalue_pos], All_value Pointer, Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1221,10 +1214,7 @@ let toploop_setvalue id lam =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield
-                    ([toploop_setvalue_pos],
-                     block_shape_with_locality_mode_for_field
-                       toploop_setvalue_pos generic_value,
-                     Reads_agree),
+                    ([toploop_setvalue_pos], All_value Pointer, Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=

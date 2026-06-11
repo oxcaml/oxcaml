@@ -2537,6 +2537,18 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
            ( Int_comp (I.Tagged_immediate, Yielding_bool (Lt Unsigned)),
              arg1,
              arg2 )) ]
+  | Pfield ([index], All_value _int_or_ptr, sem), [[arg]] ->
+    (* CR mshinwell: make use of the int-or-ptr flag (new in OCaml 5)? *)
+    let imm = Target_ocaml_int.of_int machine_width index in
+    check_non_negative_imm imm "Pfield";
+    let mutability = convert_field_read_semantics sem in
+    let block_access : P.Block_access_kind.t =
+      Values { tag = Unknown; size = Unknown; field_kind = Any_value }
+    in
+    [ Unary
+        (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
+    ]
+  | Pfield (_, All_value _, _), [[_]] -> assert false
   | Pfloatfield (field, sem, mode), [[arg]] ->
     let imm = Target_ocaml_int.of_int machine_width field in
     check_non_negative_imm imm "Pfloatfield";
@@ -2559,7 +2571,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
-  | Pfield (field_path, shape, sem), [[arg]] ->
+  | Pfield (field_path, Shape shape, sem), [[arg]] ->
     if List.length field_path < 1
     then Misc.fatal_error "Pfield: field_path must be non-empty";
     let shape =
@@ -2601,6 +2613,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
           prim)
       new_indexes
+  | ( Psetfield
+        ([index], All_value immediate_or_pointer, initialization_or_assignment),
+      [[block]; [value]] ) ->
+    let field_kind = convert_block_access_field_kind immediate_or_pointer in
+    let imm = Target_ocaml_int.of_int machine_width index in
+    check_non_negative_imm imm "Psetfield";
+    let init_or_assign = convert_init_or_assign initialization_or_assignment in
+    let block_access : P.Block_access_kind.t =
+      Values { tag = Unknown; size = Unknown; field_kind }
+    in
+    [ Binary
+        ( Block_set { kind = block_access; init = init_or_assign; field = imm },
+          block,
+          value ) ]
+  | ( Psetfield (_, All_value _, _), [[_]; [_]] ) -> assert false
   | Psetfloatfield (field, initialization_or_assignment), [[block]; [value]] ->
     let imm = Target_ocaml_int.of_int machine_width field in
     check_non_negative_imm imm "Psetfloatfield";
@@ -2623,7 +2650,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Block_set { kind = block_access; init = init_or_assign; field = imm },
           block,
           value ) ]
-  | ( Psetfield (field_path, shape, initialization_or_assignment),
+  | ( Psetfield (field_path, Shape shape, initialization_or_assignment),
       [[block]; values] ) ->
     if List.length field_path < 1
     then Misc.fatal_error "Psetfield: field_path must be non-empty";
