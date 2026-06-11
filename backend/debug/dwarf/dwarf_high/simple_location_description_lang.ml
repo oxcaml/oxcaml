@@ -144,6 +144,9 @@ module Rvalue = struct
   let location_from_another_die ~die_label ~compilation_unit_header_label =
     [OB.call ~die_label ~compilation_unit_header_label]
 
+  let entry_value_of_register ~dwarf_reg_number dwarf_version =
+    [OB.entry_value_of_register ~dwarf_reg_number dwarf_version]
+
   let implicit_pointer ~offset_in_bytes ~die_label dwarf_version =
     [OB.implicit_pointer ~offset_in_bytes ~die_label dwarf_version]
 end

@@ -207,6 +207,8 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
+  | DW_op_entry_value_of_register of { reg_number : int }
+  | DW_op_GNU_entry_value_of_register of { reg_number : int }
 
 let opcode_name t =
   match t with
@@ -366,6 +368,8 @@ let opcode_name t =
   | DW_op_bit_piece _ -> "DW_op_bit_piece"
   | DW_op_implicit_pointer _ -> "DW_op_implicit_pointer"
   | DW_op_GNU_implicit_pointer _ -> "DW_op_GNU_implicit_pointer"
+  | DW_op_entry_value_of_register _ -> "DW_op_entry_value"
+  | DW_op_GNU_entry_value_of_register _ -> "DW_op_GNU_entry_value"
 
 (* DWARF-4 spec section 7.7.1. *)
 let opcode = function
@@ -525,6 +529,12 @@ let opcode = function
   | DW_op_bit_piece _ -> 0x9d
   | DW_op_implicit_pointer _ -> 0xa0
   | DW_op_GNU_implicit_pointer _ -> 0xf2
+  | DW_op_entry_value_of_register _ -> 0xa3
+  | DW_op_GNU_entry_value_of_register _ -> 0xf3
+
+let uleb128_size_in_bytes i =
+  let rec loop i acc = if i < 0x80 then acc else loop (i lsr 7) (acc + 1) in
+  loop i 1
 
 external caml_string_set32 : bytes -> index:int -> Int32.t -> unit
   = "%caml_string_set32"
@@ -707,6 +717,34 @@ struct
       let offset_in_bytes = Targetint.to_int64 offset_in_bytes in
       value (V.offset_into_debug_info label) >>> fun () ->
       value (V.sleb128 ~comment:"offset in bytes" offset_in_bytes)
+    | DW_op_entry_value_of_register { reg_number }
+    | DW_op_GNU_entry_value_of_register { reg_number } ->
+      (* The operand is a block holding a DWARF expression, here always a single
+         register location description. *)
+      if reg_number < 0
+      then
+        Misc.fatal_errorf "Negative DWARF register number %d for entry value"
+          reg_number;
+      if reg_number < 32
+      then
+        value
+          (V.uleb128 ~comment:"block length" (Uint64.of_nonnegative_int_exn 1))
+        >>> fun () ->
+        value
+          (V.uint8 ~comment:"DW_op_reg<n>"
+             (Uint8.of_nonnegative_int_exn (0x50 + reg_number)))
+      else
+        let block_length = 1 + uleb128_size_in_bytes reg_number in
+        value
+          (V.uleb128 ~comment:"block length"
+             (Uint64.of_nonnegative_int_exn block_length))
+        >>> fun () ->
+        value
+          (V.uint8 ~comment:"DW_op_regx" (Uint8.of_nonnegative_int_exn 0x90))
+        >>> fun () ->
+        value
+          (V.uleb128 ~comment:"DWARF reg number"
+             (Uint64.of_nonnegative_int_exn reg_number))
 end
 
 module Print = Make (struct

@@ -55,5 +55,6 @@ val dwarf :
   function_proto_die:Proto_die.t ->
   proto_dies_for_vars:proto_dies_for_vars ->
   which_vars:which_vars ->
+  fun_end_label:Asm_targets.Asm_label.t ->
   Available_ranges_all_vars.t ->
   unit

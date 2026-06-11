@@ -40,4 +40,5 @@ val dwarf :
   function_proto_die:Proto_die.t ->
   available_ranges_all_vars:Available_ranges_all_vars.t ->
   proto_dies_for_vars:Dwarf_variables_and_parameters.proto_dies_for_vars ->
+  fun_end_label:Asm_targets.Asm_label.t ->
   Proto_die.t Inlined_frame_ranges.Inlined_frames.Key.Map.t
