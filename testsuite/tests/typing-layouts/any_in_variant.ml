@@ -460,7 +460,7 @@ Line 1, characters 10-14:
               ^^^^
 Error: The representation of the constructor "Gany"
        depends on the layout of the argument of constructor "Gint",
-       which this instantiation of the type int gadt does not determine.
+       which this instantiation of the type 'a gadt does not determine.
        The layout of abstract_any is any
          because of the definition of abstract_any at line 1, characters 0-23.
        But the layout of abstract_any must be representable
@@ -480,11 +480,19 @@ val ok : string g2 = M
 val ok : #(unit# * int) g2 = D <void>
 |}]
 
-(* ... though at an undetermined instantiation, checking [D] pins the
-   instantiation to its result type. *)
+(* ... and an undetermined instantiation is not pinned to [D]'s result type:
+   since [D]'s occurrence is not implied here, it is checked at its own
+   result type, and [m] stays usable at every instantiation. *)
 let m = M
 [%%expect{|
-val m : #('a * int) g2 = M
+val m : ('a : any). 'a g2 = M
+|}]
+
+let _ = (m : string g2)
+let _ = (m : #(unit# * int) g2)
+[%%expect{|
+- : string g2 = M
+- : #(unit# * int) g2 = M
 |}]
 
 (* A constraint pinning the parameter to a type of layout [any] makes the

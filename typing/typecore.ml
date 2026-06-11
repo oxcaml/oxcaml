@@ -2848,64 +2848,83 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
-let require_constructor_instance_representable env constr ~loc ~why
-      ~containing_type =
-  let check_sibling (sibling : Types.constructor_description) =
-    match sibling.cstr_shape with
-    | Some _ -> ()
-    | None ->
+(* The sorts of the arguments of [cstr], a constructor of the variant type
+   [containing_type], when the use of constructor [used_cstr_name] requires
+   them to be determined. If [cstr]'s representation was not determined at
+   its declaration (it has an argument of layout [any]), the sorts are
+   computed at [containing_type] when it is an instance of [cstr]'s result
+   type ([cstr] occurs at this instantiation), and at [cstr]'s own result
+   type otherwise (a GADT constructor that cannot, or need not, occur
+   here). *)
+let constructor_argument_sorts env (cstr : Types.constructor_description)
+      ~containing_type ~why ~loc ~used_cstr_name =
+  match cstr.cstr_shape with
+  | Some _ ->
+      (* Determined at declaration. *)
+      begin match
+        Misc.Stdlib.List.map_option
+          (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
+          cstr.cstr_args
+      with
+      | Some sorts -> sorts
+      | None -> Misc.fatal_error "representable constructor missing a sort"
+      end
+  | None ->
       let (ty_args, ty_res, _) =
-        instance_constructor Keep_existentials_flexible sibling
+        instance_constructor Keep_existentials_flexible cstr
       in
-      let snap = Btype.snapshot () in
-      (* Refine the instance by the use-site instantiation when the two are
-         compatible. A GADT constructor whose result type does not match
-         cannot occur at this instantiation, but its arguments are checked
-         at its own result type all the same. *)
-      begin match unify env ty_res containing_type with
-      | () -> ()
-      | exception Unify _ -> Btype.backtrack snap
+      begin match
+        matches ~expand_error_trace:false env containing_type ty_res
+      with
+      | All_good -> unify env ty_res containing_type
+      | Unification_failure _ | Jkind_mismatch _ -> ()
       end;
-      List.iter
+      List.map
         (fun (ca : Types.constructor_argument) ->
            match type_sort ~why ~fixed:false env ca.ca_type with
-           | Ok _ -> ()
+           | Ok sort -> sort
            | Error violation ->
              raise (Error (loc, env,
                Constructor_representation_indeterminate
-                 { cstr_name = constr.cstr_name;
+                 { cstr_name = used_cstr_name;
                    containing_type;
-                   arg_cstr_name = sibling.cstr_name;
+                   arg_cstr_name = cstr.cstr_name;
                    arg_type = ca.ca_type;
                    violation })))
         ty_args
-  in
-  match constr.cstr_repr with
+
+let representation_for_tuple_constructor env constr ty_args ~loc ~types
+      ~containing_type ~why : _ Result.t =
+  (* When some constructor of the variant has an argument of layout [any]
+     ([Cstr_layout_variable]), which constructors are constant — and hence
+     the runtime tags of all of them — can depend on the instantiation, so
+     using any constructor requires every constructor's representation to be
+     determined at [containing_type]. The siblings' sorts are discarded for
+     now; resolving the variant's representation will consume them. *)
+  begin match constr.cstr_repr with
   | Variant_boxed layouts
     when Array.exists
            (function
              | Cstr_layout_variable -> true
              | Cstr_layout_known _ -> false)
            layouts ->
-    List.iter check_sibling
+    List.iter
+      (fun sibling ->
+         ignore
+           (constructor_argument_sorts env sibling ~containing_type ~why
+              ~loc ~used_cstr_name:constr.cstr_name
+            : Jkind.sort list))
       (Parmatch.get_variant_constructors env containing_type)
   | Variant_boxed _ | Variant_unboxed | Variant_with_null
   | Variant_extensible -> ()
-
-let representation_for_tuple_constructor env constr ty_args ~loc ~types
-      ~containing_type ~why : _ Result.t =
-  require_constructor_instance_representable env constr ~loc ~why
-    ~containing_type;
+  end;
+  (* The used constructor's own shape and sorts come from the types of the
+     arguments it is applied to, which can further determine existentials. *)
   match constr.cstr_shape with
   | Some shape ->
-      begin match
-        Misc.Stdlib.List.map_option
-          (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
-          constr.cstr_args
-      with
-      | Some sorts -> Ok (shape, sorts)
-      | None -> Misc.fatal_error "representable constructor missing a sort"
-      end
+      Ok (shape,
+          constructor_argument_sorts env constr ~containing_type ~why ~loc
+            ~used_cstr_name:constr.cstr_name)
   | None ->
       begin match
         Misc.Stdlib.List.mapi_result
