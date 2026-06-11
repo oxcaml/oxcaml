@@ -196,8 +196,14 @@ val new_local_jkind:
         unit -> jkind_declaration
 
 module Pattern_env : sig
+  type envop
   type t = private
     { mutable env : Env.t;
+      mutable op_list : envop list;
+      (* When comparing module-dependent functions we add a module to the
+         environment locally. [op_list] records all the changes to the
+         environment in order to replay them once again after removing the local
+         module from the environment. *)
       equations_scope : int;
       (* scope for local type declarations *)
       in_counterexample : bool;
@@ -209,6 +215,7 @@ module Pattern_env : sig
   val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
+  val enter_type: scope:int -> label -> type_declaration -> t -> Ident.t
   val set_env: t -> Env.t -> unit
   val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end
@@ -249,6 +256,22 @@ val instance_poly_fixed:
         type_expr list -> type_expr -> type_expr list * type_expr
         (* Take an instance of a type scheme containing free univars for
            checking that an expression matches this scheme. *)
+
+val instance_funct_opt:
+        id_in:Ident.t -> p_out:Path.t -> fixed:bool ->
+        type_expr -> type_expr option
+(** Takes a instance of the functor return type by replacing [id_in]
+    by [p_out]. Returns [None] if [id_in] did not occur in the type. *)
+
+val instance_funct:
+        id_in:Ident.t -> p_out:Path.t -> fixed:bool -> type_expr -> type_expr
+(** Same as [instance_funct_opt] but behaves as identity if [id_in] does
+    not occur in the type. *)
+
+val instance_funct_nondep :
+        Env.t -> arg_label -> tfunctor -> module_type -> type_expr
+(** Tries to use the module argument actual signature to remove the depencies
+    that might occur in the return type of a module-dependent function. *)
 
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 
@@ -354,16 +377,76 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-val filter_arrow: Env.t -> type_expr -> arg_label -> param_hole:bool ->
-        filtered_arrow
+type filter_arrow_failure =
+  | Unification_error of Errortrace.unification_error
+  | Label_mismatch of
+      { got           : arg_label
+      ; expected      : arg_label
+      ; expected_type : type_expr
+      }
+  | Not_a_function
+  | Jkind_error of type_expr * Jkind.Violation.t
+
+val filter_arrow: Env.t -> in_apply:bool -> type_expr -> arg_label ->
+        param_hole:bool -> (filtered_arrow, filter_arrow_failure) result
         (* A special case of unification with [l:'a -> 'b]. If [param_hole] is
            true then ['a] might be initialized with a [Tvar _] hole to be filled
            later by a [Tpoly _].
-           Raises [Filter_arrow_failed] instead of [Unify]. *)
+           If [in_apply] is false than the type argument is presented as the
+           expected type in the error message if filter_arrow fails.
+           Returns a result instead of raising [Unify]. *)
+val filter_functor:
+        Env.t -> type_expr -> arg_label ->
+        ((Ident.Unscoped.t * package * type_expr) option,
+         filter_arrow_failure) result
+        (* A special case of unification with [{M:P} -> 'a]
+           Returns a result instead of raising [Unify].
+           May return [Some _] when the type is not principally known,
+           so you should check for principality. *)
+val filter_arity:
+  Env.t -> type_expr -> arg_label -> param_hole:bool ->
+  (Env.t * type_expr, filter_arrow_failure) result
+(* A specialized case of unification with [ l:_ -> 'a ] for all arrows *)
+
 val is_really_poly : Env.t -> type_expr -> bool
 val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
+
+(** [arrow_labels env ty] expands [ty] as an array type in [env] and
+    returns its argument labels.
+
+    [is_ret_tvar] is [true] if the final return type is a type variable,
+    indicating that the list of labels isn't necessarily exhaustive. *)
+val arrow_labels : Env.t -> type_expr -> arg_label list * is_ret_tvar:bool
+
+(** An argument in an arrow spine. *)
+type arrow_arg =
+  | Arg_value of type_expr
+    (** A regular value argument. *)
+  | Arg_module of Ident.Unscoped.t * package
+    (** A module dependent parameter. Consisting of a dependent module name
+        and a package type for the module. *)
+
+(** The return type of an arrow. *)
+type arrow_ret =
+  | Ret_cycle
+    (** The arrow is cyclic, its return type is ill-defined. *)
+  | Ret_type of type_expr
+    (** A regular return type. *)
+
+(** [arrow_spine env ty] expands [ty] as a arrow type in [env] and returns
+    its arrow spine.
+
+    If [ty] is [l1:ty1 -> ... -> ln:tyn -> rty], it returns
+    [([(l1, ty1); ...; (ln, tyn)], Ret_type rty)].
+
+    If [ty] is a {e cyclic} arrow type, it returns [([...], Ret_cycle)]. *)
+val arrow_spine
+  :  Env.t
+  -> type_expr
+  -> (arg_label * arrow_arg) list * arrow_ret
+
 val occur_in: Env.t -> type_expr -> type_expr -> bool
 val moregeneral: Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
@@ -400,18 +483,6 @@ val reify_univars : Env.t -> Types.type_expr -> Types.type_expr
 
 (* Exceptions for special cases of unify *)
 
-type filter_arrow_failure =
-  | Unification_error of Errortrace.unification_error
-  | Label_mismatch of
-      { got           : arg_label
-      ; expected      : arg_label
-      ; expected_type : type_expr
-      }
-  | Not_a_function
-  | Jkind_error of type_expr * Jkind.Violation.t
-
-exception Filter_arrow_failed of filter_arrow_failure
-
 type filter_method_failure =
   | Unification_error of Errortrace.unification_error
   | Not_a_method
@@ -446,6 +517,7 @@ val equal: ?do_jkind_check:bool ->
         (* [equal env [x1...xn] tau [y1...yn] sigma]
            checks whether the parameterized types
            [/\x1.../\xn.tau] and [/\y1.../\yn.sigma] are equivalent. *)
+val eq_package_path : Env.t -> Path.t -> Path.t -> bool
 val is_equal : Env.t -> bool -> type_expr list -> type_expr list -> bool
 val equal_private : Env.t -> type_expr -> type_expr -> unit
 (* [equal_private env t1 t2] checks that [t1] equals [t2] but it is allowed to
@@ -618,6 +690,10 @@ val wrap_trace_gadt_instances: ?force:bool -> Env.t -> ('a -> 'b) -> 'a -> 'b
 val package_subtype :
     (Env.t -> package -> package ->
      (unit,Errortrace.first_class_module) Result.t) ref
+
+val modtype_of_package : Env.t -> Location.t -> package -> module_type
+val set_modtype_of_package :
+        (Env.t -> Location.t -> package -> module_type) -> unit
 
 (* Raises [Incompatible] *)
 val mcomp : Env.t -> type_expr -> type_expr -> unit
@@ -886,3 +962,6 @@ val check_constructor_crossing_destruction :
 val apply_is_contained_by : Mode.Hint.is_contained_by
   -> ?modalities:Mode.Modality.Const.t
   -> ('l * 'r) Mode.Value.t -> ('l * 'r) Mode.Value.t
+
+val open_tfunctor : Env.t -> loc:Location.t -> Ident.Unscoped.t -> package ->
+        type_expr -> Env.t * type_expr

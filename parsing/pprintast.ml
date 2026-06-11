@@ -555,6 +555,14 @@ and name_jkind f (name, jkind) =
         (jkind_annotation reset_ctxt) jkind
 
 and name_loc_jkind f (str, jkind) = name_jkind f (str.txt,jkind)
+and functor_arg ctxt f (name, pck_ty) =
+  pp f "@[<hov2>(module@ %s :@ %a)@]" name.txt (package_type ctxt) pck_ty
+
+and functor_arg_with_label ctxt f (label, c) =
+  match label with
+  | Nolabel    -> functor_arg ctxt f c (* otherwise parenthesize *)
+  | Labelled s -> pp f "%a:%a" ident_of_name s (functor_arg ctxt) c
+  | Optional s -> pp f "?%a:%a" ident_of_name s (functor_arg ctxt) c
 
 and core_type ctxt f x =
   if x.ptyp_attributes <> [] then begin
@@ -565,6 +573,10 @@ and core_type ctxt f x =
     | Ptyp_arrow (l, ct1, ct2, m1, m2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
           (type_with_label ctxt) (l,ct1,m1) (return_type ctxt) (ct2,m2)
+    | Ptyp_functor (label, name, pack, ct) ->
+        pp f "@[<2>%a@;->@;%a@]"
+            (functor_arg_with_label ctxt) (label, (name, pack))
+            (core_type ctxt) ct
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
@@ -686,7 +698,7 @@ and core_type1 ctxt f x =
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
-      | Ptyp_newlayout _ | Ptyp_of_kind _) ->
+      | Ptyp_newlayout _ | Ptyp_of_kind _ | Ptyp_functor _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
@@ -826,10 +838,12 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
           punct
           (list (pattern1 ctxt) ~sep:";") l
           punct
-    | Ppat_unpack { txt = None } ->
-        pp f "(module@ _)@ "
-    | Ppat_unpack { txt = Some s } ->
+    | Ppat_unpack ({ txt; }, None) ->
+        let s = Option.value txt ~default:"_" in
         pp f "(module@ %s)@ " s
+    | Ppat_unpack ({ txt; }, Some ptyp) ->
+        let s = Option.value txt ~default:"_" in
+        pp f "@[<2>(module@ %s :@ %a)@]" s (package_type ctxt) ptyp
     | Ppat_type li ->
         pp f "#%a" (with_loc type_longident) li
     | Ppat_record (l, closed) ->

@@ -1,6 +1,6 @@
 (* TEST
  flambda;
- ocamlopt_flags = "-w -20 -O3 -flambda2-expert-cont-lifting-budget 200 -flambda2-expert-cont-specialization-budget 20";
+ ocamlopt_flags = "-w -16-20 -O3 -flambda2-expert-cont-lifting-budget 200 -flambda2-expert-cont-specialization-budget 20";
  native;
 *)
 

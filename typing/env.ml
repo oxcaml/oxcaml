@@ -678,6 +678,7 @@ type t = {
   summary: summary;
   local_constraints: type_declaration StagedPath.Map.t;
   implicit_jkinds: jkind_lr loc String.Map.t;
+  id_pairs: (Ident.Unscoped.t * Ident.Unscoped.t) list;
   flags: int;
   stage: stage;
   toplevel_scope: int
@@ -979,6 +980,7 @@ let empty = {
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = StagedPath.Map.empty;
   implicit_jkinds = String.Map.empty;
+  id_pairs = [];
   flags = 0;
   functor_args = Ident.empty;
   jkinds = IdTbl.empty;
@@ -1996,6 +1998,16 @@ let rec normalize_instance_names_in_module_path path =
   | Papply (p, a) ->
       let p2 = normalize_instance_names_in_module_path p in
       if p == p2 then path else Papply (p2, a)
+
+let try_normalize normalizer env path =
+  let path' = normalizer env path in
+  if Path.same path path' then None
+  else Some path'
+
+let try_normalize_type_path oloc env path =
+  try_normalize (normalize_type_path oloc) env path
+
+let try_normalize_modtype_path = try_normalize normalize_modtype_path
 
 let find_module_lazy path env =
   find_module_lazy ~alias:false path env
@@ -3016,6 +3028,10 @@ let enter_type ~scope name info env =
   let id = Ident.create_scoped ~scope name in
   let env = store_type ~check:true id info (Shape.leaf info.type_uid) env in
   (id, env)
+
+let reenter_type id info env =
+  let env = store_type ~check:true id info (Shape.leaf info.type_uid) env in
+  env
 
 let enter_extension ~scope ~rebind name ext env =
   let id = Ident.create_scoped ~scope name in
@@ -4948,6 +4964,13 @@ let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ _ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) -> t ->
          Format_doc.formatter -> Jkind.Violation.t -> unit)
+
+module Unscoped = struct
+  let with_pairs id_pairs env = {env with id_pairs}
+  let get_pairs env = env.id_pairs
+
+  let path_equiv env p1 p2 = Path.equiv env.id_pairs p1 p2
+end
 
 (* Error report *)
 

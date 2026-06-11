@@ -150,3 +150,4 @@ Error: This expression has type "int -> int"
        but an expression was expected of type "int"
 Hint: This function application is partial, maybe some arguments are missing.
 |}]
+

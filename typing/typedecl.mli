@@ -196,6 +196,7 @@ type error =
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
+  | Type_cannot_be_external of type_expr
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
   | Poly_not_yet_implemented

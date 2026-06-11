@@ -3758,12 +3758,11 @@ simple_pattern_not_ident:
       { reloc_pat ~loc:$sloc $2 }
   | simple_delimited_pattern
       { $1 }
-  | LPAREN MODULE ext_attributes mkrhs(module_name) RPAREN
-      { mkpat_attrs ~loc:$sloc (Ppat_unpack $4) $3 }
-  | LPAREN MODULE ext_attributes mkrhs(module_name) COLON package_type RPAREN
-      { mkpat_attrs ~loc:$sloc
-          (Ppat_constraint(mkpat ~loc:$loc($4) (Ppat_unpack $4), Some $6, []))
-          $3 }
+  | LPAREN MODULE ext_attrs = ext_attributes name = mkrhs(module_name) RPAREN
+      { mkpat_attrs ~loc:$sloc (Ppat_unpack (name, None)) ext_attrs }
+  | LPAREN MODULE ext_attrs = ext_attributes name = mkrhs(module_name) COLON
+    ptyp = package_type_ RPAREN
+      { mkpat_attrs ~loc:$sloc (Ppat_unpack (name, Some ptyp)) ext_attrs }
   | simple_pattern_not_ident_
       { $1 }
   | signed_constant { mkpat (Ppat_constant $1) ~loc:$sloc }
@@ -4720,6 +4719,18 @@ strict_function_or_labeled_tuple_type:
     { let ty, ltys = $3 in
       mktyp ~loc:$sloc (Ptyp_tuple ((Some label, ty) :: ltys))
     }
+  | mktyp(
+      label = arg_label_no_opt
+      LPAREN
+        MODULE attrs = ext_attributes id = mkrhs(UIDENT) COLON
+        ptyp = package_type_
+      RPAREN
+      MINUSGREATER
+      codomain = function_type
+        { let ptyp = {ptyp with ppt_attrs = snd attrs @ ptyp.ppt_attrs } in
+          Ptyp_functor(label, id, ptyp, codomain) }
+    )
+    { $1 }
 ;
 
 %inline strict_arg_label:
@@ -4727,6 +4738,12 @@ strict_function_or_labeled_tuple_type:
       { Optional label }
   | label = LIDENT COLON
       { Labelled label }
+
+%inline arg_label_no_opt:
+  | label = LIDENT COLON
+      { Labelled label }
+  | /* empty */
+      { Nolabel }
 ;
 
 %inline arg_label:

@@ -129,6 +129,7 @@ type error =
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
+  | Type_cannot_be_external of type_expr
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
   | Poly_not_yet_implemented
@@ -1480,6 +1481,12 @@ let rec check_constraints_rec env loc visited ty =
         | All_good -> ()
       end;
       List.iter (check_constraints_rec env loc visited) args
+  | Tfunctor (_, us, pack, ty) ->
+      List.iter (fun (_, t) -> check_constraints_rec env loc visited t)
+        pack.pack_cstrs;
+      let (env, ty) =
+        Ctype.open_tfunctor env ~loc us pack ty in
+      check_constraints_rec env loc visited ty
   | Tpoly (ty, tl) ->
       let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
@@ -4059,8 +4066,12 @@ let rec parse_native_repr_attributes env core_type ty rmode
         ~global_repr ~is_layout_poly
     in
     ((mode, repr_arg) :: repr_args, repr_res)
+  | Ptyp_functor _, Tfunctor _, _ ->
+    raise (Error (core_type.ptyp_loc, Type_cannot_be_external ty))
   | (Ptyp_poly (_, t) | Ptyp_alias (t, _, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr ~is_layout_poly
+  | Ptyp_functor _, _, _ | _, Tfunctor _, _ ->
+    raise (Error (core_type.ptyp_loc, Type_cannot_be_external ty))
   | _ ->
      let rmode =
        if Builtin_attributes.has_local_opt core_type.ptyp_attributes
@@ -5380,7 +5391,10 @@ let report_error ~loc = function
             "@[<v>The enabled layouts extension does not allow for mixed %s.@]"
             (Mixed_product_kind.to_plural_string mixed_product_kind)
             ~sub:hint)
-    end
+    end  | Type_cannot_be_external ty ->
+      Location.errorf ~loc
+        "The type@ %a@ cannot be used to annotate an external function."
+          (Style.as_inline_code Printtyp.type_expr) ty
   | Bad_unboxed_attribute msg ->
       Location.errorf ~loc "This type cannot be unboxed because@ %s." msg
   | Poly_not_yet_implemented ->

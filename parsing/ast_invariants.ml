@@ -45,6 +45,9 @@ let redundant_nested_constraints loc =
 let empty_constraint loc =
   err loc "Constraint without type or mode"
 
+let optional_label_on_functor loc =
+  err loc "Optional argument for a module dependent function."
+
 let simple_longident id =
   let rec is_simple = function
     | Longident.Lident _ -> true
@@ -52,6 +55,14 @@ let simple_longident id =
     | Longident.Lapply _ -> false
   in
   if not (is_simple id.txt) then complex_id id.loc
+
+let not_optional_label loc l =
+  let is_optional =
+    match l with
+    | Optional _ -> true
+    | _ -> false
+  in
+  if is_optional then optional_label_on_functor loc
 
 let check_empty_constraint ~loc ty mode =
   match ty, mode with
@@ -79,6 +90,9 @@ let iterator =
     match ty.ptyp_desc with
     | Ptyp_tuple ([] | [_]) -> invalid_tuple loc
     | Ptyp_package ptyp ->
+      List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_cstrs
+    | Ptyp_functor  (l, _, ptyp, _) ->
+      not_optional_label loc l;
       List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_cstrs
     | Ptyp_alias (_, None, None) -> invalid_alias loc
     | Ptyp_poly([],_) -> empty_poly_binder loc

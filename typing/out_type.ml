@@ -386,12 +386,26 @@ let env_ident namespace name =
   | _ -> None
   | exception Not_found -> None
 
+(* Unscoped module identifiers (module-dependent function parameters) are
+   bound by the type expression being printed; following upstream, we
+   disambiguate them by their shadowing depth in the printing environment
+   rather than through the session-wide conflict tables. *)
+let unscoped_ident_name id =
+  let index =
+    match in_printing_env (Env.find_module_index id) with
+    | Some n -> n
+    | None -> 0
+  in
+  if index = 0 then Out_name.create (Ident.name id)
+  else Out_name.create (human_unique (index + 1) id)
+
 (** Associate a name to the identifier [id] within [namespace] *)
 let ident_name_simple namespace id =
   match namespace, !enabled with
   | None, _ | _, false -> Out_name.create (Ident.name id)
   | Some namespace, true ->
     if fuzzy_id namespace id then Out_name.create (Ident.name id)
+    else if Ident.is_unscoped id then unscoped_ident_name id
     else
       let name = Ident.name id in
       match M.find name (get namespace) with
@@ -1238,6 +1252,35 @@ let prepare_for_printing tyl =
 
 let add_type_to_preparation = prepare_type
 
+let wrap_env ?(keep_short_paths = false) fenv ftree arg =
+  (* We save the current value of the short-path cache *)
+  (* From keys *)
+  let env = !printing_env in
+  let old_pers = !printing_pers in
+  (* to data *)
+  let old_map = !printing_map in
+  let old_depth = !printing_depth in
+  let old_cont = !printing_cont in
+  if keep_short_paths then
+    printing_env := fenv env
+  else
+    set_printing_env (fenv env);
+  let tree = ftree arg in
+  if !Clflags.real_paths
+     || same_printing_env env then ()
+   (* our cached key is still live in the cache, and we want to keep all
+      progress made on the computation of the [printing_map] *)
+  else begin
+    (* we restore the snapshotted cache before calling set_printing_env *)
+    printing_old := env;
+    printing_pers := old_pers;
+    printing_depth := old_depth;
+    printing_cont := old_cont;
+    printing_map := old_map
+  end;
+  set_printing_env env;
+  tree
+
 (* Disabled in classic mode when printing an unification error *)
 let print_labels = ref true
 let with_labels b f = Misc.protect_refs [R (print_labels,b)] f
@@ -1455,6 +1498,26 @@ let rec tree_of_modal_typexp mode modal ty =
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
         Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
+    | Tfunctor (l, id, pack, ty) ->
+        let lab =
+          if !print_labels || is_omittable l then outcome_label l
+          else Outcometree.Nolabel
+        in
+        let fenv env =
+          (* We compute an approximation of the signature. *)
+          let mty = Mty_ident pack.pack_path in
+          Env.add_module (Ident.of_unscoped id) Mp_present mty env
+          |> Env.add_functor_arg (Ident.of_unscoped id)
+        in
+        let ty =
+          (* Module-dependent functions are legacy. *)
+          wrap_env ~keep_short_paths:true fenv
+            (tree_of_typexp mode Alloc.Const.legacy) ty
+        in
+        Otyp_functor (lab,
+                      Oide_ident ({ printed_name = Ident.Unscoped.name id }
+                                  : out_name),
+                      tree_of_package mode pack, ty)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
@@ -1688,7 +1751,7 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
     reverting them. *)
 and tree_of_ret_typ_mutating acc_mode m ty=
   match get_desc ty with
-  | Tarrow _ -> begin
+  | Tarrow _ | Tfunctor _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
       match Alloc.equate (Alloc.of_const acc_mode) m with
@@ -2473,32 +2536,6 @@ let tree_of_jkind_declaration id decl =
   Osig_jkind ojkind
 
 (* Print a module type *)
-
-let wrap_env fenv ftree arg =
-  (* We save the current value of the short-path cache *)
-  (* From keys *)
-  let env = !printing_env in
-  let old_pers = !printing_pers in
-  (* to data *)
-  let old_map = !printing_map in
-  let old_depth = !printing_depth in
-  let old_cont = !printing_cont in
-  set_printing_env (fenv env);
-  let tree = ftree arg in
-  if !Clflags.real_paths
-     || same_printing_env env then ()
-   (* our cached key is still live in the cache, and we want to keep all
-      progress made on the computation of the [printing_map] *)
-  else begin
-    (* we restore the snapshotted cache before calling set_printing_env *)
-    printing_old := env;
-    printing_pers := old_pers;
-    printing_depth := old_depth;
-    printing_cont := old_cont;
-    printing_map := old_map
-  end;
-  set_printing_env env;
-  tree
 
 let dummy =
   {

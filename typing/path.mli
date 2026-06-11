@@ -65,12 +65,20 @@ val unboxed_version : t -> t
 val is_unboxed_version : t -> bool
 
 val same: t -> t -> bool
+val equiv: (Ident.Unscoped.t * Ident.Unscoped.t) list -> t -> t -> bool
+(** See ident.mli for the distrinction between [same] and [equiv] *)
+
 val compare: t -> t -> int
 val hash: t -> int
 val compare_extra: extra_ty -> extra_ty -> int
 val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
 val scope: t -> int
+
+val subst: (Ident.t * t) list -> t -> t
+val check_for_unbound_unscoped_idents:
+  Ident.Unscoped.Set.t -> t -> Ident.Unscoped.t option
+
 val flatten : t -> [ `Contains_apply | `Ok of Ident.t * string list ]
 
 val scrape_extra_ty: t -> t

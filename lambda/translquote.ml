@@ -2621,7 +2621,9 @@ let quote_nonopt loc (lbl : string option) =
   | Some s -> Label.Nonoptional.labelled loc s |> Label.Nonoptional.wrap
 
 let is_module pat =
-  List.mem Tpat_unpack (List.map (fun (extra, _, _) -> extra) pat.pat_extra)
+  List.exists
+    (fun (extra, _, _) -> match extra with Tpat_unpack _ -> true | _ -> false)
+    pat.pat_extra
 
 let rec with_new_idents_pat pat =
   match pat.pat_desc with
@@ -2862,10 +2864,10 @@ let type_for_annotation ~env ~loc typ =
                   (fun (parts, ty) ->
                     mkloc (Longident.unflatten parts |> Option.get) loc, go ty)
                   pack_cstrs;
-              tpt_type = Mty_ident pack_path;
+              tpt_type = { pack_path; pack_cstrs };
               tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
-        | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
+        | Tlink _ | Tsubst _ | Tfield _ | Tnil | Tfunctor _ ->
           fatal_errorf
             "Translquote [at %a]:@ Unexpected type expression@ in a quoted \
              higher-rank function type"
@@ -2899,7 +2901,23 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
       (quote_core_type ~scopes ty)
       (quote_modes loc ms)
     |> Pat.wrap
-  | Tpat_unpack -> pat_lam (* handled elsewhere *)
+  | Tpat_unpack None -> pat_lam (* handled elsewhere *)
+  | Tpat_unpack (Some package) ->
+    (* Print the module parameter with its package type, as the
+       pre-#14149 [Ppat_constraint] encoding did. *)
+    let { tpt_path; tpt_cstrs; tpt_txt = _; _ } = package in
+    let mod_type = module_type_for_path loc env tpt_path
+    and with_types =
+      List.map
+        (fun (lid, ty) ->
+          ( quote_modtype_path_of_lid
+              (of_location ~scopes Asttypes.(lid.loc))
+              lid.txt,
+            quote_core_type ~scopes ty ))
+        tpt_cstrs
+    in
+    let typ = Type.package loc mod_type with_types |> Type.wrap in
+    Pat.constraint_ loc pat_lam typ (Modes.wrap Modes.legacy) |> Pat.wrap
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
       Location.print_loc (to_location loc)
@@ -3162,7 +3180,7 @@ and quote_core_type ~scopes ty =
     without_idents_poly names;
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
   | Ttyp_package package ->
-    let { tpt_path; tpt_cstrs; tpt_type = _; tpt_txt = _ } = package in
+    let { tpt_path; tpt_cstrs; tpt_txt = _ } = package in
     let mod_type = module_type_for_path loc env tpt_path
     and with_types =
       List.map
@@ -3186,6 +3204,9 @@ and quote_core_type ~scopes ty =
     fatal_errorf "Translquote [at %a]: Ttyp_of_kind not implemented."
       Location.print_loc (to_location loc)
   | Ttyp_call_pos -> Type.wrap Type.call_pos
+  | Ttyp_functor _ ->
+    fatal_errorf "Translquote [at %a]: Ttyp_functor not implemented."
+      Location.print_loc (to_location loc)
 
 type case_binding =
   | Non_binding of Pat.t * Exp.t

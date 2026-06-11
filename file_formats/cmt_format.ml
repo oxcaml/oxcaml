@@ -286,6 +286,8 @@ let iter_on_occurrences
           f ~namespace:Type ctyp_env path lid
       | Ttyp_open (path, lid, _ct) ->
           f ~namespace:Module ctyp_env path lid
+      | Ttyp_functor (_, _, {tpt_path; tpt_txt; _}, _) ->
+          f ~namespace:Module_type ctyp_env tpt_path tpt_txt
       | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
@@ -314,7 +316,7 @@ let iter_on_occurrences
             f ~namespace:Module pat_env path lid
         | Tpat_type (path, lid) ->
             f ~namespace:Type pat_env path lid
-        | Tpat_constraint _ | Tpat_unpack | Tpat_inspected_type _ -> ())
+        | Tpat_constraint _ | Tpat_unpack _ | Tpat_inspected_type _ -> ())
         pat_extra;
       default_iterator.pat sub pat);
 

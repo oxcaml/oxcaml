@@ -175,6 +175,10 @@ module T = struct
     | Ptyp_repr (_, t) -> sub.typ sub t
     | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
+    | Ptyp_functor (_lab, s, ptyp, t2) ->
+      iter_loc sub s;
+      sub.package_type sub ptyp;
+      sub.typ sub t2
 
   let iter_type_declaration sub
       {ptype_name; ptype_params; ptype_cstrs;
@@ -628,7 +632,9 @@ module P = struct
         sub.pat sub p; Option.iter (sub.typ sub) t; sub.modes sub m;
     | Ppat_type s -> iter_loc_lid sub s
     | Ppat_lazy p -> sub.pat sub p
-    | Ppat_unpack s -> iter_loc sub s
+    | Ppat_unpack (s, ptyp) ->
+        iter_loc sub s;
+        iter_opt (sub.package_type sub) ptyp
     | Ppat_effect (p1,p2) -> sub.pat sub p1; sub.pat sub p2
     | Ppat_exception p -> sub.pat sub p
     | Ppat_extension x -> sub.extension sub x

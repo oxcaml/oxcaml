@@ -396,6 +396,20 @@ and print_out_type_1 ppf =
       pp_print_space ppf ();
       print_out_ret ppf ty2;
       pp_close_box ppf ()
+  | Otyp_functor (lab, id, pack, ty) ->
+      pp_open_box ppf 0;
+      (match lab with
+       | Nolabel -> ()
+       | Labelled s | Position s -> fprintf ppf "%s:" s
+       | Optional s -> fprintf ppf "?%s:" s);
+      pp_print_string ppf "(module ";
+      print_ident ppf id;
+      pp_print_string ppf " : ";
+      print_package ppf pack;
+      pp_print_string ppf ") ->";
+      pp_print_space  ppf ();
+      print_out_type_1 ppf ty;
+      pp_close_box ppf ()
   | ty -> print_out_type_2 ~arg:false ppf ty
 
 and print_out_arg am ppf ty =
@@ -403,7 +417,7 @@ and print_out_arg am ppf ty =
 
 and print_out_ret ppf =
   function
-  | Otyp_ret (rm, (Otyp_arrow _ as ty)) ->
+  | Otyp_ret (rm, ((Otyp_arrow _ | Otyp_functor _) as ty)) ->
     begin match rm with
     | Orm_no_parens ->
       print_out_type_1 ppf ty
@@ -468,8 +482,8 @@ and print_simple_out_type ppf =
          else if tags = None then "> " else "? ")
         print_fields row_fields
         print_present tags
-  | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _ | Otyp_tuple _
-  | Otyp_newlayout _
+  | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _
+  | Otyp_functor _ | Otyp_tuple _ | Otyp_newlayout _
     as ty ->
       pp_open_box ppf 1;
       pp_print_char ppf '(';

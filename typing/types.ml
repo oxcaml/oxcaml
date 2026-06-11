@@ -163,6 +163,7 @@ and type_desc =
   | Tpoly of type_expr * type_expr list
   | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of package
+  | Tfunctor of arg_label * Ident.Unscoped.t * package * type_expr
   | Tof_kind of jkind_lr
 
 and arg_label =
@@ -289,6 +290,12 @@ and jkind_declaration =
     jkind_uid : Shape.Uid.t;
     jkind_loc : Location.t
   }
+
+type tfunctor = {
+  id_us : Ident.Unscoped.t;
+  pack : package;
+  ty : type_expr;
+}
 
 module TransientTypeOps = struct
   type t = type_expr
@@ -1113,6 +1120,7 @@ type change =
   | Cmodes : Mode.changes -> change
   | Csort : Jkind_types.Sort.change -> change
   | Czero_alloc : Zero_alloc.change -> change
+  | Cuident : Ident.Unscoped.change -> change
 
 type changes =
     Change of change * changes ref
@@ -1129,7 +1137,8 @@ let log_change ch =
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
   Jkind_types.Sort.set_change_log (fun change -> log_change (Csort change));
-  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change))
+  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change));
+  Ident.Unscoped.change_log := (fun change -> log_change (Cuident change))
 
 (* constructor and accessors for [field_kind] *)
 
@@ -1325,6 +1334,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tquote _
         | Tsplice _
         | Tquote_eval _
+        | Tfunctor _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in
@@ -1509,6 +1519,11 @@ let set_row_name row row_name =
   let row = row_repr_no_fields row in
   {row with row_fields; row_name}
 
+let subst_row_name_path id_map row =
+  match row_name row with
+  | Some (p, tl) -> set_row_name row (Some (Path.subst id_map p, tl))
+  | None -> row
+
 type row_desc_repr =
     Row of { fields: (label * row_field) list;
              more:type_expr;
@@ -1620,6 +1635,7 @@ let undo_change = function
   | Cmodes c          -> Mode.undo_changes c
   | Csort change -> Jkind_types.Sort.undo_change change
   | Czero_alloc c -> Zero_alloc.undo_change c
+  | Cuident change    -> Ident.Unscoped.undo_change change
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0

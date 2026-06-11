@@ -393,8 +393,8 @@ let fold_type_expr f init ty =
       let result = f init ty1 in
       f result ty2
   | Tnil                -> init
-  | Tlink _
-  | Tsubst _            -> assert false
+  | Tlink _             -> assert false
+  | Tsubst _            -> init
   | Tunivar _           -> init
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
@@ -403,6 +403,11 @@ let fold_type_expr f init ty =
     f init ty
   | Tpackage pack ->
     List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
+  | Tfunctor (_, _, pack, ty) ->
+      let res =
+        List.fold_left (fun result (_n, ty) -> f result ty) init
+          pack.pack_cstrs in
+      f res ty
   | Tof_kind _ -> init
 
 let iter_type_expr f ty =
@@ -437,6 +442,12 @@ let iter_type_expr_kind f = function
       List.iter (fun d -> f d.ld_type) lbls
   | Type_open ->
       ()
+
+let map_pack map_path map_type { pack_path; pack_cstrs } =
+  {
+    pack_path = map_path pack_path;
+    pack_cstrs = List.map (Pair.map_snd map_type) pack_cstrs;
+  }
 
                   (**********************************)
                   (*     Utilities for marking      *)
@@ -565,6 +576,7 @@ let type_iterators mark =
     match get_desc ty with
       Tconstr (p, _, _)
     | Tobject (_, {contents=Some (p, _)})
+    | Tfunctor (_, _, {pack_path = p}, _)
     | Tpackage {pack_path = p} ->
         it.it_path p
     | Tvariant row ->
@@ -644,6 +656,9 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tpackage pack       ->
       Tpackage {pack with
         pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
+  | Tfunctor _ ->
+      (* doing this would break unicity of unscoped binding in Tfunctor *)
+      assert false
   | Tof_kind jk -> Tof_kind jk
 
 (* TODO: rename to [module Copy_scope] *)

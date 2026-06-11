@@ -402,12 +402,18 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_poly%a\n"
         (fun ppf -> List.iter (typevar_jkind ~print_quote:true ppf)) sl;
       core_type i ppf ct;
-  | Ttyp_package { tpt_path = s; tpt_cstrs = l } ->
-      line i ppf "Ttyp_package %a\n" fmt_path s;
-      list i package_with ppf l;
+  | Ttyp_package pack_ty ->
+      line i ppf "Ttyp_package\n";
+      package_type i ppf pack_ty
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
+  | Ttyp_functor (lab, id, { tpt_path = s; tpt_cstrs = l}, ct) ->
+      line i ppf "Ttyp_functor\n";
+      arg_label i ppf lab;
+      line i ppf "module \"%a\" : %a" fmt_ident id.txt fmt_path s;
+      list i package_with ppf l;
+      core_type i ppf ct
   | Ttyp_quote t ->
       line i ppf "Ttyp_quote\n";
       core_type i ppf t
@@ -429,6 +435,10 @@ let rec core_type i ppf x =
 and labeled_core_type i ppf (l, t) =
   tuple_component_label i ppf l;
   core_type i ppf t
+
+and package_type i ppf { tpt_path; tpt_cstrs } =
+  line i ppf "package_type %a\n" fmt_path tpt_path;
+  list (i+1) package_with ppf tpt_cstrs;
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident s;
@@ -548,9 +558,10 @@ and pattern_extra i ppf (extra_pat, loc, attrs) =
   line i ppf "extra %a\n" fmt_location loc;
   let i = i + 1 in
   match extra_pat with
-  | Tpat_unpack ->
+  | Tpat_unpack ptyp ->
      line i ppf "Tpat_extra_unpack\n";
      attributes i ppf attrs;
+     option i package_type ppf ptyp;
   | Tpat_constraint (cty, m) ->
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;

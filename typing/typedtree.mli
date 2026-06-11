@@ -193,11 +193,11 @@ and pat_extra =
                            branches of [tconst].
          *)
   | Tpat_open of Path.t * Longident.t loc * Env.t
-  | Tpat_unpack
-        (** (module P)     { pat_desc  = Tpat_var "P"
-                           ; pat_extra = (Tpat_unpack, _, _) :: ... }
+  | Tpat_unpack of package_type option
+        (** (module P : ?S)     { pat_desc  = Tpat_var "P"
+                           ; pat_extra = (Tpat_unpack ?S, _, _) :: ... }
             (module _)     { pat_desc  = Tpat_any
-            ; pat_extra = (Tpat_unpack, _, _) :: ... }
+            ; pat_extra = (Tpat_unpack None, _, _) :: ... }
          *)
   | Tpat_inspected_type of [ `pat ] type_inspection
         (** Inserted when type inspection was necessary to resolve types
@@ -1216,6 +1216,7 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_functor of arg_label * Ident.t loc * package_type * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
@@ -1228,7 +1229,7 @@ and core_type_desc =
 and package_type = {
   tpt_path : Path.t;
   tpt_cstrs : (Longident.t loc * core_type) list;
-  tpt_type : Types.module_type;
+  tpt_type : Types.package;
   tpt_txt : Longident.t loc;
 }
 
@@ -1563,3 +1564,7 @@ val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
+
+val path_of_module : module_expr -> Path.t option
+
+val remove_module_constraint : module_expr -> module_expr

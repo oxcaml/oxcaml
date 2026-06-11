@@ -348,11 +348,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let attrs = sub.attributes sub pat.pat_attributes in
   let desc =
   match pat with
-      { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
-        Ppat_unpack { txt = None; loc  }
-    | { pat_extra=[Tpat_unpack, _, _attrs];
+      { pat_extra=[Tpat_unpack pty, loc, _attrs]; pat_desc = Tpat_any; _ } ->
+        Ppat_unpack({ txt = None; loc  }, Option.map (sub.package_type sub) pty)
+    | { pat_extra=[Tpat_unpack pty, _, _attrs];
         pat_desc = Tpat_var { name; _ }; _ } ->
-        Ppat_unpack { name with txt = Some name.txt }
+        Ppat_unpack ({ name with txt = Some name.txt },
+          Option.map (sub.package_type sub) pty)
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
@@ -368,7 +369,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
-              Ppat_unpack { name with txt = Some name.txt}
+              Ppat_unpack ({ name with txt = Some name.txt}, None)
           | _ ->
               Ppat_var name
         end
@@ -1140,6 +1141,10 @@ let core_type sub ct =
         Ptyp_poly (bound_vars, sub.typ sub ct)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
+    | Ttyp_functor (lab, name, pack, ct) ->
+        let name = Location.mkloc (Ident.name name.txt) name.loc in
+        Ptyp_functor (label lab, name, sub.package_type sub pack,
+                      sub.typ sub ct)
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
     | Ttyp_repr (list, ct) ->

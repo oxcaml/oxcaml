@@ -1,6 +1,7 @@
 OCaml 5.4.1
 -----------
 
+
 ### Bug fixes:
 
 - #14010: Fix miscompilation / liveness errors for string operations
@@ -13,6 +14,13 @@ OCaml 5.4.1
   the result of `Float.Array.sub`, `Float.Array.append`, `Float.Array.concat`
   (when empty) not to be equal to `[||]`.
   (Marc Lasson, review by Gabriel Scherer)
+
+- #14626: Handle module-dependent functions in warning 16 (Reported in #14622).
+  (Alistair O'Brien, review by Gabriel Scherer, report by Kate Deplaix)
+
+- #14667: enable application related warnings for module-dependent functions
+  (Florian Angeletti, review by Gabriel Scherer)
+
 
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
@@ -416,6 +424,13 @@ OCaml 5.4.0 (9 October 2025)
 
 ### Type system
 
+* #13681, #13682, #13683, #13684, #13275 :
+  Introduce a new type `(module M : S) -> t[M]` that corresponds to
+  module-dependent functions (aka modular explicits). In OxCaml this is
+  gated behind the `modular_explicits` extension (off by default).
+  (Samuel Vivien review by Leo White, Gabriel Scherer, Florian Angeletti,
+    Jacques Garrigue and Stephen Dolan)
+
 * #13830: fail rather than silently create abstract module types when avoiding
   (i.e. hiding) signature items, as in:
   ```ocaml
@@ -492,6 +507,19 @@ OCaml 5.4.0 (9 October 2025)
   (Florian Angeletti, review by Gabriel Scherer)
 
 ### Internal/compiler-libs changes:
+
+- #14148: Remove an unused field from package_type in typedtree
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #14149: Distinguish `(module M : S)` from `(module M) : (module S)` in
+  patterns.
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #14512: Improve check for warning 16 (unerasable-optional-argument)
+  (Alistair O'Brien, review by Florian Angeletti, Gabriel Scherer)
+
+- #14719, #14721: compute arity correctly for module-dependent function
+  (Florian Angeletti, report by Jeremy Yallop, review by Stefan Muenzel)
 
 - #13539, #13776: Use nanosleep instead of usleep or select, if available.
   (Antonin Décimo, review by Miod Vallat and Gabriel Scherer)
@@ -804,7 +832,6 @@ OCaml 5.3.0 (8 January 2025)
   compatible identifiers.
   (Xavier Leroy and Florian Angeletti, review by Daniel Bünzli and
    Jules Aguillon)
-
 
 - #12828, #13283: Add short syntax for dependent functor types `(X:A) -> ...`
   (Jeremy Yallop, review by Nicolás Ojeda Bär and Gabriel Scherer)

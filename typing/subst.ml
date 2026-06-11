@@ -504,6 +504,18 @@ let apply_type_function params args body =
           in
           Transient_expr.set_stub_desc t desc';
           t
+      | Tfunctor (l, id, {pack_path; pack_cstrs}, t2) ->
+          let t = newgenstub ~scope:(get_scope ty)
+            (Jkind.Builtin.any ~why:Dummy_jkind) in
+          For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
+          let pack' = {
+            pack_path;
+            pack_cstrs =
+              List.map (fun (l, t) -> (l, copy t)) pack_cstrs
+          } in
+          let desc' = Tfunctor (l, id, pack', copy t2) in
+          Transient_expr.set_stub_desc t desc';
+          t
       | desc ->
           let t = newgenstub ~scope:(get_scope ty)
             (Jkind.Builtin.any ~why:Dummy_jkind) in
@@ -677,12 +689,13 @@ let rec typexp copy_scope s ty =
          | Type_function { params; body } ->
             Tlink (apply_type_function params args body)
          end
-      | Tpackage {pack_path; pack_cstrs} ->
-          Tpackage {
-            pack_path = modtype_path s pack_path;
-            pack_cstrs =
-              List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
-          }
+      | Tpackage pack ->
+          Tpackage (package copy_scope s pack)
+      | Tfunctor(lbl, us, pack, ty) ->
+          let us' = Ident.Unscoped.refresh us in
+          let s' = add_module (Ident.of_unscoped us)
+                              (Pident (Ident.of_unscoped us')) s in
+          Tfunctor(lbl, us', package copy_scope s pack, typexp copy_scope s' ty)
       | Tobject (t1, name) ->
           let t1' = typexp copy_scope s t1 in
           let name' =
@@ -755,6 +768,12 @@ let rec typexp copy_scope s ty =
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
+and package copy_scope s {pack_path; pack_cstrs} =
+  {
+    pack_path = modtype_path s pack_path;
+    pack_cstrs =
+      List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
+  }
 
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->

@@ -154,6 +154,12 @@ and out_type =
   | Otyp_of_kind of out_jkind
   | Otyp_ret of out_ret_mode * out_type
   (** INVARIANT: See [out_ret_mode]. *)
+  | Otyp_functor of arg_label * out_ident * out_package * out_type
+
+and out_row =
+  | Orow_closed
+  | Orow_open_anonymous
+  | Orow_open of out_type
 
 and out_label = {
   olab_name: string;

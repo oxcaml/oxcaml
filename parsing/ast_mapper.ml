@@ -225,6 +225,9 @@ module T = struct
     | Ptyp_newlayout (lvars, t) ->
         newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
+    | Ptyp_functor (lab, s, ptyp, t) ->
+        functor_ ~loc ~attrs lab (map_loc sub s)
+          (sub.package_type sub ptyp) (sub.typ sub t)
 
   let map_type_declaration sub
       {ptype_name; ptype_params; ptype_cstrs;
@@ -723,7 +726,8 @@ module P = struct
         constraint_ ~loc ~attrs (sub.pat sub p) (Option.map (sub.typ sub) t) (sub.modes sub m)
     | Ppat_type s -> type_ ~loc ~attrs (map_loc_lid sub s)
     | Ppat_lazy p -> lazy_ ~loc ~attrs (sub.pat sub p)
-    | Ppat_unpack s -> unpack ~loc ~attrs (map_loc sub s)
+    | Ppat_unpack (s, ptyp) ->
+        unpack ~loc ~attrs (map_loc sub s) (map_opt (sub.package_type sub) ptyp)
     | Ppat_open (lid,p) ->
         open_ ~loc ~attrs (map_loc_lid sub lid) (sub.pat sub p)
     | Ppat_exception p -> exception_ ~loc ~attrs (sub.pat sub p)

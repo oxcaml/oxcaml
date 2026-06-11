@@ -164,6 +164,10 @@ val normalize_module_path: Location.t option -> t -> Path.t -> Path.t
 val normalize_type_path: Location.t option -> t -> Path.t -> Path.t
 (* Normalize the prefix part of the type path *)
 
+val try_normalize_type_path: Location.t option -> t -> Path.t -> Path.t option
+(* Normalize the prefix part of the type path,
+   returns None if the path did not change *)
+
 val normalize_value_path: Location.t option -> t -> Path.t -> Path.t
 (* Normalize the prefix part of the value path *)
 
@@ -173,6 +177,9 @@ val normalize_modtype_path: t -> Path.t -> Path.t
 val normalize_instance_names_in_module_path: Path.t -> Path.t
 (* Normalize the instance names appearing in a module path by removing
    excess arguments arising from transparent aliases *)
+
+val try_normalize_modtype_path: t -> Path.t -> Path.t option
+(* Normalize a module type path, returns None if the path did not change *)
 
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
@@ -522,6 +529,7 @@ val enter_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     string -> value_description -> t -> Ident.t * t
 val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
+val reenter_type: Ident.t -> type_declaration -> t -> t
 val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
@@ -668,6 +676,21 @@ val summary: t -> summary
 
 val keep_only_summary : t -> t
 val env_of_only_summary : (summary -> Subst.t -> t) -> t -> t
+
+(* Equivalence of unscoped identifiers *)
+
+module Unscoped : sig
+  val with_pairs : (Ident.Unscoped.t * Ident.Unscoped.t) list -> t -> t
+  val get_pairs : t -> (Ident.Unscoped.t * Ident.Unscoped.t) list
+  val path_equiv : t -> Path.t -> Path.t -> bool
+end
+[@@alert dangerous "
+It is unsafe to use the common [Path.same] function in contexts where
+[Unscoped.with_pairs] has been used to enrich the environment with
+unscoped equalities; [Path.equiv] must be used instead. See [ctype.ml]
+for an example of careful usage of [Unscoped], by locally shadowing
+[Path] to hide [Path.same].
+"]
 
 (* Error report *)
 

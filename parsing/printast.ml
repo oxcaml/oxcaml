@@ -247,6 +247,12 @@ let rec core_type i ppf x =
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
+  | Ptyp_functor (label, name, ptyp, ct2) ->
+      line i ppf "Ptyp_functor\n";
+      arg_label i ppf label;
+      line i ppf "\"%s\"\n" name.txt;
+      package_type i ppf ptyp;
+      core_type i ppf ct2
 
 and typevar i ppf (s, jkind) =
   line i ppf "var: %s\n" s.txt;
@@ -328,8 +334,9 @@ and pattern i ppf x =
   | Ppat_type (li) ->
       line i ppf "Ppat_type\n";
       longident_loc i ppf li
-  | Ppat_unpack s ->
+  | Ppat_unpack (s, ptyp) ->
       line i ppf "Ppat_unpack %a\n" fmt_str_opt_loc s;
+      option i package_type ppf ptyp;
   | Ppat_exception p ->
       line i ppf "Ppat_exception\n";
       pattern i ppf p

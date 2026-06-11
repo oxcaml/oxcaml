@@ -32,6 +32,7 @@ type 'a t = 'a Language_extension_kernel.t =
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
+  | Modular_explicits : unit t
 
 (** Require that an extension is enabled for at least the provided level, or
     else throw an exception at the provided location saying otherwise. *)
