@@ -233,6 +233,17 @@ let stack_ptr_dwarf_register_number = 31
 
 let domainstate_ptr_dwarf_register_number = 28
 
+let extcall_code_size_after_return_address ~alloc ~stack_ofs =
+  (* This must be kept in sync with the [Lextcall] case of [emit_instr] in
+     emit.ml. Note that CFI directives do not generate machine code. *)
+  if Config.runtime5 && stack_ofs > 0
+  then Some 0 (* the BL is the last instruction in the sequence *)
+  else if alloc
+  then Some 0 (* likewise *)
+  else if Config.runtime5
+  then Some 4 (* the instruction restoring the stack pointer follows the BL *)
+  else Some 0
+
 (* Registers destroyed by operations *)
 
 let destroyed_at_c_noalloc_call =

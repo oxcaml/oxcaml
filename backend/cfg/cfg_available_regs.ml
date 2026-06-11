@@ -135,10 +135,11 @@ module Transfer = struct
       destroyed_at:(a -> Reg.t array) ->
       is_interesting_constructor:(a -> bool) ->
       is_end_region:(a -> bool) ->
+      const_for_result:RD.Holds_value_of.t option ->
       a Cfg.instruction ->
       RAS.t * RAS.t =
    fun ~avail_before ~destroyed_at ~is_interesting_constructor ~is_end_region
-       instr ->
+       ~const_for_result instr ->
     (* We split the calculation of registers that become unavailable after a
        call into two parts. First: anything that the target marks as destroyed
        by the operation, combined with any registers that will be clobbered by
@@ -212,10 +213,20 @@ module Transfer = struct
     in
     let avail_across = RD_quotient_set.diff avail_before made_unavailable in
     let avail_after =
-      let res = Reg.set_of_array instr.res in
-      RD_quotient_set.union
-        (RD_quotient_set.without_debug_info res)
-        avail_across
+      (* In addition to tracking which registers hold the values of which
+         variables, we also track which registers contain which immediate
+         constants (e.g. for DWARF call site information). *)
+      match const_for_result, instr.res with
+      | Some holds_value_of, [| res |] ->
+        RD_quotient_set.add
+          (RD.create ~reg:res ~holds_value_of ~part_of_value:0
+             ~num_parts_of_value:1 ~which_parameter:None ~provenance:None)
+          avail_across
+      | (Some _ | None), _ ->
+        let res = Reg.set_of_array instr.res in
+        RD_quotient_set.union
+          (RD_quotient_set.without_debug_info res)
+          avail_across
     in
     dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
     dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_across;
@@ -269,8 +280,9 @@ module Transfer = struct
               && RD_quotient_set.mem_reg_by_loc avail_before reg
             then
               let regd =
-                RD.create ~reg ~holds_value_of:ident ~part_of_value
-                  ~num_parts_of_value ~which_parameter ~provenance
+                RD.create ~reg ~holds_value_of:(RD.Holds_value_of.Var ident)
+                  ~part_of_value ~num_parts_of_value ~which_parameter
+                  ~provenance
               in
               avail_after
                 := RD_quotient_set.add regd
@@ -371,9 +383,16 @@ module Transfer = struct
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
+          let const_for_result : RD.Holds_value_of.t option =
+            match instr.desc with
+            | Op (Const_int i) -> Some (Const_int i)
+            | Op (Const_float f) -> Some (Const_naked_float f)
+            | Op (Const_symbol sym) -> Some (Const_symbol sym.sym_name)
+            | _ -> None
+          in
           common ~avail_before ~destroyed_at:Proc.destroyed_at_basic
             ~is_interesting_constructor:is_op_end_region
-            ~is_end_region:is_op_end_region instr)
+            ~is_end_region:is_op_end_region ~const_for_result instr)
     in
     instr.available_across <- avail_across;
     { avail_before = avail_after }
@@ -406,7 +425,7 @@ module Transfer = struct
                 | Prim { op = External _; label_after = _ } ->
                   false)
             ~is_end_region:(fun _ -> false)
-            term)
+            ~const_for_result:None term)
     in
     term.available_across <- avail_across;
     let avail_before_exn_handler =

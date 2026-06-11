@@ -361,6 +361,12 @@ let loc_exn_bucket = rax
 let stack_ptr_dwarf_register_number = 7
 let domainstate_ptr_dwarf_register_number = 14
 
+let extcall_code_size_after_return_address ~alloc:_ ~stack_ofs:_ =
+  (* CR mshinwell: implement this, mirroring the [Lextcall] case of
+     [emit_instr] in emit.ml (more delicate than for arm64, since
+     instructions are of variable length). *)
+  None
+
 (* Registers destroyed by operations *)
 
 let int_regs_destroyed_at_c_call_win64 =
