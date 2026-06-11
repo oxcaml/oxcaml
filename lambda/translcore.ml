@@ -2501,8 +2501,7 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_field (_id, lbl, repres) ->
     begin match repres with
-    | Record_boxed
-    | Record_float | Record_ufloat ->
+    | Record_boxed ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
         (fun (Uaccess_unboxed_field (_, l, _)) ->
@@ -2511,7 +2510,7 @@ and transl_idx ~scopes loc env ba uas =
                 in non-mixed boxed record")
         uas;
       Lprim (Pmake_idx_field lbl.lbl_pos, [], (of_location ~scopes loc))
-    | Record_inlined _ | Record_unboxed ->
+    | Record_float | Record_ufloat | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
       let shape = Lambda.transl_mixed_product_shape shape in
