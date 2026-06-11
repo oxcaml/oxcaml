@@ -223,5 +223,12 @@ for file in "${new_files[@]}"; do
   cp "upstream/ocaml_flambda/$file" "$tgt"
 done
 
+# Commit any changes to the .exclude files separately from the import itself,
+# since they should be included in review.
+git add upstream/ocaml_flambda/*/.exclude
+if ! git diff --cached --quiet; then
+  git commit -m "Update .exclude files"
+fi
+
 git add .
 git commit -m "Automated commit: Import compiler changes from $old_base_rev to $rev"
