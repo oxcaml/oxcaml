@@ -85,6 +85,18 @@ module Lvalue = struct
           ([O.DW_op_swap; O.DW_op_drop] @ OB.add_unsigned_const offset_in_bytes)
         ~at_join:[] ()
 
+  let read_field_unguarded ~block ~field =
+    let offset_in_bytes =
+      Targetint.mul field Targetint.size_in_bytes_as_targetint
+    in
+    block @ OB.add_unsigned_const offset_in_bytes
+
+  let offset_pointer_unguarded t ~offset_in_words =
+    let offset_in_bytes =
+      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
+    in
+    t @ OB.add_unsigned_const offset_in_bytes
+
   let location_from_another_die ~die_label ~compilation_unit_header_label =
     [OB.call ~die_label ~compilation_unit_header_label]
 end
@@ -110,6 +122,8 @@ module Rvalue = struct
   let float_const i = [OB.float_const i]
 
   let const_symbol symbol = [OB.value_of_symbol ~symbol]
+
+  let address_of_label label = [OB.address_of_label ~label]
 
   let in_register ~dwarf_reg_number = [OB.contents_of_register ~dwarf_reg_number]
 
@@ -137,6 +151,12 @@ module Rvalue = struct
           @ OB.add_unsigned_const offset_in_bytes
           @ [O.DW_op_deref])
         ~at_join:[] ()
+
+  let read_field_unguarded ~block ~field =
+    let offset_in_bytes =
+      Targetint.mul field Targetint.size_in_bytes_as_targetint
+    in
+    block @ OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref]
 
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field

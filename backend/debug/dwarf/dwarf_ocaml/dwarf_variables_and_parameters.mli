@@ -58,3 +58,18 @@ val dwarf :
   fun_end_label:Asm_targets.Asm_label.t ->
   Available_ranges_all_vars.t ->
   unit
+
+(** Emit the rvalue DIEs (location lists describing the values, rather than the
+    locations, of variables; consulted via [DW_OP_call*] from the location
+    descriptions of phantom variables) that were demanded during the [dwarf]
+    calls for the function and its inlined frames. This must be called exactly
+    once per function, after all such [dwarf] calls. *)
+val dwarf_rvalue_dies :
+  Dwarf_state.t ->
+  value_type_proto_die:Proto_die.t ->
+  function_symbol:Asm_targets.Asm_symbol.t ->
+  function_proto_die:Proto_die.t ->
+  proto_dies_for_vars:proto_dies_for_vars ->
+  fun_end_label:Asm_targets.Asm_label.t ->
+  Available_ranges_all_vars.t ->
+  unit

@@ -91,6 +91,16 @@ module Lvalue : sig
       [offset_in_words]. *)
   val offset_pointer : t -> offset_in_words:Targetint.t -> t
 
+  (** As for [read_field], but without the code that tolerates failure of
+      evaluation of [block]. For use when the location description is only
+      quoted at program counters where [block] evaluates successfully (e.g. in
+      appropriately-restricted location lists). *)
+  val read_field_unguarded : block:normal rvalue -> field:Targetint.t -> t
+
+  (** As for [offset_pointer], but without the code that tolerates failure of
+      evaluation of the supplied lvalue; see [read_field_unguarded]. *)
+  val offset_pointer_unguarded : t -> offset_in_words:Targetint.t -> t
+
   (** The address (or register location) of V is found in the location given by
       evaluating the location description (which must yield an lvalue) in the
       DIE at the given [die_label]. (This is like a function call.) *)
@@ -127,6 +137,11 @@ module Rvalue : sig
       to by the given symbol). *)
   val const_symbol : Asm_symbol.t -> normal t
 
+  (** V is the address of the given assembly label (not the contents of memory
+      at the label). Used for statically-allocated values whose defining symbols
+      are assembler-local labels rather than linker symbols. *)
+  val address_of_label : Asm_label.t -> normal t
+
   (** V will be the contents of the given register at time T. *)
   val in_register : dwarf_reg_number:int -> normal t
 
@@ -142,6 +157,10 @@ module Rvalue : sig
   (** V will be the contents of the given field of the block whose location is
       given by the provided simple location description at time T. *)
   val read_field : block:normal t -> field:Targetint.t -> normal t
+
+  (** As for [read_field], but without the code that tolerates failure of
+      evaluation of [block]; see [Lvalue.read_field_unguarded]. *)
+  val read_field_unguarded : block:normal t -> field:Targetint.t -> normal t
 
   (** V will be the contents of the given field of the given symbol at time T.
   *)

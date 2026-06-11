@@ -23,7 +23,7 @@ type label = Cmm.label
 
 type phantom_defining_expr =
   | Lphantom_const_int of Targetint.t
-  | Lphantom_const_symbol of string
+  | Lphantom_const_symbol of Cmm.symbol
   | Lphantom_var of Backend_var.t
   | Lphantom_offset_var of
       { var : Backend_var.t;
@@ -34,7 +34,7 @@ type phantom_defining_expr =
         field : int
       }
   | Lphantom_read_symbol_field of
-      { sym : string;
+      { sym : Cmm.symbol;
         field : int
       }
   | Lphantom_block of

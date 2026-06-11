@@ -119,6 +119,8 @@ let contents_of_domainstate_slot ~offset_in_bytes
 
 let value_of_symbol ~symbol : O.t = DW_op_addr (Symbol symbol)
 
+let address_of_label ~label : O.t = DW_op_addr (Label label)
+
 let signed_int_const i : O.t = DW_op_consts (Targetint.to_int64 i)
 
 let add_unsigned_const i : O.t list =

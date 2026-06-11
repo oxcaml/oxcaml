@@ -87,7 +87,7 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
 
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
-  | Cphantom_const_symbol of string
+  | Cphantom_const_symbol of Cmm.symbol
   | Cphantom_var of Backend_var.t
   | Cphantom_offset_var of
       { var : Backend_var.t;
@@ -98,7 +98,7 @@ type phantom_defining_expr =
         field : int
       }
   | Cphantom_read_symbol_field of
-      { sym : string;
+      { sym : Cmm.symbol;
         field : int
       }
   | Cphantom_block of

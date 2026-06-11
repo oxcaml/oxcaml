@@ -387,7 +387,7 @@ module Transfer = struct
             match instr.desc with
             | Op (Const_int i) -> Some (Const_int i)
             | Op (Const_float f) -> Some (Const_naked_float f)
-            | Op (Const_symbol sym) -> Some (Const_symbol sym.sym_name)
+            | Op (Const_symbol sym) -> Some (Const_symbol sym)
             | _ -> None
           in
           common ~avail_before ~destroyed_at:Proc.destroyed_at_basic
