@@ -2,6 +2,7 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 subtree_prefix="$(git rev-parse --show-prefix)"
+source scripts/common.sh
 
 # Script arguments with their default values
 commitish=HEAD
@@ -36,23 +37,6 @@ the relevant compiler files inside a subdirectory. This used to be the case for
 flambda (files were under an "ocaml/" directory), although it is no longer the
 case.
 USAGE
-}
-
-# Succeeds if the file named $2 is listed in $1/.exclude.  Each line of the
-# .exclude file is a glob pattern; a pattern starting with "!" re-includes
-# files matched by an earlier pattern.  A missing .exclude file is treated as
-# an empty one.
-function is-excluded () {
-  local dir="$1" name="$2" pattern result=1
-  if [[ ! -f "$dir/.exclude" ]]; then return 1; fi
-  while IFS= read -r pattern; do
-    case "$pattern" in
-      ''|'#'*) ;;
-      '!'*) if [[ "$name" == ${pattern#!} ]]; then result=1; fi;;
-      *)    if [[ "$name" == $pattern    ]]; then result=0; fi;;
-    esac
-  done < "$dir/.exclude"
-  return $result
 }
 
 # Maps a file under upstream/ocaml_flambda/ to its location in src/ocaml/.
