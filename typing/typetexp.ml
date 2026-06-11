@@ -823,11 +823,15 @@ let transl_type_param env path jkind_default styp =
     Ptyp_any jkind ->
       let name = None in
       let jkind, jkind_annot = transl_jkind_and_annot_opt jkind name in
-      transl_type_param_var env loc attrs name jkind jkind_annot
+      let annotated_jkind = Option.map (fun _ -> jkind) jkind_annot in
+      transl_type_param_var env loc attrs name jkind jkind_annot,
+      annotated_jkind
   | Ptyp_var (name, jkind) ->
       let name = Some name in
       let jkind, jkind_annot = transl_jkind_and_annot_opt jkind name in
-      transl_type_param_var env loc attrs name jkind jkind_annot
+      let annotated_jkind = Option.map (fun _ -> jkind) jkind_annot in
+      transl_type_param_var env loc attrs name jkind jkind_annot,
+      annotated_jkind
   | _ -> assert false
 
 let transl_type_param env path jkind_default styp =
