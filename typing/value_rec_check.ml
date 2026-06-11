@@ -827,7 +827,7 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
-          | Record_variable ->
+          | Record_variable | Record_inlined_variable _ ->
             Misc.fatal_error
               "value_rec_check: unexpected unknown representation"
         in

@@ -737,7 +737,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited cstrs rep)
-        | Type_record (_, Record_variable, _) ->
+        | Type_record (_, (Record_variable | Record_inlined_variable _), _) ->
           num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
@@ -1047,7 +1047,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
-  | Record_variable ->
+  | Record_variable | Record_inlined_variable _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -1062,7 +1062,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed | Record_dummy _ | Record_variable ->
+          | Record_unboxed | Record_dummy _ | Record_variable
+          | Record_inlined_variable _ ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -1084,7 +1085,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
                       | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_variable ->
+                      | Record_variable | Record_inlined_variable _ ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1113,7 +1114,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
           | Record_dummy _ -> assert false
-          | Record_variable -> assert false
+          | Record_variable | Record_inlined_variable _ -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))

@@ -1064,6 +1064,10 @@ module Record_diffing = struct
         | Record_variable, _ -> Some (Fixed_representation Second)
         | _, Record_variable -> Some (Fixed_representation First)
 
+        | Record_inlined_variable _, Record_inlined_variable _ -> None
+        | Record_inlined_variable _, _ -> Some (Fixed_representation Second)
+        | _, Record_inlined_variable _ -> Some (Fixed_representation First)
+
         | Record_unboxed, Record_unboxed -> None
         | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
         | _, Record_unboxed -> Some (Unboxed_representation (Second, []))

@@ -706,7 +706,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         | None ->
             let rep =
               match rep with
-              | Record_variable ->
+              | (Record_variable | Record_inlined_variable _) as old_repres ->
                   let label_params_and_types, record_params =
                     Ctype.instance_label_declarations ~fixed:false
                       (lbl_list |> Array.of_list) ~params:type_params
@@ -718,7 +718,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   in
                   (match
                      Typedecl.update_record_representation env Location.none
-                       Legacy lds_and_types ~why:Field_projection
+                       Legacy ~old_repres lds_and_types ~why:Field_projection
                    with
                    | Ok (_sorts, rep) -> rep
                    | Error _ -> Misc.fatal_error "unrepresentable record")
@@ -752,7 +752,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     else Outval_record_boxed
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"
-              | Record_variable ->
+              | Record_variable | Record_inlined_variable _ ->
                   Misc.fatal_error "variable record representation"
             in
             tree_of_record_fields depth

@@ -960,9 +960,15 @@ and record_representation =
 
      After [update_decls_jkind], no record should have this representation. *)
   | Record_variable
-  (* Used after [update_decls_jkind] for records whose representation cannot be
-     determined because at least one field has layout [any]. The actual
-     representation is decided at construction sites. *)
+  (* Used after [update_decls_jkind] for non-inlined records whose
+     representation cannot be determined because at least one field has layout
+     [any]. The actual representation is decided at construction sites. *)
+  | Record_inlined_variable of tag * variant_representation
+  (* Counterpart of [Record_variable] for inlined records: the
+     [constructor_representation] cannot be determined at typedecl time because
+     at least one field has layout [any], but the constructor's tag and the
+     containing variant's representation are fixed at declaration time. Use
+     sites replace this with [Record_inlined]; it must not reach lambda. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product

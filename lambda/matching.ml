@@ -2618,7 +2618,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
-        | Record_variable ->
+        | Record_variable | Record_inlined_variable _ ->
           fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let binding_kind =

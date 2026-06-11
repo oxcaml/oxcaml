@@ -1888,7 +1888,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
 let is_variable_repres : type rep. rep record_form -> rep -> bool =
   fun form rep ->
     match form, rep with
-    | Legacy, Record_variable -> true
+    | Legacy, (Record_variable | Record_inlined_variable _) -> true
     | Unboxed_product, Record_unboxed_product_variable -> true
     | _ -> false
 
@@ -1923,6 +1923,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
       in
       match
         Typedecl.update_record_representation ~why env loc form
+          ~old_repres:representative_label.lbl_repres
           (lbls_and_ty_args |> Array.to_list)
       with
       | Ok (sorts, rep) ->
@@ -2799,7 +2800,7 @@ module Label = NameChoice (struct
     match lbl.lbl_repres with
     | Record_boxed | Record_float | Record_ufloat | Record_unboxed
     | Record_mixed _ | Record_dummy _ | Record_variable -> true
-    | Record_inlined _ -> false
+    | Record_inlined _ | Record_inlined_variable _ -> false
 end)
 
 module Unboxed_label = NameChoice (struct
@@ -6562,9 +6563,11 @@ and type_expect_
         | Legacy -> begin match rep with
           | Record_unboxed
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
+          | Record_inlined_variable (_, (Variant_unboxed | Variant_with_null))
             -> false
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
+          | Record_inlined_variable (_, (Variant_boxed _ | Variant_extensible))
           | Record_variable
             -> true
           | Record_dummy _ ->
@@ -6794,7 +6797,8 @@ and type_expect_
                  each label all over again. Possibly we're doing things in the
                  wrong order. *)
               Typedecl.update_record_representation ~why env
-                sexp.pexp_loc record_form labels_with_updated_types
+                sexp.pexp_loc record_form ~old_repres:representation
+                labels_with_updated_types
             with
             | Ok (_, rep) -> rep
             | Error _ ->
@@ -8709,7 +8713,7 @@ and type_block_access env expected_base_ty principal
      | Record_float -> bad_record_error "float"
      | Record_ufloat -> bad_record_error "[@@represent_as_float_array]"
      | Record_unboxed -> bad_record_error "[@@unboxed]"
-     | Record_inlined _ ->
+     | Record_inlined _ | Record_inlined_variable _ ->
        Misc.fatal_error "Typecore.type_block_access: inlined record"
      | Record_dummy _ ->
        Misc.fatal_error "Typecore.type_block_access: dummy representation");

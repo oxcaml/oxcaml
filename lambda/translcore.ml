@@ -71,7 +71,7 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
-  | Record_variable ->
+  | Record_variable | Record_inlined_variable _ ->
       fatal_error "field_offset_for_label: variable record representation"
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
@@ -721,7 +721,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let repres =
         match lbl.lbl_repres with
-        | Record_variable ->
+        | Record_variable | Record_inlined_variable _ ->
             Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
               lbl.lbl_name
         | repres -> repres
@@ -807,7 +807,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
-        | Record_variable ->
+        | Record_variable | Record_inlined_variable _ ->
           fatal_error "transl_exp0: variable record representation"
       in
       begin match prim_and_args with
@@ -913,7 +913,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
             fatal_error "transl_exp0: unexpected dummy representation"
-        | Record_variable ->
+        | Record_variable | Record_inlined_variable _ ->
             fatal_error "transl_exp0: unexpected unknown representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
@@ -2213,7 +2213,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
             | Record_dummy _ ->
               fatal_error "transl_record: unexpected dummy representation"
-            | Record_variable ->
+            | Record_variable | Record_inlined_variable _ ->
               fatal_error "transl_record: unexpected variable representation"
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
@@ -2299,7 +2299,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_dummy _ ->
                    fatal_error
                      "transl_record: unexpected dummy representation"
-                 | Record_variable ->
+                 | Record_variable | Record_inlined_variable _ ->
                    fatal_error
                      "transl_record: unexpected variable representation"
                in
@@ -2363,7 +2363,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
-        | Record_variable ->
+        | Record_variable | Record_inlined_variable _ ->
           fatal_error "transl_record: unexpected variable representation"
       with Not_constant ->
         let loc = of_location ~scopes loc in
@@ -2418,7 +2418,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Null, _, _) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
-        | Record_variable ->
+        | Record_variable | Record_inlined_variable _ ->
           fatal_error "transl_record: unexpected variable representation"
     in
     begin match opt_init_expr with
@@ -2534,7 +2534,7 @@ and transl_idx ~scopes loc env ba uas =
              (of_location ~scopes loc))
     | Record_dummy _ ->
       fatal_error "transl_idx: unexpected dummy representation"
-    | Record_variable ->
+    | Record_variable | Record_inlined_variable _ ->
       fatal_error "transl_idx: unexpected unknown representation"
     end
   end
@@ -2544,7 +2544,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl repres =
   begin match repres with
   | Record_dummy _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
-  | Record_variable ->
+  | Record_variable | Record_inlined_variable _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat
