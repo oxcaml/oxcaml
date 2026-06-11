@@ -1066,7 +1066,7 @@ let initial =
         zero_alloc_assert = Zero_alloc_annotations.Assert.Assert_default;
         infer_with_bounds = false;
         kind_verbosity = 0;
-        ikinds = false
+        ikinds = true
       };
     merlin =
       { build_path = [];
