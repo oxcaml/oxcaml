@@ -862,12 +862,6 @@ module type S = sig
     ('l * 'r) Value.t ->
     (disallowed * 'r) Alloc.t
 
-  (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
-  val value_r2g :
-    ?hint:(disallowed * 'r) Hint.morph ->
-    ('l * 'r) Value.t ->
-    (disallowed * 'r) Value.t
-
   module Modality : sig
     module Comonadic : sig
       module Atom : sig
