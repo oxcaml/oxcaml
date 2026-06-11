@@ -243,7 +243,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     let cstr_existentials, cstr_args, cstr_inlined =
       let record_repr =
         match cstr_shape with
-        | None -> Record_variable
+        | None -> Record_inlined_variable (cstr_tag, rep)
         | Some shape -> Record_inlined (cstr_tag, shape, rep)
       in
       constructor_args ~current_unit decl.type_private cd_args cd_res
