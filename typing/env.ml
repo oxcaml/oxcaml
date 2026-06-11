@@ -883,8 +883,9 @@ type lookup_error =
         container_class_type : string;
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
+  | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
+  | Non_value_used_in_object of
+      Mode.Hint.pinpoint_desc * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -3742,7 +3743,7 @@ let const_closure_mode pp {Mode.monadic; comonadic}
   in
   {Mode.monadic; comonadic}
 
-let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
+let exclave_mode ~errors ~env ~pp vmode =
   match
   Mode.Regionality.submode
     (Mode.Value.proj_comonadic Areality vmode)
@@ -3750,13 +3751,13 @@ let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
 with
 | Ok () -> vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
 | Error _ ->
-    may_lookup_error errors loc env
-      (Local_value_used_in_exclave (item, lid))
+    may_lookup_error errors (fst pp) env
+      (Local_value_used_in_exclave (snd pp))
 
 let region_mode vmode =
   vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
 
-let unboxed_type ~errors ~env ~loc ~lid ty =
+let unboxed_type ~errors ~env ~pp ty =
   match ty with
   | None -> ()
   | Some ty ->
@@ -3772,7 +3773,8 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
     with
     | Ok () -> ()
     | Result.Error err ->
-      may_lookup_error errors loc env (Non_value_used_in_object (lid, ty, err))
+      may_lookup_error errors (fst pp) env
+        (Non_value_used_in_object (snd pp, ty, err))
 
 (** Takes the [mode] and [ty] of a value at definition site, walks through the
     list of locks and constrains [mode] and [ty]. Return the access mode of the
@@ -3781,14 +3783,8 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
     [ty] is optional as the function works on modules and classes as well, for
     which [ty] should be [None].
 
-    [pp] overrides the pinpoint used in closure lock errors; it defaults to the
-    identifier being looked up. *)
-let walk_locks ~errors ~env ~loc ?pp ~item ~lid mode ty locks =
-  let pp : Mode.Hint.pinpoint =
-    match pp with
-    | Some pp -> pp
-    | None -> (loc, Ident {category = item; lid})
-  in
+    [pp] is the pinpoint used in errors. *)
+let walk_locks ~errors ~env ~pp mode ty locks =
   List.fold_left
     (fun vmode lock ->
       match lock with
@@ -3798,9 +3794,9 @@ let walk_locks ~errors ~env ~loc ?pp ~item ~lid mode ty locks =
       | Closure_lock (closure_context, comonadic) ->
           closure_mode pp vmode closure_context comonadic
       | Exclave_lock ->
-          exclave_mode ~errors ~env ~loc ~item ~lid vmode
+          exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
-          unboxed_type ~errors ~env ~loc ~lid ty;
+          unboxed_type ~errors ~env ~pp ty;
           vmode
     ) mode locks
 
@@ -3808,15 +3804,13 @@ let walk_locks ~errors ~env ~loc ?pp ~item ~lid mode ty locks =
     constraining every enclosing closure lock as if a legacy value defined at
     toplevel were used at the pinpoint's location. Used for constructs (e.g.
     effect handlers) that force enclosing functions to be nonportable and
-    stateful. The region, exclave and unboxed locks never constrain a legacy
-    value with no type, so [lid] is never used in errors. *)
+    stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
   ignore
-    (walk_locks ~errors:true ~env ~loc:(fst pp) ~pp ~item:Value
-       ~lid:(Lident "") (Mode.Value.disallow_right Mode.Value.legacy) None
-       locks
+    (walk_locks ~errors:true ~env ~pp
+       (Mode.Value.disallow_right Mode.Value.legacy) None locks
       : Mode.Value.l)
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
@@ -4539,7 +4533,8 @@ let lookup_class ~errors ~use ~loc lid env =
   in
   let vmode =
     if use then
-      walk_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None locks
+      let pp : Mode.Hint.pinpoint = (loc, Ident {category = Class; lid}) in
+      walk_locks ~errors ~env ~pp clda_mode None locks
     else
       clda_mode
   in
@@ -4687,7 +4682,8 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 (* Ordinary lookup functions *)
 
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
-  walk_locks ~errors:true ~loc ~env ~item ~lid mode ty locks
+  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+  walk_locks ~errors:true ~env ~pp mode ty locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env
@@ -5097,20 +5093,9 @@ let extract_settable_variables env =
        | Val_ivar _ | Val_mut _ -> name :: acc
        | _ -> acc) None env []
 
-let print_lock_item ppf (item, lid) =
-  match (item : Mode.Hint.lock_item) with
-  | Module ->
-      fprintf ppf "The module %a is"
-        quoted_longident lid
-  | Class ->
-      fprintf ppf "%a is a class, and classes are always"
-        quoted_longident lid
-  | Value ->
-      fprintf ppf "The value %a is"
-        quoted_longident lid
-  | Constructor ->
-      fprintf ppf "The constructor %a is"
-        quoted_longident lid
+let print_pinpoint_desc ppf desc =
+  (Mode.print_pinpoint_desc desc |> Option.get)
+    ~definite:true ~capitalize:true ppf
 
 let print_stage ppf stage =
   if stage = 0 then fprintf ppf "outside any quotations"
@@ -5392,15 +5377,22 @@ let report_lookup_error_doc loc env = function
         "The module %a is an alias for module %a, which %s"
         quoted_longident lid
         (Style.as_inline_code pp_path) p cause
-  | Local_value_used_in_exclave (item, lid) ->
+  | Local_value_used_in_exclave desc ->
       Location.errorf ~loc
-        "%a local, so it cannot be used inside an exclave_"
-        print_lock_item (item, lid)
-  | Non_value_used_in_object (lid, typ, err) ->
+        "%a is local, so it cannot be used inside an exclave_"
+        print_pinpoint_desc desc
+  | Non_value_used_in_object (desc, typ, err) ->
+      (* Identifiers are special-cased to preserve the historical
+         printing of this error. *)
+      let print_subject ppf (desc : Mode.Hint.pinpoint_desc) =
+        match desc with
+        | Ident {lid; _} -> quoted_longident ppf lid
+        | desc -> print_pinpoint_desc ppf desc
+      in
       Location.errorf ~loc
         "%a must have a type of layout value because it is captured by an \
          object.@ %a"
-        quoted_longident lid
+        print_subject desc
         (fun ppf v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
            env ppf v)
