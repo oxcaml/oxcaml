@@ -2848,6 +2848,27 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
+(* Unify [ty_res], the result type of a constructor instance, with the
+   use-site type [containing_type] when that leaves [containing_type] alone,
+   as decided by inspecting its variables (cf. [Ctype.matches]). Otherwise
+   the unification is undone — the constructor cannot, or need not, occur at
+   this instantiation — and the variables of [containing_type] it would have
+   instantiated, on whose layouts the constructor's representation depends,
+   are returned. *)
+let refine_constructor_instance env ty_res ~containing_type =
+  let use_site_vars = free_variables containing_type in
+  let snap = Btype.snapshot () in
+  match unify env ty_res containing_type with
+  | exception Unify _ ->
+    Btype.backtrack snap;
+    []
+  | () ->
+    match List.filter (fun v -> not (is_Tvar v)) use_site_vars with
+    | [] -> []
+    | refined ->
+      Btype.backtrack snap;
+      refined
+
 (* The sorts of the arguments of [cstr], a constructor of the variant type
    [containing_type], raising if the use of constructor [used_cstr_name]
    does not determine them. *)
@@ -2885,27 +2906,9 @@ let constructor_argument_sorts env (cstr : Types.constructor_description)
         (fun (ty, _jkind) ->
            ignore (require_sort ~fixed:true ty : Jkind.sort))
         existentials;
-      (* Refine the instance by the use-site instantiation. Like
-         [Ctype.matches], unify and then inspect [containing_type]'s
-         variables, but keep the unification when it left them alone. *)
-      let use_site_vars = free_variables containing_type in
-      let snap = Btype.snapshot () in
-      begin match unify env ty_res containing_type with
-      | exception Unify _ ->
-        (* [cstr] cannot occur at this instantiation. *)
-        Btype.backtrack snap
-      | () ->
-        match List.filter (fun v -> not (is_Tvar v)) use_site_vars with
-        | [] -> ()
-        | refined ->
-          (* The unification made [containing_type] more specific, so
-             [cstr] need not occur here: undo it, but require sorts for the
-             refined variables, on which [cstr]'s representation depends. *)
-          Btype.backtrack snap;
-          List.iter
-            (fun v -> ignore (require_sort ~fixed:false v : Jkind.sort))
-            refined
-      end;
+      List.iter
+        (fun v -> ignore (require_sort ~fixed:false v : Jkind.sort))
+        (refine_constructor_instance env ty_res ~containing_type);
       List.map
         (fun (ca : Types.constructor_argument) ->
            require_sort ~fixed:false ca.ca_type)
