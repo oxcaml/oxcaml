@@ -1,0 +1,7 @@
+total: 6
+doubled: 42
+gen: 1 2 3
+read: hello
+copy: true
+gen-in-await: 1 5
+pstate: foo!
