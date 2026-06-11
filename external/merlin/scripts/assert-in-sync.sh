@@ -8,11 +8,11 @@ function usage () {
 Usage: $0
 
 Asserts that the compiler sources in this repository are in sync with the
-copies in external/merlin/upstream/ocaml_flambda.  For each directory mirrored
-in external/merlin/upstream/ocaml_flambda, every compiler file in the working
-tree (not counting gitignored files) must either be imported with identical
-contents or be listed in that directory's ".exclude" file, and every imported
-file must still exist in the compiler.
+copies in Merlin (by comparing against external/merlin/upstream/ocaml_flambda).
+For each directory mirrored in external/merlin/upstream/ocaml_flambda, every
+compiler file in the working tree (not counting gitignored files) must either be
+imported with identical contents or be listed in that directory's ".exclude"
+file, and every imported file must still exist in the compiler.
 
 Exits non-zero if anything is out of sync; run
 external/merlin/scripts/import-ocaml-source.sh to bring the copies back in sync.
@@ -56,22 +56,16 @@ for dir in */; do
     name="${compiler_file#"$dir"/}"
     if is-excluded "$dir" "$name"; then continue; fi
     if [[ ! -e "$compiler_file" ]]; then
-      error "$compiler_file exists in the compiler but was never imported;" \
-            "import it, or add it to" \
-            "external/merlin/upstream/ocaml_flambda/$dir/.exclude" \
-            "to ignore it"
+      error "$compiler_file exists in the compiler, but not in Merlin"
     elif ! cmp -s "$root/$compiler_file" "$compiler_file"; then
-      error "external/merlin/upstream/ocaml_flambda/$compiler_file is out of" \
-            "date with the compiler's copy"
+      error "$compiler_file is out of sync with Merlin"
     fi
   done
   # The glob skips dotfiles, so the .exclude files themselves are not checked
   for file in "$dir"/*; do
     name="${file#"$dir"/}"
     if ! printf '%s\n' $compiler_files | grep -qxF "$dir/$name"; then
-      error "external/merlin/upstream/ocaml_flambda/$file no longer exists in" \
-            "the compiler; delete it (and its external/merlin/src/ocaml" \
-            "counterpart, if any)"
+      error "$compiler_file was deleted, but not in Merlin"
     fi
   done
 done
