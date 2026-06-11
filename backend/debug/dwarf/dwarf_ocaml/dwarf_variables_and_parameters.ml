@@ -315,16 +315,8 @@ type location_list_entry =
   | Dwarf_4 of Dwarf_4_location_list_entry.t
   | Dwarf_5 of Location_list_entry.t
 
-let location_list_entry state ~start_of_code_symbol ~subrange
-    single_location_description : location_list_entry =
-  let start_pos =
-    Asm_label.create_int Text (ARAV.Subrange.start_pos subrange |> Label.to_int)
-  in
-  let start_pos_offset = ARAV.Subrange.start_pos_offset subrange in
-  let end_pos =
-    Asm_label.create_int Text (ARAV.Subrange.end_pos subrange |> Label.to_int)
-  in
-  let end_pos_offset = ARAV.Subrange.end_pos_offset subrange in
+let location_list_entry state ~start_of_code_symbol ~start_pos ~start_pos_offset
+    ~end_pos ~end_pos_offset single_location_description : location_list_entry =
   match !Dwarf_flags.gdwarf_version with
   | Four ->
     let location_list_entry =
@@ -357,9 +349,142 @@ let location_list_entry state ~start_of_code_symbol ~subrange
     Dwarf_5
       (Location_list_entry.create location_list_entry ~start_of_code_symbol)
 
+let location_list_entry_for_subrange state ~start_of_code_symbol ~subrange
+    single_location_description : location_list_entry =
+  let start_pos =
+    Asm_label.create_int Text (ARAV.Subrange.start_pos subrange |> Label.to_int)
+  in
+  let start_pos_offset = ARAV.Subrange.start_pos_offset subrange in
+  let end_pos =
+    Asm_label.create_int Text (ARAV.Subrange.end_pos subrange |> Label.to_int)
+  in
+  let end_pos_offset = ARAV.Subrange.end_pos_offset subrange in
+  location_list_entry state ~start_of_code_symbol ~start_pos ~start_pos_offset
+    ~end_pos ~end_pos_offset single_location_description
+
+(* For a parameter of the current function (not a parameter of an inlined
+   function), describe the value of the parameter at any program counters not
+   covered by its subranges -- for example after its register has been clobbered
+   -- using a DWARF "entry value" expression denoting the value the parameter's
+   register held upon entry to the function. OCaml function parameters are
+   immutable, so the parameter's value is always equal to that entry value.
+   Debuggers recover entry values by virtually unwinding to the call site. One
+   location list entry is produced for every hole in between the subranges, plus
+   one for the (potentially empty, see below) region from the end of the last
+   subrange to the end of the function. *)
+let entry_value_location_list_entries state ~provenance
+    ~(is_parameter : Is_parameter.t) ~start_of_code_symbol ~fun_end_label ~range
+    : location_list_entry list =
+  match is_parameter with
+  | Local -> []
+  | Parameter _ -> (
+    let is_parameter_of_inlined_function =
+      (* Parameters of inlined functions have two or more items in their
+         provenance locations (see [inlining_contexts_match] below). For such
+         parameters the entry register, and hence the entry value, is
+         unknown. *)
+      match provenance with
+      | None -> true (* such variables are hidden anyway *)
+      | Some provenance -> (
+        match
+          Debuginfo.to_items (Backend_var.Provenance.location provenance)
+        with
+        | [] | [_] -> false
+        | _ :: _ :: _ -> true)
+    in
+    if is_parameter_of_inlined_function
+    then []
+    else
+      (* Sort the subranges by increasing address. Note that the numerical order
+         of labels coincides with increasing address order (see
+         [Compute_ranges]). *)
+      let compare_pos (label1, offset1) (label2, offset2) =
+        let c = Label.compare label1 label2 in
+        if c <> 0 then c else Int.compare offset1 offset2
+      in
+      let start_of subrange =
+        ( ARAV.Subrange.start_pos subrange,
+          ARAV.Subrange.start_pos_offset subrange )
+      in
+      let end_of subrange =
+        ARAV.Subrange.end_pos subrange, ARAV.Subrange.end_pos_offset subrange
+      in
+      let subranges =
+        List.sort
+          (fun subrange1 subrange2 ->
+            compare_pos (start_of subrange1) (start_of subrange2))
+          (ARAV.Range.fold range ~init:[] ~f:(fun acc subrange ->
+               subrange :: acc))
+      in
+      match subranges with
+      | [] -> []
+      | first :: rest -> (
+        (* The first subrange, for a parameter of the current function, begins
+           at the function's entry point and identifies the register in which
+           the parameter arrived. *)
+        match ARAV.Subrange.info first with
+        | Phantom _ -> []
+        | Non_phantom { reg; offset = _ } -> (
+          match reg.loc with
+          | Unknown | Stack _ -> []
+          | Reg phys_reg ->
+            let dwarf_reg_number = Regs.dwarf_reg_number reg.typ phys_reg in
+            let dwarf_version =
+              match !Dwarf_flags.gdwarf_version with
+              | Four -> Dwarf_version.four
+              | Five -> Dwarf_version.five
+            in
+            let single_location_description =
+              Single_location_description.of_simple_location_description
+                (SLDL.compile
+                   (SLDL.of_lvalue_without_address
+                      (SLDL.Lvalue_without_address.of_rvalue
+                         (SLDL.Rvalue.entry_value_of_register ~dwarf_reg_number
+                            dwarf_version))))
+            in
+            let entry_for_gap (gap_start_label, gap_start_offset) ~gap_end
+                ~gap_end_offset =
+              location_list_entry state ~start_of_code_symbol
+                ~start_pos:
+                  (Asm_label.create_int Text (Label.to_int gap_start_label))
+                ~start_pos_offset:gap_start_offset ~end_pos:gap_end
+                ~end_pos_offset:gap_end_offset single_location_description
+            in
+            (* [cover_end] is the furthest end position of the subranges seen so
+               far. *)
+            let rec walk ~cover_end subranges entries =
+              match subranges with
+              | [] ->
+                (* The final entry, from the end of the last subrange to the end
+                   of the function. If the parameter is in fact available up to
+                   the very end of the function, this produces an empty range,
+                   which has no effect (DWARF-4 spec section 2.6.2). *)
+                entry_for_gap cover_end ~gap_end:fun_end_label ~gap_end_offset:0
+                :: entries
+              | subrange :: subranges ->
+                let start_label, start_offset = start_of subrange in
+                let entries =
+                  if compare_pos cover_end (start_label, start_offset) < 0
+                  then
+                    entry_for_gap cover_end
+                      ~gap_end:
+                        (Asm_label.create_int Text (Label.to_int start_label))
+                      ~gap_end_offset:start_offset
+                    :: entries
+                  else entries
+                in
+                let cover_end =
+                  if compare_pos (end_of subrange) cover_end > 0
+                  then end_of subrange
+                  else cover_end
+                in
+                walk ~cover_end subranges entries
+            in
+            walk ~cover_end:(end_of first) rest [])))
+
 let dwarf_for_variable state ~value_type_proto_die ~function_symbol
-    ~function_proto_die ~proto_dies_for_vars (var : Backend_var.t)
-    ~ident_for_type ~range =
+    ~function_proto_die ~proto_dies_for_vars ~fun_end_label
+    (var : Backend_var.t) ~ident_for_type ~range =
   let range_info = ARAV.Range.info range in
   let provenance = ARAV.Range_info.provenance range_info in
   let (parent_proto_die : Proto_die.t), hidden =
@@ -428,8 +553,8 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
           | None -> dwarf_4_location_list_entries, location_list
           | Some single_location_description -> (
             let location_list_entry =
-              location_list_entry state ~start_of_code_symbol ~subrange
-                single_location_description
+              location_list_entry_for_subrange state ~start_of_code_symbol
+                ~subrange single_location_description
             in
             match location_list_entry with
             | Dwarf_4 location_list_entry ->
@@ -442,6 +567,18 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
                 Location_list.add location_list location_list_entry
               in
               dwarf_4_location_list_entries, location_list))
+    in
+    let dwarf_4_location_list_entries, location_list =
+      List.fold_left
+        (fun (dwarf_4_location_list_entries, location_list) entry ->
+          match entry with
+          | Dwarf_4 entry ->
+            entry :: dwarf_4_location_list_entries, location_list
+          | Dwarf_5 entry ->
+            dwarf_4_location_list_entries, Location_list.add location_list entry)
+        (dwarf_4_location_list_entries, location_list)
+        (entry_value_location_list_entries state ~provenance ~is_parameter
+           ~start_of_code_symbol ~fun_end_label ~range)
     in
     match !Dwarf_flags.gdwarf_version with
     | Four ->
@@ -575,9 +712,9 @@ let iterate_over_variable_like_things ~available_ranges_all_vars
         f var ~ident_for_type ~range)
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
-    ~proto_dies_for_vars ~which_vars available_ranges_all_vars =
+    ~proto_dies_for_vars ~which_vars ~fun_end_label available_ranges_all_vars =
   iterate_over_variable_like_things ~available_ranges_all_vars
     ~proto_dies_for_vars ~which_vars
     ~f:
       (dwarf_for_variable state ~value_type_proto_die ~function_symbol
-         ~function_proto_die ~proto_dies_for_vars)
+         ~function_proto_die ~proto_dies_for_vars ~fun_end_label)

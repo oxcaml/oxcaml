@@ -203,6 +203,14 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
+  | DW_op_entry_value_of_register of { reg_number : int }
+      (** The DWARF-5 [DW_OP_entry_value] operator, restricted to the case where
+          the block operand consists of a single register location description:
+          the value pushed is the value the given register held upon entry to
+          the current function. *)
+  | DW_op_GNU_entry_value_of_register of { reg_number : int }
+      (** As for [DW_op_entry_value_of_register], but using the pre-DWARF-5 GNU
+          extension opcode. *)
 
 val print : Format.formatter -> t -> unit
 
