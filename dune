@@ -712,6 +712,7 @@
   ;; build it as part of that library.
   dwarf
   dwarf_abstract_instances
+  dwarf_call_sites
   dwarf_compilation_unit
   dwarf_concrete_instances
   dwarf_inlined_frames

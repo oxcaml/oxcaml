@@ -170,7 +170,8 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
       (* XXX maybe this can work for parameters, if we pass the uids through
          in order to construct the correct DIE here? *)
       [ DAH.create_name demangled_name;
-        DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
+        DAH.create_linkage_name
+          ~linkage_name:(Asm_symbol.encode_without_prefix fun_symbol);
         DAH.create_external ~is_visible_externally:true ]
   in
   (* [DW_AT_call_file/line/column] describe the call site of the inlined
