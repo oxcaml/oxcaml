@@ -4995,52 +4995,64 @@ module Report = struct
       | `Expected -> Fmt.pp_print_string ppf "is expected to be ");
     print_mode side obj ppf a
 
-  let check_locality_morph : type lsrc ldst d a b.
-      (lsrc, ldst, d) C.Locality_morph.t -> a C.obj -> b C.obj -> a -> b -> unit
-      =
-   fun locality_morph src obj a b ->
-    let implements_morph =
-      match src, obj, locality_morph with
-      | Locality, Regionality, Locality_as_regionality ->
-        Misc.Le_result.equal ~le:(C.le obj)
-          (C.Locality_morph.apply Locality_as_regionality a)
-          b
-      | Regionality, Locality, Regional_to_global ->
-        Misc.Le_result.equal ~le:(C.le obj)
-          (C.Locality_morph.apply Regional_to_global a)
-          b
-      | Regionality, Locality, Regional_to_local ->
-        Misc.Le_result.equal ~le:(C.le obj)
-          (C.Locality_morph.apply Regional_to_local a)
-          b
-      | ( Comonadic_with_locality,
-          Comonadic_with_regionality,
-          Locality_as_regionality ) ->
-        Misc.Le_result.equal ~le:(C.le obj)
-          (C.Core_morph.apply obj (Locality_full Locality_as_regionality) a)
-          b
-      | Comonadic_with_regionality, Comonadic_with_locality, Regional_to_global
-        ->
-        Misc.Le_result.equal ~le:(C.le obj)
-          (C.Core_morph.apply obj (Locality_full Regional_to_global) a)
-          b
-      | Comonadic_with_regionality, Comonadic_with_locality, Regional_to_local
-        ->
-        Misc.Le_result.equal ~le:(C.le obj)
-          (C.Core_morph.apply obj (Locality_full Regional_to_local) a)
-          b
-      | _, _, _ -> (
-        match C.equal_obj src obj with
-        | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le src) a b
-        | Misc.Is_not_eq -> false)
-    in
-    if not implements_morph
-    then
-      Misc.fatal_errorf_doc
-        "Unexpected objects for allocation hint:@ source object %a,@ source \
-         value %a,@ target object %a,@ target value %a"
-        C.print_obj src (C.print src) a C.print_obj obj (C.print obj) b
+  let implements_morph : type a b d.
+      b C.obj -> (a, b, d) C.morph -> a -> b -> bool =
+   fun obj morph a b ->
+    Misc.Le_result.equal ~le:(C.le obj) (C.apply obj morph a) b
 
+  let unexpected_allocation_hint : type a b.
+      a C.obj -> b C.obj -> a -> b -> unit =
+   fun src obj a b ->
+    Misc.fatal_errorf_doc
+      "Unexpected objects for allocation hint:@ source object %a,@ source \
+       value %a,@ target object %a,@ target value %a"
+      C.print_obj src (C.print src) a C.print_obj obj (C.print obj) b
+
+  let check_identity_morph : type a b. a C.obj -> b C.obj -> a -> b -> unit =
+   fun src obj a b ->
+    match C.equal_obj src obj with
+    | Misc.Is_eq -> assert (implements_morph obj (Simple Id) a b)
+    | Misc.Is_not_eq -> unexpected_allocation_hint src obj a b
+
+  let check_value_to_alloc_morph : type l r a b.
+      (C.Regionality.t, C.Locality.t, l * r) C.Locality_morph.t ->
+      a C.obj ->
+      b C.obj ->
+      a ->
+      b ->
+      unit =
+   fun locality_morph src obj a b ->
+    match src, obj with
+    | Regionality, Locality ->
+      assert (
+        implements_morph obj
+          (Simple (Core (Locality_restricted locality_morph))) a b)
+    | Comonadic_with_regionality, Comonadic_with_locality ->
+      assert (
+        implements_morph obj (Simple (Core (Locality_full locality_morph))) a b)
+    | _, _ -> check_identity_morph src obj a b
+
+  let check_alloc_to_value_morph : type l r a b.
+      (C.Locality.t, C.Regionality.t, l * r) C.Locality_morph.t ->
+      a C.obj ->
+      b C.obj ->
+      a ->
+      b ->
+      unit =
+   fun locality_morph src obj a b ->
+    match src, obj with
+    | Locality, Regionality ->
+      assert (
+        implements_morph obj
+          (Simple (Core (Locality_restricted locality_morph))) a b)
+    | Comonadic_with_locality, Comonadic_with_regionality ->
+      assert (
+        implements_morph obj (Simple (Core (Locality_full locality_morph))) a b)
+    | _, _ -> check_identity_morph src obj a b
+
+  (** Checks whether [a] = [b], where [a] and [b] belong to the same axis, while
+      allowing the areality of [a] to be [Regionality] and the areality of [b]
+      to be [Locality]. Thrown an exception if the objects are different. *)
   let equal_mode_regionality_to_locality : type a b.
       a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
@@ -5051,10 +5063,9 @@ module Report = struct
     | Comonadic_with_regionality, Comonadic_with_locality ->
       Misc.Le_result.equal ~le:(C.le a_obj) a
         (C.Core_morph.apply a_obj (Locality_full Locality_as_regionality) b)
-    | _, _ -> (
-      match C.equal_obj a_obj b_obj with
-      | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-      | Misc.Is_not_eq -> false)
+    | _, _ ->
+      check_identity_morph a_obj b_obj a b;
+      true
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
@@ -5087,18 +5098,18 @@ module Report = struct
       ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
       (* We assert that the morphism is value_to_alloc_r2g *)
-      check_locality_morph Regional_to_global src obj a b;
+      check_value_to_alloc_morph Regional_to_global src obj a b;
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ~is_skip:(equal_mode_regionality_to_locality src obj a b), ~fixpoint
     | Allocation_l _ ->
       (* We assert that the morphism is value_to_alloc_r2l *)
-      check_locality_morph Regional_to_local src obj a b;
+      check_value_to_alloc_morph Regional_to_local src obj a b;
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ~is_skip:(equal_mode_regionality_to_locality src obj a b), ~fixpoint
     | Allocation _ ->
       (* We always want to skip an Allocation hint. All we need is to assert that the
          hint was indeed applied to an alloc_as_value morphism *)
-      check_locality_morph Locality_as_regionality src obj a b;
+      check_alloc_to_value_morph Locality_as_regionality src obj a b;
       ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
