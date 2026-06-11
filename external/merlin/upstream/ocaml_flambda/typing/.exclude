@@ -1,0 +1,5 @@
+.ocamlformat
+.ocamlformat-enable
+HACKING.adoc
+TODO.md
+cmt2annot.mli
