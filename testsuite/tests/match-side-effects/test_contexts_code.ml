@@ -41,17 +41,21 @@ let example_1 () =
                                                (consts ())
                                                 (non_consts ([1: (?)]
                                                 [0: (?)]))>)
-                1 [0: 1]))
+                1 [0: (shape (value<int>)) 1]))
            (if (field_int 0 input/307)
              (let (*match*/332 =o? (field_mut 1 input/307))
                (switch* *match*/332
                 case tag 0:
-                 (if (seq (setfield_ptr(maybe-stack) 1 input/307 [1: 3]) 0)
-                   [1: 3]
+                 (if
+                   (seq
+                     (setfield_ptr(maybe-stack) 1 input/307
+                       [1: (shape (value<int>)) 3])
+                     0)
+                   [1: (shape (value<int>)) 3]
                    (let (*match*/334 =o? (field_mut 1 input/307))
-                     (makeblock 0 (field_imm 0 *match*/334))))
-                case tag 1: [1: 2]))
-             [1: 1])))))
+                     (makeblock 0 (value<int>) (field_imm 0 *match*/334))))
+                case tag 1: [1: (shape (value<int>)) 2]))
+             [1: (shape (value<int>)) 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_1" example_1/305))
 val example_1 : unit -> (bool, int) Result.t = <fun>
 |}]
@@ -91,7 +95,7 @@ let example_2 () =
                 (makelocalmutable 0 (value<
                                       (consts ()) (non_consts ([1: (?)]
                                        [0: (?)]))>)
-                  [0: 1])))
+                  [0: (shape (value<int>)) 1])))
            (if (field_int 0 input/346)
              (let (*match*/352 =o? (field_mut 0 (field_imm 1 input/346)))
                (switch* *match*/352
@@ -99,14 +103,14 @@ let example_2 () =
                  (if
                    (seq
                      (setfield_ptr(maybe-stack) 0 (field_imm 1 input/346)
-                       [1: 3])
+                       [1: (shape (value<int>)) 3])
                      0)
-                   [1: 3]
+                   [1: (shape (value<int>)) 3]
                    (let
                      (*match*/355 =o? (field_mut 0 (field_imm 1 input/346)))
-                     (makeblock 0 (field_imm 0 *match*/355))))
-                case tag 1: [1: 2]))
-             [1: 1])))))
+                     (makeblock 0 (value<int>) (field_imm 0 *match*/355))))
+                case tag 1: [1: (shape (value<int>)) 2]))
+             [1: (shape (value<int>)) 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_2" example_2/344))
 val example_2 : unit -> (bool, int) Result.t = <fun>
 |}]
@@ -149,7 +153,7 @@ let example_3 () =
               [0: (shape
                (value<int>,value<
                             (consts ()) (non_consts ([1: (?)] [0: (?)]))>))
-               1 [0: 1]]
+               1 [0: (shape (value<int>)) 1]]
             *match*/367 =o? *input/364)
            (if (field_imm 0 *match*/367)
              (switch* (field_imm 1 *match*/367)
@@ -161,12 +165,13 @@ let example_3 () =
                       (value<int>,value<
                                    (consts ()) (non_consts ([1: (?)]
                                     [0: (?)]))>))
-                      1 [1: 3]])
+                      1 [1: (shape (value<int>)) 3]])
                    0)
-                 [1: 3]
-                 (makeblock 0 (field_imm 0 (field_imm 1 *match*/367))))
-              case tag 1: [1: 2])
-             [1: 1])))))
+                 [1: (shape (value<int>)) 3]
+                 (makeblock 0 (value<int>)
+                   (field_imm 0 (field_imm 1 *match*/367))))
+              case tag 1: [1: (shape (value<int>)) 2])
+             [1: (shape (value<int>)) 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_3" example_3/362))
 val example_3 : unit -> (bool, int) Result.t = <fun>
 |}]

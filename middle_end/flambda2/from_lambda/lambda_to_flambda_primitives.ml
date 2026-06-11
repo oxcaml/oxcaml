@@ -2575,12 +2575,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     if List.length field_path < 1
     then Misc.fatal_error "Pfield: field_path must be non-empty";
     let shape =
-      match field_path with
-      | field :: _ when field >= Array.length shape ->
-        L.block_shape_of_generic_values (field + 1)
-      | _ -> shape
-    in
-    let shape =
       Mixed_block_shape.of_block_elements shape
         ~print_locality:Printlambda.locality_mode
     in

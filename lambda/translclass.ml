@@ -36,6 +36,7 @@ let layout_table = layout_block
 let layout_meth = layout_any_value
 let layout_tables = layout_any_value
 
+
 let lfunction ?(kind=Curried {nlocal=0}) ?(ret_mode=alloc_heap) return_layout params body =
   if params = [] then body else
   match kind, body with
@@ -91,7 +92,7 @@ let lsequence l1 l2 =
   if l2 = lambda_unit then l1 else Lsequence(l1, l2)
 
 let lfield v i =
-  Lprim (Pfield ([i], All_value Pointer, Reads_vary), [Lvar v], Loc_unknown)
+  Lprim(Pfield ([i], All_value Pointer, Reads_vary), [Lvar v], Loc_unknown)
 
 let transl_label l = share (Const_immstring l)
 
@@ -169,7 +170,8 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
         match envs with None -> []
         | Some envs ->
             let i = List.length inh_init + 1 in
-            [Lprim(Pfield ([i], All_value Pointer, Reads_vary), [Lvar envs],
+            [Lprim(Pfield ([i], All_value Pointer, Reads_vary),
+                   [Lvar envs],
                    Loc_unknown)]
       in
       let loc = of_location ~scopes cl.cl_loc in

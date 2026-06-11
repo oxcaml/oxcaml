@@ -43,26 +43,18 @@ exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
-(*= let block_shape_with_locality_mode_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
-let block_shape_for_field pos value_kind =
-  Array.init (pos + 1) (fun i ->
-    Value (if i = pos then value_kind else generic_value))
-
-let transl_mixed_product_shape_for_exprs exprs shape =
-  let exprs = Array.of_list exprs in
-  Array.mapi
-    (fun i elt ->
-      let expr, _sort = exprs.(i) in
-      Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
-        expr.exp_type elt)
-    shape *)
-
-
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
+
+let transl_constructor_shape
+  (shape : mixed_product_shape)
+  (args_with_sorts : (expression * Shape.Layout.t) list) : block_shape =
+  let args = Misc.Stdlib.Array.of_list_map fst args_with_sorts in
+  Array.map2
+    (fun shape arg ->
+      transl_mixed_block_element arg.exp_env arg.exp_loc arg.exp_type shape)
+    shape
+    args
 
 let field_offset_for_label lbl =
   match lbl.lbl_repres with
@@ -524,13 +516,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         transl_value_list_with_shape ~scopes
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
+      let shape = Lambda.block_shape_of_value_kinds shape in
       begin try
-        Lconst(Const_block(0, Lambda.block_shape_of_value_kinds shape,
-                           List.map extract_constant ll))
+        Lconst(Const_block(0, shape, List.map extract_constant ll))
       with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable,
-                         Lambda.block_shape_of_value_kinds shape,
-                         transl_alloc_mode alloc_mode),
+        Lprim(Pmakeblock(0, Immutable, shape, transl_alloc_mode alloc_mode),
               ll,
               (of_location ~scopes e.exp_loc))
       end
@@ -570,10 +560,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
-          (* TODO: This shape might be worse than the one derivable via typeopt
-             from Typeopt.layout or Typeopt.transl_mixed_block_element but maybe
-             it's sometimes better? *)
-          let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
+          let shape =
+            transl_constructor_shape cstr.cstr_shape args_with_sorts
+          in
           let constant =
             match List.map extract_constant ll with
             | exception Not_constant -> None
@@ -622,8 +611,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               (* CR layouts v5: once all-void records are allowed, handle
                   constructors with all-void inline records, which are stored
                   as immediates *)
-              (* TODO: This shape might also be worse *)
-              let shape = Lambda.transl_mixed_product_shape cstr.cstr_shape in
+              let shape =
+                transl_constructor_shape cstr.cstr_shape args_with_sorts
+              in
               let shape =
                 (* This corresponds to the poly variant hash.  This will
                     always stay in the same place because the reordering
@@ -814,7 +804,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Patomic_set_field { immediate_or_pointer },
             [arg_lambda; field_lambda; newval_lambda]
           else
-            Psetfield ([lbl.lbl_pos + 1], All_value immediate_or_pointer, mode),
+            Psetfield([lbl.lbl_pos + 1], All_value immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
@@ -1007,9 +997,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Lapply{
         ap_loc=loc;
         ap_func=
-          Lprim(Pfield
-                  ([0], Shape (Lambda.block_shape_of_generic_values 1),
-                   Reads_vary),
+          Lprim(Pfield ([0], All_value Pointer, Reads_vary),
               [transl_class_path loc e.exp_env cl], loc);
         ap_args=[lambda_unit];
         ap_result_layout=layout_exp sort e;
@@ -1666,7 +1654,8 @@ and transl_tupled_function
                      | Value vk -> Pvalue vk
                      | _ ->
                        Misc.fatal_error
-                         "tuple variant shape contains non-value field")
+                         "Translcore.transl_tupled_function: \
+                          tuple variant shape contains non-value field")
                    kinds)
           | _ ->
               Misc.fatal_error
@@ -2130,19 +2119,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, shape, Variant_extensible)
               when Types.mixed_product_shape_is_flat_all_value shape ->
                 let pos = lbl.lbl_pos + 1 in
-                let field_shape =
-                  Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
-                    expr.exp_type shape.(lbl.lbl_pos)
-                in
-                let shape = Lambda.transl_mixed_product_shape shape in
-                (* Field 0 of an extension constructor block holds the
-                   extension slot; mirror the shape used for allocation. *)
-                let shape =
-                  Array.append [| Lambda.Value Lambda.generic_value |] shape
-                in
-                (* Update the shape with details for the modified field. *)
-                shape.(pos) <- field_shape;
-                Psetfield ([pos], Shape shape, Assignment modify_heap)
+                let ptr, _ = maybe_pointer expr in
+                Psetfield ([pos], All_value ptr, Assignment modify_heap)
             | Record_inlined (_, _, Variant_extensible) ->
                 (* CR layouts v5.9: support this *)
                 fatal_error
@@ -2478,6 +2456,8 @@ and transl_idx ~scopes loc env ba uas =
     begin match lbl.lbl_repres with
     | Record_boxed shape ->
       let shape = Lambda.transl_mixed_product_shape shape in
+      (* Check to make sure the gap never overflows.
+         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       let cts =
         Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
       in
@@ -2488,9 +2468,7 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pmake_idx_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     | Record_float | Record_ufloat ->
-      let shape = Lambda.block_shape_of_generic_values (lbl.lbl_pos + 1) in
-      Lprim (Pmake_idx_field (shape, lbl.lbl_pos, []), [],
-             (of_location ~scopes loc))
+      Misc.fatal_error "transl_idx: (unboxed) float records not supported"
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     end

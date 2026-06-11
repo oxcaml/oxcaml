@@ -546,6 +546,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pfield ([n], All_value _, _sem) -> unary (Getfield n)
     | Pfield (_ :: _, All_value _, _sem) -> assert false
     | Pfield (path, Shape shape, _sem) ->
+      (* Non-value mixed fields are always boxed in bytecode; they aren't
+         stored flat like they are in native code. *)
       let read_expr =
         List.fold_left
           (fun expr idx -> Prim (Getfield idx, [expr]))

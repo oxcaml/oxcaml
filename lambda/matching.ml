@@ -1970,6 +1970,14 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     let shape = transl_mixed_product_shape cstr.cstr_shape in
+    let shape =
+      match cstr.cstr_repr with
+      | Variant_extensible ->
+        (* Field 0 of an extension constructor block holds the extension
+            slot; mirror the shape used for allocation. *)
+        Array.append [| Lambda.Value Lambda.generic_value |] shape
+      | _ -> shape
+    in
     let e, layout = lambda_void_of_el shape.(pos) in
     (e, binding_kind, sort, layout)
   in

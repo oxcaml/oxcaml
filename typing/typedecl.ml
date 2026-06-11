@@ -1933,7 +1933,7 @@ let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
   =
-  let flat_suffix =
+  let shape =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
@@ -1952,12 +1952,14 @@ let update_constructor_representation
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
   in
-  (* CR layouts v5.9: Enable extension constructors in the flambda2 middle-end
-     so that we can permit them in the source language. *)
-  let mpb = Mixed_product_bytes.count_types_shape flat_suffix in
-  if is_extension_constructor && not (Mixed_product_bytes.all_value mpb)
-  then raise (Error (loc, Illegal_mixed_product Extension_constructor));
-  flat_suffix
+  (* CR layouts v5.9: Enable extension constructors in the flambda2
+      middle-end so that we can permit them in the source language.
+  *)
+  if is_extension_constructor &&
+      not (Types.mixed_product_shape_is_flat_all_value shape)
+  then
+    raise (Error (loc, Illegal_mixed_product Extension_constructor));
+  shape
 
 
 let add_types_to_env ~shapes decls env =

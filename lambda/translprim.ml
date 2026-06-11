@@ -2062,18 +2062,6 @@ let comparison_primitive comparison comparison_kind =
   | Compare, Compare_int32s -> three_way_comparei_signed int32
   | Compare, Compare_int64s -> three_way_comparei_signed int64
 
-let shape_loc = function
-  | Loc_POS ->
-    [| Value { raw_kind = Pgenval; nullable = Non_nullable };
-       Value { raw_kind = Pintval; nullable = Non_nullable };
-       Value { raw_kind = Pintval; nullable = Non_nullable };
-       Value { raw_kind = Pintval; nullable = Non_nullable } |]
-  | Loc_LINE -> [| Value { raw_kind = Pintval; nullable = Non_nullable } |]
-  | Loc_FILE
-  | Loc_MODULE
-  | Loc_LOC
-  | Loc_FUNCTION ->  [| Value { raw_kind = Pgenval; nullable = Non_nullable } |]
-
 let lambda_of_loc kind sloc =
   let loc = to_location sloc in
   let loc_start = loc.Location.loc_start in
@@ -2087,7 +2075,7 @@ let lambda_of_loc kind sloc =
       loc_start.Lexing.pos_cnum + cnum in
   match kind with
   | Loc_POS ->
-    Lconst (Const_block (0, shape_loc kind, [
+    Lconst (Const_block (0, block_shape_of_generic_values 4, [
       Const_immstring file;
       Const_base (Const_int lnum);
       Const_base (Const_int cnum);
@@ -2263,7 +2251,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, shape_loc kind, alloc_heap),
+      Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 2,
+                       alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)

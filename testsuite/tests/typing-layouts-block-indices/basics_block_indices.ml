@@ -139,7 +139,9 @@ type t = { f : float }
 let f () = (.f)
 [%%expect{|
 type t = { f : float; }
-val f : unit -> (t, float#) idx_imm = <fun>
+>> Fatal error: transl_idx: (unboxed) float records not supported
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Unboxed float record *)
@@ -166,7 +168,9 @@ let fr_f () = (.fr.#f)
 [%%expect{|
 type fr = #{ f : float; }
 type t = { f : float; fr : fr; }
-val fr_f : unit -> (t, float#) idx_imm = <fun>
+>> Fatal error: transl_idx: (unboxed) float records not supported
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* But we can't create a pointer to a flattened [fr], because it has no unboxed
@@ -216,7 +220,9 @@ let f () : (r, pfa#) idx_mut = (.pfa)
 [%%expect{|
 type pfa = private float
 type r = { mutable pfa : pfa; }
-val f : unit -> (r, pfa#) idx_mut = <fun>
+>> Fatal error: transl_idx: (unboxed) float records not supported
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Cannot bypass private float aliases *)

@@ -90,7 +90,7 @@ let f r =
        (region
          (let
            (*match*/313 =[value<(consts (0)) (non_consts ([0: (?)]))>]
-              (makelocalblock 0 r/311))
+              (makelocalblock 0 (*) r/311))
            (catch
              (if *match*/313
                (let (*match*/315 =o? (field_mut 0 (field_imm 0 *match*/313)))
@@ -177,13 +177,22 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
        (region
          (let
            (*match*/341 =[value<(consts (0)) (non_consts ([0: (?)]))>]
-              (makelocalblock 0
+              (makelocalblock 0 (value<
+                                  (consts ())
+                                   (non_consts ([0:
+                                                 (*,value<
+                                                     (consts ())
+                                                      (non_consts ([1:
+                                                                    (
+                                                                    value<
+                                                                    int>)]
+                                                      [0: (value<int>)]))>)]))>)
                 (makelocalblock 0 (*,value<
                                       (consts ())
                                        (non_consts ([1: (value<int>)]
                                        [0: (value<int>)]))>)
                   (makelocalmutable 0 (value<int>) 1)
-                  [0: (shape (value_or_null<int>)) 42])))
+                  [0: (shape (value<int>)) 42])))
            (if *match*/341
              (let
                (*match*/342 =a? (field_imm 0 *match*/341)
