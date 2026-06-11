@@ -144,6 +144,7 @@ type allocation_desc =
   | Function_coercion
   | Float_projection
   | Lpoly_captured_environment
+  | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
 
@@ -165,8 +166,6 @@ type 'd morph =
      the source and destination pinpoints. Once we make [pinpoint] mandatory for
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
-  | Captured_by_partial_application : (disallowed * 'r) morph
-  | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
