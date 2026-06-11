@@ -909,7 +909,15 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
     in
     (* The free variables passed to [wrap] must include those referenced by the
        phantom defining expression, to prevent the (just-flushed) bindings of
-       such variables from being deleted as dead code. *)
+       such variables from being deleted as dead code. The [Cphantom_let] binds
+       [backend_var_with_prov]: it must be removed from the body's free
+       variables, otherwise references to this phantom variable from other
+       phantom defining expressions would propagate upwards as unbound. *)
+    let free_vars =
+      Backend_var.Set.remove
+        (Backend_var.With_provenance.var backend_var_with_prov)
+        free_vars
+    in
     let free_vars =
       Backend_var.Set.union free_vars free_vars_of_defining_expr
     in
