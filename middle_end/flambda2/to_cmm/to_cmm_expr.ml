@@ -924,15 +924,15 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
     let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
   in
-  (* For use after flushing only (at which point no delayed bindings remain, so
-     the environment and result returned by the lookup are unchanged). *)
-  let backend_var_for env res var =
-    let To_cmm_env.{ expr = { cmm; _ }; _ } =
-      C.simple ~dbg:Debuginfo.none env res (Simple.var var)
-    in
-    match[@warning "-4"] cmm with
-    | Cmm.Cvar backend_var -> Some backend_var
-    | _ -> None
+  (* For use after flushing only (at which point no delayed bindings remain).
+     Note that the variable may not be bound at all, for example if its only
+     uses are phantom (meaning that its defining expression was never
+     evaluated); in such cases [None] is returned and the phantom defining
+     expression concerned will be dropped. *)
+  let backend_var_for env _res var =
+    match[@warning "-4"] Env.find_bound_expression env var with
+    | Some (Cmm.Cvar backend_var) -> Some backend_var
+    | Some _ | None -> None
   in
   (* If the defining expression turns out not to be expressible as a phantom
      defining expression, the flush must still be honoured, by wrapping the
