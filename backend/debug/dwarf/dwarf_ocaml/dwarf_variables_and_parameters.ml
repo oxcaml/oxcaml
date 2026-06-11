@@ -221,14 +221,21 @@ let rec phantom_var_location_description state
        use "implicit pointers" rather than normal pointers in the target's
        address space. *)
     let header =
-      (* Create a proper OCaml block header with the tag and field count *)
+      (* Create a proper OCaml block header with the tag and field count. The
+         [DW_OP_stack_value] (arising from [Lvalue_without_address.of_rvalue])
+         is required: without it, this constant piece of the composite would
+         denote a memory address rather than the value itself. The field
+         pieces below do not need it, since their [DW_OP_call*]-referenced
+         expressions yield register, implicit or suchlike locations
+         themselves. *)
       let header_value =
         Cmm_helpers.black_block_header tag (List.length fields)
       in
       SLDL.compile
-        (SLDL.of_rvalue
-           (SLDL.Rvalue.signed_int_const
-              (Targetint.of_int64 (Int64.of_nativeint header_value))))
+        (SLDL.of_lvalue_without_address
+           (SLDL.Lvalue_without_address.of_rvalue
+              (SLDL.Rvalue.signed_int_const
+                 (Targetint.of_int64 (Int64.of_nativeint header_value)))))
     in
     let header_size = arch_size_addr in
     let field_size = arch_size_addr in
@@ -256,9 +263,13 @@ let rec phantom_var_location_description state
         all_pieces
     in
     (* Create a Proto_die for the phantom block with the composite location,
-       then return an implicit pointer to it *)
+       then return an implicit pointer to it. [DW_TAG_dwarf_procedure] is the
+       tag intended for DIEs that exist only to hold a location for
+       [DW_OP_call*] / implicit pointer references; unlike an unnamed
+       [DW_TAG_variable], debuggers will not display such DIEs as variables
+       in their own right. *)
     let proto_die =
-      Proto_die.create ~parent ~tag:Variable
+      Proto_die.create ~parent ~tag:Dwarf_procedure
         ~attribute_values:
           [ DAH.create_composite_location_description
               composite_location_description ]
