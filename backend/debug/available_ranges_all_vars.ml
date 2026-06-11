@@ -167,6 +167,14 @@ let iter t ~f =
   ARV.iter t.non_phantom ~f:(fun var range -> f var (Range.Non_phantom range));
   ARPV.iter t.phantom ~f:(fun var range -> f var (Range.Phantom range))
 
+let find t var =
+  match ARV.find t.non_phantom var with
+  | range -> Some (Range.Non_phantom range)
+  | exception Not_found -> (
+    match ARPV.find t.phantom var with
+    | range -> Some (Range.Phantom range)
+    | exception Not_found -> None)
+
 let fold t ~init ~f =
   let acc =
     ARV.fold t.non_phantom ~init ~f:(fun acc var range ->

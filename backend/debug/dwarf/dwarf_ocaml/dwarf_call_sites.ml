@@ -98,7 +98,7 @@ let call_site_value_attribute ~(arg : Reg.t)
           single_call_value_attribute
             (SLDL.compile
                (SLDL.of_rvalue
-                  (SLDL.Rvalue.const_symbol (Asm_symbol.create_global sym))))
+                  (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)))
         | Var var -> (
           if is_tail
           then []

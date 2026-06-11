@@ -23,7 +23,7 @@ type label = Cmm.label
 
 type phantom_defining_expr = private
   | Lphantom_const_int of Targetint.t
-  | Lphantom_const_symbol of string
+  | Lphantom_const_symbol of Cmm.symbol
   | Lphantom_var of Backend_var.t
   | Lphantom_offset_var of
       { var : Backend_var.t;
@@ -34,7 +34,7 @@ type phantom_defining_expr = private
         field : int
       }
   | Lphantom_read_symbol_field of
-      { sym : string;
+      { sym : Cmm.symbol;
         field : int
       }
   | Lphantom_block of
@@ -44,7 +44,7 @@ type phantom_defining_expr = private
 
 val lphantom_const_int : Targetint.t -> phantom_defining_expr
 
-val lphantom_const_symbol : string -> phantom_defining_expr
+val lphantom_const_symbol : Cmm.symbol -> phantom_defining_expr
 
 val lphantom_var : Backend_var.t -> phantom_defining_expr
 
@@ -55,7 +55,7 @@ val lphantom_read_field :
   var:Backend_var.t -> field:int -> phantom_defining_expr
 
 val lphantom_read_symbol_field :
-  sym:string -> field:int -> phantom_defining_expr
+  sym:Cmm.symbol -> field:int -> phantom_defining_expr
 
 val lphantom_block :
   tag:int -> fields:Backend_var.t list -> phantom_defining_expr

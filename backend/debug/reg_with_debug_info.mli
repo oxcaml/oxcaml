@@ -26,7 +26,7 @@ module Holds_value_of : sig
     | Var of Backend_var.t
     | Const_int of nativeint
     | Const_naked_float of Int64.t
-    | Const_symbol of string  (** Linkage name of the symbol. *)
+    | Const_symbol of Cmm.symbol
 
   val compare : t -> t -> int
 

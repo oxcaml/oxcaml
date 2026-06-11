@@ -960,10 +960,26 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
         let wrap, env, res =
           Env.flush_delayed_lets ~mode:Flush_everything env res
         in
-        let sym_name = Symbol.linkage_name_as_string sym in
-        make_phantom_let env res ~wrap bound_var
-          (Cmm.Cphantom_const_symbol sym_name)
-          ~free_vars_of_defining_expr:Backend_var.Set.empty ~body)
+        let cmm_sym = To_cmm_result.symbol res sym in
+        let symbol_usable_for_phantom_let =
+          match cmm_sym.sym_global with
+          | Global -> true
+          | Local ->
+            (* The data for a local symbol may never be emitted, for example if
+               the corresponding lifted constant was deduplicated against a
+               structurally-equal one. (References to such symbols from normal
+               code will have been simplified away, but references from phantom
+               lets may remain.) Such symbols cannot be referenced from DWARF:
+               local symbols are referenced via assembler-temporary labels,
+               which must be defined. *)
+            To_cmm_result.data_symbol_is_defined res cmm_sym
+        in
+        if symbol_usable_for_phantom_let
+        then
+          make_phantom_let env res ~wrap bound_var
+            (Cmm.Cphantom_const_symbol cmm_sym)
+            ~free_vars_of_defining_expr:Backend_var.Set.empty ~body
+        else drop_phantom_let env res ~wrap ~body)
       ~const:(fun const ->
         match Reg_width_const.descr const with
         | Tagged_immediate i ->

@@ -28,6 +28,9 @@ module V = Dwarf_value
 type implicit_value =
   | Int of Targetint.t
   | Symbol of Asm_symbol.t
+  | Label of Asm_label.t
+      (** For statically-allocated values whose defining symbols are
+          assembler-local labels rather than linker symbols. *)
 
 type t =
   | DW_op_lit0
@@ -573,6 +576,7 @@ struct
       unit_result
     | DW_op_addr (Int addr) -> value (V.absolute_address addr)
     | DW_op_addr (Symbol sym) -> value (V.code_address_from_symbol sym)
+    | DW_op_addr (Label lbl) -> value (V.code_address_from_label lbl)
     | DW_op_const1u n -> value (V.uint8 ~comment:"  arg of DW_OP_const1u" n)
     | DW_op_const2u n -> value (V.uint16 ~comment:"  arg of DW_OP_const2u" n)
     | DW_op_const4u n -> value (V.uint32 ~comment:"  arg of DW_OP_const4u" n)
@@ -703,6 +707,11 @@ struct
         (V.uleb128 ~comment:"Dwarf_arch_sizes.size_addr"
            (Uint64.of_nonnegative_int_exn Dwarf_arch_sizes.size_addr))
       >>> fun () -> value (V.code_address_from_symbol symbol)
+    | DW_op_implicit_value (Label lbl) ->
+      value
+        (V.uleb128 ~comment:"Dwarf_arch_sizes.size_addr"
+           (Uint64.of_nonnegative_int_exn Dwarf_arch_sizes.size_addr))
+      >>> fun () -> value (V.code_address_from_label lbl)
     | DW_op_stack_value -> unit_result
     | DW_op_piece { size_in_bytes } ->
       let size_in_bytes = Targetint.nonnegative_to_uint64_exn size_in_bytes in

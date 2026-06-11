@@ -90,4 +90,6 @@ val create :
 
 val iter : t -> f:(Backend_var.t -> Range.t -> unit) -> unit
 
+val find : t -> Backend_var.t -> Range.t option
+
 val fold : t -> init:'a -> f:('a -> Backend_var.t -> Range.t -> 'a) -> 'a

@@ -22,14 +22,24 @@ module Holds_value_of = struct
     | Var of V.t
     | Const_int of nativeint
     | Const_naked_float of Int64.t
-    | Const_symbol of string
+    | Const_symbol of Cmm.symbol
+
+  let compare_symbol (sym1 : Cmm.symbol) (sym2 : Cmm.symbol) =
+    let c = String.compare sym1.sym_name sym2.sym_name in
+    if c <> 0
+    then c
+    else
+      match sym1.sym_global, sym2.sym_global with
+      | Global, Global | Local, Local -> 0
+      | Global, Local -> -1
+      | Local, Global -> 1
 
   let compare t1 t2 =
     match t1, t2 with
     | Var var1, Var var2 -> V.compare var1 var2
     | Const_int i1, Const_int i2 -> Nativeint.compare i1 i2
     | Const_naked_float f1, Const_naked_float f2 -> Int64.compare f1 f2
-    | Const_symbol sym1, Const_symbol sym2 -> String.compare sym1 sym2
+    | Const_symbol sym1, Const_symbol sym2 -> compare_symbol sym1 sym2
     | Var _, (Const_int _ | Const_naked_float _ | Const_symbol _) -> -1
     | Const_int _, Var _ -> 1
     | Const_int _, (Const_naked_float _ | Const_symbol _) -> -1
@@ -44,7 +54,7 @@ module Holds_value_of = struct
     | Var var -> V.print ppf var
     | Const_int i -> Format.fprintf ppf "%nd" i
     | Const_naked_float f -> Format.fprintf ppf "0x%Lx" f
-    | Const_symbol sym -> Format.pp_print_string ppf sym
+    | Const_symbol sym -> Format.pp_print_string ppf sym.sym_name
 end
 
 module Debug_info = struct
