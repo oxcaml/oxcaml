@@ -5000,19 +5000,11 @@ module Report = struct
    fun obj morph a b ->
     Misc.Le_result.equal ~le:(C.le obj) (C.apply obj morph a) b
 
-  let unexpected_allocation_hint : type a b.
-      a C.obj -> b C.obj -> a -> b -> unit =
-   fun src obj a b ->
-    Misc.fatal_errorf_doc
-      "Unexpected objects for allocation hint:@ source object %a,@ source \
-       value %a,@ target object %a,@ target value %a"
-      C.print_obj src (C.print src) a C.print_obj obj (C.print obj) b
-
   let check_identity_morph : type a b. a C.obj -> b C.obj -> a -> b -> unit =
    fun src obj a b ->
     match C.equal_obj src obj with
     | Misc.Is_eq -> assert (implements_morph obj (Simple Id) a b)
-    | Misc.Is_not_eq -> unexpected_allocation_hint src obj a b
+    | Misc.Is_not_eq -> assert false
 
   let check_value_to_alloc_morph : type l r a b.
       (C.Regionality.t, C.Locality.t, l * r) C.Locality_morph.t ->
