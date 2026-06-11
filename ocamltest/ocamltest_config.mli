@@ -154,3 +154,6 @@ val tsan : bool
 
 val address_sanitizer : bool
 (** Whether AddressSanitizer support has been enabled at configure time *)
+
+val name_mangling : string
+(** Which name-mangling scheme has been enabled at configure time *)

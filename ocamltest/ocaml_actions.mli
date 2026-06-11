@@ -55,6 +55,9 @@ val native_compiler : Actions.t
 val afl_instrument : Actions.t
 val no_afl_instrument : Actions.t
 
+val flat_name_mangling : Actions.t
+val structured_name_mangling : Actions.t
+
 val fexpr : Actions.t
 val check_fexpr_dump : Actions.t
 

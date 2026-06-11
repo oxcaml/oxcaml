@@ -6,6 +6,7 @@
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  flags += " -cfg-merge-blocks";
  only-default-codegen;
+ flat-name-mangling;
  expect.opt;
 *)
 
