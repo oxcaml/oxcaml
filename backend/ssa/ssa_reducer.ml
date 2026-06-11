@@ -1,449 +1,516 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
 open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-40-41-42"]
 
 (** Framework for SSA-to-SSA transformations.
 
-    A reducer is a functor over a [Context] (input + output graphs and the
-    builder ops to translate between them). {!run} drives the framework: it
-    allocates a fresh output graph (so input and output have distinct [Block.t]
-    / [Instruction.t] types and can't be accidentally mixed), creates an output
-    block per input block, then walks the input in the Finished_graph default
-    order (which is guaranteed to have dominators first) and translates each
-    block, skipping unused operations and block parameters.
+    A reducer is a functor over a [Context]; {!Make_run} instantiates it once
+    and drives the framework. [Make_run.run] allocates a fresh output graph,
+    creates an output block per input block, then walks the input in the
+    finished-graph default order (which is guaranteed to have dominators first)
+    and translates each block while removing unused block parameters.
+
+    The per-run state (the two graphs and the input->output reference maps)
+    lives in [Context.t]; it is threaded to every hook and on to the [Context]
+    operations. [Context] is a plain (non-recursive) module so that a reducer's
+    calls into it ([Cursor.emit_op] / [Cursor.finish_block] / [map_value] / ...)
+    inline. To route emissions back through the reducer's [emit_op] and
+    [finish_block] hooks without a recursive module, [Context.t] also stores
+    those hooks (with the run's analysis already captured); the only non-inlined
+    step is then the indirect call back into the reducer.
 
     Two layered hooks:
-    - [visit_block] / [visit_instruction] / [visit_terminator]: intercept the
-      walk over the input. Return [Replaced] to take over (e.g. emit something
-      else), or [Unchanged] to let the framework apply its default translation.
-    - [rewrite_instruction] / [rewrite_terminator]: intercept emissions into the
-      output. Fire on every emission — both the framework's default translation
-      and reducer-driven ones go through here.
+    - [visit_instruction] / [visit_terminator]: intercept the walk over the
+      input. Return [Emitted_replacement] after take over (that is, having
+      emitted something else), or [For_next_reducer] to let the framework apply
+      its default translation.
+    - [emit_op] / [finish_block]: intercept emissions into the output. Fire on
+      every emission — both the framework's default translation and
+      reducer-driven ones go through here.
 
-    Default translation, applied when [visit_*] returns [Unchanged]:
+    Default translation, applied when [visit_*] returns [For_next_reducer]:
     - Args (op args, block-param uses, terminator args) and blocks are mapped
-      from the input to the output via [map_arg] and [map_block].
+      from the input to the output via [map_value] and [map_block].
     - Block params with [usage_count = 0] are dropped from both the block
-      parameter list and from [Goto]s.
+      parameter list and from [Continue]s.
     - Other terminators are reconstructed with their args mapped through.
 
-    Dead-Op and unreachable-handler cleanup (dropping [Op]s with
-    [usage_count = 0] and [Push_trap]/[Pop_trap] whose handler has no
-    predecessors) happens in [finalize_blocks] inside [Out.finish_graph], not
-    here.
+    Unused instruction and unreachable block or exception handler cleanup
+    happens in [Ssa.finish_graph], not here.
 
     [keep_unused_ops] disables removing unused operations and parameters, used
     before [Cfg_compare]. *)
 
+open! Ssa.Export
+
+type 'a did_emit =
+  | For_next_reducer
+  | Emitted_replacement of 'a
+
+(* A param can be dropped only if every incoming edge passes its arg through a
+   [Continue (Goto _)] (the only terminator with positional per-param args). Any
+   other predecessor supplies the parameter's value through a runtime-fixed
+   mechanism, so the parameter's position must be preserved. *)
+let dropped_param_sentinel = -1
+
 module type Context = sig
-  module In : Ssa.Finished_graph
+  type t
 
-  include Ssa.Graph_builder
+  type out
 
-  val emit_instruction : Cursor.t -> Instruction.t -> Instruction.t
+  (** Mirrors [Ssa.Cursor], with the context taking the graph's place; [emit_op]
+      and [finish_block] route through the reducer's [emit_op] / [finish_block]
+      hooks. *)
+  module Cursor : sig
+    type context := t
 
-  val emit_op :
-    Cursor.t ->
-    op:op ->
-    dbg:Debuginfo.t ->
-    typ:Cmm.machtype ->
-    args:Instruction.t array ->
-    Instruction.t
+    type t
 
-  val map_arg : In.Instruction.t -> Instruction.t
+    val start : out Block.t -> t
 
-  val map_block : In.Block.t -> Block.t
+    val move : t -> new_pos:out Block.t -> unit
+
+    val is_finished : t -> bool
+
+    val emit_op :
+      context ->
+      t ->
+      Ssa.op ->
+      Debuginfo.t ->
+      Cmm.machtype ->
+      out Value.t array ->
+      out Value.t array
+
+    val emit_push_trap : t -> handler:out Block.t -> unit
+
+    val emit_pop_trap : t -> handler:out Block.t -> unit
+
+    val finish_block :
+      context -> t -> dbg:Debuginfo.t -> out Terminator.t -> unit
+  end
+
+  val in_graph : t -> finished Ssa.graph
+
+  val out_graph : t -> out Ssa.graph
+
+  val map_value : t -> finished Value.t -> out Value.t
+
+  val map_block : t -> finished Block.t -> out Block.t
 end
 
-type 'a result =
-  | Unchanged
-  | Replaced of 'a
+module type S = sig
+  type analysis_result
 
-module type Reducer = functor (C : Context) -> sig
-  val analyze : unit -> unit
+  type context
 
-  val visit_block : C.In.Block.t -> C.Cursor.t -> unit result
+  type cursor
+
+  type out
+
+  val analyze : finished Ssa.graph -> analysis_result
 
   val visit_instruction :
-    C.In.Block.t -> instr_index:int -> C.Cursor.t -> C.Instruction.t result
+    analysis_result ->
+    context ->
+    finished Block.t ->
+    instr_index:int ->
+    cursor ->
+    out Value.t array did_emit
 
-  val visit_terminator : C.In.Block.t -> C.Cursor.t -> unit result
+  val visit_terminator :
+    analysis_result -> context -> finished Block.t -> cursor -> unit did_emit
 
-  val rewrite_instruction :
-    C.Cursor.t -> C.Instruction.t -> C.Instruction.t result
+  val emit_op :
+    analysis_result ->
+    context ->
+    cursor ->
+    op:Ssa.op ->
+    dbg:Debuginfo.t ->
+    typ:Cmm.machtype ->
+    args:out Value.t array ->
+    out Value.t array did_emit
 
-  val rewrite_terminator :
-    C.Cursor.t -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
+  val finish_block :
+    analysis_result ->
+    context ->
+    cursor ->
+    dbg:Debuginfo.t ->
+    out Terminator.t ->
+    unit did_emit
 end
 
-module Default : Reducer =
+module type Reducer = functor (C : Context) ->
+  S with type context := C.t and type cursor := C.Cursor.t and type out := C.out
+
+module Default (C : Context) = struct
+  type analysis_result = unit
+
+  let analyze (_ : finished Ssa.graph) = ()
+
+  let visit_instruction (_ : analysis_result) (_ : C.t) (_ : finished Block.t)
+      ~instr_index:(_ : int) (_ : C.Cursor.t) =
+    For_next_reducer
+
+  let visit_terminator (_ : analysis_result) (_ : C.t) (_ : finished Block.t)
+      (_ : C.Cursor.t) =
+    For_next_reducer
+
+  let emit_op (_ : analysis_result) (_ : C.t) (_ : C.Cursor.t) ~op:(_ : Ssa.op)
+      ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
+      ~args:(_ : C.out Value.t array) =
+    For_next_reducer
+
+  let finish_block (_ : analysis_result) (_ : C.t) (_ : C.Cursor.t)
+      ~dbg:(_ : Debuginfo.t) (_ : C.out Terminator.t) =
+    For_next_reducer
+end
+
+module Combine (Reducer_a : Reducer) (Reducer_b : Reducer) : Reducer =
 functor
   (C : Context)
   ->
   struct
-    let analyze () = ()
+    module A = Reducer_a (C)
+    module B = Reducer_b (C)
 
-    let visit_block (_ : C.In.Block.t) (_ : C.Cursor.t) = Unchanged
+    type analysis_result = A.analysis_result * B.analysis_result
 
-    let visit_instruction (_ : C.In.Block.t) ~instr_index:(_ : int)
-        (_ : C.Cursor.t) =
-      Unchanged
+    let analyze g = A.analyze g, B.analyze g
 
-    let visit_terminator (_ : C.In.Block.t) (_ : C.Cursor.t) = Unchanged
+    let visit_instruction (ra, rb) ctx block ~instr_index c =
+      match A.visit_instruction ra ctx block ~instr_index c with
+      | For_next_reducer -> B.visit_instruction rb ctx block ~instr_index c
+      | Emitted_replacement vs -> Emitted_replacement vs
 
-    let rewrite_instruction (_ : C.Cursor.t) (_ : C.Instruction.t) = Unchanged
+    let visit_terminator (ra, rb) ctx block c =
+      match A.visit_terminator ra ctx block c with
+      | For_next_reducer -> B.visit_terminator rb ctx block c
+      | Emitted_replacement () -> Emitted_replacement ()
 
-    let rewrite_terminator (_ : C.Cursor.t) ~dbg:(_ : Debuginfo.t)
-        (_ : C.Terminator.t) =
-      Unchanged
+    let emit_op (ra, rb) ctx c ~op ~dbg ~typ ~args =
+      match A.emit_op ra ctx c ~op ~dbg ~typ ~args with
+      | For_next_reducer -> B.emit_op rb ctx c ~op ~dbg ~typ ~args
+      | Emitted_replacement vs -> Emitted_replacement vs
+
+    let finish_block (ra, rb) ctx c ~dbg t =
+      match A.finish_block ra ctx c ~dbg t with
+      | For_next_reducer -> B.finish_block rb ctx c ~dbg t
+      | Emitted_replacement () -> Emitted_replacement ()
   end
 
-let combine (rs : (module Reducer) list) : (module Reducer) =
-  let module Combined =
-  functor
-    (C : Context)
-    ->
-    struct
-      module type S = sig
-        val analyze : unit -> unit
+module Make_run (R : Reducer) = struct
+  (** [Context] is a plain (non-recursive) module so that the reducer's calls
+      into it are inlined. The reducer's [emit_op] and [finish_block] hooks
+      (with the run's analysis already captured) live in [t], so that
+      [Cursor.emit_op] / [Cursor.finish_block] route emissions back through the
+      reducer; only that (uncommon) indirect call is left un-inlined. *)
+  module Context = struct
+    type out = under_construction
 
-        val visit_block : C.In.Block.t -> C.Cursor.t -> unit result
+    type t =
+      { in_graph : finished Ssa.graph;
+        out_graph : under_construction Ssa.graph;
+        block_map : under_construction Block.t Block.Tbl.t;
+        (* Output value(s) for each input [Op], indexed by its id. *)
+        op_map : under_construction Value.t array Instruction.Id.Tbl.t;
+        (* Old param index -> new param index (or [dropped_param_sentinel]). *)
+        block_param_map : int array Block.Tbl.t;
+        (* Output [Block_param] values, in the compressed (post-drop) order. *)
+        block_param_values : under_construction Value.t array Block.Tbl.t;
+        emit_op :
+          t ->
+          Ssa.Cursor.t ->
+          op:Ssa.op ->
+          dbg:Debuginfo.t ->
+          typ:Cmm.machtype ->
+          args:under_construction Value.t array ->
+          under_construction Value.t array did_emit;
+        finish_block :
+          t ->
+          Ssa.Cursor.t ->
+          dbg:Debuginfo.t ->
+          under_construction Terminator.t ->
+          unit did_emit
+      }
 
-        val visit_instruction :
-          C.In.Block.t ->
-          instr_index:int ->
-          C.Cursor.t ->
-          C.Instruction.t result
+    type context = t
 
-        val visit_terminator : C.In.Block.t -> C.Cursor.t -> unit result
+    module Cursor = struct
+      include Ssa.Cursor
 
-        val rewrite_instruction :
-          C.Cursor.t -> C.Instruction.t -> C.Instruction.t result
+      let emit_op (ctx : context) c op dbg typ args =
+        match ctx.emit_op ctx c ~op ~dbg ~typ ~args with
+        | For_next_reducer -> Ssa.Cursor.emit_op ctx.out_graph c op dbg typ args
+        | Emitted_replacement vs -> vs
 
-        val rewrite_terminator :
-          C.Cursor.t -> dbg:Debuginfo.t -> C.Terminator.t -> unit result
-      end
-
-      let children : (module S) list =
-        List.map
-          (fun m ->
-            let module Red = (val m : Reducer) in
-            let module Inst = Red (C) in
-            (module Inst : S))
-          rs
-
-      let analyze () =
-        List.iter (fun (module Red : S) -> Red.analyze ()) children
-
-      let visit_block block c =
-        let rec loop = function
-          | [] -> Unchanged
-          | (module Red : S) :: rest -> (
-            match Red.visit_block block c with
-            | Unchanged -> loop rest
-            | Replaced () -> Replaced ())
-        in
-        loop children
-
-      let visit_instruction block ~instr_index c =
-        let rec loop = function
-          | [] -> Unchanged
-          | (module Red : S) :: rest -> (
-            match Red.visit_instruction block ~instr_index c with
-            | Unchanged -> loop rest
-            | Replaced instr -> Replaced instr)
-        in
-        loop children
-
-      let visit_terminator block c =
-        let rec loop = function
-          | [] -> Unchanged
-          | (module Red : S) :: rest -> (
-            match Red.visit_terminator block c with
-            | Unchanged -> loop rest
-            | Replaced () -> Replaced ())
-        in
-        loop children
-
-      let rewrite_instruction c instr =
-        let rec loop = function
-          | [] -> Unchanged
-          | (module Red : S) :: rest -> (
-            match Red.rewrite_instruction c instr with
-            | Unchanged -> loop rest
-            | Replaced instr' -> Replaced instr')
-        in
-        loop children
-
-      let rewrite_terminator c ~dbg t =
-        let rec loop = function
-          | [] -> Unchanged
-          | (module Red : S) :: rest -> (
-            match Red.rewrite_terminator c ~dbg t with
-            | Unchanged -> loop rest
-            | Replaced () -> Replaced ())
-        in
-        loop children
-    end in
-  (module Combined : Reducer)
-
-let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
-    (input : (module Ssa.Finished_graph)) : (module Ssa.Finished_graph) =
-  let module In = (val input : Ssa.Finished_graph) in
-  let module Out = (val Ssa.make_builder In.function_info ~keep_unused_ops) in
-  (* Map each input block to its output counterpart. *)
-  let block_map : Out.Block.t In.Block.Tbl.t = In.Block.Tbl.create 64 in
-  let op_map : Out.Instruction.t In.Instruction.Id.Tbl.t =
-    In.Instruction.Id.Tbl.create 256
-  in
-  (* Maps each old param index to its new index in [Out], or
-     [dropped_param_sentinel] if the param is dropped. A param can be dropped
-     only if every incoming edge passes its arg through a [Goto] (the only
-     terminator that has positional per-param args). A non-Goto predecessor
-     supplies the parameter's value through a runtime-fixed mechanism, so the
-     parameter's position must be preserved. *)
-  let block_param_map : int array In.Block.Tbl.t = In.Block.Tbl.create 64 in
-  let dropped_param_sentinel = -1 in
-  let compute_block_param_map (block : In.Block.t) : int array =
-    let n = Array.length block.params in
-    let any_non_goto_pred () =
-      List.exists
-        (fun (pred : In.Block.t) ->
-          match[@warning "-fragile-match"] pred.terminator with
-          | Goto _ -> false
-          | _ -> true)
-        block.predecessors
-    in
-    if
-      keep_unused_ops || any_non_goto_pred ()
-      || Array.for_all
-           (fun (param : In.Block.param) -> param.usage_count > 0)
-           block.params
-    then Array.init n Fun.id
-    else
-      let to_new = Array.make n dropped_param_sentinel in
-      let j = ref 0 in
-      for i = 0 to n - 1 do
-        if block.params.(i).usage_count > 0
-        then begin
-          to_new.(i) <- !j;
-          incr j
-        end
-      done;
-      to_new
-  in
-  (* Step 1: create an output block for each input block. The entry's params
-     come from the function ABI and are kept verbatim; other blocks may drop
-     unused params per [compute_block_param_map]. *)
-  let entry_out = Out.entry in
-  In.Block.Tbl.replace block_map In.entry entry_out;
-  In.Block.Tbl.replace block_param_map In.entry
-    (Array.init (Array.length In.entry.params) Fun.id);
-  List.iter
-    (fun (block : In.Block.t) ->
-      if not (In.Block.equal block In.entry)
-      then begin
-        let param_map = compute_block_param_map block in
-        In.Block.Tbl.replace block_param_map block param_map;
-        let params =
-          block.params |> Array.to_list
-          |> List.filteri (fun i _ -> param_map.(i) <> dropped_param_sentinel)
-          |> List.map (fun (param : In.Block.param) -> param.typ, param.name)
-          |> Array.of_list
-        in
-        In.Block.Tbl.replace block_map block (Out.new_block_with_names ~params)
-      end)
-    In.blocks;
-  let map_block (old : In.Block.t) : Out.Block.t =
-    In.Block.Tbl.find block_map old
-  in
-  let rec map_arg (instr : In.Instruction.t) : Out.Instruction.t =
-    match instr with
-    | Op { id; _ } -> In.Instruction.Id.Tbl.find op_map id
-    | Block_param { block; param_index } ->
-      let new_index = (In.Block.Tbl.find block_param_map block).(param_index) in
-      assert (new_index <> dropped_param_sentinel);
-      Out.Instruction.make_block_param (map_block block) ~index:new_index
-    | Proj { output_index; src } ->
-      Out.Instruction.make_proj (map_arg src) ~index:output_index
-    | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
-      ->
-      Misc.fatal_error "Unexpected instruction in Ssa_reducer.map_arg"
-  in
-  let map_args (args : In.Instruction.t array) : Out.Instruction.t array =
-    Array.map map_arg args
-  in
-  let map_instruction (instr : In.Instruction.t) : Out.Instruction.t =
-    match instr with
-    | Op { op; typ; args; dbg; name; _ } ->
-      let new_op =
-        Out.Instruction.make_op ~op ~typ ~args:(map_args args) ~dbg
-      in
-      Option.iter (Out.Instruction.set_name new_op) name;
-      new_op
-    | Push_trap { handler } -> Push_trap { handler = map_block handler }
-    | Pop_trap { handler } -> Pop_trap { handler = map_block handler }
-    | Stack_check { max_frame_size_bytes } ->
-      Stack_check { max_frame_size_bytes }
-    | Name_for_debugger { ident; provenance; which_parameter; args } ->
-      Name_for_debugger
-        { ident; provenance; which_parameter; args = map_args args }
-    | Block_param _ | Proj _ | Tuple _ -> assert false
-  in
-  let map_terminator (t : In.Terminator.t) : Out.Terminator.t =
-    match t with
-    | Goto { goto; args } ->
-      let param_map = In.Block.Tbl.find block_param_map goto in
-      let mapped_args =
-        args
-        |> Misc.Stdlib.Array.filteri (fun i _ ->
-            param_map.(i) <> dropped_param_sentinel)
-        |> Array.map (Option.map map_arg)
-      in
-      Goto { goto = map_block goto; args = mapped_args }
-    | Branch { cond; ifso; ifnot } ->
-      Branch
-        { cond = map_arg cond; ifso = map_block ifso; ifnot = map_block ifnot }
-    | Switch { index; targets } ->
-      Switch { index = map_arg index; targets = Array.map map_block targets }
-    | Return { args } -> Return { args = map_args args }
-    | Raise { raise_kind; args } -> Raise { raise_kind; args = map_args args }
-    | Tailcall_self { destination; args } ->
-      Tailcall_self
-        { destination = map_block destination; args = map_args args }
-    | Tailcall_func { op; args } -> Tailcall_func { op; args = map_args args }
-    | Call { op; args; continuation; may_raise; nontail } ->
-      Call
-        { op;
-          args = map_args args;
-          continuation = map_block continuation;
-          may_raise;
-          nontail
-        }
-    | Invalid { message; args; continuation } ->
-      Invalid
-        { message;
-          args = map_args args;
-          continuation = Option.map map_block continuation
-        }
-  in
-  let module M = struct
-    module rec Ctx : sig
-      include
-        Context
-          with type block = Out.Block.t
-           and type cursor = Out.Cursor.t
-           and module In = In
-
-      val visit_instruction : In.Block.t -> instr_index:int -> Cursor.t -> unit
-
-      val visit_terminator : In.Block.t -> Cursor.t -> unit
-    end = struct
-      module In = In
-      include Out
-
-      let emit_instruction c instr =
-        match Red.rewrite_instruction c instr with
-        | Unchanged ->
-          Out.emit_instruction c instr;
-          instr
-        | Replaced instr' -> instr'
-
-      let emit_op c ~op ~dbg ~typ ~args =
-        emit_instruction c (Out.Instruction.make_op ~op ~typ ~args ~dbg)
-
-      let finish_block c ~dbg term =
-        match Red.rewrite_terminator c ~dbg term with
-        | Unchanged -> Out.finish_block c ~dbg term
-        | Replaced () -> ()
-
-      let map_arg = map_arg
-
-      let map_block = map_block
-
-      let visit_instruction (block : In.Block.t) ~instr_index c =
-        let instr = Array.get block.body instr_index in
-        let replacement =
-          match Red.visit_instruction block ~instr_index c with
-          | Replaced replacement -> replacement
-          | Unchanged -> emit_instruction c (map_instruction instr)
-        in
-        if
-          In.Instruction.result_arity instr
-          <> Instruction.result_arity replacement
-        then
-          Misc.fatal_errorf
-            "Ssa_reducer: replacement arity %d does not match input arity %d.@ \
-             Input: %a@ Replacement: %a"
-            (Instruction.result_arity replacement)
-            (In.Instruction.result_arity instr)
-            In.Instruction.print instr Out.Instruction.print replacement;
-        match[@warning "-fragile-match"] instr with
-        | Op { id; _ } -> In.Instruction.Id.Tbl.replace op_map id replacement
-        | _ -> ()
-
-      let visit_terminator (block : In.Block.t) c =
-        match Red.visit_terminator block c with
-        | Replaced () ->
-          if not (Out.Cursor.is_finished c)
-          then
-            Misc.fatal_error
-              "The reducer promised to have replaced the block terminator, but \
-               did not actually finish the block."
-        | Unchanged ->
-          let term = map_terminator block.terminator in
-          finish_block c ~dbg:block.terminator_dbg term
+      let finish_block (ctx : context) c ~dbg term =
+        match ctx.finish_block ctx c ~dbg term with
+        | For_next_reducer -> Ssa.Cursor.finish_block ctx.out_graph c ~dbg term
+        | Emitted_replacement () -> ()
     end
 
-    and Red : sig
-      val analyze : unit -> unit
+    let create ~in_graph ~out_graph ~block_map ~op_map ~block_param_map
+        ~block_param_values ~emit_op ~finish_block =
+      { in_graph;
+        out_graph;
+        block_map;
+        op_map;
+        block_param_map;
+        block_param_values;
+        emit_op;
+        finish_block
+      }
 
-      val visit_block : In.Block.t -> Out.Cursor.t -> unit result
+    let in_graph t = t.in_graph
 
-      val visit_instruction :
-        In.Block.t ->
-        instr_index:int ->
-        Out.Cursor.t ->
-        Out.Instruction.t result
+    let out_graph t = t.out_graph
 
-      val visit_terminator : In.Block.t -> Out.Cursor.t -> unit result
+    let map_block t (old : finished Block.t) : under_construction Block.t =
+      Block.Tbl.find t.block_map old
 
-      val rewrite_instruction :
-        Out.Cursor.t -> Out.Instruction.t -> Out.Instruction.t result
+    let map_value t (value : finished Value.t) : under_construction Value.t =
+      match value with
+      | Res ({ id; _ }, i) -> (Instruction.Id.Tbl.find t.op_map id).(i)
+      | Block_param (block, i) ->
+        let new_index = (Block.Tbl.find t.block_param_map block).(i) in
+        assert (new_index <> dropped_param_sentinel);
+        (Block.Tbl.find t.block_param_values block).(new_index)
+      | Undefined -> Value.undefined
+  end
 
-      val rewrite_terminator :
-        Out.Cursor.t -> dbg:Debuginfo.t -> Out.Terminator.t -> unit result
-    end =
-      Red_ctor (Ctx)
-  end in
-  let module Red = M.Red in
-  let module Ctx = M.Ctx in
-  Red.analyze ();
-  (* Step 2: walk the input graph in [In.blocks] order, which already guarantees
-     each block's dominators come before it. *)
-  List.iter
-    (fun (block : In.Block.t) ->
-      let out_block = In.Block.Tbl.find block_map block in
-      let c = Out.Cursor.start out_block in
-      try
-        match Red.visit_block block c with
-        | Replaced () -> ()
-        | Unchanged ->
+  module Red = R (Context)
+
+  let run ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
+      finished Ssa.graph =
+    let analysis = Red.analyze in_graph in
+    let out_graph =
+      Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
+    in
+    (* Map each input block to its output counterpart. *)
+    let block_map : under_construction Block.t Block.Tbl.t =
+      Block.Tbl.create 64
+    in
+    let op_map : under_construction Value.t array Instruction.Id.Tbl.t =
+      Instruction.Id.Tbl.create 256
+    in
+    let block_param_map : int array Block.Tbl.t = Block.Tbl.create 64 in
+    let block_param_values : under_construction Value.t array Block.Tbl.t =
+      Block.Tbl.create 64
+    in
+    let compute_block_param_map (block : finished Block.t) : int array =
+      let params = Block.params block in
+      let n = Array.length params in
+      (* A param can only be dropped if every predecessor feeds it via a
+         positional [Continue (Goto _)] arg, which we can then drop too. Any
+         other edge (call results, exception bucket) supplies it at a
+         runtime-fixed position. *)
+      let any_non_continue_pred () =
+        List.exists
+          (fun (pred : finished Block.t) ->
+            match Block.terminator pred with
+            | Continue { continuation = Goto _; _ } -> false
+            | Continue { continuation = Return | Raise _; _ }
+            | Call _ | Switch _ | Invalid _ ->
+              true)
+          (Block.predecessors block)
+      in
+      if
+        keep_unused_ops || any_non_continue_pred ()
+        || Array.for_all (fun param -> Value.usage_count param > 0) params
+      then Array.init n Fun.id
+      else
+        let to_new = Array.make n dropped_param_sentinel in
+        let j = ref 0 in
+        for i = 0 to n - 1 do
+          if Value.usage_count params.(i) > 0
+          then begin
+            to_new.(i) <- !j;
+            incr j
+          end
+        done;
+        to_new
+    in
+    (* Step 1: create an output block for each input block. The entry's params
+       come from the function ABI and are kept verbatim; other blocks may drop
+       unused params per [compute_block_param_map]. *)
+    let in_entry = Ssa.entry in_graph in
+    Block.Tbl.replace block_map in_entry (Ssa.entry out_graph);
+    Block.Tbl.replace block_param_map in_entry
+      (Array.init (Array.length (Block.params in_entry)) Fun.id);
+    Block.Tbl.replace block_param_values in_entry
+      (Block.params (Ssa.entry out_graph));
+    List.iter
+      (fun (block : finished Block.t) ->
+        if not (Block.equal block in_entry)
+        then begin
+          let param_map = compute_block_param_map block in
+          Block.Tbl.replace block_param_map block param_map;
+          let params =
+            Block.params block |> Array.to_list
+            |> List.filteri (fun i _ -> param_map.(i) <> dropped_param_sentinel)
+            |> List.map (fun param -> Value.typ param, Value.name param)
+            |> Array.of_list
+          in
+          let out_block = Block.create_with_names out_graph ~params in
+          Block.Tbl.replace block_map block out_block;
+          Block.Tbl.replace block_param_values block (Block.params out_block)
+        end)
+      (Ssa.blocks in_graph);
+    let ctx =
+      Context.create ~in_graph ~out_graph ~block_map ~op_map ~block_param_map
+        ~block_param_values ~emit_op:(Red.emit_op analysis)
+        ~finish_block:(Red.finish_block analysis)
+    in
+    let map_values (args : finished Value.t array) :
+        under_construction Value.t array =
+      Array.map (Context.map_value ctx) args
+    in
+    (* Default translation of one body instruction, returning the value(s) its
+       results map to ([||] for a trap instruction). *)
+    let default_translate_instruction (instr : finished Instruction.t)
+        (c : Cursor.t) : under_construction Value.t array =
+      match instr with
+      | Op { op; typ; args; dbg; name; _ } ->
+        let vs = Context.Cursor.emit_op ctx c op dbg typ (map_values args) in
+        (match name with
+        | Some name when Array.length vs > 0 -> Value.set_name vs.(0) name
+        | Some _ | None -> ());
+        vs
+      | Push_trap { handler } ->
+        Context.Cursor.emit_push_trap c ~handler:(Context.map_block ctx handler);
+        [||]
+      | Pop_trap { handler } ->
+        Context.Cursor.emit_pop_trap c ~handler:(Context.map_block ctx handler);
+        [||]
+    in
+    let map_continuation (cont : finished Ssa.continuation) :
+        under_construction Ssa.continuation =
+      match cont with
+      | Goto b -> Goto (Context.map_block ctx b)
+      | Return -> Return
+      | Raise k -> Raise k
+    in
+    let map_terminator (t : finished Terminator.t) :
+        under_construction Terminator.t =
+      match t with
+      | Continue { continuation = Goto goto; args } ->
+        (* Drop the args going to dropped target params. *)
+        let param_map = Block.Tbl.find block_param_map goto in
+        let mapped_args =
+          args
+          |> Misc.Stdlib.Array.filteri (fun i _ ->
+              param_map.(i) <> dropped_param_sentinel)
+          |> Array.map (Context.map_value ctx)
+        in
+        Continue
+          { continuation = Goto (Context.map_block ctx goto);
+            args = mapped_args
+          }
+      | Continue { continuation = (Return | Raise _) as continuation; args } ->
+        Continue
+          { continuation = map_continuation continuation;
+            args = map_values args
+          }
+      | Switch { index; targets } ->
+        Switch
+          { index = Context.map_value ctx index;
+            targets = Array.map (Context.map_block ctx) targets
+          }
+      | Call { op; args; continuation; may_raise; nontail } ->
+        Call
+          { op;
+            args = map_values args;
+            continuation = map_continuation continuation;
+            may_raise;
+            nontail
+          }
+      | Invalid { message; args; continuation } ->
+        Invalid
+          { message;
+            args = map_values args;
+            continuation = Option.map (Context.map_block ctx) continuation
+          }
+    in
+    let visit_instruction (block : finished Block.t) ~instr_index c =
+      let instr = Array.get (Block.body block) instr_index in
+      let vs =
+        match Red.visit_instruction analysis ctx block ~instr_index c with
+        | Emitted_replacement vs -> vs
+        | For_next_reducer -> default_translate_instruction instr c
+      in
+      if Instruction.result_arity instr <> Array.length vs
+      then
+        Misc.fatal_errorf
+          "Ssa_reducer: replacement arity %d does not match input arity %d.@ \
+           Input: %a"
+          (Array.length vs)
+          (Instruction.result_arity instr)
+          Instruction.print instr;
+      match instr with
+      | Op { id; _ } -> Instruction.Id.Tbl.replace op_map id vs
+      | Push_trap _ | Pop_trap _ -> ()
+    in
+    let visit_terminator (block : finished Block.t) c =
+      match Red.visit_terminator analysis ctx block c with
+      | Emitted_replacement () ->
+        if not (Cursor.is_finished c)
+        then
+          Misc.fatal_error
+            "The reducer promised to have replaced the block terminator, but \
+             did not actually finish the block."
+      | For_next_reducer ->
+        let term = map_terminator (Block.terminator block) in
+        Context.Cursor.finish_block ctx c ~dbg:(Block.terminator_dbg block) term
+    in
+    (* Step 2: walk the input graph in [blocks] order, which already guarantees
+       each block's dominators come before it. *)
+    List.iter
+      (fun (block : finished Block.t) ->
+        let out_block = Block.Tbl.find block_map block in
+        let c = Cursor.start out_block in
+        try
           Array.iteri
-            (fun instr_index _ -> Ctx.visit_instruction block ~instr_index c)
-            block.body;
-          Ctx.visit_terminator block c
-      with exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        Format.eprintf
-          "*** Ssa_reducer.run error for %s while processing block %a: %s@.*** \
-           Input SSA:@.%a@."
-          In.function_info.sym_name In.Block.print_id block
-          (Printexc.to_string exn) Ssa_print.print
-          (module In : Ssa.Finished_graph);
-        Format.pp_print_flush Format.err_formatter ();
-        Printexc.raise_with_backtrace exn bt)
-    In.blocks;
-  let result = Out.finish_graph () in
-  Ssa_validate.validate result;
-  result
+            (fun instr_index _ -> visit_instruction block ~instr_index c)
+            (Block.body block);
+          visit_terminator block c
+        with exn ->
+          let bt = Printexc.get_raw_backtrace () in
+          Format.eprintf
+            "*** Ssa_reducer.run error for %s while processing block %a: \
+             %s@.*** Input SSA:@.%a@."
+            (Ssa.function_info in_graph).sym_name Block.print_id block
+            (Printexc.to_string exn) Ssa_print.print in_graph;
+          Format.pp_print_flush Format.err_formatter ();
+          Printexc.raise_with_backtrace exn bt)
+      (Ssa.blocks in_graph);
+    let result = Ssa.finish_graph out_graph in
+    Ssa_invariants.validate result;
+    result
+end
