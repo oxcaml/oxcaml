@@ -42,13 +42,11 @@ open! Int_replace_polymorphic_compare
       continuation, Invalid continuation), from [Pushtrap]/[Poptrap] body
       instructions, and from block-level [exn] pointers. As blocks are paired up
       the framework checks that their bodies match instruction-by-instruction
-      (modulo skipping moves and [Pushtrap]/[Poptrap] with unreachable
-      handlers), that their terminators have the same shape, and that
-      block-level metadata (is_trap_handler, can_raise, cold) agrees.
-      [Pushtrap]/[Poptrap] with unreachable trap handlers are skipped because
-      the handlers are unreachable anyway and the trap stack is not being
-      observed in this case. This is necessary because the SSA pipeline eagerly
-      removes unreachable blocks including trap handlers.
+      (modulo skipping moves), that their terminators have the same shape, and
+      that block-level metadata (is_trap_handler, can_raise, cold, stack_offset)
+      agrees. Dead trap handlers (and their [Pushtrap]/[Poptrap]s) are removed
+      by [Cfg_simplify] in both pipelines when SSA is enabled, so they need no
+      special handling here.
 
     - [verify_register_equivalence]: Backward fixpoint over matched block pairs:
       starting from all block ends with the empty equation set, propagate
@@ -190,18 +188,6 @@ let is_move (i : Cfg.basic Cfg.instruction) =
     && Reg.equal_location i.res.(0).Reg.loc Reg.Unknown
   | _ -> false
 
-(** A [Pushtrap]/[Poptrap] whose target has no predecessors is unreachable as a
-    trap handler at runtime. [Cfg_selectgen] keeps an [unreachable_handler]
-    block as the target while [Cfg_of_ssa] drops the trap push/pop entirely; we
-    treat both options as equivalent by skipping the op on either side when the
-    handler has no predecessors. *)
-let is_skippable_trap cfg (i : Cfg.basic Cfg.instruction) =
-  match i.desc with
-  | Pushtrap { lbl_handler } | Poptrap { lbl_handler } ->
-    let target = Cfg.get_block_exn cfg lbl_handler in
-    Label.Set.is_empty target.predecessors
-  | _ -> false
-
 (* === Phase 1: structural matching === *)
 
 let basic_desc_match ~map_label (old_d : Cfg.basic) (new_d : Cfg.basic) =
@@ -215,9 +201,7 @@ let basic_desc_match ~map_label (old_d : Cfg.basic) (new_d : Cfg.basic) =
 (** Compare the non-register, non-desc fields of a [Cfg.instruction] pair.
     [desc] is compared by the caller (its type and equality depend on whether it
     is a basic or terminator instruction); [arg]/[res] are compared in phase 2
-    ([process_block_backward]); [id] is allowed to differ; [stack_offset] can
-    legitimately differ because the SSA pipeline removes [Pushtrap]/[Poptrap]
-    instructions when the handler is unreachable. *)
+    ([process_block_backward]); [id] is allowed to differ. *)
 let compare_instruction_fields ~ppf_m ~kind ~ol ~nl (oi : _ Cfg.instruction)
     (ni : _ Cfg.instruction) =
   let[@warning "+9"] { Cfg.desc = _;
@@ -227,7 +211,7 @@ let compare_instruction_fields ~ppf_m ~kind ~ol ~nl (oi : _ Cfg.instruction)
                        dbg = oi_dbg;
                        fdo = oi_fdo;
                        live = oi_live;
-                       stack_offset = _;
+                       stack_offset = oi_stack_offset;
                        available_before = oi_avail_before;
                        available_across = oi_avail_across
                      } =
@@ -240,7 +224,7 @@ let compare_instruction_fields ~ppf_m ~kind ~ol ~nl (oi : _ Cfg.instruction)
                        dbg = ni_dbg;
                        fdo = ni_fdo;
                        live = ni_live;
-                       stack_offset = _;
+                       stack_offset = ni_stack_offset;
                        available_before = ni_avail_before;
                        available_across = ni_avail_across
                      } =
@@ -259,6 +243,10 @@ let compare_instruction_fields ~ppf_m ~kind ~ol ~nl (oi : _ Cfg.instruction)
   in
   if Debuginfo.compare oi_dbg ni_dbg <> 0
   then report_with "dbg" Debuginfo.print_compact oi_dbg ni_dbg;
+  if not (Int.equal oi_stack_offset ni_stack_offset)
+  then
+    report_with "stack_offset" Format.pp_print_int oi_stack_offset
+      ni_stack_offset;
   if not (Fdo_info.equal oi_fdo ni_fdo) then report "fdo";
   if not (Reg.Set.equal oi_live ni_live)
   then report_with "live" Printreg.regset oi_live ni_live;
@@ -268,16 +256,14 @@ let compare_instruction_fields ~ppf_m ~kind ~ol ~nl (oi : _ Cfg.instruction)
   if not (Reg_availability_set.equal oi_avail_across ni_avail_across)
   then report_with "available_across" pp_avail oi_avail_across ni_avail_across
 
-let compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl old_body new_body =
-  let rec advance cfg cell =
+let compare_body ~ppf_m ~map_label ~ol ~nl old_body new_body =
+  let rec advance cell =
     match cell with
-    | Some c when is_move (DLL.value c) || is_skippable_trap cfg (DLL.value c)
-      ->
-      advance cfg (DLL.next c)
+    | Some c when is_move (DLL.value c) -> advance (DLL.next c)
     | _ -> cell
   in
   let rec loop oc nc =
-    match advance old_cfg oc, advance new_cfg nc with
+    match advance oc, advance nc with
     | None, None -> ()
     | Some _, None | None, Some _ ->
       Format.fprintf ppf_m "Body length mismatch at old=%a new=%a@."
@@ -459,10 +445,11 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
         then
           Format.fprintf ppf_m "cold mismatch at old=%a(%b) new=%a(%b)@."
             Label.format ol ob.cold Label.format nl nb.cold;
-        (* [stack_offset] is intentionally not compared: the legacy pipeline
-           keeps unreachable trap handlers as [Pushtrap]/[Poptrap] pairs while
-           [Cfg_of_ssa] drops them, so the trap-stack-derived component of
-           [stack_offset] can legitimately differ. *)
+        if not (Int.equal ob.stack_offset nb.stack_offset)
+        then
+          Format.fprintf ppf_m
+            "Block stack_offset mismatch at old=%a(%d) new=%a(%d)@."
+            Label.format ol ob.stack_offset Label.format nl nb.stack_offset;
         (match ob.exn, nb.exn with
         | Some oe, Some ne -> map_label oe ne
         | None, None -> ()
@@ -470,7 +457,7 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
           Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
             Label.format ol Label.format nl);
         (* Compare body structure, debuginfo, and map labels *)
-        compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl ob.body nb.body;
+        compare_body ~ppf_m ~map_label ~ol ~nl ob.body nb.body;
         (* Compare terminator structure and map labels *)
         if
           not
@@ -528,8 +515,8 @@ let effective_arg (i : Cfg.basic Cfg.instruction) =
     regs
   | _ -> i.arg
 
-let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
-    ~(old_block : Cfg.basic_block) ~(new_block : Cfg.basic_block) =
+let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
+    ~(new_block : Cfg.basic_block) =
   let ol = old_block.start in
   let nl = new_block.start in
   let process_reg_pairs eqs ~old_regs ~new_regs ~(old_instr : _ Cfg.instruction)
@@ -617,8 +604,8 @@ let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
     process_instruction eqs ~old_instr:old_t ~new_instr:new_t ~old_arg:old_t.arg
       ~new_arg:new_t.arg
   in
-  (* Process body backwards (iterating the cells back to front), skipping moves
-     and unreachable trap handlers *)
+  (* Process body backwards (iterating the cells back to front), skipping
+     moves *)
   let rec loop eqs oc nc =
     match oc, nc with
     | None, None -> eqs
@@ -634,10 +621,6 @@ let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
         (Equations.subst_new_move eqs ~src:new_instr.arg.(0)
            ~dst:new_instr.res.(0))
         oc (DLL.prev c)
-    | Some c, _ when is_skippable_trap old_cfg (DLL.value c) ->
-      loop eqs (DLL.prev c) nc
-    | _, Some c when is_skippable_trap new_cfg (DLL.value c) ->
-      loop eqs oc (DLL.prev c)
     | Some old_c, Some new_c ->
       let old_instr = DLL.value old_c in
       let new_instr = DLL.value new_c in
@@ -675,8 +658,7 @@ let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
     | Some ob, Some nb ->
       let eqs = Label.Tbl.find block_eqs nl in
       let start_eqs =
-        process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs ~old_block:ob
-          ~new_block:nb
+        process_block_backward ~ppf_m eqs ~old_block:ob ~new_block:nb
       in
       Label.Set.iter
         (fun pred_nl ->
@@ -709,17 +691,31 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
   let ppf_m = Format.formatter_of_buffer mismatches in
   begin
     (* We did run [Cfg_simplify] already in both pipelines, but it does not
-       always reach a fixed-point and the SSA pipeline differs in more
-       aggressive removal of unreachable blocks. *)
+       always reach a fixed-point. *)
     let old_cfg = Cfg_with_layout.cfg (Cfg_simplify.run old_cfg) in
     let new_cfg = Cfg_with_layout.cfg (Cfg_simplify.run new_cfg) in
     (* Phase 1: structural matching *)
     let new_to_old = collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg in
     (* Phase 2: register equivalence *)
     verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old;
-    (* Check CFG metadata. [fun_contains_calls] is intentionally not compared:
-       dropping unreachable trap-handler blocks (which contain a [Raise]) can
-       legitimately change whether the function appears to contain calls. *)
+    (* Check CFG metadata. The stored [fun_contains_calls] flags are computed
+       before the final [Cfg_simplify] in both pipelines, so they can
+       legitimately differ for blocks that were subsequently removed. Instead of
+       exact equality, check that the new flag is correct (set whenever the new
+       CFG does contain calls) and at least as precise as the old one. *)
+    if
+      (not new_cfg.fun_contains_calls)
+      && Label.Tbl.to_seq_values new_cfg.blocks
+         |> Seq.exists Cfg.basic_block_contains_calls
+    then
+      Format.fprintf ppf_m
+        "fun_contains_calls is unset on the new CFG even though it contains \
+         calls@.";
+    if new_cfg.fun_contains_calls && not old_cfg.fun_contains_calls
+    then
+      Format.fprintf ppf_m
+        "fun_contains_calls mismatch: old=%b new=%b (new is less precise)@."
+        old_cfg.fun_contains_calls new_cfg.fun_contains_calls;
     if not (String.equal old_cfg.fun_name new_cfg.fun_name)
     then
       Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg.fun_name

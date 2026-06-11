@@ -239,7 +239,8 @@ module Make_run (R : Reducer) = struct
         out_graph : under_construction Ssa.graph;
         block_map : under_construction Block.t Block.Tbl.t;
         (* Output value(s) for each input [Op], indexed by its id. *)
-        op_map : under_construction Value.t array Instruction.Id.Tbl.t;
+        op_map :
+          (finished, under_construction Value.t array) Instruction.Id.Tbl.t;
         (* Old param index -> new param index (or [dropped_param_sentinel]). *)
         block_param_map : int array Block.Tbl.t;
         (* Output [Block_param] values, in the compressed (post-drop) order. *)
@@ -317,7 +318,8 @@ module Make_run (R : Reducer) = struct
     let block_map : under_construction Block.t Block.Tbl.t =
       Block.Tbl.create 64
     in
-    let op_map : under_construction Value.t array Instruction.Id.Tbl.t =
+    let op_map :
+        (finished, under_construction Value.t array) Instruction.Id.Tbl.t =
       Instruction.Id.Tbl.create 256
     in
     let block_param_map : int array Block.Tbl.t = Block.Tbl.create 64 in

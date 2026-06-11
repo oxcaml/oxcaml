@@ -63,12 +63,12 @@ type value = finished Value.t
 
 type env =
   { ssa_graph : finished Ssa.graph;
-    op_regs : Reg.t array Instruction.Id.Tbl.t;
+    op_regs : (finished, Reg.t array) Instruction.Id.Tbl.t;
     block_params_regs : Reg.t array Block.Tbl.t;
     block_labels : Label.t Block.Tbl.t;
     call_result_locs : Reg.t array Block.Tbl.t;
     call_stack_ofs : int Block.Tbl.t;
-    fused_comparison_ops : int Instruction.Id.Tbl.t
+    fused_comparison_ops : (finished, int) Instruction.Id.Tbl.t
         (* Comparison ops that will be fused into the block terminator and
            should therefore not be emitted into the block body. The map counts
            how often a comparison has been fused. *)

@@ -117,13 +117,33 @@ type op = Operation.t
 type 'g block
 
 module Instruction : sig
-  (** ID namespace for [Op] instructions. IDs are only unique within one graph,
-      so ID-keyed containers ([Id.Tbl] etc.) must not mix instructions of
-      different graphs. *)
-  module Id : Oxcaml_utils.Id_counter.S
+  (** IDs of [Op] instructions, usable as table indices. The ['g] phantom is the
+      construction state of the owning graph, like everywhere else, so an
+      ID-keyed container cannot mix instructions of differently-staged graphs.
+      IDs are only unique within one graph, so containers must still not mix
+      instructions of two graphs in the same state. *)
+  module Id : sig
+    type 'g t
+
+    val equal : 'g t -> 'g t -> bool
+
+    module Tbl : sig
+      type 'g key = 'g t
+
+      type ('g, 'a) t
+
+      val create : int -> ('g, 'a) t
+
+      val find : ('g, 'a) t -> 'g key -> 'a
+
+      val find_opt : ('g, 'a) t -> 'g key -> 'a option
+
+      val replace : ('g, 'a) t -> 'g key -> 'a -> unit
+    end
+  end
 
   type 'g op_data = private
-    { id : Id.t;
+    { id : 'g Id.t;
       op : op;
       typ : Cmm.machtype;
       args : 'g value array;
@@ -254,9 +274,6 @@ module Block : sig
       the same state (unfortunately) share a type. *)
   type 'g t = 'g block
 
-  (** ID namespace for blocks. IDs are only unique within one graph. *)
-  module Id : Oxcaml_utils.Id_counter.S
-
   (** Create a new block with parameters of the given types. *)
   val create :
     under_construction graph -> params:Cmm.machtype -> under_construction t
@@ -281,8 +298,6 @@ module Block : sig
   module Tbl : Hashtbl.S with type key = finished t
 
   val print_id : Format.formatter -> 'g t -> unit
-
-  val id : 'g t -> Id.t
 
   val is_function_start : 'g t -> bool
 

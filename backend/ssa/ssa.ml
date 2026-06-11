@@ -229,8 +229,6 @@ let create_block ~block_id_gen ~is_function_start ~(params : block_param array)
 module Block = struct
   type nonrec 'g t = 'g block
 
-  module Id = Block_id
-
   let create (graph : under_construction graph) ~(params : Cmm.machtype) :
       under_construction t =
     create_block ~block_id_gen:graph.block_id_gen ~is_function_start:false
@@ -243,8 +241,6 @@ module Block = struct
     create_block ~block_id_gen:graph.block_id_gen ~is_function_start:false
       ~params:
         (params |> Array.map (fun (typ, name) -> { typ; name; usage_count = 0 }))
-
-  let id (b : 'g t) = b.block_id
 
   let is_function_start (b : 'g t) = b.is_function_start
 
@@ -415,10 +411,28 @@ module Value = struct
 end
 
 module Instruction = struct
-  module Id = Instruction_id
+  module Id = struct
+    type 'g t = Instruction_id.t
+
+    let equal = Instruction_id.equal
+
+    module Tbl = struct
+      type 'g key = 'g t
+
+      type ('g, 'a) t = 'a Instruction_id.Tbl.t
+
+      let create n : (_, _) t = Instruction_id.Tbl.create n
+
+      let find tbl key = Instruction_id.Tbl.find tbl key
+
+      let find_opt tbl key = Instruction_id.Tbl.find_opt tbl key
+
+      let replace tbl key value = Instruction_id.Tbl.replace tbl key value
+    end
+  end
 
   type nonrec 'g op_data = 'g op_data =
-    { id : Id.t;
+    { id : 'g Id.t;
       op : Operation.t;
       typ : Cmm.machtype;
       args : 'g value array;
