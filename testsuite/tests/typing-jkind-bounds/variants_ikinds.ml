@@ -51,6 +51,10 @@ module Recursive_list_alias_annotation = struct
   type ('a : value mod contended portable) t : value mod contended portable =
     | A of ('a t list as (_ : any mod contended portable))
 end
+(* CR layouts with-kinds: Fix the principal case for payload alias annotations.
+   Non-principal checking uses the temporary declaration ikind, but principal
+   checking still rejects the alias while looking through the temporary
+   environment. *)
 [%%expect{|
 module Recursive_list_alias_annotation :
   sig type ('a : value mod portable contended) t = A of 'a t list end
