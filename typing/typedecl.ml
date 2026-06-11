@@ -368,6 +368,11 @@ in
         Btype.newgenvar ?name jkind)
       sdecl.ptype_params
   in
+  (* These temporary declarations can be consulted before the final
+     declaration exists, for example by early alias annotation checks on a
+     variant payload. Give them an ikind derived from the declaration jkind so
+     those checks see the same declaration-level bound information as jkind
+     checks. *)
   let type_ikind =
     Ikind.type_declaration_ikind_of_jkind ~env:(Some env) ~params:type_params
       type_jkind
