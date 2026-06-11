@@ -703,7 +703,6 @@
   ;; backend/ssa/
   ssa
   ssa_print
-  ssa_invariants
   ssa_reducer
   ssa_simplify
   ssa_tail_call

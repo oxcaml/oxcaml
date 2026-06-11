@@ -87,8 +87,7 @@ module Tail_call_reducer (C : Context) = struct
            nontail = false
          } as operation)
       when List.is_empty (Block.block_end_trap_stack block)
-           && returns_args_unchanged cont
-           && stack_offsets_zero call_op args (Block.params_machtype cont) -> (
+           && returns_args_unchanged cont -> (
       let mapped_args = Array.map (map_value ctx) args in
       let dbg = Block.terminator_dbg block in
       match call_op with
@@ -102,10 +101,12 @@ module Tail_call_reducer (C : Context) = struct
                args = mapped_args
              });
         Emitted_replacement ()
-      | Direct _ | Indirect _ ->
+      | (Direct _ | Indirect _)
+        when stack_offsets_zero call_op args (Block.params_machtype cont) ->
         Cursor.finish_block ctx c ~dbg
           (Call { operation with args = mapped_args; continuation = Return });
         Emitted_replacement ()
+      | Direct _ | Indirect _ -> For_next_reducer
       | External _ | Probe _ -> assert false)
     | _ -> For_next_reducer
 end

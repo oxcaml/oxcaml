@@ -493,22 +493,26 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
   (* Validate predecessors match under the label mapping *)
   new_to_old
   |> Label.Tbl.iter (fun nl ol ->
-      let ob = Cfg.get_block_exn old_cfg ol in
-      let nb = Cfg.get_block_exn new_cfg nl in
-      (* We ignore unvisited predecessors, which could be eliminated handler
-         blocks and their successors.*)
-      let mapped_old_preds =
-        Label.Set.filter_map
-          (fun op -> Label.Tbl.find_opt old_to_new op)
-          ob.predecessors
-      in
-      let visited_new_preds =
-        Label.Set.filter (Label.Tbl.mem new_to_old) nb.predecessors
-      in
-      if not (Label.Set.equal mapped_old_preds visited_new_preds)
-      then
-        Format.fprintf ppf_m "Predecessor mismatch at old=%a new=%a@."
-          Label.format ol Label.format nl);
+      match Cfg.get_block old_cfg ol, Cfg.get_block new_cfg nl with
+      | None, _ | _, None ->
+        (* Already reported as "Missing block" during the matching walk; don't
+           die here, so that the buffered report still reaches the user. *)
+        ()
+      | Some ob, Some nb ->
+        (* We ignore unvisited predecessors, which could be eliminated handler
+           blocks and their successors.*)
+        let mapped_old_preds =
+          Label.Set.filter_map
+            (fun op -> Label.Tbl.find_opt old_to_new op)
+            ob.predecessors
+        in
+        let visited_new_preds =
+          Label.Set.filter (Label.Tbl.mem new_to_old) nb.predecessors
+        in
+        if not (Label.Set.equal mapped_old_preds visited_new_preds)
+        then
+          Format.fprintf ppf_m "Predecessor mismatch at old=%a new=%a@."
+            Label.format ol Label.format nl);
   new_to_old
 
 (* === Phase 2: register equivalence ===
@@ -613,41 +617,41 @@ let process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs
     process_instruction eqs ~old_instr:old_t ~new_instr:new_t ~old_arg:old_t.arg
       ~new_arg:new_t.arg
   in
-  (* Process body backwards, skipping moves and unreachable trap handlers *)
-  let old_instrs = List.rev (DLL.to_list old_block.body) in
-  let new_instrs = List.rev (DLL.to_list new_block.body) in
-  let rec loop eqs ~old_instrs ~new_instrs =
-    match old_instrs, new_instrs with
-    | [], [] -> eqs
-    | (old_instr : _ Cfg.instruction) :: rest, _ when is_move old_instr ->
+  (* Process body backwards (iterating the cells back to front), skipping moves
+     and unreachable trap handlers *)
+  let rec loop eqs oc nc =
+    match oc, nc with
+    | None, None -> eqs
+    | Some c, _ when is_move (DLL.value c) ->
+      let (old_instr : Cfg.basic Cfg.instruction) = DLL.value c in
       loop
         (Equations.subst_old_move eqs ~src:old_instr.arg.(0)
            ~dst:old_instr.res.(0))
-        ~old_instrs:rest ~new_instrs
-    | _, (new_instr : _ Cfg.instruction) :: rest when is_move new_instr ->
+        (DLL.prev c) nc
+    | _, Some c when is_move (DLL.value c) ->
+      let (new_instr : Cfg.basic Cfg.instruction) = DLL.value c in
       loop
         (Equations.subst_new_move eqs ~src:new_instr.arg.(0)
            ~dst:new_instr.res.(0))
-        ~old_instrs ~new_instrs:rest
-    | old_instr :: rest, _ when is_skippable_trap old_cfg old_instr ->
-      loop eqs ~old_instrs:rest ~new_instrs
-    | _, new_instr :: rest when is_skippable_trap new_cfg new_instr ->
-      loop eqs ~old_instrs ~new_instrs:rest
-    | old_instr :: old_rest, new_instr :: new_rest ->
+        oc (DLL.prev c)
+    | Some c, _ when is_skippable_trap old_cfg (DLL.value c) ->
+      loop eqs (DLL.prev c) nc
+    | _, Some c when is_skippable_trap new_cfg (DLL.value c) ->
+      loop eqs oc (DLL.prev c)
+    | Some old_c, Some new_c ->
+      let old_instr = DLL.value old_c in
+      let new_instr = DLL.value new_c in
       let eqs =
         process_instruction eqs ~old_instr ~new_instr
           ~old_arg:(effective_arg old_instr) ~new_arg:(effective_arg new_instr)
       in
-      loop eqs ~old_instrs:old_rest ~new_instrs:new_rest
-    | _ :: _, [] | [], _ :: _ ->
-      Format.fprintf ppf_m
-        "Body length mismatch at old=%a new=%a: old_remaining=%d \
-         new_remaining=%d@."
-        Label.format ol Label.format nl (List.length old_instrs)
-        (List.length new_instrs);
+      loop eqs (DLL.prev old_c) (DLL.prev new_c)
+    | Some _, None | None, Some _ ->
+      Format.fprintf ppf_m "Body length mismatch at old=%a new=%a@."
+        Label.format ol Label.format nl;
       eqs
   in
-  loop eqs ~old_instrs ~new_instrs
+  loop eqs (DLL.last_cell old_block.body) (DLL.last_cell new_block.body)
 
 let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
   (* block_eqs and worklist are keyed by new labels. new_to_old is used to find
@@ -663,24 +667,28 @@ let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
   while not (Queue.is_empty worklist) do
     let nl = Queue.pop worklist in
     let ol = Label.Tbl.find new_to_old nl in
-    let ob = Cfg.get_block_exn old_cfg ol in
-    let nb = Cfg.get_block_exn new_cfg nl in
-    let eqs = Label.Tbl.find block_eqs nl in
-    let start_eqs =
-      process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs ~old_block:ob
-        ~new_block:nb
-    in
-    Label.Set.iter
-      (fun pred_nl ->
-        match Label.Tbl.find_opt block_eqs pred_nl with
-        | None -> ()
-        | Some prev ->
-          let merged = Equations.union prev start_eqs in
-          if not (Equations.equal prev merged)
-          then (
-            Label.Tbl.replace block_eqs pred_nl merged;
-            Queue.add pred_nl worklist))
-      (Label.Set.filter (Label.Tbl.mem new_to_old) nb.predecessors)
+    match Cfg.get_block old_cfg ol, Cfg.get_block new_cfg nl with
+    | None, _ | _, None ->
+      (* Already reported as "Missing block" during the matching walk; don't die
+         here, so that the buffered report still reaches the user. *)
+      ()
+    | Some ob, Some nb ->
+      let eqs = Label.Tbl.find block_eqs nl in
+      let start_eqs =
+        process_block_backward ~ppf_m ~old_cfg ~new_cfg eqs ~old_block:ob
+          ~new_block:nb
+      in
+      Label.Set.iter
+        (fun pred_nl ->
+          match Label.Tbl.find_opt block_eqs pred_nl with
+          | None -> ()
+          | Some prev ->
+            let merged = Equations.union prev start_eqs in
+            if not (Equations.equal prev merged)
+            then (
+              Label.Tbl.replace block_eqs pred_nl merged;
+              Queue.add pred_nl worklist))
+        (Label.Set.filter (Label.Tbl.mem new_to_old) nb.predecessors)
   done;
   (* Check entry equations are empty *)
   let new_entry = Cfg.entry_label new_cfg in

@@ -336,7 +336,7 @@ module Make_run (R : Reducer) = struct
           (fun (pred : finished Block.t) ->
             match Block.terminator pred with
             | Continue { continuation = Goto _; _ } -> false
-            | Continue { continuation = Return | Raise _; _ }
+            | Continue { continuation = Return | Raise _ | Unreachable; _ }
             | Call _ | Switch _ | Invalid _ ->
               true)
           (Block.predecessors block)
@@ -416,6 +416,7 @@ module Make_run (R : Reducer) = struct
       | Goto b -> Goto (Context.map_block ctx b)
       | Return -> Return
       | Raise k -> Raise k
+      | Unreachable -> Unreachable
     in
     let map_terminator (t : finished Terminator.t) :
         under_construction Terminator.t =
@@ -433,7 +434,10 @@ module Make_run (R : Reducer) = struct
           { continuation = Goto (Context.map_block ctx goto);
             args = mapped_args
           }
-      | Continue { continuation = (Return | Raise _) as continuation; args } ->
+      | Continue
+          { continuation = (Return | Raise _ | Unreachable) as continuation;
+            args
+          } ->
         Continue
           { continuation = map_continuation continuation;
             args = map_values args
@@ -510,7 +514,5 @@ module Make_run (R : Reducer) = struct
           Format.pp_print_flush Format.err_formatter ();
           Printexc.raise_with_backtrace exn bt)
       (Ssa.blocks in_graph);
-    let result = Ssa.finish_graph out_graph in
-    Ssa_invariants.validate result;
-    result
+    Ssa.finish_graph out_graph
 end

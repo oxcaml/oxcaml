@@ -203,6 +203,10 @@ type 'g continuation =
       (** raise the args to the topmost handler in the enclosing block's
           [block_end_trap_stack]; if that stack is empty, the exception escapes
           the function *)
+  | Unreachable
+      (** control never returns. Only allowed on a [Call] to an [External]
+          function that does not return ([Cursor.finish_block] checks this); it
+          can still raise (via [may_raise]). *)
 
 module Terminator : sig
   type 'g t =
@@ -226,7 +230,8 @@ module Terminator : sig
           args : 'g Value.t array;
           continuation : 'g continuation;
               (** [Goto b]: a normal call returning its results as [b]'s block
-                  params. [Return]: a tail call. [Raise] is not allowed
+                  params. [Return]: a tail call. [Unreachable]: an [External]
+                  call that does not return. [Raise] is not allowed
                   ([Cursor.finish_block] checks this). *)
           may_raise : bool;
           nontail : bool

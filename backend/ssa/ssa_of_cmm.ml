@@ -40,19 +40,15 @@ module SU = Select_utils
 module V = Backend_var
 module VP = Backend_var.With_provenance
 module Sel = Cfg_selectgen.Make (Cfg_selection)
+module Or_never_returns = SU.Or_never_returns
+open! Or_never_returns.Syntax
 open Ssa.Export
 
 type block = under_construction Block.t
 
 type value = under_construction Ssa.Value.t
 
-type 'a or_never_returns =
-  | Ok of 'a
-  | Never_returns
-
-let ( let* ) x f = match x with Never_returns -> Never_returns | Ok x -> f x
-
-type result = value array or_never_returns
+type result = value array Or_never_returns.t
 
 type env =
   { vars : value array V.Map.t;
@@ -66,39 +62,10 @@ let env_find v env =
 let env_add v instrs env =
   { env with vars = V.Map.add (VP.var v) instrs env.vars }
 
-let chunk_of_machtype (c : Cmm.machtype_component) : Cmm.memory_chunk =
-  match c with
-  | Float -> Double
-  | Float32 -> Single { reg = Float32 }
-  | Vec128 -> Onetwentyeight_unaligned
-  | Vec256 -> Twofiftysix_unaligned
-  | Vec512 -> Fivetwelve_unaligned
-  | Val | Int | Addr -> Word_val
-  | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-
-let rec size_of_cmm_expr env (e : Cmm.expression) =
-  match e with
-  | Cconst_int _ | Cconst_natint _ -> Arch.size_int
-  | Cconst_symbol _ -> Arch.size_addr
-  | Cconst_float _ -> Arch.size_float
-  | Cconst_float32 _ -> Arch.size_float
-  | Cconst_vec128 _ -> Arch.size_vec128
-  | Cconst_vec256 _ -> Arch.size_vec256
-  | Cconst_vec512 _ -> Arch.size_vec512
-  | Cvar id ->
-    let instrs = V.Map.find id env.vars in
-    Array.fold_left
-      (fun acc i -> acc + SU.size_component (Value.typ i))
-      0 instrs
-  | Ctuple el -> List.fold_left (fun acc e -> acc + size_of_cmm_expr env e) 0 el
-  | Cop (op, _, _) ->
-    let ty = SU.oper_result_type op in
-    Array.fold_left (fun acc c -> acc + SU.size_component c) 0 ty
-  | Clet (_, _, body) | Csequence (_, body) -> size_of_cmm_expr env body
-  | Cifthenelse _ | Cphantom_let _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _
-    ->
-    Misc.fatal_error
-      "Ssa_of_cmm.size_of_cmm_expr: unexpected kind of expression"
+let size_of_cmm_expr env e =
+  SU.size_expr_with e ~size_of_var:(fun id ->
+      env_find id env
+      |> Array.fold_left (fun acc i -> acc + SU.size_component (Value.typ i)) 0)
 
 let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
     : finished Ssa.graph =
@@ -169,51 +136,16 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
     in
     finish_block c ~dbg:Debuginfo.none term
   in
-  let rec emit_parts env c ~effects_after exp =
-    let module EC = SU.Effect_and_coeffect in
-    let may_defer_evaluation =
-      let ec = Sel.effects_of exp in
-      match EC.effect_ ec with
-      | Arbitrary | Raise -> EC.pure_and_copure effects_after
-      | None -> (
-        match EC.coeffect ec with
-        | None -> true
-        | Read_mutable -> (
-          match EC.effect_ effects_after with
-          | None | Raise -> true
-          | Arbitrary -> false)
-        | Arbitrary -> (
-          match EC.effect_ effects_after with
-          | None -> true
-          | Arbitrary | Raise -> false))
-    in
-    if may_defer_evaluation && Sel.is_simple_expr exp
-    then Ok (exp, env)
-    else
-      let* r = emit env c exp ~tail:false in
-      if Array.length r = 0
-      then Ok (Cmm.Ctuple [], env)
-      else
-        let id = V.create_local "bind" in
-        Ok (Cmm.Cvar id, { env with vars = V.Map.add id r env.vars })
-  and emit_parts_list env c exp_list =
-    let module EC = SU.Effect_and_coeffect in
-    let exp_list_right_to_left, _effect =
-      List.fold_left
-        (fun (exp_list, effects_after) exp ->
-          let exp_effect = Sel.effects_of exp in
-          (exp, effects_after) :: exp_list, EC.join exp_effect effects_after)
-        ([], EC.none) exp_list
-    in
-    List.fold_left
-      (fun acc (exp, effects_after) ->
-        let* result, env = acc in
-        let* exp_result, env = emit_parts env c ~effects_after exp in
-        Ok (exp_result :: result, env))
-      (Ok ([], env))
-      exp_list_right_to_left
+  let rec emit_parts_list env c exp_list :
+      (Cmm.expression list * env) Or_never_returns.t =
+    SU.emit_parts_list ~effects_of:Sel.effects_of
+      ~is_simple_expr:Sel.is_simple_expr
+      ~emit:(fun env exp -> emit env c exp ~tail:false)
+      ~bind_result:(fun env id r -> { env with vars = V.Map.add id r env.vars })
+      env exp_list
   and emit_tuple env c exp_list : result =
-    let rec emit_list = function
+    let rec emit_list :
+        Cmm.expression list -> value array list Or_never_returns.t = function
       | [] -> Ok []
       | exp :: rem ->
         let* loc_rem = emit_list rem in
@@ -276,7 +208,7 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
         | None ->
           Array.iter
             (fun (r : value) ->
-              let chunk = chunk_of_machtype (Value.typ r) in
+              let chunk = SU.chunk_of_machtype_component (Value.typ r) in
               emit_op_nores c
                 (Operation.Store (chunk, !addressing_mode, false))
                 dbg [| r; !base |];
@@ -290,7 +222,7 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
     in
     List.iter for_one_arg args
   and emit env c (exp : Cmm.expression) ~tail : result =
-    let r =
+    let* r =
       match exp with
       | Clet (v, e1, e2) ->
         let* r1 = emit env c e1 ~tail:false in
@@ -381,14 +313,12 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
       | Cexit (lbl, args, traps) -> emit_expr_exit env c lbl args traps
       | Cinvalid { message; symbol } -> emit_invalid env c message symbol
     in
-    match r with
-    | Ok _ when tail -> insert_return c r
-    | Ok _ | Never_returns -> r
-  and insert_return c (r : result) : result =
-    let* r = r in
-    finish_block c ~dbg:Debuginfo.none
-      (Continue { continuation = Return; args = r });
-    Never_returns
+    if tail
+    then (
+      finish_block c ~dbg:Debuginfo.none
+        (Continue { continuation = Return; args = r });
+      Never_returns)
+    else Ok r
   and emit_invalid env c message symbol =
     let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
     let* arg_instrs = emit_tuple env c [arg_expr] in
@@ -405,36 +335,44 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
       Never_returns)
   and emit_call _env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
       result =
-    let (op : Ssa.call_op), (ty : Cmm.machtype) =
-      match new_op with
-      | Call { op = Direct sym; _ } -> Direct sym, ty
-      | Call { op = Indirect candidates; _ } -> Indirect candidates, ty
-      | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
-        External ext_call, ty_res
-      | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
-        Probe { name; handler_code_sym; enabled_at_init }, ty
-      | Call_no_return _ ->
-        Misc.fatal_errorf
-          "Ssa_of_cmm: Currently unused codepath, implement when it becomes \
-           reachable"
-      | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
-      | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
-      | Invalid _ ->
-        Misc.fatal_errorf "Ssa_of_cmm: unexpected terminator (%a)"
-          (Cfg.dump_terminator ~sep:"")
-          new_op
+    let may_raise = Cfg.can_raise_terminator new_op in
+    let call_returning_to op (ty : Cmm.machtype) : result =
+      let cont_block = new_block ~params:ty in
+      finish_block c ~dbg
+        (Call
+           { op;
+             args = arg_instrs;
+             continuation = Goto cont_block;
+             may_raise;
+             nontail
+           });
+      Cursor.move c ~new_pos:cont_block;
+      Ok (Block.params cont_block)
     in
-    let cont_block = new_block ~params:ty in
-    finish_block c ~dbg
-      (Call
-         { op;
-           args = arg_instrs;
-           continuation = Goto cont_block;
-           may_raise = Cfg.can_raise_terminator new_op;
-           nontail
-         });
-    Cursor.move c ~new_pos:cont_block;
-    Ok (Block.params cont_block)
+    match new_op with
+    | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
+    | Call { op = Indirect candidates; _ } ->
+      call_returning_to (Indirect candidates) ty
+    | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
+      call_returning_to (External ext_call) ty_res
+    | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
+      call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
+    | Call_no_return ext_call ->
+      finish_block c ~dbg
+        (Call
+           { op = External ext_call;
+             args = arg_instrs;
+             continuation = Unreachable;
+             may_raise;
+             nontail
+           });
+      Never_returns
+    | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
+    | Invalid _ ->
+      Misc.fatal_errorf "Ssa_of_cmm: unexpected terminator (%a)"
+        (Cfg.dump_terminator ~sep:"")
+        new_op
   and emit_expr_op env c op args dbg : result =
     let* simple_args, env = emit_parts_list env c args in
     let ty = SU.oper_result_type op in
@@ -539,15 +477,6 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
             params |> List.map (fun (_id, ty) -> ty) |> Array.concat
           in
           let handler_block = new_block ~params:types in
-          let pos = ref 0 in
-          params
-          |> List.iter (fun (id, ty) ->
-              let n = Array.length ty in
-              let name = V.name (VP.var id) in
-              for i = 0 to n - 1 do
-                Value.set_name (Block.param handler_block (!pos + i)) name
-              done;
-              pos := !pos + n);
           ( Static_label.Map.add nfail handler_block static_exceptions,
             handler_block ))
         env.static_exceptions handlers
@@ -556,34 +485,20 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
     let r_body = emit env c body ~tail in
     let translate_handler (handler : Cmm.static_handler)
         (handler_block : under_construction Block.t) =
-      let handler_env =
-        let param_idx = ref 0 in
+      let c = Cursor.start handler_block in
+      (* Bind each handler param to its slice of the flattened block params;
+         [bind_let] also sets the param names and emits the [Name_for_debugger]
+         markers. *)
+      let handler_env, _ =
         List.fold_left
-          (fun env (id, ty) ->
+          (fun (env, param_idx) (id, ty) ->
             let n = Array.length ty in
             let proj_instrs =
-              Array.init n (fun i -> Block.param handler_block (!param_idx + i))
+              Array.init n (fun i -> Block.param handler_block (param_idx + i))
             in
-            param_idx := !param_idx + n;
-            env_add id proj_instrs env)
-          env handler.params
+            bind_let env c id proj_instrs, param_idx + n)
+          (env, 0) handler.params
       in
-      let c = Cursor.start handler_block in
-      List.iter
-        (fun (id, _ty) ->
-          match VP.provenance id with
-          | None -> ()
-          | Some _ as provenance ->
-            let args = V.Map.find (VP.var id) handler_env.vars in
-            emit_op_nores c
-              (Operation.Name_for_debugger
-                 { ident = VP.var id;
-                   which_parameter = None;
-                   provenance;
-                   regs = [||]
-                 })
-              Debuginfo.none args)
-        handler.params;
       emit handler_env c handler.body ~tail, c
     in
     let handler_results = List.map2 translate_handler handlers handler_blocks in
@@ -622,8 +537,8 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
      returns. *)
   and join c (results : (result * Cursor.t) array) : result =
     let join_info = ref None in
-    Array.iter
-      (fun (r, _) ->
+    results
+    |> Array.iter (fun ((r, _) : result * Cursor.t) ->
         match r with
         | Never_returns -> ()
         | Ok instrs -> (
@@ -636,20 +551,18 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
                block's param types accommodate every incoming arm. *)
             assert (Array.length prev = Array.length types);
             let lub = Array.map2 Cmm.lub_component prev types in
-            join_info := Some lub))
-      results;
+            join_info := Some lub));
     match !join_info with
     | None -> Never_returns
     | Some join_types ->
       let join_block = new_block ~params:join_types in
-      Array.iter
-        (fun (r, c_branch) ->
+      results
+      |> Array.iter (fun ((r, c_branch) : result * Cursor.t) ->
           match r with
           | Never_returns -> ()
           | Ok instrs ->
             finish_block c_branch ~dbg:Debuginfo.none
-              (Continue { continuation = Goto join_block; args = instrs }))
-        results;
+              (Continue { continuation = Goto join_block; args = instrs }));
       Cursor.move c ~new_pos:join_block;
       Ok (Block.params join_block)
   in
@@ -668,9 +581,7 @@ let convert_with_builder (g : under_construction Ssa.graph) (cmm : Cmm.fundecl)
   in
   let r = emit env (Cursor.start (Ssa.entry g)) cmm.fun_body ~tail:true in
   assert (match r with Never_returns -> true | Ok _ -> false);
-  let result = Ssa.finish_graph g in
-  Ssa_invariants.validate result;
-  result
+  Ssa.finish_graph g
 
 let convert (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph =
   try

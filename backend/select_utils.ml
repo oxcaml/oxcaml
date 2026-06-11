@@ -290,7 +290,7 @@ let size_machtype mty =
   done;
   !size
 
-let size_expr env exp =
+let size_expr_with ~size_of_var exp =
   let rec size localenv = function
     | Cconst_int _ | Cconst_natint _ -> Arch.size_int
     | Cconst_symbol _ -> Arch.size_addr
@@ -303,14 +303,7 @@ let size_expr env exp =
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
     | Cvar id -> (
-      try V.Map.find id localenv
-      with Not_found -> (
-        try
-          let regs = env_find id env in
-          size_machtype (Array.map (fun r -> r.Reg.typ) regs)
-        with Not_found ->
-          Misc.fatal_error
-            ("Selection.size_expr: unbound var " ^ V.unique_name id)))
+      try V.Map.find id localenv with Not_found -> size_of_var id)
     | Ctuple el -> List.fold_right (fun e sz -> size localenv e + sz) el 0
     | Cop (op, _, _) -> size_machtype (oper_result_type op)
     | Clet (id, arg, body) ->
@@ -319,6 +312,14 @@ let size_expr env exp =
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
   size V.Map.empty exp
+
+let size_expr env exp =
+  size_expr_with exp ~size_of_var:(fun id ->
+      try
+        let regs = env_find id env in
+        size_machtype (Array.map (fun r -> r.Reg.typ) regs)
+      with Not_found ->
+        Misc.fatal_error ("Selection.size_expr: unbound var " ^ V.unique_name id))
 
 (* Name of function being compiled *)
 let current_function_name = ref ""
@@ -411,6 +412,95 @@ let select_effects (e : Cmm.effects) : Effect.t =
 
 let select_coeffects (e : Cmm.coeffects) : Coeffect.t =
   match e with No_coeffects -> None | Has_coeffects -> Arbitrary
+
+(* [emit_parts] and [emit_parts_list] force right-to-left evaluation order as
+   required by the Flambda [Un_anf] pass (and to be consistent with the bytecode
+   compiler). *)
+
+let may_defer_evaluation ec ~effects_after =
+  let module EC = Effect_and_coeffect in
+  match EC.effect_ ec with
+  | Arbitrary | Raise ->
+    (* Preserve the ordering of effectful expressions by evaluating them early
+       (in the correct order) and assigning their results to temporaries. We can
+       avoid this in just one case: if we know that every [exp'] in the original
+       expression list (cf. [emit_parts_list]) to be evaluated after [exp]
+       cannot possibly affect the result of [exp] or depend on the result of
+       [exp], then [exp] may be deferred. (Checking purity here is not enough:
+       we need to check copurity too to avoid e.g. moving mutable reads earlier
+       than the raising of an exception.) *)
+    EC.pure_and_copure effects_after
+  | None -> (
+    match EC.coeffect ec with
+    | None ->
+      (* Pure expressions may be moved. *)
+      true
+    | Read_mutable -> (
+      (* Read-mutable expressions may only be deferred if evaluation of every
+         [exp'] (for [exp'] as in the comment above) has no effects "worse" (in
+         the sense of the ordering in [t]) than raising an exception. *)
+      match EC.effect_ effects_after with
+      | None | Raise -> true
+      | Arbitrary -> false)
+    | Arbitrary -> (
+      (* Arbitrary expressions may only be deferred if evaluation of every
+         [exp'] (for [exp'] as in the comment above) has no effects. *)
+      match EC.effect_ effects_after with
+      | None -> true
+      | Arbitrary | Raise -> false))
+
+let emit_parts ~effects_of ~is_simple_expr ~emit ~bind_result env ~effects_after
+    exp : _ Or_never_returns.t =
+  let open Or_never_returns.Syntax in
+  (* Even though some expressions may look like they can be deferred from the
+     (co)effect analysis, it may be forbidden to move them. *)
+  if may_defer_evaluation (effects_of exp) ~effects_after && is_simple_expr exp
+  then Ok (exp, env)
+  else
+    let* r = emit env exp in
+    if Array.length r = 0
+    then Or_never_returns.Ok (Cmm.Ctuple [], env)
+    else
+      (* The normal case: introduce a fresh temp to hold the result. *)
+      let id = V.create_local "bind" in
+      Ok (Cmm.Cvar id, bind_result env id r)
+
+let emit_parts_list ~effects_of ~is_simple_expr ~emit ~bind_result env exp_list
+    : _ Or_never_returns.t =
+  let module EC = Effect_and_coeffect in
+  let open Or_never_returns.Syntax in
+  let exp_list_right_to_left, _effect =
+    (* Annotate each expression with the (co)effects that happen after it when
+       the original expression list is evaluated from right to left. The
+       resulting expression list has the rightmost expression first. *)
+    List.fold_left
+      (fun (exp_list, effects_after) exp ->
+        (exp, effects_after) :: exp_list, EC.join (effects_of exp) effects_after)
+      ([], EC.none) exp_list
+  in
+  List.fold_left
+    (fun acc (exp, effects_after) ->
+      let* result, env = acc in
+      let* exp_result, env =
+        emit_parts ~effects_of ~is_simple_expr ~emit ~bind_result env
+          ~effects_after exp
+      in
+      Or_never_returns.Ok (exp_result :: result, env))
+    (Or_never_returns.Ok ([], env))
+    exp_list_right_to_left
+
+let chunk_of_machtype_component (c : Cmm.machtype_component) : Cmm.memory_chunk
+    =
+  match c with
+  | Float -> Double
+  | Float32 -> Single { reg = Float32 }
+  (* SIMD memory operations are unaligned by default. Aligned bigarray
+     operations are handled separately via cmm. *)
+  | Vec128 -> Onetwentyeight_unaligned
+  | Vec256 -> Twofiftysix_unaligned
+  | Vec512 -> Fivetwelve_unaligned
+  | Val | Addr | Int -> Word_val
+  | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :
     Cmm.float_width ->

@@ -51,7 +51,7 @@ open! Int_replace_polymorphic_compare
     records the block. [finish_graph] then fills in metadata and produces the
     final immutable [body] array.
 
-    [finish_graph] performs four passes over the finished blocks, in order:
+    [finish_graph] performs five passes over the finished blocks, in order:
     - [compute_reachability_and_trap_stacks]: forward DFS from [entry] following
       structural and exception successors, threading the trap stack so each
       reachable block gets its [block_end_trap_stack] populated; unreachable
@@ -64,9 +64,12 @@ open! Int_replace_polymorphic_compare
       Push_trap/Pop_trap pairs whose handler is unreachable. When
       [keep_unused_ops] is false, also drops dead [Op]s and replaces
       [Continue (Goto _)] args going to unused target params with [Undefined].
+    - [check_value_invariants]: every use is dominated by its definition, and
+      [Undefined] only feeds unused block params.
 
     Invariants enforced here:
-    - Every reachable block is finished via [finish_block].
+    - Every reachable block is finished via [finish_block] and all edges into a
+      block carry the same trap stack (checked during the reachability DFS).
     - [Block_param] / [Res] output indices are in range by construction. *)
 
 module Block_id = Oxcaml_utils.Id_counter.Make ()
@@ -154,6 +157,7 @@ and 'g continuation =
   | Goto of 'g block
   | Return
   | Raise of Lambda.raise_kind
+  | Unreachable
 
 and 'g terminator =
   | Continue of
@@ -285,7 +289,7 @@ module Block = struct
     Array.map (fun (p : block_param) -> p.typ) b.params
 
   let non_exn_successors_of_continuation (c : 'g continuation) : 'g block list =
-    match c with Goto b -> [b] | Return | Raise _ -> []
+    match c with Goto b -> [b] | Return | Raise _ | Unreachable -> []
 
   (* The terminator is missing the exception successors, which are derived from
      [block_end_trap_stack]. *)
@@ -305,7 +309,8 @@ module Block = struct
       match block.terminator with
       | Continue { continuation = Raise _; _ } -> true
       | Call { may_raise; _ } -> may_raise
-      | Continue { continuation = Goto _ | Return; _ } | Switch _ | Invalid _ ->
+      | Continue { continuation = Goto _ | Return | Unreachable; _ }
+      | Switch _ | Invalid _ ->
         false
     in
     if raises
@@ -345,6 +350,8 @@ module Block = struct
   let terminator (b : finished t) : finished terminator = b.terminator
 
   let terminator_dbg (b : finished t) : Debuginfo.t = b.terminator_dbg
+
+  let is_finished block = block.terminator != pending_terminator
 end
 
 (* Print the [name/vN] reference of an [Op]; shared by [Value.print] (which
@@ -531,6 +538,9 @@ module Terminator = struct
       Format.fprintf ppf "return(%a)" print_args args
     | Continue { continuation = Raise _; args } ->
       Format.fprintf ppf "raise(%a)" print_args args
+    | Continue { continuation = Unreachable; args } ->
+      (* Invalid (rejected by [check_terminator]), but printable. *)
+      Format.fprintf ppf "unreachable(%a)" print_args args
     | Switch { index; targets } ->
       Format.fprintf ppf "switch(%a) [" Value.print index;
       Array.iteri
@@ -543,7 +553,7 @@ module Terminator = struct
       let kind =
         match continuation with
         | Return -> "tailcall"
-        | Goto _ | Raise _ -> "call"
+        | Goto _ | Raise _ | Unreachable -> "call"
       in
       (match op with
       | Direct sym ->
@@ -556,7 +566,8 @@ module Terminator = struct
       (match continuation with
       | Goto b -> Format.fprintf ppf " -> %a" Block.print_id b
       | Return -> ()
-      | Raise _ -> Format.fprintf ppf " -> raise");
+      | Raise _ -> Format.fprintf ppf " -> raise"
+      | Unreachable -> Format.fprintf ppf " -> unreachable");
       if may_raise then Format.fprintf ppf " may_raise";
       if nontail then Format.fprintf ppf " nontail"
     | Invalid { message; args; continuation } -> (
@@ -583,6 +594,9 @@ let check_terminator (term : under_construction terminator) : unit =
   | Continue { continuation = Goto goto; args } ->
     check_args_arity ~term_name:"Continue" ~args ~expected:goto.params
   | Continue { continuation = Return | Raise _; _ } -> ()
+  | Continue { continuation = Unreachable; _ } ->
+    Misc.fatal_error
+      "Ssa.check_terminator: a Continue continuation cannot be Unreachable"
   | Switch { targets; _ } ->
     Array.iter (check_target_has_no_params ~term_name:"Switch") targets
   | Call { continuation = Return; nontail; _ } ->
@@ -593,6 +607,12 @@ let check_terminator (term : under_construction terminator) : unit =
          nontail"
   | Call { continuation = Raise _; _ } ->
     Misc.fatal_error "Ssa.check_terminator: a Call continuation cannot be Raise"
+  | Call { continuation = Unreachable; op = External _; _ } -> ()
+  | Call { continuation = Unreachable; op = Direct _ | Indirect _ | Probe _; _ }
+    ->
+    Misc.fatal_error
+      "Ssa.check_terminator: a Call with continuation Unreachable must be an \
+       external call"
   | Call { continuation = Goto _; _ } | Invalid _ -> ()
 
 module Cursor = struct
@@ -600,7 +620,7 @@ module Cursor = struct
 
   let start (block : under_construction Block.t) : t = { block }
 
-  let is_finished (c : t) = c.block.terminator != pending_terminator
+  let is_finished (c : t) = Block.is_finished c.block
 
   let move (c : t) ~(new_pos : under_construction Block.t) : unit =
     assert (is_finished c);
@@ -657,14 +677,18 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
         |> Array.map (fun typ : block_param ->
             { typ; name = None; usage_count = 0 }))
   in
-  (* Initialize names from the function's argument names, when known. *)
-  List.iteri
-    (fun i (var, _ty) ->
-      if i < Array.length entry.params
-      then
-        entry.params.(i).name
-          <- Some (Backend_var.name (Backend_var.With_provenance.var var)))
-    function_info.parameters;
+  (* Initialize names from the function's argument names; each parameter covers
+     one flattened entry param per machtype component. *)
+  let (_ : int) =
+    List.fold_left
+      (fun pos (var, (ty : Cmm.machtype)) ->
+        let name = Backend_var.name (Backend_var.With_provenance.var var) in
+        for i = 0 to Array.length ty - 1 do
+          entry.params.(pos + i).name <- Some name
+        done;
+        pos + Array.length ty)
+      0 function_info.parameters
+  in
   { function_info;
     keep_unused_ops;
     block_id_gen;
@@ -707,17 +731,42 @@ let compute_block_end_trap_stack ~(block : finished block)
 (* Forward search from [entry]: populates [predecessors] on each reachable
    block, computes [block_end_trap_stack] for each visited block (also needed to
    derive exception successors), and verifies that every reachable block has
-   been finished. *)
+   been finished and that all edges into a block agree on the trap stack at its
+   entry. *)
 let compute_reachability_and_trap_stacks (graph : finished graph) :
     finished block list =
-  let visited = Block.Tbl.create 64 in
+  let print_trap_stack ppf stack =
+    Format.fprintf ppf "[%a]"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+         Block.print_id)
+      stack
+  in
+  let visited : finished block list Block.Tbl.t = Block.Tbl.create 64 in
   let worklist = ref [graph.entry, []] in
   while not (List.is_empty !worklist) do
     let block, start_stack = List.hd !worklist in
     worklist := List.tl !worklist;
-    if not (Block.Tbl.mem visited block)
-    then begin
-      Block.Tbl.add visited block ();
+    match Block.Tbl.find_opt visited block with
+    | Some recorded_start_stack ->
+      (* The trap stack at entry must agree across all incoming edges (the
+         exception edge into a handler already accounts for the runtime popping
+         the handler). *)
+      if not (List.equal Block.equal start_stack recorded_start_stack)
+      then
+        Misc.fatal_errorf
+          "Ssa.compute_reachability_and_trap_stacks (%s): block %a is entered \
+           with mismatching trap stacks %a and %a"
+          graph.function_info.sym_name Block.print_id block print_trap_stack
+          recorded_start_stack print_trap_stack start_stack
+    | None ->
+      if not (Block.is_finished block)
+      then
+        Misc.fatal_errorf
+          "Ssa.compute_reachability_and_trap_stacks (%s): reachable block %a \
+           was never finished"
+          graph.function_info.sym_name Block.print_id block;
+      Block.Tbl.add visited block start_stack;
       let end_stack =
         compute_block_end_trap_stack ~block start_stack block.pending_body
       in
@@ -732,25 +781,10 @@ let compute_reachability_and_trap_stacks (graph : finished graph) :
          off the trap stack. *)
       Block.exn_successor block
       |> Option.iter (fun succ -> add_pred_to succ (List.tl end_stack))
-    end
   done;
-  let reachable_blocks =
-    List.filter
-      (fun block -> Block.Tbl.mem visited block)
-      (List.rev graph.finished_blocks_rev)
-  in
-  let unfinished_blocks =
-    Block.Set.diff
-      (Block.Tbl.to_seq_keys visited |> Block.Set.of_seq)
-      (Block.Set.of_list graph.finished_blocks_rev)
-  in
-  unfinished_blocks
-  |> Block.Set.iter (fun unfinished ->
-      Misc.fatal_errorf
-        "Ssa.compute_reachability_and_trap_stacks: reachable block %a was \
-         never finished"
-        Block.print_id unfinished);
-  reachable_blocks
+  List.filter
+    (fun block -> Block.Tbl.mem visited block)
+    (List.rev graph.finished_blocks_rev)
 
 let compute_dominators (graph : finished graph)
     ~(reachable_blocks : finished block list) : unit =
@@ -817,7 +851,7 @@ let rec increment_use ~keep_unused_ops (value : finished value) =
           match pred.terminator with
           | Continue { continuation = Goto _; args } ->
             increment_use ~keep_unused_ops args.(i)
-          | Continue { continuation = Return | Raise _; _ }
+          | Continue { continuation = Return | Raise _ | Unreachable; _ }
           | Switch _ | Call _ | Invalid _ ->
             (* The arg feeding this param arrives through an edge whose position
                is fixed (call results, exception bucket), so it is counted
@@ -835,7 +869,7 @@ let increment_uses_in_terminator ~keep_unused_ops (term : finished terminator) =
     (* An ordinary [Continue]'s args are counted through block-param use
        propagation; only count them all here when keeping unused ops. *)
     if keep_unused_ops then Array.iter (increment_use ~keep_unused_ops) args
-  | Continue { continuation = Return | Raise _; args } ->
+  | Continue { continuation = Return | Raise _ | Unreachable; args } ->
     Array.iter (increment_use ~keep_unused_ops) args
   | Switch { index; _ } -> increment_use ~keep_unused_ops index
   | Call { args; _ } | Invalid { args; _ } ->
@@ -860,20 +894,25 @@ let increment_uses_in_block ~keep_unused_ops (block : finished block) =
     - filter out [Op]s with [usage_count = 0] (skipped when [keep_unused_ops]);
     - drop [Push_trap]/[Pop_trap] whose handler has no predecessors (i.e. is
       never raised into) — the matching push/pop reference the same handler and
-      are dropped together, preserving trap-stack balance; and, when
-      [keep_unused_ops] is false, replace [Continue (Goto _)] args going to
-      unused target params with [Undefined]. (The entry params are pre-marked as
-      used, so a self-tail call's args are never dropped here.) *)
+      are dropped together, preserving trap-stack balance; the same handlers are
+      filtered out of [block_end_trap_stack] so it stays consistent with the
+      finalized body; and, when [keep_unused_ops] is false, replace
+      [Continue (Goto _)] args going to unused target params with [Undefined].
+      (The entry params are pre-marked as used, so a self-tail call's args are
+      never dropped here.) *)
 let finalize_block ~keep_unused_ops (block : finished block) =
+  let handler_reachable handler = not (List.is_empty handler.predecessors) in
   block.body
     <- block.pending_body
        |> List.filter (fun (instr : finished instruction) : bool ->
            match instr with
            | Op { usage_count; _ } -> keep_unused_ops || usage_count > 0
            | Push_trap { handler } | Pop_trap { handler } ->
-             not (List.is_empty handler.predecessors))
+             handler_reachable handler)
        |> Array.of_list;
   block.pending_body <- [];
+  block.block_end_trap_stack
+    <- List.filter handler_reachable block.block_end_trap_stack;
   if not keep_unused_ops
   then
     match block.terminator with
@@ -887,7 +926,7 @@ let finalize_block ~keep_unused_ops (block : finished block) =
             if goto.params.(i).usage_count = 0 then Undefined else arg)
       in
       block.terminator <- Continue { continuation = Goto goto; args }
-    | Continue { continuation = Return | Raise _; _ }
+    | Continue { continuation = Return | Raise _ | Unreachable; _ }
     | Switch _ | Call _ | Invalid _ ->
       ()
 
@@ -911,6 +950,74 @@ let order_blocks_dominators_first (blocks : finished block list) :
   List.iter visit blocks;
   List.rev !acc
 
+(* Check the SSA invariants that the construction interface cannot enforce and
+   that no other pass checks: every value use must be dominated by its
+   definition, and [Undefined] may only appear as a [Goto] argument feeding an
+   unused block parameter. Requires [ordered_blocks] to list every block after
+   its dominators (so that, walking in order, the definitions dominating a use
+   have already been seen). *)
+let check_value_invariants (graph : finished graph)
+    (ordered_blocks : finished block list) : unit =
+  let fail fmt =
+    Format.kasprintf
+      (fun s ->
+        Misc.fatal_errorf "Ssa.check_value_invariants (%s): %s"
+          graph.function_info.sym_name s)
+      fmt
+  in
+  let defining_block : finished block Instruction_id.Tbl.t =
+    Instruction_id.Tbl.create 64
+  in
+  let check_use (user : finished block) (v : finished value) =
+    match v with
+    | Res (op, _) -> (
+      match Instruction_id.Tbl.find_opt defining_block op.id with
+      | Some def_block ->
+        if not (Block.dominates def_block user)
+        then
+          fail "block %a: use of %a, defined in non-dominating block %a"
+            Block.print_id user Value.print v Block.print_id def_block
+      | None ->
+        fail "block %a: use of undefined value %a" Block.print_id user
+          Value.print v)
+    | Block_param (param_block, _) ->
+      if not (Block.dominates param_block user)
+      then
+        fail "block %a: use of %a of non-dominating block %a" Block.print_id
+          user Value.print v Block.print_id param_block
+    | Undefined ->
+      fail
+        "block %a: Undefined is only allowed as a Goto argument feeding an \
+         unused block parameter"
+        Block.print_id user
+  in
+  ordered_blocks
+  |> List.iter (fun (block : finished block) ->
+      Array.iter
+        (fun (instr : finished instruction) ->
+          match instr with
+          | Op op ->
+            Array.iter (check_use block) op.args;
+            Instruction_id.Tbl.replace defining_block op.id block
+          | Push_trap _ | Pop_trap _ -> ())
+        block.body;
+      match block.terminator with
+      | Continue { continuation = Goto goto; args } ->
+        args
+        |> Array.iteri (fun i (arg : finished value) ->
+            match arg with
+            | Undefined ->
+              if goto.params.(i).usage_count <> 0
+              then
+                fail "block %a: Undefined passed to live parameter %d of %a"
+                  Block.print_id block i Block.print_id goto
+            | Res _ | Block_param _ -> check_use block arg)
+      | Continue { continuation = Return | Raise _ | Unreachable; args }
+      | Call { args; _ }
+      | Invalid { args; _ } ->
+        Array.iter (check_use block) args
+      | Switch { index; _ } -> check_use block index)
+
 let compute_metadata (graph : finished graph) : finished block list =
   let keep_unused_ops = graph.keep_unused_ops in
   let reachable_blocks = compute_reachability_and_trap_stacks graph in
@@ -922,7 +1029,9 @@ let compute_metadata (graph : finished graph) : finished block list =
     graph.entry.params;
   reachable_blocks |> List.iter (increment_uses_in_block ~keep_unused_ops);
   reachable_blocks |> List.iter (finalize_block ~keep_unused_ops);
-  order_blocks_dominators_first reachable_blocks
+  let ordered_blocks = order_blocks_dominators_first reachable_blocks in
+  check_value_invariants graph ordered_blocks;
+  ordered_blocks
 
 let finish_graph (graph : under_construction graph) : finished graph =
   assert (not graph.finished);

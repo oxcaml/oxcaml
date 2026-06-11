@@ -238,7 +238,7 @@ let is_call_predecessor (pred : block) (target : block) =
     Block.equal continuation target
   | Call { continuation = Goto continuation; _ } ->
     Block.equal continuation target
-  | Call { continuation = Return | Raise _; _ }
+  | Call { continuation = Return | Raise _ | Unreachable; _ }
   | Switch _ | Continue _
   | Invalid { continuation = None; _ } ->
     false
@@ -246,7 +246,7 @@ let is_call_predecessor (pred : block) (target : block) =
 (** The incoming ABI for trap handlers is different. Thus, we require ALL
     predecessors to be exception predecessors. We could relax this in the future
     by inserting a merge block to join the non-exception predecessors. *)
-let is_trap_handler (block : block) =
+let block_is_trap_handler (block : block) =
   let any_exn_pred =
     List.exists (fun p -> is_exn_predecessor p block) (Block.predecessors block)
   in
@@ -295,7 +295,8 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         (make_cfg_instr (Cfg.Op (Stackoffset (-stack_ofs))) [||] [||]
            Debuginfo.none)
   end;
-  if is_trap_handler block
+  let is_trap_handler = block_is_trap_handler block in
+  if is_trap_handler
   then begin
     let virt_res = get_block_params_regs env block in
     let exn_bucket = [| Proc.loc_exn_bucket |] in
@@ -428,6 +429,9 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       in
       emit_moves body ~src ~dst;
       make_cfg_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg
+    | Continue { continuation = Unreachable; _ } ->
+      Misc.fatal_error
+        "Cfg_of_ssa: a Continue continuation cannot be Unreachable"
     | Switch { index; targets } ->
       if
         (* A two-target switch is the boolean branch ([targets.(0)] false,
@@ -466,6 +470,21 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         [||] dbg
     | Call { continuation = Raise _; _ } ->
       Misc.fatal_error "Cfg_of_ssa: a call continuation cannot be Raise"
+    | Call { op; args; continuation = Unreachable; _ } -> (
+      let virt_args = Array.map (get_reg env) args in
+      match op with
+      | External ({ ty_args; ty_res; _ } as ext) ->
+        let loc_arg, stack_ofs, stack_align =
+          move_to_extcall_arg_locs body ty_args virt_args dbg
+        in
+        make_cfg_instr
+          (Cfg.Call_no_return { ext with stack_ofs; stack_align })
+          loc_arg
+          (Proc.loc_external_results ty_res)
+          dbg
+      | Direct _ | Indirect _ | Probe _ ->
+        Misc.fatal_error
+          "Cfg_of_ssa: only an external call can have continuation Unreachable")
     | Call { op; args; continuation = Goto continuation; _ } -> (
       let virt_args = Array.map (get_reg env) args in
       let virt_res = get_block_params_regs env continuation in
@@ -507,12 +526,17 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
              })
           loc_arg loc_res dbg
       | Probe { name; handler_code_sym; enabled_at_init } ->
+        (* Probes don't use the regular calling convention: their args stay in
+           virtual registers and there are no results ([Cprobe] has type
+           [typ_void]), so the continuation needs no result moves. *)
+        assert (Array.length virt_res = 0);
+        Block.Tbl.replace env.call_result_locs continuation [||];
         make_cfg_instr
           (Cfg.Prim
              { op = Probe { name; handler_code_sym; enabled_at_init };
                label_after = label_of env continuation
              })
-          virt_args virt_res dbg)
+          virt_args [||] dbg)
     | Invalid { message; args; continuation } ->
       (* Invalid with continuation behaves just like an external call. *)
       let virt_args = Array.map (get_reg env) args in
@@ -541,7 +565,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     stack_offset = Cfg.invalid_stack_offset;
     exn = None;
     can_raise;
-    is_trap_handler = is_trap_handler block;
+    is_trap_handler;
     cold = false
   }
 
@@ -646,7 +670,6 @@ let convert_and_emit_blocks env cfg layout ~fun_arg_locs ~fun_arg_regs :
   List.iter
     (fun (ssa_block : block) ->
       let cfg_block = convert_block env ssa_block in
-      cfg_block.can_raise <- Cfg.can_raise_terminator cfg_block.terminator.desc;
       if Block.equal ssa_block entry
       then
         prologue_poll_instr_id

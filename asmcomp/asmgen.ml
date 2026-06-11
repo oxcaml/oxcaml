@@ -546,7 +546,12 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
-  try Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
+  try
+    (* Before creating the final CFG that will actually go through register
+       allocation, make sure to clear the global list of relocatable registers
+       again.*)
+    Reg.clear_relocatable_regs ();
+    Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
   with exn -> report_pipeline_error exn ssa
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
