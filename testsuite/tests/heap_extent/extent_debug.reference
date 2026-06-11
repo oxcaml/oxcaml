@@ -1,0 +1,6 @@
+live extent verified: ok
+partially-dead extent verified: ok
+survivors intact under debug runtime: ok
+survivors intact under debug runtime: ok
+extent freed under debug runtime: ok
+custom extent finalised and freed under debug runtime: ok
