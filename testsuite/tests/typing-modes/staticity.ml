@@ -467,12 +467,7 @@ let f (x @ static) =
     ()
   done
 [%%expect{|
-Line 3, characters 21-22:
-3 |     let _ @ static = x in
-                         ^
-Error: This value is "dynamic"
-         because it is used in a loop (at lines 2-5, characters 2-6).
-       However, the highlighted expression is expected to be "static".
+val f : 'a -> unit = <fun>
 |}]
 
 let f (x @ dynamic) =
@@ -484,7 +479,5 @@ let f (x @ dynamic) =
 Line 3, characters 21-22:
 3 |     let _ @ static = x in
                          ^
-Error: This value is "dynamic"
-         because it is used in a loop (at lines 2-5, characters 2-6).
-       However, the highlighted expression is expected to be "static".
+Error: This value is "dynamic" but is expected to be "static".
 |}]
