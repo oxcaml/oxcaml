@@ -194,10 +194,18 @@ let rec phantom_var_location_description state
       match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
       | None -> None
       | Some l -> lvalue l)
-  | Lphantom_read_field { var; field } ->
-    (* For now, show field access as unavailable since we cannot dereference
-       values built with implicit pointers. *)
-    None
+  | Lphantom_read_field { var; field } -> (
+    (* Note that if the location of [var] is an implicit pointer (e.g. [var] was
+       bound to a phantom block construction) then this will fail to evaluate in
+       the debugger: implicit pointers cannot be dereferenced during location
+       computations. *)
+    match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
+    | None -> None
+    | Some block ->
+      let field = Targetint.of_int field in
+      if need_rvalue
+      then rvalue (SLDL.Rvalue.read_field ~block ~field)
+      else lvalue (SLDL.Lvalue.read_field ~block ~field))
   | Lphantom_offset_var { var; offset_in_words } -> (
     match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
     | None -> None
@@ -256,7 +264,11 @@ let rec phantom_var_location_description state
               composite_location_description ]
         ()
     in
-    let offset_in_bytes = Targetint.zero in
+    (* The pieces of the composite location description start with the block
+       header, but OCaml values of block type point at the first field (the
+       header lying at a negative offset from such pointers). The offset here
+       compensates accordingly. *)
+    let offset_in_bytes = header_size in
     let die_label = Proto_die.reference proto_die in
     let version =
       match !Dwarf_flags.gdwarf_version with
