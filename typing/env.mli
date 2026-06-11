@@ -286,8 +286,9 @@ type lookup_error =
         container_class_type : string
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
+  | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
+  | Non_value_used_in_object of
+      Mode.Hint.pinpoint_desc * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint

@@ -5120,6 +5120,8 @@ end
 
 let print_pinpoint = Report.print_pinpoint
 
+let print_pinpoint_desc = Report.print_pinpoint_desc
+
 type changes = S.changes
 
 let undo_changes = S.undo_changes
