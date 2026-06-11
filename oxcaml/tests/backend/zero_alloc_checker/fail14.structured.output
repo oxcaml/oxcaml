@@ -1,0 +1,2 @@
+File "fail14.ml", line 6, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Fail14.foo (_CamlU6Fail14F5foo_HIDE_STAMP).
