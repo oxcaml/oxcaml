@@ -122,7 +122,7 @@ module Solver = struct
     | Types.Tvariant _ -> true
     | Types.Tconstr _ -> true
     | Types.Tobject _ -> true
-    | _ -> false
+    | _ -> !Clflags.recursive_types
 
   let is_principal_type (ty : Types.type_expr) : bool =
     (not !Clflags.principal)
