@@ -224,10 +224,9 @@ let rec phantom_var_location_description state
       (* Create a proper OCaml block header with the tag and field count. The
          [DW_OP_stack_value] (arising from [Lvalue_without_address.of_rvalue])
          is required: without it, this constant piece of the composite would
-         denote a memory address rather than the value itself. The field
-         pieces below do not need it, since their [DW_OP_call*]-referenced
-         expressions yield register, implicit or suchlike locations
-         themselves. *)
+         denote a memory address rather than the value itself. The field pieces
+         below do not need it, since their [DW_OP_call*]-referenced expressions
+         yield register, implicit or suchlike locations themselves. *)
       let header_value =
         Cmm_helpers.black_block_header tag (List.length fields)
       in
@@ -266,8 +265,8 @@ let rec phantom_var_location_description state
        then return an implicit pointer to it. [DW_TAG_dwarf_procedure] is the
        tag intended for DIEs that exist only to hold a location for
        [DW_OP_call*] / implicit pointer references; unlike an unnamed
-       [DW_TAG_variable], debuggers will not display such DIEs as variables
-       in their own right. *)
+       [DW_TAG_variable], debuggers will not display such DIEs as variables in
+       their own right. *)
     let proto_die =
       Proto_die.create ~parent ~tag:Dwarf_procedure
         ~attribute_values:
