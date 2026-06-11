@@ -3154,9 +3154,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
       in
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
-      let loc = sbody.pmod_loc in
       let alloc_mode, closed_over_mode =
-        register_allocation loc
+        register_allocation sbody.pmod_loc
       in
       let newenv =
         Env.add_closure_lock
@@ -4277,7 +4276,7 @@ let type_package env m p fl =
       with Ctype.Unify _ ->
         raise (Error(modl.mod_loc, env, Scoping_pack (n,ty))))
     fl';
-  let _, mode = register_allocation (modl.mod_loc) in
+  let _, mode = register_allocation modl.mod_loc in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
