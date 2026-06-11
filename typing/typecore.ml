@@ -2849,13 +2849,8 @@ type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
 (* The sorts of the arguments of [cstr], a constructor of the variant type
-   [containing_type], when the use of constructor [used_cstr_name] requires
-   them to be determined. If [cstr]'s representation was not determined at
-   its declaration (it has an argument of layout [any]), the sorts are
-   computed at [containing_type] when it is an instance of [cstr]'s result
-   type ([cstr] occurs at this instantiation), and at [cstr]'s own result
-   type otherwise (a GADT constructor that cannot, or need not, occur
-   here). *)
+   [containing_type], raising if the use of constructor [used_cstr_name]
+   does not determine them. *)
 let constructor_argument_sorts env (cstr : Types.constructor_description)
       ~containing_type ~why ~loc ~used_cstr_name =
   match cstr.cstr_shape with
@@ -2870,27 +2865,50 @@ let constructor_argument_sorts env (cstr : Types.constructor_description)
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
   | None ->
-      let (ty_args, ty_res, _) =
+      let (ty_args, ty_res, existentials) =
         instance_constructor Keep_existentials_flexible cstr
       in
-      begin match
-        matches ~expand_error_trace:false env containing_type ty_res
-      with
-      | All_good -> unify env ty_res containing_type
-      | Unification_failure _ | Jkind_mismatch _ -> ()
+      let require_sort ~fixed ty =
+        match type_sort ~why ~fixed env ty with
+        | Ok sort -> sort
+        | Error violation ->
+          raise (Error (loc, env,
+            Constructor_representation_indeterminate
+              { cstr_name = used_cstr_name;
+                containing_type;
+                arg_cstr_name = cstr.cstr_name;
+                arg_type = ty;
+                violation }))
+      in
+      (* An existential's layout is determined by no instantiation. *)
+      List.iter
+        (fun (ty, _jkind) ->
+           ignore (require_sort ~fixed:true ty : Jkind.sort))
+        existentials;
+      (* Refine the instance by the use-site instantiation. Like
+         [Ctype.matches], unify and then inspect [containing_type]'s
+         variables, but keep the unification when it left them alone. *)
+      let use_site_vars = free_variables containing_type in
+      let snap = Btype.snapshot () in
+      begin match unify env ty_res containing_type with
+      | exception Unify _ ->
+        (* [cstr] cannot occur at this instantiation. *)
+        Btype.backtrack snap
+      | () ->
+        match List.filter (fun v -> not (is_Tvar v)) use_site_vars with
+        | [] -> ()
+        | refined ->
+          (* The unification made [containing_type] more specific, so
+             [cstr] need not occur here: undo it, but require sorts for the
+             refined variables, on which [cstr]'s representation depends. *)
+          Btype.backtrack snap;
+          List.iter
+            (fun v -> ignore (require_sort ~fixed:false v : Jkind.sort))
+            refined
       end;
       List.map
         (fun (ca : Types.constructor_argument) ->
-           match type_sort ~why ~fixed:false env ca.ca_type with
-           | Ok sort -> sort
-           | Error violation ->
-             raise (Error (loc, env,
-               Constructor_representation_indeterminate
-                 { cstr_name = used_cstr_name;
-                   containing_type;
-                   arg_cstr_name = cstr.cstr_name;
-                   arg_type = ca.ca_type;
-                   violation })))
+           require_sort ~fixed:false ca.ca_type)
         ty_args
 
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
