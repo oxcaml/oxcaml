@@ -693,15 +693,17 @@ let split_complex_binding ~env ~res (binding : complex binding) =
 let rec add_binding_to_env ?extra env res var (Binding binding as b) =
   let env =
     let bindings = Variable.Map.add var b env.bindings in
-    let cmm_var = Backend_var.With_provenance.var binding.cmm_var in
-    let free_vars = Backend_var.Set.singleton cmm_var in
-    let vars = Variable.Map.add var (C.var cmm_var, free_vars) env.vars in
     let vars_extra =
       match extra with
       | None -> env.vars_extra
       | Some info -> Variable.Map.add var info env.vars_extra
     in
-    { env with bindings; vars; vars_extra }
+    (* Note that [env.vars] is not updated here: that happens when (and if) the
+       binding is flushed (see [flush_delayed_lets]). Bindings that are instead
+       substituted out at their use sites are never bound by [Clet]s, so their
+       variables must never appear in [vars] (in particular, phantom lets must
+       not be able to see them; see [find_bound_expression]). *)
+    { env with bindings; vars_extra }
   in
   let env, res = add_to_effect_stages env res var (Binding binding) in
   let env, res = add_to_validity_stages env res var (Binding binding) in
@@ -1005,6 +1007,18 @@ let can_substitute ?consider_inlining_effectful_expressions env var binding =
   | Possible env ->
     can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
       binding
+
+let find_bound_expression env var =
+  let var = resolve_alias env var in
+  match Variable.Map.find var env.bindings with
+  | _binding ->
+    (* A delayed binding would be substituted out at its use site(s); there is
+       no backend variable for a phantom defining expression to reference. *)
+    None
+  | exception Not_found -> (
+    match Variable.Map.find var env.vars with
+    | exception Not_found -> None
+    | cmm_expr, _free_vars -> Some cmm_expr)
 
 let inline_variable ?consider_inlining_effectful_expressions env res var =
   let var = resolve_alias env var in
@@ -1321,11 +1335,25 @@ let flush_delayed_lets ~mode env res =
     then []
     else [Depend_on_control_flow control_flow_dep_variables]
   in
+  let vars =
+    (* The variables of bindings about to be flushed as actual [Clet]s become
+       visible as [Cvar]s for any later uses, in particular from phantom
+       lets. *)
+    Variable.Map.fold
+      (fun var (Binding b) vars ->
+        if Variable.Map.mem var bindings_to_keep
+        then vars
+        else
+          let v = Backend_var.With_provenance.var b.cmm_var in
+          Variable.Map.add var (C.var v, Backend_var.Set.singleton v) vars)
+      env.bindings env.vars
+  in
   let env =
     { env with
       effect_stages = [];
       validity_stages;
       bindings = bindings_to_keep;
+      vars;
       symbol_inits = Backend_var.Map.empty
     }
   in

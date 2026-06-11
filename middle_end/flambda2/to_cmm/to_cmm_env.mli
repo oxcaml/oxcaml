@@ -300,6 +300,15 @@ val add_phantom_let_binding :
   bv_is_parameter:Bound_var.Is_parameter.t ->
   t * Backend_var.With_provenance.t
 
+(** Look up the Cmm expression to which the given variable is bound, if any,
+    without changing any state and without faulting on unbound variables.
+    Returns [None] for variables bound by (not yet flushed) delayed bindings.
+    For use when translating phantom lets, whose defining expressions may
+    legitimately reference variables that were never bound (for example
+    variables whose only uses are phantom, the defining expressions of which
+    are therefore not evaluated). *)
+val find_bound_expression : t -> Variable.t -> Cmm.expression option
+
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
   ?consider_inlining_effectful_expressions:bool ->
