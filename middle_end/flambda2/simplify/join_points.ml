@@ -129,8 +129,8 @@ let add_extra_params_from_join_analysis denv analysis use_envs_with_ids' =
   in
   denv, extra_params_and_args
 
-let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
-    ~previous_extra_params_and_args =
+let join ?cut_after denv params ~is_recursive ~consts_lifted_after_fork
+    ~use_envs_with_ids ~previous_extra_params_and_args =
   let definition_scope = DE.get_continuation_scope denv in
   let extra_lifted_consts_in_use_envs =
     LCS.all_defined_symbols consts_lifted_after_fork
@@ -140,29 +140,22 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
     let typing_env = DE.typing_env denv in
     assert (Scope.equal definition_scope (TE.current_scope typing_env));
     CSE.join ~typing_env_at_fork:typing_env ~cse_at_fork:(DE.cse denv)
-      ~use_info:use_envs_with_ids
+      ~is_recursive ~use_info:use_envs_with_ids
       ~get_typing_env:(fun (use_env, _, _) -> DE.typing_env use_env)
       ~get_rewrite_id:(fun (_, id, _) -> id)
       ~get_cse:(fun (use_env, _, _) -> DE.cse use_env)
       ~params
   in
   let extra_params_and_args =
-    match cse_join_result with
-    | None -> previous_extra_params_and_args
-    | Some cse_join_result ->
-      (* CR gbury: the order of the EPA should not matter here *)
-      EPA.concat ~outer:cse_join_result.extra_params
-        ~inner:previous_extra_params_and_args
+    (* CR gbury: the order of the EPA should not matter here *)
+    EPA.concat ~outer:cse_join_result.extra_params
+      ~inner:previous_extra_params_and_args
   in
   let denv, use_envs_with_ids' =
     introduce_extra_params_for_join denv use_envs_with_ids
       ~extra_params_and_args
   in
-  let extra_allowed_names =
-    match cse_join_result with
-    | None -> NO.empty
-    | Some cse_join_result -> cse_join_result.extra_allowed_names
-  in
+  let extra_allowed_names = cse_join_result.extra_allowed_names in
   let cut_after = Option.value cut_after ~default:definition_scope in
   let handler_env, join_analysis =
     T.cut_and_n_way_join (DE.typing_env denv) use_envs_with_ids'
@@ -172,16 +165,11 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
       ~cut_after ~extra_lifted_consts_in_use_envs ~extra_allowed_names
   in
   let handler_env =
-    match cse_join_result with
-    | None -> handler_env
-    | Some cse_join_result ->
-      TE.add_env_extension handler_env cse_join_result.env_extension
+    TE.add_env_extension handler_env cse_join_result.env_extension
   in
   let denv =
     let denv = DE.with_typing_env denv handler_env in
-    match cse_join_result with
-    | None -> denv
-    | Some cse_join_result -> DE.with_cse denv cse_join_result.cse_at_join_point
+    DE.with_cse denv cse_join_result.cse_at_join_point
   in
   let denv, extra_params_and_args =
     (* If we have a join analysis available (i.e. if we are using the new n-way
@@ -405,7 +393,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
            environments *)
         let denv = DE.define_parameters denv ~extra:false ~params in
         Profile.record_call ~accumulate:true "join" (fun () ->
-            join ?cut_after denv params ~consts_lifted_after_fork
+            join ?cut_after denv params ~is_recursive ~consts_lifted_after_fork
               ~use_envs_with_ids ~previous_extra_params_and_args)
       else
         (* Define parameters with basic equations from the subkinds *)
@@ -419,6 +407,21 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
         denv, None, previous_extra_params_and_args
     in
     let handler_env = DE.with_join_analysis join_analysis handler_env in
+    (* When no real join was performed (i.e. [should_do_join] is [false],
+       meaning join points are disabled and there are multiple uses), the
+       handler environment is taken directly from the fork environment rather
+       than being computed from the use environments. CSE equations on
+       coeffectful primitives present at the fork may have been invalidated on a
+       path to one of the uses (e.g. by a non-inlined call, an effectful
+       primitive or an allocation), so they must be discarded, otherwise stale
+       values could be used. (When a join is performed, [CSE.join] does the
+       corresponding filtering itself, including the more aggressive clearing
+       required for recursive continuations.) *)
+    let handler_env =
+      if not should_do_join
+      then DE.clear_cse_equations_on_coeffectful_primitives handler_env
+      else handler_env
+    in
     let escapes =
       List.exists
         (fun (_, _, (cont_use_kind : Continuation_use_kind.t)) ->

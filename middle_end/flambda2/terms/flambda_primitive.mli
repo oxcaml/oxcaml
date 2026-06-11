@@ -739,6 +739,18 @@ val at_most_generative_effects : t -> bool
     effects. *)
 val only_generative_effects : t -> bool
 
+(** Returns [true] iff the given primitive has coeffects. *)
+val has_coeffects : t -> bool
+
+(** Returns [true] iff evaluation of the given primitive might write to mutable
+    memory that a primitive with coeffects could read: either it has arbitrary
+    effects, or it allocates on the OCaml heap (heap allocation points can run
+    arbitrary code, for example finalizers and signal handlers). Primitives that
+    allocate only on the local allocation stack can never trigger the execution
+    of such code (see [caml_alloc_local] in the runtime) and so, absent other
+    effects, return [false] here. *)
+val invalidates_cse_equations_on_coeffectful_primitives : t -> bool
+
 module Eligible_for_cse : sig
   (** Primitive applications that may be replaced by a variable which is let
       bound to a single instance of such application. Primitives that are

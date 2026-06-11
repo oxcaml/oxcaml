@@ -35,6 +35,11 @@ val map_denv : t -> f:(Downwards_env.t -> Downwards_env.t) -> t
 (** Replace the environment component of the given downwards accumulator. *)
 val with_denv : t -> Downwards_env.t -> t
 
+(** Discard all CSE equations on primitives that have coeffects (see
+    [Downwards_env.clear_cse_equations_on_coeffectful_primitives]). Returns the
+    accumulator unchanged if there are no such equations. *)
+val clear_cse_equations_on_coeffectful_primitives : t -> t
+
 (** Extract the dataflow analysis accumulator *)
 val flow_acc : t -> Flow.Acc.t
 
