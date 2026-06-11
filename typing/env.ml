@@ -1081,7 +1081,7 @@ module Normalize_mode = struct
     | Assert_normalized, true -> modality, mode
     | (Normalize | Normalize_exn), false ->
         Mode.Modality.undefined,
-        Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
+        Mode.Modality.apply_left
           modality mode
     | Assert_normalized, false ->
         Misc.fatal_error "mode is not already normalized but expected otherwise"
@@ -1120,6 +1120,7 @@ let rec address_head = function
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
   val get : unit -> Unit_info.t option
+  val get_cu : unit -> Compilation_unit.t option
   val set : Unit_info.t option -> unit
   val is : string -> bool
   val is_ident : Ident.t -> bool
@@ -1150,6 +1151,9 @@ end
 let set_unit_name = Current_unit_name.set
 let get_unit_name = Current_unit_name.get
 
+let in_current_unit_and_stage ~name ~stage =
+  Current_unit_name.is name && stage = 0
+
 let find_same_module id tbl =
   match IdTbl.find_same_without_locks id tbl with
   | x -> x
@@ -1157,10 +1161,10 @@ let find_same_module id tbl =
     when Ident.is_global id && not (Current_unit_name.is_ident id) ->
       Mod_persistent
 
-let find_name_module ~mark name tbl =
+let find_name_module ~mark ~stage name tbl =
   match IdTbl.find_name_and_locks wrap_module ~mark name tbl with
   | Ok x -> x
-  | Error locks when not (Current_unit_name.is name) ->
+  | Error locks when not (in_current_unit_and_stage ~name ~stage) ->
       let path = Pident(Ident.create_persistent name) in
       path, locks, Mod_persistent
   | _ ->
@@ -1212,7 +1216,7 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit =
+let mode_unit ~staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
   Mode.Value.of_const
     { areality = Global;
@@ -1224,12 +1228,11 @@ let mode_unit =
       yielding = Unyielding;
       statefulness = Stateful;
       visibility = Read_write;
-      staticity = Dynamic;
-      (* CR-soon zqian: persistent modules are always static *)
+      staticity;
     }
     ~hint_monadic:hint ~hint_comonadic:hint
 
-let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
+let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
   let path = Pident id in
   let alerts =
@@ -1247,7 +1250,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let mda_address = Lazy_backtrack.create_forced addr in
   let mda_declaration = md in
-  let mda_mode = Mode.Value.disallow_right mode_unit in
+  let mda_mode = Mode.Value.disallow_right (mode_unit ~staticity) in
   let mda_shape = shape in
   let mda_components =
     let mty = md.md_type in
@@ -1856,18 +1859,32 @@ let add_required_global path env =
   add_required_ident (Path.head path) env
 
 let add_required_global_for_quote path env =
-  let address = find_module_address path env in
-  begin match address_head address with
-  | AHlocal _ -> ()
-  | AHunit cu ->
-    add_required_unit cu;
-    Persistent_env.require_impl_for_quote !persistent_env cu
-  end;
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    Persistent_env.require_intf_for_quote !persistent_env
-      (Compilation_unit.Name.of_head_of_global_name global)
+    let name = Compilation_unit.Name.of_head_of_global_name global in
+    if Current_unit_name.is (Compilation_unit.Name.to_string name)
+    then begin
+      (* The current compilation unit appears in quotes.
+         [find_module_address] would [raise Not_found] in this case. *)
+      match Current_unit_name.get_cu () with
+      | Some cu ->
+        Persistent_env.require_impl_for_quote !persistent_env cu
+      | None ->
+        Misc.fatal_error
+          "the current compilation unit was required for a quote \
+          but is unavailable"
+      end
+    else begin
+      (* Any other compilation unit *)
+      let address = find_module_address path env in
+      match address_head address with
+      | AHlocal _ -> ()
+      | AHunit cu ->
+        add_required_unit cu;
+        Persistent_env.require_impl_for_quote !persistent_env cu
+      end;
+    Persistent_env.require_intf_for_quote !persistent_env name
   end
 
 let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
@@ -2002,7 +2019,12 @@ let find_type_expansion_opt path env =
 let find_jkind_expansion path env =
   let decl = find_jkind path env in
   match decl.jkind_manifest with
-  | None -> raise Not_found
+  | None ->
+      (* CR-someday lmaurer: Raising [Not_found] here makes it impossible to
+         differentiate an abstract kind (normal) from a path missing from the
+         environment (big error). We should instead be returning [None] or
+         [`Kind_is_abstract] or some such. *)
+      raise Not_found
   | Some body -> body
 
 let find_modtype_expansion_lazy path env =
@@ -3226,8 +3248,8 @@ let enter_unbound_module name reason env =
 
 (* Read a signature from a file *)
 let read_signature modname cmi =
-  let mty = read_pers_mod modname cmi in
-  Subst.Lazy.force_signature mty
+  let mty, staticity = read_pers_mod modname cmi in
+  Subst.Lazy.force_signature mty, staticity
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3253,8 +3275,8 @@ let persistent_structures_of_dir dir =
   |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
-let save_signature_with_transform cmi_transform ~alerts sg modname kind
-      cmi_info =
+let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
+      kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
   let sg = Subst.Lazy.of_signature sg
@@ -3262,7 +3284,7 @@ let save_signature_with_transform cmi_transform ~alerts sg modname kind
         (Subst.with_additional_action Prepare_for_saving Subst.identity)
   in
   let cmi =
-    Persistent_env.make_cmi !persistent_env modname kind sg alerts
+    Persistent_env.make_cmi !persistent_env modname kind (sg, staticity) alerts
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
@@ -3599,7 +3621,7 @@ let lookup_global_name_module_no_locks
 
 let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
-    match find_name_module ~mark:use s env.modules with
+    match find_name_module ~mark:use ~stage:env.stage s env.modules with
     | path, locks, data -> begin
         let stage_locks, locks = partition_locks locks in
         check_cross_quotation ~errors ~loc_use:loc ~loc_def:Location.none env
@@ -3629,7 +3651,16 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       let path, a =
         lookup_global_name_module_no_locks load ~errors ~use ~loc name env
       in
-      path, (Mode.Value.(disallow_right mode_unit), locks), a
+      let mode =
+        match load with
+        | Load -> (a : module_data).mda_mode
+        | Don't_load ->
+          (* The cmi is not loaded, so [cmi_staticity] is unknown.
+             Conservatively fall back to [Dynamic]. *)
+          Mode.Value.disallow_right
+            (mode_unit ~staticity:Mode.Staticity.Dynamic)
+      in
+      path, (mode, locks), a
     end
 
 let closure_mode ~loc ~item ~lid
@@ -4317,21 +4348,25 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
   let locks = IdTbl.get_all_locks env.modules in
-  let path, loc_def =
+  let path, loc_def, mode =
     if !Clflags.transparent_modules && not load then
       let path, () =
         lookup_global_name_module_no_locks Don't_load ~errors ~use ~loc name env
       in
-      path, Location.none
+      (* The cmi is not loaded, so [cmi_staticity] is unknown. Conservatively
+         fall back to [Dynamic]. *)
+      path, Location.none,
+        Mode.Value.disallow_right
+          (mode_unit ~staticity:Mode.Staticity.Dynamic)
     else
       let path, (mda : module_data) =
         lookup_global_name_module_no_locks Load ~errors ~use ~loc name env
       in
-      path, mda.mda_declaration.md_loc
+      path, mda.mda_declaration.md_loc, mda.mda_mode
   in
   let stage_locks, locks = partition_locks locks in
   assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
-  path, locks
+  path, (mode, locks)
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
   check_value_name (Longident.last lid) loc;
@@ -4636,7 +4671,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let mode =
             m0
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
-            |> Mode.Modality.Const.apply
+            |> Mode.Modality.Const.apply_right
                 Typemode.let_mutable_modalities
           in
           mutate_value ~use ~loc path vda;
@@ -4664,7 +4699,7 @@ let bound_module name env =
   match IdTbl.find_name_and_locks wrap_module ~mark:false name env.modules with
   | Ok _ -> true
   | Error _ ->
-      if Current_unit_name.is name then false
+      if in_current_unit_and_stage ~name ~stage:env.stage then false
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
@@ -5011,7 +5046,7 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Module type definition using %a"
         (Style.inline_code) "sig..end"
   | Open_qt ->
-      fprintf ppf "Opening modules"
+      fprintf ppf "Opening a non-identifier module expression"
   | Object_field_with_attribute_qt ->
       fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
@@ -5246,14 +5281,30 @@ let report_lookup_error_doc _loc env ppf = function
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
         quoted_longident lid;
+      let has_atomic_field lbls =
+        List.exists
+          (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
+          lbls
+      in
       begin match decl.type_kind with
       | Type_record (_, Record_unboxed, _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: \
              [%@%@unboxed] records don't get unboxed versions.@]"
+      | Type_record (lbls, _, _) when has_atomic_field lbls ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             Records with [%@atomic] fields don't get unboxed versions.@]"
       | Type_record (_, (Record_float | Record_ufloat), _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
+      | Type_record (_, Record_boxed _, _) ->
+          (* A [Record_boxed] only lacks an unboxed version when its shape
+             contains a [Float_boxed] element, which only happens via
+             [@@flatten_floats]. *)
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Records with [%@%@flatten_floats] don't get \
+             unboxed versions.@]";
       | Type_record_unboxed_product _ ->
           fprintf ppf "@.@[@{<hint>Hint@}: It is already an unboxed record.@]";
       | _ -> ()

@@ -218,11 +218,11 @@ module Describe : sig
       This is a [int param_cons] encoded to either a bool ["true" | "false"] or
       an int. *)
 
-  type 'p encode_case = encode_env -> 'p -> param list
+  type 'p encode_case = 'p -> encode_env -> param list
 
   type 'p build_either
 
-  val return_either : (encode_env -> 'p -> param list) -> 'p build_either
+  val return_either : 'p encode_case -> 'p build_either
 
   val ( let| ) :
     'case param_cons * (decode_env -> 'case -> 'p) ->
@@ -230,6 +230,8 @@ module Describe : sig
     'p build_either
 
   val ( let|= ) : 'p build_either -> ('p param_cons -> 'a) -> 'a
+
+  val flag_case : string -> 'p -> unit param_cons * (decode_env -> unit -> 'p)
 
   val param2_case :
     decode:(decode_env -> 'c1 -> 'c2 -> 'p) ->
@@ -262,6 +264,13 @@ module Describe : sig
     'c5 param_cons ->
     ('c1 * 'c2 * 'c3 * 'c4 * 'c5) param_cons
     * (decode_env -> 'c1 * 'c2 * 'c3 * 'c4 * 'c5 -> 'p)
+
+  (** Syntactic sugar for "toplevel" [let|=] *)
+  val patterns : 'p build_either -> 'p param_cons
+
+  (** Allow recursive [param_cons]. Needed to define recursive pattern matching.
+  *)
+  val recursive_patterns : ('p param_cons -> 'p build_either) -> 'p param_cons
 
   (** {2 Parameter payload descriptors}
 

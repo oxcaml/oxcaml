@@ -8,3 +8,8 @@ module A = M
 
 type t1 = M.Foo(M).t
 type t2 = A.Foo(A).t
+
+(* Also test that we don't need the .cmi for a type to be present to know a
+   constructor argument is representable *)
+
+type v = A of A.a | Z

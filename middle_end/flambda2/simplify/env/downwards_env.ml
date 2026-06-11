@@ -24,8 +24,6 @@ module TE = Flambda2_types.Typing_env
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
 
-type get_imported_names = unit -> Name.Set.t
-
 type get_imported_code = unit -> Exported_code.t
 
 module Disable_inlining_reason = struct
@@ -217,11 +215,10 @@ let define_extra_variable t var kind =
   (define_variable0 [@inlined hint]) ~extra:true t var kind
 
 let create ~round ~machine_width ~(resolver : resolver)
-    ~(get_imported_names : get_imported_names)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
     ~toplevel_my_region ~toplevel_my_ghost_region =
-  let typing_env = TE.create ~machine_width ~resolver ~get_imported_names in
+  let typing_env = TE.create ~machine_width ~resolver in
   let t =
     { round;
       machine_width;
@@ -244,7 +241,7 @@ let create ~round ~machine_width ~(resolver : resolver)
         Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.can_specialize;
+      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
       cost_of_lifting_continuations_out_of_current_one = 0;
@@ -360,7 +357,7 @@ let enter_set_of_closures
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
-    specialization_cost = Specialization_cost.can_specialize;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     join_analysis = None;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
@@ -717,7 +714,7 @@ let enter_continuation_handler lifted_params t =
        we reset the `has_seen_a_non_liftable_continuation` when we enter a new
        continuation handler *)
     has_seen_a_non_liftable_continuation = false;
-    specialization_cost = Specialization_cost.can_specialize
+    specialization_cost = Specialization_cost.can_specialize ()
   }
 
 let variables_defined_in_current_continuation t =

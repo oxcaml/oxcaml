@@ -72,7 +72,7 @@ module Sort = struct
   and var =
     { mutable contents : t option;
       mutable level : int;  (** See comments on [level_generic] *)
-      uid : int (* For debugging / printing only *)
+      id : int
     }
 
   let is_rigidvar var =
@@ -167,7 +167,7 @@ module Sort = struct
       | Base b1, Base b2 -> equal_base b1 b2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar v1, Genvar v2 -> v1.id = v2.id
       | (Base _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let format ppf c =
@@ -245,7 +245,7 @@ module Sort = struct
               cs
           | Univar { name = Some n } -> Format.fprintf ppf "Univar '%s" n
           | Univar { name = None } -> Format.fprintf ppf "Univar '_"
-          | Genvar v -> Format.fprintf ppf "Genvar %d" v.uid
+          | Genvar v -> Format.fprintf ppf "Genvar %d" v.id
         in
         pp_element ~nested:false ppf c
     end
@@ -301,29 +301,80 @@ module Sort = struct
     let for_type_extension = scannable
 
     let for_class = scannable
+
+    (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
+       once at module initialization and shared by [some] /
+       [some_of_base] to avoid allocating a fresh [Some] block per
+       call. Not exposed: callers go through [some]. *)
+    let some_scannable = Some scannable
+
+    let some_void = Some void
+
+    let some_untagged_immediate = Some untagged_immediate
+
+    let some_float64 = Some float64
+
+    let some_float32 = Some float32
+
+    let some_word = Some word
+
+    let some_bits8 = Some bits8
+
+    let some_bits16 = Some bits16
+
+    let some_bits32 = Some bits32
+
+    let some_bits64 = Some bits64
+
+    let some_vec128 = Some vec128
+
+    let some_vec256 = Some vec256
+
+    let some_vec512 = Some vec512
+
+    let[@inline] some_of_base = function
+      | Scannable -> some_scannable
+      | Void -> some_void
+      | Untagged_immediate -> some_untagged_immediate
+      | Float64 -> some_float64
+      | Float32 -> some_float32
+      | Word -> some_word
+      | Bits8 -> some_bits8
+      | Bits16 -> some_bits16
+      | Bits32 -> some_bits32
+      | Bits64 -> some_bits64
+      | Vec128 -> some_vec128
+      | Vec256 -> some_vec256
+      | Vec512 -> some_vec512
+
+    let[@inline] some : t -> t option = function
+      | Base b -> some_of_base b
+      | (Product _ | Univar _ | Genvar _) as t -> Some t
   end
 
   module Var = struct
     type id = int
 
-    let get_id { uid; _ } = uid
+    let get_id { id; _ } = id
 
-    (* Map var uids to smaller numbers for more consistent printing. *)
+    let is_cmi_var { id; _ } = id < 0
+
+    (* Map var ids to smaller numbers for more consistent printing. *)
     let next_id = ref 1
 
     let names : (int, int) Hashtbl.t = Hashtbl.create 16
 
-    let get_print_number uid =
-      match Hashtbl.find_opt names uid with
+    let get_print_number id =
+      match Hashtbl.find_opt names id with
       | Some n -> n
       | None ->
-        let id = !next_id in
+        let counter = !next_id in
         incr next_id;
-        Hashtbl.add names uid id;
-        id
+        Hashtbl.add names id counter;
+        counter
 
-    let name { uid; _ } =
-      "'_representable_layout_" ^ Int.to_string (get_print_number uid)
+    let name { id; _ } =
+      "'_representable_layout_" ^ Int.to_string (get_print_number id)
   end
 
   (*** debug printing **)
@@ -362,7 +413,7 @@ module Sort = struct
       | None -> fprintf ppf "None"
 
     and var ppf v =
-      fprintf ppf "{@[@ contents = %a;@ uid = %d@ @]}" opt_t v.contents v.uid
+      fprintf ppf "{@[@ contents = %a;@ id = %d@ @]}" opt_t v.contents v.id
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
@@ -574,11 +625,15 @@ module Sort = struct
 
   let of_var v = Var v
 
-  let last_var_uid = ref 0
+  let last_var_id = ref 0
+
+  let last_var_cmi_id = ref 0
+
+  let reset_cmi_sort_id () = last_var_cmi_id := 0
 
   let new_var_unsafe ~level =
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level }
+    incr last_var_id;
+    { contents = None; level; id = !last_var_id }
 
   let new_var ~level =
     (* Guard against accidentally creating a genvar or rigidvar via this path:
@@ -592,6 +647,12 @@ module Sort = struct
 
   let new_genvar () = new_var_unsafe ~level:level_generic
 
+  let new_genvar_for_cmi () =
+    decr last_var_cmi_id;
+    { contents = None; level = level_generic; id = !last_var_cmi_id }
+
+  let new_rigidvar () = new_var_unsafe ~level:level_rigid
+
   let instance_map : (var * var) list ref = ref []
 
   let instance_with ~level vars f =
@@ -599,6 +660,8 @@ module Sort = struct
       List.map
         (fun v ->
           assert (is_genvar v);
+          (* ensure the variable is not a CMI serialised variable *)
+          assert (v.id > 0);
           let v' = new_var_unsafe ~level in
           v, v')
         vars
@@ -617,8 +680,13 @@ module Sort = struct
       begin match List.assq_opt v !instance_map with
       | Some v' -> Var v'
       | None ->
-        Misc.fatal_error
-          "generic layout variables found in non-layout instantiation"
+        (* If the caller didn't set up layout instantiation, conservatively
+           return a rigid variable (which is not equal to anything) *)
+        (* CR-someday zqian: explicitly distinguish among three cases:
+        - instantiating layouts properly
+        - knowingly instantiating to rigidvar conservatively
+        - unknown context, in which case we should crash *)
+        Var (new_rigidvar ())
       end
     | None -> Var v
     | Some t -> instance t
@@ -725,6 +793,10 @@ module Sort = struct
   and var_default_to_scannable_and_get r : Const.t =
     match r.contents with
     | None when is_genvar r -> Genvar r
+    | None when is_rigidvar r ->
+      Misc.fatal_error
+        "Jkind_types.var_default_to_scannable_and_get: cannot default rigid \
+         variables"
     | None ->
       set r Static.T_option.scannable;
       Static.Const.scannable
@@ -733,6 +805,12 @@ module Sort = struct
       set_to_compress r (Static.T_option.of_const result);
       (* path compression *)
       result
+
+  (* Like [default_to_scannable_and_get], but returns a [Some] wrapping. Reuses
+     pre-allocated [Some] boxes when the result is one of the known base
+     constants, to avoid an allocation per call site. *)
+  let default_to_scannable_and_get_some s =
+    Const.some (default_to_scannable_and_get s)
 
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
@@ -810,7 +888,7 @@ module Sort = struct
     | Univar uv2 -> equate_var_univar v1 uv2
 
   and equate_var_var v1 v2 =
-    if v1 == v2
+    if v1.id = v2.id (* equal id means physical equality *)
     then Equal_no_mutation
     else
       match v1.contents, v2.contents with
@@ -922,6 +1000,12 @@ module Scannable_axes = struct
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2
+
+  let less_or_equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Misc.Le_result.combine
+      (Nullability.less_or_equal n1 n2)
+      (Separability.less_or_equal s1 s2)
 end
 
 module Layout = struct
@@ -950,12 +1034,12 @@ module Layout = struct
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar v1, Genvar v2 -> v1.id = v2.id
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
-      | Base (b, _) -> Some (Base b)
+      | Base (b, _) -> Sort.Const.some (Base b)
       | Product ts ->
         Option.map
           (fun x -> Sort.Const.Product x)

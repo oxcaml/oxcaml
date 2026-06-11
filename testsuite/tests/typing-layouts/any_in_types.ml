@@ -1,5 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    native;
  }{
@@ -111,3 +112,48 @@ let f' () =
   let _ = f () 10 in
   f () (unbox 10.)
 ;;
+
+(* These should type check *)
+module rec Rec_unboxed_tuple_1 : sig
+  type t = #(int * Rec_unboxed_tuple_2.t)
+end = Rec_unboxed_tuple_1
+and Rec_unboxed_tuple_2 : sig
+  type t : value & (value & (value & any)) (* can be arbitrarily deep *)
+end = struct
+  type t = #(int * Rec_unboxed_tuple_1.t)
+end
+
+module rec Rec_unboxed_record_1 : sig
+  type t = #{ i : int; r : Rec_unboxed_record_2.t }
+end = Rec_unboxed_record_1
+and Rec_unboxed_record_2 : sig
+  type t : value & (value & (value & any)) (* can be arbitrarily deep *)
+end = struct
+  type t = #{ i : int; r : Rec_unboxed_record_1.t }
+end
+
+type ('a : any) t = { a : 'a }
+
+(* Refining block with any to all-float64 record *)
+let () =
+  let t : float# t = { a = #1.0 } in
+  let f = t.a in
+  Printf.printf "Refining to float64 ==\n";
+  Printf.printf "%f\n"
+    (Stdlib_upstream_compatible.Float_u.to_float f)
+
+(* Refining block with any to float record *)
+let () =
+  Printf.printf "Refining to float ==\n";
+  let x : float t = { a = 1.0 } in
+  let y = x.a +. 1.0 in
+  Printf.printf "%f\n" y
+
+(* Refining block with any to float-float64 record *)
+type ('a : any) mixed = { f : float; a : 'a }
+let () =
+  Printf.printf "Refining to mixed ==\n";
+  let x : float# mixed = { f = 1.; a = #10.0 } in
+  Printf.printf "%f\n" x.f;
+  Printf.printf "%f\n"
+    (Stdlib_upstream_compatible.Float_u.to_float x.a)

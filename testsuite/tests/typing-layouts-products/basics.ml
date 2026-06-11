@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -243,22 +244,20 @@ type t6_wrong_inner_record = #{ i : int; i64 : int64 }
 and ('a : value & bits64) t6_wrong = 'a t7_wrong
 and 'a t7_wrong = { x : t6_wrong_inner_record t6_wrong }
 [%%expect{|
-Line 2, characters 37-48:
-2 | and ('a : value & bits64) t6_wrong = 'a t7_wrong
-                                         ^^^^^^^^^^^
-Error: Layout mismatch in final type declaration consistency check.
-       This is most often caused by the fact that type inference is not
-       clever enough to propagate layouts through variables in different
-       declarations. It is also not clever enough to produce a good error
-       message, so we'll say this instead:
-         The layout of 'a is value
-           because it instantiates an unannotated type parameter of t7_wrong,
-           chosen to have layout value.
-         But the layout of 'a must overlap with value & bits64
-           because of the annotation on 'a in the declaration of the type
-                                        t6_wrong.
-       A good next step is to add a layout annotation on a parameter to
-       the declaration where this error is reported.
+Line 1, characters 0-54:
+1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of t6_wrong_inner_record is
+           value non_pointer & value non_float
+         because it is an unboxed record.
+       But the layout of t6_wrong_inner_record must be a sublayout of
+           value & bits64
+         because of the annotation on 'a in the declaration of the type
+                                      t6_wrong.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Just like t6/t7, but with the annotation on the other (the order doesn't
@@ -932,24 +931,13 @@ module F :
     sig type r = X.t4 t_constraint end
 |}]
 
-(* This typechecks for unboxed tuples, but fail for [@@unboxed], unboxed, and
-   boxed records, in the same way as below.
-
-   CR layouts v7.2: These should typecheck for all record forms.
-*)
 module type S_coherence_deep = sig
   type t1 : any
   type t2 = #{ i : int; t1 : t1 }
 end
 [%%expect{|
-Line 3, characters 24-31:
-3 |   type t2 = #{ i : int; t1 : t1 }
-                            ^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = #{ i : int; t1 : t1; } end
 |}]
 
 module type S_coherence_deep = sig
@@ -957,14 +945,8 @@ module type S_coherence_deep = sig
   type t2 = { t1 : t1 } [@@unboxed]
 end
 [%%expect{|
-Line 3, characters 14-21:
-3 |   type t2 = { t1 : t1 } [@@unboxed]
-                  ^^^^^^^
-Error: [@@unboxed] record element types must have a representable layout.
-       The layout of t1/2 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1/2 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = { t1 : t1; } [@@unboxed] end
 |}]
 
 (*************************************************)
@@ -2073,9 +2055,7 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           value mod forkable unyielding many stateless immutable
-           & value mod forkable unyielding many stateless immutable
+       The kind of string t is immutable_data & immutable_data
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2086,8 +2066,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           value mod everything mod dynamic with string u
-           & value mod everything mod dynamic with string u
+           value mod everything non_float mod dynamic with string u
+           & value mod everything non_float mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2149,9 +2129,7 @@ Line 1, characters 19-27:
 1 | type should_fail = string t needs_any_mod_global
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           value mod forkable unyielding many stateless immutable
-           & value mod forkable unyielding many stateless immutable
+       The kind of string t is immutable_data & immutable_data
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2160,9 +2138,7 @@ Line 1, characters 19-27:
 1 | type should_fail = string t needs_any_mod_global
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           value mod everything mod dynamic with string u
-           & value mod everything mod dynamic with string u
+       The kind of string t is immutable_data & immutable_data
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.

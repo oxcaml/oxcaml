@@ -40,6 +40,12 @@ val index_magic_number: string
 val max_tag: int
         (* Biggest tag that can be stored in the header of a regular block. *)
 
+type name_mangling_scheme =
+  | Flat
+  | Structured
+
+val name_mangling_scheme : name_mangling_scheme
+
 val flat_float_array: bool
 
 val reserved_header_bits : int

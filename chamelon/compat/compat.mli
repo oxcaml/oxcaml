@@ -77,6 +77,14 @@ type texp_tuple_identifier
 
 type texp_construct_identifier
 
+type texp_construct_arg_identifier
+
+type texp_record_identifier
+
+type texp_record_field_identifier
+
+type texp_record_extended_expression_identifier
+
 type texp_function_identifier
 
 type texp_sequence_identifier
@@ -98,7 +106,19 @@ val mkTexp_tuple :
 
 val mkTexp_construct :
   ?id:texp_construct_identifier ->
-  Longident.t Location.loc * constructor_description * expression list ->
+  Longident.t Location.loc
+  * constructor_description
+  * (texp_construct_arg_identifier * expression) list ->
+  expression_desc
+
+val mkTexp_record :
+  id:texp_record_identifier ->
+  (Types.label_description
+  * texp_record_field_identifier
+  * record_label_definition)
+  array
+  * (expression * texp_record_extended_expression_identifier * Unique_barrier.t)
+    option ->
   expression_desc
 
 val mkTexp_function :
@@ -131,8 +151,21 @@ type matched_expression_desc =
   | Texp_construct of
       Longident.t Location.loc
       * constructor_description
-      * expression list
+      * (texp_construct_arg_identifier * expression) list
       * texp_construct_identifier
+  | Texp_record of
+      { fields :
+          (Types.label_description
+          * texp_record_field_identifier
+          * record_label_definition)
+          array;
+        extended_expression :
+          (expression
+          * texp_record_extended_expression_identifier
+          * Unique_barrier.t)
+          option;
+        id : texp_record_identifier
+      }
   | Texp_tuple of expression list * texp_tuple_identifier
   | Texp_function of texp_function * texp_function_identifier
   | Texp_sequence of expression * expression * texp_sequence_identifier
@@ -159,6 +192,16 @@ type tpat_array_identifier
 
 type tpat_tuple_identifier
 
+type tpat_construct_identifier
+
+type tpat_record_identifier
+
+type tpat_record_unboxed_product_identifier
+
+type tpat_construct_type_arg
+
+type value_binding_identifier
+
 val mkTpat_var :
   ?id:tpat_var_identifier -> Ident.t * string Location.loc -> value pattern_desc
 
@@ -172,6 +215,30 @@ val mkTpat_array :
 
 val mkTpat_tuple :
   ?id:tpat_tuple_identifier -> value general_pattern list -> value pattern_desc
+
+val mkTpat_construct :
+  ?id:tpat_construct_identifier ->
+  Longident.t Location.loc
+  * Types.constructor_description
+  * (value_binding_identifier * value general_pattern) list
+  * (tpat_construct_type_arg list * core_type) option ->
+  value pattern_desc
+
+val mkTpat_record :
+  ?id:tpat_record_identifier ->
+  (Longident.t Location.loc * Types.label_description * value general_pattern)
+  list
+  * Asttypes.closed_flag ->
+  value pattern_desc
+
+val mkTpat_record_unboxed_product :
+  ?id:tpat_record_unboxed_product_identifier ->
+  (Longident.t Location.loc
+  * Types.unboxed_label_description
+  * value general_pattern)
+  list
+  * Asttypes.closed_flag ->
+  value pattern_desc
 
 type 'a matched_pattern_desc =
   | Tpat_var :
@@ -188,6 +255,31 @@ type 'a matched_pattern_desc =
       -> value matched_pattern_desc
   | Tpat_tuple :
       value general_pattern list * tpat_tuple_identifier
+      -> value matched_pattern_desc
+  | Tpat_construct :
+      Longident.t Location.loc
+      * Types.constructor_description
+      * (value_binding_identifier * value general_pattern) list
+      * (tpat_construct_type_arg list * core_type) option
+      * tpat_construct_identifier
+      -> value matched_pattern_desc
+  | Tpat_record :
+      (Longident.t Location.loc
+      * Types.label_description
+      * value general_pattern)
+      list
+      * Asttypes.closed_flag
+      * tpat_record_identifier
+      -> value matched_pattern_desc
+  (* CR-soon lmaurer: Consolidate this into [Tpat_record] _absolutely
+     everywhere_ *)
+  | Tpat_record_unboxed_product :
+      (Longident.t Location.loc
+      * Types.unboxed_label_description
+      * value general_pattern)
+      list
+      * Asttypes.closed_flag
+      * tpat_record_unboxed_product_identifier
       -> value matched_pattern_desc
   | O : 'a pattern_desc -> 'a matched_pattern_desc
 
@@ -216,8 +308,6 @@ val fold_arg_or_omitted :
 val option_of_arg_or_omitted : apply_arg -> (expression * arg_identifier) option
 
 val mk_constructor_description : string -> constructor_description
-
-type value_binding_identifier
 
 val value_binding_identifier_from_texp_match_identifier :
   texp_match_identifier -> value_binding_identifier

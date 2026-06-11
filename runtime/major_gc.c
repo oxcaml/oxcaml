@@ -995,6 +995,29 @@ static void shrink_mark_stack (void)
 
 void caml_darken_cont(value cont);
 
+/* Mark a single block's header. Lifted from the various marking
+ * functions to ensure the lazy logic is consistently correct.
+ * Return the final header value (whose colour and tag may have
+ * changed). */
+
+Caml_inline header_t mark_header(value block, header_t hd, status marked)
+{
+  header_t marked_hd;
+again:
+  marked_hd = With_status_hd(hd, marked);
+  if (Tag_hd(hd) == Lazy_tag && Tag_hd(hd) == Forcing_tag) {
+    /* To detect and mitigate a race against some other domain
+     * short-circuiting alazy block, we compare-and-swap */
+    if (!atomic_compare_exchange_strong(Hp_atomic_val(block), &hd, marked_hd)) {
+      hd = Hd_val(block);
+      goto again;
+    }
+  } else {
+    atomic_store_relaxed(Hp_atomic_val(block), marked_hd);
+  }
+  return marked_hd;
+}
+
 static void mark_slice_darken(struct mark_stack* stk, value child,
                               intnat* work)
 {
@@ -1021,18 +1044,7 @@ static void mark_slice_darken(struct mark_stack* stk, value child,
         caml_darken_cont(child);
         *work -= Wosize_hd(chd);
       } else {
-    again:
-        if (Tag_hd(chd) == Lazy_tag || Tag_hd(chd) == Forcing_tag){
-          if(!atomic_compare_exchange_strong(Hp_atomic_val(child), &chd,
-                With_status_hd(chd, caml_global_heap_state.MARKED))){
-                  chd = Hd_val(child);
-                  goto again;
-          }
-        } else {
-          atomic_store_relaxed(
-            Hp_atomic_val(child),
-            With_status_hd(chd, caml_global_heap_state.MARKED));
-        }
+        chd = mark_header(child, chd, caml_global_heap_state.MARKED);
         if(Scannable_hd(chd)) {
           *work -= mark_stack_push_block(stk, child);
         } else {
@@ -1097,20 +1109,7 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
         budget -= Whsize_hd(hd);
         continue;
       }
-
-again:
-      if (Tag_hd(hd) == Lazy_tag || Tag_hd(hd) == Forcing_tag) {
-        if (!atomic_compare_exchange_strong(Hp_atomic_val(block), &hd,
-              With_status_hd(hd, heap_state.MARKED))) {
-          hd = Hd_val(block);
-          goto again;
-        }
-      } else {
-        atomic_store_relaxed(
-            Hp_atomic_val(block),
-            With_status_hd(hd, heap_state.MARKED));
-      }
-
+      hd = mark_header(block, hd, heap_state.MARKED);
       budget--; /* header word */
       if (!Scannable_hd(hd)) {
         /* Nothing to scan here */
@@ -1303,9 +1302,7 @@ void caml_darken(void* state, value v, volatile value* ignored) {
     if (Tag_hd(hd) == Cont_tag) {
       caml_darken_cont(v);
     } else {
-      atomic_store_relaxed(
-         Hp_atomic_val(v),
-         With_status_hd(hd, caml_global_heap_state.MARKED));
+      hd = mark_header(v, hd, caml_global_heap_state.MARKED);
       if (Scannable_hd(hd)) {
         mark_stack_push_block(domain_state->mark_stack, v);
         Caml_state->mark_work_done_between_slices += 1; /* just the header */
@@ -1554,6 +1551,40 @@ static bool should_compact_from_stw_single(int compaction_mode)
     CAML_GC_MESSAGE (POLICY,
                      "Heap is only %"ARCH_INTNAT_PRINTF_FORMAT"u words: "
                      "compaction off.\n", heap_words);
+    return false;
+  }
+
+  if (s.global_stats.chunks == 1) {
+    /* If the heap is a single chunk, compaction (at present) will not
+       return any memory to the OS, so is not worth doing.
+
+       This is a stop-gap to prevent the bad case of repeatedly
+       compacting on every major GC after a heap has shrunk to a small
+       fraction of its previous size (such that it fits in a fraction
+       of the largest chunk). Becuase compaction at present always
+       compacts preferentially into the largest chunk, and only ever
+       frees whole chunks, if the heap is much smaller than the
+       largest chunk then (without this stop-gap) the overhead
+       calculation below will always trigger a compaction.
+
+       This means we might miss out on other benefits of compaction
+       (e.g. TLB improvement).
+
+       TODO: choose a better fix. Possibilities include:
+
+       - In compaction, take an early bath (after phase one?) if we
+         won't be able to return any memory to the OS.
+
+       - During compaction, choose an order for chunks so that the
+         live pools fit fairly neatly into a prefix of the chunk list.
+
+       - At the end of compaction, shrinking the partially-full chunk
+         to be a better fit for the pools it contains (with some
+         number of free pools as slack). Have to rewrite the chunk
+         size in each pool.
+     */
+    CAML_GC_MESSAGE (POLICY,
+                     "Heap is a single chunk. Compaction off.\n");
     return false;
   }
 

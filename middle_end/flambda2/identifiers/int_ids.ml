@@ -954,18 +954,9 @@ module Code_id_or_symbol = struct
   module Map = Tree.Map
   module Lmap = Lmap.Make (T)
 
-  let set_of_code_id_set code_ids =
-    (* CR-someday lmaurer: This is just an expensive identity. Should add
-       something to [Patricia_tree] to let us translate. *)
-    Code_id.Set.fold
-      (fun code_id free_code_ids ->
-        Set.add (create_code_id code_id) free_code_ids)
-      code_ids Set.empty
+  let set_of_code_id_set (code_ids : Code_id.Set.t) : Set.t = code_ids
 
-  let set_of_symbol_set symbols =
-    Symbol.Set.fold
-      (fun sym free_syms -> Set.add (create_symbol sym) free_syms)
-      symbols Set.empty
+  let set_of_symbol_set (symbols : Symbol.Set.t) : Set.t = symbols
 end
 
 module Code_id_or_name = struct

@@ -1395,8 +1395,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         { nullable = Non_nullable;
           raw_kind = Pvariant { consts = []; non_consts = [(0, shape)] }
         }
-      when Array.for_all (function | Lambda.Value _ -> true | _ -> false) shape
-      ->
+      when Array.for_all (function Lambda.Value _ -> true | _ -> false) shape ->
       Some
         (Fields_of_block_with_tag_zero
            (Array.to_list shape

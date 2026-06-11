@@ -60,7 +60,8 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
   let new_cmis =
     Compilation_unit.Name.Map.map
       (fun (cmi : Cmi_format.cmi_infos) : Cmi_format.cmi_infos_lazy ->
-        { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
+        let sign, staticity = cmi.cmi_sign in
+        { cmi with cmi_sign = Subst.Lazy.of_signature sign, staticity })
       bundled_cmis
   in
   let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =

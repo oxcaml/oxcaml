@@ -1,11 +1,7 @@
 (* TEST
  include stdlib_upstream_compatible;
- {
-   expect;
- }{
-   flags = "-extension layouts_beta";
-   expect;
- }
+ flags = "-extension layouts_beta";
+ expect;
 *)
 
 type t_value : value
@@ -621,7 +617,7 @@ type ('a : void) void4 = Void4 of 'a
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
-type ('a : value_or_null) any4 = Any4 of 'a
+type ('a : any) any4 = Any4 of 'a
 |}];;
 
 (************************************************************)

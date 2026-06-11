@@ -114,13 +114,15 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation () =
-  let m, _ =
-    Value.(newvar_below (of_const
+let register_allocation () : Alloc.lr * Value.lr =
+  let upper_bound =
+    Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
-      { Const.max with areality = Global }))
+      { Alloc.Const.max with areality = Global }
   in
-  value_to_alloc_r2g m, m
+  let alloc_mode, _ = Alloc.newvar_below upper_bound in
+  let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
+  alloc_mode, closed_over_mode
 
 open Typedtree
 
@@ -143,7 +145,7 @@ let apply_is_contained_by ~loc_md item ?modalities mode =
     { containing = Structure (item, Modality);
       container = (loc_md, Structure) }
   in
-  Ctype.apply_is_contained_by is_contained_by ?modalities mode
+  Ctype.apply_right_is_contained_by is_contained_by ?modalities mode
 
 (** Given a value whose location in the source code is described by [pp] and at
 [mode], infer the modalities on the value when it's placed as an [item] in a
@@ -190,11 +192,7 @@ let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
     { containing = Structure (item, Modality);
       container = (loc, Structure)}
   in
-  let hint =
-    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
-      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
-  in
-  let mode = Modality.apply ~hint modalities mode in
+  let mode = Modality.apply_left ~is_contained_by modalities mode in
   infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
@@ -3154,9 +3152,13 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
       in
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
-      let alloc_mode, mode = register_allocation () in
+      let alloc_mode, closed_over_mode =
+        register_allocation ()
+      in
       let newenv =
-        Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
+        Env.add_closure_lock
+          (smod.pmod_loc, Functor)
+          closed_over_mode.comonadic env
       in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
@@ -3209,7 +3211,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
        | _ -> ());
       { mod_desc = Tmod_functor(t_arg, body);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
-        mod_mode = Value.disallow_right mode, None;
+        mod_mode = Value.disallow_right closed_over_mode, None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
@@ -3286,11 +3288,10 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   | Pmod_instance glob ->
       Language_extension.assert_enabled ~loc:smod.pmod_loc Instances ();
       let glob = instance_name ~loc:smod.pmod_loc env glob in
-      let path, locks =
+      let path, mode_with_locks =
         Env.lookup_module_instance_path ~load:(not alias) ~loc:smod.pmod_loc
           glob env
       in
-      let mode_with_locks = (Value.disallow_right Env.mode_unit, locks) in
       let lid =
         (* Only used by [untypeast] *)
         let name =
@@ -4341,7 +4342,17 @@ let cms_register_toplevel_struct_attributes ~sourcefile ~uid ast =
         | { pstr_desc = Pstr_attribute attr; _ }  -> Some attr
         | _ -> None)
 
-let check_argument_type_if_given env sourcefile actual_sig arg_module_opt =
+let staticity_of_modalities (modalities : Typedtree.modalities) =
+  if List.exists (fun { Location.txt = atom; _ } ->
+    match atom with
+    | Mode.Modality.Atom (Monadic Staticity, _) -> true
+    | _ -> false)
+    modalities.moda_desc
+  then Staticity.Static
+  else Staticity.Dynamic
+
+let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
+      arg_module_opt =
   match arg_module_opt with
   | None -> None
   | Some arg_param ->
@@ -4365,13 +4376,18 @@ let check_argument_type_if_given env sourcefile actual_sig arg_module_opt =
         Unit_info.Artifact.from_filename ~for_pack_prefix arg_filename
       in
       let arg_module = Global_module.Name.of_parameter_name arg_param in
-      let arg_sig = Env.read_signature arg_module arg_cmi in
+      let arg_sig, arg_staticity = Env.read_signature arg_module arg_cmi in
       if not (Env.is_parameter_unit arg_module) then
         raise (Error (Location.none, env,
                       Argument_for_non_parameter (arg_module, arg_filename)));
+      let modes =
+        Includecore.Specific
+          ((Env.mode_unit ~staticity:actual_staticity, None),
+           Env.mode_unit ~staticity:arg_staticity)
+      in
       let coercion =
-        Includemod.compunit_as_argument env sourcefile actual_sig
-          arg_filename arg_sig
+        Includemod.compunit_as_argument
+          env sourcefile ~modes actual_sig arg_filename arg_sig
       in
       Some { ai_signature = arg_sig;
              ai_coercion_from_primary = coercion;
@@ -4407,7 +4423,7 @@ let type_implementation target modulename initial_env ast =
         Profile.record_call "infer" (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
-        mode Env.mode_unit;
+        mode (Env.mode_unit ~staticity:Staticity.Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4473,7 +4489,9 @@ let type_implementation target modulename initial_env ast =
           let global_name =
             Compilation_unit.to_global_name_without_prefix modulename
           in
-          let dclsig = Env.read_signature global_name compiled_intf_file in
+          let dclsig, staticity =
+            Env.read_signature global_name compiled_intf_file
+          in
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi = Env.implemented_parameter global_name in
@@ -4484,8 +4502,11 @@ let type_implementation target modulename initial_env ast =
                        old_arg_type = arg_type_from_cmi });
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true
-                sourcefile sg compiled_intf_file_name dclsig shape)
+              Includemod.compunit
+                initial_env ~mark:true sourcefile
+                ~modes:(Includecore.Specific
+                  ((mode, None), Env.mode_unit ~staticity))
+                sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
              the visible type of the module and that's what needs to conform to
@@ -4497,7 +4518,8 @@ let type_implementation target modulename initial_env ast =
              coercion in the .cmi if we can sort out the dependency issues
              ([Tcoerce_primitive] is a pain in particular). *)
           let argument_interface =
-            check_argument_type_if_given initial_env source_intf dclsig arg_type
+            check_argument_type_if_given initial_env source_intf
+              ~actual_staticity:staticity dclsig arg_type
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
@@ -4520,9 +4542,15 @@ let type_implementation target modulename initial_env ast =
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
           let coercion, shape =
+            (* No [.mli], so the inferred signature has no file-level [@@]
+               and is at [Dynamic] on both sides. *)
+            let modes =
+              let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+              Includecore.Specific ((mode, None), mode)
+            in
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true
-                sourcefile sg "(inferred signature)" simple_sg shape)
+              Includemod.compunit initial_env ~mark:true sourcefile ~modes
+                sg "(inferred signature)" simple_sg shape)
           in
           check_nongen_signature finalenv simple_sg;
           let zap_modality =
@@ -4537,7 +4565,8 @@ let type_implementation target modulename initial_env ast =
           in
           normalize_signature simple_sg;
           let argument_interface =
-            check_argument_type_if_given initial_env sourcefile simple_sg arg_type
+            check_argument_type_if_given initial_env sourcefile
+              ~actual_staticity:Staticity.Dynamic simple_sg arg_type
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
@@ -4555,8 +4584,8 @@ let type_implementation target modulename initial_env ast =
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature ~alerts simple_sg name kind
-                  (Unit_info.cmi target))
+                Env.save_signature ~alerts (simple_sg, Staticity.Dynamic)
+                  name kind (Unit_info.cmi target))
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
@@ -4615,7 +4644,9 @@ let type_interface ~sourcefile modulename env ast =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
   in
-  ignore (check_argument_type_if_given env sourcefile sg.sig_type arg_type
+  let actual_staticity = staticity_of_modalities sg.sig_modalities in
+  ignore (check_argument_type_if_given env sourcefile ~actual_staticity
+            sg.sig_type arg_type
           : Typedtree.argument_interface option);
   sg
 
@@ -4665,7 +4696,7 @@ let package_units initial_env objfiles target_cmi modulename =
          let global_name =
            Compilation_unit.to_global_name_without_prefix modname
          in
-         let sg =
+         let sg, _ =
            Env.read_signature global_name (Unit_info.companion_cmi artifact)
          in
          if Unit_info.is_cmi artifact &&
@@ -4696,10 +4727,19 @@ let package_units initial_env objfiles target_cmi modulename =
                   Interface_not_compiled mli))
     end;
     let name = Compilation_unit.to_global_name_without_prefix modulename in
-    let dclsig = Env.read_signature name target_cmi in
+    let dclsig, staticity = Env.read_signature name target_cmi in
+    (* [-pack] is a corner case feature that doesn't support staticity, so the
+       packed [.mli] should not carry a file-level [@@ static]/[@@ dynamic]. *)
+    Staticity.submode_err (Location.in_file mli, Module)
+      (Staticity.of_const staticity)
+      (Staticity.of_const Staticity.Dynamic);
     let cc, _shape =
+      let modes =
+        let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+        Includecore.Specific ((mode, None), mode)
+      in
       Includemod.compunit initial_env ~mark:true
-        "(obtained by packing)" sg mli dclsig shape
+        "(obtained by packing)" ~modes sg mli dclsig shape
     in
     let decl_deps =
       (* This is cleared after saving the cmt so we have to save is before *)
@@ -4728,9 +4768,13 @@ let package_units initial_env objfiles target_cmi modulename =
       let kind = Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for } in
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
-          sg name kind target_cmi (Array.of_list imports)
+          (sg, Staticity.Dynamic) name kind target_cmi
+          (Array.of_list imports)
       in
-      let sign = Subst.Lazy.force_signature cmi.Cmi_format.cmi_sign in
+      let sign =
+        let cmi_sign, _ = cmi.Cmi_format.cmi_sign in
+        Subst.Lazy.force_signature cmi_sign
+      in
       let decl_deps =
         (* This is cleared after saving the cmt so we have to save is before *)
         Cmt_format.get_declaration_dependencies ()

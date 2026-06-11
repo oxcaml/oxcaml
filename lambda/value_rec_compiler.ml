@@ -239,6 +239,12 @@ let compute_static_size lam =
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
+        | Record_dummy _ ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected dummy representation"
+        | Record_variable ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (_, _, shape, _) ->
         (* Note that flat float arrays/records use Pmakearray, so we don't need
@@ -285,6 +291,8 @@ let compute_static_size lam =
     | Pfloatfield _
     | Pwith_stack
     | Pwith_stack_bind
+    | Pwith_stack_preemptible
+    | Pwith_stack_bind_preemptible
     | Pperform
     | Presume
     | Preperform

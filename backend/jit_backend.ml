@@ -64,7 +64,7 @@ let register callback =
             (fun map (name, instrs) ->
               let name_str = X86_proc.Section_name.to_string name in
               let section =
-                { X86_binary_emitter.sec_name = name_str;
+                { X86_binary_emitter.sec_name = name;
                   sec_instrs = DLL.to_array instrs
                 }
               in

@@ -654,9 +654,9 @@ end = struct
   let machine_width { source_env; _ } = TE.machine_width source_env
 
   let exists_in_source_env { source_env } var =
-    if TE.variable_definitely_not_in_scope source_env var
-    then None
-    else Some (Variable_in_source_env.create var)
+    if TE.mem source_env (Name.var var)
+    then Some (Variable_in_source_env.create var)
+    else None
 
   let exists_at_name_mode ~min_name_mode { source_env } var =
     if TE.mem ~min_name_mode source_env (Name.var var)
@@ -821,10 +821,16 @@ module Bindings_in_target_env : sig
   val alias_types_in_target_env :
     t -> Type_in_target_env.t Name_in_source_env.Map.t
 
-  (* Assuming that [since] derives from [t], returns the definitions of local
+  (* Assuming that [t] derives from [since], returns the definitions of local
      variables that have been added to [t] after [since]. *)
   val new_bindings :
     t -> since:t -> definition_in_joined_envs Name_in_target_env.Map.t
+
+  (* Assuming that [t] derives from [since], extract the created variables from
+     [t], adding them to [since]. Any information about the created variables
+     besides their kind (in particular, their [definition_in_joined_env]) is
+     forgotten, and they won't appear in the [new_bindings]. *)
+  val forget_definition_of_created_variables : t -> since:t -> t
 
   val fold_created_variables :
     (Variable_in_target_env.t -> K.t -> 'a -> 'a) -> t -> 'a -> 'a
@@ -944,6 +950,11 @@ end = struct
     Name_in_target_env.Map.diff_shared
       (fun _ new_definition _old_definition -> Some new_definition)
       t.definitions_in_joined_envs since.definitions_in_joined_envs
+
+  let forget_definition_of_created_variables t ~since =
+    (* We still need to record the fact that we created those variables in order
+       to add them to the target environment at the end of the join. *)
+    { since with created_variables = t.created_variables }
 
   let source_env { source_env; _ } = source_env
 
@@ -1283,15 +1294,15 @@ end = struct
     Index.Map.filter_map
       (fun _index (env, _) ->
         if
-          TE.variable_definitely_not_in_scope env
-            (var : Variable_in_one_joined_env.t :> Variable.t)
-        then None
-        else
+          TE.mem env
+            (Name.var (var : Variable_in_one_joined_env.t :> Variable.t))
+        then
           let canonical =
             get_canonical_simple_ignoring_name_mode env
               (Simple_in_one_joined_env.var var)
           in
-          Some (Type_in_one_joined_env.alias_type_of kind canonical))
+          Some (Type_in_one_joined_env.alias_type_of kind canonical)
+        else None)
       (envs_and_equations t)
 
   let expand_heads t types =
@@ -1601,8 +1612,8 @@ let cut_for_join typing_env ~cut_after =
   in
   incremental_equations, symbol_projections
 
-let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
-    joined_envs equations_to_join symbol_projections_to_join =
+let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+    source_env joined_envs equations_to_join symbol_projections_to_join =
   try
     let empty_bindings =
       Bindings_in_target_env.from_source_env
@@ -1666,7 +1677,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
         bindings source_env
     in
     let target_env =
-      ME.add_env_extension ~meet_type target_env
+      ME.add_env_extension ~meet_expanded_head target_env
         (TEE.from_map
            (equations
              : Type_in_target_env.t Name_in_target_env.Map.t
@@ -1851,8 +1862,8 @@ module Analysis = struct
       t.canonical_definitions_at_normal_mode init
 end
 
-let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
-    joined_envs =
+let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
+    source_env joined_envs =
   let joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index typing_env
@@ -1867,13 +1878,13 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
       (Index.Map.empty, Index.Map.empty, Index.Map.empty)
   in
   let target_env, _ =
-    cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
-      joined_envs equations_to_join symbol_projections_to_join
+    cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+      source_env joined_envs equations_to_join symbol_projections_to_join
   in
   target_env
 
-let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_type ~cut_after
-    source_env joined_envs =
+let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
+    ~cut_after source_env joined_envs =
   let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index (external_id, typing_env)
@@ -1893,8 +1904,8 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_type ~cut_after
   in
   let source_env = ME.create source_env in
   let target_env, bindings =
-    cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
-      joined_envs equations_to_join symbol_projections_to_join
+    cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+      source_env joined_envs equations_to_join symbol_projections_to_join
   in
   let target_env = ME.typing_env target_env in
   let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
@@ -1931,7 +1942,7 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * t =
 
 (** {2:extensions Join of extensions} *)
 
-let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
+let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
   let joined_envs_and_extensions =
     List.fold_left
       (fun joined_envs_and_extensions (index, extension) ->
@@ -1947,7 +1958,7 @@ let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
         match
-          ME.add_env_extension_strict ~meet_type (ME.create typing_env)
+          ME.add_env_extension_strict ~meet_expanded_head (ME.create typing_env)
             extension
         with
         | Bottom ->
@@ -1957,19 +1968,25 @@ let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
           joined_envs_and_extensions
         | Ok env ->
           let level = ME.cut env ~cut_after in
-          let extension = TEL.as_extension_without_bindings level in
           Index.Map.add index
-            (ME.typing_env env, extension)
+            (ME.typing_env env, level)
             joined_envs_and_extensions)
       Index.Map.empty extensions
   in
   Index.Map.mapi
-    (fun index (env, diff_ext) ->
+    (fun index (env, diff_level) ->
       let previous_equations =
         Joined_envs.equations_in_nth_joined_env joined_envs index
       in
       let diff_equations =
-        Type_in_one_joined_env.create_equations (TEE.to_map diff_ext)
+        (* Note that we forget the potential newly created variables here, but
+           they could end up in the [Bindings_in_target_env] and cause issue if
+           they are ever used in the parent environment.
+
+           This is fine, however, because we drop any possible information about
+           these variables by calling [forget_definition_of_created_variables]
+           in [n_way_join_env_extension]. *)
+        Type_in_one_joined_env.create_equations (TEL.equations diff_level)
       in
       (* The call below to [replay_definition_of_aliases_in_target_env] is only
          relevant when doing a nested join (join of env extensions); for a
@@ -2131,11 +2148,11 @@ let join_aliases_in_env_extension ~joined_envs ~bindings equations_to_join =
         in
         equations_in_target_env, equations_to_join, bindings)
 
-let n_way_join_env_extension ~n_way_join_type ~meet_type t extensions :
+let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
     _ Or_bottom.t =
   let joined_equations =
     try
-      prepare_nested_join ~meet_type ~bindings:t.bindings
+      prepare_nested_join ~meet_expanded_head ~bindings:t.bindings
         ~joined_envs:t.joined_envs extensions
     with Misc.Fatal_error ->
       let bt = Printexc.get_raw_backtrace () in
@@ -2159,9 +2176,26 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t extensions :
          join of env extensions, we might need additional rounds for
          completeness (see comment in [n_way_join_simples]) -- in practice one
          round should be plenty. *)
-      let equations, { bindings; _ } =
+      let equations, { bindings = bindings_after_extension; _ } =
         n_way_join_round ~n_way_join_type { joined_envs; bindings }
           concrete_types_to_join alias_types_in_target_env
+      in
+      (* It is possible for the call to [add_env_extension] in
+         [prepare_nested_join] above to create new variables, which do not exist
+         in the parent environments. These variables must not leak into the
+         [bindings]: since they don't exist in the parent joined environments,
+         we won't be able to find a type for them in the target environment
+         outside of the extension.
+
+         For now, we avoid this problem by simply forgetting about the
+         definition of new variables (in the target env) during the join of
+         extensions. This means that in some cases we might create the same
+         variable twice (e.g. we might create a variable to represent {0, 1}
+         inside an env extension and then another one outside of the env
+         extension), but not incorrect, only slighly inefficient. *)
+      let bindings =
+        Bindings_in_target_env.forget_definition_of_created_variables
+          bindings_after_extension ~since:t.bindings
       in
       Ok
         ( TEE.from_map

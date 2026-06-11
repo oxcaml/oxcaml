@@ -335,6 +335,8 @@ let record_rep ppf r = match r with
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
+  | Record_dummy _ -> fprintf ppf "dummy"
+  | Record_variable -> fprintf ppf "variable"
 
 let elide_uniform print_block_shape ppf shape =
   if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) shape then ()
@@ -497,6 +499,8 @@ let primitive ppf = function
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
   | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
+  | Pwith_stack_preemptible -> fprintf ppf "with_stack_preemptible"
+  | Pwith_stack_bind_preemptible -> fprintf ppf "with_stack_bind_preemptible"
   | Pperform -> fprintf ppf "perform"
   | Presume -> fprintf ppf "resume"
   | Preperform -> fprintf ppf "reperform"
@@ -1039,6 +1043,8 @@ let name_of_primitive = function
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"
   | Pwith_stack_bind -> "Pwith_stack_bind"
+  | Pwith_stack_preemptible -> "Pwith_stack_preemptible"
+  | Pwith_stack_bind_preemptible -> "Pwith_stack_bind_preemptible"
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"

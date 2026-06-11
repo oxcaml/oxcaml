@@ -310,8 +310,8 @@ let fold_type_expr f init ty =
       let result = f init ty1 in
       f result ty2
   | Tnil                -> init
-  | Tlink _
-  | Tsubst _            -> assert false
+  | Tlink _             -> assert false
+  | Tsubst (ty, _)      -> f init ty
   | Tunivar _           -> init
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
@@ -1312,6 +1312,14 @@ module Jkind0 = struct
           name = "any mod everything"
         }
 
+      let scannable =
+        { jkind =
+            mk_jkind (Base (Scannable, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max;
+          name = "scannable"
+        }
+
       let value_or_null =
         { jkind =
             mk_jkind
@@ -1322,6 +1330,28 @@ module Jkind0 = struct
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "value_or_null"
+        }
+
+      let value_maybe_null =
+        { jkind =
+            mk_jkind
+              (Base
+                (Scannable,
+                  { nullability = Maybe_null; separability = Separable }))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max;
+          name = "value_maybe_null"
+        }
+
+      let value_maybe_separable =
+        { jkind =
+            mk_jkind
+              (Base
+                (Scannable,
+                  { nullability = Non_null; separability = Maybe_separable }))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max;
+          name = "value_maybe_separable"
         }
 
       let value_or_null_mod_everything =
@@ -1344,25 +1374,47 @@ module Jkind0 = struct
           name = "value"
         }
 
-      let immutable_data =
+      let value_mod_everything =
+        { jkind =
+            mk_jkind (Base (Scannable, Scannable_axes.value_axes))
+              ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min;
+          name = "value mod everything"
+        }
+
+      let immutable_data_mod_bounds =
         let open Mod_bounds in
+        let crossing =
+          Crossing.create ~regionality:false ~linearity:true ~portability:true
+            ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
+            ~statefulness:true ~visibility:true ~staticity:false
+        in
+        create crossing ~externality:Externality.max
+
+      let immutable_data =
         { jkind =
             { base =
                 Layout
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds =
-                (let crossing =
-                   Crossing.create ~regionality:false ~linearity:true
-                     ~portability:true ~forkable:true ~yielding:true
-                     ~uniqueness:false ~contention:true ~statefulness:true
-                     ~visibility:true ~staticity:false
-                 in
-                 create crossing ~externality:Externality.max);
+              mod_bounds = immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "immutable_data"
+        }
+
+      let immutable_data_or_null =
+        { jkind =
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Maybe_null; separability = Non_float }));
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name = "immutable_data_or_null"
         }
 
       let exn =
@@ -1386,46 +1438,74 @@ module Jkind0 = struct
           name = "exn"
         }
 
-      let sync_data =
+      let sync_data_mod_bounds =
         let open Mod_bounds in
+        let crossing =
+          Crossing.create ~regionality:false ~linearity:true ~portability:true
+            ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
+            ~statefulness:true ~visibility:false ~staticity:false
+        in
+        create crossing ~externality:Externality.max
+
+      let sync_data =
         { jkind =
             { base =
                 Layout
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds =
-                (let crossing =
-                   Crossing.create ~regionality:false ~linearity:true
-                     ~portability:true ~forkable:true ~yielding:true
-                     ~uniqueness:false ~contention:true ~statefulness:true
-                     ~visibility:false ~staticity:false
-                 in
-                 create crossing ~externality:Externality.max);
+              mod_bounds = sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "sync_data"
         }
 
-      let mutable_data =
+      let sync_data_or_null =
+        { jkind =
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Maybe_null; separability = Non_float }));
+              mod_bounds = sync_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name = "sync_data_or_null"
+        }
+
+      let mutable_data_mod_bounds =
         let open Mod_bounds in
+        let crossing =
+          Crossing.create ~regionality:false ~linearity:true ~portability:true
+            ~forkable:true ~yielding:true ~contention:false ~uniqueness:false
+            ~statefulness:true ~visibility:false ~staticity:false
+        in
+        create crossing ~externality:Externality.max
+
+      let mutable_data =
         { jkind =
             { base =
                 Layout
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds =
-                (let crossing =
-                   Crossing.create ~regionality:false ~linearity:true
-                     ~portability:true ~forkable:true ~yielding:true
-                     ~contention:false ~uniqueness:false ~statefulness:true
-                     ~visibility:false ~staticity:false
-                 in
-                 create crossing ~externality:Externality.max);
+              mod_bounds = mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "mutable_data"
+        }
+
+      let mutable_data_or_null =
+        { jkind =
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Maybe_null; separability = Non_float }));
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name = "mutable_data_or_null"
         }
 
       let void =
@@ -1713,11 +1793,18 @@ module Jkind0 = struct
 
       let builtins =
         [ any;
+          (* Order matters: value_maybe_null comes before value_or_null because
+             we prefer to print the latter. *)
+          value_maybe_null;
+          value_maybe_separable;
           value_or_null;
           value;
           immutable_data;
+          immutable_data_or_null;
           sync_data;
+          sync_data_or_null;
           mutable_data;
+          mutable_data_or_null;
           void;
           immediate;
           immediate_or_null;
@@ -1737,6 +1824,7 @@ module Jkind0 = struct
 
       let additional_common_jkinds =
         [ any_mod_everything;
+          value_mod_everything;
           value_or_null_mod_everything;
           void_mod_everything;
           kind_of_untagged_int;
@@ -1789,6 +1877,8 @@ module Jkind0 = struct
 
     module Builtin = struct
       let any = max
+
+      let scannable = of_const Const.Builtin.scannable.jkind
 
       let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
@@ -1963,6 +2053,10 @@ module Jkind0 = struct
           ~why:(Void_creation why)
         |> mark_best
 
+      let scannable ~why =
+        fresh_jkind Jkind_desc.Builtin.scannable
+          ~annotation:(mk_annot "scannable") ~why:(Scannable_creation why)
+
       let value_or_null ~why =
         match (why : Jkind_intf.History.value_or_null_creation_reason) with
         | V1_safety_check -> value_v1_safety_check |> allow_left |> allow_right
@@ -2006,14 +2100,11 @@ module Jkind0 = struct
            through the product, by one step, never loses any information. *)
         |> mark_best
 
-      let product_of_sorts ~why ~level arity =
+      let product_of_any ~why arity =
         let layout =
           Jkind_types.Layout.product
-            (List.init arity
-               (fun _ ->
-                  fst
-                    (Jkind_types.Layout.of_new_sort_var ~level
-                       Jkind_types.Scannable_axes.max)))
+            (List.init arity (fun _ ->
+               Jkind_types.Layout.Any Jkind_types.Scannable_axes.max))
         in
         let desc : _ jkind_desc =
           { base = Layout layout;
@@ -2074,30 +2165,42 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
+    let all_void_sort_option sort =
+      match sort with
+      | Some sort -> Jkind_types.Sort.Const.all_void sort
+      | None -> false
+
+    let all_void_labels_with_updates lbls_updated =
+      List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
+
     let all_void_labels lbls =
       List.for_all
         (fun (lbl : label_declaration) ->
-           Jkind_types.Sort.Const.(all_void lbl.ld_sort))
+           all_void_sort_option lbl.ld_sort)
         lbls
 
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
-        (fun (lbl : label_declaration) ->
-          add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities)
+        (fun ((lbl : label_declaration), ld_type, _sort) ->
+          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
         lbls jkind
 
-    let for_boxed_record lbls =
-      if all_void_labels lbls
+    let for_boxed_record_with_updates lbls =
+      if all_void_labels_with_updates lbls
       then Builtin.immediate ~why:Empty_record
       else
         let base =
           lbls
-          |> List.map (fun (ld : label_declaration) -> ld.ld_mutable)
+          |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
           |> List.fold_left combine_mutability Immutable
           |> jkind_of_mutability ~why:Boxed_record
           |> mark_best
         in
         add_labels_as_with_bounds lbls base
+
+    let for_boxed_record lbls =
+      for_boxed_record_with_updates
+        (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =
@@ -2284,7 +2387,7 @@ module Jkind0 = struct
             match cstr.cd_args with
             | Cstr_tuple args ->
               List.for_all
-                (fun arg -> Jkind_types.Sort.Const.(all_void arg.ca_sort)) args
+                (fun arg -> all_void_sort_option arg.ca_sort) args
             | Cstr_record lbls -> all_void_labels lbls)
           cstrs
       in

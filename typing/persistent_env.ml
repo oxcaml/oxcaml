@@ -125,7 +125,7 @@ type import_info =
 type pers_name = {
   pn_import : import;
   pn_global : Global_module.t;
-  pn_sign : Subst.Lazy.signature;
+  pn_sign : Subst.Lazy.persistent_signature;
 }
 
 (* What a global identifier is actually bound to in Lambda code *)
@@ -789,7 +789,7 @@ type address =
   | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
-  Subst.Lazy.signature
+  Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t

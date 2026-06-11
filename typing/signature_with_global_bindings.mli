@@ -13,7 +13,7 @@
     Note that globals without parameters are understood to be bound but aren't
     represented explicitly. *)
 type t = private {
-  sign : Subst.Lazy.signature;
+  sign : Subst.Lazy.persistent_signature;
   bound_globals : Global_module.With_precision.t array;
 }
 

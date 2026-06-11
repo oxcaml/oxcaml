@@ -122,7 +122,6 @@ let keyword_table : keywords =
     "nonrec", NONREC;
     "object", OBJECT;
     "of", OF;
-    "once_", ONCE;
     "open", OPEN;
     "or", OR;
     "overwrite_", OVERWRITE;
@@ -140,7 +139,6 @@ let keyword_table : keywords =
     "true", TRUE;
     "try", TRY;
     "type", TYPE;
-    "unique_", UNIQUE;
     "val", VAL;
     "virtual", VIRTUAL;
     "when", WHEN;
