@@ -48,7 +48,9 @@ let foo (t : int option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t;
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 26-33.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* crosses contention but not portability or linearity *)
@@ -94,7 +96,9 @@ let foo (t : ('a -> 'a) option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 33-40.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* references crosses portability but not contention *)
@@ -104,7 +108,9 @@ let foo (t : int ref option @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 30-39.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : int ref option @ nonportable once) =
@@ -131,7 +137,9 @@ let foo (t : int ref option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 30-37.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* shouldn't cross anything *)
@@ -142,7 +150,9 @@ let foo (t : ('a -> 'a) ref option @ contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended t
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 37-46.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : ('a -> 'a) ref option @ nonportable) =
@@ -182,7 +192,9 @@ let foo (t : ('a -> 'a) ref option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 37-44.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* crosses nothing *)
@@ -192,7 +204,9 @@ let foo (t : 'a option @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 25-34.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : 'a option @ nonportable) =
@@ -231,7 +245,9 @@ let foo (t : 'a option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 25-32.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* looks at kinds *)
@@ -257,7 +273,9 @@ val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
 Line 2, characters 18-19:
 2 |   use_uncontended t;
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 58-79.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (type a : value mod contended portable) (t : a option @ once) =
@@ -287,7 +305,9 @@ let foo (type a : value mod aliased) (t : a option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 53-60.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (********************************************)
@@ -318,7 +338,9 @@ let foo (t : int list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t;
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 24-31.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* crosses contention but not portability or linearity *)
@@ -364,7 +386,9 @@ let foo (t : ('a -> 'a) list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 31-38.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* references crosses portability but not contention *)
@@ -374,7 +398,9 @@ let foo (t : int ref list @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 28-37.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : int ref list @ nonportable once) =
@@ -401,7 +427,9 @@ let foo (t : int ref list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 28-35.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* shouldn't cross anything *)
@@ -412,7 +440,9 @@ let foo (t : ('a -> 'a) ref list @ contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended t
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 35-44.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : ('a -> 'a) ref list @ nonportable) =
@@ -452,7 +482,9 @@ let foo (t : ('a -> 'a) ref list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 35-42.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* crosses nothing *)
@@ -462,7 +494,9 @@ let foo (t : 'a list @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 23-32.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : 'a list @ nonportable) =
@@ -501,7 +535,9 @@ let foo (t : 'a list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 23-30.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* looks at kinds *)
@@ -542,7 +578,9 @@ let foo (type a : value mod contended portable) (t : a list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 62-69.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (****************************)
@@ -626,7 +664,10 @@ let f (type a) (t : a t) (x : a contended_with @ contended) : _ @ uncontended =
 Line 3, characters 9-10:
 3 |   | _ -> x
              ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 49-58.
+       However, the highlighted expression is expected to be "uncontended"
+         because of an annotation at line 1, characters 66-77.
 |}]
 
 
@@ -744,7 +785,9 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 19-28.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ nonportable) = use_portable t
@@ -790,7 +833,9 @@ val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 19-28.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ nonportable) = use_portable t
@@ -846,7 +891,9 @@ let foo (t : (_, _) t @ contended) = use_uncontended t
 Line 1, characters 53-54:
 1 | let foo (t : (_, _) t @ contended) = use_uncontended t
                                                          ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 24-33.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : (_, int) t @ contended) = use_uncontended t
@@ -854,7 +901,9 @@ let foo (t : (_, int) t @ contended) = use_uncontended t
 Line 1, characters 55-56:
 1 | let foo (t : (_, int) t @ contended) = use_uncontended t
                                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 26-35.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (********************************************************)
@@ -902,7 +951,9 @@ let foo (t : _ T.t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : _ T.t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 21-30.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : int T.t @ nonportable) = use_portable t
@@ -941,7 +992,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 21-28.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (*********************)
@@ -974,7 +1027,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 21-28.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (***********************)
@@ -1139,7 +1194,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 21-28.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -1147,7 +1204,9 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 19-28.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ nonportable) = use_portable t

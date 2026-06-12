@@ -151,7 +151,8 @@ Line 7, characters 12-17:
 Error: This value is "aliased"
          because it is used inside the function at lines 6-7, characters 22-17
          which is expected to be "many".
-       However, the highlighted expression is expected to be "unique".
+       However, the highlighted expression is expected to be "unique"
+         because of an annotation at line 1, characters 19-25.
 |}]
 
 

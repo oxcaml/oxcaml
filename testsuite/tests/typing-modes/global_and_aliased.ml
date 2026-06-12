@@ -88,7 +88,8 @@ Line 1, characters 58-60:
                                                               ^^
 Error: This value is "aliased"
          because it is the field "x1" (with some modality) of the record at line 1, characters 11-17.
-       However, the highlighted expression is expected to be "unique".
+       However, the highlighted expression is expected to be "unique"
+         because of an annotation at line 1, characters 49-55.
 |}]
 
 let fail2 ({ x2 } : 'a t2 @ local unique) : 'a @ unique = x2
@@ -99,7 +100,8 @@ Line 1, characters 58-60:
                                                               ^^
 Error: This value is "aliased"
          because it is the field "x2" (with some modality) of the record at line 1, characters 11-17.
-       However, the highlighted expression is expected to be "unique".
+       However, the highlighted expression is expected to be "unique"
+         because of an annotation at line 1, characters 49-55.
 |}]
 
 let fail3 ({ x3 } : 'a t3 @ local unique) : 'a @ unique = x3
@@ -110,7 +112,8 @@ Line 1, characters 58-60:
                                                               ^^
 Error: This value is "aliased"
          because it is the field "x3" (with some modality) of the record at line 1, characters 11-17.
-       However, the highlighted expression is expected to be "unique".
+       However, the highlighted expression is expected to be "unique"
+         because of an annotation at line 1, characters 49-55.
 |}]
 
 (* Mutable fields. *)

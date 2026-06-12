@@ -98,7 +98,9 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 17-24.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -138,7 +140,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 21-28.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -475,7 +479,9 @@ end
 Line 2, characters 50-51:
 2 |   let foo (x : M.t @ contended) = use_uncontended x
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 2, characters 21-30.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* _ in parameters *)
@@ -500,7 +506,9 @@ let should_reject (x : int ref box @ contended) = use_uncontended x
 Line 1, characters 66-67:
 1 | let should_reject (x : int ref box @ contended) = use_uncontended x
                                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 37-46.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 
@@ -519,7 +527,9 @@ let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
 Line 1, characters 78-79:
 1 | let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
                                                                                   ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 49-58.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 type show_me_the_kind : immediate = (int ref, int ref) box2
@@ -567,7 +577,9 @@ let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
 Line 1, characters 74-75:
 1 | let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
                                                                               ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 45-54.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* Constraints and existentials *)
@@ -633,7 +645,9 @@ let foo (x : exist_row1 @ contended) = use_uncontended x
 Line 1, characters 55-56:
 1 | let foo (x : exist_row1 @ contended) = use_uncontended x
                                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 26-35.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 type exist_row2 = Mk : ([> `A | `B of int ref] as 'a) -> exist_row2
@@ -669,7 +683,9 @@ let foo (x : exist_row2 @ contended) = use_uncontended x
 Line 1, characters 55-56:
 1 | let foo (x : exist_row2 @ contended) = use_uncontended x
                                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 26-35.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 type 'a exist_row3 = Mk : ([> `A | `B of int ref] as 'a) -> 'a option exist_row3
@@ -698,7 +714,9 @@ let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontend
 Line 1, characters 83-84:
 1 | let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x
                                                                                        ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 54-63.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* This would be lovely to accept, but it seems beyond the
@@ -734,7 +752,9 @@ type exist = Exist : ('a : value mod portable). 'a * 'a idx -> exist
 Line 8, characters 24-29:
 8 |         use_uncontended exist;
                             ^^^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 3, characters 25-34.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (*********************************************************)

@@ -246,7 +246,9 @@ let foo (t : int ref @ contended) = use_uncontended t
 Line 1, characters 52-53:
 1 | let foo (t : int ref @ contended) = use_uncontended t
                                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 23-32.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* list *)
@@ -459,7 +461,9 @@ let foo (t : int array @ contended) = use_uncontended t
 Line 1, characters 54-55:
 1 | let foo (t : int array @ contended) = use_uncontended t
                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 25-34.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* iarray *)

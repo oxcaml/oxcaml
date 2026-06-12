@@ -431,7 +431,9 @@ val reset_ref : int ref @ unique -> unit = <fun>
 Line 6, characters 12-13:
 6 |   reset_ref x;
                 ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       but is expected to be "unique"
+         because of an annotation at line 1, characters 19-25.
 |}]
 
 (* Test 13.2: Unique mutable variable *)
@@ -444,7 +446,9 @@ let x_13_2 =
 Line 3, characters 12-13:
 3 |   reset_ref x;
                 ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       but is expected to be "unique"
+         because of an annotation at line 1, characters 19-25.
 |}]
 
 (* Test 13.3: [let mutable x @ m] checks only that the initial value of x has
