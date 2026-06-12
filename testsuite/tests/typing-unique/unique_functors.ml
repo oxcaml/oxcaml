@@ -142,3 +142,29 @@ Line 4, characters 17-18:
                      ^
 
 |}]
+
+(* A component of a functor result that aliases a captured free variable
+   shares that variable's paths: reading the component then consuming the
+   variable uniquely conflicts. *)
+let functor_result_captures () =
+  let x = "foo" in
+  let module F () = struct let y = x end in
+  let module M = F () in
+  let r = M.y in
+  unique_id x;
+  ignore r
+[%%expect{|
+val functor_result_captures : unit -> unit = <fun>
+|}]
+
+(* Two components of a functor result that alias the same parameter component
+   alias each other. *)
+let functor_result_siblings_alias () =
+  let module M = struct let x = "foo" end in
+  let module F (X : s @ unique) = struct let y = X.x let z = X.x end in
+  let module A = F(M) in
+  unique_id A.y;
+  ignore A.z
+[%%expect{|
+val functor_result_siblings_alias : unit -> unit = <fun>
+|}]
