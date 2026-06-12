@@ -1446,7 +1446,8 @@ val will_be_reordered : _ mixed_block_element -> bool
 
 val primitive_result_layout : primitive -> layout
 
-val array_ref_kind_result_layout: array_ref_kind -> layout
+val array_kind_of_array_ref_kind : array_ref_kind -> array_kind
+val array_kind_of_array_set_kind : array_set_kind -> array_kind
 
 (** The mode will be discarded if unnecessary for the given [array_kind] *)
 val array_ref_kind : locality_mode -> array_kind -> array_ref_kind
