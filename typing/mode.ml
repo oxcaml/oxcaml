@@ -190,6 +190,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Lpoly_inst -> Lpoly_inst
         | Contained_by c -> Contained_by c
+        | Annotation loc -> Annotation loc
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -211,6 +212,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
+        | Annotation loc -> Annotation loc
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -238,6 +240,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
+        | Annotation loc -> Annotation loc
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -265,6 +268,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
+        | Annotation loc -> Annotation loc
     end)
   end
 end
@@ -4902,6 +4906,10 @@ module Report = struct
     | Contained_by c ->
       let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
+    | Annotation loc ->
+      Fmt.fprintf ppf "of an annotation at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
