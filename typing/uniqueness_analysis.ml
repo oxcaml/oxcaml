@@ -3182,27 +3182,35 @@ and check_uniqueness_mod ~borrows ienv (me : module_expr) : mod_value * UF.t =
        are derived on demand. Free variables used in the body are treated
        like those of a function body: implicit borrows are lifted, and the
        mode system's closure lock governs captures across multiple
-       applications. *)
+       applications. The body's components become those of an application:
+       they may alias the parameter or captured free variables, so they are
+       propagated (the root is fresh, as an application builds a new
+       module). *)
     let ienv =
       match param with
       | Unit | Named (None, _, _, _) -> ienv
       | Named (Some id, _, _, _) ->
         Ienv.extend ienv (Ienv.Extension.singleton id (Paths.fresh ()))
     in
-    let _, uf = check_uniqueness_mod ~borrows ienv body in
-    fresh_mod_value, lift_implicit_borrowing uf
+    let mv_body, uf = check_uniqueness_mod ~borrows ienv body in
+    ( { mod_root = Value.fresh; mod_components = mv_body.mod_components },
+      lift_implicit_borrowing uf )
   | Tmod_apply (funct, arg, _) ->
-    (* Applying a functor consumes the functor closure and the argument: the
-       resulting module may retain references to both. *)
+    (* Applying a functor consumes the functor closure and the argument; the
+       resulting module may retain references to both. Its components are
+       those previewed by the functor (which may alias captured values or the
+       argument), so we propagate them. Only the functor's root is consumed:
+       its components are the result preview, not values consumed here. *)
     let mv_funct, uf_funct = check_uniqueness_mod ~borrows ienv funct in
     let mv_arg, uf_arg = check_uniqueness_mod ~borrows ienv arg in
-    let uf_consume_funct = consume_mod_value ~loc:funct.mod_loc mv_funct in
+    let uf_consume_funct = Value.mark_maybe_unique mv_funct.mod_root in
     let uf_consume_arg = consume_mod_value ~loc:arg.mod_loc mv_arg in
-    fresh_mod_value, UF.seqs [uf_funct; uf_arg; uf_consume_funct; uf_consume_arg]
+    ( { mod_root = Value.fresh; mod_components = mv_funct.mod_components },
+      UF.seqs [uf_funct; uf_arg; uf_consume_funct; uf_consume_arg] )
   | Tmod_apply_unit funct ->
     let mv_funct, uf_funct = check_uniqueness_mod ~borrows ienv funct in
-    ( fresh_mod_value,
-      UF.seq uf_funct (consume_mod_value ~loc:funct.mod_loc mv_funct) )
+    ( { mod_root = Value.fresh; mod_components = mv_funct.mod_components },
+      UF.seq uf_funct (Value.mark_maybe_unique mv_funct.mod_root) )
   | Tmod_constraint (inner, _, _, coercion) -> (
     let mv, uf = check_uniqueness_mod ~borrows ienv inner in
     match coercion with

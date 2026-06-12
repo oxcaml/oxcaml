@@ -154,7 +154,14 @@ let functor_result_captures () =
   unique_id x;
   ignore r
 [%%expect{|
-val functor_result_captures : unit -> unit = <fun>
+Line 7, characters 9-10:
+7 |   ignore r
+             ^
+Error: This value is used here, but it has already been used as unique at:
+Line 6, characters 12-13:
+6 |   unique_id x;
+                ^
+
 |}]
 
 (* Two components of a functor result that alias the same parameter component
@@ -166,5 +173,12 @@ let functor_result_siblings_alias () =
   unique_id A.y;
   ignore A.z
 [%%expect{|
-val functor_result_siblings_alias : unit -> unit = <fun>
+Line 6, characters 9-12:
+6 |   ignore A.z
+             ^^^
+Error: This value is used here, but it has already been used as unique at:
+Line 5, characters 12-15:
+5 |   unique_id A.y;
+                ^^^
+
 |}]
