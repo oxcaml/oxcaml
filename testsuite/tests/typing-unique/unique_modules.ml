@@ -321,3 +321,19 @@ Line 4, characters 20-21:
                         ^
 
 |}]
+
+(* Items bound by [open struct ... end] are hidden, not addressable
+   components: they must not shadow a real component of the same name. Here
+   [M.x] denotes the first [x] (which aliases [s]), so consuming it conflicts
+   with consuming [s]. *)
+let open_struct_shadow () =
+  let s = "foo" in
+  let module M = struct
+    let x = s
+    open struct let x = "other" end
+  end in
+  unique_id M.x;
+  unique_id s
+[%%expect{|
+val open_struct_shadow : unit -> unit = <fun>
+|}]
