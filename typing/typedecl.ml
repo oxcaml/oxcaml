@@ -1309,8 +1309,8 @@ let shape_has_float_boxed shape =
     shape
 
 let record_has_float_boxed = function
-  | Record_mixed shape -> shape_has_float_boxed shape
-  | Record_unboxed | Record_inlined _ | Record_boxed
+  | Record_boxed shape -> shape_has_float_boxed shape
+  | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
@@ -1326,10 +1326,10 @@ let record_gets_unboxed_version lbls repr =
   not (record_has_atomic_field lbls) &&
   match repr with
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed | Record_variable -> true
+  | Record_boxed shape -> not (shape_has_float_boxed shape)
+  | Record_variable -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
-  | Record_mixed shape -> not (shape_has_float_boxed shape)
 
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -2097,7 +2097,7 @@ let compute_record_repr
       | Ok x -> x
       | Error _ -> Misc.fatal_error "expected mixed block"
     in
-    Ok (Record_mixed shape)
+    Ok (Record_boxed shape)
   in
   (* Important: If [refining_block_with_any] is true, we must use a plain
       value block or mixed block. *)
@@ -2130,7 +2130,7 @@ let compute_record_repr
         |> Array.of_list
       in
       assert_mixed_product_support loc Record ~value_prefix_len:0;
-      Ok (Record_mixed shape)
+      Ok (Record_boxed shape)
     else
       mixed_record ()
   (* Any record with a field of kind [any] can't be represented. *)
@@ -2165,7 +2165,7 @@ let compute_record_repr
       ~voids:false, ..
   | ~refining_block_with_any:true, ~float64s:false,
       ~non_float64_unboxed_fields:false, ~voids:false, .. ->
-    Ok Record_boxed
+    mixed_record ()
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
       flat float records.
   *)
@@ -2177,7 +2177,7 @@ let compute_record_repr
   | ~atomic_floats:true, ~first_any:None, .. ->
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
-    Ok Record_boxed
+    mixed_record ()
   (* Any remaining atomic-bearing shape should have been rejected by
      [check_atomic_fields] above. *)
   | ~atomic_fields:true, .. ->
@@ -2338,7 +2338,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     sorts, rep, jkind
   | Legacy, _,
-    (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
+    (Record_boxed _ | Record_inlined _ | Record_float
           | Record_ufloat | Record_unboxed | Record_variable)
     ->
     (* These are never created by [transl_declaration], so they will only
@@ -2371,7 +2371,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
       begin match rep with
-      | Ok (Record_boxed | Record_mixed _) -> ()
+      | Ok (Record_boxed _) -> ()
       | Ok _ ->
         Misc.fatal_error "none became something other than mixed"
       | Error _ -> ()

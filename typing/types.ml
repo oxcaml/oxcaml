@@ -517,10 +517,9 @@ and module_representation = Jkind_types.Sort.t array
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * mixed_product_shape * variant_representation
-  | Record_boxed
+  | Record_boxed of mixed_product_shape
   | Record_float
   | Record_ufloat
-  | Record_mixed of mixed_product_shape
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   | Record_variable
 
@@ -963,20 +962,18 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       ignore (shp2 : mixed_product_shape);
       equal_tag tag1 tag2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
-  | Record_boxed, Record_boxed ->
-      true
+  | Record_boxed shape1, Record_boxed shape2 ->
+      equal_mixed_product_shape_up_to_scannable_axes shape1 shape2
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
       true
-  | Record_mixed mx1, Record_mixed mx2 ->
-      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | Record_dummy { represent_as_float_array = a1; flatten_floats = b1 },
     Record_dummy { represent_as_float_array = a2; flatten_floats = b2 } ->
       Bool.equal a1 a2 && Bool.equal b1 b2
   | Record_variable, Record_variable -> true
-  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable), _ ->
+  | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
+    | Record_ufloat | Record_dummy _ | Record_variable), _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
@@ -1025,8 +1022,8 @@ let find_unboxed_type decl =
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
-                    | Record_boxed | Record_float | Record_ufloat
-                    | Record_mixed _ | Record_dummy _ | Record_variable), _)
+                    | Record_boxed _ | Record_float | Record_ufloat
+                    | Record_dummy _ | Record_variable), _)
   | Type_record_unboxed_product
       (_, (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed

@@ -734,10 +734,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               | Record_inlined (_, _, Variant_unboxed)
               | Record_unboxed
                   -> Outval_record_unboxed
-              | Record_boxed | Record_float | Record_ufloat
+              | Record_float | Record_ufloat
                   -> Outval_record_boxed
+              | Record_boxed shape
               | Record_inlined (_, shape, _)
-              | Record_mixed shape
                   ->
                     (* Mixed records are only represented as
                        mixed blocks in native code. *)

@@ -293,9 +293,7 @@ let compute_static_size lam =
 
     | Pduprecord (repres, size) ->
         begin match repres with
-        | Record_boxed ->
-            Block (Shape (block_shape_of_generic_values size))
-        | Record_mixed shape
+        | Record_boxed shape
         | Record_inlined (_, shape, (Variant_boxed _ | Variant_extensible)) ->
             Block (Shape (Lambda.transl_mixed_product_shape shape))
         | Record_float ->

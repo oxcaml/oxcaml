@@ -900,7 +900,14 @@ let decl_of_type_constr tconstr =
            ("pos_bol", type_int);
            ("pos_cnum", type_int) ]
          in
-         Type_record (labels, Record_boxed, None)
+         Type_record
+           ( labels,
+             Record_boxed
+               (Array.init (List.length labels)
+                  (fun _ ->
+                    mixed_block_element_of_const_sort
+                      Jkind_types.Sort.Const.scannable)),
+             None )
        )
        (* Fields are [int] and [string], so [immutable_data] already captures
           their direct contribution. Encoding this directly avoids predef-time

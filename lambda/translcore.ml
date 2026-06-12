@@ -59,7 +59,7 @@ let transl_constructor_shape
 
 let field_offset_for_label lbl repres =
   match repres with
-  | Record_boxed
+  | Record_boxed _
   | Record_inlined (_, _, Variant_boxed _)
   | Record_inlined (_, _, Variant_with_null) ->
       lbl.lbl_pos
@@ -75,8 +75,6 @@ let field_offset_for_label lbl repres =
   | Record_float ->
       lbl.lbl_pos
   | Record_ufloat ->
-      lbl.lbl_pos
-  | Record_mixed _ ->
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
@@ -721,19 +719,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
       let prim_and_args =
         match record_repres with
-          Record_boxed ->
-          let immediate_or_pointer, _ = maybe_pointer e in
-          if Types.is_atomic lbl.lbl_mut
-          then
-            Some
-              (Patomic_load_field { immediate_or_pointer },
-               [targ;
-                Lconst (Const_base (Const_int (
-                  field_offset_for_label lbl record_repres)))])
-          else
-            Some
-              (Pfield ([lbl.lbl_pos], All_value immediate_or_pointer, sem),
-                [targ])
+          Record_boxed shape
         | Record_inlined (_, shape, Variant_boxed _)
           when Types.mixed_product_shape_is_flat_all_value shape ->
           let immediate_or_pointer, _ = maybe_pointer e in
@@ -781,7 +767,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR layouts v5: once all-void records are allowed, handle
              constructors with all-void inline records, which are stored as
              immediates *)
-        | Record_mixed shape ->
+        | Record_boxed shape ->
           let shape =
             Lambda.transl_mixed_product_shape_for_read
               ~get_value_kind:(fun i ->
@@ -865,15 +851,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let newval_lambda = transl_exp ~scopes sort_newval newval in
       let prim, args =
         match record_repres with
-          Record_boxed ->
-          let immediate_or_pointer, _ = maybe_pointer newval in
-          if Types.is_atomic lbl.lbl_mut
-          then
-            Patomic_set_field { immediate_or_pointer },
-            [arg_lambda; field_lambda; newval_lambda]
-          else
-            Psetfield ([lbl.lbl_pos], All_value immediate_or_pointer, mode),
-            [arg_lambda; newval_lambda]
+          Record_boxed shape
         | Record_inlined (_, shape, Variant_boxed _)
           when Types.mixed_product_shape_is_flat_all_value shape ->
           let immediate_or_pointer, _ = maybe_pointer newval in
@@ -908,7 +886,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR layouts v5: once all-void records are allowed, handle
              constructors with all-void inline records, which are stored as
              immediates *)
-        | Record_mixed shape ->
+        | Record_boxed shape ->
           let field_shape =
             Typeopt.transl_mixed_block_element newval.exp_env newval.exp_loc
               newval.exp_type shape.(lbl.lbl_pos)
@@ -2198,10 +2176,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       | Overridden (_lid, expr) ->
           let upd =
             match repres with
-            | Record_boxed ->
-                let ptr, _ = maybe_pointer expr in
-                Psetfield ([lbl.lbl_pos], All_value ptr, Assignment modify_heap)
-            | Record_mixed shape
+            | Record_boxed shape
             | Record_inlined (_, shape, Variant_boxed _)
                 (* CR layouts v5: once all-void records are allowed, handle
                   constructors with all-void inline records, which are stored as
@@ -2289,10 +2264,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                let sem = add_barrier_to_read unique_barrier sem in
                let access =
                  match repres with
-                 | Record_boxed ->
-                   let ptr, _ = maybe_pointer_type env typ in
-                   Pfield ([i], All_value ptr, sem)
-                 | Record_mixed shape
+                 | Record_boxed shape
                  | Record_inlined (_, shape, Variant_boxed _) ->
                    (* CR layouts v5: once all-void records are allowed, handle
                       constructors with all-void inline records, which are
@@ -2371,7 +2343,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                transl_exp ~scopes lbl_sort expr, field_layout)
         fields
     in
-    let ll, shape = List.split (Array.to_list lv) in
+    let ll, _shape = List.split (Array.to_list lv) in
     let mut : Lambda.mutable_flag =
       if Array.exists (fun (lbl, _, _) -> Types.is_mutable lbl.lbl_mut) fields
       then Mutable
@@ -2381,10 +2353,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         if mut = Mutable then raise Not_constant;
         let cl = List.map extract_constant ll in
         match repres with
-        | Record_boxed ->
-            Lconst(Const_block(0,
-              Lambda.block_shape_of_generic_values (List.length cl), cl))
-        | Record_mixed shape ->
+        | Record_boxed shape ->
             if !Clflags.native_code ||
               (Mixed_product_bytes.types_shape_is_all_value shape)
             then
@@ -2422,12 +2391,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       with Not_constant ->
         let loc = of_location ~scopes loc in
         match repres with
-          Record_boxed ->
-            let shape = List.map must_be_value shape in
-            Lprim(Pmakeblock(0, mut,
-                             Lambda.block_shape_of_value_kinds shape,
-                             Option.get mode), ll, loc)
-        | Record_mixed shape ->
+          Record_boxed shape ->
             let shape = transl_record_shape shape in
             Lprim(Pmakeblock(0, mut,
                              shape,
@@ -2567,20 +2531,7 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_field (_id, lbl, repres) ->
     begin match repres with
-    | Record_boxed ->
-      (* Assert that all unboxed fields are of singleton records *)
-      List.iter
-        (fun (Uaccess_unboxed_field (_, l, _)) ->
-            if Array.length l.lbl_all <> 1 then
-              Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
-                in non-mixed boxed record")
-        uas;
-      let shape =
-        Lambda.block_shape_of_generic_values (Array.length lbl.lbl_all)
-      in
-      Lprim (Pmake_idx_field (shape, lbl.lbl_pos, uas_path), [],
-             (of_location ~scopes loc))
-    | Record_mixed shape ->
+    | Record_boxed shape ->
       let shape = Lambda.transl_mixed_product_shape shape in
       (* Check to make sure the gap never overflows.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
@@ -2611,17 +2562,21 @@ and transl_atomic_loc ~scopes arg arg_sort lbl repres =
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
   | Record_variable ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
+  | Record_boxed shape
+    when not (Types.mixed_product_shape_is_flat_all_value shape) ->
+      (* Atomic fields not allowed here *)
+      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
   | Record_inlined (_, shape,
       (Variant_boxed _ | Variant_extensible | Variant_with_null))
     when not (Types.mixed_product_shape_is_flat_all_value shape) ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed)
   | Record_float | Record_ufloat
     ->
       (* Atomic fields not allowed here *)
       Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
-  | Record_boxed
+  | Record_boxed _
   | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
                           | Variant_with_null))

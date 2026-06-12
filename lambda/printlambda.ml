@@ -328,11 +328,13 @@ let print_bigarray name unsafe kind ppf layout =
 
 let record_rep ppf r = match r with
   | Record_unboxed -> fprintf ppf "unboxed"
-  | Record_boxed -> fprintf ppf "boxed"
+  | Record_boxed shape ->
+    if Types.mixed_product_shape_is_flat_all_value shape
+    then fprintf ppf "boxed"
+    else fprintf ppf "mixed"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
-  | Record_mixed _ -> fprintf ppf "mixed"
   | Record_dummy _ -> fprintf ppf "dummy"
   | Record_variable -> fprintf ppf "variable"
 

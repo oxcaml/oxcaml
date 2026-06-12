@@ -87,9 +87,9 @@ end
 (apply (field_imm 1 (global Toploop!)) "X/378"
   (let
     (x1 =[value<(consts ()) (non_consts ([0: (*,value<int>)]))>]
-       [0: "first" 1]
+       [0: (shape (*,value<int>)) "first" 1]
      x2 =[value<(consts ()) (non_consts ([0: (*,value<int>)]))>]
-       [0: "second" 2])
+       [0: (shape (*,value<int>)) "second" 2])
     (makeblock 0 x1 x2)))
 module X : sig type t : immutable_data val x1 : t val x2 : t end
 |}]

@@ -39,7 +39,7 @@ let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
 
 let dummy_ctor_repres = [||]
 
-let dummy_record_repres = Record_boxed
+let dummy_record_repres = Record_boxed [||]
 
 let dummy_record_unboxed_product_repres = Record_unboxed_product
 

@@ -1026,7 +1026,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
+  | Record_boxed _ | Record_float | Record_ufloat -> begin
       let is_mutable =
         List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
           labels
@@ -1039,7 +1039,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed | Record_dummy _ | Record_variable ->
               (* The outer match guards against this *)
               assert false
-          | Record_boxed | Record_float | Record_ufloat ->
+          | Record_float | Record_ufloat ->
               let num_nodes_visited, fields =
                 List.fold_left_map
                   (fun num_nodes_visited (label:Types.label_declaration) ->
@@ -1053,11 +1053,10 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                       | Record_float | Record_ufloat ->
                         num_nodes_visited,
                         non_nullable (Pboxedfloatval Boxed_float64)
-                      | Record_inlined _ | Record_boxed ->
+                      | Record_inlined _ | Record_boxed _ ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_variable ->
+                      | Record_unboxed | Record_dummy _ | Record_variable ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1066,7 +1065,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
               in
               num_nodes_visited, Lambda.block_shape_of_value_kinds fields
           | Record_inlined (_, shape, _)
-          | Record_mixed shape ->
+          | Record_boxed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in
             value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
               ~shape (List.map (fun t -> Some t) types)
@@ -1077,11 +1076,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
             [runtime_tag, fields]
           | Record_float | Record_ufloat ->
             [ Obj.double_array_tag, fields ]
-          | Record_boxed ->
+          | Record_boxed _ ->
             [0, fields]
           | Record_inlined (Extension _, _, _) ->
-            [0, fields]
-          | Record_mixed _ ->
             [0, fields]
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false

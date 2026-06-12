@@ -1086,19 +1086,13 @@ module Record_diffing = struct
         | _, Record_ufloat ->
            Some (Record_mismatch (Ufloat_representation Second))
 
-        | Record_mixed m1, Record_mixed m2 ->
+        | Record_boxed m1, Record_boxed m2 ->
             begin match
               find_mismatch_in_mixed_record_representations m1 m2
             with
             | None -> None
             | Some mismatch -> Some (Record_mismatch mismatch)
             end
-        | Record_mixed _, _ ->
-           Some (Record_mismatch (Mixed_representation First))
-        | _, Record_mixed _ ->
-           Some (Record_mismatch (Mixed_representation Second))
-
-        | Record_boxed, Record_boxed -> None
 
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error

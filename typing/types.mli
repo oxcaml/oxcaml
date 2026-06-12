@@ -936,16 +936,12 @@ and record_representation =
   (* For an inlined record, we record the representation of the variant that
      contains it and the tag/representation of the relevant constructor of that
      variant. *)
-  | Record_boxed
+  | Record_boxed of mixed_product_shape
   | Record_float (* All fields are floats *)
   | Record_ufloat
   (* All fields are [float#]s.  Same runtime representation as [Record_float],
      but operations on these (e.g., projection, update) work with unboxed floats
      rather than boxed floats. *)
-  | Record_mixed of mixed_product_shape
-  (* The record contains a mix of values and unboxed elements. The block
-     is tagged such that polymorphic operations will not work.
-  *)
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   (* Note [Record_dummy]:
      We typecheck type declarations before updating their kinds, yet some record

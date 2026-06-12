@@ -2076,18 +2076,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pduprecord (repr, num_fields), [[arg]] ->
     let kind : P.Duplicate_block_kind.t =
       match repr with
-      | Record_boxed ->
-        Values
-          { tag = Tag.Scannable.zero;
-            length = Target_ocaml_int.of_int machine_width num_fields
-          }
-      | Record_mixed shape
+      | Record_boxed shape
         when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
-      | Record_mixed _ -> Mixed
+      | Record_boxed _ -> Mixed
       | Record_float | Record_ufloat ->
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }

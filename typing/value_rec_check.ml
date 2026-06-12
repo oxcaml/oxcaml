@@ -812,9 +812,8 @@ let rec expression : Typedtree.expression -> term_judg =
         let field_mode i = match rep with
           | Record_float | Record_ufloat -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
-          | Record_boxed -> Guard
           | Record_inlined (_, mixed_shape, _)
-          | Record_mixed mixed_shape ->
+          | Record_boxed mixed_shape ->
             (match mixed_shape.(i) with
              | Scannable _ | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64

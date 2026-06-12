@@ -383,6 +383,20 @@ module Type_shape = struct
 end
 
 module Type_decl_shape = struct
+  let mixed_block_element_is_all_value = function
+    (* Note that [Void] and [Product] elements do not occupy exactly one word
+       at runtime, so records containing them need the per-field layouts of
+       [Record_mixed] for the debugger to compute field offsets. *)
+    | Types.Scannable _ -> true
+    | Types.Void | Types.Product _ | Types.Float_boxed | Types.Float64
+    | Types.Float32 | Types.Bits8 | Types.Bits16 | Types.Bits32 | Types.Bits64
+    | Types.Untagged_immediate | Types.Vec128 | Types.Vec256 | Types.Vec512
+    | Types.Word ->
+      false
+
+  let mixed_block_shape_is_all_value shape =
+    Array.for_all mixed_block_element_is_all_value shape
+
   let rec mixed_block_shape_to_layout = function
     (* CR layouts-scannable: We forget about the stored scannable axes when
        converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
@@ -563,12 +577,15 @@ module Type_decl_shape = struct
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
-          | Record_boxed ->
-            record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
-          | Record_mixed fields ->
-            record_of_labels ~shape_for_constr ~type_subst
-              (Record_mixed (Array.map mixed_block_shape_to_layout fields))
-              lbl_list
+          | Record_boxed fields ->
+            if mixed_block_shape_is_all_value fields
+            then
+              record_of_labels ~shape_for_constr ~type_subst Record_boxed
+                lbl_list
+            else
+              record_of_labels ~shape_for_constr ~type_subst
+                (Record_mixed (Array.map mixed_block_shape_to_layout fields))
+                lbl_list
           | Record_unboxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_unboxed
               lbl_list
@@ -786,7 +803,7 @@ module Type_decl_shape = struct
       let record =
         record_of_labels
           ~shape_for_constr:(fun _ ~args:_ -> None)
-          ~type_subst:[] Record_boxed lbls
+          ~type_subst:[] Shape.Record_boxed lbls
         (* CR sspies: Instead of [Record_boxed], it would be nicer to mark
            these as virtual, because they only exist for Merlin. This saves
            us from trouble when shapes that are intended for Merlin end up

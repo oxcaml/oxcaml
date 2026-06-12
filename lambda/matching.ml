@@ -2584,9 +2584,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let sem = add_barrier_to_read ubr sem in
       let access, sort, layout =
         match lbl_repres with
-        | Record_boxed ->
-            Lprim (Pfield ([lbl.lbl_pos], All_value ptr, sem), [ arg ], loc),
-            lbl_sort, lbl_layout
+        | Record_boxed shape
         | Record_inlined (_, shape, Variant_boxed _)
           when Types.mixed_product_shape_is_flat_all_value shape ->
             Lprim (Pfield ([lbl.lbl_pos], All_value ptr, sem), [ arg ], loc),
@@ -2611,7 +2609,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             fatal_error
               "Mixed inlined records not supported for extensible variants"
         | Record_inlined (_, shape, Variant_boxed _)
-        | Record_mixed shape ->
+        | Record_boxed shape ->
             let shape =
               Lambda.transl_mixed_product_shape_for_read
                 ~get_value_kind:(fun _i -> Lambda.generic_value)
