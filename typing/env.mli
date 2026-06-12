@@ -608,6 +608,13 @@ val save_signature:
   -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind, file name. *)
+val save_signature_with_transform:
+  (Cmi_format.cmi_infos_lazy -> Cmi_format.cmi_infos_lazy) ->
+  alerts:alerts -> persistent_signature
+  -> Compilation_unit.Name.t -> Cmi_format.kind
+  -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
+        (* Like [save_signature], but applies the given transform to the
+           [cmi_infos] before writing it to disk. *)
 val save_signature_with_imports:
   alerts:alerts -> persistent_signature
   -> Compilation_unit.Name.t -> Cmi_format.kind
