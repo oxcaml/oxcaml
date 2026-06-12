@@ -1563,20 +1563,25 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               loc_arg.(!loc_arg_index + index))
         in
         loc_arg_index := !loc_arg_index + num_regs_for_arg;
-        if Option.is_some provenance
-        then
-          let naming_op =
-            Operation.Name_for_debugger
-              { ident = var;
-                provenance;
-                which_parameter = Some param_index;
-                regs = hard_regs_for_arg
-              }
-          in
-          DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
-               (* CR mshinwell: is [None] correct? *)
-               Debuginfo.none ~phantom_available_before:None))
+        (* The naming operation is inserted even when [provenance] is [None],
+           in which case no named variable will be visible in the debugger
+           (such variables only receive hidden, artificial DIEs). The register
+           availability information arising from the naming operation is
+           nonetheless used when generating DWARF call site information -- in
+           particular entry values, including for compiler-generated functions
+           such as [caml_applyN], whose parameters have no provenance. *)
+        let naming_op =
+          Operation.Name_for_debugger
+            { ident = var;
+              provenance;
+              which_parameter = Some param_index;
+              regs = hard_regs_for_arg
+            }
+        in
+        DLL.add_end block.Cfg.body
+          (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
+             (* CR mshinwell: is [None] correct? *)
+             Debuginfo.none ~phantom_available_before:None))
       fun_args
 
   (* Sequentialization of a function definition *)
