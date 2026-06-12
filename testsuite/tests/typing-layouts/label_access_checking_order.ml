@@ -36,10 +36,14 @@ Error: Record element types must have a representable layout.
    representation is undetermined: which error is reported? *)
 let set_bad (type a : any) (r : a t) = r.v <- "hello"
 [%%expect{|
-Line 1, characters 46-53:
+Line 1, characters 39-53:
 1 | let set_bad (type a : any) (r : a t) = r.v <- "hello"
-                                                  ^^^^^^^
-Error: This constant has type "string" but an expression was expected of type "a"
+                                           ^^^^^^^^^^^^^^
+Error: Record element types must have a representable layout.
+       The layout of a/2 is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a/2 must be representable
+         because it's the type of a field being assigned a value.
 |}]
 
 (* Atomic fields may be declared in a record whose representation is
@@ -59,5 +63,5 @@ Error: Record element types must have a representable layout.
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
-         because it's the type of a field in a record being projected from.
+         because it's the type of a field being assigned a value.
 |}]
