@@ -884,8 +884,7 @@ type lookup_error =
       }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
-  | Non_value_used_in_object of
-      Mode.Hint.pinpoint_desc * type_expr * Jkind.Violation.t
+  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -3711,10 +3710,10 @@ with
 let region_mode vmode =
   vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
 
-let unboxed_type ~errors ~env ~pp ty =
-  match ty with
+let unboxed_type ~errors ~env ~loc ty_and_lid =
+  match ty_and_lid with
   | None -> ()
-  | Some ty ->
+  | Some (ty, lid) ->
     (* The type is the type of a variable in the environment. It thus is likely
        generic. Despite the fact that instantiated variables work better in
        [constrain_type_jkind] (because they can be assigned more specific
@@ -3727,18 +3726,18 @@ let unboxed_type ~errors ~env ~pp ty =
     with
     | Ok () -> ()
     | Result.Error err ->
-      may_lookup_error errors (fst pp) env
-        (Non_value_used_in_object (snd pp, ty, err))
+      may_lookup_error errors loc env
+        (Non_value_used_in_object (lid, ty, err))
 
 (** Takes the [mode] and [ty] of a value at definition site, walks through the
     list of locks and constrains [mode] and [ty]. Return the access mode of the
     value allowed by the locks.
 
-    [ty] is optional as the function works on modules and classes as well, for
-    which [ty] should be [None].
+    [ty_and_lid] is the type of the value paired with its identifier; it is
+    [None] when the function is used on modules and classes.
 
     [pp] is the pinpoint used in errors. *)
-let walk_locks ~errors ~env ~pp mode ty locks =
+let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
     (fun vmode lock ->
       match lock with
@@ -3750,7 +3749,7 @@ let walk_locks ~errors ~env ~pp mode ty locks =
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
-          unboxed_type ~errors ~env ~pp ty;
+          unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
     ) mode locks
 
@@ -4617,7 +4616,8 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
-  walk_locks ~errors:true ~env ~pp mode ty locks
+  let ty_and_lid = Option.map (fun ty -> (ty, lid)) ty in
+  walk_locks ~errors:true ~env ~pp mode ty_and_lid locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env
@@ -5315,18 +5315,11 @@ let report_lookup_error_doc loc env = function
       Location.errorf ~loc
         "%a is local, so it cannot be used inside an exclave_"
         print_pinpoint_desc desc
-  | Non_value_used_in_object (desc, typ, err) ->
-      (* Identifiers are special-cased to preserve the historical
-         printing of this error. *)
-      let print_subject ppf (desc : Mode.Hint.pinpoint_desc) =
-        match desc with
-        | Ident {lid; _} -> quoted_longident ppf lid
-        | desc -> print_pinpoint_desc ppf desc
-      in
+  | Non_value_used_in_object (lid, typ, err) ->
       Location.errorf ~loc
         "%a must have a type of layout value because it is captured by an \
          object.@ %a"
-        print_subject desc
+        quoted_longident lid
         (fun ppf v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
            env ppf v)
