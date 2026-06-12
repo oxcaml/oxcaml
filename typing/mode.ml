@@ -5339,6 +5339,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let to_const_exn m = S.to_const_exn obj m
 
+  let to_of_const_exn m = S.to_of_const_exn obj m
+
   let unhint = S.Unhint.unhint
 
   let hint ?hint = S.Unhint.hint obj ?hint
@@ -5440,6 +5442,8 @@ module Monadic_gen (Obj : Obj) = struct
    fun ?hint a -> S.of_const ?hint obj a
 
   let to_const_exn m = S.to_const_exn obj m
+
+  let to_of_const_exn m = S.to_of_const_exn obj m
 
   let unhint = S.Unhint.unhint
 
@@ -6144,6 +6148,12 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.to_const_exn monadic in
     { comonadic; monadic } |> merge
 
+  let to_of_const_exn m =
+    let { comonadic; monadic } = m in
+    let comonadic = Comonadic.to_of_const_exn comonadic in
+    let monadic = Monadic.to_of_const_exn monadic in
+    { comonadic; monadic }
+
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in
     let monadic = Monadic.unhint monadic in
@@ -6756,9 +6766,9 @@ let alloc_to_value_l2r_unhint m =
   in
   { comonadic; monadic }
 
-let alloc_to_value_l2r m =
+let alloc_to_value_l2r ?hint m =
   m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
-  |> Value.hint ~monadic:Skip
+  |> Value.hint ~monadic:Skip ?comonadic:hint
 
 let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
@@ -7738,12 +7748,14 @@ module Crossing = struct
      where [regional_to_global] is the right adjoint of [alloc_as_value], and
      [regional_to_local] the left adjoint. *)
 
-  let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left_unhint t |> value_to_alloc_r2l_unhint
+  let apply_left_alloc ?hint t m =
+    m |> alloc_as_value ?hint |> apply_left_unhint t
+    |> value_to_alloc_r2l_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
-  let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right_unhint t |> value_to_alloc_r2g_unhint
+  let apply_right_alloc ?hint t m =
+    m |> alloc_as_value ?hint |> apply_right_unhint t
+    |> value_to_alloc_r2g_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_left_right_alloc t m =

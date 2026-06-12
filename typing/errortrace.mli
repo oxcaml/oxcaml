@@ -84,6 +84,11 @@ type 'variety obj =
   (* Unification *)
   | Self_cannot_be_closed : unification obj
 
+type mode_mismatch =
+  { context : string;
+    left_pos : position;
+    error : Mode.Alloc.error }
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -98,6 +103,7 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Mode_mismatch : mode_mismatch -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 

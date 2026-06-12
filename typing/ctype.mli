@@ -846,6 +846,7 @@ val cross_left :
 val cross_right_alloc :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
+  ?hint:(disallowed * allowed) Mode.Hint.morph ->
   Types.type_expr ->
   Mode.Alloc.r ->
   Mode.Alloc.r
@@ -854,6 +855,7 @@ val cross_right_alloc :
 val cross_left_alloc :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
+  ?hint:(allowed * disallowed) Mode.Hint.morph ->
   Types.type_expr ->
   Mode.Alloc.l ->
   Mode.Alloc.l

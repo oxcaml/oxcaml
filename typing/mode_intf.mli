@@ -763,6 +763,8 @@ module type S = sig
 
     val to_const_exn : lr -> Const.t
 
+    val to_of_const_exn : lr -> lr
+
     module List : sig
       (* No new types exposed to avoid too many type names *)
       include Allow_disallow with type (_, _, 'd) sided = 'd t list
@@ -850,7 +852,10 @@ module type S = sig
     ?hint:('l * 'r) Hint.morph -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
-  val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
+  val alloc_to_value_l2r :
+    ?hint:('l * disallowed) Hint.morph ->
+    ('l * 'r) Alloc.t ->
+    ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val value_to_alloc_r2l :
@@ -1208,10 +1213,12 @@ module type S = sig
        either fully or fully not, and therefore [alloc_as_value] seems sufficient. *)
 
     (** Similar to [apply_left] but for [Alloc] via [alloc_as_value] *)
-    val apply_left_alloc : t -> Alloc.l -> Alloc.l
+    val apply_left_alloc :
+      ?hint:(allowed * disallowed) Hint.morph -> t -> Alloc.l -> Alloc.l
 
     (** Similar to [apply_right] but for [Alloc] via [alloc_as_value] *)
-    val apply_right_alloc : t -> Alloc.r -> Alloc.r
+    val apply_right_alloc :
+      ?hint:(disallowed * allowed) Hint.morph -> t -> Alloc.r -> Alloc.r
 
     (** Apply mode crossong on the left comonadic fragment, and the right
         monadic fragment. *)
