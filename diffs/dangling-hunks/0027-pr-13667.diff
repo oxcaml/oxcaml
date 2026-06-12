@@ -1,0 +1,213 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index ff8d5cce09c2..8c68cb0814c0 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -59,7 +59,7 @@ jobs:
+          '${{ github.event.repository.full_name }}'
+       - name: Configure tree
+         run: |
+-          MAKE_ARG=-j CONFIG_ARG='--enable-flambda --enable-cmm-invariants --enable-dependency-generation --enable-native-toplevel' OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh configure
++          MAKE_ARG=-j CONFIG_ARG='--enable-flambda --enable-cmm-invariants --enable-codegen-invariants --enable-dependency-generation --enable-native-toplevel' OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh configure
+       - name: Build
+         run: |
+           MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
+@@ -188,7 +188,7 @@ jobs:
+ 
+       - name: configure tree
+         run: |
+-          CONFIG_ARG='${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
++          CONFIG_ARG='--enable-codegen-invariants ${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
+       - name: Build
+         run: |
+           MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
+diff --git a/Changes b/Changes
+index 029e541a0c93..dbe7c17cbce2 100644
+--- a/Changes
++++ b/Changes
+@@ -91,6 +91,10 @@ Working version
+   (Pierre Chambart, review by Gabriel Scherer and Xavier Leroy,
+    report by Patrick Nicodemus)
+ 
++- #13667: (originally #11162) Fix instr_size computation on arm64.
++  (Stephen Dolan and Tim McGilchrist, review by Xavier Leroy
++  and David Allsopp)
++
+ ### Standard library:
+ 
+ - #13729: Add Either.retract
+diff --git a/Makefile.config.in b/Makefile.config.in
+index 522c0f63381b..8ddb5fe79088 100644
+--- a/Makefile.config.in
++++ b/Makefile.config.in
+@@ -213,6 +213,7 @@ HOST=@host@
+ FLAMBDA=@flambda@
+ WITH_FLAMBDA_INVARIANTS=@flambda_invariants@
+ WITH_CMM_INVARIANTS=@cmm_invariants@
++WITH_CODEGEN_INVARIANTS=@codegen_invariants@
+ FORCE_SAFE_STRING=true
+ DEFAULT_SAFE_STRING=true
+ WINDOWS_UNICODE=@windows_unicode@
+diff --git a/configure b/configure
+index b9bc2ae55c95..ded0f421bf7b 100755
+--- a/configure
++++ b/configure
+@@ -862,6 +862,7 @@ otherlibs
+ otherlibraries
+ instrumented_runtime_libs
+ instrumented_runtime
++codegen_invariants
+ debug_runtime
+ cmxs
+ natdynlink_archive
+@@ -998,6 +999,7 @@ ac_subst_files=''
+ ac_user_opts='
+ enable_option_checking
+ enable_debug_runtime
++enable_codegen_invariants
+ enable_ocamldebug
+ enable_debugger
+ enable_dependency_generation
+@@ -1697,6 +1699,8 @@ Optional Features:
+   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+   --disable-debug-runtime do not build runtime with debugging support
++  --enable-codegen-invariants
++                          enable invariants checks in native codegen
+   --enable-ocamldebug     build ocamldebug [default=auto]
+   --enable-debugger       alias for --enable-ocamldebug
+   --disable-dependency-generation
+@@ -3498,6 +3502,7 @@ LINEAR_MAGIC_NUMBER=Caml1999L035
+ 
+ 
+ 
++
+ 
+ 
+  # TODO: rename this variable
+@@ -3869,6 +3874,13 @@ then :
+ fi
+ 
+ 
++# Check whether --enable-codegen-invariants was given.
++if test ${enable_codegen_invariants+y}
++then :
++  enableval=$enable_codegen_invariants;
++fi
++
++
+ # Check whether --enable-ocamldebug was given.
+ if test ${enable_ocamldebug+y}
+ then :
+@@ -21664,6 +21676,14 @@ case $enable_debug_runtime in #(
+     debug_runtime=true ;;
+ esac
+ 
++## Should the codegen with debugging support be built
++case $enable_codegen_invariants in #(
++  no) :
++    codegen_invariants=false ;; #(
++  *) :
++    codegen_invariants=true ;;
++esac
++
+ ## Determine how to link with the POSIX threads library
+ 
+ case $target in #(
+diff --git a/configure.ac b/configure.ac
+index 2fcdf29bbe50..1ab2160ced23 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -196,6 +196,7 @@ AC_SUBST([natdynlinkopts])
+ AC_SUBST([natdynlink_archive])
+ AC_SUBST([cmxs])
+ AC_SUBST([debug_runtime])
++AC_SUBST([codegen_invariants])
+ AC_SUBST([instrumented_runtime])
+ AC_SUBST([instrumented_runtime_libs])
+ AC_SUBST([otherlibraries])
+@@ -378,6 +379,10 @@ AC_ARG_ENABLE([debug-runtime],
+   [AS_HELP_STRING([--disable-debug-runtime],
+     [do not build runtime with debugging support])])
+ 
++AC_ARG_ENABLE([codegen-invariants],
++  [AS_HELP_STRING([--enable-codegen-invariants],
++    [enable invariants checks in native codegen])])
++
+ AC_ARG_ENABLE([ocamldebug],
+   [AS_HELP_STRING([--enable-ocamldebug],
+     [build ocamldebug @<:@default=auto@:>@])],
+@@ -2439,6 +2444,11 @@ AS_CASE([$enable_debug_runtime],
+   [no], [debug_runtime=false],
+   [debug_runtime=true])
+ 
++## Should the codegen with debugging support be built
++AS_CASE([$enable_codegen_invariants],
++  [no], [codegen_invariants=false],
++  [codegen_invariants=true])
++
+ ## Determine how to link with the POSIX threads library
+ 
+ AS_CASE([$target],
+diff --git a/tools/ci/inria/main b/tools/ci/inria/main
+index 5ece025cb4fc..4dcf83e09384 100755
+--- a/tools/ci/inria/main
++++ b/tools/ci/inria/main
+@@ -155,7 +155,7 @@ conffile=Makefile.config
+ make=make
+ instdir="$HOME/ocaml-tmp-install"
+ confoptions="--enable-ocamltest --enable-dependency-generation \
+-${OCAML_CONFIGURE_OPTIONS}"
++--enable-codegen-invariants ${OCAML_CONFIGURE_OPTIONS}"
+ make_native=true
+ cleanup=false
+ check_make_alldepend=false
+diff --git a/utils/config.common.ml.in b/utils/config.common.ml.in
+index 2757c7e9dd6e..c5a9b5f1c7ed 100644
+--- a/utils/config.common.ml.in
++++ b/utils/config.common.ml.in
+@@ -124,6 +124,7 @@ let configuration_variables () =
+   p_bool "supports_shared_libraries" supports_shared_libraries;
+   p_bool "native_dynlink" native_dynlink;
+   p_bool "naked_pointers" naked_pointers;
++  p_bool "with_codegen_invariants" with_codegen_invariants;
+ 
+   p "exec_magic_number" exec_magic_number;
+   p "cmi_magic_number" cmi_magic_number;
+diff --git a/utils/config.fixed.ml b/utils/config.fixed.ml
+index 213d0afb7fc4..4665cce8931b 100644
+--- a/utils/config.fixed.ml
++++ b/utils/config.fixed.ml
+@@ -49,6 +49,7 @@ let mkmaindll = native_pack_linker
+ let flambda = false
+ let with_flambda_invariants = false
+ let with_cmm_invariants = false
++let with_codegen_invariants = false
+ let windows_unicode = false
+ let flat_float_array = true
+ let align_double = true
+diff --git a/utils/config.generated.ml.in b/utils/config.generated.ml.in
+index 6e15683f7c69..148d812f7dad 100644
+--- a/utils/config.generated.ml.in
++++ b/utils/config.generated.ml.in
+@@ -59,6 +59,7 @@ let mkmaindll = {@QS@|@mkmaindll_exp@|@QS@}
+ let flambda = @flambda@
+ let with_flambda_invariants = @flambda_invariants@
+ let with_cmm_invariants = @cmm_invariants@
++let with_codegen_invariants = @codegen_invariants@
+ let windows_unicode = @windows_unicode@ != 0
+ 
+ let flat_float_array = @flat_float_array@
+diff --git a/utils/config.mli b/utils/config.mli
+index bfcf804b72ab..0375f71efbe3 100644
+--- a/utils/config.mli
++++ b/utils/config.mli
+@@ -227,6 +227,9 @@ val with_flambda_invariants : bool
+ val with_cmm_invariants : bool
+ (** Whether the invariants checks for Cmm are enabled *)
+ 
++val with_codegen_invariants : bool
++(** Whether the invariant checks for native code generation are enabled. *)
++
+ val reserved_header_bits : int
+ (** How many bits of a block's header are reserved *)
+ 

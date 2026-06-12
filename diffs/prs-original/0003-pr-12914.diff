@@ -1,0 +1,41 @@
+diff --git a/Changes b/Changes
+index 160793009187..458284cc673c 100644
+--- a/Changes
++++ b/Changes
+@@ -45,6 +45,10 @@ _______________
+   bytecode linker in `-custom` and `-output-*` modes.
+   (David Allsopp, Antonin Décimo and Samuel Hym, review by Vincent Laviron)
+ 
++- #xxxxx: Slightly change the s390x assembly dialect in order to build with
++  Clang's integrated assembler.
++  (Miod Vallat, review by TBD)
++
+ ### Build system:
+ 
+ ### Bug fixes:
+diff --git a/asmcomp/s390x/emit.mlp b/asmcomp/s390x/emit.mlp
+index a9df052774f3..c98a0d77623f 100644
+--- a/asmcomp/s390x/emit.mlp
++++ b/asmcomp/s390x/emit.mlp
+@@ -121,7 +121,7 @@ let emit_stack env r =
+ 
+ let emit_load_symbol_addr reg s =
+   if !pic_code then
+-  `	lgrl	{emit_reg reg}, {emit_symbol s}@GOTENT\n`
++  `	lgrl	{emit_reg reg}, {emit_symbol s}@GOT\n`
+   else
+   `	larl	{emit_reg reg}, {emit_symbol s}\n`
+ 
+diff --git a/runtime/s390x.S b/runtime/s390x.S
+index 5b7cdc8e4a88..52a5e228b52e 100644
+--- a/runtime/s390x.S
++++ b/runtime/s390x.S
+@@ -35,7 +35,7 @@
+ 
+ #define LBL(x) .L##x
+ #define G(r) r
+-#define GREL(r) r@GOTENT
++#define GREL(r) r@GOT
+ #define GCALL(r) r@PLT
+ #define TEXT_SECTION(name)
+ #define FUNCTION(name) \

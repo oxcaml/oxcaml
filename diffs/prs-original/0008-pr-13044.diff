@@ -1,0 +1,131 @@
+diff --git a/.depend b/.depend
+index 8d2363f4fbe9..1cb497b506b2 100644
+--- a/.depend
++++ b/.depend
+@@ -2644,7 +2644,6 @@ asmcomp/cmm_helpers.cmo : \
+     utils/targetint.cmi \
+     lambda/switch.cmi \
+     asmcomp/strmatch.cmi \
+-    asmcomp/proc.cmi \
+     typing/primitive.cmi \
+     utils/numbers.cmi \
+     utils/misc.cmi \
+@@ -2667,7 +2666,6 @@ asmcomp/cmm_helpers.cmx : \
+     utils/targetint.cmx \
+     lambda/switch.cmx \
+     asmcomp/strmatch.cmx \
+-    asmcomp/proc.cmx \
+     typing/primitive.cmx \
+     utils/numbers.cmx \
+     utils/misc.cmx \
+diff --git a/asmcomp/amd64/proc.ml b/asmcomp/amd64/proc.ml
+index 97e55e80ff1e..7470d88caf53 100644
+--- a/asmcomp/amd64/proc.ml
++++ b/asmcomp/amd64/proc.ml
+@@ -149,10 +149,6 @@ let destroyed_by_plt_stub_set = Reg.set_of_array destroyed_by_plt_stub
+ let stack_slot slot ty =
+   Reg.at_location ty (Stack slot)
+ 
+-(* Instruction selection *)
+-
+-let word_addressed = false
+-
+ (* Calling conventions *)
+ 
+ let size_domainstate_args = 64 * size_int
+diff --git a/asmcomp/arm64/proc.ml b/asmcomp/arm64/proc.ml
+index 40fb6fb0637b..78845f33857c 100644
+--- a/asmcomp/arm64/proc.ml
++++ b/asmcomp/arm64/proc.ml
+@@ -24,10 +24,6 @@ open Reg
+ open Arch
+ open Mach
+ 
+-(* Instruction selection *)
+-
+-let word_addressed = false
+-
+ (* Registers available for register allocation *)
+ 
+ (* Integer register map:
+diff --git a/asmcomp/cmm_helpers.ml b/asmcomp/cmm_helpers.ml
+index 44b3e0928dc2..c99c39bc0013 100644
+--- a/asmcomp/cmm_helpers.ml
++++ b/asmcomp/cmm_helpers.ml
+@@ -673,13 +673,10 @@ let tag_offset =
+   if big_endian then -1 else -size_int
+ 
+ let get_tag ptr dbg =
+-  if Proc.word_addressed then           (* If byte loads are slow *)
+-    Cop(Cand, [get_header ptr dbg; Cconst_int (255, dbg)], dbg)
+-  else                                  (* If byte loads are efficient *)
+-    (* Same comment as [get_header] above *)
+-    Cop(
+-      mk_load_immut Byte_unsigned,
+-      [Cop(Cadda, [ptr; Cconst_int(tag_offset, dbg)], dbg)], dbg)
++  (* Same comment as [get_header] above *)
++  Cop(
++    mk_load_immut Byte_unsigned,
++    [Cop(Cadda, [ptr; Cconst_int(tag_offset, dbg)], dbg)], dbg)
+ 
+ let get_size ptr dbg =
+   Cop(Clsr, [get_header_masked ptr dbg; Cconst_int (10, dbg)], dbg)
+diff --git a/asmcomp/power/proc.ml b/asmcomp/power/proc.ml
+index 8eb0c8232f3f..f7338a9adc9b 100644
+--- a/asmcomp/power/proc.ml
++++ b/asmcomp/power/proc.ml
+@@ -22,10 +22,6 @@ open Reg
+ open Arch
+ open Mach
+ 
+-(* Instruction selection *)
+-
+-let word_addressed = false
+-
+ (* Registers available for register allocation *)
+ 
+ (* Integer register map:
+diff --git a/asmcomp/proc.mli b/asmcomp/proc.mli
+index e6352e027902..2cd94f76ae94 100644
+--- a/asmcomp/proc.mli
++++ b/asmcomp/proc.mli
+@@ -15,9 +15,6 @@
+ 
+ (* Processor descriptions *)
+ 
+-(* Instruction selection *)
+-val word_addressed: bool
+-
+ (* Registers available for register allocation *)
+ val num_register_classes: int
+ val register_class: Reg.t -> int
+diff --git a/asmcomp/riscv/proc.ml b/asmcomp/riscv/proc.ml
+index 827ef3d03abb..48e33a9665dd 100644
+--- a/asmcomp/riscv/proc.ml
++++ b/asmcomp/riscv/proc.ml
+@@ -22,10 +22,6 @@ open Reg
+ open Arch
+ open Mach
+ 
+-(* Instruction selection *)
+-
+-let word_addressed = false
+-
+ (* Registers available for register allocation *)
+ 
+ (* Integer register map
+diff --git a/asmcomp/s390x/proc.ml b/asmcomp/s390x/proc.ml
+index e6daa98b7ee2..d2258b90ac18 100644
+--- a/asmcomp/s390x/proc.ml
++++ b/asmcomp/s390x/proc.ml
+@@ -24,10 +24,6 @@ open Reg
+ open Arch
+ open Mach
+ 
+-(* Instruction selection *)
+-
+-let word_addressed = false
+-
+ (* Registers available for register allocation *)
+ 
+ (* Integer register map:

@@ -1,0 +1,142 @@
+diff --git a/asmcomp/cmmgen.ml b/asmcomp/cmmgen.ml
+index 8ae58c170695..edbfeaa1a795 100644
+--- a/asmcomp/cmmgen.ml
++++ b/asmcomp/cmmgen.ml
+@@ -508,7 +508,7 @@ let rec transl env e =
+       | ((Pfield_computed|Psequand
+          | Prunstack | Pperform | Presume | Preperform
+          | Pdls_get
+-         | Patomic_load _
++         | Patomic_load
+          | Psequor | Pnot | Pnegint | Paddint | Psubint
+          | Pmulint | Pandint | Porint | Pxorint | Plslint
+          | Plsrint | Pasrint | Pintoffloat | Pfloatofint
+@@ -831,9 +831,7 @@ and transl_prim_1 env p arg dbg =
+        dbg)
+   | Pdls_get ->
+       Cop(Cdls_get, [transl env arg], dbg)
+-  | Patomic_load {immediate_or_pointer = Immediate} ->
+-      Cop(mk_load_atomic Word_int, [transl env arg], dbg)
+-  | Patomic_load {immediate_or_pointer = Pointer} ->
++  | Patomic_load ->
+       Cop(mk_load_atomic Word_val, [transl env arg], dbg)
+   | Ppoll ->
+     (Csequence (remove_unit (transl env arg),
+@@ -1024,7 +1022,7 @@ and transl_prim_2 env p arg1 arg2 dbg =
+                      [transl_unbox_int dbg env bi arg1;
+                       transl_unbox_int dbg env bi arg2], dbg)) dbg
+   | Prunstack | Pperform | Presume | Preperform | Pdls_get
+-  | Patomic_load _
++  | Patomic_load
+   | Pnot | Pnegint | Pintoffloat | Pfloatofint | Pnegfloat
+   | Pabsfloat | Pstringlength | Pbyteslength | Pbytessetu | Pbytessets
+   | Pisint | Pbswap16 | Pint_as_pointer | Popaque | Pread_symbol _
+@@ -1091,7 +1089,7 @@ and transl_prim_3 env p arg1 arg2 arg3 dbg =
+            dbg)
+ 
+   | Pperform | Pdls_get | Presume
+-  | Patomic_load _
++  | Patomic_load
+   | Pfield_computed | Psequand | Psequor | Pnot | Pnegint | Paddint
+   | Psubint | Pmulint | Pandint | Porint | Pxorint | Plslint | Plsrint | Pasrint
+   | Pintoffloat | Pfloatofint | Pnegfloat | Pabsfloat | Paddfloat | Psubfloat
+@@ -1124,7 +1122,7 @@ and transl_prim_4 env p arg1 arg2 arg3 arg4 dbg =
+   | Pbytessetu | Pbytessets | Parraysetu _
+   | Parraysets _ | Pbytes_set _ | Pbigstring_set _
+   | Prunstack | Preperform | Pperform | Pdls_get
+-  | Patomic_load _
++  | Patomic_load
+   | Pfield_computed | Psequand | Psequor | Pnot | Pnegint | Paddint
+   | Psubint | Pmulint | Pandint | Porint | Pxorint | Plslint | Plsrint | Pasrint
+   | Pintoffloat | Pfloatofint | Pnegfloat | Pabsfloat | Paddfloat | Psubfloat
+diff --git a/middle_end/clambda_primitives.ml b/middle_end/clambda_primitives.ml
+index 38a3094af012..459644a710df 100644
+--- a/middle_end/clambda_primitives.ml
++++ b/middle_end/clambda_primitives.ml
+@@ -120,7 +120,7 @@ type primitive =
+   (* Integer to external pointer *)
+   | Pint_as_pointer
+   (* Atomic operations *)
+-  | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
++  | Patomic_load
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetch domain-local state *)
+diff --git a/middle_end/clambda_primitives.mli b/middle_end/clambda_primitives.mli
+index e13491d607ef..30efd0b2d263 100644
+--- a/middle_end/clambda_primitives.mli
++++ b/middle_end/clambda_primitives.mli
+@@ -123,7 +123,7 @@ type primitive =
+   (* Integer to external pointer *)
+   | Pint_as_pointer
+   (* Atomic operations *)
+-  | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
++  | Patomic_load
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetch domain-local state *)
+diff --git a/middle_end/convert_primitives.ml b/middle_end/convert_primitives.ml
+index 72831d7127e9..90dd67b89610 100644
+--- a/middle_end/convert_primitives.ml
++++ b/middle_end/convert_primitives.ml
+@@ -144,8 +144,7 @@ let convert (prim : Lambda.primitive) : Clambda_primitives.primitive =
+   | Pbigarraydim dim -> Pbigarraydim dim
+   | Pbswap16 -> Pbswap16
+   | Pint_as_pointer -> Pint_as_pointer
+-  | Patomic_load { immediate_or_pointer } ->
+-      Patomic_load { immediate_or_pointer }
++  | Patomic_load -> Patomic_load
+   | Popaque -> Popaque
+   | Pdls_get -> Pdls_get
+   | Ppoll -> Ppoll
+diff --git a/middle_end/internal_variable_names.ml b/middle_end/internal_variable_names.ml
+index 9ae690e4f359..bc194e1cf114 100644
+--- a/middle_end/internal_variable_names.ml
++++ b/middle_end/internal_variable_names.ml
+@@ -421,7 +421,7 @@ let of_primitive : Lambda.primitive -> string = function
+   | Pbbswap _ -> pbbswap
+   | Pint_as_pointer -> pint_as_pointer
+   | Popaque -> popaque
+-  | Patomic_load _ -> patomic_load
++  | Patomic_load -> patomic_load
+   | Prunstack -> prunstack
+   | Pperform -> pperform
+   | Presume -> presume
+@@ -531,7 +531,7 @@ let of_primitive_arg : Lambda.primitive -> string = function
+   | Pbbswap _ -> pbbswap_arg
+   | Pint_as_pointer -> pint_as_pointer_arg
+   | Popaque -> popaque_arg
+-  | Patomic_load _ -> patomic_load_arg
++  | Patomic_load -> patomic_load_arg
+   | Prunstack -> prunstack_arg
+   | Pperform -> pperform_arg
+   | Presume -> presume_arg
+diff --git a/middle_end/printclambda_primitives.ml b/middle_end/printclambda_primitives.ml
+index a54883eb6948..56a95bbfe913 100644
+--- a/middle_end/printclambda_primitives.ml
++++ b/middle_end/printclambda_primitives.ml
+@@ -213,10 +213,7 @@ let primitive ppf (prim:Clambda_primitives.primitive) =
+   | Pbswap16 -> fprintf ppf "bswap16"
+   | Pbbswap(bi) -> print_boxed_integer "bswap" ppf bi
+   | Pint_as_pointer -> fprintf ppf "int_as_pointer"
+-  | Patomic_load {immediate_or_pointer} ->
+-      (match immediate_or_pointer with
+-        | Immediate -> fprintf ppf "atomic_load_imm"
+-        | Pointer -> fprintf ppf "atomic_load_ptr")
++  | Patomic_load -> fprintf ppf "atomic_load"
+   | Popaque -> fprintf ppf "opaque"
+   | Pdls_get -> fprintf ppf "dls_get"
+   | Ppoll -> fprintf ppf "poll"
+diff --git a/middle_end/semantics_of_primitives.ml b/middle_end/semantics_of_primitives.ml
+index 17219759a0cc..5d0e2dcfc132 100644
+--- a/middle_end/semantics_of_primitives.ml
++++ b/middle_end/semantics_of_primitives.ml
+@@ -116,7 +116,7 @@ let for_primitive (prim : Clambda_primitives.primitive) =
+   | Psetfield _
+   | Psetfield_computed _
+   | Psetfloatfield _
+-  | Patomic_load _
++  | Patomic_load
+   | Parraysetu _
+   | Parraysets _
+   | Pbytessetu

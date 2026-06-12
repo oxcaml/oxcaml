@@ -1,0 +1,38 @@
+diff --git a/asmcomp/arm64/emit.mlp b/asmcomp/arm64/emit.mlp
+index 3325139d4f87..6a770fc3e5ea 100644
+--- a/asmcomp/arm64/emit.mlp
++++ b/asmcomp/arm64/emit.mlp
+@@ -1035,8 +1035,7 @@ let emit_instr env i =
+     | Lpushtrap { lbl_handler; } ->
+         `	adr	{emit_reg reg_tmp1}, {emit_label lbl_handler}\n`;
+         env.stack_offset <- env.stack_offset + 16;
+-        `	str	{emit_reg reg_trap_ptr}, [sp, -16]!\n`;
+-        `	str	{emit_reg reg_tmp1}, [sp, #8]\n`;
++        `	stp	{emit_reg reg_trap_ptr}, {emit_reg reg_tmp1}, [sp, -16]!\n`;
+         cfi_adjust_cfa_offset 16;
+         `	mov	{emit_reg reg_trap_ptr}, sp\n`
+     | Lpoptrap ->
+@@ -1053,8 +1052,7 @@ let emit_instr env i =
+           `{record_frame env Reg.Set.empty (Dbg_raise i.dbg)}\n`
+         | Lambda.Raise_notrace ->
+           `	mov	sp, {emit_reg reg_trap_ptr}\n`;
+-          `	ldr	{emit_reg reg_tmp1}, [sp, #8]\n`;
+-          `	ldr	{emit_reg reg_trap_ptr}, [sp], 16\n`;
++          `	ldp	{emit_reg reg_trap_ptr}, {emit_reg reg_tmp1}, [sp], 16\n`;
+           `	br	{emit_reg reg_tmp1}\n`
+         end
+ 
+diff --git a/runtime/arm64.S b/runtime/arm64.S
+index 17706ffbb425..9f493e96c422 100644
+--- a/runtime/arm64.S
++++ b/runtime/arm64.S
+@@ -761,8 +761,7 @@ L(trap_handler):
+     /* Cut stack at current trap handler */
+         mov     sp, TRAP_PTR
+     /* Pop previous handler and jump to it */
+-        ldr     TMP, [sp, 8]
+-        ldr     TRAP_PTR, [sp], 16
++        ldp     TRAP_PTR, TMP, [sp], 16
+         br      TMP
+ .endm
+ 

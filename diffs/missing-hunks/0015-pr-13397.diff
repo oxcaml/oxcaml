@@ -1,0 +1,184 @@
+diff --git a/asmcomp/cmmgen.ml b/asmcomp/cmmgen.ml
+index c8c2eb397ea2..8ae58c170695 100644
+--- a/asmcomp/cmmgen.ml
++++ b/asmcomp/cmmgen.ml
+@@ -508,8 +508,7 @@ let rec transl env e =
+       | ((Pfield_computed|Psequand
+          | Prunstack | Pperform | Presume | Preperform
+          | Pdls_get
+-         | Patomic_load _ | Patomic_exchange
+-         | Patomic_cas | Patomic_fetch_add
++         | Patomic_load _
+          | Psequor | Pnot | Pnegint | Paddint | Psubint
+          | Pmulint | Pandint | Porint | Pxorint | Plslint
+          | Plsrint | Pasrint | Pintoffloat | Pfloatofint
+@@ -841,7 +840,6 @@ and transl_prim_1 env p arg dbg =
+                 return_unit dbg (Cop(Cpoll, [], dbg))))
+   | (Pfield_computed | Psequand | Psequor
+     | Prunstack | Presume | Preperform
+-    | Patomic_exchange | Patomic_cas | Patomic_fetch_add
+     | Paddint | Psubint | Pmulint | Pandint
+     | Porint | Pxorint | Plslint | Plsrint | Pasrint
+     | Paddfloat | Psubfloat | Pmulfloat | Pdivfloat
+@@ -1025,14 +1023,8 @@ and transl_prim_2 env p arg1 arg2 dbg =
+       tag_int (Cop(Ccmpi cmp,
+                      [transl_unbox_int dbg env bi arg1;
+                       transl_unbox_int dbg env bi arg2], dbg)) dbg
+-  | Patomic_exchange ->
+-     Cop (Cextcall ("caml_atomic_exchange", typ_val, [], false),
+-          [transl env arg1; transl env arg2], dbg)
+-  | Patomic_fetch_add ->
+-     Cop (Cextcall ("caml_atomic_fetch_add", typ_int, [], false),
+-          [transl env arg1; transl env arg2], dbg)
+   | Prunstack | Pperform | Presume | Preperform | Pdls_get
+-  | Patomic_cas | Patomic_load _
++  | Patomic_load _
+   | Pnot | Pnegint | Pintoffloat | Pfloatofint | Pnegfloat
+   | Pabsfloat | Pstringlength | Pbyteslength | Pbytessetu | Pbytessets
+   | Pisint | Pbswap16 | Pint_as_pointer | Popaque | Pread_symbol _
+@@ -1084,10 +1076,6 @@ and transl_prim_3 env p arg1 arg2 arg3 dbg =
+       bigstring_set size unsafe (transl env arg1) (transl env arg2)
+         (transl_unbox_sized size dbg env arg3) dbg
+ 
+-  | Patomic_cas ->
+-     Cop (Cextcall ("caml_atomic_cas", typ_int, [], false),
+-          [transl env arg1; transl env arg2; transl env arg3], dbg)
+-
+   (* Effects *)
+ 
+   | Prunstack ->
+@@ -1103,7 +1091,7 @@ and transl_prim_3 env p arg1 arg2 arg3 dbg =
+            dbg)
+ 
+   | Pperform | Pdls_get | Presume
+-  | Patomic_exchange | Patomic_fetch_add | Patomic_load _
++  | Patomic_load _
+   | Pfield_computed | Psequand | Psequor | Pnot | Pnegint | Paddint
+   | Psubint | Pmulint | Pandint | Porint | Pxorint | Plslint | Plsrint | Pasrint
+   | Pintoffloat | Pfloatofint | Pnegfloat | Pabsfloat | Paddfloat | Psubfloat
+@@ -1134,9 +1122,9 @@ and transl_prim_4 env p arg1 arg2 arg3 arg4 dbg =
+            dbg)
+   | Psetfield_computed _
+   | Pbytessetu | Pbytessets | Parraysetu _
+-  | Parraysets _ | Pbytes_set _ | Pbigstring_set _ | Patomic_cas
++  | Parraysets _ | Pbytes_set _ | Pbigstring_set _
+   | Prunstack | Preperform | Pperform | Pdls_get
+-  | Patomic_exchange | Patomic_fetch_add | Patomic_load _
++  | Patomic_load _
+   | Pfield_computed | Psequand | Psequor | Pnot | Pnegint | Paddint
+   | Psubint | Pmulint | Pandint | Porint | Pxorint | Plslint | Plsrint | Pasrint
+   | Pintoffloat | Pfloatofint | Pnegfloat | Pabsfloat | Paddfloat | Psubfloat
+diff --git a/middle_end/clambda_primitives.ml b/middle_end/clambda_primitives.ml
+index bddb01491722..38a3094af012 100644
+--- a/middle_end/clambda_primitives.ml
++++ b/middle_end/clambda_primitives.ml
+@@ -121,9 +121,6 @@ type primitive =
+   | Pint_as_pointer
+   (* Atomic operations *)
+   | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
+-  | Patomic_exchange
+-  | Patomic_cas
+-  | Patomic_fetch_add
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetch domain-local state *)
+diff --git a/middle_end/clambda_primitives.mli b/middle_end/clambda_primitives.mli
+index 50d5a212859b..e13491d607ef 100644
+--- a/middle_end/clambda_primitives.mli
++++ b/middle_end/clambda_primitives.mli
+@@ -124,9 +124,6 @@ type primitive =
+   | Pint_as_pointer
+   (* Atomic operations *)
+   | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
+-  | Patomic_exchange
+-  | Patomic_cas
+-  | Patomic_fetch_add
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetch domain-local state *)
+diff --git a/middle_end/convert_primitives.ml b/middle_end/convert_primitives.ml
+index aa6465132f0c..72831d7127e9 100644
+--- a/middle_end/convert_primitives.ml
++++ b/middle_end/convert_primitives.ml
+@@ -146,9 +146,6 @@ let convert (prim : Lambda.primitive) : Clambda_primitives.primitive =
+   | Pint_as_pointer -> Pint_as_pointer
+   | Patomic_load { immediate_or_pointer } ->
+       Patomic_load { immediate_or_pointer }
+-  | Patomic_exchange -> Patomic_exchange
+-  | Patomic_cas -> Patomic_cas
+-  | Patomic_fetch_add -> Patomic_fetch_add
+   | Popaque -> Popaque
+   | Pdls_get -> Pdls_get
+   | Ppoll -> Ppoll
+diff --git a/middle_end/internal_variable_names.ml b/middle_end/internal_variable_names.ml
+index ca529ac25538..9ae690e4f359 100644
+--- a/middle_end/internal_variable_names.ml
++++ b/middle_end/internal_variable_names.ml
+@@ -169,9 +169,6 @@ let psubfloat = "Psubfloat"
+ let psubint = "Psubint"
+ let pxorbint = "Pxorbint"
+ let pxorint = "Pxorint"
+-let patomic_cas = "Patomic_cas"
+-let patomic_exchange = "Patomic_exchange"
+-let patomic_fetch_add = "Patomic_fetch_add"
+ let patomic_load = "Patomic_load"
+ let prunstack = "Prunstack"
+ let pperform = "Pperform"
+@@ -282,9 +279,6 @@ let psubfloat_arg = "Psubfloat_arg"
+ let psubint_arg = "Psubint_arg"
+ let pxorbint_arg = "Pxorbint_arg"
+ let pxorint_arg = "Pxorint_arg"
+-let patomic_cas_arg = "Patomic_cas_arg"
+-let patomic_exchange_arg = "Patomic_exchange_arg"
+-let patomic_fetch_add_arg = "Patomic_fetch_add_arg"
+ let patomic_load_arg = "Patomic_load_arg"
+ let prunstack_arg = "Prunstack_arg"
+ let pperform_arg = "Pperform_arg"
+@@ -427,9 +421,6 @@ let of_primitive : Lambda.primitive -> string = function
+   | Pbbswap _ -> pbbswap
+   | Pint_as_pointer -> pint_as_pointer
+   | Popaque -> popaque
+-  | Patomic_cas -> patomic_cas
+-  | Patomic_exchange -> patomic_exchange
+-  | Patomic_fetch_add -> patomic_fetch_add
+   | Patomic_load _ -> patomic_load
+   | Prunstack -> prunstack
+   | Pperform -> pperform
+@@ -540,9 +531,6 @@ let of_primitive_arg : Lambda.primitive -> string = function
+   | Pbbswap _ -> pbbswap_arg
+   | Pint_as_pointer -> pint_as_pointer_arg
+   | Popaque -> popaque_arg
+-  | Patomic_cas -> patomic_cas_arg
+-  | Patomic_exchange -> patomic_exchange_arg
+-  | Patomic_fetch_add -> patomic_fetch_add_arg
+   | Patomic_load _ -> patomic_load_arg
+   | Prunstack -> prunstack_arg
+   | Pperform -> pperform_arg
+diff --git a/middle_end/printclambda_primitives.ml b/middle_end/printclambda_primitives.ml
+index 3f54a255c9b2..a54883eb6948 100644
+--- a/middle_end/printclambda_primitives.ml
++++ b/middle_end/printclambda_primitives.ml
+@@ -217,9 +217,6 @@ let primitive ppf (prim:Clambda_primitives.primitive) =
+       (match immediate_or_pointer with
+         | Immediate -> fprintf ppf "atomic_load_imm"
+         | Pointer -> fprintf ppf "atomic_load_ptr")
+-  | Patomic_exchange -> fprintf ppf "atomic_exchange"
+-  | Patomic_cas -> fprintf ppf "atomic_cas"
+-  | Patomic_fetch_add -> fprintf ppf "atomic_fetch_add"
+   | Popaque -> fprintf ppf "opaque"
+   | Pdls_get -> fprintf ppf "dls_get"
+   | Ppoll -> fprintf ppf "poll"
+diff --git a/middle_end/semantics_of_primitives.ml b/middle_end/semantics_of_primitives.ml
+index e921ee942655..17219759a0cc 100644
+--- a/middle_end/semantics_of_primitives.ml
++++ b/middle_end/semantics_of_primitives.ml
+@@ -117,9 +117,6 @@ let for_primitive (prim : Clambda_primitives.primitive) =
+   | Psetfield_computed _
+   | Psetfloatfield _
+   | Patomic_load _
+-  | Patomic_exchange
+-  | Patomic_cas
+-  | Patomic_fetch_add
+   | Parraysetu _
+   | Parraysets _
+   | Pbytessetu

@@ -1,0 +1,27 @@
+diff --git a/Changes b/Changes
+index e77aa2d6e9e7..5a3f3284660a 100644
+--- a/Changes
++++ b/Changes
+@@ -135,6 +135,9 @@ Working version
+   `.size` and `.type` directives and the `.note.GNU-stack` section
+   (Samuel Hym, review by Miod Vallat, Antonin Décimo and Gabriel Scherer)
+ 
++- #13807: Allow unaligned memory accesses on ARM64. (Matthew Else, review by
++  Xavier Leroy)
++
+ ### Standard library:
+ 
+ - #13796: Add Uchar.utf_8_decode_length_of_byte and
+diff --git a/asmcomp/arm64/arch.ml b/asmcomp/arm64/arch.ml
+index 8ffc903093d1..731e9a4cac9c 100644
+--- a/asmcomp/arm64/arch.ml
++++ b/asmcomp/arm64/arch.ml
+@@ -74,7 +74,7 @@ let size_addr = 8
+ let size_int = 8
+ let size_float = 8
+ 
+-let allow_unaligned_access = false
++let allow_unaligned_access = true
+ 
+ (* Behavior of division *)
+ 

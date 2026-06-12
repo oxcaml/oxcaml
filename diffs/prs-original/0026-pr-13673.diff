@@ -1,0 +1,122 @@
+diff --git a/Changes b/Changes
+index d730c3b74bb0..6a89332de1ba 100644
+--- a/Changes
++++ b/Changes
+@@ -571,7 +571,8 @@ ___________
+ 
+ ### Compiler user-interface and warnings:
+ 
+-* #12084: Check link order when creating archive and when using ocamlopt
++* #12084, #13669, #13673: Check link order when creating archive and when using
++   ocamlopt.
+   (Hugo Heuzard, review by Stefan Muenzel and Sébastien Hinderer)
+ 
+ - #12980: Explain type mismatch involving first-class modules by including
+diff --git a/asmcomp/asmlibrarian.ml b/asmcomp/asmlibrarian.ml
+index 5b1c315bb283..823b07db3a8d 100644
+--- a/asmcomp/asmlibrarian.ml
++++ b/asmcomp/asmlibrarian.ml
+@@ -68,7 +68,7 @@ let create_archive file_list lib_name =
+          (fun (filename, (unit, _crc)) ->
+             Linkdeps.add ldeps
+               ~filename ~compunit:unit.ui_name
+-              ~provides:unit.ui_defines
++              ~provides:[unit.ui_name]
+               ~requires:(List.map fst unit.ui_imports_cmx))
+          (List.rev units);
+        (match Linkdeps.check ldeps with
+diff --git a/asmcomp/asmlink.ml b/asmcomp/asmlink.ml
+index ce021c1496ea..e8179a729f7c 100644
+--- a/asmcomp/asmlink.ml
++++ b/asmcomp/asmlink.ml
+@@ -156,7 +156,7 @@ let scan_file ldeps file tolink = match file with
+       (* This is a .cmx file. It must be linked in any case. *)
+       Linkdeps.add ldeps
+         ~filename:file_name ~compunit:info.ui_name
+-        ~provides:info.ui_defines
++        ~provides:[info.ui_name]
+         ~requires:(List.map fst info.ui_imports_cmx);
+       (info, file_name, crc) :: tolink
+   | Library (file_name,infos) ->
+@@ -171,7 +171,7 @@ let scan_file ldeps file tolink = match file with
+            then begin
+              Linkdeps.add ldeps
+                ~filename:file_name ~compunit:info.ui_name
+-               ~provides:info.ui_defines
++               ~provides:[info.ui_name]
+                ~requires:(List.map fst info.ui_imports_cmx);
+              (info, file_name, crc) :: reqd
+            end else
+diff --git a/bytecomp/bytelink.ml b/bytecomp/bytelink.ml
+index c452f0585cb7..c55224fab8e8 100644
+--- a/bytecomp/bytelink.ml
++++ b/bytecomp/bytelink.ml
+@@ -110,6 +110,7 @@ let provided compunit =
+ 
+ let linkdeps_unit ldeps ~filename compunit =
+   let requires = required compunit in
++  (* [requires] contains pack submodules *)
+   let provides = provided compunit in
+   let Compunit compunit = compunit.cu_name in
+   Linkdeps.add ldeps ~filename ~compunit ~requires ~provides
+diff --git a/testsuite/tests/badly-ordered-deps/a.ml b/testsuite/tests/badly-ordered-deps/a.ml
+new file mode 100644
+index 000000000000..179d429e2b27
+--- /dev/null
++++ b/testsuite/tests/badly-ordered-deps/a.ml
+@@ -0,0 +1 @@
++let x = 3
+diff --git a/testsuite/tests/badly-ordered-deps/cocinelle.ml b/testsuite/tests/badly-ordered-deps/cocinelle.ml
+new file mode 100644
+index 000000000000..e4ed458695ef
+--- /dev/null
++++ b/testsuite/tests/badly-ordered-deps/cocinelle.ml
+@@ -0,0 +1,41 @@
++(* TEST
++ modules = "a.ml cocinelle.ml";
++ {
++   setup-ocamlc.byte-build-env;
++   flags = "-for-pack Pack";
++   module = "a.ml";
++   ocamlc.byte;
++   flags = "-for-pack Pack";
++   module = "cocinelle.ml";
++   ocamlc.byte;
++   module = "";
++   flags = "";
++   program="./cocinelle.byte";
++   all_modules = "a.cmo cocinelle.cmo";
++   module = "";
++   ocamlc.byte;
++   run;
++   check-program-output;
++ }{
++   setup-ocamlopt.byte-build-env;
++     flags = "-for-pack Pack";
++     module = "a.ml";
++     ocamlopt.byte;
++     flags = "-for-pack Pack";
++     module = "cocinelle.ml";
++     ocamlopt.byte;
++     output="cocinelle";
++     all_modules = "a.cmx cocinelle.cmx";
++     program="./cocinelle.exe";
++     module = "";
++     ocamlopt.byte;
++     run;
++     check-program-output;
++ }
++*)
++
++(* Check that it is still possible to link modules compiled with -for-pack but
++   not yet packed for the sake of backward compatibility. This is not officially
++   supported, but it is not worth breaking packages using this property. *)
++
++let () = Format.printf "A.x=%d@." A.x
+diff --git a/testsuite/tests/badly-ordered-deps/cocinelle.reference b/testsuite/tests/badly-ordered-deps/cocinelle.reference
+new file mode 100644
+index 000000000000..df3a9ff3cf21
+--- /dev/null
++++ b/testsuite/tests/badly-ordered-deps/cocinelle.reference
+@@ -0,0 +1 @@
++A.x=3

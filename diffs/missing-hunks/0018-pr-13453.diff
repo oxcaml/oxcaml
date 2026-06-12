@@ -1,0 +1,39 @@
+diff --git a/asmcomp/amd64/emit.mlp b/asmcomp/amd64/emit.mlp
+index 23f5b4525c28..9a3e9d287125 100644
+--- a/asmcomp/amd64/emit.mlp
++++ b/asmcomp/amd64/emit.mlp
+@@ -550,7 +550,7 @@ let emit_instr env fallthrough i =
+         cfi_def_cfa_register "rbx";
+         (* NB: gdb has asserts on contiguous stacks that mean it
+            will not unwind through this unless we were to tag this
+-           calling frame with cfi_signal_frame in it's definition. *)
++           calling frame with cfi_signal_frame in its definition. *)
+         I.mov (domain_field Domainstate.Domain_c_stack) rsp;
+ 
+         emit_call func;
+diff --git a/asmcomp/s390x/emit.mlp b/asmcomp/s390x/emit.mlp
+index 9959ff1531d5..045bbf9f5d71 100644
+--- a/asmcomp/s390x/emit.mlp
++++ b/asmcomp/s390x/emit.mlp
+@@ -384,7 +384,7 @@ let emit_instr env i =
+           cfi_def_cfa_register "%r12";
+           (* NB: gdb has asserts on contiguous stacks that mean it
+              will not unwind through this unless we were to tag this
+-             calling frame with cfi_signal_frame in it's definition. *)
++             calling frame with cfi_signal_frame in its definition. *)
+           let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
+           `	lg	%r15, {emit_int offset}(%r10)\n`;
+           emit_call func;
+diff --git a/middle_end/flambda/inlining_transforms.ml b/middle_end/flambda/inlining_transforms.ml
+index 6deb99b3c488..11c3a0fef713 100644
+--- a/middle_end/flambda/inlining_transforms.ml
++++ b/middle_end/flambda/inlining_transforms.ml
+@@ -373,7 +373,7 @@ let add_free_var ~free_vars ~state ~free_var =
+   end
+ 
+ (* Add a function to the new set of closures iff:
+-   1) All it's specialised parameters are available in
++   1) All its specialised parameters are available in
+       [old_outside_to_new_outside]
+    2) At least one more parameter will become specialised *)
+ let add_function ~specialised_args ~state ~fun_var ~function_decl =

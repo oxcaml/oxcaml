@@ -1,0 +1,14 @@
+diff --git a/runtime/arm64.S b/runtime/arm64.S
+index 17706ffbb425..9f493e96c422 100644
+--- a/runtime/arm64.S
++++ b/runtime/arm64.S
+@@ -761,8 +761,7 @@ L(trap_handler):
+     /* Cut stack at current trap handler */
+         mov     sp, TRAP_PTR
+     /* Pop previous handler and jump to it */
+-        ldr     TMP, [sp, 8]
+-        ldr     TRAP_PTR, [sp], 16
++        ldp     TRAP_PTR, TMP, [sp], 16
+         br      TMP
+ .endm
+ 
