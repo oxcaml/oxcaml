@@ -7414,7 +7414,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let record, record_sort, _record_sorts, mode, label, _, ambiguity,
+      let record, record_sort, _record_sorts, mode, label, ambiguity,
           ty_arg, record_repres =
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord Legacy
           lid
@@ -7482,7 +7482,7 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let record, record_sort, record_sorts, mode, label, _, ambiguity,
+      let record, record_sort, record_sorts, mode, label, ambiguity,
           ty_arg, record_repres =
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
           Unboxed_product lid
@@ -8443,7 +8443,7 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let record, record_sort, _, rmode, label, _, ambiguity, ty_arg, _ =
+          let record, record_sort, _, rmode, label, ambiguity, ty_arg, _ =
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
@@ -9517,9 +9517,9 @@ and type_label_access
 
 and solve_Pexp_field
   : 'rep . label_usage:_ -> _ -> _ -> _ -> _ -> 'rep record_form -> _ ->
-    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep =
+    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep =
   fun ~label_usage loc env sexp srecord record_form lid ->
-  let (record, record_sort, rmode, label, expected_type, ambiguity) =
+  let (record, record_sort, rmode, label, _expected_type, ambiguity) =
     type_label_access record_form env srecord label_usage lid
   in
   let ty_arg, record_sorts, record_repres =
@@ -9548,7 +9548,7 @@ and solve_Pexp_field
       ty_arg, record_sorts, record_repres
     end
   in
-  (record, record_sort, record_sorts, rmode, label, expected_type,
+  (record, record_sort, record_sorts, rmode, label,
    ambiguity, ty_arg, record_repres)
 
 (* Typing format strings for printing or reading.
