@@ -5000,64 +5000,43 @@ module Report = struct
    fun obj morph a b ->
     Misc.Le_result.equal ~le:(C.le obj) (C.apply obj morph a) b
 
-  let check_identity_morph : type a b. a C.obj -> b C.obj -> a -> b -> unit =
+  let implements_identity : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun src obj a b ->
     match C.equal_obj src obj with
-    | Misc.Is_eq -> assert (implements_morph obj (Simple Id) a b)
-    | Misc.Is_not_eq -> assert false
+    | Misc.Is_eq -> implements_morph obj (Simple Id) a b
+    | Misc.Is_not_eq -> false
 
-  let check_value_to_alloc_morph : type l r a b.
+  let implements_value_to_alloc : type l r a b.
       (C.Regionality.t, C.Locality.t, l * r) C.Locality_morph.t ->
       a C.obj ->
       b C.obj ->
       a ->
       b ->
-      unit =
+      bool =
    fun locality_morph src obj a b ->
     match src, obj with
     | Regionality, Locality ->
-      assert (
-        implements_morph obj
-          (Simple (Core (Locality_restricted locality_morph))) a b)
+      implements_morph obj (Simple (Core (Locality_restricted locality_morph)))
+        a b
     | Comonadic_with_regionality, Comonadic_with_locality ->
-      assert (
-        implements_morph obj (Simple (Core (Locality_full locality_morph))) a b)
-    | _, _ -> check_identity_morph src obj a b
+      implements_morph obj (Simple (Core (Locality_full locality_morph))) a b
+    | _, _ -> implements_identity src obj a b
 
-  let check_alloc_to_value_morph : type l r a b.
+  let implements_alloc_to_value : type l r a b.
       (C.Locality.t, C.Regionality.t, l * r) C.Locality_morph.t ->
       a C.obj ->
       b C.obj ->
       a ->
       b ->
-      unit =
+      bool =
    fun locality_morph src obj a b ->
     match src, obj with
     | Locality, Regionality ->
-      assert (
-        implements_morph obj
-          (Simple (Core (Locality_restricted locality_morph))) a b)
+      implements_morph obj (Simple (Core (Locality_restricted locality_morph)))
+        a b
     | Comonadic_with_locality, Comonadic_with_regionality ->
-      assert (
-        implements_morph obj (Simple (Core (Locality_full locality_morph))) a b)
-    | _, _ -> check_identity_morph src obj a b
-
-  (** Checks whether [a] = [b], where [a] and [b] belong to the same axis, while
-      allowing the areality of [a] to be [Regionality] and the areality of [b]
-      to be [Locality]. Thrown an exception if the objects are different. *)
-  let equal_mode_regionality_to_locality : type a b.
-      a C.obj -> b C.obj -> a -> b -> bool =
-   fun a_obj b_obj a b ->
-    match a_obj, b_obj with
-    | Regionality, Locality ->
-      Misc.Le_result.equal ~le:(C.le a_obj) a
-        (C.Locality_morph.apply Locality_as_regionality b)
-    | Comonadic_with_regionality, Comonadic_with_locality ->
-      Misc.Le_result.equal ~le:(C.le a_obj) a
-        (C.Core_morph.apply a_obj (Locality_full Locality_as_regionality) b)
-    | _, _ ->
-      check_identity_morph a_obj b_obj a b;
-      true
+      implements_morph obj (Simple (Core (Locality_full locality_morph))) a b
+    | _, _ -> implements_identity src obj a b
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
@@ -5090,18 +5069,20 @@ module Report = struct
       ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
       (* We assert that the morphism is value_to_alloc_r2g *)
-      check_value_to_alloc_morph Regional_to_global src obj a b;
+      assert (implements_value_to_alloc Regional_to_global src obj a b);
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ~is_skip:(equal_mode_regionality_to_locality src obj a b), ~fixpoint
+      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
+        ~fixpoint )
     | Allocation_l _ ->
       (* We assert that the morphism is value_to_alloc_r2l *)
-      check_value_to_alloc_morph Regional_to_local src obj a b;
+      assert (implements_value_to_alloc Regional_to_local src obj a b);
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ~is_skip:(equal_mode_regionality_to_locality src obj a b), ~fixpoint
+      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
+        ~fixpoint )
     | Allocation _ ->
       (* We always want to skip an Allocation hint. All we need is to assert that the
          hint was indeed applied to an alloc_as_value morphism *)
-      check_alloc_to_value_morph Locality_as_regionality src obj a b;
+      assert (implements_alloc_to_value Locality_as_regionality src obj a b);
       ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
@@ -6815,9 +6796,9 @@ let value_to_alloc_r2g ?allocation m =
     monadic = Alloc.Monadic.apply_hint Skip monadic
   }
 
-let value_to_alloc_r2l ?hint { comonadic; monadic } =
+let value_to_alloc_r2l { comonadic; monadic } =
   { comonadic =
-      S.apply Alloc.Comonadic.Obj.obj ?hint
+      S.apply Alloc.Comonadic.Obj.obj
         (Simple (Core (Locality_full Regional_to_local))) comonadic;
     monadic = Alloc.Monadic.apply_hint Skip monadic
   }
