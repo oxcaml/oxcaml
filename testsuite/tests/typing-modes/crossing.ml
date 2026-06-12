@@ -184,7 +184,8 @@ let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
 Line 1, characters 61-62:
 1 | let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
                                                                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 37-44)
+       but is expected to be "unique" (line 1, characters 52-58).
 |}]
 
 let cross_contended1 (x : cross_contended @ shared) : _ @ uncontended = x
@@ -220,8 +221,9 @@ Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
 Error: This value is "corrupted" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "shared" or "uncontended".
+         which is "contended"
+         because of an annotation at line 1, characters 38-47.
+       However, the highlighted expression is expected to be "shared" or "uncontended" (line 1, characters 55-61).
 |}]
 
 let cross_corrupted1 (x : cross_corrupted @ corrupted) : _ @ uncontended = x
@@ -235,8 +237,9 @@ Line 1, characters 73-74:
 1 | let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
                                                                              ^
 Error: This value is "shared" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+         which is "contended"
+         because of an annotation at line 1, characters 44-53.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended" (line 1, characters 61-70).
 |}]
 
 let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
@@ -244,7 +247,8 @@ let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
 Line 1, characters 76-77:
 1 | let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
                                                                                 ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" (line 1, characters 48-54)
+       but is expected to be "uncontended" (line 1, characters 62-73).
 |}]
 
 let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
@@ -252,7 +256,8 @@ let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
 Line 1, characters 74-75:
 1 | let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
                                                                               ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
+Error: This value is "contended" (line 1, characters 48-57)
+       but is expected to be "shared" or "uncontended" (line 1, characters 65-71).
 |}]
 
 let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
@@ -260,7 +265,8 @@ let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
 Line 1, characters 79-80:
 1 | let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
                                                                                    ^
-Error: This value is "corrupted" but is expected to be "uncontended".
+Error: This value is "corrupted" (line 1, characters 48-57)
+       but is expected to be "uncontended" (line 1, characters 65-76).
 |}]
 
 let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
@@ -268,8 +274,8 @@ let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
 Line 1, characters 77-78:
 1 | let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
                                                                                  ^
-Error: This value is "contended"
-       but is expected to be "corrupted" or "uncontended".
+Error: This value is "contended" (line 1, characters 48-57)
+       but is expected to be "corrupted" or "uncontended" (line 1, characters 65-74).
 |}]
 
 (* Check that all modalities cross modes *)

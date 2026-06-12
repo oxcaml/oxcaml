@@ -460,7 +460,8 @@ let hidden_string_unshare =
 Line 2, characters 75-76:
 2 |   let x : Hidden_string.t = Hidden_string.hide "hello" in ignore x; unique x
                                                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       but is expected to be "unique" (line 1, characters 16-22).
 |}]
 
 let hidden_int_unshare =
@@ -490,7 +491,7 @@ Line 4, characters 22-23:
 Error: This value is "aliased"
          because it contains (via constructor "::") the expression at line 3, characters 5-28
          which is "aliased".
-       However, the highlighted expression is expected to be "unique".
+       However, the highlighted expression is expected to be "unique" (line 1, characters 16-22).
 |}]
 
 let hidden_int_list_unshare =
@@ -681,7 +682,8 @@ let ref_immutable_data_right x =
 Line 2, characters 30-53:
 2 |   take_strong_immutable_data (weaken_immutable_data x : float ref);
                                   ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       but is expected to be "uncontended" (line 4, characters 36-61).
 |}]
 
 let ref_immutable_data_left x =
@@ -691,7 +693,8 @@ let ref_immutable_data_left x =
 Line 3, characters 29-30:
 3 |   take_strong_immutable_data x
                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       but is expected to be "uncontended" (line 4, characters 36-61).
 |}]
 
 let float_immutable_data_right x =

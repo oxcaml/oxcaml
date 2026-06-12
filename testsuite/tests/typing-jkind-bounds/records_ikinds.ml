@@ -403,7 +403,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 type t = { mutable x : int }
@@ -428,7 +429,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
@@ -436,7 +438,8 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 17-26)
+       but is expected to be "uncontended".
 |}]
 
 type 'a t = { x : 'a }
@@ -462,7 +465,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -481,7 +485,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ once) = use_many t
@@ -505,7 +510,8 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 19-26)
+       but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -538,7 +544,8 @@ let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
 Line 1, characters 61-62:
 1 | let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
                                                                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 39-46)
+       but is expected to be "unique".
 |}]
 
 type ('a : immutable_data) t = { x : 'a }
@@ -571,7 +578,8 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 19-26)
+       but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }

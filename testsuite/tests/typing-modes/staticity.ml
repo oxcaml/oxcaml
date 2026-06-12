@@ -20,7 +20,7 @@ Lines 2-3, characters 4-16:
 2 | ....if b then "hello"
 3 |     else "world"
 Error: The expression is "dynamic" because it has branches.
-       However, the expression highlighted is expected to be "static".
+       However, the expression highlighted is expected to be "static" (line 1, characters 22-28).
 |}]
 
 let f (b @ static) @ static =
@@ -31,7 +31,7 @@ Lines 2-3, characters 4-16:
 2 | ....if b then "hello"
 3 |     else "world"
 Error: The expression is "dynamic" because it has branches.
-       However, the expression highlighted is expected to be "static".
+       However, the expression highlighted is expected to be "static" (line 1, characters 21-27).
 |}]
 
 let f (b @ dynamic) @ dynamic =
@@ -84,8 +84,9 @@ Line 3, characters 27-28:
                                ^
 Error: This value is "dynamic"
          because it is contained (via constructor "Some") in the value at line 3, characters 6-12
-         which is "dynamic".
-       However, the highlighted expression is expected to be "static".
+         which is "dynamic"
+         because of an annotation at line 1, characters 13-20.
+       However, the highlighted expression is expected to be "static" (line 1, characters 20-26).
 |}]
 
 (* refuted case is not counted *)
@@ -110,7 +111,7 @@ Lines 2-4, characters 4-22:
 3 |     | true -> "hello"
 4 |     | false -> "hello"
 Error: The result of the cases is "dynamic" because it has branches.
-       However, the result of the cases highlighted is expected to be "static".
+       However, the result of the cases highlighted is expected to be "static" (line 1, characters 23-29).
 |}]
 
 (* Similiarly, the matched value becomes dynamic *)
@@ -125,7 +126,7 @@ Line 3, characters 27-28:
 Error: This value is "dynamic"
          because it is contained (via constructor "Some") in the value at line 3, characters 6-12
          which is "dynamic" because it has branches.
-       However, the highlighted expression is expected to be "static".
+       However, the highlighted expression is expected to be "static" (line 1, characters 20-26).
 |}]
 
 let foo (b @ dynamic) @ static =
@@ -154,7 +155,7 @@ Line 3, characters 36-37:
 Error: This value is "dynamic"
          because it is contained (via constructor "Baz") in the value at line 3, characters 15-20
          which is "dynamic" because it has branches.
-       However, the highlighted expression is expected to be "static".
+       However, the highlighted expression is expected to be "static" (line 1, characters 20-26).
 |}]
 
 (* or pattern makes the bound value dynamic, but the branch can still return static *)
@@ -206,7 +207,7 @@ Lines 2-4, characters 4-28:
 3 |     | x -> "hello"
 4 |     | exception _ -> "world"
 Error: The result of the cases is "dynamic" because it has branches.
-       However, the result of the cases highlighted is expected to be "static".
+       However, the result of the cases highlighted is expected to be "static" (line 1, characters 23-29).
 |}]
 
 let foo (b @ dynamic) @ static =
@@ -337,7 +338,7 @@ Line 3, characters 15-16:
 Error: This value is "dynamic"
          because it is contained (via constructor "Baz") in the value at line 2, characters 17-22
          which is "dynamic" because it has branches.
-       However, the highlighted expression is expected to be "static".
+       However, the highlighted expression is expected to be "static" (line 1, characters 20-26).
 |}]
 
 let foo (b : t @ dynamic) @ static =
@@ -347,7 +348,7 @@ Line 2, characters 4-28:
 2 |     try b with e -> Foo true
         ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The expression is "dynamic" because try-with clauses are always dynamic.
-       However, the expression highlighted is expected to be "static".
+       However, the expression highlighted is expected to be "static" (line 1, characters 28-34).
 |}]
 
 let foo (b : t @ static) @ static =
@@ -357,7 +358,7 @@ Line 2, characters 4-28:
 2 |     try b with e -> Foo true
         ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The expression is "dynamic" because try-with clauses are always dynamic.
-       However, the expression highlighted is expected to be "static".
+       However, the expression highlighted is expected to be "static" (line 1, characters 27-33).
 |}]
 
 let foo (b : t @ static) @ dynamic =

@@ -27,7 +27,7 @@ let foo (x @ read uncontended) a = x.a <- a
 Line 1, characters 35-36:
 1 | let foo (x @ read uncontended) a = x.a <- a
                                        ^
-Error: This value is "read"
+Error: This value is "read" (line 1, characters 13-29)
        but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
@@ -42,7 +42,7 @@ let foo (x @ immutable uncontended) a = x.a <- a
 Line 1, characters 40-41:
 1 | let foo (x @ immutable uncontended) a = x.a <- a
                                             ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-34)
        but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
@@ -57,7 +57,7 @@ let foo (x @ write uncontended) = x.a
 Line 1, characters 34-35:
 1 | let foo (x @ write uncontended) = x.a
                                       ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-30)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -67,7 +67,7 @@ let foo (x @ immutable uncontended) = x.a
 Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.a
                                           ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-34)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -95,7 +95,7 @@ let foo (x @ write uncontended) upd = { x with b = upd }
 Line 1, characters 40-41:
 1 | let foo (x @ write uncontended) upd = { x with b = upd }
                                             ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-30)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -105,7 +105,7 @@ let foo (x @ immutable uncontended) upd = { x with b = upd }
 Line 1, characters 44-45:
 1 | let foo (x @ immutable uncontended) upd = { x with b = upd }
                                                 ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-34)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -117,7 +117,7 @@ let foo (x @ read contended) a = x.a <- a
 Line 1, characters 33-34:
 1 | let foo (x @ read contended) a = x.a <- a
                                      ^
-Error: This value is "read"
+Error: This value is "read" (line 1, characters 13-27)
        but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
@@ -127,7 +127,7 @@ let foo (x @ contended read) a = x.a <- a
 Line 1, characters 33-34:
 1 | let foo (x @ contended read) a = x.a <- a
                                      ^
-Error: This value is "read"
+Error: This value is "read" (line 1, characters 13-27)
        but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
@@ -137,7 +137,7 @@ let foo (x @ read shared) a = x.a <- a
 Line 1, characters 30-31:
 1 | let foo (x @ read shared) a = x.a <- a
                                   ^
-Error: This value is "read"
+Error: This value is "read" (line 1, characters 13-24)
        but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
@@ -147,7 +147,7 @@ let foo (x @ immutable contended) a = x.a
 Line 1, characters 38-39:
 1 | let foo (x @ immutable contended) a = x.a
                                           ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-32)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -159,7 +159,7 @@ let foo (x @ write contended) = x.a
 Line 1, characters 32-33:
 1 | let foo (x @ write contended) = x.a
                                     ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-28)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -169,7 +169,7 @@ let foo (x @ contended write) = x.a
 Line 1, characters 32-33:
 1 | let foo (x @ contended write) = x.a
                                     ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-28)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -179,7 +179,7 @@ let foo (x @ write corrupted) = x.a
 Line 1, characters 32-33:
 1 | let foo (x @ write corrupted) = x.a
                                     ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-28)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -189,7 +189,7 @@ let foo (x @ immutable contended) = x.a
 Line 1, characters 36-37:
 1 | let foo (x @ immutable contended) = x.a
                                         ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-32)
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
 |}]
@@ -201,7 +201,7 @@ let foo (x @ immutable) = x.contents
 Line 1, characters 26-27:
 1 | let foo (x @ immutable) = x.contents
                               ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-22)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -211,7 +211,7 @@ let foo (x @ immutable shared) = x.contents
 Line 1, characters 33-34:
 1 | let foo (x @ immutable shared) = x.contents
                                      ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-29)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -221,7 +221,7 @@ let foo (x @ immutable corrupted) = x.contents
 Line 1, characters 36-37:
 1 | let foo (x @ immutable corrupted) = x.contents
                                         ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-32)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -231,7 +231,7 @@ let foo (x @ immutable uncontended) = x.contents
 Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.contents
                                           ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-34)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -241,7 +241,7 @@ let foo (x @ write) = x.contents
 Line 1, characters 22-23:
 1 | let foo (x @ write) = x.contents
                           ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-18)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -251,7 +251,7 @@ let foo (x @ write shared) = x.contents
 Line 1, characters 29-30:
 1 | let foo (x @ write shared) = x.contents
                                  ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-25)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -261,7 +261,7 @@ let foo (x @ write corrupted) = x.contents
 Line 1, characters 32-33:
 1 | let foo (x @ write corrupted) = x.contents
                                     ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-28)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -271,7 +271,7 @@ let foo (x @ write uncontended) = x.contents
 Line 1, characters 34-35:
 1 | let foo (x @ write uncontended) = x.contents
                                       ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-30)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -286,7 +286,7 @@ let foo (x @ read contended) = x.contents
 Line 1, characters 31-32:
 1 | let foo (x @ read contended) = x.contents
                                    ^
-Error: This value is "contended"
+Error: This value is "contended" (line 1, characters 13-27)
        but is expected to be "shared" or "uncontended"
          because its mutable field "contents" is being read.
 |}]
@@ -296,7 +296,7 @@ let foo (x @ read corrupted) = x.contents
 Line 1, characters 31-32:
 1 | let foo (x @ read corrupted) = x.contents
                                    ^
-Error: This value is "corrupted"
+Error: This value is "corrupted" (line 1, characters 13-27)
        but is expected to be "shared" or "uncontended"
          because its mutable field "contents" is being read.
 |}]
@@ -316,7 +316,7 @@ let foo (x @ read_write contended) = x.contents
 Line 1, characters 37-38:
 1 | let foo (x @ read_write contended) = x.contents
                                          ^
-Error: This value is "contended"
+Error: This value is "contended" (line 1, characters 13-33)
        but is expected to be "shared" or "uncontended"
          because its mutable field "contents" is being read.
 |}]
@@ -326,7 +326,7 @@ let foo (x @ read_write corrupted) = x.contents
 Line 1, characters 37-38:
 1 | let foo (x @ read_write corrupted) = x.contents
                                          ^
-Error: This value is "corrupted"
+Error: This value is "corrupted" (line 1, characters 13-33)
        but is expected to be "shared" or "uncontended"
          because its mutable field "contents" is being read.
 |}]
@@ -341,7 +341,8 @@ let foo (x @ immutable) a = x := a
 Line 1, characters 28-29:
 1 | let foo (x @ immutable) a = x := a
                                 ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-22)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ immutable corrupted) a = x := a
@@ -349,7 +350,8 @@ let foo (x @ immutable corrupted) a = x := a
 Line 1, characters 38-39:
 1 | let foo (x @ immutable corrupted) a = x := a
                                           ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-32)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ immutable shared) a = x := a
@@ -357,7 +359,8 @@ let foo (x @ immutable shared) a = x := a
 Line 1, characters 35-36:
 1 | let foo (x @ immutable shared) a = x := a
                                        ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-29)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ immutable uncontended) a = x := a
@@ -365,7 +368,8 @@ let foo (x @ immutable uncontended) a = x := a
 Line 1, characters 40-41:
 1 | let foo (x @ immutable uncontended) a = x := a
                                             ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-34)
+       but is expected to be "read_write".
 |}]
 
 (* CR nmatschke: These should work, but we need to update stdlib. *)
@@ -375,7 +379,8 @@ let foo (x @ write) a = x := a
 Line 1, characters 24-25:
 1 | let foo (x @ write) a = x := a
                             ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-18)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write shared) a = x := a
@@ -383,7 +388,8 @@ let foo (x @ write shared) a = x := a
 Line 1, characters 31-32:
 1 | let foo (x @ write shared) a = x := a
                                    ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-25)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write corrupted) a = x := a
@@ -391,7 +397,8 @@ let foo (x @ write corrupted) a = x := a
 Line 1, characters 34-35:
 1 | let foo (x @ write corrupted) a = x := a
                                       ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-28)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write uncontended) a = x := a
@@ -399,7 +406,8 @@ let foo (x @ write uncontended) a = x := a
 Line 1, characters 36-37:
 1 | let foo (x @ write uncontended) a = x := a
                                         ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-30)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read) a = x := a
@@ -407,7 +415,8 @@ let foo (x @ read) a = x := a
 Line 1, characters 23-24:
 1 | let foo (x @ read) a = x := a
                            ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-17)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read contended) a = x := a
@@ -415,7 +424,8 @@ let foo (x @ read contended) a = x := a
 Line 1, characters 33-34:
 1 | let foo (x @ read contended) a = x := a
                                      ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-27)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read corrupted) a = x := a
@@ -423,7 +433,8 @@ let foo (x @ read corrupted) a = x := a
 Line 1, characters 33-34:
 1 | let foo (x @ read corrupted) a = x := a
                                      ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-27)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read uncontended) a = x := a
@@ -431,7 +442,8 @@ let foo (x @ read uncontended) a = x := a
 Line 1, characters 35-36:
 1 | let foo (x @ read uncontended) a = x := a
                                        ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-29)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read_write) a = x := a
@@ -444,7 +456,8 @@ let foo (x @ read_write contended) a = x := a
 Line 1, characters 39-40:
 1 | let foo (x @ read_write contended) a = x := a
                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 13-33)
+       but is expected to be "uncontended".
 |}]
 
 let foo (x @ read_write shared) a = x := a
@@ -452,7 +465,8 @@ let foo (x @ read_write shared) a = x := a
 Line 1, characters 36-37:
 1 | let foo (x @ read_write shared) a = x := a
                                         ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" (line 1, characters 13-30)
+       but is expected to be "uncontended".
 |}]
 
 let foo (x @ immutable) = !x
@@ -460,7 +474,8 @@ let foo (x @ immutable) = !x
 Line 1, characters 27-28:
 1 | let foo (x @ immutable) = !x
                                ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-22)
+       but is expected to be "read_write".
 |}]
 
 (* CR dkalinichenko: update Stdlib to reflect required visibility and contention. *)
@@ -470,7 +485,8 @@ let foo (x @ immutable shared) = !x
 Line 1, characters 34-35:
 1 | let foo (x @ immutable shared) = !x
                                       ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-29)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ immutable corrupted) = !x
@@ -478,7 +494,8 @@ let foo (x @ immutable corrupted) = !x
 Line 1, characters 37-38:
 1 | let foo (x @ immutable corrupted) = !x
                                          ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-32)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ immutable uncontended) = !x
@@ -486,7 +503,8 @@ let foo (x @ immutable uncontended) = !x
 Line 1, characters 39-40:
 1 | let foo (x @ immutable uncontended) = !x
                                            ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-34)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write) = !x
@@ -494,7 +512,8 @@ let foo (x @ write) = !x
 Line 1, characters 23-24:
 1 | let foo (x @ write) = !x
                            ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-18)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write shared) = !x
@@ -502,7 +521,8 @@ let foo (x @ write shared) = !x
 Line 1, characters 30-31:
 1 | let foo (x @ write shared) = !x
                                   ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-25)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write corrupted) = !x
@@ -510,7 +530,8 @@ let foo (x @ write corrupted) = !x
 Line 1, characters 33-34:
 1 | let foo (x @ write corrupted) = !x
                                      ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-28)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ write uncontended) = !x
@@ -518,7 +539,8 @@ let foo (x @ write uncontended) = !x
 Line 1, characters 35-36:
 1 | let foo (x @ write uncontended) = !x
                                        ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-30)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read) = !x
@@ -526,7 +548,8 @@ let foo (x @ read) = !x
 Line 1, characters 22-23:
 1 | let foo (x @ read) = !x
                           ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-17)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read contended) = !x
@@ -534,7 +557,8 @@ let foo (x @ read contended) = !x
 Line 1, characters 32-33:
 1 | let foo (x @ read contended) = !x
                                     ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-27)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read corrupted) = !x
@@ -542,7 +566,8 @@ let foo (x @ read corrupted) = !x
 Line 1, characters 32-33:
 1 | let foo (x @ read corrupted) = !x
                                     ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-27)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read uncontended) = !x
@@ -550,7 +575,8 @@ let foo (x @ read uncontended) = !x
 Line 1, characters 34-35:
 1 | let foo (x @ read uncontended) = !x
                                       ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-29)
+       but is expected to be "read_write".
 |}]
 
 let foo (x @ read_write) = !x
@@ -563,7 +589,8 @@ let foo (x @ read_write contended) = !x
 Line 1, characters 38-39:
 1 | let foo (x @ read_write contended) = !x
                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 13-33)
+       but is expected to be "uncontended".
 |}]
 
 let foo (x @ read_write shared) = !x
@@ -571,7 +598,8 @@ let foo (x @ read_write shared) = !x
 Line 1, characters 35-36:
 1 | let foo (x @ read_write shared) = !x
                                        ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" (line 1, characters 13-30)
+       but is expected to be "uncontended".
 |}]
 
 let foo (x @ read_write corrupted) = !x
@@ -579,7 +607,8 @@ let foo (x @ read_write corrupted) = !x
 Line 1, characters 38-39:
 1 | let foo (x @ read_write corrupted) = !x
                                           ^
-Error: This value is "corrupted" but is expected to be "uncontended".
+Error: This value is "corrupted" (line 1, characters 13-33)
+       but is expected to be "uncontended".
 |}]
 
 (* API that uses the [sync_data] kind. *)
@@ -617,7 +646,8 @@ let foo (a @ read) = Atomic.set a 42
 Line 1, characters 32-33:
 1 | let foo (a @ read) = Atomic.set a 42
                                     ^
-Error: This value is "read" but is expected to be "write" or "read_write".
+Error: This value is "read" (line 1, characters 13-17)
+       but is expected to be "write" or "read_write".
 |}]
 
 let foo (a @ write) = Atomic.set a 42
@@ -635,7 +665,8 @@ let foo (a @ immutable) = Atomic.set a 9
 Line 1, characters 37-38:
 1 | let foo (a @ immutable) = Atomic.set a 9
                                          ^
-Error: This value is "immutable" but is expected to be "write" or "read_write".
+Error: This value is "immutable" (line 1, characters 13-22)
+       but is expected to be "write" or "read_write".
 |}]
 
 let foo (a @ read) = Atomic.get a
@@ -648,7 +679,8 @@ let foo (a @ write) = Atomic.get a
 Line 1, characters 33-34:
 1 | let foo (a @ write) = Atomic.get a
                                      ^
-Error: This value is "write" but is expected to be "read" or "read_write".
+Error: This value is "write" (line 1, characters 13-18)
+       but is expected to be "read" or "read_write".
 |}]
 
 let foo (a @ read_write) = Atomic.get a
@@ -661,7 +693,8 @@ let foo (a @ immutable) = Atomic.get a
 Line 1, characters 37-38:
 1 | let foo (a @ immutable) = Atomic.get a
                                          ^
-Error: This value is "immutable" but is expected to be "read" or "read_write".
+Error: This value is "immutable" (line 1, characters 13-22)
+       but is expected to be "read" or "read_write".
 |}]
 
 let foo (a @ read) = Atomic.exchange a 42
@@ -669,7 +702,8 @@ let foo (a @ read) = Atomic.exchange a 42
 Line 1, characters 37-38:
 1 | let foo (a @ read) = Atomic.exchange a 42
                                          ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" (line 1, characters 13-17)
+       but is expected to be "read_write".
 |}]
 
 let foo (a @ write) = Atomic.exchange a 42
@@ -677,7 +711,8 @@ let foo (a @ write) = Atomic.exchange a 42
 Line 1, characters 38-39:
 1 | let foo (a @ write) = Atomic.exchange a 42
                                           ^
-Error: This value is "write" but is expected to be "read_write".
+Error: This value is "write" (line 1, characters 13-18)
+       but is expected to be "read_write".
 |}]
 
 let foo (a @ read_write) = Atomic.exchange a 42
@@ -690,7 +725,8 @@ let foo (a @ immutable) = Atomic.exchange a 42
 Line 1, characters 42-43:
 1 | let foo (a @ immutable) = Atomic.exchange a 42
                                               ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" (line 1, characters 13-22)
+       but is expected to be "read_write".
 |}]
 
 (* Closing over use of read_write gives stateful *)
@@ -1259,7 +1295,7 @@ let () =
 Line 3, characters 4-13:
 3 |   | lazy (-1) -> ()
         ^^^^^^^^^
-Error: This value is "contended"
+Error: This value is "contended" (line 1, characters 24-41)
        but is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]
@@ -1296,7 +1332,7 @@ let () =
 Line 4, characters 4-5:
 4 |     x.contents <- 42;
         ^
-Error: This value is "immutable"
+Error: This value is "immutable" (line 1, characters 13-34)
        but is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
@@ -1318,7 +1354,7 @@ let () =
 Line 5, characters 4-5:
 5 |     y.contents <- 24
         ^
-Error: This value is "read"
+Error: This value is "read" (line 1, characters 13-29)
        but is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
@@ -1340,7 +1376,7 @@ let () =
 Line 5, characters 12-13:
 5 |     assert (z.contents = 24)
                 ^
-Error: This value is "write"
+Error: This value is "write" (line 1, characters 13-30)
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]

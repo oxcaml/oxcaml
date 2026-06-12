@@ -131,7 +131,8 @@ let foo (obj : cla @ contended) =
 Line 2, characters 26-29:
 2 |     let _ @ uncontended = obj in
                               ^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 (* methods are available as legacy *)

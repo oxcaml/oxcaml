@@ -139,7 +139,8 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 32-41)
+       but is expected to be "uncontended".
 |}]
 
 type 'a portable = Portable of { portable : 'a @@ portable } [@@unboxed]
@@ -154,7 +155,8 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 32-41)
+       but is expected to be "uncontended".
 |}]
 
 type 'a portable = Portable : 'a @@ portable -> 'a portable [@@unboxed]
@@ -169,7 +171,8 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 32-41)
+       but is expected to be "uncontended".
 |}]
 
 type 'a portable = Portable : { portable : 'a @@ portable } -> 'a portable [@@unboxed]
@@ -184,7 +187,8 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 32-41)
+       but is expected to be "uncontended".
 |}]
 
 (* unboxed records *)

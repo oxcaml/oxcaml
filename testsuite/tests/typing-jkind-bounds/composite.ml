@@ -104,7 +104,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -168,7 +169,8 @@ val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -251,7 +253,8 @@ let foo (t : int ref t @ contended) = use_uncontended t
 Line 1, characters 54-55:
 1 | let foo (t : int ref t @ contended) = use_uncontended t
                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 25-34)
+       but is expected to be "uncontended".
 |}]
 
 (***********************************************************************)
@@ -272,7 +275,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int ref t @ contended) = use_uncontended t
@@ -280,7 +284,8 @@ let foo (t : int ref t @ contended) = use_uncontended t
 Line 1, characters 54-55:
 1 | let foo (t : int ref t @ contended) = use_uncontended t
                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 25-34)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ local) = use_global t [@nontail]
@@ -307,7 +312,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ local) = use_global t [@nontail]
@@ -360,7 +366,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -382,7 +389,8 @@ val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -390,7 +398,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -414,7 +423,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -422,7 +432,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -443,7 +454,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -464,7 +476,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -485,7 +498,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -493,7 +507,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -512,7 +527,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -557,7 +573,8 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 17-26)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -565,7 +582,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -593,7 +611,8 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 (***********************************************************************)
@@ -617,7 +636,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -625,7 +645,8 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 19-26)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -664,7 +685,8 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -673,7 +695,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -681,7 +704,8 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 19-26)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -702,7 +726,8 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 17-24)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -720,7 +745,8 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 (***********************************************************************)
@@ -739,7 +765,8 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -747,7 +774,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -755,7 +783,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -771,7 +800,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -781,7 +811,8 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 (* Even this is safe because 'a cannot appear in 'a t *)
@@ -790,7 +821,8 @@ let foo (t : (int ref) t @ contended) = use_uncontended t
 Line 1, characters 56-57:
 1 | let foo (t : (int ref) t @ contended) = use_uncontended t
                                                             ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 27-36)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -798,7 +830,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -815,7 +848,8 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 21-30)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : (int ref) t @ contended) = use_uncontended t
@@ -823,7 +857,8 @@ let foo (t : (int ref) t @ contended) = use_uncontended t
 Line 1, characters 56-57:
 1 | let foo (t : (int ref) t @ contended) = use_uncontended t
                                                             ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 27-36)
+       but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -831,7 +866,8 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 19-28)
+       but is expected to be "uncontended".
 |}]
 
 (***********************************************************************)
@@ -852,7 +888,8 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" (line 1, characters 21-28)
+       but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -869,7 +906,8 @@ let f (x : int ref rose_tree @ contended) = use_uncontended x
 Line 1, characters 60-61:
 1 | let f (x : int ref rose_tree @ contended) = use_uncontended x
                                                                 ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 31-40)
+       but is expected to be "uncontended".
 |}]
 
 let f (x : int rose_tree @ nonportable) = use_portable x
@@ -901,7 +939,8 @@ let f (x : int ref rose_tree2 @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let f (x : int ref rose_tree2 @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" (line 1, characters 32-41)
+       but is expected to be "uncontended".
 |}]
 
 let f (x : int rose_tree2 @ nonportable) = use_portable x

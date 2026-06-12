@@ -195,7 +195,7 @@ let foo (x @ contended) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is "contended"
+Error: This value is "contended" (line 1, characters 13-22)
        but is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]
@@ -208,7 +208,7 @@ let foo (x @ shared) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is "shared"
+Error: This value is "shared" (line 1, characters 13-19)
        but is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]
@@ -221,7 +221,7 @@ let foo (x @ corrupted) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is "corrupted"
+Error: This value is "corrupted" (line 1, characters 13-22)
        but is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]

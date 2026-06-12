@@ -370,7 +370,8 @@ end
 Line 7, characters 28-31:
 7 |     let _ = uncontended_use M.x
                                 ^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       but is expected to be "uncontended" (line 9, characters 25-36).
 |}]
 
 module Inclusion_weakens_comonadic = struct
@@ -458,7 +459,7 @@ Line 7, characters 20-23:
 Error: This value is "contended"
          because it is used inside the function at lines 5-7, characters 23-23
          which is expected to be "portable".
-       However, the highlighted expression is expected to be "uncontended".
+       However, the highlighted expression is expected to be "uncontended" (line 6, characters 29-40).
 |}]
 
 module Close_over_value_comonadic = struct
