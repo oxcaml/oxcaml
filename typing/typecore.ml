@@ -7488,8 +7488,7 @@ and type_expect_
   | Pexp_field(srecord, lid) ->
       let record, record_sort, _record_sorts, mode, label, ambiguity,
           ty_arg, record_repres =
-        solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord Legacy
-          lid
+        type_label_access Legacy loc env sexp srecord Env.Projection lid
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
@@ -7556,8 +7555,8 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       let record, record_sort, record_sorts, mode, label, ambiguity,
           ty_arg, record_repres =
-        solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
-          Unboxed_product lid
+        type_label_access Unboxed_product loc env sexp srecord
+          Env.Projection lid
       in
       if Types.is_mutable label.lbl_mut then
         fatal_error
@@ -7588,16 +7587,10 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _, rmode, label, expected_type, ambiguity) =
-        type_label_access Legacy env srecord Env.Mutation lid in
-      let ty_record =
-        if expected_type = None
-        then
-          newvar
-            (Jkind.of_new_sort ~why:Record_assignment
-               ~level:(Ctype.get_current_level ()))
-        else record.exp_type
-      in
+      let (record, _, record_sorts, rmode, label, ambiguity, _,
+           record_repres) =
+        type_label_access Legacy loc env sexp srecord Env.Mutation lid in
+      let ty_record = record.exp_type in
       let (label_loc, label, newval) =
         match label.lbl_mut with
         | Mutable { mode = m0; atomic } ->
@@ -7615,12 +7608,6 @@ and type_expect_
         { record with exp_extra =
           (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
             :: record.exp_extra }
-      in
-      unify_exp ~sexp env record ty_record;
-      let record_sorts, record_repres =
-        update_labels env Legacy ~representative_label:label ~loc
-          ~why:Field_assignment
-          ~containing_type:ty_record
       in
       rue {
         exp_desc = Texp_setfield {
@@ -8522,8 +8509,7 @@ and type_expect_
                } ] ->
           let record, record_sort, _, rmode, label, ambiguity, ty_arg,
               record_repres =
-            solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
-              Legacy lid
+            type_label_access Legacy loc env sexp srecord Env.Mutation lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
           check_atomic_loc ~loc ~env record_repres label.lbl_mut lid.txt;
@@ -9577,9 +9563,9 @@ and type_function
      }
 
 and type_label_access
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _ * _
-  = fun record_form env srecord usage lid ->
+  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ -> _ -> _ ->
+    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep
+  = fun record_form loc env sexp srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
     Jkind.of_new_sort_var ~why:Record_projection
@@ -9609,44 +9595,31 @@ and type_label_access
   let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
-  (record, record_sort, Mode.Value.disallow_right mode,
-   label, expected_type, ambiguity)
-
-and solve_Pexp_field
-  : 'rep . label_usage:_ -> _ -> _ -> _ -> _ -> 'rep record_form -> _ ->
-    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep =
-  fun ~label_usage loc env sexp srecord record_form lid ->
-  let (record, record_sort, rmode, label, _expected_type, ambiguity) =
-    type_label_access record_form env srecord label_usage lid
-  in
   let ty_arg, record_sorts, record_repres =
-    (* XXX Not clear to me why this can't be done in [type_label_access] so that
-       the [Texp_setfield] case wouldn't have to have its own call to
-       [update_label], but doing it that way causes principality issues.
-       Notably, this call to [update_label] happens inside a local level and the
-       [Texp_setfield] call does not. *)
     with_local_level_generalize_structure_if_principal begin fun () ->
       (* [ty_arg] is the type of field, [ty_res] is the type of record, they
        could share type variables, which are now instantiated *)
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
       unify_exp ~sexp env record ty_res;
+      let why : Jkind.History.concrete_creation_reason =
+        match (usage : Env.label_usage) with
+        | Mutation -> Field_assignment
+        | Projection | Construct | Exported_private | Exported ->
+          Field_projection
+      in
       let record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
            and it also gives a nicer error message *)
-        (* XXX Not entirely sure why it's necessary to do this in the inner
-           level, but weird errors happen if we don't, and it's also
-           necessary to do it in _this_ inner level so that the correct type
-           hits a [generalize_structure] *)
         update_labels env record_form ~representative_label:label ~loc
-          ~why:Field_projection ~containing_type:record.exp_type
+          ~why ~containing_type:record.exp_type
       in
       ty_arg, record_sorts, record_repres
     end
   in
-  (record, record_sort, record_sorts, rmode, label,
-   ambiguity, ty_arg, record_repres)
+  (record, record_sort, record_sorts, Mode.Value.disallow_right mode,
+   label, ambiguity, ty_arg, record_repres)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.
