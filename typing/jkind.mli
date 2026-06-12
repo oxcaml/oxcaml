@@ -116,6 +116,12 @@ module Layout : sig
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
+  (** Updates the nullability on the layout's scannable axis. *)
+  val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
+
+  (** Updates the separability on the layout's scannable axis. *)
+  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
+
   module Debug_printers : sig
     val t :
       (Format.formatter -> 'sort -> unit) -> Format.formatter -> 'sort t -> unit
@@ -306,6 +312,18 @@ module Builtin : sig
       But we cannot compile run-time manipulations of values of types with jkind
       [any]. *)
   val any : why:History.any_creation_reason -> 'd Types.jkind
+
+  (** Like [any], but with the given nullability on the scannable axis. *)
+  val any_with_nullability :
+    Jkind_axis.Nullability.t ->
+    why:History.any_creation_reason ->
+    'd Types.jkind
+
+  (** Like [any], but with the given separability on the scannable axis. *)
+  val any_with_separability :
+    Jkind_axis.Separability.t ->
+    why:History.any_creation_reason ->
+    'd Types.jkind
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
@@ -608,16 +626,6 @@ val set_externality_upper_bound :
 
 (** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
 val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
-
-(** Computes a jkind that is the same as the input but with an updated
-    nullability on the layout's scannable axis *)
-val set_root_nullability :
-  Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
-
-(** Computes a jkind that is the same as the input but with an updated
-    separability on the layout's scannable axis *)
-val set_root_separability :
-  Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind

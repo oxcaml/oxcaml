@@ -665,6 +665,14 @@ module Jkind0 : sig
 
     module Builtin : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
+      val any_with_nullability :
+        Jkind_axis.Nullability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
+      val any_with_separability :
+        Jkind_axis.Separability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :

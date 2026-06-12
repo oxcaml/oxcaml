@@ -2641,28 +2641,6 @@ let get_nullability env jk =
   let sa = Jkind_desc.get_scannable_axes_of_fully_expanded expanded in
   Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability) sa
 
-let set_root_nullability jk nullability =
-  { jk with
-    jkind =
-      { jk.jkind with
-        base =
-          Base.map_layout
-            ~f:(fun l -> Layout.set_root_nullability l nullability)
-            jk.jkind.base
-      }
-  }
-
-let set_root_separability jk separability =
-  { jk with
-    jkind =
-      { jk.jkind with
-        base =
-          Base.map_layout
-            ~f:(fun l -> Layout.set_root_separability l separability)
-            jk.jkind.base
-      }
-  }
-
 let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
 
@@ -2695,14 +2673,18 @@ let apply_or_null_l env jkind =
   in
   match Jkind_desc.get_scannable_axes_of_fully_expanded jkind.jkind with
   | Some { nullability = Non_null; separability } ->
-    let jkind = set_root_nullability jkind Maybe_null in
-    let jkind =
-      match separability with
-      | Maybe_separable -> jkind
-      | Separable -> set_root_separability jkind Maybe_separable
-      | Non_float | Non_pointer64 | Non_pointer -> jkind
-    in
-    Ok jkind
+    begin match jkind.jkind.base with
+    | Kconstr _ -> Error ()
+    | Layout l ->
+      let l = Layout.set_root_nullability l Maybe_null in
+      let l =
+        match separability with
+        | Maybe_separable -> l
+        | Separable -> Layout.set_root_separability l Maybe_separable
+        | Non_float | Non_pointer64 | Non_pointer -> l
+      in
+      Ok (set_layout jkind l)
+    end
   | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
 
 let apply_or_null_r env jkind =
@@ -2711,14 +2693,18 @@ let apply_or_null_r env jkind =
   in
   match Jkind_desc.get_scannable_axes_of_fully_expanded jkind.jkind with
   | Some { nullability = Maybe_null; separability } ->
-    let jkind = set_root_nullability jkind Non_null in
-    let jkind =
-      match separability with
-      | Maybe_separable -> jkind
-      | Separable -> set_root_separability jkind Non_float
-      | Non_float | Non_pointer64 | Non_pointer -> jkind
-    in
-    Ok jkind
+    begin match jkind.jkind.base with
+    | Kconstr _ -> Error ()
+    | Layout l ->
+      let l = Layout.set_root_nullability l Non_null in
+      let l =
+        match separability with
+        | Maybe_separable -> l
+        | Separable -> Layout.set_root_separability l Non_float
+        | Non_float | Non_pointer64 | Non_pointer -> l
+      in
+      Ok (set_layout jkind l)
+    end
   | Some { nullability = Non_null; separability = _ } -> Error ()
   | None ->
     Misc.fatal_error "or_null applied to a type without a scannable layout"
