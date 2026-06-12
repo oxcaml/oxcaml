@@ -2124,6 +2124,28 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
+  let add_extension_slot shape =
+    match cstr.cstr_repr with
+    | Variant_extensible ->
+      (* Field 0 of an extension constructor block holds the extension
+         slot; mirror the shape used for allocation. *)
+      Array.append [| Lambda.Value Lambda.generic_value |] shape
+    | _ -> shape
+  in
+  let void_shape =
+    lazy (add_extension_slot (transl_mixed_product_shape cstr_shape))
+  in
+  let read_shape =
+    lazy
+      (add_extension_slot
+         (Lambda.transl_mixed_product_shape_for_read
+            ~get_value_kind:(fun _i -> Lambda.generic_value)
+            ~get_mode:(fun _i ->
+              Misc.fatal_error
+                "unexpected flat float of layout value in \
+                  constructor field")
+            cstr_shape))
+  in
   let make_void_access binding_kind sort pos =
     (* Constructors whose arguments are all void, e.g.
        [A of #(void * void) * void], are immediate. Accesses to their arguments
@@ -2147,42 +2169,14 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
-    let shape = transl_mixed_product_shape cstr_shape in
-    let shape =
-      match cstr.cstr_repr with
-      | Variant_extensible ->
-        (* Field 0 of an extension constructor block holds the extension
-            slot; mirror the shape used for allocation. *)
-        Array.append [| Lambda.Value Lambda.generic_value |] shape
-      | _ -> shape
-    in
-    let e, layout = lambda_void_of_el shape.(pos) in
+    let e, layout = lambda_void_of_el (Lazy.force void_shape).(pos) in
     { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
       make_void_access binding_kind sort pos
     else
-      let prim =
-        let shape =
-          Lambda.transl_mixed_product_shape_for_read
-            ~get_value_kind:(fun _i -> Lambda.generic_value)
-            ~get_mode:(fun _i ->
-              Misc.fatal_error
-                "unexpected flat float of layout value in \
-                  constructor field")
-            cstr_shape
-        in
-        let shape =
-          match cstr.cstr_repr with
-          | Variant_extensible ->
-            (* Field 0 of an extension constructor block holds the extension
-               slot; mirror the shape used for allocation. *)
-            Array.append [| Lambda.Value Lambda.generic_value |] shape
-          | _ -> shape
-        in
-        Pfield ([pos], Shape shape, sem)
-      in
+      let prim = Pfield ([pos], Shape (Lazy.force read_shape), sem) in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
         arg = Lprim (prim, [ arg ], loc);

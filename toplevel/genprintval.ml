@@ -742,7 +742,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     (* Mixed records are only represented as
                        mixed blocks in native code. *)
                     if !Clflags.native_code &&
-                      Types.mixed_product_shape_is_flat_all_value shape
+                      not (Types.mixed_product_shape_is_flat_all_value shape)
                     then Outval_record_mixed_block shape
                     else Outval_record_boxed
               | Record_dummy _ ->
