@@ -335,5 +335,12 @@ let open_struct_shadow () =
   unique_id M.x;
   unique_id s
 [%%expect{|
-val open_struct_shadow : unit -> unit = <fun>
+Line 8, characters 12-13:
+8 |   unique_id s
+                ^
+Error: This value is used here, but it has already been used as unique at:
+Line 7, characters 12-15:
+7 |   unique_id M.x;
+                ^^^
+
 |}]

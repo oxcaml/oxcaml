@@ -3261,10 +3261,16 @@ and check_uniqueness_structure_items ~borrows ienv items :
           check_uniqueness_structure_item ~borrows ~preceding:names ienv item
         in
         let names =
-          List.fold_left
-            (fun acc (id, entry) -> String_map.add (Ident.name id) entry acc)
-            names
-            (Ienv.Extension.bindings ext)
+          (* An [open] only affects name resolution within the structure (it
+             extends [ienv]); the opened items are not addressable components
+             of the enclosing structure, so they must not enter [names]. *)
+          match item.str_desc with
+          | Tstr_open _ -> names
+          | _ ->
+            List.fold_left
+              (fun acc (id, entry) -> String_map.add (Ident.name id) entry acc)
+              names
+              (Ienv.Extension.bindings ext)
         in
         Ienv.extend ienv ext, names, uf :: rev_ufs)
       (ienv, String_map.empty, [])
@@ -3351,8 +3357,10 @@ and check_uniqueness_module_binding ~borrows ienv mb : Ienv.Extension.t * UF.t =
 and check_uniqueness_open_decl ~borrows ienv od : Ienv.Extension.t * UF.t =
   (* Opening is not a use of the module: it only affects name resolution.
      Uses of the opened components are tracked at their use sites, which carry
-     full paths. Items introduced by [open struct ... end] are bound to the
-     structure's components. *)
+     full paths. Items introduced by [open struct ... end] extend the scope
+     (the returned extension is added to [ienv]) but are not addressable
+     components of the enclosing structure, so callers keep them out of the
+     structure's component map. *)
   let mv, uf = check_uniqueness_mod ~borrows ienv od.open_expr in
   let ext = ext_of_signature (entry_of_mod_value mv) od.open_bound_items in
   ext, uf
@@ -3401,10 +3409,16 @@ let check_structure_item state item =
     state.ienv <- Ienv.extend state.ienv ext;
     state.uf <- UF.seq state.uf uf;
     let occ = Occurrence.mk item.str_loc in
-    List.iter
-      (fun (id, entry) ->
-        state.bound <- String_map.add (Ident.name id) (entry, occ) state.bound)
-      (Ienv.Extension.bindings ext)
+    (* As in [check_uniqueness_structure_items], opened items extend the scope
+       but are not addressable components, so they are kept out of [bound]
+       (which drives name resolution of [M.x] and the export marking). *)
+    match item.str_desc with
+    | Tstr_open _ -> ()
+    | _ ->
+      List.iter
+        (fun (id, entry) ->
+          state.bound <- String_map.add (Ident.name id) (entry, occ) state.bound)
+        (Ienv.Extension.bindings ext)
   end
 
 (** Marks the entries bound to [names] as aliased: they are exported from the
