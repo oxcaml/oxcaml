@@ -33,7 +33,8 @@ Error: Signature mismatch:
          sig val with_ : f:('a -> 'a) @ local -> unit end
        Value with_ does not match:
          The mode of argument f in the interface is "yielding"
-         but the implementation expects it to be "unyielding"
+           because of an annotation at line 2, characters 29-34.
+         However, the implementation expects it to be "unyielding"
            because it is used inside the function at lines 6-7, characters 35-9
            which is expected to be "unyielding".
 |}]
@@ -82,7 +83,8 @@ Error: Signature mismatch:
          sig val with_ : ('a -> 'a) @ local -> unit end
        Value with_ does not match:
          The mode of the argument in the interface is "yielding"
-         but the implementation expects it to be "unyielding"
+           because of an annotation at line 2, characters 27-32.
+         However, the implementation expects it to be "unyielding"
            because it is used inside the function at lines 6-7, characters 35-9
            which is expected to be "unyielding".
 |}]
@@ -105,5 +107,6 @@ Error: Signature mismatch:
          sig val local_ret : 'a @ local -> 'a @ local unyielding end
        Value local_ret does not match:
          The mode of the return in the implementation is "yielding"
-         but the interface expects it to be "unyielding".
+         but the interface expects it to be "unyielding"
+           because of an annotation at line 2, characters 37-53.
 |}]

@@ -831,6 +831,10 @@ let type_open :
     ref =
   ref (fun ?used_slot:_ _ -> assert false)
 
+let loc_of_mode_desc ~loc (desc : Alloc.atom loc list) =
+  if List.is_empty desc then loc else
+    Location.merge (List.map (fun a -> a.loc) desc)
+
 let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
   Builtin_attributes.warning_scope styp.ptyp_attributes
     (fun () -> transl_type_aux env ~policy ~aliased ~row_context mode styp)
@@ -894,8 +898,22 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in
-          let arg_mode_desc = Alloc.of_const arg_mode.mode_modes in
-          let ret_mode_desc = Alloc.of_const ret_mode.mode_modes in
+          let arg_hint =
+            Hint.Annotation
+              (loc_of_mode_desc ~loc:arg.ptyp_loc arg_mode.mode_desc)
+          in
+          let ret_hint =
+            Hint.Annotation
+              (loc_of_mode_desc ~loc:ret.ptyp_loc ret_mode.mode_desc)
+          in
+          let arg_mode_desc =
+            Alloc.of_const ~hint_monadic:arg_hint ~hint_comonadic:arg_hint
+              arg_mode.mode_modes
+          in
+          let ret_mode_desc =
+            Alloc.of_const ~hint_monadic:ret_hint ~hint_comonadic:ret_hint
+              ret_mode.mode_modes
+          in
           let arrow_desc = (l, arg_mode_desc, ret_mode_desc) in
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
