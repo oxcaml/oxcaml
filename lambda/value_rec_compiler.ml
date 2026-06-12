@@ -359,6 +359,8 @@ let compute_static_size lam =
         | Punboxedvectorarray _ | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
+        | Punspecializedarray ->
+            Misc.fatal_error "size_of_primitive: Punspecializedarray"
         end
     | Pmakearray_dynamic _ -> Misc.fatal_error "size_of_primitive"
     | Parrayblit _ -> Constant

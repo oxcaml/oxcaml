@@ -451,6 +451,19 @@ and array_kind =
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray
+  (* Used only in the definition of primitives, to represent primitives that
+     have not yet been specialized. Note that [Punspecializedarray] and
+     [Pgenarray] are not the same thing:
+
+     - [Pgenarray] represent arrays that can be either [Paddrarray] or
+       [Pintarray]
+     - [Punspecializedarray] is for arrays that can be of any kind, including
+       [Pgenarray].
+
+     When [Config.flat_float_array] is [false], then [Pgenarray] must not be
+     used, but [Punspecializedarray] always is. After specialization, no value
+     of this kind should remain. *)
 
 (** When accessing a flat float array, we need to know the mode which we should
     box the resulting float at. *)
@@ -466,6 +479,8 @@ and array_ref_kind =
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray_ref of locality_mode
+    (* See [Punspecializedarray]. *)
 
 (** When updating an array that might contain pointers, we need to know what
     mode they're at; otherwise, access is uniform. *)
@@ -482,6 +497,8 @@ and array_set_kind =
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray_set of modify_mode
+    (* See [Punspecializedarray]. *)
 
 and ignorable_product_element_kind =
   | Pint_ignorable

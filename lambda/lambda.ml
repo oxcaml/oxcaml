@@ -498,6 +498,7 @@ and array_kind =
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
+  | Punspecializedarray
 
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
@@ -510,6 +511,7 @@ and array_ref_kind =
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
+  | Punspecializedarray_ref of locality_mode
 
 and array_set_kind =
   | Pgenarray_set of modify_mode
@@ -523,6 +525,7 @@ and array_set_kind =
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
+  | Punspecializedarray_set of modify_mode
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -2486,6 +2489,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
       | Pgcignorableproductarray_ref _), _, _) -> None
   | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
   | Parrayrefs ((Pgenarray_ref m | Pfloatarray_ref m), _, _) -> Some m
+  | Parrayrefu (Punspecializedarray_ref _, _, _)
+  | Parrayrefs (Punspecializedarray_ref _, _, _) ->
+    Misc.fatal_error "Lambda.primitive_may_allocate: Punspecializedarray_ref"
   | Pisint _ | Pisnull | Pisout -> None
   | Pbigarrayset _ | Pbigarraydim _ -> None
   | Pbigarrayref (_, _, _, _) ->
@@ -2883,6 +2889,9 @@ let array_ref_kind_result_layout = function
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
+  | Punspecializedarray_ref _ ->
+    Misc.fatal_error
+      "Lambda.array_ref_kind_result_layout: Punspecializedarray_ref"
 
 let rec layout_of_mixed_block_element element =
   match element with
@@ -3238,6 +3247,7 @@ let array_ref_kind mode = function
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_ref kinds
+  | Punspecializedarray -> Punspecializedarray_ref mode
 
 let array_set_kind mode = function
   | Pgenarray -> Pgenarray_set mode
@@ -3251,6 +3261,7 @@ let array_set_kind mode = function
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_set kinds
+  | Punspecializedarray -> Punspecializedarray_set mode
 
 let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
       : array_ref_kind =
@@ -3267,6 +3278,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Paddrarray_set _ -> Paddrarray_ref
   | Pgcignorableaddrarray_set -> Pgcignorableaddrarray_ref
   | Pfloatarray_set -> Pfloatarray_ref mode
+  | Punspecializedarray_set _ -> Punspecializedarray_ref mode
 
 let may_allocate_in_region lam =
   (* loop_region raises, if the lambda might allocate in parent region *)
@@ -3373,6 +3385,9 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
       0 ignorables
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.count_initializers_array_kind: Punspecializedarray"
 
 (* CR mshinwell: This function might need revisiting for JSIR and any
    Flambda 2 -> WASM backend *)
@@ -3402,6 +3417,9 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.array_element_size_in_bytes: Punspecializedarray"
 
 let element_layout_of_array_kind ak =
   (* [alloc_heap] is ignored by [array_ref_kind_result_layout]. *)
