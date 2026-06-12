@@ -868,7 +868,8 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-expert-max-function-simplify-run";
     "-llvm-flags";
     "-reaper-preserve-direct-calls";
-    "-save-ir-after"
+    "-save-ir-after";
+    "-X"
   ]
 
 let ocaml_warnings_spec ~error =

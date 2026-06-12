@@ -1,9 +1,9 @@
 Get a list of all flags that ocaml understands.
   $ OCAMLOPT="$MERLIN_TEST_OCAML_PATH/bin/ocamlopt.opt"
-  $ "$OCAMLOPT" --help | grep -oP '(?<=  )-[a-z\-_0-9]+(?= )' > ocamlopt-flags.txt
+  $ "$OCAMLOPT" --help | grep -oP '(?<=  )-[a-zA-Z\-_0-9]+(?= )' > ocamlopt-flags.txt
 
   $ OCAMLC="$MERLIN_TEST_OCAML_PATH/bin/ocamlc"
-  $ "$OCAMLC" --help | grep -oP '(?<=  )-[a-z\-_0-9]+(?= )' > ocamlc-flags.txt
+  $ "$OCAMLC" --help | grep -oP '(?<=  )-[a-zA-Z\-_0-9]+(?= )' > ocamlc-flags.txt
 
   $ OCAML_FLAGS=$(sort -u ocamlopt-flags.txt ocamlc-flags.txt)
 
@@ -50,6 +50,17 @@ logic.
   $ echo "$OCAML_FLAGS"
   --help
   --version
+  -H
+  -H-manifest
+  -I
+  -I-manifest
+  -Ix
+  -O2
+  -O3
+  -O4
+  -Oclassic
+  -S
+  -X
   -a
   -absname
   -afl-inst-ratio
@@ -189,6 +200,7 @@ logic.
   -error-style
   -extension
   -extension-universe
+  -fPIC
   -favx
   -favx2
   -favx512f
@@ -242,6 +254,7 @@ logic.
   -flambda2-unbox-along-intra-function-control-flow
   -flambda2-unicode
   -flzcnt
+  -fno-PIC
   -fno-asan
   -fno-avx
   -fno-avx2
