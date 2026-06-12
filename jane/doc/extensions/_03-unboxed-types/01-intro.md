@@ -453,7 +453,7 @@ Here's the list of primitives that currently support `[@layout_poly]`:
 * `%array_safe_set`
 * `%array_unsafe_get`
 * `%array_unsafe_set`
-* `%array_size`
+* `%array_length`
 
 # Arrays of unboxed elements
 
