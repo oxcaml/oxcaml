@@ -15,6 +15,10 @@
 
 external ( + ) : int -> int -> int = "%addint"
 external opaque : 'a -> 'a = "%opaque"
+external ( |> ) : 'a -> ('a -> 'b) -> 'b = "%revapply"
+
+external pipe_yielding :
+  'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
 
 let f x = x + 1
 
@@ -37,10 +41,21 @@ let add a b = a + b
 
 let inc = add 1
 
+(* The function is a lambda, so typecore does not rewrite this into a plain
+   application and it reaches the [%revapply] primitive path: expect
+   "after/unyielding-call(1)" on the call synthesized for [|>]. *)
+let revapply_nontail x = (x |> (fun y -> y + 1)) + 1
+
+(* Same, but through a [%revapply] whose declared argument modes are
+   yielding: expect a plain "after/ret(1)". *)
+let revapply_yielding x = pipe_yielding x (fun y -> y + 1) + 1
+
 let () =
   let _ = opaque (call_nontail ()) in
   let _ = opaque (loop 3) in
   let _ = opaque (call_yielding_arg (fun () -> 7)) in
   let _ = opaque (tail_yielding (fun () -> 8)) in
   let _ = opaque (inc 5) in
+  let _ = opaque (revapply_nontail 1) in
+  let _ = opaque (revapply_yielding 2) in
   ()
