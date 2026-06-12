@@ -162,6 +162,12 @@ module Rvalue : sig
       evaluation of [block]; see [Lvalue.read_field_unguarded]. *)
   val read_field_unguarded : block:normal t -> field:Targetint.t -> normal t
 
+  (** V is the full-application code pointer of the OCaml function slot whose
+      address is given by [closure]. (The relevant field of the function slot
+      depends on the arity of the function, which is determined by inspecting
+      the closure information word at time T.) *)
+  val full_application_code_pointer_of_closure : closure:normal t -> normal t
+
   (** V will be the contents of the given field of the given symbol at time T.
   *)
   val read_symbol_field : Asm_symbol.t -> field:Targetint.t -> normal t

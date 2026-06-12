@@ -158,6 +158,30 @@ module Rvalue = struct
     in
     block @ OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref]
 
+  let full_application_code_pointer_of_closure ~closure =
+    (* The full-application code pointer of an OCaml function slot lies at field
+       0 when the function's arity is one, but at field 2 when the arity is
+       greater than one (field 0 then holding the code pointer for partial
+       applications, and field 1, in both cases, the closure information word).
+       See [To_cmm_set_of_closures.fill_slot]. The arity is determined here by
+       inspecting the closure information word: it is held in the topmost byte
+       (in twos-complement form, hence the arithmetic shift); see
+       [Cmm_helpers.pack_closure_info]. *)
+    let size_addr = Targetint.of_int_exn Dwarf_arch_sizes.size_addr in
+    let pos_arity_in_closinfo = (8 * Dwarf_arch_sizes.size_addr) - 8 in
+    closure @ [O.DW_op_dup]
+    @ OB.add_unsigned_const size_addr
+    @ [ O.DW_op_deref;
+        OB.signed_int_const (Targetint.of_int_exn pos_arity_in_closinfo);
+        O.DW_op_shra;
+        O.DW_op_lit1;
+        O.DW_op_eq ]
+    @ OB.conditional
+        ~if_zero:
+          (OB.add_unsigned_const
+             (Targetint.mul (Targetint.of_int_exn 2) size_addr))
+        ~if_nonzero:[] ~at_join:[O.DW_op_deref] ()
+
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field
 
