@@ -7414,19 +7414,20 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let (record, record_sort, _record_sorts, rmode, label, _, ambiguity,
-           ty_arg, record_repres) =
-        type_label_projection Legacy loc env srecord lid
+      let record, record_sort, _record_sorts, mode, label, _, ambiguity,
+          ty_arg, record_repres =
+        solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord Legacy
+          lid
       in
       check_project_mutability ~loc:record.exp_loc ~env
-        (Record_field label.lbl_name) label.lbl_mut rmode;
+        (Record_field label.lbl_name) label.lbl_mut mode;
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }
       in
       let mode =
         apply_left_is_contained_by is_contained_by
-          ~modalities:label.lbl_modalities rmode
+          ~modalities:label.lbl_modalities mode
       in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -7481,9 +7482,10 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let (record, record_sort, record_sorts, rmode, label, _, ambiguity,
-           ty_arg, record_repres) =
-        type_label_projection Unboxed_product loc env srecord lid
+      let record, record_sort, record_sorts, mode, label, _, ambiguity,
+          ty_arg, record_repres =
+        solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
+          Unboxed_product lid
       in
       if Types.is_mutable label.lbl_mut then
         fatal_error
@@ -7494,7 +7496,7 @@ and type_expect_
       in
       let mode =
         apply_left_is_contained_by is_contained_by
-          ~modalities:label.lbl_modalities rmode
+          ~modalities:label.lbl_modalities mode
       in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
@@ -8441,8 +8443,8 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let record, record_sort, rmode, label, ambiguity, ty_arg =
-            solve_Pexp_field ~label_usage:Env.Mutation env sexp srecord
+          let record, record_sort, _, rmode, label, _, ambiguity, ty_arg, _ =
+            solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
@@ -9514,30 +9516,11 @@ and type_label_access
    label, expected_type, ambiguity)
 
 and solve_Pexp_field
-  : 'rep . label_usage:_ -> _ -> _ -> _ -> 'rep record_form -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _ * _ =
-  fun ~label_usage env sexp srecord form lid ->
-  let (record, record_sort, rmode, label, _, ambiguity) =
-    type_label_access form env srecord label_usage lid
-  in
-  let ty_arg =
-    with_local_level_generalize_structure_if_principal begin fun () ->
-      (* [ty_arg] is the type of field, [ty_res] is the type of record, they
-       could share type variables, which are now instantiated *)
-      let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
-      (* we now link the two record types *)
-      unify_exp ~sexp env record ty_res;
-      ty_arg
-    end
-  in
-  (record, record_sort, rmode, label, ambiguity, ty_arg)
-
-and type_label_projection
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep
-  = fun record_form loc env srecord lid ->
-  let record, record_sort, mode, label, expected_type, ambiguity =
-    type_label_access record_form env srecord Env.Projection lid
+  : 'rep . label_usage:_ -> _ -> _ -> _ -> _ -> 'rep record_form -> _ ->
+    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep =
+  fun ~label_usage loc env sexp srecord record_form lid ->
+  let (record, record_sort, rmode, label, expected_type, ambiguity) =
+    type_label_access record_form env srecord label_usage lid
   in
   let ty_arg, record_sorts, record_repres =
     (* XXX Not clear to me why this can't be done in [type_label_access] so that
@@ -9547,10 +9530,10 @@ and type_label_projection
        [Texp_setfield] call does not. *)
     with_local_level_generalize_structure_if_principal begin fun () ->
       (* [ty_arg] is the type of field, [ty_res] is the type of record, they
-         could share type variables, which are now instantiated *)
+       could share type variables, which are now instantiated *)
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
-      unify_exp ~sexp:srecord env record ty_res;
+      unify_exp ~sexp env record ty_res;
       let record_sorts, record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
@@ -9565,8 +9548,7 @@ and type_label_projection
       ty_arg, record_sorts, record_repres
     end
   in
-  (record, record_sort, record_sorts,
-   Mode.Value.disallow_right mode, label, expected_type,
+  (record, record_sort, record_sorts, rmode, label, expected_type,
    ambiguity, ty_arg, record_repres)
 
 (* Typing format strings for printing or reading.
