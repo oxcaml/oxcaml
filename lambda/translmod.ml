@@ -1202,7 +1202,8 @@ let toploop_getvalue id =
     fatal_error "Translmod.toploop_getvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
+    ap_func=Lprim(Pfield
+                    ([toploop_getvalue_pos], All_value Pointer, Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1222,7 +1223,8 @@ let toploop_setvalue id lam =
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
+    ap_func=Lprim(Pfield
+                    ([toploop_setvalue_pos], All_value Pointer, Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=

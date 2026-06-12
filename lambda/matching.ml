@@ -2130,7 +2130,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
        must create a void (represented in lambda as an empty unboxed product)
        or product of voids rather than access a block.
 
-       This is necessary for bytecode, where [Pmixedfield]s that access void are
+       This is necessary for bytecode, where [Pfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
        boxed in bytecode). *)
     let rec lambda_void_of_el el =
@@ -2162,7 +2162,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     else
       let prim =
         match cstr_shape with
-        | Constructor_uniform_value -> Pfield (pos, Pointer, sem)
+        | Constructor_uniform_value -> Pfield ([pos], All_value Pointer, sem)
         | Constructor_mixed shape ->
             let shape =
               Lambda.transl_mixed_product_shape_for_read
@@ -2173,7 +2173,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                       constructor field")
                 shape
             in
-            Pmixedfield ([pos], shape, sem)
+            Pfield ([pos], Shape shape, sem)
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
@@ -2231,7 +2231,7 @@ let get_expr_args_variant_constant = drop_expr_arg
 
 let nonconstant_variant_field ubr index =
   let sem = add_barrier_to_read ubr Reads_agree in
-  Lambda.Pfield(index, Pointer, sem)
+  Lambda.Pfield([index], All_value Pointer, sem)
 
 let get_expr_args_variant_nonconst ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
@@ -2345,7 +2345,7 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_probe = None;
     }
 
-let lazy_forward_field = Lambda.Pfield (0, Pointer, Reads_vary)
+let lazy_forward_field = Lambda.Pfield ([0], All_value Pointer, Reads_vary)
 
 let inline_lazy_force_cond arg pos loc =
   let idarg = Ident.create_local "lzarg" in
@@ -2403,8 +2403,9 @@ let inline_lazy_force_switch arg pos loc =
                 sw_numconsts = 256;
                 (* PR#6033 - tag ranges from 0 to 255 *)
                 sw_consts =
-                  [ (Runtimetags.forward_tag, Lprim (Pfield(0, Pointer, Reads_vary),
-                                             [ varg ], loc));
+                  [ (Runtimetags.forward_tag,
+                      Lprim (Pfield ([0], All_value Pointer, Reads_vary),
+                        [varg], loc));
                     (Runtimetags.lazy_tag, call_force_lazy_block varg loc ~pos);
                     (Runtimetags.forcing_tag, call_force_lazy_block varg loc ~pos)
                   ];
@@ -2484,7 +2485,7 @@ let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
       rem
     else
       {
-        arg = Lprim (Pfield (pos, Pointer, sem), [ arg ], loc);
+        arg = Lprim (Pfield ([pos], All_value Pointer, sem), [ arg ], loc);
         binding_kind;
         mut = compose_mut mut Immutable;
         sort = Jkind.Sort.Const.for_tuple_element;
@@ -2583,7 +2584,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         match lbl_repres with
         | Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-            Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
+            Lprim (Pfield ([lbl.lbl_pos], All_value ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_unboxed
         | Record_inlined (_, _, Variant_unboxed) -> arg, sort, layout
@@ -2597,7 +2598,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
            (* Here we are projecting an unboxed float from a float record. *)
            lbl_sort, lbl_layout
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-            Lprim (Pfield (lbl.lbl_pos + 1, ptr, sem), [ arg ], loc),
+            Lprim (Pfield ([lbl.lbl_pos + 1], All_value ptr, sem), [arg], loc),
             lbl_sort, lbl_layout
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
@@ -2613,7 +2614,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
                   alloc_heap)
                 shape
             in
-            Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
+            Lprim (Pfield ([lbl.lbl_pos], Shape shape, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
@@ -3690,7 +3691,7 @@ let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
           let sem = add_barrier_to_read ubr Reads_agree in
           let binding_kind = add_barrier_to_let_kind ubr Alias in
           Llet (binding_kind, Lambda.layout_block, tag, tag_duid,
-                Lprim (Pfield (0, Pointer, sem), [ arg ], loc),
+                Lprim (Pfield ([0], All_value Pointer, sem), [ arg ], loc),
                 tests)
     in
     List.fold_right
@@ -5022,7 +5023,7 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
-           (Pfield (0, Pointer, Reads_agree),
+           (Pfield ([0], All_value Pointer, Reads_agree),
             [ Lvar param ],
             sloc))
   in

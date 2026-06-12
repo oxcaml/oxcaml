@@ -545,7 +545,19 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
-    | Pfield (n, _, _) -> unary (Getfield n)
+    | Pfield ([], _, _) -> assert false
+    | Pfield ([n], All_value _, _sem) -> unary (Getfield n)
+    | Pfield (_ :: _, All_value _, _sem) -> assert false
+    | Pfield (path, Shape shape, _sem) ->
+      (* Non-value mixed fields are always boxed in bytecode; they aren't
+         stored flat like they are in native code. *)
+      let read_expr =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          (unary (Getfield (List.hd path)))
+          (List.tl path)
+      in
+      copy_unboxed_product shape ~path read_expr
     | Punboxed_product_field (n, _) -> unary (Getfield n)
     | Parray_element_size_in_bytes _array_kind -> (
       match args with
@@ -559,9 +571,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pget_idx _ -> binary (Ccall "caml_get_idx_bytecode")
     | Pset_idx _ -> ternary (Ccall "caml_set_idx_bytecode")
-    | Pmake_idx_field pos ->
-      Const (Const_block (0, [Const_base (Const_int pos)]))
-    | Pmake_idx_mixed_field (_, pos, path) ->
+    | Pmake_idx_field (_, pos, path) ->
       let path_consts =
         List.map (fun x -> Const_base (Const_int x)) (pos :: path)
       in
@@ -606,25 +616,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pfield_computed _sem -> binary Getvectitem
-    | Psetfield (n, _ptr, _init) -> binary (Setfield n)
-    | Psetfield_computed (_ptr, _init) -> ternary Setvectitem
-    (* In bytecode, float#s are boxed.  So, we can use the existing float
-       instructions for the ufloat primitives. *)
-    | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
-      pseudo_event (unary (Getfloatfield n))
-    | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
-    | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
-    | Pmixedfield (path, shape, _sem) ->
-      (* Non-value mixed fields are always boxed in bytecode; they aren't
-         stored flat like they are in native code. *)
-      let read_expr =
-        List.fold_left
-          (fun expr idx -> Prim (Getfield idx, [expr]))
-          (unary (Getfield (List.hd path)))
-          (List.tl path)
-      in
-      copy_unboxed_product shape ~path read_expr
-    | Psetmixedfield (path, shape, _init) ->
+    | Psetfield ([], _, _) -> assert false
+    | Psetfield ([n], All_value _ptr, _init) -> binary (Setfield n)
+    | Psetfield (_ :: _, All_value _, _) -> assert false
+    | Psetfield (path, Shape shape, _init) ->
       let block, value =
         match args with
         | [block; value] -> comp_expr block, comp_expr value
@@ -642,6 +637,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           block parent_path
       in
       Prim (Setfield last_idx, [target_block; value_expr])
+    | Psetfield_computed (_ptr, _init) -> ternary Setvectitem
+    (* In bytecode, float#s are boxed.  So, we can use the existing float
+       instructions for the ufloat primitives. *)
+    | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
+      pseudo_event (unary (Getfloatfield n))
+    | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
     | Pduprecord _ -> unary (Ccall "caml_obj_dup")
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1

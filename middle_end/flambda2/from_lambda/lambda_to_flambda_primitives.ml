@@ -1885,11 +1885,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (Simple.const_int
            (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
               num_bytes)) ]
-  | Pmake_idx_field pos, [] ->
-    needs_64_bit_target prim dbg;
-    let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
-    [H.simple_i64_expr idx_raw_value]
-  | Pmake_idx_mixed_field (shape, pos, path), [] ->
+  | Pmake_idx_field (shape, pos, path), [] ->
     needs_64_bit_target prim dbg;
     let module W = Mixed_product_bytes.Wrt_path in
     let { W.offset_bytes; gap_bytes } =
@@ -2549,7 +2545,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
            ( Int_comp (I.Tagged_immediate, Yielding_bool (Lt Unsigned)),
              arg1,
              arg2 )) ]
-  | Pfield (index, _int_or_ptr, sem), [[arg]] ->
+  | Pfield ([index], All_value _int_or_ptr, sem), [[arg]] ->
     (* CR mshinwell: make use of the int-or-ptr flag (new in OCaml 5)? *)
     let imm = Target_ocaml_int.of_int machine_width index in
     check_non_negative_imm imm "Pfield";
@@ -2560,6 +2556,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
+  | Pfield (_, All_value _, _), [[_]] -> assert false
   | Pfloatfield (field, sem, mode), [[arg]] ->
     let imm = Target_ocaml_int.of_int machine_width field in
     check_non_negative_imm imm "Pfloatfield";
@@ -2582,9 +2579,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
-  | Pmixedfield (field_path, shape, sem), [[arg]] ->
+  | Pfield (field_path, Shape shape, sem), [[arg]] ->
     if List.length field_path < 1
-    then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
+    then Misc.fatal_error "Pfield: field_path must be non-empty";
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:Printlambda.locality_mode
@@ -2599,7 +2596,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     List.map
       (fun new_index ->
         let imm = Target_ocaml_int.of_int machine_width new_index in
-        check_non_negative_imm imm "Pmixedfield";
+        check_non_negative_imm imm "Pfield";
         let mutability = convert_field_read_semantics sem in
         let field_elt = flattened_reordered_shape.(new_index) in
         let block_access =
@@ -2618,7 +2615,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
           prim)
       new_indexes
-  | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
+  | ( Psetfield
+        ([index], All_value immediate_or_pointer, initialization_or_assignment),
       [[block]; [value]] ) ->
     let field_kind = convert_block_access_field_kind immediate_or_pointer in
     let imm = Target_ocaml_int.of_int machine_width index in
@@ -2631,6 +2629,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Block_set { kind = block_access; init = init_or_assign; field = imm },
           block,
           value ) ]
+  | Psetfield (_, All_value _, _), [[_]; [_]] -> assert false
   | Psetfloatfield (field, initialization_or_assignment), [[block]; [value]] ->
     let imm = Target_ocaml_int.of_int machine_width field in
     check_non_negative_imm imm "Psetfloatfield";
@@ -2653,10 +2652,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Block_set { kind = block_access; init = init_or_assign; field = imm },
           block,
           value ) ]
-  | ( Psetmixedfield (field_path, shape, initialization_or_assignment),
+  | ( Psetfield (field_path, Shape shape, initialization_or_assignment),
       [[block]; values] ) ->
     if List.length field_path < 1
-    then Misc.fatal_error "Psetmixedfield: field_path must be non-empty";
+    then Misc.fatal_error "Psetfield: field_path must be non-empty";
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -2672,13 +2671,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let num_values = List.length values in
     if num_indices <> num_values
     then
-      Misc.fatal_errorf "inconsistent Psetmixedfield: %d indices and %d values"
+      Misc.fatal_errorf "inconsistent Psetfield: %d indices and %d values"
         num_indices num_values;
     let exprs =
       List.map2
         (fun new_index value : H.expr_primitive ->
           let imm = Target_ocaml_int.of_int machine_width new_index in
-          check_non_negative_imm imm "Psetmixedfield";
+          check_non_negative_imm imm "Psetfield";
           let field_elt = flattened_reordered_shape.(new_index) in
           let block_access =
             H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
@@ -3211,8 +3210,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        here, either a bug in [Closure_conversion] or the wrong number of \
        arguments"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | (Pprobe_is_enabled _ | Pmake_idx_field _ | Pmake_idx_mixed_field _), _ :: _
-    ->
+  | (Pprobe_is_enabled _ | Pmake_idx_field _), _ :: _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for nullary primitive \
        %a (%a)"
@@ -3224,8 +3222,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _ | Pmixedfield _
-      | Preinterpret_unboxed_int64_as_tagged_int63
+      | Patomic_load_field _ | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
@@ -3243,14 +3240,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
       | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
       | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
-      | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
-      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-      | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-      | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-      | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+      | Psetfloatfield _ | Psetufloatfield _ | Pbigstring_load_i8 _
+      | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+      | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+      | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+      | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _

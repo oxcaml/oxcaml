@@ -47,9 +47,9 @@ let rec eliminate_ref id = function
   | Lletrec(idel, e2) ->
       List.iter (fun rb -> check_function_escape id rb.def) idel;
       Lletrec(idel, eliminate_ref id e2)
-  | Lprim(Pfield (0, _, _), [Lvar v], _) when Ident.same v id ->
+  | Lprim(Pfield ([0], _, _), [Lvar v], _) when Ident.same v id ->
       Lmutvar id
-  | Lprim(Psetfield(0, _, _), [Lvar v; e], _) when Ident.same v id ->
+  | Lprim(Psetfield([0], _, _), [Lvar v; e], _) when Ident.same v id ->
       Lassign(id, eliminate_ref id e)
   | Lprim(Poffsetref delta, [Lvar v], loc) when Ident.same v id ->
     Lassign(id, add int ~loc (Lmutvar id) (tagged_immediate delta))

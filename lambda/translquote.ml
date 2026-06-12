@@ -91,9 +91,9 @@ let cons ~loc hd tl =
       [hd; tl],
       loc )
 
-let hd ~loc l = Lprim (Pfield (0, Pointer, Reads_agree), [l], loc)
+let hd ~loc l = Lprim (Pfield ([0], All_value Pointer, Reads_agree), [l], loc)
 
-let tl ~loc l = Lprim (Pfield (1, Pointer, Reads_agree), [l], loc)
+let tl ~loc l = Lprim (Pfield ([1], All_value Pointer, Reads_agree), [l], loc)
 
 let rec mk_list ~loc list =
   match list with [] -> nil | hd :: tl -> cons ~loc hd (mk_list ~loc tl)

@@ -255,7 +255,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_unboxed_nativeint _ )
       | Const_block _ | Const_mixed_block _ | Const_float_array _
-      | Const_immstring _ | Const_float_block _ | Const_null ->
+      | Const_float_block _ | Const_immstring _ | Const_null ->
         Misc.fatal_errorf
           "In constant mixed block, a field of kind\n\
           \       Float_boxed contained the  constant %a"
@@ -287,13 +287,13 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Float_boxed _ -> unbox_float_constant arg)
         args
     in
-    let block_shape : K.Scannable_block_shape.t =
+    let mixed_block_shape : K.Scannable_block_shape.t =
       match K.Scannable_block_shape.from_mixed_block_shape shape with
       | Value_only ->
         (* See Note [Constant all-value mixed records] in translcore.ml *)
         Misc.fatal_error
           "Const_mixed_block: from_mixed_block_shape returned Value_only"
-      | Mixed_record _ as block_shape -> block_shape
+      | Mixed_record _ as mixed_block_shape -> mixed_block_shape
     in
     let acc, fields =
       List.fold_left_map
@@ -303,7 +303,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         acc args
     in
     let const : SC.t =
-      SC.block (Tag.Scannable.create_exn tag) Immutable block_shape fields
+      SC.block (Tag.Scannable.create_exn tag) Immutable mixed_block_shape fields
     in
     register_const acc dbg const "const_mixed_block"
   | Const_null -> acc, reg_width RWC.const_null, "null"
@@ -1268,17 +1268,17 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
       | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
-      | Psequor | Pnot | Pmixedfield _ | Psetmixedfield _ | Poffsetref _
-      | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
-      | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
-      | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
-      | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
-      | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
-      | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
-      | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
-      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
-      | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+      | Psequor | Pnot | Poffsetref _ | Pstringlength | Pstringrefu
+      | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs
+      | Pbytessets | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
+      | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisout
+      | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _
+      | Pstring_load_i16 _ | Pstring_load_16 _ | Pstring_load_32 _
+      | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
+      | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
+      | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
+      | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _
+      | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
       | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
@@ -1301,14 +1301,13 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
       | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
       | Pwith_stack_bind_preemptible | Pperform | Presume | Preperform
-      | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
-      | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
-      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-      | Patomic_compare_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get
-      | Pdomain_index | Ppoll | Patomic_load_field _ | Patomic_set_field _
-      | Preinterpret_tagged_int63_as_unboxed_int64
+      | Pmake_idx_field _ | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _
+      | Pset_idx _ | Pget_ptr _ | Pset_ptr _ | Patomic_exchange_field _
+      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
+      | Patomic_set_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
@@ -1507,7 +1506,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             ( Variadic (Make_block (block_kind, Immutable, alloc_mode), fields),
               dbg ) -> (
           (* CR mshinwell: split into a separate function *)
-          let tag, block_shape = P.Block_kind.to_shape block_kind in
+          let tag, mixed_block_shape = P.Block_kind.to_shape block_kind in
           let approxs =
             List.map (find_value_approximation body_env) fields |> Array.of_list
           in
@@ -1521,7 +1520,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           match fields_kind with
           | Constant static_fields | Computed_static static_fields -> (
             let approx, static_const =
-              match block_shape with
+              match mixed_block_shape with
               | Scannable scannable_block_shape -> (
                 match Tag.Scannable.of_tag tag with
                 | Some tag ->
@@ -1542,7 +1541,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                     "Binding of %a to %a has yielded a tag %a which is not \
                      scannable, yet the block shape appears to be: %a"
                     Ident.print id Named.print defining_expr Tag.print tag
-                    Flambda_kind.Block_shape.print block_shape)
+                    Flambda_kind.Block_shape.print mixed_block_shape)
               | Float_record ->
                 let static_fields =
                   List.map
@@ -1617,7 +1616,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             | Dynamic_block -> (* Handled in outer match *) assert false)
           | Dynamic_block ->
             let body_env =
-              match block_shape with
+              match mixed_block_shape with
               | Scannable scannable_block_shape -> (
                 match Tag.Scannable.of_tag tag with
                 | Some tag ->
@@ -1630,7 +1629,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                      which is not scannable, yet the block shape appears to \
                      be: %a"
                     Ident.print id Named.print defining_expr Tag.print tag
-                    Flambda_kind.Block_shape.print block_shape)
+                    Flambda_kind.Block_shape.print mixed_block_shape)
               | Float_record ->
                 (* No approximations for float records at the moment. *)
                 body_env
@@ -3886,14 +3885,15 @@ let bind_static_consts_and_code acc body =
         defining_expr ~body)
     (acc, body) components
 
-(* Returns a tuple [block_shape, field_count, block_access, kind_of_field].
-   [block_access] and [kind_of_field] are function that take an index [pos] and
-   return the block_access/kind of the [pos]th field of the module. "Fields" are
-   physical, so unboxed products count as more than one field when indexing and
-   determining [field_count]. *)
+(* Returns a tuple [mixed_block_shape, field_count, block_access,
+   kind_of_field]. [block_access] and [kind_of_field] are function that take an
+   index [pos] and return the block_access/kind of the [pos]th field of the
+   module. "Fields" are physical, so unboxed products count as more than one
+   field when indexing and determining [field_count]. *)
 let final_module_block_representation acc
     ~(module_repr : Lambda.module_representation) =
-  let (block_shape : K.Scannable_block_shape.t), block_access, field_count =
+  let (mixed_block_shape : K.Scannable_block_shape.t), block_access, field_count
+      =
     match module_repr with
     | Module_value_only { field_count } ->
       let block_access _pos : P.Block_access_kind.t =
@@ -3914,31 +3914,34 @@ let final_module_block_representation acc
       let flattened_reordered_shape =
         K.Mixed_block_lambda_shape.flattened_reordered_shape shape
       in
-      let block_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+      let mixed_block_shape =
+        K.Scannable_block_shape.from_mixed_block_shape shape
+      in
       let field_count = Array.length flattened_reordered_shape in
       let block_access pos : P.Block_access_kind.t =
         Lambda_to_flambda_primitives_helpers
         .block_access_kind_of_mixed_field_element
-          ~tag:(Known Tag.Scannable.zero) ~size:Unknown ~kind_shape:block_shape
+          ~tag:(Known Tag.Scannable.zero) ~size:Unknown
+          ~kind_shape:mixed_block_shape
           flattened_reordered_shape.(pos)
       in
-      block_shape, block_access, field_count
+      mixed_block_shape, block_access, field_count
   in
   let kind_of_field =
-    match block_shape with
+    match mixed_block_shape with
     | Value_only -> fun _ -> K.value
     | Mixed_record shape ->
       let field_kinds = K.Mixed_block_shape.field_kinds shape in
       fun pos -> field_kinds.(pos)
   in
-  block_shape, field_count, block_access, kind_of_field
+  mixed_block_shape, field_count, block_access, kind_of_field
 
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
-  let block_shape, field_count, block_access, kind_of_field =
+  let mixed_block_shape, field_count, block_access, kind_of_field =
     final_module_block_representation acc ~module_repr
   in
   let load_fields_body acc =
@@ -3968,7 +3971,8 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        Static_const.block module_block_tag Immutable block_shape field_vars
+        Static_const.block module_block_tag Immutable mixed_block_shape
+          field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of

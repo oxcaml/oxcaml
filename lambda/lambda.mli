@@ -136,23 +136,19 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int * immediate_or_pointer * field_read_semantics
+  | Pfield of int list * locality_mode field_shape * field_read_semantics
+    (** The index to [Pfield] corresponds to an element of the shape, not
+        necessarily the index of the field at runtime, as reordering may take
+        place on entry to Flambda 2. *)
   | Pfield_computed of field_read_semantics
-  | Psetfield of int * immediate_or_pointer * initialization_or_assignment
+  | Psetfield of int list * unit field_shape * initialization_or_assignment
+    (** The same comment about the index as for [Pfield] applies to
+        [Psetfield]. *)
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
-      * field_read_semantics
-    (** The index to [Pmixedfield] corresponds to an element of the shape, not
-        necessarily the index of the field at runtime, as reordering may take
-        place on entry to Flambda 2. *)
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
-  | Psetmixedfield of int list * mixed_block_shape
-      * initialization_or_assignment
-    (** The same comment about the index as for [Pmixedfield] applies to
-        [Psetmixedfield]. *)
   | Pduprecord of Types.record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
@@ -160,8 +156,7 @@ type primitive =
       (* the [layout list] is the layout of the whole product *)
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of int
-  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_field of mixed_block_shape * int * int list
     (** The lone int is the index into the mixed_block_shape, the int list is
         the path into that mixed_block_element *)
   | Pmake_idx_array of
@@ -559,8 +554,7 @@ and 'a mixed_block_element =
 
 and mixed_block_shape = unit mixed_block_element array
 
-and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
+and mixed_block_shape_with_locality_mode = locality_mode mixed_block_element array
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -592,6 +586,10 @@ and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+
+and 'a field_shape =
+  | All_value of immediate_or_pointer
+  | Shape of 'a mixed_block_element array
 
 and peek_or_poke =
   | Ppp_tagged_immediate
@@ -1196,8 +1194,7 @@ val layout_top : layout
 val layout_bottom : layout
 
 val mixed_block_element_for_module : unit mixed_block_element
-val mixed_block_element_with_locality_mode_for_module :
-  locality_mode mixed_block_element
+val mixed_block_element_with_locality_mode_for_module : locality_mode mixed_block_element
 
 
 (** [dummy_constant] produces a placeholder value with a recognizable

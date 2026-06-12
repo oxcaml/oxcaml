@@ -658,16 +658,20 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%loc_POS" -> Loc Loc_POS
     | "%loc_MODULE" -> Loc Loc_MODULE
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
-    | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
-    | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
-    | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
-    | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
+    | "%field0" ->
+       Primitive (Pfield ([0], All_value Pointer, Reads_vary), 1)
+    | "%field1" ->
+       Primitive (Pfield ([1], All_value Pointer, Reads_vary), 1)
+    | "%field0_immut" ->
+       Primitive (Pfield ([0], All_value Pointer, Reads_agree), 1)
+    | "%field1_immut" ->
+       Primitive (Pfield ([1], All_value Pointer, Reads_agree), 1)
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
-       Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
+       Primitive (Psetfield ([0], All_value Pointer, Assignment mode), 2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
-       Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
+       Primitive (Psetfield ([1], All_value Pointer, Assignment mode), 2)
     | "%makeblock" ->
       Primitive ((Pmakeblock(0, Immutable, [| Value generic_value |], mode)), 1)
     | "%makemutable" ->
@@ -1691,17 +1695,19 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
           | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
   in
   match prim, param_tys with
-  | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
+  | Primitive (Psetfield([n], All_value Pointer, init), arity), [_; p2] -> begin
       match fst (maybe_pointer_type env p2) with
       | Pointer -> None
-      | Immediate -> Some (Primitive (Psetfield(n, Immediate, init), arity))
+      | Immediate ->
+        Some (Primitive (Psetfield([n], All_value Immediate, init), arity))
     end
-  | Primitive (Pfield (n, Pointer, mut), arity), _ ->
+  | Primitive (Pfield ([n], All_value Pointer, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
       let is_int = match is_function_type env ty with
         | None -> Pointer
         | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
-      Some (Primitive (Pfield (n, is_int, mut), arity))
+      Some (Primitive (Pfield ([n], All_value is_int, mut), arity))
+  | Primitive (Pfield _, _), _ -> None
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
       let array_type =
@@ -2194,10 +2200,12 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
       | _ ->
           let varg = Ident.create_local "atomic_arg" in
           let ptr =
-            Lprim (Pfield (0, Pointer, Reads_agree), [Lvar varg], loc)
+            Lprim
+              (Pfield ([0], All_value Pointer, Reads_agree), [Lvar varg], loc)
           in
           let ofs =
-            Lprim (Pfield (1, Immediate, Reads_agree), [Lvar varg], loc)
+            Lprim
+              (Pfield ([1], All_value Immediate, Reads_agree), [Lvar varg], loc)
           in
           let args = ptr :: ofs :: rest in
           Llet (
@@ -2542,12 +2550,12 @@ let lambda_primitive_needs_event_after = function
   | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pmake_idx_field _ | Pmake_idx_array _
   | Pidx_deepen _
 
   | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _
-  | Pufloatfield _ | Psetufloatfield _ | Pmixedfield _ | Psetmixedfield _
+  | Pufloatfield _ | Psetufloatfield _
   | Poffsetref _
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu

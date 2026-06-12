@@ -345,6 +345,9 @@ let field_read_semantics ppf sem =
   | Reads_agree -> ()
   | Reads_vary -> fprintf ppf "_mut"
 
+let field_path ppf path =
+  pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int ppf path
+
 let peek_or_poke ppf (pp : peek_or_poke) =
   match pp with
   | Ppp_tagged_immediate -> fprintf ppf "tagged_immediate"
@@ -412,21 +415,32 @@ let primitive ppf = function
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
       fprintf ppf "makeforwardblock"
-  | Pfield (n, ptr, sem) ->
-      let instr =
-        match ptr, sem with
-        | Immediate, _ -> "field_int"
-        | Pointer, Reads_vary -> "field_mut"
-        | Pointer, Reads_agree -> "field_imm"
-      in
-      fprintf ppf "%s %i" instr n
+  | Pfield (path, All_value ptr, sem) ->
+    let instr =
+      match ptr, sem with
+      | Immediate, _ -> "field_int"
+      | Pointer, Reads_vary -> "field_mut"
+      | Pointer, Reads_agree -> "field_imm"
+    in
+    fprintf ppf "%s %a" instr field_path path
+  | Pfield (path, Shape shape, sem) ->
+    let instr =
+      match sem with
+      | Reads_vary -> "field_mut"
+      | Reads_agree -> "field_imm"
+    in
+    fprintf ppf "%s %a%a"
+      instr
+      field_path path
+      (elide_uniform mixed_block_shape_with_locality_mode) shape
   | Pfield_computed sem ->
       fprintf ppf "field_computed%a" field_read_semantics sem
-  | Psetfield(n, ptr, init) ->
+  | Psetfield(path, shape, init) ->
       let instr =
-        match ptr with
-        | Pointer -> "ptr"
-        | Immediate -> "imm"
+        match shape with
+        | All_value Pointer -> "_ptr"
+        | All_value Immediate -> "_imm"
+        | Shape _ -> ""
       in
       let init =
         match init with
@@ -435,7 +449,13 @@ let primitive ppf = function
         | Assignment Modify_heap -> ""
         | Assignment Modify_maybe_stack -> "(maybe-stack)"
       in
-      fprintf ppf "setfield_%s%s %i" instr init n
+      fprintf ppf "setfield%s%s %a%a"
+        instr init
+        field_path path
+        (fun ppf shape ->
+          match shape with
+          | Shape shape -> elide_uniform mixed_block_shape ppf shape
+          | All_value _ -> ()) shape
   | Psetfield_computed (ptr, init) ->
       let instr =
         match ptr with
@@ -456,11 +476,6 @@ let primitive ppf = function
   | Pufloatfield (n, sem) ->
       fprintf ppf "ufloatfield%a %i"
         field_read_semantics sem n
-  | Pmixedfield (n, shape, sem) ->
-      fprintf ppf "mixedfield%a %a %a"
-        field_read_semantics sem
-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
-        mixed_block_shape_with_locality_mode shape
   | Psetfloatfield (n, init) ->
       let init =
         match init with
@@ -479,18 +494,6 @@ let primitive ppf = function
         | Assignment Modify_maybe_stack -> "(maybe-stack)"
       in
       fprintf ppf "setufloatfield%s %i" init n
-  | Psetmixedfield (n, shape, init) ->
-      let init =
-        match init with
-        | Heap_initialization -> "(heap-init)"
-        | Root_initialization -> "(root-init)"
-        | Assignment Modify_heap -> ""
-        | Assignment Modify_maybe_stack -> "(maybe-stack)"
-      in
-      fprintf ppf "setmixedfield%s %a %a"
-        init
-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
-        mixed_block_shape shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
   | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
@@ -509,14 +512,11 @@ let primitive ppf = function
         layouts
   | Parray_element_size_in_bytes ak ->
       fprintf ppf "array_element_size_in_bytes (%s)" (array_kind ak)
-  | Pmake_idx_field pos ->
-      fprintf ppf "idx_field %d" pos
-  | Pmake_idx_mixed_field (shape, pos, path) ->
-      fprintf ppf "idx_mixed_field %a %a %a"
-        mixed_block_shape shape
+  | Pmake_idx_field (shape, pos, path) ->
+      fprintf ppf "idx_field%a %a %a"
+        (elide_uniform mixed_block_shape) shape
         pp_print_int pos
-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
-          path
+        field_path path
   | Pmake_idx_array (ak, ik, mbe, path) ->
       fprintf ppf "idx_array %s %a %a %a"
         (array_kind ak) array_index_kind ik
@@ -920,13 +920,10 @@ let name_of_primitive = function
   | Psetfloatfield _ -> "Psetfloatfield"
   | Pufloatfield _ -> "Pufloatfield"
   | Psetufloatfield _ -> "Psetufloatfield"
-  | Pmixedfield _ -> "Pmixedfield"
-  | Psetmixedfield _ -> "Psetmixedfield"
   | Pduprecord _ -> "Pduprecord"
   | Pmake_unboxed_product _ -> "Pmake_unboxed_product"
   | Punboxed_product_field _ -> "Punboxed_product_field"
   | Pmake_idx_field _ -> "Pmake_idx_field"
-  | Pmake_idx_mixed_field _ -> "Pmake_idx_mixed_field"
   | Pmake_idx_array _ -> "Pmake_idx_array"
   | Pidx_deepen _ -> "Pidx_deepen"
   | Parray_element_size_in_bytes _ -> "Parray_element_size_in_bytes"

@@ -263,7 +263,6 @@ let compute_static_size lam =
     | Psetfield _
     | Psetfield_computed _
     | Psetfloatfield _
-    | Psetmixedfield _
     | Poffsetref _
     | Pbytessetu
     | Pbytessets
@@ -363,7 +362,6 @@ let compute_static_size lam =
     | Pfield _
     | Pfield_computed _
     | Pfloatfield _
-    | Pmixedfield _
     | Pwith_stack
     | Pwith_stack_bind
     | Pwith_stack_preemptible
@@ -440,7 +438,7 @@ let compute_static_size lam =
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
     | Parray_element_size_in_bytes _
-    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+    | Pmake_idx_field _ | Pmake_idx_array _
     | Pidx_deepen _
     | Punbox_unit ->
         Constant
@@ -577,7 +575,7 @@ let rec split_static_function lfun block_var local_idents lam :
         lfun.params
     in
     let ap_func =
-      Lprim (Pfield (0, Pointer, lifted_block_read_sem),
+      Lprim (Pfield ([0], All_value Pointer, lifted_block_read_sem),
         [Lvar block_var], no_loc)
     in
     let body =
@@ -618,7 +616,7 @@ let rec split_static_function lfun block_var local_idents lam :
     let free_vars_block_size, subst, block_fields_rev =
       Ident.Set.fold (fun var (i, subst, fields) ->
           let access =
-            Lprim (Pfield (i, Pointer, lifted_block_read_sem),
+            Lprim (Pfield ([i], All_value Pointer, lifted_block_read_sem),
                    [Lvar block_var], no_loc)
           in
           (Stdlib.succ i, Ident.Map.add var access subst, Lvar var :: fields))
@@ -947,8 +945,9 @@ let compile_alloc size =
             [Lambda.lambda_unit],
             no_loc)
   | Shape shape ->
-    (* CR layout poly: This can no longer be computed before slambda eval, we
-       should use [Pmakeblock] here (or delay this until after). *)
+      (* CR layout poly: This is can no longer be computed before slambda
+        eval, we should use [Pmakeblock] here (or delay this until after
+        slambda eval). *)
     if Mixed_product_bytes.shape_is_all_value shape then
       alloc alloc_prim [all_value_mixed_block_size shape]
     else if !Clflags.native_code then
@@ -964,6 +963,7 @@ let compile_alloc size =
     else
       let size = Array.length shape in
       alloc alloc_mixed_record_prim [size; size]
+
 
 let compile_update size dummy newval =
   let prim, newval =

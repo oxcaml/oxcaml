@@ -161,30 +161,25 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int * immediate_or_pointer * field_read_semantics
+  (* CR-someday xclerc: the first argument of `Pfield` and
+     `Psetfield` (the path / list of indices) should probably be
+     abstracted so that we do not check in multiple places that its length is
+     correct. *)
+  | Pfield of int list * locality_mode field_shape * field_read_semantics
   | Pfield_computed of field_read_semantics
-  | Psetfield of int * immediate_or_pointer * initialization_or_assignment
+  | Psetfield of int list * unit field_shape * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
-  (* CR-someday xclerc: the first argument of `Pmixedfield` and
-     `Psetmixedfield` (the path / list of indices) should probably be
-     abstracted so that we do not check in multiple places that its length is
-     correct. *)
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
-      * field_read_semantics
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
-  | Psetmixedfield of int list * mixed_block_shape
-      * initialization_or_assignment
   | Pduprecord of Types.record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of int
-  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_field of mixed_block_shape * int * int list
   | Pmake_idx_array of
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
@@ -562,6 +557,10 @@ and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+
+and 'a field_shape =
+  | All_value of immediate_or_pointer
+  | Shape of 'a mixed_block_element array
 
 and peek_or_poke =
   | Ppp_tagged_immediate
@@ -1807,9 +1806,9 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
-    Pfield(pos, Pointer, read_semantics)
+    Pfield([pos], All_value Pointer, read_semantics)
   | Module_mixed (_, shape_for_read) ->
-    Pmixedfield([pos], shape_for_read, read_semantics)
+    Pfield([pos], Shape shape_for_read, read_semantics)
 
 let transl_module_representation repr =
   (* The shape here is potentially an underapproximation, since the scannable
@@ -2341,8 +2340,7 @@ let locality_mode_of_primitive_description (p : external_call_description) =
       if p.prim_alloc then Some alloc_heap else None
 
 let project_from_mixed_block_shape
-    : 'a. 'a mixed_block_element array -> path:int list
-          -> 'a mixed_block_element
+    : 'a. 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
     = fun shape ~path ->
   match path with
   | [] ->
@@ -2404,7 +2402,9 @@ let mixed_block_projection_may_allocate shape ~path =
        it's currently used by transl. *)
     | Splice_variable _ -> Some alloc_local
   in
-  allocates (project_from_mixed_block_shape shape ~path)
+  match shape with
+  | All_value _ -> None
+  | Shape shape -> allocates (project_from_mixed_block_shape shape ~path)
 
 (* Changes to this function may also require changes in Flambda 2 (e.g.
    closure_conversion.ml). *)
@@ -2424,14 +2424,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
-  | Pfield _ | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
+  | Pfield (path, shape, _) -> mixed_block_projection_may_allocate shape ~path
+  | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
   | Pfloatfield (_, _, m) -> Some m
   | Pufloatfield _ -> None
-  | Pmixedfield (path, shape, _) ->
-    mixed_block_projection_may_allocate shape ~path
   | Psetfloatfield _ -> None
   | Psetufloatfield _ -> None
-  | Psetmixedfield _ -> None
   | Pduprecord _ -> Some alloc_heap
   | Pmake_unboxed_product _ | Punboxed_product_field _ -> None
   | Pccall p -> locality_mode_of_primitive_description p
@@ -2561,7 +2559,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Ppeek _ | Ppoke _ ->
     None
   | Pmake_idx_field _
-  | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
   | Preinterpret_tagged_int63_as_unboxed_int64 ->
@@ -2648,7 +2645,7 @@ let primitive_can_raise prim =
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
   | Pmakelazyblock _
-  | Pmixedfield _ | Psetmixedfield _ | Pnot
+  | Pnot
   | Poffsetref _
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu | Pbytessetu
   | Pmakearray _ | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
@@ -2745,7 +2742,7 @@ let primitive_can_raise prim =
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pmake_idx_field _ | Pmake_idx_array _
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
@@ -2876,10 +2873,13 @@ let rec layout_of_mixed_block_element element =
       (Array.to_list (Array.map layout_of_mixed_block_element shape))
   | Splice_variable id -> Psplicevar id
 
-let layout_of_mixed_block_shape
-    : 'a. 'a mixed_block_element array -> path:int list -> layout
+let layout_of_field_shape
+    : 'a. 'a field_shape -> path:int list -> layout
     = fun shape ~path ->
-  layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
+  match shape with
+  | All_value ptr -> nullable_value (value_kind_of_pointerness ptr)
+  | Shape shape ->
+    layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
 let layout_of_module_field repr pos =
   match repr with
@@ -2941,8 +2941,7 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 
-let rec mixed_block_element_leaves (el : _ mixed_block_element)
-  : _ mixed_block_element list =
+let rec mixed_block_element_leaves (el : _ mixed_block_element) : _ mixed_block_element list =
   match el with
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
@@ -3005,7 +3004,7 @@ let primitive_result_layout (p : primitive) =
   | Popaque layout | Pobj_magic layout -> layout
   | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
-  | Psetufloatfield _ | Psetmixedfield _
+  | Psetufloatfield _
   | Pbytessetu | Pbytessets | Parraysetu _ | Parraysets _ | Pbigarrayset _
   | Pbytes_set_8 _
   | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
@@ -3025,11 +3024,12 @@ let primitive_result_layout (p : primitive) =
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
-  | Pfield _ | Pfield_computed _ -> layout_value_field
+  | Pfield (path, shape, _) -> layout_of_field_shape shape ~path
+  | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
   | Parray_element_size_in_bytes _ -> layout_int
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pmake_idx_field _ | Pmake_idx_array _
   | Pidx_deepen _ ->
     Punboxed_or_untagged_integer Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
@@ -3040,7 +3040,6 @@ let primitive_result_layout (p : primitive) =
   | Psplit_vec256 ->
     Punboxed_product
       [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
-  | Pmixedfield (path, shape, _) -> layout_of_mixed_block_shape shape ~path
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
   | Psequor | Psequand | Pnot
