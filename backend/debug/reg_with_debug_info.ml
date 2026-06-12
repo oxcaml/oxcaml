@@ -20,6 +20,7 @@ module V = Backend_var
 module Holds_value_of = struct
   type t =
     | Var of V.t
+    (* CR mshinwell: There are more numeric cases to add here *)
     | Const_int of nativeint
     | Const_naked_float of Int64.t
     | Const_symbol of Cmm.symbol

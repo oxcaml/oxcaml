@@ -76,7 +76,9 @@ let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
     | None -> None
     | Some debug_info -> (
       match RD.Debug_info.holds_value_of debug_info with
-      | Const_int _ | Const_naked_float _ | Const_symbol _ -> None
+      | Const_int _ | Const_naked_float _ | Const_symbol _ ->
+        (* CR mshinwell: is it useful to return [Some] here instead? *)
+        None
       | Var var -> (
         if RD.Debug_info.num_parts_of_value debug_info <> 1
         then None (* Values split across registers are not handled yet. *)
@@ -128,11 +130,16 @@ let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
    site parameter DIE describes how to compute the value passed for the
    parameter, as an expression to be evaluated in the context of the _caller_
    (typically after the debugger has virtually unwound to it). As such only the
-   following may be quoted: - constants; - spilled copies of the relevant value,
-   at CFA-relative stack locations (such slots, unlike registers and the
-   domainstate area, are preserved during the call). For tail calls the caller's
-   frame no longer exists by the time the callee executes, so only constants may
-   be quoted. *)
+   following may be specified:
+
+   - constants;
+
+   - spilled copies of the relevant value, at CFA-relative stack locations (such
+   slots, unlike registers and the domainstate area, are preserved during the
+   call).
+
+   For tail calls the caller's frame no longer exists by the time the callee
+   executes, so only constants may be quoted. *)
 let call_site_value_attribute ~(arg : Reg.t)
     ~(available_before : Reg_availability_set.t) ~is_tail ~stack_offset
     ~fun_contains_calls ~fun_num_stack_slots =
@@ -191,6 +198,7 @@ let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
     | [] ->
       (* A call site parameter DIE without a means of computing the value passed
          is of no use to debuggers. *)
+      (* CR mshinwell: does it produce an LLDB warning though? *)
       ()
     | value_attribute ->
       let location_attribute =
@@ -301,17 +309,19 @@ let external_callee_attributes state ~func =
 let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
     ~(available_before : Reg_availability_set.t) ~is_tail ~stack_offset
     ~fun_contains_calls ~fun_num_stack_slots =
-  let recomputable_target =
-    (* The code pointer for an OCaml indirect call is the first field of the
-       closure, which is passed as the final argument. If the closure has a
-       spilled copy, surviving the call, then the code pointer can be recomputed
-       by the debugger in the context of the caller's frame even after the call.
-       This permits the use of [DW_AT_call_target] rather than the "clobbered"
+  let closure_rvalue =
+    (* The code pointer for an OCaml indirect call lies within the closure (more
+       precisely the function slot), which is passed as the final argument. If
+       the closure is statically allocated (a symbol), or has a spilled copy
+       surviving the call, then the code pointer can be recomputed by the
+       debugger in the context of the caller's frame even after the call. This
+       permits the use of [DW_AT_call_target] rather than the "clobbered"
        variant: debuggers cannot identify callees, in particular when resolving
        entry values during virtual unwinding, from clobbered target expressions.
-       (Not applicable to tail calls, whose frames no longer exist by the time
-       the callee executes.) *)
-    if is_tail || Array.length args < 1
+       (Spilled copies are not usable for tail calls, whose frames no longer
+       exist by the time the callee executes; statically-allocated closures are
+       always usable.) *)
+    if Array.length args < 1
     then None
     else
       match available_before with
@@ -322,20 +332,33 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
         | Stack _ | Unknown -> None
         | Reg _ -> (
           match
-            spilled_copy_rvalue ~reg:closure ~avail ~stack_offset
-              ~fun_contains_calls ~fun_num_stack_slots
+            RD.Set_distinguishing_names_and_locations
+            .find_reg_with_same_location_exn avail closure
           with
-          | None -> None
-          | Some closure_rvalue ->
-            Some
-              (SLDL.Rvalue.read_field_unguarded ~block:closure_rvalue
-                 ~field:Targetint.zero)))
+          | exception Not_found -> None
+          | rd -> (
+            match RD.debug_info rd with
+            | None -> None
+            | Some debug_info -> (
+              match RD.Debug_info.holds_value_of debug_info with
+              | Const_symbol sym ->
+                Some (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)
+              | Var _ ->
+                if is_tail
+                then None
+                else
+                  spilled_copy_rvalue ~reg:closure ~avail ~stack_offset
+                    ~fun_contains_calls ~fun_num_stack_slots
+              | Const_int _ | Const_naked_float _ -> None))))
   in
-  match recomputable_target with
-  | Some target_rvalue ->
+  match closure_rvalue with
+  | Some closure ->
     [ DAH.create_call_target
         (Single_location_description.of_simple_location_description
-           (SLDL.compile (SLDL.of_rvalue target_rvalue))) ]
+           (SLDL.compile
+              (SLDL.of_rvalue
+                 (SLDL.Rvalue.full_application_code_pointer_of_closure ~closure))))
+    ]
   | None -> (
     match callee.loc with
     | Reg _ ->
