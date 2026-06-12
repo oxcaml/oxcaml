@@ -15,7 +15,7 @@ let code loopify(never) size(29) newer_version_of(test_1)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
   apply f (0) -> k4 * k1
-    where k4 (param : imm tagged) =
+    where k4 (param : [ 0 |1 ]) =
       let unboxed_field = %untag_imm (param) in
       cont k3 (unboxed_field)
     where k3 (unboxed_field : imm) =
