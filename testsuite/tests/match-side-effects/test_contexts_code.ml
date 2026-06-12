@@ -37,11 +37,8 @@ let example_1 () =
        (region
          (let
            (input/307 =
-              (makelocalmutable 0 (value<int>,value<
-                                               (consts ())
-                                                (non_consts ([1: (?)]
-                                                [0: (?)]))>)
-                1 [0: (shape (value<int>)) 1]))
+              (makelocalmutable 0 (value_or_null<int>,?) 1
+                [0: (shape (value<int>)) 1]))
            (if (field_int 0 input/307)
              (let (*match*/332 =o? (field_mut 1 input/307))
                (switch* *match*/332
@@ -91,11 +88,8 @@ let example_2 () =
        (region
          (let
            (input/346 =[value<(consts ()) (non_consts ([0: (value<int>,*)]))>]
-              (makelocalblock 0 (value<int>,*) 1
-                (makelocalmutable 0 (value<
-                                      (consts ()) (non_consts ([1: (?)]
-                                       [0: (?)]))>)
-                  [0: (shape (value<int>)) 1])))
+              (makelocalblock 0 (value_or_null<int>,?) 1
+                (makelocalmutable 0 [0: (shape (value<int>)) 1])))
            (if (field_int 0 input/346)
              (let (*match*/352 =o? (field_mut 0 (field_imm 1 input/346)))
                (switch* *match*/352
@@ -143,13 +137,7 @@ let example_3 () =
        : (consts ()) (non_consts ([1: (?)] [0: (?)]))
        (region
          (let
-           (input/364 =mut[value<
-                            (consts ())
-                             (non_consts ([0:
-                                           (value<int>,value<
-                                                        (consts ())
-                                                         (non_consts (
-                                                         [1: (?)] [0: (?)]))>)]))>]
+           (input/364 =mut?
               [0: (shape
                (value<int>,value<
                             (consts ()) (non_consts ([1: (?)] [0: (?)]))>))

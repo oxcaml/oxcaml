@@ -88,10 +88,7 @@ let[@tail_mod_cons] rec rec_map f = function
                                              (consts (0))
                                               (non_consts ([0: (?)]))>)]))>)
              (let
-               (block =
-                  (makemutable 0 (*,value<
-                                     (consts (0)) (non_consts ([0: (?)]))>)
-                    (apply f (field_imm 0 *match*)) 24029))
+               (block = (makemutable 0 (apply f (field_imm 0 *match*)) 24029))
                (seq (apply rec_map_dps block 1 f (field_imm 1 *match*))
                  block))))
          0))
@@ -103,9 +100,7 @@ let[@tail_mod_cons] rec rec_map f = function
           (let
             (*match* =a? (field_imm 0 param)
              block1_arg0 =? (apply f (field_imm 0 *match*))
-             block =
-               (makemutable 0 (*,value<(consts (0)) (non_consts ([0: (?)]))>)
-                 block1_arg0 24029))
+             block = (makemutable 0 block1_arg0 24029))
             (seq
               (setfield_ptr(heap-init)_computed dst offset
                 (makeblock 0 (value<

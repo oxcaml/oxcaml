@@ -2061,7 +2061,9 @@ let update_constructor_representation
       (* CR layouts v5.9: Enable extension constructors in the flambda2
          middle-end so that we can permit them in the source language.
       *)
-      if is_extension_constructor then
+      if is_extension_constructor &&
+        not (Types.mixed_product_shape_is_flat_all_value shape)
+      then
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok shape
 

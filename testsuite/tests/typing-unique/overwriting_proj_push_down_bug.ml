@@ -289,92 +289,13 @@ let swap_inner (t : tree) =
              (if *match*/379
                (let (*match*/383 =a? (field_imm 2 t/370))
                  (if *match*/383
-                   (makeblock 0 (value<
-                                  (consts (0))
-                                   (non_consts ([0:
-                                                 (value<
-                                                   (consts (0))
-                                                    (non_consts ([0:
-                                                                  (*,
-                                                                  value<int>,*)]))>,
-                                                 value<int>,value<
-                                                             (consts (0))
-                                                              (non_consts (
-                                                              [0:
-                                                               (*,value<int>,*)]))>)]))>,
-                     value<int>,value<
-                                 (consts (0))
-                                  (non_consts ([0:
-                                                (value<
-                                                  (consts (0))
-                                                   (non_consts ([0:
-                                                                 (*,value<
-                                                                    int>,*)]))>,
-                                                value<int>,value<
-                                                            (consts (0))
-                                                             (non_consts (
-                                                             [0:
-                                                              (*,value<int>,*)]))>)]))>)
-                     (makeblock 0 (value<
-                                    (consts (0))
-                                     (non_consts ([0:
-                                                   (value<
-                                                     (consts (0))
-                                                      (non_consts ([0:
-                                                                    (*,
-                                                                    value<
-                                                                    int>,*)]))>,
-                                                   value<int>,value<
-                                                               (consts (0))
-                                                                (non_consts (
-                                                                [0:
-                                                                 (*,value<
-                                                                    int>,*)]))>)]))>,
-                       value<int>,value<
-                                   (consts (0))
-                                    (non_consts ([0:
-                                                  (value<
-                                                    (consts (0))
-                                                     (non_consts ([0:
-                                                                   (*,
-                                                                   value<int>,*)]))>,
-                                                  value<int>,value<
-                                                              (consts (0))
-                                                               (non_consts (
-                                                               [0:
-                                                                (*,value<int>,*)]))>)]))>)
+                   (makeblock 0 (?,value_or_null<int>,?)
+                     (makeblock 0 (?,value_or_null<int>,?)
                        (field_imm 0 (*,value_or_null<int>,?) *match*/379)
                        (field_imm 1 (?,value<int>,?) *match*/379)
                        (field_imm 0 *match*/383))
                      (field_imm 1 (?,value<int>,?) t/370)
-                     (makeblock 0 (value<
-                                    (consts (0))
-                                     (non_consts ([0:
-                                                   (value<
-                                                     (consts (0))
-                                                      (non_consts ([0:
-                                                                    (*,
-                                                                    value<
-                                                                    int>,*)]))>,
-                                                   value<int>,value<
-                                                               (consts (0))
-                                                                (non_consts (
-                                                                [0:
-                                                                 (*,value<
-                                                                    int>,*)]))>)]))>,
-                       value<int>,value<
-                                   (consts (0))
-                                    (non_consts ([0:
-                                                  (value<
-                                                    (consts (0))
-                                                     (non_consts ([0:
-                                                                   (*,
-                                                                   value<int>,*)]))>,
-                                                  value<int>,value<
-                                                              (consts (0))
-                                                               (non_consts (
-                                                               [0:
-                                                                (*,value<int>,*)]))>)]))>)
+                     (makeblock 0 (?,value_or_null<int>,?)
                        (field_imm 2 *match*/379)
                        (field_imm 1 (?,value<int>,?) *match*/383)
                        (field_imm 2 (?,value_or_null<int>,*) *match*/383)))
