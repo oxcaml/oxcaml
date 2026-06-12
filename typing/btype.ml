@@ -2087,6 +2087,28 @@ module Jkind0 = struct
           fresh_jkind Jkind_desc.Builtin.any
             ~annotation:(mk_annot "any") ~why:(Any_creation why)
 
+      let any_with_nullability nullability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with nullability })
+          }
+          ~annotation:None ~why:(Any_creation why)
+
+      let any_with_separability separability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with separability })
+          }
+          ~annotation:None ~why:(Any_creation why)
+
       let value_v1_safety_check =
         { jkind = Jkind_desc.Builtin.value_or_null;
           annotation = mk_annot "value";
