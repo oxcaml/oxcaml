@@ -1,0 +1,6 @@
+.ocamlformat
+.ocamlformat-enable
+CONFLICTS.md
+HACKING.adoc
+VIPs.md
+dune
