@@ -71,7 +71,7 @@ end
          (makeblock 0 (*,value<int>) r 1))
      slow_cas =
        (function {nlocal = 0} r oldv newv : int
-         (let (atomic_arg = (apply get_loc r))
+         (let (atomic_arg = (apply[unyielding] get_loc r))
            (atomic_compare_set_field_ptr (field_imm 0 atomic_arg)
              (field_int 1 atomic_arg) oldv newv))))
     (makeblock 0 get get_imm set set_imm cas get_loc slow_cas)))
@@ -235,8 +235,10 @@ end
        (function {nlocal = 0} param : int
          (if (%eq (field_imm 0 param) A) (atomic_load_field_imm param 1) 0))
      *match* =[value<int>]
-       (if (%eq (apply test (makemutable 0 (?,value<int>) A 42)) 42) 0
-         (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
+       (if
+         (%eq (apply[unyielding] test (makemutable 0 (?,value<int>) A 42))
+           42)
+         0 (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
     (makeblock 0 A test)))
 module Extension_with_inline_record :
   sig

@@ -646,7 +646,8 @@ let start () =
             prerr_endline "Calling function has no debugging information.";
             raise Toplevel
         with
-          {ev_ev = {ev_info = Event_return nargs}} -> nargs
+          {ev_ev = {ev_info = Event_return nargs}}
+        | {ev_ev = {ev_info = Event_unyielding_call nargs}} -> nargs
         | _ ->  Misc.fatal_error "Time_travel.start"
       in
       let offset = if nargs < 4 then 1 else 2 in

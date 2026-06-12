@@ -297,7 +297,7 @@ and expression_desc =
       }
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
-        Mode.Locality.l * Zero_alloc.assume option
+        Mode.Locality.l * Mode.Yielding.l * Zero_alloc.assume option
   | Texp_match of
       expression * Jkind.sort * computation case list * value case list
       * partial
@@ -1521,7 +1521,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_function { params; body; _ } ->
       let acc = fold_antiquote_fun_params f acc params in
       fold_antiquote_function_body f acc body
-  | Texp_apply (exp, list, _, _, _) ->
+  | Texp_apply (exp, list, _, _, _, _) ->
       let acc = fold_antiquote_exp f acc exp in
       fold_antiquote_args f acc list
   | Texp_match (exp, _, cases, eff_cases, _) ->
