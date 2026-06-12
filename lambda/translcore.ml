@@ -448,6 +448,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let stack =
         List.exists (function (Texp_stack, _, _) -> true | _ -> false) e.exp_extra
       in
+      let yielding = transl_yielding_mode_l ap_yielding in
       let lam =
         let loc =
           map_scopes
@@ -457,7 +458,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         in
         Translprim.transl_primitive_application
           loc p e.exp_env prim_type
-          ~poly_mode:pmode ~poly_sort:psort ~stack
+          ~poly_mode:pmode ~poly_sort:psort ~stack ~yielding
           path prim_exp args (List.map fst arg_exps) position
       in
       if extra_args = [] then lam
@@ -467,7 +468,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let specialised = Translattribute.get_specialised_attribute funct in
         let position = transl_apply_position pos in
         let mode = transl_locality_mode_l ap_mode in
-        let yielding = transl_yielding_mode_l ap_yielding in
         let result_layout = layout_exp sort e in
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised

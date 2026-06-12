@@ -45,7 +45,7 @@ let proj_aliased r =
        (let
          (y/299 = (field_imm 1 r/298)
           r/300 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply aliased_use/290 r/298))
+            (apply[unyielding] aliased_use/290 r/298))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/300
            y/299))))
   (apply (field_imm 1 (global Toploop!)) "proj_aliased" proj_aliased/296))
@@ -67,7 +67,7 @@ let proj_unique r =
        (let
          (y/304 = (field_mut 1 r/303)
           r/305 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply unique_use/293 r/303))
+            (apply[unyielding] unique_use/293 r/303))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/305
            y/304))))
   (apply (field_imm 1 (global Toploop!)) "proj_unique" proj_unique/301))
@@ -91,7 +91,7 @@ let match_aliased r =
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
          (r/310 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply aliased_use/290 r/308))
+            (apply[unyielding] aliased_use/290 r/308))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/310
            (field_imm 1 r/308)))))
   (apply (field_imm 1 (global Toploop!)) "match_aliased" match_aliased/306))
@@ -115,7 +115,7 @@ let match_unique r =
        (let
          (y/315 =o? (field_mut 1 r/314)
           r/316 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply unique_use/293 r/314))
+            (apply[unyielding] unique_use/293 r/314))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/316
            y/315))))
   (apply (field_imm 1 (global Toploop!)) "match_unique" match_unique/312))
@@ -141,7 +141,7 @@ let match_mini_anf_aliased r =
        (let
          (*match*/326 =[value<int>] 1
           r/323 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply aliased_use/290 r/320))
+            (apply[unyielding] aliased_use/290 r/320))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/323
            (field_imm 1 r/320)))))
   (apply (field_imm 1 (global Toploop!)) "match_mini_anf_aliased"
@@ -169,7 +169,7 @@ let match_mini_anf_unique r =
          (y/332 =o? (field_mut 1 r/330)
           *match*/336 =[value<int>] 1
           r/333 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply unique_use/293 r/330))
+            (apply[unyielding] unique_use/293 r/330))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/333
            y/332))))
   (apply (field_imm 1 (global Toploop!)) "match_mini_anf_unique"
@@ -201,7 +201,7 @@ let match_anf_aliased r =
         with (8 y/341)
          (let
            (r/344 =[value<(consts ()) (non_consts ([0: *, *]))>]
-              (apply aliased_use/290 r/340))
+              (apply[unyielding] aliased_use/290 r/340))
            (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/344
              y/341)))))
   (apply (field_imm 1 (global Toploop!)) "match_anf_aliased"
@@ -235,7 +235,7 @@ let match_anf_unique r =
         with (14 y/353)
          (let
            (r/356 =[value<(consts ()) (non_consts ([0: *, *]))>]
-              (apply unique_use/293 r/352))
+              (apply[unyielding] unique_use/293 r/352))
            (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/356
              y/353)))))
   (apply (field_imm 1 (global Toploop!)) "match_anf_unique"
@@ -424,13 +424,13 @@ let match_guard r =
          (if (caml_string_equal y/389 "")
            (let
              (r/460 =[value<(consts ()) (non_consts ([0: *, *]))>]
-                (apply aliased_use/290 r/388))
+                (apply[unyielding] aliased_use/290 r/388))
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
                r/460 y/389))
            (let
              (y/390 =o? (field_mut 1 r/388)
               r/461 =[value<(consts ()) (non_consts ([0: *, *]))>]
-                (apply unique_use/293 r/388))
+                (apply[unyielding] unique_use/293 r/388))
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
                r/461 y/390))))))
   (apply (field_imm 1 (global Toploop!)) "match_guard" match_guard/386))
