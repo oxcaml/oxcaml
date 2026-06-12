@@ -261,7 +261,8 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
 
 (* Extract the signature and the mode of a functor's return, given the signature
    [sig_acc] and mode [md_mode] of the functor argument. *)
-let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
+let extract_sig_functor_open ?(arg_loc = Location.none) funct_body env loc mty
+    sig_acc md_mode =
   let sig_acc = List.rev sig_acc in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
@@ -274,8 +275,10 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
       let mm_param = mm_param |> alloc_as_value in
       (* The implicit argument of [include functor] consists of the preceding
          items of the enclosing structure, which remain accessible afterwards;
-         hence the functor may not consume them uniquely. *)
-      Value.submode_err (loc, Module)
+         hence the functor may not consume them uniquely. The error is about
+         that implicit argument (the whole [include functor] item), not [F]. *)
+      let arg_loc = if arg_loc = Location.none then loc else arg_loc in
+      Value.submode_err (arg_loc, Module)
         Value.(of_const { Const.min with uniqueness = Aliased })
         mm_param;
       let input_coercion =
@@ -2221,7 +2224,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let sg, mode, incl_kind =
-          extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
+          extract_sig_functor_open ~arg_loc:sincl.pincl_loc false env
+            smty.pmty_loc mty sig_acc md_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -3670,8 +3674,8 @@ and type_structure ?(toplevel = None) ?uniqueness_state funct_body anchor env
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let sg, mode, incl_kind =
-          extract_sig_functor_open funct_body env smodl.pmod_loc
-            modl.mod_type sig_acc md_mode
+          extract_sig_functor_open ~arg_loc:sincl.pincl_loc funct_body env
+            smodl.pmod_loc modl.mod_type sig_acc md_mode
         in
         incl_kind, sg, Value.disallow_right mode
       | Structure ->
@@ -4180,7 +4184,17 @@ let type_module_alias env smod =
 let type_module = type_module true false None
 let type_module_maybe_hold_locks = type_module_maybe_hold_locks true false None
 let type_structure ?uniqueness_state env sstr =
-  type_structure ?uniqueness_state false None env sstr
+  match uniqueness_state with
+  | Some _ -> type_structure ?uniqueness_state false None env sstr
+  | None ->
+    (* No state was supplied (e.g. an out-of-tree compiler-libs consumer). Run
+       the uniqueness analysis with a fresh state, as the unique extension is
+       on by default, and mark everything exported (like a toplevel phrase),
+       so the analysis is not silently skipped. *)
+    let uniqueness_state = Uniqueness_analysis.new_structure_state () in
+    let result = type_structure ~uniqueness_state false None env sstr in
+    Uniqueness_analysis.mark_all_exported uniqueness_state;
+    result
 
 (* Normalize types in a signature *)
 

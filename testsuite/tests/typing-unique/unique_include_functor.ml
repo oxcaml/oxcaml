@@ -25,9 +25,9 @@ let include_functor_unique_param () =
   end in
   ()
 [%%expect{|
-Line 5, characters 20-21:
+Line 5, characters 4-21:
 5 |     include functor F
-                        ^
+        ^^^^^^^^^^^^^^^^^
 Error: The module is "aliased" but is expected to be "unique".
 |}]
 

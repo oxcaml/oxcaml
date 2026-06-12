@@ -33,8 +33,14 @@ and not strictly enforced. The caller is reponsible to enforce mode constraint
 by inspecting the returned mode. *)
 (* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
 
+(* [type_module] does not run the uniqueness analysis on the module
+   expression; callers that need uniqueness checking should go through
+   [type_structure] or [type_implementation]. *)
 val type_module:
   Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+(* When [uniqueness_state] is omitted, [type_structure] runs the uniqueness
+   analysis with a fresh state and marks everything exported (as a toplevel
+   phrase would); pass a state to thread usage across several calls. *)
 val type_structure:
   ?uniqueness_state:Uniqueness_analysis.structure_state ->
   Env.t -> Parsetree.structure ->
