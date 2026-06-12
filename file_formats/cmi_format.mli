@@ -39,8 +39,10 @@ type 'sg cmi_infos_generic = {
     cmi_flags : pers_flags list;
 }
 
-type cmi_infos_lazy = Subst.Lazy.persistent_signature cmi_infos_generic
-type cmi_infos = Types.persistent_signature cmi_infos_generic
+type cmi_infos_lazy =
+  (Subst.Lazy.signature * Mode.Staticity.Const.t) cmi_infos_generic
+type cmi_infos =
+  (Types.signature * Mode.Staticity.Const.t) cmi_infos_generic
 
 (* write the magic + the cmi information *)
 val output_cmi : string -> out_channel -> cmi_infos_lazy -> Digest.t

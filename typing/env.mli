@@ -232,10 +232,6 @@ val locks_empty : locks
 
 val locks_is_empty : locks -> bool
 
-(* CR-soon zqian: all persistent modules should always be [Static], at which
-   point the [staticity] parameter can be removed. *)
-val mode_unit : staticity:Mode.Staticity.Const.t -> Mode.Value.lr
-
 type structure_components_reason =
   | Project
   | Open
@@ -597,17 +593,17 @@ val get_unit_name: unit -> Unit_info.t option
 (* Read, save a signature to/from a file. *)
 val read_signature:
   Global_module.Name.t -> Unit_info.Artifact.t
-  -> persistent_signature
+  -> signature * Mode.Staticity.Const.t
         (* Arguments: module name, file name, [add_binding] flag.
            Results: signature. If [add_binding] is true, creates an entry for
            the module in the environment. *)
 val save_signature:
-  alerts:alerts -> persistent_signature
+  alerts:alerts -> Allowance.both persistent_signature
   -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind, file name. *)
 val save_signature_with_imports:
-  alerts:alerts -> persistent_signature
+  alerts:alerts -> Allowance.both persistent_signature
   -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,

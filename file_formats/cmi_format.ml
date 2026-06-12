@@ -64,7 +64,7 @@ type header = {
     header_name : Compilation_unit.Name.t;
     header_kind : kind;
     header_globals : Global_module.With_precision.t array;
-    header_sign : Serialized.persistent_signature;
+    header_sign : Serialized.signature * Mode.Staticity.Const.t;
     header_params : Global_module.Parameter_name.t list;
 }
 
@@ -78,8 +78,12 @@ type 'sg cmi_infos_generic = {
     cmi_flags : flags;
 }
 
-type cmi_infos_lazy = Subst.Lazy.persistent_signature cmi_infos_generic
-type cmi_infos = Types.persistent_signature cmi_infos_generic
+(* The cmi records the staticity as a plain constant; the in-memory
+   [Types.persistent_signature] carries the unit's full mode (see [Types]). *)
+type cmi_infos_lazy =
+  (Subst.Lazy.signature * Mode.Staticity.Const.t) cmi_infos_generic
+type cmi_infos =
+  (Types.signature * Mode.Staticity.Const.t) cmi_infos_generic
 
 let force_cmi_infos cmi =
   let sign, staticity = cmi.cmi_sign in

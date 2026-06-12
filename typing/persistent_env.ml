@@ -125,7 +125,7 @@ type import_info =
 type pers_name = {
   pn_import : import;
   pn_global : Global_module.t;
-  pn_sign : Subst.Lazy.persistent_signature;
+  pn_sign : Allowance.left_only Subst.Lazy.persistent_signature;
 }
 
 (* What a global identifier is actually bound to in Lambda code *)
@@ -546,6 +546,47 @@ let check_for_unset_parameters penv global =
            }))
     global.Global_module.hidden_args
 
+(* The mode of a compilation unit: legacy on every axis, with the given
+   staticity. *)
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+let mode_unit ~staticity =
+  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
+  Mode.Value.of_const
+    { areality = Global;
+      linearity = Many;
+      uniqueness = Aliased;
+      portability = Nonportable;
+      contention = Uncontended;
+      forkable = Forkable;
+      yielding = Unyielding;
+      statefulness = Stateful;
+      visibility = Read_write;
+      staticity;
+    }
+    ~hint_monadic:hint ~hint_comonadic:hint
+
+(* Like [mode_unit] but takes the staticity as a (left-only) mode, which may
+   carry a hint (e.g. [Cmx_not_guaranteed]). The result is the unit mode with
+   that staticity injected. *)
+let mode_unit_with_staticity staticity =
+  let legacy = mode_unit ~staticity:Mode.Staticity.Dynamic in
+  let monadic =
+    Mode.Value.Monadic.join
+      [ legacy.monadic
+        |> Mode.Value.Monadic.proj Uniqueness
+        |> Mode.Value.Monadic.min_with Uniqueness;
+        legacy.monadic
+        |> Mode.Value.Monadic.proj Contention
+        |> Mode.Value.Monadic.min_with Contention;
+        legacy.monadic
+        |> Mode.Value.Monadic.proj Visibility
+        |> Mode.Value.Monadic.min_with Visibility;
+        Mode.Value.Monadic.min_with Staticity staticity ]
+  in
+  { Mode.monadic;
+    comonadic = Mode.Value.Comonadic.disallow_right legacy.comonadic }
+
 let rec global_of_global_name penv ~check name ~allow_excess_args =
   let load () =
     let pn =
@@ -686,9 +727,27 @@ and acknowledge_new_pers_name penv check global_name global import =
        remember_global penv bound_global ~precision
          ~mentioned_by:(Other global_name))
     sign.bound_globals;
+  let pn_sign =
+    let signature, staticity = sign.sign in
+    let mode =
+      match import.imp_visibility with
+      | Visible { cmx_guaranteed = true } ->
+        (* A [.cmx] is guaranteed, so the unit keeps the staticity recorded in
+           its [.cmi]. *)
+        Mode.Value.disallow_right (mode_unit ~staticity)
+      | Visible { cmx_guaranteed = false } | Hidden ->
+        (* Without a guaranteed [.cmx], the unit is not available for
+           compile-time evaluation, so it must be treated as dynamic regardless
+           of what the [.cmi] claims. *)
+        mode_unit_with_staticity
+          (Mode.Staticity.of_const ~hint:Cmx_not_guaranteed
+             Mode.Staticity.Dynamic)
+    in
+    signature, mode
+  in
   let pn = { pn_import = import;
              pn_global = global;
-             pn_sign = sign.sign;
+             pn_sign;
            } in
   if check then check_consistency penv import;
   Hashtbl.add persistent_names global_name pn;
@@ -789,7 +848,7 @@ type address =
   | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
-  Subst.Lazy.persistent_signature
+  Allowance.left_only Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t
@@ -1090,6 +1149,11 @@ let implemented_parameter penv modname =
   | None -> None
 
 let make_cmi penv modname kind sign alerts =
+  let signature, mode = sign in
+  (* The cmi records the staticity as a constant. The unit mode is always a
+     constant (it is built by [mode_unit] from a constant staticity). *)
+  let staticity = (Mode.Value.to_const_exn mode).staticity in
+  let cmi_sign = signature, staticity in
   let flags =
     List.concat [
       if !Clflags.recursive_types then [Cmi_format.Rectypes] else [];
@@ -1121,7 +1185,7 @@ let make_cmi penv modname kind sign alerts =
     cmi_name = modname;
     cmi_kind = kind;
     cmi_globals = globals;
-    cmi_sign = sign;
+    cmi_sign;
     cmi_params = params;
     cmi_crcs = Array.of_list crcs;
     cmi_flags = flags
