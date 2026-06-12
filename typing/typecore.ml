@@ -753,9 +753,10 @@ let tuple_pat_mode mode tuple_modes =
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
   { mode; tuple_modes }
 
-let effect_handler_modes loc pinpoint env expected_mode =
+let effect_handler_modes pinpoint env expected_mode =
+  Env.walk_locks_for_legacy_construct ~env pinpoint;
   let env =
-    Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
+    Env.add_const_closure_lock pinpoint Value.Comonadic.Const.legacy env
   in
   env, simple_pat_mode Value.legacy, mode_effect_handler_body mode_legacy,
   mode_effect_handler_body expected_mode
@@ -7260,7 +7261,7 @@ and type_expect_
           in
           env, arg_pat_mode, arg_expected_mode, expected_mode
         | _ :: _ ->
-          effect_handler_modes loc Effect_match env expected_mode
+          effect_handler_modes (loc, Effect_match) env expected_mode
       in
       let arg, sort =
         with_local_level_generalize begin fun () ->
@@ -7314,7 +7315,7 @@ and type_expect_
           expected_mode
         | _ :: _ ->
           let env, arg_mode, _, expected_mode =
-            effect_handler_modes loc Effect_try env expected_mode
+            effect_handler_modes (loc, Effect_try) env expected_mode
           in
           env, arg_mode, expected_mode, expected_mode
       in
