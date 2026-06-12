@@ -336,8 +336,8 @@ Line 3, characters 10-36:
 3 |   val i : ('a : value mod external_) -> 'a
               ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 181 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `value mod external_'
-but was inferred to have kind `value mod immutable external_'.
+  was annotated with kind `value mod external_'
+  but was inferred to have kind `value mod immutable external_'.
 
 Line 3, characters 10-36:
 3 |   val i : ('a : value mod external_) -> 'a
@@ -362,8 +362,8 @@ Line 4, characters 10-22:
 4 |   val i : ('a : value) -> 'a
               ^^^^^^^^^^^^
 Warning 181 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `value'
-but was inferred to have kind `value mod immutable'.
+  was annotated with kind `value'
+  but was inferred to have kind `value mod immutable'.
 
 module type S18 = sig val i : ('a : value mod immutable). 'a -> 'a end
 |}]
@@ -656,8 +656,7 @@ Line 4, characters 34-44:
 4 |   external[@layout_poly] ignore : ('a : any) -> unit = "%ignore"
                                       ^^^^^^^^^^
 Warning 181 [imprecise-kind-annotation]: The type variable `'a'
-was annotated with kind `any'
-but was inferred to have kind `word'.
+  was annotated with kind `any' but was inferred to have kind `word'.
 
 Line 4, characters 34-52:
 4 |   external[@layout_poly] ignore : ('a : any) -> unit = "%ignore"
