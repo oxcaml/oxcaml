@@ -207,17 +207,7 @@ and mixed_block_shape
 and tag_and_constructor_shape ppf (tag, shape) =
   fprintf ppf "@[<hov 1>[%d:@ %a]@]"
     tag
-    constructor_shape shape
-
-and constructor_shape ppf shape =
-  match shape with
-  | Constructor_uniform fields ->
-     Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-       value_kind ppf fields
-  | Constructor_mixed shape ->
-    fprintf ppf "%a"
-      (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-         (mixed_block_element (fun _ () -> ()))) (Array.to_list shape)
+    (mixed_block_shape (fun _ () -> ())) shape
 
 and variant_kind ppf ~consts ~non_consts =
   fprintf ppf "@[<hov 1>(consts (%a))@ (non_consts (%a))@]"

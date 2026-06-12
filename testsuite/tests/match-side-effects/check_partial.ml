@@ -30,9 +30,10 @@ type _ t = Int : int -> int t | True : bool t | False : bool t
      (function {nlocal = 0}
        param/0[value<
                 (consts ())
-                 (non_consts ([0: *,
-                               value<
-                                (consts (1 0)) (non_consts ([0: value<int>]))>]))>]
+                 (non_consts ([0:
+                               (*,value<
+                                   (consts (1 0))
+                                    (non_consts ([0: (value<int>)]))>)]))>]
        : int
        (let (*match*/0 =o? (field_mut 0 (field_imm 0 param/0)))
          (switch* (field_imm 1 param/0)
@@ -60,7 +61,7 @@ let lazy_needs_partial : _ * bool t ref -> int = function
 (let
   (lazy_needs_partial/0 =
      (function {nlocal = 0}
-       param/1[value<(consts ()) (non_consts ([0: *, *]))>] : int
+       param/1[value<(consts ()) (non_consts ([0: (*,*)]))>] : int
        (catch
          (let
            (*match*/2 =a? (field_imm 0 param/1)

@@ -446,7 +446,7 @@ and value_kind_non_null =
   | Pboxedintval of boxed_integer
   | Pvariant of {
       consts : int list;
-      non_consts : (int * constructor_shape) list;
+      non_consts : (int * mixed_block_shape) list;
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
@@ -481,11 +481,7 @@ and 'a mixed_block_element =
 and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
-
-and constructor_shape =
-  | Constructor_uniform of value_kind list
-  | Constructor_mixed of mixed_block_shape
+ = locality_mode mixed_block_element array
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -642,7 +638,7 @@ let rec equal_value_kind_non_null x y =
     List.equal Int.equal consts1 consts2
       && List.equal (fun (tag1, cstr1) (tag2, cstr2) ->
              Int.equal tag1 tag2
-             && equal_constructor_shape cstr1 cstr2)
+             && equal_mixed_block_shape cstr1 cstr2)
            non_consts1 non_consts2
   | (Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pintval | Pvariant _
       | Parrayval _ | Pboxedvectorval _), _ -> false
@@ -681,15 +677,6 @@ and equal_mixed_block_element :
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
-
-and equal_constructor_shape x y =
-  match x, y with
-  | Constructor_uniform fields1, Constructor_uniform fields2 ->
-      List.length fields1 = List.length fields2
-      && List.for_all2 equal_value_kind fields1 fields2
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
-      equal_mixed_block_shape shape1 shape2
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> false
 
 let block_shape_of_value_kinds vks =
   Misc.Stdlib.Array.of_list_map (fun vk -> Value vk) vks
@@ -1333,9 +1320,8 @@ let layout_list =
        { consts = [0];
          non_consts =
            [0,
-            Constructor_uniform
-              [generic_value;
-               { generic_value with nullable = Non_nullable}]] })
+            [| Value generic_value;
+               Value { generic_value with nullable = Non_nullable} |]] })
 let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_tmc_field = nullable_value Pgenval
@@ -1379,8 +1365,7 @@ let layout_tupled_vector v =
     | Boxed_vec512 -> [| Vec128; Vec128; Vec128; Vec128 |]
   in
   Pvalue
-    { raw_kind =
-        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+    { raw_kind = Pvariant { consts = []; non_consts = [0, fields] };
       nullable = Non_nullable
     }
 

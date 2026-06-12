@@ -786,7 +786,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
         num_nodes_visited,
         non_nullable
           (Pvariant { consts = [];
-                      non_consts = [0, Constructor_uniform fields] }))
+                      non_consts =
+                        [0, Lambda.block_shape_of_value_kinds fields] }))
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -886,7 +887,7 @@ and value_kind_mixed_block
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
   in
-  num_nodes_visited, Constructor_mixed (Array.of_list shape)
+  num_nodes_visited, Array.of_list shape
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       (cstrs : Types.constructor_declaration list) rep =
@@ -924,7 +925,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           num_nodes_visited
           fields
       in
-      num_nodes_visited, Lambda.Constructor_uniform shape
+      num_nodes_visited, Lambda.block_shape_of_value_kinds shape
     in
     let for_one_constructor (constructor : Types.constructor_declaration)
           ~depth ~num_nodes_visited
@@ -1001,18 +1002,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                     ~cstr_shape
                 in
                 if is_mutable then None
-                else match fields with
-                | Constructor_uniform xs
-                    when List.compare_length_with xs 0 = 0 ->
+                else if mixed_block_shape_is_empty fields then
                   let consts = next_const :: consts in
                   Some (num_nodes_visited,
                         next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed shape
-                    when mixed_block_shape_is_empty shape ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed _ | Constructor_uniform _ ->
+                else
                   let non_consts =
                     (next_tag, fields) :: non_consts
                   in
@@ -1091,7 +1085,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                     num_nodes_visited, field)
                   num_nodes_visited labels
               in
-              num_nodes_visited, Constructor_uniform fields
+              num_nodes_visited, Lambda.block_shape_of_value_kinds fields
           | Record_inlined (_, Constructor_mixed shape, _)
           | Record_mixed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in

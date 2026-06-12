@@ -1733,10 +1733,18 @@ and transl_tupled_function
           | Pvalue {
               nullable = Non_nullable;
               raw_kind = Pvariant { consts = [];
-                               non_consts = [0, Constructor_uniform kinds] }} ->
+                               non_consts = [0, kinds] }} ->
               (* CR layouts v5: to change when we have non-value tuple
                  elements. *)
-              List.map (fun vk -> Pvalue vk) kinds
+              Array.to_list
+                (Array.map
+                   (function
+                     | Value vk -> Pvalue vk
+                     | _ ->
+                       Misc.fatal_error
+                         "Translcore.transl_tupled_function: \
+                          tuple variant shape contains non-value field")
+                   kinds)
           | _ ->
               Misc.fatal_error
                 "Translcore.transl_tupled_function: \

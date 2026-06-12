@@ -520,7 +520,7 @@ and value_kind_non_null =
   | Pboxedintval of boxed_integer
   | Pvariant of {
       consts : int list;
-      non_consts : (int * constructor_shape) list;
+      non_consts : (int * mixed_block_shape) list;
       (** [non_consts] must be non-empty.  For constant variants [Pintval]
           must be used.  This causes a small loss of precision but it is not
           expected to be significant. *)
@@ -561,10 +561,6 @@ and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
-
-and constructor_shape =
-  | Constructor_uniform of value_kind list
-  | Constructor_mixed of mixed_block_shape
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
