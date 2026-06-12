@@ -128,6 +128,7 @@ type 'd const =
   | Quoted_computation : ('l * disallowed) pos const
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
+  | Annotation : Location.t -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

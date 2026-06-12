@@ -29,7 +29,8 @@ Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a <- 42
                               ^
 Error: This value is "contended"
-       but is expected to be "corrupted" or "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 
@@ -39,7 +40,8 @@ Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a
                               ^
 Error: This value is "contended"
-       but is expected to be "shared" or "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.
 |}]
 
@@ -54,7 +56,8 @@ Line 1, characters 27-28:
 1 | let foo (r @ contended) = {r with b = best_bytes ()}
                                ^
 Error: This value is "contended"
-       but is expected to be "shared" or "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.
 |}]
 
@@ -65,7 +68,8 @@ Line 1, characters 23-24:
 1 | let foo (r @ shared) = r.a <- 42
                            ^
 Error: This value is "shared"
-       but is expected to be "corrupted" or "uncontended"
+         because of an annotation at line 1, characters 13-19.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 
@@ -291,14 +295,18 @@ let foo (r @ contended) = Array.set r 42 (best_bytes ())
 Line 1, characters 36-37:
 1 | let foo (r @ contended) = Array.set r 42 (best_bytes ())
                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 let foo (r @ contended) = Array.get r 42
 [%%expect{|
 Line 1, characters 36-37:
 1 | let foo (r @ contended) = Array.get r 42
                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 let foo (r @ contended) =
     match r with
@@ -308,7 +316,8 @@ Line 3, characters 6-16:
 3 |     | [| x; y |] -> ()
           ^^^^^^^^^^
 Error: This value is "contended"
-       but is expected to be "shared" or "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "shared" or "uncontended"
          because its array elements is being read.
 |}]
 (* CR modes: Error message should mention array, not record. *)
@@ -318,7 +327,9 @@ let foo (r @ shared) = Array.set r 42 (best_bytes ())
 Line 1, characters 33-34:
 1 | let foo (r @ shared) = Array.set r 42 (best_bytes ())
                                      ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared"
+         because of an annotation at line 1, characters 13-19.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* The signature of Array.get could be generalized to expect shared rather than
@@ -330,7 +341,9 @@ let foo (r @ shared) = Array.get r 42
 Line 1, characters 33-34:
 1 | let foo (r @ shared) = Array.get r 42
                                      ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared"
+         because of an annotation at line 1, characters 13-19.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* Reading from a shared array is fine *)
@@ -522,7 +535,9 @@ let foo (r @ contended) = Iarray.get r 42
 Line 1, characters 37-38:
 1 | let foo (r @ contended) = Iarray.get r 42
                                          ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* CR zqian: add portable/uncontended modality and test. *)
@@ -535,7 +550,9 @@ let foo (x @ corrupted) = (x : @ shared)
 Line 1, characters 27-28:
 1 | let foo (x @ corrupted) = (x : @ shared)
                                ^
-Error: This value is "corrupted" but is expected to be "shared" or "uncontended".
+Error: This value is "corrupted"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "shared" or "uncontended".
 |}]
 
 let foo (x @ shared) = (x : @ corrupted)
@@ -543,7 +560,9 @@ let foo (x @ shared) = (x : @ corrupted)
 Line 1, characters 24-25:
 1 | let foo (x @ shared) = (x : @ corrupted)
                             ^
-Error: This value is "shared" but is expected to be "corrupted" or "uncontended".
+Error: This value is "shared"
+         because of an annotation at line 1, characters 13-19.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
 |}]
 
 (* corrupted submodes to contended *)
@@ -571,7 +590,8 @@ Line 1, characters 26-27:
 1 | let foo (r @ corrupted) = r.a
                               ^
 Error: This value is "corrupted"
-       but is expected to be "shared" or "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.
 |}]
 
@@ -634,7 +654,8 @@ Line 1, characters 37-38:
 1 | let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptible)
                                          ^
 Error: This value is "contended"
-       but is expected to be "corrupted" or "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 

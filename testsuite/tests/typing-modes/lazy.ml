@@ -196,7 +196,8 @@ Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
 Error: This value is "contended"
-       but is expected to be "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]
 
@@ -209,7 +210,8 @@ Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
 Error: This value is "shared"
-       but is expected to be "uncontended"
+         because of an annotation at line 1, characters 13-19.
+       However, the highlighted expression is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]
 
@@ -222,7 +224,8 @@ Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
 Error: This value is "corrupted"
-       but is expected to be "uncontended"
+         because of an annotation at line 1, characters 13-22.
+       However, the highlighted expression is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]
 

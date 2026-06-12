@@ -52,7 +52,9 @@ let don't_cross_unique (x : int t @ aliased) = use_unique x
 Line 1, characters 58-59:
 1 | let don't_cross_unique (x : int t @ aliased) = use_unique x
                                                               ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because of an annotation at line 1, characters 36-43.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let don't_cross_locality (x : int t @ local) = use_global x [@nontail]
@@ -197,7 +199,9 @@ let f (x : [< `A of int | `B of string] @ contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended x
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+         because of an annotation at line 1, characters 42-51.
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* CR layouts v2.8: This should also be accepted, but not with a best quality. Internal ticket 4294 *)

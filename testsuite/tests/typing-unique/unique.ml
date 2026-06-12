@@ -174,7 +174,8 @@ Line 5, characters 14-15:
                   ^
 Error: This value is "aliased"
          because it is used in a loop (at lines 4-6, characters 2-6).
-       However, the highlighted expression is expected to be "unique".
+       However, the highlighted expression is expected to be "unique"
+         because of an annotation at line 3, characters 13-19.
 |}]
 
 let f =
