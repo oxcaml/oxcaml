@@ -281,3 +281,18 @@ Line 5, characters 29-32:
                                  ^^^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
+
+(* A component of a recursive module that aliases an outer value shares that
+   value's paths: consuming the value uniquely conflicts with reading the
+   alias. *)
+let recmodule_binding_aliases () =
+  let s = "foo" in
+  let module M = struct
+    module rec R : s = struct let x = s end
+  end in
+  let alias = M.R.x in
+  unique_id s;
+  alias
+[%%expect{|
+val recmodule_binding_aliases : unit -> string = <fun>
+|}]
