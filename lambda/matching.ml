@@ -2124,6 +2124,28 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
+  let add_extension_slot shape =
+    match cstr.cstr_repr with
+    | Variant_extensible ->
+      (* Field 0 of an extension constructor block holds the extension
+         slot; mirror the shape used for allocation. *)
+      Array.append [| Lambda.Value Lambda.generic_value |] shape
+    | _ -> shape
+  in
+  let void_shape =
+    lazy (add_extension_slot (transl_mixed_product_shape cstr_shape))
+  in
+  let read_shape =
+    lazy
+      (add_extension_slot
+         (Lambda.transl_mixed_product_shape_for_read
+            ~get_value_kind:(fun _i -> Lambda.generic_value)
+            ~get_mode:(fun _i ->
+              Misc.fatal_error
+                "unexpected flat float of layout value in \
+                  constructor field")
+            cstr_shape))
+  in
   let make_void_access binding_kind sort pos =
     (* Constructors whose arguments are all void, e.g.
        [A of #(void * void) * void], are immediate. Accesses to their arguments
@@ -2147,34 +2169,14 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
-    match cstr_shape with
-    | Constructor_uniform_value ->
-      fatal_error
-        "Matching.get_exr_args_constr: constant Constructor_uniform_value"
-    | Constructor_mixed shape ->
-      let shape = transl_mixed_product_shape shape in
-      let e, layout = lambda_void_of_el shape.(pos) in
-      { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
+    let e, layout = lambda_void_of_el (Lazy.force void_shape).(pos) in
+    { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
       make_void_access binding_kind sort pos
     else
-      let prim =
-        match cstr_shape with
-        | Constructor_uniform_value -> Pfield ([pos], All_value Pointer, sem)
-        | Constructor_mixed shape ->
-            let shape =
-              Lambda.transl_mixed_product_shape_for_read
-                ~get_value_kind:(fun _i -> Lambda.generic_value)
-                ~get_mode:(fun _i ->
-                  Misc.fatal_error
-                    "unexpected flat float of layout value in \
-                      constructor field")
-                shape
-            in
-            Pfield ([pos], Shape shape, sem)
-      in
+      let prim = Pfield ([pos], Shape (Lazy.force read_shape), sem) in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
         arg = Lprim (prim, [ arg ], loc);
@@ -2582,8 +2584,11 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let sem = add_barrier_to_read ubr sem in
       let access, sort, layout =
         match lbl_repres with
-        | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_boxed ->
+            Lprim (Pfield ([lbl.lbl_pos], All_value ptr, sem), [ arg ], loc),
+            lbl_sort, lbl_layout
+        | Record_inlined (_, shape, Variant_boxed _)
+          when Types.mixed_product_shape_is_flat_all_value shape ->
             Lprim (Pfield ([lbl.lbl_pos], All_value ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_unboxed
@@ -2597,14 +2602,15 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
            Lprim (Pufloatfield (lbl.lbl_pos, sem), [ arg ], loc),
            (* Here we are projecting an unboxed float from a float record. *)
            lbl_sort, lbl_layout
-        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+        | Record_inlined (_, shape, Variant_extensible)
+          when Types.mixed_product_shape_is_flat_all_value shape ->
             Lprim (Pfield ([lbl.lbl_pos + 1], All_value ptr, sem), [arg], loc),
             lbl_sort, lbl_layout
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+        | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, shape, Variant_boxed _)
         | Record_mixed shape ->
             let shape =
               Lambda.transl_mixed_product_shape_for_read
@@ -3289,9 +3295,7 @@ let complete_pats_constrs = function
         cstr_pat.pat_desc in
       let pat_of_constr cstr =
         let open Patterns.Head in
-        let fake_repr : constructor_representation =
-          Constructor_mixed [| Types.Bits64 |]
-        in
+        let fake_repr : mixed_product_shape = [| Types.Bits64 |] in
         let sorts =
           List.map
             (fun _ ->

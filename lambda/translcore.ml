@@ -47,13 +47,26 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+let transl_constructor_shape
+  (shape : mixed_product_shape)
+  (args_with_sorts : (expression * Shape.Layout.t) list) : block_shape =
+  let args = Misc.Stdlib.Array.of_list_map fst args_with_sorts in
+  Array.map2
+    (fun shape arg ->
+      transl_mixed_block_element arg.exp_env arg.exp_loc arg.exp_type shape)
+    shape
+    args
+
 let field_offset_for_label lbl repres =
   match repres with
   | Record_boxed
-  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
-  | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
+  | Record_inlined (_, _, Variant_boxed _)
+  | Record_inlined (_, _, Variant_with_null) ->
       lbl.lbl_pos
-  | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+  | Record_inlined (_, shape, Variant_extensible) ->
+      if not (Types.mixed_product_shape_is_flat_all_value shape) then
+        fatal_error
+          "Mixed inlined records not supported for extensible variants";
       lbl.lbl_pos + 1
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
     (* CR layouts 5.1: For unboxed records, no offset calculation needed in
@@ -63,10 +76,6 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_ufloat ->
       lbl.lbl_pos
-  | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
-      fatal_error "Mixed inlined records not supported for extensible variants"
-  | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
-  | Record_inlined (_, Constructor_mixed _, Variant_with_null)
   | Record_mixed _ ->
       lbl.lbl_pos
   | Record_dummy _ ->
@@ -586,59 +595,35 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
+          let shape =
+            transl_constructor_shape shape args_with_sorts
+          in
           let constant =
             match List.map extract_constant ll with
             | exception Not_constant -> None
             | constants -> (
-              match shape with
-              | Constructor_mixed shape
-                when Mixed_product_bytes.types_shape_is_all_value shape ->
-                  (* Note [Constant all-value mixed records]:
-                     Currently unreachable: mixed constructors with all-value
-                     shapes require void or product fields, which don't have
-                     constant representations, so [extract_constant] raises
-                     [Not_constant] first. *)
-                  (* Some (Const_block(runtime_tag, constants)) *)
-                  None
-              | Constructor_mixed shape ->
-                  (* CR layouts v5: once all-void records are allowed, handle
-                     constructors with all-void inline records, which are stored
-                     as immediates *)
-                  if !Clflags.native_code then
-                    let shape = Lambda.transl_mixed_product_shape shape in
-                    Some (Const_block(runtime_tag, shape, constants))
-                  else
-                    (* CR layouts v5.9: Structured constants for mixed blocks should
-                       be supported in bytecode. See symtable.ml for the difficulty.
-                    *)
-                    None
-              | Constructor_uniform_value ->
-                  Some (Const_block(runtime_tag,
-                    Lambda.block_shape_of_generic_values
-                      (List.length constants),
-                    constants)))
+              (* CR layouts v5: once all-void records are allowed, handle
+                  constructors with all-void inline records, which are stored
+                  as immediates *)
+              if !Clflags.native_code ||
+                  (Mixed_product_bytes.shape_is_all_value shape)
+              then
+                Some (Const_block(runtime_tag, shape, constants))
+              else
+                (* CR layouts v5.9: Structured constants for mixed blocks should
+                  be supported in bytecode. See symtable.ml for the difficulty.
+                *)
+                None)
           in
           begin match constant with
           | Some constant -> Lconst constant
           | None ->
               let alloc_mode = transl_alloc_mode (Option.get alloc_mode) in
               let makeblock =
-                match shape with
-                | Constructor_uniform_value ->
-                    let shape =
-                      List.map (fun (e, sort) ->
-                          Lambda.must_be_value (layout_exp sort e))
-                        args_with_sorts
-                    in
-                    Pmakeblock(runtime_tag, Immutable,
-                               Lambda.block_shape_of_value_kinds shape,
-                               alloc_mode)
-                | Constructor_mixed shape ->
-                    (* CR layouts v5: once all-void records are allowed, handle
-                       constructors with all-void inline records, which are
-                       stored as immediates *)
-                    let shape = Lambda.transl_mixed_product_shape shape in
-                    Pmakeblock(runtime_tag, Immutable, shape, alloc_mode)
+                (* CR layouts v5: once all-void records are allowed, handle
+                    constructors with all-void inline records, which are
+                    stored as immediates *)
+                Pmakeblock(runtime_tag, Immutable, shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
@@ -658,33 +643,24 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             (* CR mshinwell: why are we using generic_value and not an immediate
                value kind for the poly variant hash? *)
             let makeblock =
-              match cstr.cstr_shape with
-              | Some Constructor_uniform_value ->
-                  let shape =
-                    List.map (fun (e, sort) ->
-                        Lambda.must_be_value (layout_exp sort e))
-                      args_with_sorts
-                  in
-                  Pmakeblock(0, Immutable,
-                             Lambda.block_shape_of_value_kinds
-                               (Lambda.generic_value :: shape),
-                             alloc_mode)
-              | Some (Constructor_mixed shape) ->
-                  (* CR layouts v5: once all-void records are allowed, handle
-                     constructors with all-void inline records, which are stored
-                     as immediates *)
-                  let shape = Lambda.transl_mixed_product_shape shape in
-                  let shape =
-                    (* This corresponds to the poly variant hash.  This will
-                       always stay in the same place because the reordering
-                       sorting is stable and immediates are always put in the
-                       value prefix of a mixed block. *)
-                    Array.append [| Lambda.Value Lambda.generic_value |] shape
-                  in
-                  Pmakeblock(0, Immutable, shape, alloc_mode)
-              | None ->
+              (* CR layouts v5: once all-void records are allowed, handle
+                  constructors with all-void inline records, which are stored
+                  as immediates *)
+              let shape =
+                match cstr.cstr_shape with
+                | Some shape -> transl_constructor_shape shape args_with_sorts
+                | None ->
                   fatal_error "Unexpected indeterminate representation in \
                                extensible variant"
+              in
+              let shape =
+                (* This corresponds to the poly variant hash.  This will
+                    always stay in the same place because the reordering
+                    sorting is stable and immediates are always put in the
+                    value prefix of a mixed block. *)
+                Array.append [| Lambda.Value Lambda.generic_value |] shape
+              in
+              Pmakeblock(0, Immutable, shape, alloc_mode)
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
       | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_with_null)
@@ -745,8 +721,21 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
       let prim_and_args =
         match record_repres with
-          Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+          Record_boxed ->
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ;
+                Lconst (Const_base (Const_int (
+                  field_offset_for_label lbl record_repres)))])
+          else
+            Some
+              (Pfield ([lbl.lbl_pos], All_value immediate_or_pointer, sem),
+                [targ])
+        | Record_inlined (_, shape, Variant_boxed _)
+          when Types.mixed_product_shape_is_flat_all_value shape ->
           let immediate_or_pointer, _ = maybe_pointer e in
           if Types.is_atomic lbl.lbl_mut
           then
@@ -770,7 +759,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
           Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
-        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+        | Record_inlined (_, shape, Variant_extensible)
+          when Types.mixed_product_shape_is_flat_all_value shape ->
           let immediate_or_pointer, _ = maybe_pointer e in
           if Types.is_atomic lbl.lbl_mut
           then
@@ -783,11 +773,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               (Pfield ([lbl.lbl_pos + 1], All_value immediate_or_pointer, sem),
                 [targ])
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+        | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, shape, Variant_boxed _)
           (* CR layouts v5: once all-void records are allowed, handle
              constructors with all-void inline records, which are stored as
              immediates *)
@@ -875,8 +865,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let newval_lambda = transl_exp ~scopes sort_newval newval in
       let prim, args =
         match record_repres with
-          Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+          Record_boxed ->
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield ([lbl.lbl_pos], All_value immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
+        | Record_inlined (_, shape, Variant_boxed _)
+          when Types.mixed_product_shape_is_flat_all_value shape ->
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
           then
@@ -891,7 +890,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
         | Record_ufloat ->
           Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
-        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+        | Record_inlined (_, shape, Variant_extensible)
+          when Types.mixed_product_shape_is_flat_all_value shape ->
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
           then
@@ -900,11 +900,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           else
             Psetfield([lbl.lbl_pos + 1], All_value immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+        | Record_inlined (_, _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, shape, Variant_boxed _)
           (* CR layouts v5: once all-void records are allowed, handle
              constructors with all-void inline records, which are stored as
              immediates *)
@@ -2198,12 +2198,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       | Overridden (_lid, expr) ->
           let upd =
             match repres with
-            | Record_boxed
-            | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+            | Record_boxed ->
                 let ptr, _ = maybe_pointer expr in
                 Psetfield ([lbl.lbl_pos], All_value ptr, Assignment modify_heap)
             | Record_mixed shape
-            | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+            | Record_inlined (_, shape, Variant_boxed _)
                 (* CR layouts v5: once all-void records are allowed, handle
                   constructors with all-void inline records, which are stored as
                   immediates *) ->
@@ -2221,12 +2220,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 Psetfloatfield (lbl.lbl_pos, Assignment modify_heap)
             | Record_ufloat ->
                 Psetufloatfield (lbl.lbl_pos, Assignment modify_heap)
-            | Record_inlined (_, Constructor_uniform_value,
-                              Variant_extensible) ->
+            | Record_inlined (_, shape, Variant_extensible)
+              when Types.mixed_product_shape_is_flat_all_value shape ->
                 let pos = lbl.lbl_pos + 1 in
                 let ptr, _ = maybe_pointer expr in
                 Psetfield ([pos], All_value ptr, Assignment modify_heap)
-            | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+            | Record_inlined (_, _, Variant_extensible) ->
                 (* CR layouts v5.9: support this *)
                 fatal_error
                   "Mixed inlined records not supported for extensible variants"
@@ -2256,6 +2255,23 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     (* CR layouts v5: allow non-value fields beyond just float# *)
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
+    let transl_record_shape shape =
+      let shape_for_construction = Lambda.transl_mixed_product_shape shape in
+      Array.iter
+        (fun (lbl, _lbl_sort, definition) ->
+          let field_shape =
+            match definition with
+            | Kept (typ, _mut, _) ->
+              Typeopt.transl_mixed_block_element env lbl.lbl_loc typ
+                shape.(lbl.lbl_pos)
+            | Overridden (_lid, expr) ->
+              Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
+                expr.exp_type shape.(lbl.lbl_pos)
+          in
+          shape_for_construction.(lbl.lbl_pos) <- field_shape)
+        fields;
+      shape_for_construction
+    in
     let lv =
       Array.mapi
         (fun i (lbl, lbl_sort, definition) ->
@@ -2273,14 +2289,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                let sem = add_barrier_to_read unique_barrier sem in
                let access =
                  match repres with
-                 | Record_boxed
-                 | Record_inlined (_, Constructor_uniform_value,
-                                   Variant_boxed _) ->
+                 | Record_boxed ->
                    let ptr, _ = maybe_pointer_type env typ in
                    Pfield ([i], All_value ptr, sem)
                  | Record_mixed shape
-                 | Record_inlined (_, Constructor_mixed shape,
-                                   Variant_boxed _) ->
+                 | Record_inlined (_, shape, Variant_boxed _) ->
                    (* CR layouts v5: once all-void records are allowed, handle
                       constructors with all-void inline records, which are
                       stored as immediates *)
@@ -2305,12 +2318,34 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    Pfield ([i], Shape shape, sem)
                  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                    assert false
-                 | Record_inlined (_, Constructor_uniform_value,
-                                   Variant_extensible) ->
-                   let ptr, _ = maybe_pointer_type env typ in
-                   Pfield ([i + 1], All_value ptr, sem)
-                 | Record_inlined (_, Constructor_mixed _,
-                                   Variant_extensible) ->
+                 | Record_inlined (_, shape, Variant_extensible)
+                   when Mixed_product_bytes.types_shape_is_all_value shape ->
+                   let shape =
+                    Lambda.transl_mixed_product_shape_for_read
+                      ~get_value_kind:(fun i ->
+                        if i <> lbl.lbl_pos then Lambda.generic_value
+                        else
+                          let pointerness, nullable =
+                            maybe_pointer_type env typ
+                          in
+                          let raw_kind =
+                            value_kind_of_pointerness pointerness
+                          in
+                          Lambda.{ raw_kind; nullable })
+                      ~get_mode:(fun _i ->
+                         (* See the handling of [Record_float] above for
+                            why we choose Alloc_heap. *)
+                        Lambda.alloc_heap)
+                     shape
+                   in
+                   (* Field 0 of an extension constructor block holds the
+                      extension slot; mirror the shape used for allocation. *)
+                   let shape =
+                     Array.append
+                       [| Lambda.Value Lambda.generic_value |] shape
+                   in
+                   Pfield ( [i + 1], Shape shape, sem )
+                 | Record_inlined (_, _, Variant_extensible) ->
                      (* CR layouts v5.9: support this *)
                      fatal_error
                        "Mixed inlined records not supported for extensible \
@@ -2349,45 +2384,36 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_boxed ->
             Lconst(Const_block(0,
               Lambda.block_shape_of_generic_values (List.length cl), cl))
-        | Record_inlined (Ordinary {runtime_tag},
-                          Constructor_uniform_value, Variant_boxed _) ->
-            Lconst(Const_block(runtime_tag,
-              Lambda.block_shape_of_generic_values (List.length cl), cl))
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
-            Lconst(match cl with [v] -> v | _ -> assert false)
-        | Record_float ->
-            Lconst(Const_float_block(List.map extract_float cl))
-        | Record_mixed shape
-          when Mixed_product_bytes.types_shape_is_all_value shape ->
-            (* Currently unreachable; see Note [Constant all-value
-               mixed records]. *)
-            (* Lconst(Const_block(0, cl)) *)
-            raise Not_constant
         | Record_mixed shape ->
-            if !Clflags.native_code then
-              let shape = Lambda.transl_mixed_product_shape shape in
+            if !Clflags.native_code ||
+              (Mixed_product_bytes.types_shape_is_all_value shape)
+            then
+              let shape = transl_record_shape shape in
               Lconst(Const_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
                  be supported in bytecode. See symtable.ml for the difficulty.
               *)
               raise Not_constant
-        | Record_inlined
-            (Ordinary { runtime_tag = _; _ }, Constructor_mixed shape,
-             Variant_boxed _)
+        | Record_inlined (Ordinary {runtime_tag},
+                          shape, Variant_boxed _)
           when Mixed_product_bytes.types_shape_is_all_value shape ->
-            (* Currently unreachable; see Note [Constant all-value
-               mixed records]. *)
-            (* Lconst(Const_block(runtime_tag, cl)) *)
-            raise Not_constant
-        | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
+            Lconst
+              (Const_block
+                 ( runtime_tag,
+                   transl_record_shape shape,
+                   cl ))
+        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+            Lconst(match cl with [v] -> v | _ -> assert false)
+        | Record_float ->
+            Lconst(Const_float_block(List.map extract_float cl))
+        | Record_inlined (_, _, Variant_boxed _)
         | Record_ufloat ->
             (* CR layouts v5.1: We should support structured constants for
                blocks containing unboxed float literals.
             *)
             raise Not_constant
-        | Record_inlined (_, _, (Variant_extensible | Variant_with_null))
-        | Record_inlined ((Extension _ | Null), _, _) ->
+        | Record_inlined (_, _, (Variant_extensible | Variant_with_null)) ->
             raise Not_constant
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
@@ -2401,11 +2427,17 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lprim(Pmakeblock(0, mut,
                              Lambda.block_shape_of_value_kinds shape,
                              Option.get mode), ll, loc)
+        | Record_mixed shape ->
+            let shape = transl_record_shape shape in
+            Lprim(Pmakeblock(0, mut,
+                             shape,
+                             Option.get mode), ll, loc)
         | Record_inlined (Ordinary {runtime_tag},
-                          Constructor_uniform_value, Variant_boxed _) ->
-            let shape = List.map must_be_value shape in
+                          shape, Variant_boxed _)
+          when Mixed_product_bytes.types_shape_is_all_value shape ->
+            let shape = transl_record_shape shape in
             Lprim(Pmakeblock(runtime_tag, mut,
-                             Lambda.block_shape_of_value_kinds shape,
+                             shape,
                              Option.get mode), ll, loc)
         | Record_unboxed | Record_inlined (Ordinary _, _, Variant_unboxed) ->
             (match ll with [v] -> v | _ -> assert false)
@@ -2413,33 +2445,33 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lprim(Pmakefloatblock (mut, Option.get mode), ll, loc)
         | Record_ufloat ->
             Lprim(Pmakeufloatblock (mut, Option.get mode), ll, loc)
-        | Record_inlined (Extension _,
-                          Constructor_mixed _, Variant_extensible) ->
+        | Record_inlined (Extension _, shape, Variant_extensible)
+          when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
         | Record_inlined (Extension path,
-                          Constructor_uniform_value, Variant_extensible) ->
-            let shape = List.map must_be_value shape in
+                          shape, Variant_extensible) ->
+            let shape =
+              Array.append
+                [| Lambda.Value Lambda.generic_value |]
+                (transl_record_shape shape)
+            in
             let slot = transl_extension_path loc env path in
             Lprim(Pmakeblock(0,
                              mut,
-                             Lambda.block_shape_of_value_kinds
-                               (Lambda.generic_value :: shape),
+                             shape,
                              Option.get mode),
                   slot :: ll, loc)
         | Record_inlined (Extension _, _, (Variant_unboxed | Variant_boxed _))
         | Record_inlined (Ordinary _, _, Variant_extensible) ->
             assert false
-        | Record_mixed shape ->
-            let shape = Lambda.transl_mixed_product_shape shape in
-            Lprim (Pmakeblock (0, mut, shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
-                          Constructor_mixed shape, Variant_boxed _) ->
+                          shape, Variant_boxed _) ->
             (* CR layouts v5: once all-void records are allowed, handle
               constructors with all-void inline records, which are stored as
               immediates *)
-            let shape = Lambda.transl_mixed_product_shape shape in
+            let shape = transl_record_shape shape in
             Lprim (Pmakeblock (runtime_tag, mut, shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2579,6 +2611,11 @@ and transl_atomic_loc ~scopes arg arg_sort lbl repres =
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
   | Record_variable ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
+  | Record_inlined (_, shape,
+      (Variant_boxed _ | Variant_extensible | Variant_with_null))
+    when not (Types.mixed_product_shape_is_flat_all_value shape) ->
+      (* Atomic fields not allowed here *)
+      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat
     ->

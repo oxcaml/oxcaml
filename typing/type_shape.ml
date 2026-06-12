@@ -443,44 +443,22 @@ module Type_decl_shape = struct
           list
     in
     match (arg_layout : Types.cstr_layout), args with
-    | Cstr_layout_known { shape = constructor_repr; _ }, Some args ->
+    | Cstr_layout_known { shape = shapes; _ }, Some args ->
       let constructor_repr =
-        match (constructor_repr : Types.constructor_representation) with
-        | Constructor_mixed shapes ->
-          List.iter2
-            (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
-              let ly2 = mixed_block_shape_to_layout mix_shape in
-              if not (Layout.equal ly ly2)
+        List.iter2
+          (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
+            let ly2 = mixed_block_shape_to_layout mix_shape in
+            if not (Layout.equal ly ly2)
+            then
+              if !Clflags.dwarf_pedantic
               then
-                if !Clflags.dwarf_pedantic
-                then
-                  Misc.fatal_errorf_doc
-                    "Type_shape: variant constructor with mismatched layout, \
-                     has %a but expected %a"
-                    Layout.format ly Layout.format ly2
-                else ())
-            (Array.to_list shapes) args;
-          Array.map mixed_block_shape_to_layout shapes
-        | Constructor_uniform_value ->
-          let lys =
-            List.map
-              (fun { Shape.field_name = _; field_value = _, ly } ->
-                if
-                  not
-                    (Layout.equal ly (Layout.Base Scannable)
-                    || Layout.equal ly (Layout.Base Void))
-                then
-                  if !Clflags.dwarf_pedantic
-                  then
-                    Misc.fatal_errorf_doc
-                      "Type_shape: variant constructor with mismatched layout, \
-                       has %a but expected value or void."
-                      Layout.format ly
-                  else Layout.Base Scannable
-                else ly)
-              args
-          in
-          Array.of_list lys
+                Misc.fatal_errorf_doc
+                  "Type_shape: variant constructor with mismatched layout, has \
+                   %a but expected %a"
+                  Layout.format ly Layout.format ly2
+              else ())
+          (Array.to_list shapes) args;
+        Array.map mixed_block_shape_to_layout shapes
       in
       Some
         { Shape.name;

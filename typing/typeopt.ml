@@ -914,34 +914,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
-    let for_one_uniform_value_constructor fields ~field_to_type ~depth
-          ~num_nodes_visited =
-      let num_nodes_visited, shape =
-        List.fold_left_map
-          (fun num_nodes_visited field ->
-             let ty = field_to_type field in
-             let num_nodes_visited = num_nodes_visited + 1 in
-             value_kind env ~loc ~visited ~depth ~num_nodes_visited ty)
-          num_nodes_visited
-          fields
-      in
-      num_nodes_visited, Lambda.block_shape_of_value_kinds shape
-    in
     let for_one_constructor (constructor : Types.constructor_declaration)
           ~depth ~num_nodes_visited
-          ~(cstr_shape : Types.constructor_representation) =
+          ~(cstr_shape : Types.mixed_product_shape) =
       let num_nodes_visited = num_nodes_visited + 1 in
       match constructor.cd_args with
       | Cstr_tuple fields ->
         let field_to_type { Types.ca_type } = ca_type in
         let num_nodes_visited, fields =
-          match cstr_shape with
-          | Constructor_uniform_value ->
-              for_one_uniform_value_constructor fields ~field_to_type
-                ~depth ~num_nodes_visited
-          | Constructor_mixed shape ->
-              value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-                ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+            ~shape:cstr_shape (List.map (fun f -> Some (field_to_type f))
+            fields)
         in
         (false, num_nodes_visited), fields
       | Cstr_record labels ->
@@ -953,13 +936,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
             labels
         in
         let num_nodes_visited, fields =
-          match cstr_shape with
-          | Constructor_uniform_value ->
-              for_one_uniform_value_constructor labels ~field_to_type
-                ~depth ~num_nodes_visited
-          | Constructor_mixed shape ->
-              value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-                ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+            ~shape:cstr_shape
+            (List.map (fun f -> Some (field_to_type f)) labels)
         in
         (is_mutable, num_nodes_visited), fields
     in
@@ -978,8 +957,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     in
     let rec mixed_block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
-    and mixed_block_element_is_empty (element : _ block_element) =
+    and mixed_block_element_is_empty (element : mixed_block_element) =
       match element with
+      | Void -> true
       | Product shape -> mixed_block_shape_is_empty shape
       | _ -> false
     in
@@ -1002,7 +982,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                     ~cstr_shape
                 in
                 if is_mutable then None
-                else if mixed_block_shape_is_empty fields then
+                else if mixed_block_shape_is_empty cstr_shape then
                   let consts = next_const :: consts in
                   Some (num_nodes_visited,
                         next_const + 1, consts, next_tag, non_consts)
@@ -1059,7 +1039,6 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed | Record_dummy _ | Record_variable ->
               (* The outer match guards against this *)
               assert false
-          | Record_inlined (_, Constructor_uniform_value, _)
           | Record_boxed | Record_float | Record_ufloat ->
               let num_nodes_visited, fields =
                 List.fold_left_map
@@ -1086,7 +1065,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                   num_nodes_visited labels
               in
               num_nodes_visited, Lambda.block_shape_of_value_kinds fields
-          | Record_inlined (_, Constructor_mixed shape, _)
+          | Record_inlined (_, shape, _)
           | Record_mixed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in
             value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited

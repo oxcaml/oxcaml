@@ -788,15 +788,12 @@ let rec expression : Typedtree.expression -> term_judg =
         | Variant_unboxed | Variant_with_null ->
           Return
         | Variant_boxed _ | Variant_extensible ->
-           (match shape with
-            | Constructor_uniform_value -> Guard
-            | Constructor_mixed mixed_shape ->
-                (match mixed_shape.(i) with
-                 | Scannable _ | Float_boxed -> Guard
-                 | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-                 | Void | Product _ ->
-                   Dereference))
+          (match shape.(i) with
+           | Scannable _ | Float_boxed -> Guard
+           | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+           | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+           | Void | Product _ ->
+             Dereference)
       in
       let arg i (_sort, e) = expression e << arg_mode i in
       join [
@@ -815,9 +812,8 @@ let rec expression : Typedtree.expression -> term_judg =
         let field_mode i = match rep with
           | Record_float | Record_ufloat -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
-          | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
-              Guard
-          | Record_inlined (_, Constructor_mixed mixed_shape, _)
+          | Record_boxed -> Guard
+          | Record_inlined (_, mixed_shape, _)
           | Record_mixed mixed_shape ->
             (match mixed_shape.(i) with
              | Scannable _ | Float_boxed -> Guard

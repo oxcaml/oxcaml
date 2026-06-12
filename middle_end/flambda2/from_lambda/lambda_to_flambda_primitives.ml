@@ -2081,43 +2081,43 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
-      | Record_float | Record_ufloat ->
-        Naked_floats
-          { length = Target_ocaml_int.of_int machine_width num_fields }
-      | Record_inlined
-          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
-        when Mixed_product_bytes.types_shape_is_all_value shape ->
-        Values
-          { tag = Tag.Scannable.create_exn runtime_tag;
-            length = Target_ocaml_int.of_int machine_width num_fields
-          }
       | Record_mixed shape
         when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
-      | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
-      | Record_inlined
-          ( Ordinary { runtime_tag; _ },
-            Constructor_uniform_value,
-            Variant_boxed _ ) ->
+      | Record_mixed _ -> Mixed
+      | Record_float | Record_ufloat ->
+        Naked_floats
+          { length = Target_ocaml_int.of_int machine_width num_fields }
+      | Record_inlined (Ordinary { runtime_tag; _ }, shape, Variant_boxed _)
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
-      | Record_inlined (Extension _, shape, Variant_extensible) -> (
-        match shape with
-        | Constructor_uniform_value ->
-          Values
-            { tag = Tag.Scannable.zero;
-              (* The "+1" is because there is an extra field containing the
-                 hashed constructor. *)
-              length = Target_ocaml_int.of_int machine_width (num_fields + 1)
-            }
-        | Constructor_mixed _ ->
-          (* CR layouts v5.9: support this *)
-          Misc.fatal_error "Mixed blocks extensible variants are not supported")
+      | Record_inlined (_, shape, Variant_extensible)
+        when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
+        (* CR layouts v5.9: support this *)
+        Misc.fatal_error
+          "Pduprecord: mixed inlined records are not supported for extensible \
+           variants"
+      | Record_inlined (_, shape, _)
+        when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
+        Mixed
+      | Record_inlined (Ordinary { runtime_tag; _ }, _, Variant_boxed _) ->
+        Values
+          { tag = Tag.Scannable.create_exn runtime_tag;
+            length = Target_ocaml_int.of_int machine_width num_fields
+          }
+      | Record_inlined (Extension _, _, Variant_extensible) ->
+        Values
+          { tag = Tag.Scannable.zero;
+            (* The "+1" is because there is an extra field containing the hashed
+               constructor. *)
+            length = Target_ocaml_int.of_int machine_width (num_fields + 1)
+          }
       | Record_inlined (Extension _, _, _)
       | Record_inlined
           ( Ordinary _,

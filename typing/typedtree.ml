@@ -216,7 +216,7 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_construct :
       Longident.t loc * constructor_description *
-        Types.constructor_representation *
+        Types.mixed_product_shape *
         (Jkind.sort * value general_pattern) list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
@@ -307,7 +307,7 @@ and expression_desc =
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
-      Longident.t loc * constructor_description * constructor_representation *
+      Longident.t loc * constructor_description * mixed_product_shape *
       (Jkind.sort * expression) list * alloc_mode option
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {

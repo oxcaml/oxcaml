@@ -157,7 +157,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Cstr_tuple [{ ca_sort = Some sort }]
       | Cstr_record [{ ld_sort = Some sort }] ->
         [| Cstr_layout_known
-             { shape = Constructor_uniform_value; sorts = [| sort |] } |],
+             { shape = [| mixed_block_element_of_const_sort sort |];
+               sorts = [| sort |] } |],
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
@@ -172,11 +173,12 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         match classify_variant_with_null_constructor cstr with
         | Variant_with_null_nullary ->
           Cstr_layout_known
-            { shape = Constructor_uniform_value; sorts = [| |] }
+            { shape = [| |]; sorts = [| |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
           Cstr_layout_known
-            { shape = Constructor_uniform_value; sorts = [| sort |] }
+            { shape = [| mixed_block_element_of_const_sort sort |];
+              sorts = [| sort |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = None; _ }; _ } ->
           (* Sort may be [None] during the recursive-decl temp-env phase

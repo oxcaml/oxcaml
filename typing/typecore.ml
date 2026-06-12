@@ -1057,7 +1057,7 @@ let mkexp exp_desc exp_type exp_loc exp_env =
 let type_option_none env ty loc =
   let lid = Longident.Lident "None" in
   let cnone = Env.find_ident_constructor Predef.ident_none env in
-  let repres = Types.Constructor_uniform_value in
+  let repres = [||] in
   mkexp (Texp_construct (mknoloc lid, cnone, repres, [], None)) ty loc env
 
 let extract_option_type env ty =
@@ -9814,7 +9814,7 @@ and type_option_some env expected_mode sarg ty ty0 =
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
   let sort = Jkind.Sort.scannable in
-  let repres = Types.Constructor_uniform_value in
+  let repres = [| Scannable Jkind_types.Scannable_axes.max |] in
   mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
                         Some alloc_mode))
     (type_option arg.exp_type) arg.exp_loc arg.exp_env
@@ -10475,7 +10475,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
           let dummy_repres =
             (* This shouldn't be used anywhere, so make it highly unlikely to be
                accidentally correct *)
-            Types.Constructor_mixed [| Float32 |]
+            [| Float32 |]
           in
           let texp =
             re {

@@ -49,9 +49,9 @@ let code inline(never) loopify(never) size(160) newer_version_of(f_0)
                   | 0 -> k2
                   | 1 -> k5
               where k5 =
-                let Pfield = %block_load.[`0`] (`*match*_1`) in
+                let Pfield = %block_load.`imm`.[`0`] (`*match*_1`) in
                 let Popaque = %opaque (Pfield) in
-                let Pfield_1 = %block_load.[`0`] (`*match*`) in
+                let Pfield_1 = %block_load.`imm`.[`0`] (`*match*`) in
                 let Popaque_1 = %opaque (Pfield_1) in
                 let Pmakeblock = %block.[`0`] (Popaque_1, Popaque) in
                 let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
@@ -67,12 +67,12 @@ let code inline(never) loopify(never) size(160) newer_version_of(f_0)
                   | 0 -> k4
                   | 1 -> k2
               where k4 =
-                let Pfield = %block_load.[`1`] (`*match*_1`) in
-                let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
+                let Pfield = %block_load.`imm`.[`1`] (`*match*_1`) in
+                let Pfield_1 = %block_load.`imm`.[`0`] (`*match*_1`) in
                 let int_add = %int_barith.add (Pfield_1, Pfield) in
                 let Popaque = %opaque (int_add) in
-                let Pfield_2 = %block_load.[`1`] (`*match*`) in
-                let Pfield_3 = %block_load.[`0`] (`*match*`) in
+                let Pfield_2 = %block_load.`imm`.[`1`] (`*match*`) in
+                let Pfield_3 = %block_load.`imm`.[`0`] (`*match*`) in
                 let int_add_1 = %int_barith.add (Pfield_3, Pfield_2) in
                 let Popaque_1 = %opaque (int_add_1) in
                 let Pmakeblock = %block.[`0`] (Popaque_1, Popaque) in

@@ -731,24 +731,19 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             in
             let rep =
               match rep with
-              | Record_inlined (_, Constructor_mixed _,
-                                Variant_unboxed) ->
-                  Misc.fatal_error
-                    "a 'mixed' unboxed record is impossible"
-              | Record_inlined (_, Constructor_uniform_value,
-                                Variant_unboxed)
+              | Record_inlined (_, _, Variant_unboxed)
               | Record_unboxed
                   -> Outval_record_unboxed
               | Record_boxed | Record_float | Record_ufloat
-              | Record_inlined (_, Constructor_uniform_value, _)
                   -> Outval_record_boxed
-              | Record_inlined (_, Constructor_mixed mixed, _)
-              | Record_mixed mixed
+              | Record_inlined (_, shape, _)
+              | Record_mixed shape
                   ->
                     (* Mixed records are only represented as
                        mixed blocks in native code. *)
-                    if !Clflags.native_code
-                    then Outval_record_mixed_block mixed
+                    if !Clflags.native_code &&
+                      not (Types.mixed_product_shape_is_flat_all_value shape)
+                    then Outval_record_mixed_block shape
                     else Outval_record_boxed
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"

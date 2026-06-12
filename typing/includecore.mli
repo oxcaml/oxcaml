@@ -108,7 +108,7 @@ type extension_constructor_mismatch =
                             * extension_constructor
                             * constructor_mismatch
 type variant_change =
-  (Types.constructor_declaration * Types.constructor_representation option
+  (Types.constructor_declaration * Types.mixed_product_shape option
      as 'cd,
    'cd, constructor_mismatch)
     Diffing_with_keys.change

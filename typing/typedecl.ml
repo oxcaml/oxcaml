@@ -1124,7 +1124,9 @@ let transl_declaration env sdecl (id, uid) =
                      | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                    in
                    Cstr_layout_known
-                     { shape = Constructor_uniform_value; sorts })
+                     { shape =
+                        Array.map Types.mixed_block_element_of_const_sort sorts;
+                       sorts })
                 (Array.of_list cstrs)
             ),
           Jkind.for_non_float ~why:Boxed_variant
@@ -1971,24 +1973,18 @@ module Element_repr = struct
       Option.bind layout layout_to_t
 
   let mixed_product_shape_known loc ts kind =
-    let mixed =
-      List.exists
-        (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
+    let shape =
+      List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
     in
-    if not mixed then `Not_mixed else begin
-      let shape =
-        List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
-      in
-      (* All-value/void shapes will compile to uniform blocks, so the
-         scannable prefix length limit doesn't apply. *)
-      let mpb = Mixed_product_bytes.count_types_shape shape in
-      if not (Mixed_product_bytes.all_value mpb)
-      then
-        assert_mixed_product_support loc kind
-          ~value_prefix_len:
-            (Mixed_product_bytes.value_prefix_len mpb);
-      `Mixed shape
-    end
+    (* All-value/void shapes will compile to uniform blocks, so the
+        scannable prefix length limit doesn't apply. *)
+    let mpb = Mixed_product_bytes.count_types_shape shape in
+    if not (Mixed_product_bytes.all_value mpb)
+    then
+      assert_mixed_product_support loc kind
+        ~value_prefix_len:
+          (Mixed_product_bytes.value_prefix_len mpb);
+    shape
 
   type unrepresentable_element =
     Unrepresentable_element of int
@@ -2041,7 +2037,7 @@ let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
   =
-  let flat_suffix =
+  let shape =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
@@ -2066,16 +2062,17 @@ let update_constructor_representation
              let bad_field = List.nth fields i in
              Unrepresentable_argument_field (Ident.name bad_field.ld_id))
   in
-  match flat_suffix with
+  match shape with
   | Error e -> Result.Error e
-  | Ok `Not_mixed -> Ok Constructor_uniform_value
-  | Ok (`Mixed shape) ->
+  | Ok shape ->
       (* CR layouts v5.9: Enable extension constructors in the flambda2
          middle-end so that we can permit them in the source language.
       *)
-      if is_extension_constructor then
+      if is_extension_constructor &&
+        not (Types.mixed_product_shape_is_flat_all_value shape)
+      then
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
-      Ok (Constructor_mixed shape)
+      Ok shape
 
 type unrepresentable_record =
   | Unrepresentable_field of string
@@ -2097,8 +2094,8 @@ let compute_record_repr
     in
     let shape =
       match shape with
-      | Ok (`Mixed x) -> x
-      | Ok `Not_mixed | Error _ -> Misc.fatal_error "expected mixed block"
+      | Ok x -> x
+      | Error _ -> Misc.fatal_error "expected mixed block"
     in
     Ok (Record_mixed shape)
   in

@@ -104,7 +104,7 @@ type unrepresentable_constructor =
 val update_constructor_representation:
     Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
     loc:Location.t -> is_extension_constructor:bool ->
-    (Types.constructor_representation, unrepresentable_constructor) Result.t
+    (Types.mixed_product_shape, unrepresentable_constructor) Result.t
 
 type unrepresentable_record =
   | Unrepresentable_field of string

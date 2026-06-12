@@ -37,7 +37,7 @@ let dummy_scannable_sort = Jkind.Sort.scannable
 
 let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
 
-let dummy_ctor_repres = Constructor_uniform_value
+let dummy_ctor_repres = [||]
 
 let dummy_record_repres = Record_boxed
 
@@ -82,7 +82,7 @@ let mkTexp_tuple ?id exps =
   let exps = List.combine labels exps in
   Texp_tuple (exps, alloc)
 
-type texp_construct_identifier = alloc_mode option * constructor_representation
+type texp_construct_identifier = alloc_mode option * mixed_product_shape
 
 type texp_construct_arg_identifier = Jkind.Sort.t
 
@@ -392,7 +392,7 @@ let mkTpat_tuple ?id pats =
   in
   Tpat_tuple (List.combine labels pats)
 
-type tpat_construct_identifier = constructor_representation
+type tpat_construct_identifier = mixed_product_shape
 
 type value_binding_identifier = Jkind.Sort.t
 
@@ -516,7 +516,7 @@ let option_of_arg_or_omitted arg =
 let mk_constructor_description cstr_name =
   { Data_types.cstr_name;
     cstr_res = Btype.newty2 ~level:0 (mkTvar (Some "a"));
-    cstr_shape = Some Constructor_uniform_value;
+    cstr_shape = Some [||];
     cstr_existentials = [];
     cstr_args = [];
     cstr_arity = 0;

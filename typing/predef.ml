@@ -704,7 +704,8 @@ let decl_of_type_constr tconstr =
       in
       match sorts with
       | Some sorts ->
-        Cstr_layout_known { shape = Constructor_uniform_value; sorts }
+        Cstr_layout_known
+          { shape = Array.map mixed_block_element_of_const_sort sorts; sorts }
       | None -> Cstr_layout_variable
     in
     Type_variant (
@@ -1054,6 +1055,11 @@ let build_initial_env add_type add_extension add_jkind empty_env =
               Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
         | Univar _ | Genvar _ | Product _ -> raise_error ())
       l;
+    let ext_shape =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, sort) -> mixed_block_element_of_const_sort sort)
+        l
+    in
     add_extension id
       { ext_type_path = path_exn;
         ext_type_params = [];
@@ -1070,7 +1076,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                   ca_loc=Location.none
                 })
               l);
-        ext_shape = Constructor_uniform_value;
+        ext_shape;
         ext_constant = l = [];
         ext_ret_type = None;
         ext_private = Asttypes.Public;

@@ -391,7 +391,7 @@ type private_object_mismatch =
   | Types of Errortrace.equality_error
 
 type variant_change =
-  (Types.constructor_declaration * Types.constructor_representation option
+  (Types.constructor_declaration * Types.mixed_product_shape option
      as 'cd,
    'cd, constructor_mismatch)
     Diffing_with_keys.change
@@ -1162,8 +1162,8 @@ module Variant_diffing = struct
 
   let compare_constructor_shapes
         ~loc:_ _env
-        (shape1 : constructor_representation option)
-        (shape2 : constructor_representation option)
+        (shape1 : mixed_product_shape option)
+        (shape2 : mixed_product_shape option)
       : constructor_mismatch option =
     match shape1, shape2 with
     | None, None -> None
@@ -1223,7 +1223,7 @@ module Variant_diffing = struct
 
   module Defs = struct
     type left =
-      Types.constructor_declaration * constructor_representation option
+      Types.constructor_declaration * mixed_product_shape option
     type right = left
     type diff = constructor_mismatch
     type state = type_expr list * type_expr list

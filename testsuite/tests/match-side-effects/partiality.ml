@@ -192,7 +192,8 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
   (test/0 =
      (function {nlocal = 0}
        param/0[value<(consts (0)) (non_consts ([0: (?)]))>] : int
-       (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
+       (if param/0 (field_imm 0 (value_or_null<int>) (field_imm 0 param/0))
+         0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
 |}]
@@ -214,7 +215,8 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
   (test/1 =
      (function {nlocal = 0} param/1 : int
        (let (*match*/8 =o? (field_mut 0 param/1))
-         (if *match*/8 (field_imm 0 (field_imm 0 *match*/8)) 0))))
+         (if *match*/8
+           (field_imm 0 (value_or_null<int>) (field_imm 0 *match*/8)) 0))))
   (apply (field_imm 1 (global Toploop!)) "test" test/1))
 val test : int t option ref -> int = <fun>
 |}]
@@ -255,13 +257,17 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
                                       (consts ())
                                        (non_consts ([1: (value<int>)]
                                        [0: (value<int>)]))>)
-                  (makelocalmutable 0 (value<int>) 1) [0: 42])))
+                  (makelocalmutable 0 (value<int>) 1)
+                  [0: (shape (value<int>)) 42])))
            (if *match*/9
              (let
                (*match*/10 =a? (field_imm 0 *match*/9)
                 *match*/11 =o? (field_mut 0 (field_imm 0 *match*/10)))
-               (if *match*/11 (field_imm 0 (field_imm 1 *match*/10))
-                 (%int_neg (field_imm 0 (field_imm 1 *match*/10)))))
+               (if *match*/11
+                 (field_imm 0 (value_or_null<int>) (field_imm 1 *match*/10))
+                 (%int_neg
+                   (field_imm 0 (value_or_null<int>)
+                     (field_imm 1 *match*/10)))))
              3)))))
   (apply (field_imm 1 (global Toploop!)) "test" test/2))
 val test : 'a -> int = <fun>
@@ -449,8 +455,9 @@ type t = A of int | B of string | C of string | D of string
           case tag 0:
            (switch t2/0
             case tag 0:
-             (apply (field_imm 8 (global Stdlib__Int!)) (field_imm 0 t1/0)
-               (field_imm 0 t2/0))
+             (apply (field_imm 8 (global Stdlib__Int!))
+               (field_imm 0 (value_or_null<int>) t1/0)
+               (field_imm 0 (value_or_null<int>) t2/0))
             default: -1)
           case tag 1:
            (catch

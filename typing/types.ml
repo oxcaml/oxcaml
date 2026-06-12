@@ -516,7 +516,7 @@ and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
-  | Record_inlined of tag * constructor_representation * variant_representation
+  | Record_inlined of tag * mixed_product_shape * variant_representation
   | Record_boxed
   | Record_float
   | Record_ufloat
@@ -536,14 +536,10 @@ and variant_representation =
 
 and cstr_layout =
   | Cstr_layout_known of
-      { shape : constructor_representation;
+      { shape : mixed_product_shape;
         sorts : Jkind_types.Sort.Const.t array;
       }
   | Cstr_layout_variable
-
-and constructor_representation =
-  | Constructor_uniform_value
-  | Constructor_mixed of mixed_product_shape
 
 and label_declaration =
   {
@@ -583,7 +579,7 @@ type extension_constructor =
   { ext_type_path: Path.t;
     ext_type_params: type_expr list;
     ext_args: constructor_arguments;
-    ext_shape: constructor_representation;
+    ext_shape: mixed_product_shape;
     ext_constant: bool;
     ext_ret_type: type_expr option;
     ext_private: private_flag;
@@ -929,12 +925,12 @@ let rec compare_mixed_block_element e1 e2 =
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
 
-let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
-  match r1, r2 with
-  | Constructor_uniform_value, Constructor_uniform_value -> true
-  | Constructor_mixed mx1, Constructor_mixed mx2 ->
-      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
+let mixed_product_shape_is_flat_all_value =
+  Array.for_all (function
+    | Scannable _ -> true
+    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Word | Untagged_immediate | Vec128 | Vec256 | Vec512 | Product _ | Void
+      -> false)
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
@@ -946,7 +942,7 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
            | Cstr_layout_variable, Cstr_layout_variable -> true
            | Cstr_layout_known { shape = s1; sorts = ss1 },
              Cstr_layout_known { shape = s2; sorts = ss2 } ->
-             equal_constructor_representation_up_to_scannable_axes s1 s2
+             equal_mixed_product_shape_up_to_scannable_axes s1 s2
              && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
            | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
         layouts1
@@ -960,11 +956,11 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
 let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
-  | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
+  | Record_inlined (tag1, shp1, vr1), Record_inlined (tag2, shp2, vr2) ->
       (* Equality of tag and variant representation imply equality of
          constructor representation. *)
-      ignore (cr1 : constructor_representation);
-      ignore (cr2 : constructor_representation);
+      ignore (shp1 : mixed_product_shape);
+      ignore (shp2 : mixed_product_shape);
       equal_tag tag1 tag2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
