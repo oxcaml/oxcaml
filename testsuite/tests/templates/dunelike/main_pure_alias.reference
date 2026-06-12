@@ -1,0 +1,4 @@
+File "main_pure_alias.ml", line 11, characters 24-53:
+11 | let () = print_endline (Inst.Pure_alias.Message.hello (P_int.create ()))
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The module "Inst.Pure_alias.Message" is an alias for module "Module_alias_pruned", which is missing

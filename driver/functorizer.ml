@@ -108,7 +108,10 @@ type rev_bundle = bundle_module list
 
 module Bindings = Misc.Stdlib.String.Map
 
-type bindings = Ident.t Bindings.t
+type bindings = Ident.t option Bindings.t
+(** Maps a globally-named compunit to the Local Ident it is bound to, or to
+    [None] while that module is *in progress* (on the [insert_module] recursion
+    stack) — used to detect circular dependencies. *)
 
 let empty_rev_bundle : rev_bundle = []
 let empty_bindings : bindings = Bindings.empty
@@ -124,6 +127,16 @@ let classify_cmi (loaded : Persistent_env.loaded_cmi) =
   match loaded.cu with
   | None -> `Parameter
   | Some _ -> if loaded.params = [] then `Plain else `Parameterised
+
+(* Sentinel target for pruned references.  Approximate [cmi_globals] edges (and,
+   defensively, any edge that closes a recursion cycle) are rewritten to this
+   fake global rather than bound to a bundle-local module.  It has no cmi file,
+   so an *unused* alias to it is harmless (just warning 49), but any attempt to
+   actually project a type through it fails with a clear error rather than the
+   silent dangling abstract type produced by a forward reference into a
+   not-yet-defined bundle module. *)
+let pruned_module_ident =
+  Ident.create_global (GM.Name.create_no_args "Module_alias_pruned")
 
 (* Insert [swg] into [rev_bundle] as a module declaration named [name].
 
@@ -151,38 +164,70 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~rev_bundle
   if Bindings.mem name bindings then
     Misc.fatal_errorf "Functorizer.insert_module: %s already in bundle" name;
   let new_id = Ident.create_local name in
-  let bindings = Bindings.add name new_id bindings in
+  (* Mark [name] as *in progress* ([None]) before walking its [bound_globals],
+     so that an edge leading back to a module still on the recursion stack is
+     recognised as a cycle and pruned (see [process_bound]) rather than bound to
+     a not-yet-defined bundle-local module.  Once fully built below, the entry
+     is replaced with [Some new_id]. *)
+  let bindings = Bindings.add name None bindings in
   let loaded = load_cmi name in
   (* Walk [bound_globals], collecting each head's Local Ident into [subst].
      For not-yet-known heads, recursively insert (parameterised) or skip
      (plain).  Parameter compunits must be pre-registered by the caller. *)
-  let add_subst_entry head id subst =
-    let name_id = Ident.create_global (GM.Name.create_no_args head) in
+  let add_subst_entry (name : GM.Name.t) id subst =
+    let name_id = Ident.create_global name in
     Subst.add_module name_id (Path.Pident id) subst
   in
+  let add_subst_entry_pruned (name : GM.Name.t) subst =
+    let name_id = Ident.create_global name in
+    Subst.add_module name_id (Path.Pident pruned_module_ident) subst
+  in
   let process_bound (subst, rev_bundle, bindings)
-      ((gm, _prec) : GM.With_precision.t) =
+      ((gm, prec) : GM.With_precision.t) =
     let head = gm.GM.head in
-    match Bindings.find_opt head bindings with
-    | Some id -> (add_subst_entry head id subst, rev_bundle, bindings)
-    | None -> (
-        let loaded = load_cmi head in
-        match classify_cmi loaded with
-        | `Plain ->
-            (* Leave as global; no subst entry. *)
-            (subst, rev_bundle, bindings)
-        | `Parameter ->
+    let name = GM.Name.create_no_args head in
+    match prec with
+    | GM.Precision.Approximate ->
+        (* Prune every approximate edge to the [Module_alias_pruned] sentinel.
+           Approximate [cmi_globals] entries are [-no-alias-deps]
+           over-approximations ("this wrapper sibling is in scope") rather than
+           precise uses; descending through them pulls the whole complete graph
+           of siblings into the bundle in an arbitrary order and yields dangling
+           forward references.  An unused pruned alias is harmless; an actual
+           projection through one fails with a clear error. *)
+        (add_subst_entry_pruned name subst, rev_bundle, bindings)
+    | GM.Precision.Exact -> (
+        match Bindings.find_opt head bindings with
+        | Some (Some id) -> (add_subst_entry name id subst, rev_bundle, bindings)
+        | Some None ->
+            (* [head] is still in progress on the recursion stack, i.e. an exact
+               edge closes a cycle.  Exact edges point backwards in compilation
+               order, so the exact-dependency subgraph is acyclic and this
+               cannot arise; fail loudly rather than silently prune (which would
+               yield a subtly truncated bundle) if the invariant is ever
+               violated. *)
             Misc.fatal_errorf
-              "Functorizer.insert_module: parameter %s not pre-registered in \
-               bindings (the caller must add parameters before calling \
-               insert_module)"
+              "Functorizer.insert_module: exact dependency cycle through %s \
+               (exact edges should form a DAG)"
               head
-        | `Parameterised ->
-            let id, rev_bundle, bindings =
-              insert_module ~name:head loaded.sign_with_globals ~rev_bundle
-                ~bindings
-            in
-            (add_subst_entry head id subst, rev_bundle, bindings))
+        | None -> (
+            let loaded = load_cmi head in
+            match classify_cmi loaded with
+            | `Plain ->
+                (* Leave as global; no subst entry. *)
+                (subst, rev_bundle, bindings)
+            | `Parameter ->
+                Misc.fatal_errorf
+                  "Functorizer.insert_module: parameter %s not pre-registered \
+                   in bindings (the caller must add parameters before calling \
+                   insert_module)"
+                  head
+            | `Parameterised ->
+                let id, rev_bundle, bindings =
+                  insert_module ~name:head loaded.sign_with_globals ~rev_bundle
+                    ~bindings
+                in
+                (add_subst_entry name id subst, rev_bundle, bindings)))
   in
   let subst, rev_bundle, bindings =
     Array.fold_left process_bound
@@ -197,13 +242,16 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~rev_bundle
       (fun subst p ->
         let p_name = GM.Parameter_name.to_string p in
         match Bindings.find_opt p_name bindings with
-        | None -> subst
-        | Some id -> add_subst_entry p_name id subst)
+        | Some (Some id) ->
+            add_subst_entry (GM.Name.create_no_args p_name) id subst
+        | Some None | None -> subst)
       subst loaded.params
   in
   let sign_lazy, _staticity = swg.sign in
   let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
   let sign = Subst.Lazy.force_signature sign_lazy in
+  (* [name] is now fully built: replace the in-progress [None] with its Ident. *)
+  let bindings = Bindings.add name (Some new_id) bindings in
   let rev_bundle = { bm_id = new_id; bm_sign = sign } :: rev_bundle in
   (new_id, rev_bundle, bindings)
 
@@ -219,8 +267,8 @@ let rec insert_module ~name (swg : Signature_with_global_bindings.t) ~rev_bundle
 let rec insert_instantiation ~name ~find_impl_unit_info_by_name ~instantiations
     ~bindings =
   match Bindings.find_opt name bindings with
-  | Some id -> (id, instantiations, bindings)
-  | None ->
+  | Some (Some id) -> (id, instantiations, bindings)
+  | None | Some None ->
       let impl =
         try find_impl_unit_info_by_name name
         with Not_found ->
@@ -228,7 +276,7 @@ let rec insert_instantiation ~name ~find_impl_unit_info_by_name ~instantiations
             "Cannot find impl for module '%s'." name
       in
       let new_id = Ident.create_local (name ^ "__block") in
-      let bindings = Bindings.add name new_id bindings in
+      let bindings = Bindings.add name (Some new_id) bindings in
       let runtime_params =
         match impl.ui_format with
         | Mb_struct _ -> []
@@ -249,8 +297,8 @@ let rec insert_instantiation ~name ~find_impl_unit_info_by_name ~instantiations
       in
       let resolve_lvar head =
         match Bindings.find_opt head bindings with
-        | Some id -> id
-        | None ->
+        | Some (Some id) -> id
+        | None | Some None ->
             Misc.fatal_errorf "insert_instantiation: %s not in bindings" head
       in
       let args =
@@ -310,7 +358,7 @@ let compute_bundle_sig (src_infos : intf_unit_info list) : bundle_sig =
   in
   let initial_bindings =
     List.fold_left
-      (fun bindings id -> Bindings.add (Ident.name id) id bindings)
+      (fun bindings id -> Bindings.add (Ident.name id) (Some id) bindings)
       empty_bindings param_ids
   in
   let rev_bundle, _bindings =
@@ -555,7 +603,7 @@ let functorize_impl_with ~initial_env ~(info : Compile_common.info) ~input_files
     in
     let initial_bindings =
       List.fold_left2
-        (fun bindings gm id -> Bindings.add gm.GM.head id bindings)
+        (fun bindings gm id -> Bindings.add gm.GM.head (Some id) bindings)
         empty_bindings all_params param_idents
     in
     (* Locate each module's impl: from [src_impls] (a user-provided input) by

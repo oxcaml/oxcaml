@@ -16,7 +16,7 @@
    main_functorize_type_share.ml \
    message.mli message.ml with_message.ml pure_alias.ml \
    main_pure_alias.ml \
-   test_functorize_pure_alias.reference \
+   main_pure_alias.reference \
    plain.mli plain.ml uses_plain.ml main_uses_plain.ml \
    test_functorize_uses_plain.reference \
    bad_non_param_input.reference \
@@ -599,36 +599,22 @@
    all_modules = "pure_alias/pure_alias.cmo";
    ocamlc.byte;
 
-   (* Consumer: apply the bundle's functor and access values through both
-      the direct path ([Inst.Message]) and the alias chain
-      ([Inst.Pure_alias.Message]).  Pre-path-compression, the alias chain
-      failed because the saved bundle's signature treated the alias target
-      as a global reference. *)
+   (* Consumer: with prune-all-approx, [pure_alias]'s [module Message = Message]
+      is an Approximate [cmi_globals] edge, so functorize rewrites it to the
+      [Module_alias_pruned] sentinel instead of bundling [Message].  Accessing
+      it through the bundle therefore fails to compile: the sentinel module is
+      missing.  Pins down that an approximate sibling alias is intentionally not
+      carried through functorization. *)
+   {
+     flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
+     module = "main_pure_alias.ml";
+     ocamlc_byte_exit_status = "2";
+     compiler_output = "main_pure_alias.output";
+     ocamlc.byte;
 
-   flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
-   module = "main_pure_alias.ml";
-   ocamlc.byte;
-
-   flags = "";
-   module = "";
-   program = "$test_build_directory/test_functorize_pure_alias.bc";
-   all_modules = "\
-     message/message.cmo \
-     pure_alias/pure_alias.cmo \
-     p_int/p_int__.cmo \
-     p_int/p_int.cmo \
-     bundle_pure_alias/bundle_pure_alias.cmo \
-     main_pure_alias.cmo \
-   ";
-   ocamlc.byte;
-
-   stdout = "test_functorize_pure_alias.output";
-   stderr = "test_functorize_pure_alias.output";
-   output = "test_functorize_pure_alias.output";
-   run;
-
-   reference = "test_functorize_pure_alias.reference";
-   check-program-output;
+     compiler_reference = "main_pure_alias.reference";
+     check-ocamlc.byte-output;
+   }
  }
 
  {

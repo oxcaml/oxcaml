@@ -66,12 +66,13 @@ type rev_bundle = bundle_module list
 
 module Bindings : Map.S with type key = string
 
-type bindings = Ident.t Bindings.t
+type bindings = Ident.t option Bindings.t
 (** Records, for every globally-named compunit already accounted for, the Local
-    Ident it is bound to — either a functor parameter or a bundled module. Plain
-    (non-parameterised) compunits never go into the bundle and so never appear
-    here; they remain global references at link time. Parameter declaration
-    order is the caller's responsibility. *)
+    Ident it is bound to — either a functor parameter or a bundled module — or
+    [None] while that module is still in progress on the [insert_module]
+    recursion stack. Plain (non-parameterised) compunits never go into the
+    bundle and so never appear here; they remain global references at link time.
+    Parameter declaration order is the caller's responsibility. *)
 
 val empty_rev_bundle : rev_bundle
 val empty_bindings : bindings
